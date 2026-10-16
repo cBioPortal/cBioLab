@@ -94,9 +94,12 @@ async function labRaces(browser, ok, BASE) {
       const onFail = (r) => { if (r.url().includes("/api/analysis")) failed++; };
       page.on("request", onReq); page.on("response", onRes); page.on("requestfailed", onFail);
       await page.locator(".viewcard .genesbtn").first().click();
-      const pills = await page.locator("[role=dialog].genedialog [data-slot=badge]", { hasText: "TP53" }).count();
-      await page.locator("[role=dialog].genedialog [data-slot=badge]", { hasText: "TP53" }).click(); // re-runs this view
-      await page.locator("[role=dialog].genedialog").getByRole("button", { name: "Done" }).click();
+      const dlg = page.locator("[role=dialog].gene-query-dialog");
+      const listed = await dlg.locator("textarea").inputValue();
+      const pills = listed.split(/\s+/).filter((g) => g === "TP53").length;
+      await dlg.locator("textarea").fill(listed.split(/\s+/).filter((g) => g && g !== "TP53").join(" "));
+      await page.waitForFunction(() => { const b = [...document.querySelectorAll("[role=dialog].gene-query-dialog button")].find((x) => x.textContent === "Apply"); return b && !b.disabled; }, null, { timeout: 60000 });
+      await dlg.getByRole("button", { name: "Apply" }).click(); // re-runs this view
       await until(async () => !(await genesOf()).includes("TP53"), "the re-run without TP53", 60000).catch(() => {});
       const after = await genesOf();
       // on a failure, whether the edit reached the document says which half went wrong; a further
@@ -120,12 +123,11 @@ async function labRaces(browser, ok, BASE) {
     //    inside the page component would be a new component every render, and lose it.
     {
       await page.locator(".viewcard .genesbtn").first().click();
-      const input = page.locator("[role=dialog].genedialog input[placeholder='add a gene…']");
+      const input = page.locator("[role=dialog].gene-query-dialog input[aria-label='search genes']");
       await input.click();
       await input.type("BRC");
       await tool(page, "analysis_set_details", { notes: "re-render while typing" });
       await settled(page);
-      // (focus is not asserted: the input is disabled while the edit runs, which blurs it)
       const kept = await input.inputValue().catch(() => null);
       await page.keyboard.press("Escape");
       ok("lab: text being typed in a dialog survives the page re-rendering", kept === "BRC", JSON.stringify(kept));

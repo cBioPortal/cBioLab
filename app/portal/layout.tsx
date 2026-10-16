@@ -1,7 +1,9 @@
 // The portal pages are client components rendered from the URL's search params; under Cache
-// Components that request-time read streams inside a Suspense boundary.
+// Components that request-time read streams inside a Suspense boundary. The query cache is the
+// lab's, so the study list is fetched once whichever page asks for it.
 import { Suspense } from "react";
+import { LabProviders } from "../lab/providers.tsx";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
-  return <Suspense>{children}</Suspense>;
+  return <LabProviders><Suspense>{children}</Suspense></LabProviders>;
 }

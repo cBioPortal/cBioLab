@@ -8,21 +8,19 @@
 import React, { useState } from "react";
 import OncoprintFigure, { type ColumnSelection } from "./OncoprintFigure.tsx";
 import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, sortKeyText } from "./view-display.ts";
-import { formatGeneList, geneSymbols, normalizeGeneTracks, parseGeneList, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
+import { normalizeGeneTracks, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import { heatmapTrackLabel, STUDY_TRACK } from "../../lib/profile-names.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
-import { Plus, Rows3 } from "lucide-react";
+import { Rows3 } from "lucide-react";
 import { Button } from "../_ui/button";
-import { RemoveBadge } from "../_ui/remove-badge";
 import { Checkbox } from "../_ui/checkbox";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
+import { ViewGenesDialog } from "../_genes/GeneQueryDialog.tsx";
 import { GearMenu } from "../_ui/gear-menu.tsx";
 import { Input } from "../_ui/input";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
-import { Textarea } from "../_ui/textarea";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 
@@ -102,77 +100,6 @@ export const setDisplayKey = (v: V, key: string, value: unknown): V => {
   if (Object.keys(display).length) next.display = display; else delete next.display;
   return next;
 };
-
-// ---- the gene list editor (any gene view; merged rows are the oncoprint's) -----------------------
-
-export function GeneListEditor({ view, busy, onGenes }: { view: V; busy: boolean; onGenes: (next: GeneTrackSpec[]) => void }) {
-  const [add, setAdd] = useState("");
-  const [text, setText] = useState<string | null>(null);
-  const [textErr, setTextErr] = useState<string | null>(null);
-  const list: GeneTrackSpec[] = view.genes || [];
-  // a list that cannot be read is still editable as text, which is how it gets fixed
-  let rows: { label: string; members: string[] }[] = [];
-  let listErr: string | null = null;
-  try { rows = normalizeGeneTracks(list).tracks; } catch (e) { listErr = String((e as Error).message || e); }
-  const symbols = geneSymbols(list);
-  // co-occurrence and co-expression are pairwise: one gene yields no pairs
-  const floor = (view.kind === "cooccurrence" || view.kind === "coexpression") ? 2 : 1;
-  const merges = view.kind === "oncoprint";
-  const drop = (label: string) => onGenes(list.filter((e) => geneRowLabel(e) !== label));
-  const commit = () => {
-    const g = add.trim().toUpperCase();
-    if (!g || symbols.includes(g)) { setAdd(""); return; }
-    onGenes([...list, g]);
-    setAdd("");
-  };
-  const applyText = () => {
-    try { onGenes(parseGeneList(text || "")); setTextErr(null); setText(null); }
-    catch (e) { setTextErr(String((e as Error).message || e)); }
-  };
-  return (
-    <div className="setcol">
-      <span className="meta">{rows.length} of 12 rows{merges && symbols.length !== rows.length ? " · " + symbols.length + " genes" : ""} — click one to remove it</span>
-      {listErr && <span className="mark">{listErr}</span>}
-      <div className="flex flex-wrap gap-1.5">
-        {rows.map(r => (
-          <span key={r.label} className={r.members.length > 1 ? "inline-flex items-center rounded-full border border-dashed border-primary pr-2" : "contents"}>
-            <RemoveBadge label={r.label} disabled={busy || rows.length <= floor} className={r.members.length > 1 ? "border-transparent bg-transparent" : undefined}
-              title={rows.length <= floor
-                ? (floor === 2 ? "this view compares pairs, so it needs at least two genes" : "a view needs at least one gene")
-                : r.members.length > 1 ? "remove this merged row (" + r.members.join(", ") + ")" : "remove " + r.label}
-              onClick={() => drop(r.label)} />
-            {merges && r.members.length > 1 && (
-              <Button type="button" variant="link" size="inline" disabled={busy}
-                title="draw each of these genes as its own row" onClick={() => onGenes(splitGeneTrack(view, r.label).genes)}>split</Button>
-            )}
-          </span>
-        ))}
-      </div>
-      <div className="setrow">
-        <Input list="view-genes" placeholder="add a gene…" value={add} disabled={busy || rows.length >= 12} className={cn(FIELD, "w-40 uppercase placeholder:normal-case")}
-          onChange={e => setAdd(e.target.value.toUpperCase())}
-          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } }} />
-        <Button type="button" variant="outline" size="sm" className={TB} disabled={busy || !add.trim() || rows.length >= 12}
-          onClick={commit}><Plus />add</Button>
-      </div>
-      {merges && (
-        <details onToggle={(e) => { if ((e.target as HTMLDetailsElement).open && text === null) setText(formatGeneList(list)); }}>
-          <summary className="meta">edit as text — cBioPortal&apos;s gene list, where <code>[TP53 MDM2]</code> is one merged row</summary>
-          <div className="setcol" style={{ marginTop: "0.3rem" }}>
-            <Textarea value={text ?? formatGeneList(list)} spellCheck={false} rows={3} disabled={busy}
-              onChange={(e) => setText(e.target.value)} className="min-h-16 bg-muted font-mono text-md md:text-md" />
-            <div className="setrow">
-              <Button type="button" variant="outline" size="sm" className={TB} disabled={busy} onClick={applyText}>apply</Button>
-              <Button type="button" variant="link" size="inline" onClick={() => { setText(formatGeneList(list)); setTextErr(null); }}>reset</Button>
-              <span className="meta">a label is optional: <code>[&quot;TP53 pathway&quot; TP53 MDM2]</code></span>
-            </div>
-            {textErr && <span className="mark">{textErr}</span>}
-          </div>
-        </details>
-      )}
-    </div>
-  );
-}
 
 /**
  * A control whose options are still being fetched. It stands where the select will be, so the
@@ -371,13 +298,7 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
         </>}
       />
       {!onGenes && (
-        <Dialog open={genesOpen} onOpenChange={setGenesOpen}>
-          <DialogContent aria-describedby={undefined} className="genedialog gap-3 sm:max-w-md">
-            <DialogHeader><DialogTitle className="text-base">Genes</DialogTitle></DialogHeader>
-            <GeneListEditor view={view} busy={busy} onGenes={(g) => edit(withGenes(view, g))} />
-            <DialogFooter><DialogClose asChild><Button>Done</Button></DialogClose></DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ViewGenesDialog view={view} open={genesOpen} onOpenChange={setGenesOpen} onGenes={(g) => edit(withGenes(view, g))} />
       )}
     </>
   );

@@ -13,7 +13,9 @@ import { Button } from "../../_ui/button";
 import { TB } from "../../_ui/toolbar.ts";
 import { Pencil } from "lucide-react";
 import { fmtInt } from "../../../lib/chart/format.ts";
-import { PortalHeader, PortalSummary, QueryForm } from "../portal-chrome.tsx";
+import { PortalHeader, PortalSummary } from "../portal-chrome.tsx";
+import { QueryEditor, RESULTS_MAX_GENES } from "../query-editor.tsx";
+import { checkGeneQuery } from "../../../lib/gene-query.ts";
 
 const CLINICAL_SHOWN = 8;
 
@@ -40,10 +42,11 @@ function linkMutations(vs: View[], changed: number): View[] {
 }
 
 /** The Results page as the portal has it, for this study and genes. */
-function resultsLayout(study: string, genes: string[], known: StudyKnown): PageLayout {
+function resultsLayout(study: string, entries: string[], genes: string[], known: StudyKnown): PageLayout {
+  // the query decides the groups, entry by entry; the views draw its genes
   const cohorts: Record<string, CohortDef> = {
-    Altered: { all: [{ any: genes.map((g) => ({ kind: "oql", q: g })) }] } as CohortDef,
-    Unaltered: { all: genes.map((g) => ({ not: { kind: "oql", q: g } })) } as CohortDef,
+    Altered: { all: [{ any: entries.map((q) => ({ kind: "oql", q })) }] } as CohortDef,
+    Unaltered: { all: entries.map((q) => ({ not: { kind: "oql", q } })) } as CohortDef,
   };
   const expr = expressionProfile(known.profiles);
   // the portal plots and correlates over every queried sample, not one group
@@ -79,11 +82,14 @@ function resultsLayout(study: string, genes: string[], known: StudyKnown): PageL
 export default function ResultsPage() {
   const q = useSearchParams();
   const study = (q.get("study") || "").replace(/[^A-Za-z0-9._-]/g, "");
-  const genesParam = q.get("genes") || "";
-  const genes = useMemo(() => [...new Set(genesParam.split(/[\s,;]+/).map((g) => g.trim().toUpperCase()).filter((g) => /^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)))], [genesParam]);
+  const queryText = q.get("genes") || "";
+  const check = useMemo(() => checkGeneQuery(queryText, "oql"), [queryText]);
+  const genes = check.genes;
+  const queryError = check.error || check.entries.filter((e) => e.error).map((e) => e.text + ": " + e.error).join("; ") || null;
+  const filtered = check.entries.some((e) => e.meaning !== "any alteration");
   const linked = useMemo(() => decodeDoc(q.get("doc")), []);   // eslint-disable-line react-hooks/exhaustive-deps
   const { known, error } = useStudyKnown(study);
-  const fresh = useMemo(() => known && genes.length && genes.length <= 12 ? resultsLayout(study, genes, known) : null, [known, study, genes]);
+  const fresh = useMemo(() => known && genes.length && genes.length <= RESULTS_MAX_GENES && !queryError ? resultsLayout(study, check.entries.map((e) => e.text), genes, known) : null, [known, study, check, genes, queryError]);
   const page = usePageDoc(fresh, linked);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [editing, setEditing] = useState(false);
@@ -93,19 +99,21 @@ export default function ResultsPage() {
   if (!study || !genes.length) return shell(
     <section data-tw className="mb-4 rounded-lg border bg-card px-4.5 py-4">
       <div className="text-sm font-semibold tracking-[0.12em] text-muted-foreground uppercase">Query</div>
-      <p className="mt-1 text-md text-muted-foreground">A study and up to 12 genes: the page shows the patients altered in any of them against the rest, tab by tab, as cBioPortal&apos;s Results page does.</p>
-      <QueryForm study={study} genes={genes} />
+      <p className="mt-1 mb-4 text-md text-muted-foreground">A study and up to {RESULTS_MAX_GENES} genes: the page shows the patients altered in any of them against the rest, tab by tab, as cBioPortal&apos;s Results page does.</p>
+      <QueryEditor study={study} query={queryText} />
     </section>);
-  if (genes.length > 12) return shell(<p className="note">a results page takes at most 12 genes, the oncoprint&apos;s rows; this asks for {genes.length}</p>);
+  if (queryError) return shell(<><div className="error">this query cannot be read — {queryError}</div><QueryEditor study={study} query={queryText} /></>);
+  if (genes.length > RESULTS_MAX_GENES) return shell(<p className="note">a results page takes at most {RESULTS_MAX_GENES} genes, the oncoprint&apos;s rows; this asks for {genes.length}</p>);
   if (error) return shell(<div className="error">{error}</div>);
   const ready = !!(fresh && page.doc);
   return shell(<>
-    <PortalSummary eyebrow="Query results" title={known ? known.name : study} study={study} genes={genes}
+    <PortalSummary eyebrow="Query results" title={known ? known.name : study} study={study} genes={check.entries.map((e) => e.text)}
       detail={known && <span className="tabular-nums">{fmtInt(known.samples)} samples · {fmtInt(known.patients)} patients</span>}
       groups={Object.keys(fresh?.doc.cohorts || {})} counts={counts} left={fresh?.left || []}
-      stat={altered != null && queried ? { value: altered, of: queried, label: "queried patients altered in " + (genes.length === 1 ? genes[0] : "any of the " + genes.length + " genes") } : null}
+      stat={altered != null && queried ? { value: altered, of: queried, label: "queried patients altered in " + (check.entries.length === 1 ? check.entries[0].text : "any of the " + check.entries.length + " query lines") } : null}
       action={<Button variant="outline" size="sm" className={TB} aria-expanded={editing} onClick={() => setEditing((e) => !e)}><Pencil />Modify query</Button>}>
-      {editing && <QueryForm study={study} genes={genes} className="mt-0 border-t pt-2.5" />}
+      {filtered && <p className="mt-2.5 mb-0 text-sm text-muted-foreground">The query&apos;s OQL decides who is Altered; the oncoprint and the gene tabs draw every alteration of {genes.length === 1 ? "its gene" : "its genes"}.</p>}
+      {editing && <QueryEditor study={study} query={queryText} className="mt-4 border-t pt-4" />}
     </PortalSummary>
     {page.note && <p className="note">{page.note}</p>}
     {!ready

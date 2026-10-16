@@ -24,6 +24,7 @@ import { Input } from "../_ui/input";
 import { Choice } from "../_ui/choice.tsx";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
+import { StudySearch, StudyRows, filterStudies } from "../_studies/study-list.tsx";
 
 /** The most studies "add all" stages at once (each adds dozens of queries to Explore's facets). */
 export const ADD_ALL_LIMIT = 30;
@@ -71,14 +72,6 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
   const { addMode, analyzeDraft, exDraftStudies, exPanelOpen, exSel, exStudies, explore, exploreBusy, sCaps, sQuery, setExDraftStudies, setExPanelOpen, setExploreStudies, setSCaps, setSQuery, setStudyChipsOpen, studies, studyChipsOpen } = ctx;
   return <>
     {(() => {
-      const CAP_FILTERS: [string, string, (s: any) => boolean][] = [
-        ["timeline", "timeline events", (s: any) => s.timelinePatients > 0],
-        ["mrna", "mRNA", (s: any) => s.caps && s.caps.mrna],
-        ["protein", "protein", (s: any) => s.caps && s.caps.protein],
-        ["ga", "generic assay", (s: any) => s.caps && s.caps.ga],
-        ["oncokb", "OncoKB-synced", (s: any) => s.oncokb],
-        ["peer", "other instance", (s: any) => s.instance && s.instance !== "a"]
-      ];
       const byId = new Map(studies.map((s) => [s.id, s] as const));
       const selPts = exStudies.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0);
       const ready = exStudies.length > 0;      // a study alone is enough to analyse
@@ -99,10 +92,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
         setExPanelOpen(false);
         setExploreStudies(staged);
       };
-      const q = sQuery.trim().toLowerCase();
-      const hits = studies.filter(s =>
-        (!q || (s.name + " " + s.id + " " + (s.cancerType || "")).toLowerCase().includes(q)) &&
-        CAP_FILTERS.every(([k, , pred]) => !sCaps.has(k) || pred(s)));
+      const hits = filterStudies(studies, sQuery, sCaps);
       return (
         <div className="card">
           <div className="row center g5">
@@ -162,16 +152,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
           </div>
           {/* with nothing selected the picker is simply open: there is nothing else to do here */}
           {(exPanelOpen || exStudies.length === 0) && <>
-            <div className="row g5 center mt-2.5 mb-2.5">
-              <Input placeholder="search name, id, or cancer type…" value={sQuery} onChange={e => setSQuery(e.target.value)}
-                className="h-8 min-w-64 flex-1 text-md md:text-md" />
-              {CAP_FILTERS.map(([k, label]) => (
-                <Button key={k} variant="outline" size="xs" className={CHIP} aria-pressed={sCaps.has(k)}
-                  onClick={() => setSCaps(prev => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; })}>
-                  {label}
-                </Button>
-              ))}
-              <span className="meta">{hits.length.toLocaleString()} of {studies.length.toLocaleString()}</span>
+            <StudySearch query={sQuery} onQuery={setSQuery} caps={sCaps} onCaps={setSCaps} matches={hits.length} total={studies.length}>
               {/* "all matches", not "all 200 drawn": the list renders the 200 largest, and a button
                   that selected only those would disagree with the count beside it. Refused, with the
                   limit named, when it would stage more than ADD_ALL_LIMIT studies: every study adds
@@ -191,7 +172,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               })()}
               <Button variant="ghost" size="xs" className={CHIP} disabled={!staged.length}
                 onClick={() => setExDraftStudies([])}>clear</Button>
-            </div>
+            </StudySearch>
             <div className="row applybar center g5">
               <strong>{staged.length.toLocaleString()}</strong>
               <span className="meta">
@@ -205,29 +186,8 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
                 Submit
               </Button>
             </div>
-            {!studies.length && <div className="loading-block"><span className="spinner" /> Loading studies…</div>}
-            {/* One grid for the whole list (each row a subgrid), so every column lines up
-                however wide its cells are, and every row renders every cell. */}
-            <div className="scrollbox studylist">
-              {hits.length > 0 && <div className="study-row study-head" aria-hidden>
-                <span /><span>Study</span><span>Cancer type</span>
-                <span className="pts">Patients</span><span />
-              </div>}
-              {hits.slice(0, 200).map(s => (
-                <label key={s.id} title={s.name + " (" + s.id + ")"} className={"study-row" + (staged.includes(s.id) ? " sel" : "")}>
-                  <Checkbox checked={staged.includes(s.id)} onCheckedChange={() => toggleStaged(s.id)} aria-label={"stage " + s.name} />
-                  <span className="studyname">
-                    <strong>{s.name}</strong>
-                    {s.instance && s.instance !== "a" &&
-                      <span className="peerbadge" title={"held by the federated peer " + s.instanceLabel}>⧉ {s.instanceLabel}</span>}
-                  </span>
-                  <span className="meta">{s.cancerType}</span>
-                  <span className="meta pts">{s.patients.toLocaleString()}</span>
-                  <StudyActions id={s.id} ctx={ctx} />
-                </label>
-              ))}
-              {hits.length > 200 && <p className="note studylist-note">Showing the 200 largest of {hits.length.toLocaleString()} matches — refine the search.</p>}
-            </div>
+            <StudyRows hits={hits} loading={!studies.length} pick="many" selected={staged} onToggle={toggleStaged}
+              actions={(id) => <StudyActions id={id} ctx={ctx} />} />
           </>}
         </div>
       );

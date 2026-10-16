@@ -8,7 +8,7 @@ import { ViewFigure } from "../lab/figure.tsx";
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, AnalysisResult, View } from "../../lib/types";
 import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
-import { KindCardBody, KindCardControls, hasKindCard, drawsOwnWaiting } from "../lab/kind-cards";
+import { KindCardBody, KindCardControls, hasKindCard, drawsOwnWaiting, figureView } from "../lab/kind-cards";
 import { dataPart } from "../_oncoprint/view-display.ts";
 import { OncoprintCard, type TrackCatalog } from "../_oncoprint/OncoprintCard.tsx";
 import type { PageTab } from "./page-doc";
@@ -147,7 +147,7 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
             {v && v.error && <p className="note">{v.error}</p>}
             {v && !v.error && (body
               ? <>{body}{v.caveat && <p className="note vfoot">{v.caveat}</p>}</>
-              : <ViewFigure v={v} />)}
+              : <ViewFigure v={figureView(spec, v)} />)}
           </section>
         );
       })}
