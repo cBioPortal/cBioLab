@@ -14,7 +14,7 @@ import { MethodPanel } from "./method-panel.tsx";
 import { viewRequest } from "./use-analysis.ts";
 import { AxisPicker, HighlightPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, SeriesSwatch, Participation } from "./view-chrome.tsx";
 import { ViewFigure } from "./figure.tsx";
-import { ArrowLeftRight, Plus, Settings2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Settings2, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { ErrorAlert } from "../_ui/error-alert.tsx";
 import { Checkbox } from "../_ui/checkbox";
@@ -652,81 +652,116 @@ function LogToggle({ ctx, vi, side, numeric }: { ctx: ViewCtx; vi: number; side:
   const axis = ctx.docView(vi)[side];
   if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular")) return null;
   return (
-    <label className="chk" title={"draw " + side + " on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out"}>
+    <label className="chk text-md text-foreground" title={"draw this axis on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out"}>
       <Checkbox checked={!!axis.log} disabled={ctx.busy}
         onCheckedChange={(c) => ctx.updateView(vi, (vv: any) => {
           const a = { ...vv[side] };
           if (c === true) a.log = true; else delete a.log;
           return { ...vv, [side]: a };
         })} />
-      log
+      Log scale
     </label>
   );
 }
 
+/** one axis's definition in the plot's sidebar: its name down the side, its fields stacked beside it */
+function AxisBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="plot-axis flex gap-1.5 rounded-md bg-muted py-2.5 pr-2.5 pl-1" aria-label={title}>
+      <h3 className="m-0 rotate-180 text-center text-md font-normal text-primary [writing-mode:vertical-lr]">{title}</h3>
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5">{children}</div>
+    </section>
+  );
+}
+
+/**
+ * The plot view laid out as cBioPortal's Plots tab is: each axis defined in its own block in a
+ * sidebar (horizontal above vertical, a swap between them, the cases and highlights below), and the
+ * figure beside it under a line saying how many cases it shows. Under a narrow card the sidebar
+ * sits above the figure.
+ */
 function PlotCard({ ctx, v, vi }: CardProps) {
   const { attrsLoading, busy, catalogAttrs, cohortChoice, docView, menuOpenRef, profileOptions, updateView } = ctx;
+  if (v.kind !== "plot") return null;
+  const dv = docView(vi), d = v.plot, unit = dv.unit || "patient";
+  // A box is drawn with its categories across, whichever axis the document holds them on, so a
+  // box whose categories sit on y shows its "vertical" axis across. Swapping makes the two agree.
+  const boxTransposed = d?.shape === "box" && d.x.kind === "num";
+  const boxDrawn = d?.shape === "box" && !boxTransposed;
+  const axisFields = (side: "x" | "y") => <>
+    <AxisPicker side={side} stacked axis={dv[side]} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
+      onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, [side]: a }))} />
+    <LogToggle ctx={ctx} vi={vi} side={side} numeric={d?.[side].kind === "num"} />
+  </>;
+  const highlight = (() => {
+    if (d?.shape === "table") return null;
+    // every cohort the document evaluates, but the plotted one and a split (which stands for
+    // several groups, not one set of cases)
+    const ch = cohortChoice(vi, dv, 1);
+    const plotted = ch.drawn[0];
+    const options = ch.nodes.filter((nd) => nd.kind !== "split" && nd.name !== plotted)
+      .map((nd) => ({ name: nd.name, label: nd.label, depth: nd.depth }));
+    const chosen: string[] = Array.isArray(dv.highlight) ? dv.highlight : [];
+    if (!options.length && !chosen.length) return null;
+    return <div className="axfield flex flex-col gap-1">
+      <span className="axfield-name text-sm font-semibold text-foreground" title="other cohorts drawn over this one, each in its own colour">Highlight cohorts</span>
+      <HighlightPicker stacked chosen={chosen} options={options} busy={busy}
+        onChange={(next) => updateView(vi, (vv: any) => { const n = { ...vv }; if (next.length) n.highlight = next; else delete n.highlight; return n; })} />
+    </div>;
+  })();
+  const total = d?.coverage?.total;
   return <>
-    {v.kind === "plot" && <>
-      <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, docView(vi), 1)} {...placement(ctx, vi)}
-        sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
-      {/* Every control here changes what is DRAWN and costs a query, so there is one
-          zone and it says so — the same toolbar the oncoprint uses. */}
-      <div className="viewtb">
-        <div className="tbz">
-          <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
-          <AxisPicker side="x" axis={docView(vi).x} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-            onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, x: a }))} />
-          <LogToggle ctx={ctx} vi={vi} side="x" numeric={v.plot?.x.kind === "num"} />
-        </div>
-        <div className="tbz">
-          <AxisPicker side="y" axis={docView(vi).y} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-            onChange={(a) => updateView(vi, (vv: any) => ({ ...vv, y: a }))} />
-          <LogToggle ctx={ctx} vi={vi} side="y" numeric={v.plot?.y.kind === "num"} />
-        </div>
-        {/* colour/ring only affect a box plot's violin — a scatter's density and a
-            contingency table have no per-case colour to split, so the controls would
-            sit there doing nothing until a box shape is actually on screen */}
-        {v.plot?.shape === "box" && <div className="tbz">
-          <span className="tbl" title="colours each group's violin by a category">colour</span>
-          <AxisPicker side="fill" axis={docView(vi).colorBy} allowNone categorical
-            attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-            onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
-          <AxisPicker side="ring" axis={docView(vi).ringBy} allowNone categorical
-            attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-            onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
-        </div>}
-        {v.plot?.shape !== "table" && (() => {
-          // every cohort the document evaluates, but the plotted one and a split (which stands for
-          // several groups, not one set of cases)
-          const ch = cohortChoice(vi, docView(vi), 1);
-          const plotted = ch.drawn[0];
-          const options = ch.nodes.filter((nd) => nd.kind !== "split" && nd.name !== plotted)
-            .map((nd) => ({ name: nd.name, label: nd.label, depth: nd.depth }));
-          const chosen: string[] = Array.isArray(docView(vi).highlight) ? docView(vi).highlight : [];
-          if (!options.length && !chosen.length) return null;
-          return <div className="tbz">
-            <HighlightPicker chosen={chosen} options={options} busy={busy}
-              onChange={(next) => updateView(vi, (vv: any) => { const n = { ...vv }; if (next.length) n.highlight = next; else delete n.highlight; return n; })} />
-          </div>;
-        })()}
-        <div className="tbz">
-          <label className="tbfield" title="what a point is; patient mode averages a patient's samples">unit <Choice size="ctl"
-            value={docView(vi).unit || "patient"} disabled={busy}
-            onChange={(u) => updateView(vi, (vv: any) => ({ ...vv, unit: u }))}
-            options={[["patient", "patients"], ["sample", "samples"]]} /></label>
-          {/* a box plot is always drawn categories-on-x, values-on-y regardless of
-              which axis is which in the document (lib/federation.ts's box branch
-              routes by kind, not by x/y) — swapping which is "x" changes nothing a
-              reader can see, so the button is disabled rather than pretending to act */}
-          <Button variant="outline" size="sm" className={TB} disabled={busy || v.plot?.shape === "box"}
-            title={v.plot?.shape === "box" ? "a box plot is always drawn by category, whichever axis holds it — nothing to swap"
-              : "put the x axis on y and the y axis on x"}
-            onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}><ArrowLeftRight />swap</Button>
+    <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={cohortChoice(vi, dv, 1)} {...placement(ctx, vi)}
+      sub={d ? <>{d.shape === "scatter" ? "density" : d.shape === "box" ? "box" : "contingency"} · {d.n.toLocaleString()} {unit}s</> : "two axes over the same cases"} />
+    <div className="@container mt-2.5" data-tw>
+      <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-[16.5rem_minmax(0,1fr)]">
+        <aside className="plot-side flex flex-col gap-1.5" aria-label="plot axes">
+          <AxisBlock title="Horizontal axis">
+            {axisFields("x")}
+            {boxTransposed && <p className="m-0 text-sm text-muted-foreground">A box plot draws its categories across, so this axis is drawn up the side. Swap to make them agree.</p>}
+          </AxisBlock>
+          {/* a box drawn as the document says has nothing to swap: its categories are already across */}
+          <Button variant="link" size="inline" className="plot-swap self-center text-md" disabled={busy || boxDrawn}
+            title={boxDrawn ? "a box plot is always drawn by category across, which this one already is — nothing to swap"
+              : "put the horizontal axis's definition on the vertical axis, and the vertical one's on the horizontal"}
+            onClick={() => updateView(vi, (vv: any) => ({ ...vv, x: vv.y, y: vv.x }))}><ArrowUp />Swap axes<ArrowDown /></Button>
+          <AxisBlock title="Vertical axis">
+            {axisFields("y")}
+          </AxisBlock>
+          <div className="mt-2.5 flex flex-col gap-2.5">
+            <div className="axfield flex flex-col gap-1">
+              <span className="axfield-name text-sm font-semibold text-foreground">Each point is a</span>
+              <Choice size="ctl" className="w-full" value={unit} disabled={busy}
+                title="what a point is; patient mode averages a patient's samples"
+                onChange={(u) => updateView(vi, (vv: any) => ({ ...vv, unit: u }))}
+                options={[["patient", "patient"], ["sample", "sample"]]} />
+            </div>
+            {highlight}
+          </div>
+        </aside>
+        <div className="min-w-0">
+          {d && <p className="plot-showing m-0 mb-2.5 rounded-sm bg-muted px-2.5 py-1.5 text-md">
+            Showing {d.n.toLocaleString()}{total != null && total > d.n ? " of " + total.toLocaleString() : ""} {unit}{d.n === 1 ? "" : "s"} with data on both axes
+          </p>}
+          {/* colour and ring split a box's violin and points; a scatter's density and a contingency
+              have no per-case colour, so the controls appear only with a box on screen */}
+          {d?.shape === "box" && <div className="viewtb mt-0 mb-2.5">
+            <div className="tbz">
+              <span className="tbl" title="colours each group's violin and points by a category">colour samples by</span>
+              <AxisPicker side="fill" axis={dv.colorBy} allowNone categorical
+                attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
+                onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
+            </div>
+            <div className="tbz">
+              <AxisPicker side="ring" axis={dv.ringBy} allowNone categorical
+                attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
+                onChange={(a) => updateView(vi, (vv: any) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
+            </div>
+          </div>}
+          <ViewFigure v={v} empty={d?.note || "nothing to draw"} />
         </div>
       </div>
-      <ViewFigure v={v} empty={v.plot?.note || "nothing to draw"} />
-    </>}
+    </div>
   </>;
 }
 
