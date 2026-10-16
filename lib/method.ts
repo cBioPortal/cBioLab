@@ -2228,8 +2228,10 @@ export function riskmodelMethod(t: RiskmodelTrace): MethodRecord {
         ["never held out, so unscored", String(r.neverHeldOut)],
         ...r.covariates.map((c) => [c.name, "HR " + c.hr.toFixed(3) + " (mean over runs)"] as [string, string])] },
     { kind: "statistic", title: "Risk groups, their survival and hazard ratios",
-      detail: "Cuts at equal quantiles of the " + (r.validation ? "discovery half's held-out scores, applied to the validation half" : "held-out scores") +
-        ", each moved to the nearer edge of any run of tied scores so equal scores share a group — no outcome is used to place them. Each group is drawn as a Kaplan–Meier curve" +
+      detail: (r.cutsChosen ? "Cuts at the quantiles the view names (" + r.cutsChosen.join(", ") + ")" : "Cuts at equal quantiles") + " of the " +
+        (r.validation ? "discovery half's held-out scores, applied to the validation half" : "held-out scores") +
+        ", each moved to the nearer edge of any run of tied scores so equal scores share a group" +
+        (r.cutsChosen ? " — the quantiles are the view's; the computation does not use the outcome to place them, but whoever chose them may have." : " — no outcome is used to place them.") + " Each group is drawn as a Kaplan–Meier curve" +
         (r.anchoredTo ? " with delayed entry" : "") + " and read at 12 and 36 months; the groups are compared with a " + (r.strata ? "stratified " : "") +
         "log-rank test, and a Cox model of the outcome on the group indicators gives each group's hazard ratio against the lowest (Newton–Raphson, full information matrix, 95% Wald intervals). " +
         "A second Cox model on the standardised score alone gives the hazard ratio per standard deviation. " +

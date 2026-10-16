@@ -2,7 +2,7 @@
 // risk groups, from a fit alone. Synthetic fits, so each rule is checked on numbers it can be read off.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { groupRiskmodel, riskFitSpec, type RiskFit } from "../lib/views/riskmodel.ts";
+import { groupRiskmodel as groupAt, groupQuantiles, riskFitSpec, type RiskFit } from "../lib/views/riskmodel.ts";
 import type { RiskmodelView } from "../lib/types.ts";
 
 /** A fit over these held-out scores (null: never held out): survival times 1…n, every third an event. */
@@ -19,7 +19,9 @@ function fitOf(heldOut: (number | null)[], o: { validation?: number[]; external?
     cIndexRuns: [0.6], validationCIndex: null, features: [], covariates: [],
   };
 }
-const sizes = (g: ReturnType<typeof groupRiskmodel>) => g.groups.map((x) => x.curve.n);
+/** `n` equal groups, as a view with `groups: n` asks */
+const groupRiskmodel = (fit: RiskFit, n: number) => groupAt(fit, groupQuantiles({ groups: n }));
+const sizes = (g: ReturnType<typeof groupAt>) => g.groups.map((x) => x.curve.n);
 
 describe("risk groups from held-out scores", () => {
   test("distinct scores: equal quantiles make equal groups, and each group spans its cuts", () => {
@@ -55,6 +57,24 @@ describe("risk groups from held-out scores", () => {
     assert.equal(g.scale.max, -1 + 59 / 20);
   });
 
+  test("cuts a view names: the top fifth against the rest, and three groups at chosen quantiles", () => {
+    const fit = fitOf(Array.from({ length: 100 }, (_, i) => i));
+    assert.deepEqual(sizes(groupAt(fit, groupQuantiles({ cuts: [0.8] }))), [80, 20]);
+    assert.deepEqual(sizes(groupAt(fit, groupQuantiles({ cuts: [0.1, 0.5] }))), [10, 40, 50]);
+  });
+
+  test("equal groups are the quantiles k/n, as written out", () => {
+    assert.deepEqual(groupQuantiles({ groups: 4 }), [0.25, 0.5, 0.75]);
+    const fit = fitOf(Array.from({ length: 90 }, (_, i) => i / 10));
+    assert.deepEqual(groupAt(fit, groupQuantiles({ groups: 3 })), groupAt(fit, [1 / 3, 2 / 3]));
+  });
+
+  test("a chosen cut inside a run of ties moves to its nearer edge, so equal scores share a group", () => {
+    // 50 patients score 0, 30 score 1, 20 score 2: a cut at the 60th percentile falls inside the 1s
+    const g = groupAt(fitOf([...Array(50).fill(0), ...Array(30).fill(1), ...Array(20).fill(2)]), [0.6]);
+    assert.deepEqual(sizes(g), [50, 50]);
+  });
+
   test("with validation, the cuts come from the discovery half and the groups are the validation half's", () => {
     // discovery patients 0–59 hold scores 0…59; validation patients 60–89 all score above the top cut
     const held = [...Array.from({ length: 60 }, (_, i) => i), ...Array(30).fill(0)];
@@ -77,8 +97,8 @@ describe("the fit's settings, as its cache key", () => {
     covariates: ["AGE"], anchor: { eventType: "Treatment" }, validate: false, alpha: 0.5, runs: 10, seed: 1, groups: 3, labelAbove: 0.5 };
   const key = (v: RiskmodelView, pin: string | null = "v7") => JSON.stringify(riskFitSpec(v, pin));
 
-  test("the groups, the label threshold and the note are not part of it", () => {
-    for (const change of [{ groups: 5 }, { labelAbove: 0.9 }, { note: "a note" }, { cohorts: ["B"] }] as Partial<RiskmodelView>[])
+  test("the groups, the cuts, the label threshold and the note are not part of it", () => {
+    for (const change of [{ groups: 5 }, { cuts: [0.8] }, { labelAbove: 0.9 }, { note: "a note" }, { cohorts: ["B"] }] as Partial<RiskmodelView>[])
       assert.equal(key({ ...base, ...change }), key(base), JSON.stringify(change));
   });
 

@@ -949,6 +949,9 @@ export interface RiskmodelView {
   runs?: number;
   /** risk groups, cut at equal quantiles of the score (default 3, 2 to 5) */
   groups?: number;
+  /** instead of `groups`: the quantiles of the score to cut at, increasing, each strictly between 0 and 1
+   *  (1 to 4 of them, so 2 to 5 groups) — e.g. [0.8] for the top fifth against the rest, OncoCast's `cuts` */
+  cuts?: number[];
   seed?: number;
   /** clinical attributes always in the model, never penalised (at most 6): numbers as they are,
    *  categories as indicators against the commonest value */
@@ -1001,6 +1004,8 @@ export interface RiskmodelResult {
   scale: { min: number; max: number };
   /** the volcano's label threshold, as the view asked (default 0.5) */
   labelAbove: number;
+  /** the quantiles the view chose to cut at; null when the groups are `groups` equal quantiles */
+  cutsChosen: number[] | null;
 }
 
 export interface LabsView {

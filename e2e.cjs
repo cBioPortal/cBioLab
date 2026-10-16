@@ -1054,6 +1054,52 @@ async function main() {
     await ctx.close();
   }
 
+  // The risk model (lib/views/riskmodel.ts): the volcano's label threshold is applied in the browser
+  // (no request), and a cut is one request answered from the cached fit (lib/next-cache.ts
+  // cachedRiskFit), not a refit; the caveat then says the cuts were chosen.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1200 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const doc = { study: "msk_chord_2024", cohorts: { NSCLC: { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] } },
+      views: [{ kind: "riskmodel", cohorts: ["NSCLC"], runs: 2 }] };
+    const b64 = Buffer.from(JSON.stringify(doc)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const fig = page.locator("svg[aria-label^='Risk model']");
+    const text = async () => (await fig.evaluate((s) => [...s.querySelectorAll("text")].map((t) => t.textContent).join(" "))).replace(/\s+/g, " ");
+    try {
+      await page.goto(BASE + "/lab?tab=analysis&doc=" + b64, { waitUntil: "domcontentloaded" });
+      await fig.waitFor({ timeout: 240000 });
+      ok("risk model: draws the 0–10 score and the volcano", /score \(0–10\)/.test(await text()) && /Selection frequency against mean hazard ratio/.test(await text()));
+      const askew = await misalignedControls(page, ".riskmodel-tb");
+      ok("risk model: its controls share one height and centre line", askew.length === 0, askew.join(" | "));
+      let requests = 0;
+      page.on("request", (r) => { if (r.url().includes("/api/analysis")) requests++; });
+      await page.locator(".riskmodel-tb label.tbfield", { hasText: "label genes" }).locator("[role=combobox]").click();
+      await page.locator("[role=option]", { hasText: "90%" }).click();
+      await page.waitForFunction(() => /kept in ≥ 90% of runs/.test(document.querySelector("svg[aria-label^='Risk model']")?.textContent || ""), null, { timeout: 10000 });
+      ok("risk model: the label threshold redraws the volcano without a request", requests === 0, requests + " requests");
+      const cut = page.locator(".riskmodel-tb label.tbfield", { hasText: "cut at" }).locator("input");
+      await cut.fill("80");
+      const t0 = Date.now();
+      await cut.press("Enter");
+      await page.waitForFunction(() => { const l = document.querySelector("svg[aria-label^='Risk model']")?.getAttribute("aria-label") || ""; return /Low risk, High risk$/.test(l); }, null, { timeout: 120000 });
+      const ms = Date.now() - t0;
+      ok("risk model: a cut at the 80th percentile is one request", requests === 1, requests + " requests, " + ms + " ms");
+      ok("risk model: the caveat says the cuts were chosen", /The cuts were chosen in the view, at the 80th percentile/.test(await text()));
+      // the same model regrouped is the cached fit: a seed nothing else here fits, then the same with a cut
+      const post = async (view) => (await (await ctx.request.post(BASE + "/api/analysis", { data: { ...doc, views: [{ ...doc.views[0], runs: 5, seed: 7, ...view }] } })).json()).views[0];
+      const cold = await post({}), recut = await post({ cuts: [0.8] });
+      ok("risk model: regrouping reuses the fit — the same model, without the fit's time", !cold.error && !recut.error &&
+        JSON.stringify(cold.riskmodel.cIndex) === JSON.stringify(recut.riskmodel.cIndex) && JSON.stringify(cold.riskmodel.features) === JSON.stringify(recut.riskmodel.features) &&
+        cold.ms > 2000 && recut.ms * 3 < cold.ms, "fit + groups " + cold.ms + " ms, regrouped " + recut.ms + " ms");
+    } catch (e) {
+      ok("risk model: the card's controls", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("risk model: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+
   // The timeline view (app/lab/timeline-body.tsx on lib/timeline-svg.ts): the chosen patient's tracks with a
   // tooltip per event, a track that folds without a re-run, and the patient list (a dialog the navigator
   // opens) whose row click redraws another patient — a choice the document keeps, so a reload shows the same patient.

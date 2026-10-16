@@ -217,12 +217,16 @@ export interface RiskGrouping {
   distinct: number; groupsMade: number;
 }
 
+/** The quantiles a view's groups are cut at: `n` equal groups, or the quantiles it names. */
+export const groupQuantiles = (g: { groups: number } | { cuts: number[] }): number[] =>
+  "cuts" in g ? g.cuts : Array.from({ length: g.groups - 1 }, (_, k) => (k + 1) / g.groups);
+
 /**
- * Cut the fit's held-out scores into `nGroups` groups at equal quantiles, and report them: on
- * the same patients, or with validation on the other half, cut at the discovery half's quantiles —
- * so nothing reported was used to train or to place the cuts. Pure: the fit alone decides it.
+ * Cut the fit's held-out scores at quantiles `qs` (groupQuantiles), and report the groups: on the
+ * same patients, or with validation on the other half, cut at the discovery half's quantiles — so
+ * nothing reported was used to train or to place the cuts. Pure: the fit alone decides it.
  */
-export function groupRiskmodel(fit: RiskFit, nGroups: number): RiskGrouping {
+export function groupRiskmodel(fit: RiskFit, qs: number[]): RiskGrouping {
   const validate = fit.validated, anchored = fit.anchored;
   const subj: CoxSubject[] = fit.subjects.time.map((time, i) => ({ time, event: fit.subjects.event[i] === 1, entry: fit.subjects.entry[i], stratum: fit.subjects.stratum[i] }));
   const poolScored = fit.pool.filter((i) => fit.heldOut[i] != null);
@@ -242,8 +246,7 @@ export function groupRiskmodel(fit: RiskFit, nGroups: number): RiskGrouping {
     const pickEdge = !before ? after : !after ? before : Math.abs(before.at - f * sorted.length) <= Math.abs(after.at - f * sorted.length) ? before : after;
     return pickEdge ? pickEdge.v : null;
   };
-  const cuts = [...new Set(Array.from({ length: nGroups - 1 }, (_, k) => cutAt((k + 1) / nGroups)).filter((c): c is number => c != null))]
-    .sort((x, y) => x - y);
+  const cuts = [...new Set(qs.map(cutAt).filter((c): c is number => c != null))].sort((x, y) => x - y);
   const groupsMade = cuts.length + 1;
   const groupOf = (v: number) => { let g = 0; while (g < cuts.length && v > cuts[g]) g++; return g; };
   const reported = validate ? fit.validation : poolScored;
@@ -293,10 +296,17 @@ export function groupRiskmodel(fit: RiskFit, nGroups: number): RiskGrouping {
 
 // ---- the view ---------------------------------------------------------------------------------
 
+/** 0.8 → "80th", 0.333 → "33.3rd" */
+function ordinalPct(q: number): string {
+  const v = Math.round(q * 1000) / 10, n = Math.floor(v);
+  const suffix = n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th";
+  return v + suffix;
+}
+
 /**
  * The view's model settings as the fit reads them — defaults applied, names normalised — and so
- * the fit's cache key. Settings that only decide the groups or the drawing (`groups`, `labelAbove`,
- * `note`) are not in it; test/riskmodel-groups.test.ts holds that line. runRiskmodel validates it.
+ * the fit's cache key. Settings that only decide the groups or the drawing (`groups`, `cuts`,
+ * `labelAbove`, `note`) are not in it; test/riskmodel-groups.test.ts holds that line. runRiskmodel validates it.
  */
 export function riskFitSpec(view: RiskmodelView, pin: string | null): RiskFitSpec {
   const num = (x: unknown, d: number) => x == null ? d : Number(x);
@@ -335,6 +345,13 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
   if (!(alpha >= 0 && alpha <= 1)) return refuse("riskmodel", ctx, "alpha, the l1 share of the penalty, is 0 (ridge) to 1 (lasso)");
   if (!(Number.isInteger(runs) && runs >= 1 && runs <= RISK_MAX_RUNS)) return refuse("riskmodel", ctx, "runs is a whole number from 1 to " + RISK_MAX_RUNS);
   if (!(Number.isInteger(nGroups) && nGroups >= 2 && nGroups <= 5)) return refuse("riskmodel", ctx, "groups is 2 to 5");
+  const cutsChosen = view.cuts == null ? null : view.cuts;
+  if (cutsChosen) {
+    if (view.groups != null) return refuse("riskmodel", ctx, "give groups (equal quantiles) or cuts (the quantiles to cut at), not both");
+    if (!Array.isArray(cutsChosen) || cutsChosen.length < 1 || cutsChosen.length > 4 || !cutsChosen.every((c, k) => typeof c === "number" && c > 0 && c < 1 && (k === 0 || c > cutsChosen[k - 1])))
+      return refuse("riskmodel", ctx, "cuts are 1 to 4 quantiles of the score, increasing, each strictly between 0 and 1 (e.g. [0.8] for the top fifth against the rest)");
+  }
+  const asked = cutsChosen ? cutsChosen.length + 1 : nGroups;
   if (!(Number.isInteger(minMutated) && minMutated >= 5)) return refuse("riskmodel", ctx, "minMutated is a whole number of patients, at least 5");
   if (!Number.isInteger(seed)) return refuse("riskmodel", ctx, "seed is a whole number");
   const labelAbove = num(view.labelAbove, RISK_LABEL_ABOVE);
@@ -356,7 +373,7 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
     const out = refuse("riskmodel", ctx, (e.aboutCohort ? "“" + name + "” " : "") + e.message);
     return e.queries.length ? { ...out, queries: e.queries.map((q) => ({ study, ...q })) } : out;
   }
-  const g = groupRiskmodel(fit, nGroups);
+  const g = groupRiskmodel(fit, groupQuantiles(cutsChosen ? { cuts: cutsChosen } : { groups: nGroups }));
 
   const cs = [...fit.cIndexRuns].filter((c) => Number.isFinite(c)).sort((x, y) => x - y);
   const pct = (f: number) => cs.length ? cs[Math.min(cs.length - 1, Math.round(f * (cs.length - 1)))] : NaN;
@@ -370,7 +387,7 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
     validation: validate ? { discovery: fit.pool.length, validation: fit.validation.length,
       validationEvents: fit.validation.filter((i) => fit.subjects.event[i] === 1).length, cIndex: fit.validationCIndex! } : null,
     cIndex: { median: pct(0.5), q1: pct(0.25), q3: pct(0.75), values: fit.cIndexRuns },
-    features: fit.features, groups: g.groups, logrank: g.logrank, refit: g.refit, histogram: g.histogram, scale: g.scale, labelAbove,
+    features: fit.features, groups: g.groups, logrank: g.logrank, refit: g.refit, histogram: g.histogram, scale: g.scale, labelAbove, cutsChosen,
   };
   return {
     kind: "riskmodel", cohorts: vNames, riskmodel: result, queries: fit.queries.map((q) => ({ study, ...q })),
@@ -381,11 +398,14 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
       " held fixed, in this cohort" + (strata ? ", within each " + strata : "") + ". " +
       (strata ? "" : "Without strata, a gene that marks a cancer type carries that type's prognosis; on a cohort of several cancer types, stratify by CANCER_TYPE. ") +
       (validate ? "The model was trained on the discovery half of the engine's fixed split only; the curves, table and refit are the validation half's, cut at the discovery half's quantiles. "
-        : "Each patient is scored only by models that did not train on them, and the group cuts are quantiles of the score, chosen without the outcome. ") +
+        : "Each patient is scored only by models that did not train on them. ") +
+      (cutsChosen ? "The cuts were chosen in the view, at the " + cutsChosen.map(ordinalPct).join(", ") + " percentile" + (cutsChosen.length > 1 ? "s" : "") + " of the score" +
+          (validate ? ". " : "; if they were placed while looking at these curves, the log-rank p and the hazard ratios overstate the separation — confirm a cut found that way on the validation half (validate). ")
+        : "The group cuts are equal quantiles of the score, chosen without the outcome. ") +
       (anchor ? "The clock starts at " + result.anchoredTo + "; a patient enters the risk set only from the study's day 0 (delayed entry), so the time before their sequencing is not counted as survival. " : "") +
       "Genes outside the panels every patient was sequenced on are not candidates, so a patient is never counted as wild-type for a gene they were not tested for. " +
-      (g.groupsMade < nGroups ? "Asked for " + nGroups + " groups, made " + g.groupsMade + ": the scores take only " + g.distinct + " distinct values, and patients with the same score stay in the same group. " : "") +
-      (g.distinct < 20 && g.groupsMade === nGroups ? "The scores take only " + g.distinct + " distinct values, so the groups can be unequal in size: patients with the same score stay together. " : "") +
+      (g.groupsMade < asked ? "Asked for " + asked + " groups, made " + g.groupsMade + ": the scores take only " + g.distinct + " distinct values, and patients with the same score stay in the same group. " : "") +
+      (g.distinct < 20 && g.groupsMade === asked ? "The scores take only " + g.distinct + " distinct values, so the groups can be unequal in size: patients with the same score stay together. " : "") +
       "The C-index ignores delayed entry. Seeded (seed " + seed + "): the same document gives the same model.",
   };
 }

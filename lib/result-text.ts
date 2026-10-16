@@ -276,7 +276,7 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         (m.validation ? `; trained on the discovery half only (${m.validation.discovery} patients), C-index on the validation half ${m.validation.cIndex.toFixed(3)} (${m.validation.validation} patients)` : "") + "\n" +
         (m.covariates.length ? "  adjusted for: " + m.covariates.map((c) => `${c.name} HR ${c.hr.toFixed(3)}`).join(", ") + "\n" : "") +
         `  risk score on OncoCast's 0–10 scale (0 and 10 the lowest and highest held-out score${m.validation ? " in the discovery half" : ""}; raw ${m.scale.min.toFixed(3)} to ${m.scale.max.toFixed(3)})\n` +
-        `  risk groups (${m.reportedOn}):\n` +
+        `  risk groups (${m.reportedOn}${m.cutsChosen ? `; cut at the view's chosen quantiles ${m.cutsChosen.join(", ")}` : ", equal quantiles"}):\n` +
         m.groups.map((g) => `    ${g.name} (score ${riskSpan(m, g)}): n=${g.curve.n}, ${g.curve.events} events, median ${g.curve.median == null ? "not reached" : g.curve.median.toFixed(1) + "mo"}, ` +
           `12-month ${pc(g.at12)}, 36-month ${pc(g.at36)}` + (g.hr != null ? `, HR vs lowest ${g.hr.toFixed(2)} (95% CI ${g.ciLow!.toFixed(2)}–${g.ciHigh!.toFixed(2)}, ${pFmt(g.p!)})` : "")).join("\n") +
         (m.logrank ? `\n  log-rank p=${pFmt(m.logrank.p)}` : "") +
