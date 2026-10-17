@@ -949,6 +949,9 @@ export interface RiskmodelView {
   runs?: number;
   /** risk groups, cut at equal quantiles of the score (default 3, 2 to 5) */
   groups?: number;
+  /** instead of `groups`: the quantiles of the score to cut at, increasing, each strictly between 0 and 1
+   *  (1 to 4 of them, so 2 to 5 groups) — e.g. [0.8] for the top fifth against the rest, OncoCast's `cuts` */
+  cuts?: number[];
   seed?: number;
   /** clinical attributes always in the model, never penalised (at most 6): numbers as they are,
    *  categories as indicators against the commonest value */
@@ -957,6 +960,9 @@ export interface RiskmodelView {
   anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
   /** train on the discovery half of the engine's fixed split only, and report on the validation half */
   validate?: boolean;
+  /** the volcano names the genes kept in at least this share of runs (0 to 1, default 0.5); drawn in
+   *  the browser from the whole result, so changing it re-runs nothing */
+  labelAbove?: number;
 }
 
 export interface RiskmodelResult {
@@ -990,8 +996,19 @@ export interface RiskmodelResult {
   logrank: LogRankK | null;
   /** a Cox model of the outcome on the risk score alone (per standard deviation of the score) */
   refit: { hr: number; ciLow: number; ciHigh: number; p: number } | null;
-  /** the scores' distribution, for the histogram: bin edges and counts */
+  /** the scores' distribution, for the histogram: bin edges and counts (raw scores) */
   histogram: { edges: number[]; counts: number[] };
+  /** OncoCast's 0–10 risk score: (raw − min) / (max − min) × 10, min and max the lowest and highest of
+   *  the held-out scores the cuts are placed on (with `validate`, the discovery half's — so a
+   *  validation patient can fall below 0 or above 10) */
+  scale: { min: number; max: number };
+  /** the volcano's label threshold, as the view asked (default 0.5) */
+  labelAbove: number;
+  /** the quantiles the view chose to cut at; null when the groups are `groups` equal quantiles */
+  cutsChosen: number[] | null;
+  /** the held-out score (raw) at each whole percentile 0…100 of the scores the cuts are placed on,
+   *  the rank a cut at that quantile starts from — what the risk-groups dialog places its handles by */
+  percentiles: number[];
 }
 
 export interface LabsView {

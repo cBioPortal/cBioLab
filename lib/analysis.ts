@@ -21,7 +21,7 @@ import { upgradeDocument } from "./doc-version.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { ATTR_NAME_RE, assertCustomDataPresent } from "./custom-data.ts";
 import { viewRunner } from "./views/index.ts";
-import { Untimed, type ViewRun } from "./views/run.ts";
+import { Untimed, type ViewRun, type RiskFitter } from "./views/run.ts";
 import { overLimit } from "./views/shared.ts";
 
 async function oncokbPin(): Promise<string | null> {
@@ -104,6 +104,11 @@ export interface RunOpts {
    * every cohort again. A remote peer always answers for itself.
    */
   count?: (conn: ChConn, cohortSql: string) => Promise<number>;
+  /**
+   * How a risk model is fitted: the Next routes pass a cached one (lib/next-cache.ts), so a change
+   * to a risk model's groups, which the fit does not depend on, refits nothing.
+   */
+  riskFit?: RiskFitter;
 }
 
 /**
@@ -432,7 +437,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
 
     const run: ViewRun = { doc, cohorts, resolvers, vNames, vStudies, participationFor, pin, studyProfiles,
-      page: opts.page, values: opts.values, table: opts.table, oncoprint: opts.oncoprint };
+      page: opts.page, values: opts.values, table: opts.table, oncoprint: opts.oncoprint, riskFit: opts.riskFit };
     const runner = viewRunner(view.kind);
     if (runner) {
       const out = await runner(view, run);

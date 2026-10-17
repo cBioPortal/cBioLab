@@ -957,8 +957,9 @@ export interface RiskmodelRowsOpts {
  * the anchor event), the gene panels their samples were sequenced on for mutations, the genes
  * mutated in them (OncoKB drivers only with `driverPin`), their stratum and covariate values, and
  * which half of the engine's fixed held-out split they are in (`half`, the split leaf's own
- * expression). Values only: the patient id is a join key and never leaves the CTEs. Run only
- * through PatientLevelResolver.viewRows, since a model of individual patients needs their rows.
+ * expression), in patient-id order. Values only: the patient id joins and orders the rows and is
+ * never returned. Run only through PatientLevelResolver.viewRows, since a model of individual
+ * patients needs their rows.
  */
 export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o: RiskmodelRowsOpts): string {
   const { endpoint, columns, strata = null, covariates = [], driverPin = null, anchor = null } = o;
@@ -1031,7 +1032,11 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     "  LEFT JOIN mut ON mut.pid = os.pid\n" +
     (attrs.length ? "  LEFT JOIN attrs ON attrs.pid = os.pid\n" : "") +
     (anchor ? "  LEFT JOIN anch ON anch.pid = os.pid\n" : "") +
-    "WHERE os.months IS NOT NULL AND os.months > 0"
+    "WHERE os.months IS NOT NULL AND os.months > 0\n" +
+    // a fixed order: the ensemble's seeded splits are drawn over row positions, so the same
+    // document gives the same model only if the rows come back in the same order. The id orders
+    // the rows inside the database and is not returned.
+    "ORDER BY os.pid"
   );
 }
 

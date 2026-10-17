@@ -1054,6 +1054,72 @@ async function main() {
     await ctx.close();
   }
 
+  // The risk model (lib/views/riskmodel.ts): the volcano's label threshold is applied in the browser
+  // (no request), and a cut is one request answered from the cached fit (lib/next-cache.ts
+  // cachedRiskFit), not a refit; the caveat then says the cuts were chosen.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1200 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const doc = { study: "msk_chord_2024", cohorts: { NSCLC: { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] } },
+      views: [{ kind: "riskmodel", cohorts: ["NSCLC"], runs: 2 }] };
+    const b64 = Buffer.from(JSON.stringify(doc)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const fig = page.locator("svg[aria-label^='Risk model']");
+    const text = async () => (await fig.evaluate((s) => [...s.querySelectorAll("text")].map((t) => t.textContent).join(" "))).replace(/\s+/g, " ");
+    try {
+      await page.goto(BASE + "/lab?tab=analysis&doc=" + b64, { waitUntil: "domcontentloaded" });
+      await fig.waitFor({ timeout: 240000 });
+      ok("risk model: draws the 0–10 score and the volcano", /score \(0–10\)/.test(await text()) && /Selection frequency against mean hazard ratio/.test(await text()));
+      const askew = await misalignedControls(page, ".riskmodel-tb");
+      ok("risk model: its controls share one height and centre line", askew.length === 0, askew.join(" | "));
+      let requests = 0;
+      page.on("request", (r) => { if (r.url().includes("/api/analysis")) requests++; });
+      await page.locator(".riskmodel-tb label.tbfield", { hasText: "label genes" }).locator("[role=combobox]").click();
+      await page.locator("[role=option]", { hasText: "90%" }).click();
+      await page.waitForFunction(() => /kept in ≥ 90% of runs/.test(document.querySelector("svg[aria-label^='Risk model']")?.textContent || ""), null, { timeout: 10000 });
+      ok("risk model: the label threshold redraws the volcano without a request", requests === 0, requests + " requests");
+      // the risk-groups dialog: its handles move and its preview updates with no request; Apply is one
+      await page.locator(".riskgroupsbtn").click();
+      const dlg = page.locator("[role=dialog].riskgroupsdialog");
+      await dlg.locator("[data-slot=slider-thumb]").nth(1).waitFor({ timeout: 10000 });
+      // measured once the dialog has finished zooming in: mid-animation it is scaled, and so is every control in it
+      await dlg.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+      const dlgAskew = await misalignedControls(page, ".riskgroupsdialog");
+      const onLines = await dlg.evaluate((d) => {
+        const lines = [...d.querySelectorAll("svg line[stroke-dasharray='3 2']")].map((l) => l.getBoundingClientRect().left);
+        return [...d.querySelectorAll("[data-slot=slider-thumb]")].every((t, i) => { const r = t.getBoundingClientRect(); return Math.abs(r.left + r.width / 2 - lines[i]) < 1; });
+      });
+      ok("risk model: the dialog's handles sit on the histogram's cut lines, and its controls align", onLines && dlgAskew.length === 0, dlgAskew.join(" | "));
+      const shares = async () => (await dlg.locator("[aria-live=polite]").innerText()).replace(/\s+/g, " ");
+      await dlg.locator("[data-slot=slider-thumb]").nth(1).focus();
+      for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowRight");
+      const moved = await dlg.locator("input[type=number]").evaluateAll((els) => els.map((e) => e.value));
+      await dlg.getByRole("button", { name: "+ add cut" }).click();
+      const added = await dlg.locator("input[type=number]").count();
+      ok("risk model: the dialog's handles step by a percentile and a cut can be added, with no request",
+        JSON.stringify(moved) === JSON.stringify(["33", "70"]) && added === 3 && requests === 0 && /Risk group 4 of 4/.test(await shares()), JSON.stringify(moved) + ", " + added + " cuts, " + requests + " requests");
+      await dlg.getByRole("button", { name: "Top 20%" }).click();
+      ok("risk model: a preset previews its shares", /Low risk 80%.*High risk 20%/.test(await shares()), await shares());
+      const t0 = Date.now();
+      await dlg.locator(".riskgroupsapply").click();
+      await page.waitForFunction(() => { const l = document.querySelector("svg[aria-label^='Risk model']")?.getAttribute("aria-label") || ""; return /Low risk, High risk$/.test(l); }, null, { timeout: 120000 });
+      const ms = Date.now() - t0;
+      ok("risk model: Apply is one request, and the button then names the cut", requests === 1 && /cut at 80%/.test(await page.locator(".riskgroupsbtn").innerText()), requests + " requests, " + ms + " ms");
+      ok("risk model: the caveat says the cuts were chosen", /The cuts were chosen in the view, at the 80th percentile/.test(await text()));
+      // the same model regrouped is the cached fit: a seed nothing else here fits, then the same with a cut
+      const post = async (view) => (await (await ctx.request.post(BASE + "/api/analysis", { data: { ...doc, views: [{ ...doc.views[0], runs: 5, seed: 7, ...view }] } })).json()).views[0];
+      const cold = await post({}), recut = await post({ cuts: [0.8] });
+      ok("risk model: regrouping reuses the fit — the same model, without the fit's time", !cold.error && !recut.error &&
+        JSON.stringify(cold.riskmodel.cIndex) === JSON.stringify(recut.riskmodel.cIndex) && JSON.stringify(cold.riskmodel.features) === JSON.stringify(recut.riskmodel.features) &&
+        cold.ms > 2000 && recut.ms * 3 < cold.ms, "fit + groups " + cold.ms + " ms, regrouped " + recut.ms + " ms");
+    } catch (e) {
+      ok("risk model: the card's controls", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("risk model: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+
   // The timeline view (app/lab/timeline-body.tsx on lib/timeline-svg.ts): the chosen patient's tracks with a
   // tooltip per event, a track that folds without a re-run, and the patient list (a dialog the navigator
   // opens) whose row click redraws another patient — a choice the document keeps, so a reload shows the same patient.

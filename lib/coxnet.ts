@@ -448,21 +448,23 @@ export function coxFit(subj: CoxSubject[], rows: Int32Array, cols: Float64Array[
       const w = eta.map((e) => Math.exp(e - shift));
       const byEntry = qs.map((_, i) => i).sort((a, c) => subj[rows[qs[a]]].entry - subj[rows[qs[c]]].entry);
       const byExit = qs.map((_, i) => i).sort((a, c) => subj[rows[qs[a]]].time - subj[rows[qs[c]]].time);
-      const times = [...new Set(qs.filter((q) => subj[rows[q]].event).map((q) => subj[rows[q]].time))].sort((a, c) => a - c);
+      // the events by time, and within a time in row order (a stable sort)
+      const events = qs.map((_, i) => i).filter((i) => subj[rows[qs[i]]].event).sort((a, c) => subj[rows[qs[a]]].time - subj[rows[qs[c]]].time);
+      const times = [...new Set(events.map((i) => subj[rows[qs[i]]].time))];
       let S0 = 0; const S1 = new Array(p).fill(0), S2 = Array.from({ length: p }, () => new Array(p).fill(0));
       const add = (i: number, sign: number) => {
         const q = qs[i]; S0 += sign * w[i];
         for (let j = 0; j < p; j++) { S1[j] += sign * w[i] * x(q, j); for (let k = 0; k <= j; k++) S2[j][k] += sign * w[i] * x(q, j) * x(q, k); }
       };
-      let ei = 0, xi = 0;
+      let ei = 0, xi = 0, vi = 0;
       for (const t of times) {
         // at risk at t: entry < t <= time
         while (ei < byEntry.length && subj[rows[qs[byEntry[ei]]]].entry < t) add(byEntry[ei++], 1);
         while (xi < byExit.length && subj[rows[qs[byExit[xi]]]].time < t) add(byExit[xi++], -1);
         let d = 0;
-        for (let i = 0; i < qs.length; i++) {
-          const s = subj[rows[qs[i]]];
-          if (s.event && s.time === t) { d++; ll += eta[i]; for (let j = 0; j < p; j++) g[j] += x(qs[i], j); }
+        for (; vi < events.length && subj[rows[qs[events[vi]]]].time === t; vi++) {
+          const i = events[vi];
+          d++; ll += eta[i]; for (let j = 0; j < p; j++) g[j] += x(qs[i], j);
         }
         ll -= d * (Math.log(S0) + shift);
         for (let j = 0; j < p; j++) {

@@ -40,6 +40,8 @@ export function dataPart(v: Record<string, unknown>): Record<string, unknown> {
   if (v.kind === "hotspots") { const { hide, ...rest } = v; void hide; return rest; }
   // the timeline's folded tracks and its gap cuts are drawn in the browser, from the whole result
   if (v.kind === "timeline") { const { collapsed, expandGaps, ...rest } = v; void collapsed; void expandGaps; return rest; }
+  // the risk model's volcano labels are chosen in the browser, from the whole result
+  if (v.kind === "riskmodel") { const { labelAbove, ...rest } = v; void labelAbove; return rest; }
   if (v.kind !== "oncoprint") return v;
   const { sort, display, ...rest } = v;
   void sort;

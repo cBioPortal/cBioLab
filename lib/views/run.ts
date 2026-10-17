@@ -2,6 +2,7 @@
 // that skips timing.
 import type { AnalysisDoc, ViewResult, ViewParticipation } from "../types.ts";
 import type { Resolver } from "../federation.ts";
+import type { RiskFit, RiskFitArgs } from "./riskmodel.ts";
 
 /** one view of a document, as authored */
 export type DocView = NonNullable<AnalysisDoc["views"]>[number];
@@ -35,7 +36,12 @@ export interface ViewRun {
   table?: string;
   /** the oncoprint's answer: a server-drawn figure, or the spec the web app draws from */
   oncoprint?: "svg" | "spec";
+  /** how a risk model is fitted (RunOpts.riskFit); unset, riskFitDirect */
+  riskFit?: RiskFitter;
 }
+
+/** Fits a risk model from its inputs; `patients` is the cohort's size, for a cache to decide whether the fit is small enough to keep. */
+export type RiskFitter = (args: RiskFitArgs & { patients: number }) => Promise<RiskFit>;
 
 /** A view that stopped with an error before its answer: runAnalysis records it as it is, without timing or queries. */
 export class Untimed {

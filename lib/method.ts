@@ -2228,13 +2228,19 @@ export function riskmodelMethod(t: RiskmodelTrace): MethodRecord {
         ["never held out, so unscored", String(r.neverHeldOut)],
         ...r.covariates.map((c) => [c.name, "HR " + c.hr.toFixed(3) + " (mean over runs)"] as [string, string])] },
     { kind: "statistic", title: "Risk groups, their survival and hazard ratios",
-      detail: "Cuts at equal quantiles of the " + (r.validation ? "discovery half's held-out scores, applied to the validation half" : "held-out scores") +
-        ", each moved to the nearer edge of any run of tied scores so equal scores share a group — no outcome is used to place them. Each group is drawn as a Kaplan–Meier curve" +
+      detail: (r.cutsChosen ? "Cuts at the quantiles the view names (" + r.cutsChosen.join(", ") + ")" : "Cuts at equal quantiles") + " of the " +
+        (r.validation ? "discovery half's held-out scores, applied to the validation half" : "held-out scores") +
+        ", each moved to the nearer edge of any run of tied scores so equal scores share a group" +
+        (r.cutsChosen ? " — the quantiles are the view's; the computation does not use the outcome to place them, but whoever chose them may have." : " — no outcome is used to place them.") + " Each group is drawn as a Kaplan–Meier curve" +
         (r.anchoredTo ? " with delayed entry" : "") + " and read at 12 and 36 months; the groups are compared with a " + (r.strata ? "stratified " : "") +
         "log-rank test, and a Cox model of the outcome on the group indicators gives each group's hazard ratio against the lowest (Newton–Raphson, full information matrix, 95% Wald intervals). " +
-        "A second Cox model on the standardised score alone gives the hazard ratio per standard deviation.",
-      params: r.groups.map((g) => [g.name, g.curve.n.toLocaleString() + " patients, " + g.curve.events.toLocaleString() + " events, median " +
-        (g.curve.median == null ? "not reached" : g.curve.median.toFixed(1) + " months") + (g.hr != null ? ", HR " + g.hr.toFixed(2) : "")] as [string, string]) },
+        "A second Cox model on the standardised score alone gives the hazard ratio per standard deviation. " +
+        "The score is also shown on OncoCast's 0–10 scale, (score − min) / (max − min) × 10, min and max the lowest and highest " +
+        (r.validation ? "held-out score in the discovery half (so a validation patient can fall outside 0–10)" : "held-out score") +
+        "; the scale is linear, so it moves no patient between groups and changes no number above.",
+      params: [["0 on the 0–10 scale (raw score)", r.scale.min.toFixed(4)], ["10 on the 0–10 scale (raw score)", r.scale.max.toFixed(4)],
+        ...r.groups.map((g) => [g.name, g.curve.n.toLocaleString() + " patients, " + g.curve.events.toLocaleString() + " events, median " +
+        (g.curve.median == null ? "not reached" : g.curve.median.toFixed(1) + " months") + (g.hr != null ? ", HR " + g.hr.toFixed(2) : "")] as [string, string])] },
   ];
   return { steps, implementation: { functions: ["coxnetEnsemble", "coxnetPath", "cvLambda", "concordance", "coxFit"], file: "lib/coxnet.ts", commit: BUILD_COMMIT },
     verification: "lib/coxnet.ts's path is checked against scikit-survival's CoxnetSurvivalAnalysis, its delayed-entry, stratified fits (with standard errors) against statsmodels' PHReg and its C-index against lifelines, by test/coxnet-golden.test.ts (fixtures from python/golden/coxnet.py)." };

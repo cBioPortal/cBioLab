@@ -38,6 +38,7 @@ import { oncokbPin } from "./annotation.ts";
 import { runAnalysis } from "./analysis.ts";
 import { buildContract } from "./oncoprint.ts";
 import { hasCustomData } from "./custom-data.ts";
+import { riskFitDirect, type RiskFit, type RiskFitArgs } from "./views/riskmodel.ts";
 import type { AnalysisDoc, AnalysisResult, Contract, OncoprintSpec } from "./types.ts";
 
 type Json = unknown;
@@ -111,16 +112,46 @@ export async function cachedCount(conn: ChConn, sql: string): Promise<number> {
   return throughCache(async () => countEntry(conn.id, sql, await dataVersion()), () => countDirect(conn, sql));
 }
 
+/**
+ * The cohort size past which a risk model's fit is not kept. A fit holds a few numbers per modelled
+ * patient: packed, about 12 bytes each (measured on msk_chord_2024: 93 KB for 7,809 patients, 284 KB
+ * for 24,950), so Runtime Cache's 2 MB item limit is near 170,000; validation and an anchor add an
+ * array each, and this leaves room for both. Past it, the fit runs on every request.
+ */
+const RISK_FIT_CACHE_MAX_PATIENTS = 60_000;
+
+/**
+ * A risk model's fit, keyed by its arguments (`RiskFitArgs`: the study, the cohort and the whole view
+ * but for the settings that only cut and draw its groups), which are all it reads — so a change to
+ * the groups is answered from here and refits nothing, and any other change refits. It is
+ * per-patient survival times and scores without identifiers, cached where the whole answers that
+ * already hold patient ids are (docs/DATA-BOUNDARY.md), from the same patient-level resolver.
+ */
+async function riskFitEntry(args: RiskFitArgs, _version: string): Promise<string> {
+  "use cache: remote";
+  cacheLife("days");
+  return pack(await withoutFailedQueries(() => riskFitDirect(args)));
+}
+export async function cachedRiskFit(a: RiskFitArgs & { patients: number }): Promise<RiskFit> {
+  const { patients, ...args } = a;
+  // a fit over uploaded data belongs to its uploader, never to the shared cache
+  if (hasCustomData() || patients > RISK_FIT_CACHE_MAX_PATIENTS) return riskFitDirect(args);
+  return throughCache(async () => riskFitEntry(args, await dataVersion()), () => riskFitDirect(args));
+}
+
+/** What the routes run a document with: the cached count and fit. */
+const ROUTE_OPTS = { count: cachedCount, riskFit: cachedRiskFit };
+
 async function analysisEntry(doc: AnalysisDoc, oncoprint: "svg" | "spec", _version: string): Promise<string> {
   "use cache: remote";
   cacheLife("days");
-  return pack(await withoutFailedQueries(() => runAnalysis(doc, { oncoprint, count: cachedCount })));
+  return pack(await withoutFailedQueries(() => runAnalysis(doc, { oncoprint, ...ROUTE_OPTS })));
 }
 export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg" | "spec" } = {}): Promise<AnalysisResult> {
   const oncoprint = opts.oncoprint ?? "svg";
   // an answer that depends on uploaded data belongs to its uploader, never to the shared cache
   if (hasCustomData()) return runAnalysis(doc, { oncoprint });
-  return throughCache(async () => analysisEntry(doc, oncoprint, await dataVersion()), () => runAnalysis(doc, { oncoprint, count: cachedCount }));
+  return throughCache(async () => analysisEntry(doc, oncoprint, await dataVersion()), () => runAnalysis(doc, { oncoprint, ...ROUTE_OPTS }));
 }
 
 async function contractEntry(spec: OncoprintSpec, provenance: boolean, _version: string): Promise<string> {
