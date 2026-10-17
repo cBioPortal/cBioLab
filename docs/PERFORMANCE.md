@@ -191,6 +191,31 @@ Fixes, in increasing order of goodness:
 3. Stop inlining: stream ids into a temporary table and join. Removes the wall
    properly and makes request size independent of cohort size.
 
+**Since measured again, and fixed with stored id sets.** Sample ids are longer than patient
+ids, so the wall comes sooner for them: on `msk_chord_2024` (a compare and a clinical view),
+12,000 sample ids ran and 13,000 failed with the same `max_query_size` error. Each view also
+re-inlined the whole list, and the readback carried it back to the browser in every compiled
+query: at 10,000 ids every id appeared four times in an 839 KB response. And the page keeps the
+document in the URL (`?doc=`), which Node refuses past 16 KB of headers (431) — a reload or a
+shared link broke at roughly 350 sample ids, long before ClickHouse did.
+
+The fix is option 3 above, with the ids kept on the server: a list is saved once as a stored
+id set (`lib/id-set-store.ts`) and a cohort names it, `{"kind":"sampleList","set":"<id>"}`. The
+request reads the set from Postgres once (cached in memory; a set never changes) and each
+statement that reads it carries it as a ClickHouse external table. Same documents, measured
+with `runAnalysis` against the live warehouse:
+
+| set | document | response | time | result |
+|---|---|---|---|---|
+| 10,000 msk_chord_2024 samples | 416 B | 23 KB | 2.2 s | ok |
+| all 25,040 msk_chord_2024 samples | 416 B | 23 KB | 4.9 s | ok (inline: fails) |
+| 60,000 samples, msk_chord_2024 + genie_public | 504 B | 45 KB | 7.3 s | ok |
+
+Saving the 60,000-id set (matching every id to the studies' samples, then storing it) took
+0.9 s. An inline list is still accepted up to `INLINE_ID_SQL_LIMIT` (200 KB of ids per study,
+about 10,000 sample ids) and refused by name past it, pointing at a stored set, instead of
+failing with ClickHouse's syntax error.
+
 One further constraint: a `patients` leaf is refused for aggregate-only
 participants (see [DATA-BOUNDARY.md](DATA-BOUNDARY.md)), so a list-defined
 cohort is **inherently non-federatable** — it cannot cross an instance boundary

@@ -7,6 +7,7 @@ import { listArtifacts, getArtifact, createArtifact, updateArtifact, deleteArtif
 import { createGroup, addMember, getGroup, listGroups, removeMember, setRole, deleteGroup } from "../../lib/groups.ts";
 import { userForEmail, signIn, claimLegacy } from "../../lib/users.ts";
 import { dbQuery } from "../../lib/db.ts";
+import { saveIdSet, listIdSets, getIdSet, readIdSet, deleteIdSet, shareIdSet, loadIdSetForRequest } from "../../lib/id-set-store.ts";
 
 const ds = (id: string, value = "Brain") => ({
   id, name: id + " (test)", level: "patient", columns: [{ name: "MET_SITE", datatype: "STRING" }],
@@ -74,6 +75,66 @@ export function customStoreContract(backend: string): void {
       const d = await saveDataset(P, ds("private"), {});
       assert.ok(!(await listDatasets(OTHER)).some((x) => x.id === d.id));
       await assert.rejects(readVersion(OTHER, d.id), /no custom dataset .* that you may read/);
+    });
+  });
+}
+
+/** Stored id sets (lib/id-set-store.ts): read back exactly, never changed, owner-scoped, a deleted one says so. */
+export function idSetContract(backend: string): void {
+  describe("id set store (" + backend + ")", () => {
+    before(users);
+    const input = (name: string) => ({ name, level: "sample" as const, perStudy: { s2: ["T-1"], s1: ["S-2", "S-1", "S-1"] },
+      source: { idsIn: 5, unmatched: 1, duplicates: 1, multiStudy: 0 } });
+
+    test("a saved set lists without ids and reads back its distinct ids per study", async () => {
+      const meta = await saveIdSet(P, input("responders"));
+      assert.equal(meta.count, 3);
+      assert.deepEqual(meta.studies, ["s1", "s2"]);
+      assert.deepEqual(meta.perStudy, { s1: 2, s2: 1 });
+      assert.equal(meta.source.unmatched, 1);
+      const listed = await listIdSets(P);
+      assert.ok(listed.some((x) => x.id === meta.id));
+      assert.ok(!("ids" in listed[0]) && !("perStudy" in listed[0] && Array.isArray((listed[0].perStudy as any).s1)));
+      assert.deepEqual((await readIdSet(P, meta.id)).perStudy, { s1: ["S-1", "S-2"], s2: ["T-1"] });
+      const loaded = await loadIdSetForRequest(P, meta.id);
+      assert.deepEqual([loaded.name, loaded.level, loaded.count], ["responders", "sample", 3]);
+    });
+
+    test("a set with no ids, or no name, is refused rather than stored", async () => {
+      await assert.rejects(saveIdSet(P, { ...input("empty"), perStudy: { s1: [] } }), /none of the ids matched/);
+      await assert.rejects(saveIdSet(P, input("  ")), /needs a name/);
+    });
+
+    test("another principal can read nothing it was not granted, until it is shared", async () => {
+      const meta = await saveIdSet(P, input("private"));
+      assert.ok(!(await listIdSets(OTHER)).some((x) => x.id === meta.id));
+      await assert.rejects(readIdSet(OTHER, meta.id), /no stored id set .* that you may read/);
+      await assert.rejects(loadIdSetForRequest(OTHER, meta.id), /no stored id set .* that you may read/);
+      await assert.rejects(shareIdSet(OTHER, meta.id, { visibility: "public" }), /no stored id set/);
+      await shareIdSet(P, meta.id, { visibility: "public" });
+      assert.deepEqual((await readIdSet(OTHER, meta.id)).perStudy.s2, ["T-1"]);
+      await assert.rejects(deleteIdSet(OTHER, meta.id), /only its owner can delete/);
+      await loadIdSetForRequest(OTHER, meta.id);
+      await shareIdSet(P, meta.id, { visibility: "private" });
+      await assert.rejects(loadIdSetForRequest(OTHER, meta.id), /no stored id set/, "unsharing takes effect at once, not after the access check's minute");
+    });
+
+    test("a deleted set disappears from the list, and reading it says when it went", async () => {
+      const meta = await saveIdSet(P, input("gone"));
+      await loadIdSetForRequest(P, meta.id);   // read once, so it is remembered
+      await deleteIdSet(P, meta.id);
+      await assert.rejects(loadIdSetForRequest(P, meta.id), /was deleted on/, "a set read just before its deletion is not served after it");
+      assert.ok(!(await listIdSets(P)).some((x) => x.id === meta.id));
+      assert.ok((await getIdSet(P, meta.id)).deletedAt);
+      await assert.rejects(readIdSet(P, meta.id), /was deleted on \d{4}-\d{2}-\d{2}/);
+    });
+
+    test("its members cannot be changed or the row deleted, though its sharing can", async () => {
+      const meta = await saveIdSet(P, input("frozen"));
+      await assert.rejects(dbQuery("update id_set set id_count = 99 where id = $1", [meta.id]), /members are immutable/);
+      await assert.rejects(dbQuery("update id_set set ids_gz = ''::bytea where id = $1", [meta.id]), /members are immutable/);
+      await assert.rejects(dbQuery("delete from id_set where id = $1", [meta.id]), /never deleted/);
+      await dbQuery("update id_set set name = 'renamed' where id = $1", [meta.id]);
     });
   });
 }

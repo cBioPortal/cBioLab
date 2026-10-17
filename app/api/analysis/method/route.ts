@@ -12,7 +12,7 @@ export const maxDuration = 60;
 export async function POST(req: Request) {
   try {
     const { customData, customRefs, ...doc } = parseBody(AnalysisRequest, await req.json());
-    const result = await withRequestCustomData(customData, () => cachedAnalysis(doc as unknown as AnalysisDoc, { oncoprint: "spec" }), { refs: customRefs, req });
+    const result = await withRequestCustomData(customData, () => cachedAnalysis(doc as unknown as AnalysisDoc, { oncoprint: "spec" }), { refs: customRefs, req, uses: doc });
     const view = result.views[0];
     if (!view || view.error) return Response.json({ error: view ? view.error : "the document has no view" }, { status: 422 });
     return Response.json({ python: view.method?.python ?? null });

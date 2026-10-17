@@ -10,6 +10,7 @@ import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
 import { chQuery } from "../../../lib/ch.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { assertCustomDataPresent } from "../../../lib/custom-data.ts";
+import { idSetRefsIn } from "../../../lib/id-sets.ts";
 import type { DerivedRequest } from "../../../lib/types.ts";
 
 export const maxDuration = 60;
@@ -32,9 +33,9 @@ export async function POST(req: Request) {
 async function handle(req: Request) {
   try {
     const { customData, customRefs, ...body } = parseBody(ExploreRequest, await req.json());
-    // facets over uploaded data are the uploader's alone: answered directly, never cached
-    if ((Array.isArray(customData) && customData.length) || (Array.isArray(customRefs) && customRefs.length))
-      return Response.json(await withRequestCustomData(customData, () => ensureChContext(() => exploreFor(body)), { refs: customRefs, req }));
+    // facets over uploaded data or a stored id set are their reader's alone: answered directly, never cached
+    if ((Array.isArray(customData) && customData.length) || (Array.isArray(customRefs) && customRefs.length) || idSetRefsIn(body.draft).length)
+      return Response.json(await withRequestCustomData(customData, () => ensureChContext(() => exploreFor(body)), { refs: customRefs, req, uses: body.draft }));
     return Response.json(await throughCache(async () => exploreEntry(body, await dataVersion()), () => ensureChContext(() => exploreFor(body))));
   } catch (e) {
     // The reader superseded this request: not a failure, and there is nobody left to tell.

@@ -489,6 +489,7 @@ export default function AnalysisPage() {
           examples: EXAMPLES,
         }}
         onAdd={(name, def) => { if (chooser) addCohortToView(chooser, name, def); }}
+        studies={analysisStudies()}
         onExplore={() => { if (!chooser) return; const t = chooser; setChooser(null); openAddCohort(t); }}
         onLogin={requestLogin}
         cells={cellExplorerFor(doc.study || study)}

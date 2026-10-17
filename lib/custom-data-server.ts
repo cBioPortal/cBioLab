@@ -5,6 +5,7 @@
 import { validateCustomData, withCustomData, tsvField, type CustomCtx, type CustomDataset } from "./custom-data.ts";
 import { requirePrincipal } from "./auth.ts";
 import { loadVersionForRequest } from "./custom-store.ts";
+import { withRequestIdSets } from "./id-sets-server.ts";
 import { chQueryRows, registerChExternal, withChContext, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { studyRouting, instanceForStudy, patientLevelConn, resolverFor, isPatientLevel } from "./federation.ts";
@@ -40,9 +41,14 @@ export async function customContext(raw: unknown, server?: ServerRefs): Promise<
   return { datasets, allowedConns, allowedDbs };
 }
 
-/** Run `fn` with the request's custom data in effect (a no-op when it carries none). */
+/**
+ * Run `fn` with the request's custom data in effect (a no-op when it carries none), and the stored
+ * id sets `server.uses` names (lib/id-sets-server.ts).
+ */
 export async function withRequestCustomData<T>(raw: unknown, fn: () => Promise<T>, server?: ServerRefs): Promise<T> {
-  return withCustomData(await customContext(raw, server), fn);
+  const ctx = await customContext(raw, server);
+  const run = () => withCustomData(ctx, fn);
+  return server && server.uses !== undefined ? withRequestIdSets(server.uses, server.req, run) : run();
 }
 
 /**
@@ -50,7 +56,12 @@ export async function withRequestCustomData<T>(raw: unknown, fn: () => Promise<T
  * each `{ as, dataset, version }` — the name the document uses, the stored dataset, and the
  * version it is pinned to. Read as the request's principal (lib/auth.ts).
  */
-export interface ServerRefs { refs: unknown; req: Request }
+export interface ServerRefs {
+  refs: unknown;
+  req: Request;
+  /** the document, definition or spec the request serves: the stored id sets it names are read for it */
+  uses?: unknown;
+}
 export const MAX_REFS = 10;
 
 async function loadServerRefs({ refs, req }: ServerRefs): Promise<CustomDataset[]> {

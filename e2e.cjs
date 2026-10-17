@@ -1449,6 +1449,53 @@ async function main() {
       steps.copied && steps.untouched && steps.updated, JSON.stringify(steps));
     await ctx.close();
   }
+  // A pasted list of ids becomes a stored id set: matched to the study's cases (what matched nothing
+  // is said), saved on the server, and named by the cohort — the document carries the set's id,
+  // never the ids. Reading the set needs its reader to be signed in and allowed.
+  if (LOGIN) {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const sp = await ctx.newPage();
+    let steps = {};
+    try {
+      await signIn(ctx);
+      const ex = await (await ctx.request.get(BASE + "/api/custom-data/example?study=msk_chord_2024")).json();
+      const patients = ex.patients || [];
+      const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
+      await sp.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify({ dsl: "2.7", study: "msk_chord_2024", cohorts: {}, views: [] })).toString("base64url"), { waitUntil: "domcontentloaded" });
+      await sp.locator(".addview button:has-text('Survival')").click();
+      await sp.locator(".emptyview .emptyview-body button").first().click();
+      await sp.getByRole("tab", { name: "From a list of ids" }).click();
+      await sp.locator(".addcohortdialog").getByRole("tab", { name: "patients" }).click();
+      await sp.locator(".addcohortdialog textarea").fill([...patients, "NOT-A-PATIENT-1"].join("\n"));
+      await sp.locator(".addcohortdialog input[aria-label='set name']").fill("e2e list");
+      await sp.locator(".addcohortdialog .idsetsave").click();
+      await sp.waitForSelector(".addcohortdialog .idsetresult", { timeout: 60000 });
+      const said = (await sp.locator(".addcohortdialog .idsetresult").innerText()).replace(/\s+/g, " ");
+      steps.matched = patients.length > 0 && said.includes(patients.length + " patient") && /1 matched no patient/.test(said);
+      await sp.locator(".addcohortdialog").getByRole("button", { name: /Add|Use/ }).last().click();
+      await sp.waitForSelector(".cohortbox .cohortbox-head strong", { timeout: 120000 });
+      const def = (await docOf()).cohorts["e2e list"];
+      const leaf = def?.all?.[0] || {};
+      steps.named = leaf.kind === "patientList" && /^[0-9a-f-]{36}$/.test(leaf.set || "") && !leaf.ids && leaf.n === patients.length;
+      steps.counted = (await sp.locator(".cohortbox-head").first().innerText()).replace(/\s+/g, "").includes(String(patients.length));
+      steps.noIds = !(await sp.locator("#docjson").inputValue()).includes(patients[0]);
+      const doc = { dsl: "2.7", study: "msk_chord_2024", cohorts: { L: def }, views: [] };
+      const anon = await browser.newContext();
+      const r1 = await anon.request.post(BASE + "/api/analysis", { data: doc });
+      steps.signedOut = r1.status() >= 400 && /sign in/i.test((await r1.json()).error || "");
+      const other = await browser.newContext();
+      await signIn(other, "other." + LOGIN);
+      const r2 = await other.request.post(BASE + "/api/analysis", { data: doc });
+      steps.otherUser = r2.status() >= 400 && /no stored id set/.test((await r2.json()).error || "");
+      await anon.close(); await other.close();
+      await ctx.request.delete(BASE + "/api/id-sets/" + leaf.set);
+      const r3 = await ctx.request.post(BASE + "/api/analysis", { data: doc });
+      steps.deleted = r3.status() >= 400 && /was deleted on/.test((await r3.json()).error || "");
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("a pasted list of ids is matched, saved as a stored id set and named by the cohort; only its signed-in owner can read it",
+      steps.matched && steps.named && steps.counted && steps.noIds && steps.signedOut && steps.otherUser && steps.deleted, JSON.stringify(steps));
+    await ctx.close();
+  }
   // A cohort with something to save — never saved, or re-split since — offers "save" in its gear
   // menu; saving makes the analysis's copy name the saved cohort as its source, and the item goes.
   if (LOGIN) {

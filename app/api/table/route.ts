@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   } catch (e) {
     return new Response("cannot download: " + String((e as Error)?.message || e) + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
   }
-  const run = <T,>(fn: () => Promise<T>) => withRequestCustomData(body.customData, fn, { refs: body.customRefs, req });
+  const run = <T,>(fn: () => Promise<T>) => withRequestCustomData(body.customData, fn, { refs: body.customRefs, req, uses: body });
   const table = typeof body.table === "string" ? body.table : undefined;
   const first = await run(() => runAnalysis(doc, { table })).catch((e) => ({ views: [{ kind: "", cohorts: [], error: String((e as Error)?.message || e) } as ViewResult] }));
   const v = first.views[0];

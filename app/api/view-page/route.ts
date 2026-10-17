@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const view = Array.isArray(doc.views) ? doc.views[vi] : null;
     if (!view || !PAGED_KINDS.includes(view.kind)) throw new Error("view " + body.view + " is not a table view (" + PAGED_KINDS.join(", ") + ")");
     const one = { ...doc, views: [view] };
-    const run = (opts: Parameters<typeof runAnalysis>[1]) => withRequestCustomData(customData, () => runAnalysis(one, opts), { refs: customRefs, req });
+    const run = (opts: Parameters<typeof runAnalysis>[1]) => withRequestCustomData(customData, () => runAnalysis(one, opts), { refs: customRefs, req, uses: one });
     const pick = (r: Awaited<ReturnType<typeof runAnalysis>>) => {
       const v = r.views[0];
       const t = pagedTable(v, body.table);

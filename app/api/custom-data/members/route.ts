@@ -10,7 +10,7 @@ export const maxDuration = 60;
 export async function POST(req: Request) {
   try {
     const { customData, customRefs, def, studies } = parseBody(MembersRequest, await req.json());
-    return Response.json({ studies: await withRequestCustomData(customData, () => cohortMembership(def, studies.map(String)), { refs: customRefs, req }) });
+    return Response.json({ studies: await withRequestCustomData(customData, () => cohortMembership(def, studies.map(String)), { refs: customRefs, req, uses: def }) });
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }

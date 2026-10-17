@@ -1196,7 +1196,8 @@ export function sequenceKeysSql(cohortSql: string, study: string, db: string, ev
 
 /**
  * Does this definition carry explicit sample or patient identifiers? A
- * `sampleList`/`patientList` leaf embeds ids directly into the compiled SQL,
+ * `sampleList`/`patientList` leaf embeds ids directly into the compiled SQL
+ * (or, naming a stored set, uploads them beside it),
  * so sending one to an instance that is not entitled to patient-level data
  * would push identifiers across exactly the boundary this design exists to
  * respect — and the ids are study-qualified anyway, so they could never
@@ -1214,6 +1215,8 @@ export function carriesPatientIds(def: CohortDef | null | undefined): boolean {
     if (Array.isArray(x)) return x.some(walk);
     const o = x as { kind?: unknown; ids?: unknown };
     if ((o.kind === "sampleList" || o.kind === "patientList") && Array.isArray(o.ids) && o.ids.length > 0) return true;
+    // a stored set is the same list kept on the server: the instance would be asked for its ids
+    if ((o.kind === "sampleList" || o.kind === "patientList") && (o as { set?: unknown }).set !== undefined) return true;
     return Object.values(x).some(walk);
   };
   return walk(def);
