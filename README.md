@@ -21,21 +21,55 @@ msk_chord_2024 counts. A machine-readable contract is in
 
 ## Environment variables
 
-| var | example |
-|---|---|
-| `CLICKHOUSE_URL` | `https://<host>:8443` |
-| `CLICKHOUSE_USER` | read-only user scoped to one database |
-| `CLICKHOUSE_PASSWORD` | — |
-| `CLICKHOUSE_DB` | `cbioportal_public_librechat_blue` |
-| `STUDY_ID` | `msk_chord_2024` |
-| `PORTAL_URL` | `https://www.cbioportal.org` |
-| `EXAMPLES_URL` | optional: set on an instance whose database is not the public warehouse, e.g. `https://cbiolab.vercel.app`. The gallery examples are written for the public studies, so the Examples tab then opens each one there (after saying the reader is leaving), instead of running it here. Unset, they run on this instance |
-| `PUBLIC_ENV` | optional: the environment variables written into the page for the browser to read, comma-separated (default `EXAMPLES_URL`). Read per request, so one image serves every deployment; a name that looks like a secret (`PASSWORD`, `SECRET`, `KEY`, `TOKEN`, `CREDENTIAL`) is refused |
-| `CHAT_PROVIDER` | optional: `anthropic` (with `ANTHROPIC_API_KEY`) or `bedrock` (with `AWS_REGION` and AWS credentials) turns on the Assistant sidebar on a dev server (`next dev`) |
-| `CHAT_ON_DEPLOYMENT` | `1` also turns it on in a built deployment (never on Vercel), for signed-in users only |
-| `CHAT_MODEL` / `CHAT_EFFORT` | optional: the model id (default Claude Sonnet 5.5, `claude-sonnet-5-5` / `anthropic.claude-sonnet-5-5`) and effort (default `medium`) |
+Every setting is in **[`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md)**, grouped by what it controls:
+data, federation, sign-in and saved data, the site, the assistant, performance, building, and
+the test and check scripts. To run locally you need only `CLICKHOUSE_URL`, `CLICKHOUSE_USER`,
+`CLICKHOUSE_PASSWORD` and `CLICKHOUSE_DB` in `.env.local`; on Vercel they go in Project
+Settings → Environment Variables.
 
-Copy them into `.env.local` for local dev; set them in Vercel Project Settings → Environment Variables for deploys.
+## Federation
+
+One analysis can draw on studies held by more than one cBioPortal database, and the prototype
+offers that **over MCP**: the database that holds a study answers aggregate queries (and, opted
+in, some patient-level ones) through its `/api/mcp`, and this app never queries it directly.
+`docs/DATA-BOUNDARY.md` is the design and its rules.
+
+There are two ways to run it:
+
+- **A simulated peer** (the public portal, dev servers, the gate): one deployment holds both
+  databases and serves the second one to itself over MCP (`LOOPBACK_PEER`). Every query on that
+  database runs only while the app is answering an MCP call as that peer; a direct query on it,
+  or one naming its database on the other connection, is refused (`lib/ch.ts`). It exercises
+  the real protocol with no second deployment, but it is not separation: one process, one login.
+- **A separate peer**: a second cbio-lab instance whose own database is the other one, reached at
+  its `/api/mcp` (`PEER_MCP`). This instance then holds no connection to that database at all.
+
+Its settings, and how to set it up for the public portal, dev servers and a separate peer, are
+in [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md#federation).
+
+### What a federated study supports
+
+Every view either draws over every patient of its cohorts or is not drawn and says why
+(`lib/view-coverage.ts`); the add-view buttons and cohort pickers are disabled with the reason.
+
+| | over MCP, aggregates | over MCP, patient-level (`timeline`, `alterations` shared) |
+|---|---|---|
+| drawn | compare, survival, cooccurrence, coexpression, clinical, hotspots, attrition, course, sequence; Explore, study list, catalog | the same, plus timeline and alterations |
+| not drawn over the peer's studies | oncoprint, clinical data table, mutation table, cox, logistic, risk model, plot, genome, pathways, enrichment, overlap, incidence, cancer types, clonality, paired, diffexpr, correlates, assays, labs, composition | the same |
+
+Measured cost (`docs/DATA-BOUNDARY.md`, "Federation: where it stands"): about +0.3–0.4 s per
+analysis for aggregate views on a small study, about +2 s for the patient-level views; on a large
+study the database's own time dominates.
+
+### Security notes
+
+- **No caller authentication yet.** Anyone who can reach a peer's `/api/mcp` can call it. On a
+  simulated peer the patient-level tools answer only the app itself (the token); a separate peer
+  answers anyone, so it must not be reachable from outside.
+- The boundary is enforced by the coordinator: a peer's own `run_analysis`, `query_cohort` and
+  web API answer patient-level for its own studies to any caller. Fine for public data; a peer
+  serving restricted data needs caller authentication and those closed first.
+- There is no small-cell suppression: counts are exact.
 
 ## MCP server
 
