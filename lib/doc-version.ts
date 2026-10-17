@@ -14,7 +14,7 @@
 
 import { flattenSplits, viewDrawProblem } from "./partition-arms.ts";
 
-export const DOC_VERSION = "2.6";
+export const DOC_VERSION = "2.7";
 
 /** what upgrading a document did, reported in the result so a reader is told, not left to notice */
 export interface DocUpgrade {
@@ -193,12 +193,21 @@ function studyTrackRenamed(doc: AnyDoc, changes: string[]): AnyDoc {
   return { ...doc, views };
 }
 
+/**
+ * 2.6 → 2.7: a `sampleList` / `patientList` clause may name a stored id set (`set`) instead of
+ * listing its ids. Nothing an older document says changes meaning, so there is nothing to rewrite;
+ * the version exists so a 2.6 engine refuses a document naming a set rather than reading the
+ * clause as an empty list.
+ */
+const idSetsNamed = (doc: AnyDoc): AnyDoc => doc;
+
 /** each step upgrades from the version before `to`; unversioned documents start at the first */
 const STEPS: { to: string; run: (doc: AnyDoc, changes: string[]) => AnyDoc }[] = [
   { to: "2.3", run: partitionsToSplits },
   { to: "2.4", run: splitsNoLongerReplace },
   { to: "2.5", run: viewsNameTheirCohorts },
-  { to: "2.6", run: studyTrackRenamed }
+  { to: "2.6", run: studyTrackRenamed },
+  { to: "2.7", run: idSetsNamed }
 ];
 
 /**

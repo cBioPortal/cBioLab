@@ -17,6 +17,8 @@
 // version, so migrate() is the identity function — but the column and the
 // call site exist now, while adding them costs nothing, rather than being
 // retrofitted under pressure the day the DSL makes a breaking change.
+import { idSetRefsIn } from "./id-sets.ts";
+import { idSetSharingGaps } from "./id-set-store.ts";
 import { dbQuery } from "./db.ts";
 import { AccessError } from "./auth.ts";
 import { groupsOf, readableWhere, canRead, canWrite, canShare, rightsOf, sharingOf, validateSharing, covers,
@@ -43,7 +45,8 @@ export interface SavedArtifact {
 }
 
 /** A custom dataset an analysis uses that some of the people it is shared with cannot read. */
-export interface DatasetWarning { id: string; slug: string; name: string; visibility: Visibility; groupName: string | null; yours: boolean }
+/** A custom dataset (`kind` "dataset", named by `slug`) or a stored id set ("idSet") an item uses that its audience cannot all read. */
+export interface DatasetWarning { id: string; kind: "dataset" | "idSet"; slug: string; name: string; visibility: Visibility; groupName: string | null; yours: boolean }
 
 const KINDS: ArtifactKind[] = ["cohort", "workspace"];
 export function isArtifactKind(k: unknown): k is ArtifactKind {
@@ -166,15 +169,21 @@ export async function shareArtifact(principal: string, id: string, sharing: unkn
   return { artifact, warnings: await datasetWarnings(artifact) };
 }
 
-/** The datasets an analysis pins (`uploads`) that its audience could not all read. */
+/** The datasets an analysis pins (`uploads`) and the stored id sets an item names that its audience could not all read. */
 export async function datasetWarnings(a: SavedArtifact): Promise<DatasetWarning[]> {
+  if (a.sharing.visibility === "private") return [];
   const pins = (a.definition as { uploads?: { dataset?: unknown }[] })?.uploads;
   const ids = [...new Set((Array.isArray(pins) ? pins : []).map((p) => p?.dataset).filter((d): d is string => typeof d === "string" && UUID.test(d)))];
-  if (!ids.length || a.sharing.visibility === "private") return [];
-  const ds = await dbQuery<Shareable & { id: string; slug: string; name: string; group_name: string | null }>(
-    "select d.*, g.name as group_name from custom_dataset d left join user_group g on g.id = d.group_id where d.id = any($1::uuid[])", [ids]);
-  return ds.filter((d) => !covers(sharingOf(d), a.sharing)).map((d) => ({
-    id: d.id, slug: d.slug, name: d.name, visibility: d.visibility, groupName: d.group_name, yours: d.owner_id === a.owner.id,
+  let sets: string[] = [];
+  try { sets = idSetRefsIn(a.definition); } catch { /* a malformed reference names no set to warn about */ }
+  const ds = ids.length ? await dbQuery<Shareable & { id: string; slug: string; name: string; group_name: string | null }>(
+    "select d.*, g.name as group_name from custom_dataset d left join user_group g on g.id = d.group_id where d.id = any($1::uuid[])", [ids]) : [];
+  const gaps = [
+    ...ds.map((d) => ({ ...d, kind: "dataset" as const })),
+    ...(await idSetSharingGaps(sets)).map((d) => ({ ...d, slug: "", kind: "idSet" as const })),
+  ];
+  return gaps.filter((d) => !covers(sharingOf(d), a.sharing)).map((d) => ({
+    id: d.id, kind: d.kind, slug: d.slug, name: d.name, visibility: d.visibility, groupName: d.group_name, yours: d.owner_id === a.owner.id,
   }));
 }
 

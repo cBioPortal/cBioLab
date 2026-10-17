@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     const body = parseBody(CellExplorerRequest, await req.json());
     if (body.mode === "import") return Response.json(await cohortFromCells(body));
     const { customData, customRefs, doc, cohort } = body;
-    return Response.json(await withRequestCustomData(customData, () => cohortCellsLink({ doc, cohort }), { refs: customRefs, req }));
+    return Response.json(await withRequestCustomData(customData, () => cohortCellsLink({ doc, cohort }), { refs: customRefs, req, uses: doc }));
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }

@@ -7,6 +7,7 @@ import CohortPills, { type OnCustomData } from "./pills";
 import { ShareDialog, sharingLabel } from "./share-dialog.tsx";
 import { useGroups } from "./use-groups.ts";
 import { shareServerDataset } from "./custom-data-client.ts";
+import { api } from "./api.ts";
 import type { ArtifactKind } from "../../lib/artifacts.ts";
 import type { Sharing } from "../../lib/access.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
@@ -210,7 +211,13 @@ export function SavedTab({
     {sharing && <ShareDialog kind={sharing.kind === "workspace" ? "analysis" : "cohort"} name={sharing.name} sharing={sharing.sharing}
       groups={groups.groups} groupsError={groups.error}
       onSave={(s) => saved.share(sharing.kind, sharing.id, s)}
-      onShareDatasets={async (ids, s) => { for (const id of ids) await shareServerDataset(id, s); }}
+      onShareDatasets={async (items, s) => {
+        for (const w of items) {
+          if (w.kind !== "idSet") { await shareServerDataset(w.id, s); continue; }
+          const res = await api.idSets.share(w.id, s);
+          if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || res.statusText);
+        }
+      }}
       onClose={() => setSharing(null)} />}
   </div>;
 }

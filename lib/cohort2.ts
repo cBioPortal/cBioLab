@@ -19,6 +19,7 @@ import { oqlLeafSql } from "./oql.ts";
 import { clinicalValueFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
 import { clinicalTable } from "./custom-data.ts";
+import { idSetTable, idSetIfLoaded, ID_SET_UUID } from "./id-sets.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
@@ -353,8 +354,7 @@ function idsForStudy(raw: string[] | undefined, study: string): string[] {
     const i = s.indexOf(":");
     return i > 0 && i < s.length - 1 ? { study: s.slice(0, i), id: s.slice(i + 1) } : null;
   }).filter((p): p is { study: string; id: string } => !!p && p.study === study && /^[A-Za-z0-9._-]{1,64}$/.test(p.id))
-    .map(p => p.id)
-    .slice(0, 50000);
+    .map(p => p.id);
 }
 
 function requireQualifiedIds(raw: string[] | undefined, kind: string): void {
@@ -362,24 +362,51 @@ function requireQualifiedIds(raw: string[] | undefined, kind: string): void {
   if (!any) throw new Error(kind + ' clause needs ids as "<study>:<id>" — none of the given ids parsed');
 }
 
-function sampleListLeafSql(leaf: SampleListLeaf, ctx: Ctx): string {
-  requireQualifiedIds(leaf.ids, "sampleList");
+/**
+ * The most SQL text an inline list may compile to. ClickHouse refuses a statement over its
+ * 256 KB max_query_size, and the list shares the statement with the rest of the query; past this a
+ * list is refused here, by name, rather than by a syntax error from the database. A stored set
+ * (`set`) has no such limit: its ids travel as an external table.
+ */
+export const INLINE_ID_SQL_LIMIT = 200_000;
+
+/** `<pid expression> IN (…)` for a list leaf: its stored set's table, or its inline ids. Null when it names nobody in `study`. */
+function listMembership(leaf: SampleListLeaf | PatientListLeaf, ctx: Ctx, col: string): string | null {
+  const { kind } = leaf;
+  if (leaf.set !== undefined && leaf.ids !== undefined) throw new Error(kind + " clause takes ids or a stored set, not both");
+  const level = kind === "sampleList" ? "sample" : "patient";
+  if (leaf.set !== undefined) {
+    if (typeof leaf.set !== "string" || !ID_SET_UUID.test(leaf.set)) throw new Error(kind + " clause: set must be a stored id set's id (a uuid)");
+    const table = idSetTable(leaf.set, ctx.study, level);
+    return table && PID(col, ctx.study) + " IN (SELECT id FROM " + table + ")";
+  }
+  requireQualifiedIds(leaf.ids, kind);
   const ids = idsForStudy(leaf.ids, ctx.study);
+  if (!ids.length) return null;
+  const sql = ids.map(sq).join(",");
+  if (sql.length > INLINE_ID_SQL_LIMIT)
+    throw new Error("this " + kind + " has " + ids.length.toLocaleString("en-US") + " " + level + " ids for " + ctx.study +
+      ", too many to write into one query (" + Math.round(sql.length / 1000) + " KB of the " + INLINE_ID_SQL_LIMIT / 1000 +
+      " KB a list may take): save it as a stored id set and name it with \"set\" instead");
+  return PID(col, ctx.study) + " IN (" + sql + ")";
+}
+
+function sampleListLeafSql(leaf: SampleListLeaf, ctx: Ctx): string {
+  const member = listMembership(leaf, ctx, "sample_unique_id");
   // No ids for THIS study is a normal, expected shape for a cross-study list
   // (most of it belongs to other studies in the fan-out) — it contributes
   // zero patients here, not an error.
-  if (!ids.length) return "SELECT " + PID("patient_unique_id", ctx.study) + " AS pid FROM " + dbOf(ctx) + ".sample_derived WHERE 1=0";
+  if (!member) return "SELECT " + PID("patient_unique_id", ctx.study) + " AS pid FROM " + dbOf(ctx) + ".sample_derived WHERE 1=0";
   return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
     "  FROM " + dbOf(ctx) + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(ctx.study) + "\n" +
-    "    AND " + PID("sample_unique_id", ctx.study) + " IN (" + ids.map(sq).join(",") + ")";
+    "    AND " + member;
 }
 
 function patientListLeafSql(leaf: PatientListLeaf, ctx: Ctx): string {
-  requireQualifiedIds(leaf.ids, "patientList");
-  const ids = idsForStudy(leaf.ids, ctx.study);
-  if (!ids.length) return "SELECT " + PID("patient_unique_id", ctx.study) + " AS pid FROM " + dbOf(ctx) + ".sample_derived WHERE 1=0";
-  return basePatientsSql(ctx.study, dbOf(ctx)) + "\n    AND " + PID("patient_unique_id", ctx.study) + " IN (" + ids.map(sq).join(",") + ")";
+  const member = listMembership(leaf, ctx, "patient_unique_id");
+  if (!member) return "SELECT " + PID("patient_unique_id", ctx.study) + " AS pid FROM " + dbOf(ctx) + ".sample_derived WHERE 1=0";
+  return basePatientsSql(ctx.study, dbOf(ctx)) + "\n    AND " + member;
 }
 
 // The salt is part of what every held-out result means: changing it reshuffles every
@@ -497,8 +524,13 @@ function leafText(leaf: any): string {
   if (leaf.kind === "genericAssay") return leaf.entity + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "proteinPosition") return leaf.gene + " protein position " + JSON.stringify(leaf.range || {});
   if (leaf.kind === "sampleList" || leaf.kind === "patientList") {
-    const ids: string[] = leaf.ids || [];
     const noun = leaf.kind === "sampleList" ? "sample" : "patient";
+    if (typeof leaf.set === "string") {
+      const s = idSetIfLoaded(leaf.set);
+      if (!s) return "in stored " + noun + " set " + leaf.set;
+      return "in stored " + noun + " set “" + s.name + "” (" + s.count.toLocaleString("en-US") + " " + noun + (s.count === 1 ? "" : "s") + ")";
+    }
+    const ids: string[] = leaf.ids || [];
     const studies = new Set(ids.map((s) => String(s).split(":")[0]).filter(Boolean));
     return "in a list of " + ids.length + " " + noun + (ids.length === 1 ? "" : "s") +
       (studies.size > 1 ? " across " + studies.size + " studies" : "");

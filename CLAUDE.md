@@ -200,6 +200,17 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   enabled only where the deployment signs people in, each dataset its saver's. A document pins
   what it uses as `uploads: [{as, dataset, version}]` (added by the page on run); requests send
   `customRefs` and the server loads the pinned, immutable version.
+- **Stored id sets** — a cohort given as a long list of ids (`sampleList`/`patientList` with
+  `"set": "<id>"` instead of `"ids"`). **`lib/id-set-store.ts`** is the only module touching its
+  tables (`db/migrations/0006_id_sets.sql`): owned and shared by `lib/access.ts`, members
+  immutable (trigger), soft delete, every read logged. `lib/id-set-import.ts` matches a pasted list
+  to the studies' cases before saving (`POST /api/id-sets`; UI: "+ Add cohort" → "From a list of
+  ids"). Every engine route passes its body as `uses` to `withRequestCustomData`, which reads the
+  sets it names (`lib/id-sets-server.ts`) into **`lib/id-sets.ts`**'s request context; the compiler
+  then names one ClickHouse external table per set and study, and `lib/ch.ts` uploads it only to
+  the patient-level connection holding that study. A set is not read without a signed-in request
+  (MCP, scripts), and an answer that reads one bypasses the result cache (`hasIdSets()`). Inline
+  lists are refused by name past `INLINE_ID_SQL_LIMIT` (`lib/cohort2.ts`).
 - **Signing in** (`lib/auth.ts`, the header's Sign in) guards custom data, saved
   cohorts/analyses (`/api/artifacts`) and campaign changes; exploring, analyses, `?doc=` links and
   MCP need none. A deployment has ONE way in: an OpenID Connect provider (`lib/oidc.ts`;
@@ -311,7 +322,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   Read before claiming this project is "fast": on a cached single chart the portal is ~20x
   quicker (those measurements predate the result cache of invariant 11, which answers only
   exact repeats), and our advantage is data movement (36x less to the
-  browser), not speed. Also records the ~20,000-id ceiling on explicit patient lists.
+  browser), not speed. Also records the ceiling on inline id lists (~12,000 sample ids) and the
+  stored id sets that remove it.
 
 ## Invariants — do not break these
 

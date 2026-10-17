@@ -84,6 +84,16 @@ export const api = {
     share: (id: string, sharing: Sharing) => send("PUT", "/api/artifacts/" + id + "/sharing", sharing),
   },
 
+  /** Stored id sets (lib/id-set-store.ts): cohorts given as long lists of ids, kept on the server and named by id. */
+  idSets: {
+    list: (opts: Opts = {}) => fetch("/api/id-sets", { signal: opts.signal }),
+    /** match `ids` ("<study>:<id>" or bare, looked up in every study given) and save the matches; answers what did not match */
+    create: (body: { name: string; level: "sample" | "patient"; studies: string[]; ids: string[] }) => post("/api/id-sets", body),
+    remove: (id: string) => fetch("/api/id-sets/" + id, { method: "DELETE" }),
+    /** who it is shared with (its owner only) */
+    share: (id: string, sharing: Sharing) => send("PUT", "/api/id-sets/" + id + "/sharing", sharing),
+  },
+
   /** Groups (lib/groups.ts): the reader's, and managing one. */
   groups: {
     list: (opts: Opts = {}) => fetch("/api/groups", { signal: opts.signal }),

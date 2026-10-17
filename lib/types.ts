@@ -57,9 +57,14 @@ export interface ClinicalLeaf {
  * an error, so one list can span as many studies as it likes. Never sent to
  * a remote or aggregate-only participant: see carriesPatientIds in
  * lib/federation.ts.
+ *
+ * `set` instead of `ids` names a stored id set (lib/id-set-store.ts) by its id: the same list,
+ * kept on the server, so the document carries a uuid however many ids the set holds. `label` and
+ * `n` are its name and size as the page wrote them, for the cohort's pill; never compiled — the
+ * readback names the set from the store.
  */
-export interface SampleListLeaf { kind: "sampleList"; ids: string[] }
-export interface PatientListLeaf { kind: "patientList"; ids: string[] }
+export interface SampleListLeaf { kind: "sampleList"; ids?: string[]; set?: string; label?: string; n?: number }
+export interface PatientListLeaf { kind: "patientList"; ids?: string[]; set?: string; label?: string; n?: number }
 /**
  * A fixed, engine-owned half of the study's patients: a salted hash of the study-qualified
  * patient id decides the half, so the partition is reproducible, identical for every caller,

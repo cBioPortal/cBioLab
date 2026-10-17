@@ -31,7 +31,7 @@ export async function POST(req: Request) {
         view, method: view.method, files, missing, doc, viewIndex: notebookView.index,
         origin: process.env.APP_BASE_URL || new URL(req.url).origin,
       });
-    }, { refs: customRefs, req });
+    }, { refs: customRefs, req, uses: doc });
     const name = slug(notebookView.kind + "-" + String((doc as { study?: string }).study || "")) + ".ipynb";
     return new Response(JSON.stringify(nb), {
       headers: { "Content-Type": "application/x-ipynb+json; charset=utf-8", "Content-Disposition": `attachment; filename="${name}"` },

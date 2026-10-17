@@ -9,7 +9,7 @@ export const maxDuration = 60;
 export async function POST(req: Request) {
   try {
     const { customData, customRefs, ...body } = parseBody(PartitionRequest, await req.json());
-    return Response.json(await withRequestCustomData(customData, () => proposePartition(body as unknown as Parameters<typeof proposePartition>[0]), { refs: customRefs, req }));
+    return Response.json(await withRequestCustomData(customData, () => proposePartition(body as unknown as Parameters<typeof proposePartition>[0]), { refs: customRefs, req, uses: body }));
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }
