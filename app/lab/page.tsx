@@ -362,6 +362,7 @@ export default function AnalysisPage() {
         <span className="sub">analysis documents — cohorts and views over one declarative object</span>
         <span className="spacer" />
         <a className="toplink" href="/reproductions">paper reproductions</a>
+        <a className="toplink" href="/singlecell">single-cell data</a>
         <a className="toplink" href="/verification">how we verify</a>
         <a className="toplink" href="/campaign">hypothesis campaigns</a>
         <a className="toplink" href="/rationale">rationale</a>

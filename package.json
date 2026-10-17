@@ -62,6 +62,7 @@
     "streamdown": "^2.7.0",
     "tailwind-merge": "^3.7.0",
     "use-stick-to-bottom": "^1.1.6",
+    "zarrita": "0.7.5",
     "zod": "^4.4.3"
   },
   "type": "module",

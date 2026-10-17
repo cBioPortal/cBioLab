@@ -84,6 +84,15 @@ export const CellExplorerRequest = z.union([
   z.object({ mode: z.literal("import"), study: z.string(), text: z.string().max(200000, "that is more text than a list of donors") }),
 ]);
 
+/** POST /api/singlecell — the single-cell review page's questions: Cell Explorer's catalog, which of a
+ *  dataset's values are a study's patients or samples, and the cell counts the study already holds. */
+export const SingleCellRequest = z.union([
+  z.object({ mode: z.literal("catalog") }),
+  z.object({ mode: z.literal("crosswalk"), study: z.string(), level: z.enum(["patient", "sample"]),
+    values: z.array(z.string()).max(50000, "a crosswalk matches at most 50,000 values"), attribute: z.string().nullable().optional() }),
+  z.object({ mode: z.literal("reference"), study: z.string() }),
+]);
+
 /** POST /api/partition — proposed arms for splitting a cohort by an attribute, a gene or OQL queries. */
 export const PartitionRequest = z.object({
   doc: DocEnvelope,
@@ -130,6 +139,7 @@ export type OncoprintDetailBody = z.input<typeof OncoprintDetailRequest>;
 export type PatientsOfBody = z.input<typeof PatientsOfRequest>;
 export type PartitionBody = z.input<typeof PartitionRequest>;
 export type CellExplorerBody = z.input<typeof CellExplorerRequest>;
+export type SingleCellBody = z.input<typeof SingleCellRequest>;
 export type MembersBody = z.input<typeof MembersRequest>;
 export type ViewPageBody = z.input<typeof ViewPageRequest>;
 export type TableBody = z.input<typeof TableRequest>;
