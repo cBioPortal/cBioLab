@@ -586,9 +586,12 @@ async function main() {
           const m = document.body.innerText.match(/dragged\s+([\d,]+)\s+patients/);
           return m ? Number(m[1].replace(/,/g, "")) : null;
         });
-        dragOk = claimed > 0 && leaf.kind === "patientList" && leaf.ids.length === claimed && counted === claimed
-          && leaf.ids.every((id) => id.startsWith("msk_chord_2024:"));
-        dragWhat = said + " -> " + leaf.ids.length + " ids -> compiler counted " + counted;
+        // signed in, the selection is stored as an id set and the cohort names it (app/lab/id-sets-client.ts);
+        // signed out, it stays an inline list
+        const n = leaf.set ? leaf.n : leaf.ids?.length;
+        dragOk = claimed > 0 && leaf.kind === "patientList" && n === claimed && counted === claimed
+          && (leaf.set ? /^[0-9a-f-]{36}$/.test(leaf.set) && !leaf.ids : leaf.ids.every((id) => id.startsWith("msk_chord_2024:")));
+        dragWhat = said + " -> " + (leaf.set ? "stored set of " + n : n + " inline ids") + " -> compiler counted " + counted;
       } catch (e) { dragWhat = String(e.message).split("\n")[0]; }
       ok("a drag across the oncoprint becomes a cohort of exactly those patients", dragOk, dragWhat);
 
@@ -1494,6 +1497,48 @@ async function main() {
     } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
     ok("a pasted list of ids is matched, saved as a stored id set and named by the cohort; only its signed-in owner can read it",
       steps.matched && steps.named && steps.counted && steps.noIds && steps.signedOut && steps.otherUser && steps.deleted, JSON.stringify(steps));
+    await ctx.close();
+  }
+  // Nothing is saved with an inline id list: saving a cohort that carries one stores the list as an
+  // id set first, the analysis's copy takes the same set, and saving again stores nothing new.
+  if (LOGIN) {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const sp = await ctx.newPage();
+    let steps = {};
+    try {
+      await signIn(ctx, "lists." + LOGIN);
+      const ex = await (await ctx.request.get(BASE + "/api/custom-data/example?study=msk_chord_2024")).json();
+      const ids = (ex.patients || []).map((p) => "msk_chord_2024:" + p);
+      const name = "e2e inline " + Date.now();
+      const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
+      const sets = async () => ((await (await ctx.request.get(BASE + "/api/id-sets")).json()).sets || []).length;
+      const doc = { dsl: "2.7", study: "msk_chord_2024", cohorts: { [name]: { all: [{ kind: "patientList", ids }] } }, views: [{ kind: "survival", cohorts: [name] }] };
+      await sp.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify(doc)).toString("base64url"), { waitUntil: "domcontentloaded" });
+      await sp.waitForSelector(".cohortbox .cohortbox-head strong", { timeout: 120000 });
+      const before = await sets();
+      const save = async (label) => {
+        const gear = sp.locator(".cohortbox", { hasText: name }).locator(".cohortgear");
+        if ((await gear.getAttribute("data-state")) !== "open") await gear.click();
+        await sp.locator("[data-slot=popover-content]").getByRole("button", { name: label, exact: true }).click();
+      };
+      await save("save to library");
+      await sp.waitForFunction((n) => { try { return !!JSON.parse(document.querySelector("#docjson").value).cohorts[n].from; } catch { return false; } }, name, { timeout: 60000 });
+      const art = ((await (await ctx.request.get(BASE + "/api/artifacts?kind=cohort")).json()).artifacts || []).find((a) => a.name === name);
+      const savedLeaf = art?.definition?.all?.[0] || {};
+      const copyLeaf = (await docOf()).cohorts[name].all[0];
+      steps.saved = /^[0-9a-f-]{36}$/.test(savedLeaf.set || "") && !savedLeaf.ids && savedLeaf.n === ids.length;
+      steps.copy = copyLeaf.set === savedLeaf.set && !copyLeaf.ids;
+      steps.oneSet = (await sets()) === before + 1;
+      // the copy now matches what was saved, so there is nothing left to save
+      const gear = sp.locator(".cohortbox", { hasText: name }).locator(".cohortgear");
+      if ((await gear.getAttribute("data-state")) !== "open") await gear.click();
+      const items = await sp.locator("[data-slot=popover-content]").getByRole("button").allInnerTexts();
+      steps.nothingToSave = !items.some((t) => /^save/.test(t.trim()));
+      steps.stillCounted = (await sp.locator(".cohortbox-head").first().innerText()).replace(/\s+/g, "").includes(String(ids.length));
+      await ctx.request.delete(BASE + "/api/artifacts/" + art.id);
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("saving a cohort stores its inline id list as an id set, which the analysis's copy then names; nothing is stored twice",
+      steps.saved && steps.copy && steps.oneSet && steps.nothingToSave && steps.stillCounted, JSON.stringify(steps));
     await ctx.close();
   }
   // A cohort with something to save — never saved, or re-split since — offers "save" in its gear

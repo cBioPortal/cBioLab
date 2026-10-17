@@ -37,13 +37,15 @@ export interface CohortEditsPage {
   /** the login's saved cohorts, and whether they have arrived */
   saved: Record<string, SavedCohort>;
   savedReady: boolean;
+  /** a cohort's inline id lists stored as id sets, where the reader is signed in (id-sets-client.ts) */
+  storeLists: (def: CohortDef, name: string) => Promise<CohortDef>;
   persist: (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"], id?: string) => Promise<SavedCohort>;
   /** a cohort's last evaluation, kept with it when saved */
   evalOf: (name: string) => SavedCohort["lastEval"];
 }
 
 export function useCohortEdits(page: CohortEditsPage) {
-  const { doc, docs, evalOf, persist, proposePartition, saved, savedReady, setError, setToast, study } = page;
+  const { doc, docs, evalOf, persist, proposePartition, saved, savedReady, setError, setToast, storeLists, study } = page;
 
   // ---- editing a cohort's name/note (the gear menu's "edit…") -------------
   const [cohortEditing, setCohortEditing] = useState<string | null>(null); // the name AS IT IS in doc.cohorts right now
@@ -85,8 +87,9 @@ export function useCohortEdits(page: CohortEditsPage) {
     let name = sel.name || "selection";
     for (let i = 2; taken.has(name); i++) name = (sel.name || "selection") + " " + i;
     const qualified = ids.map(id => one + ":" + id);
-    const d: AnalysisDoc = { ...doc, cohorts: { ...doc.cohorts, [name]: { all: [{ kind: "patientList", ids: qualified }] } } };
-    docs.set(d);
+    const def = await storeLists({ all: [{ kind: "patientList", ids: qualified }] }, name);
+    const now = docs.current.doc;
+    docs.set({ ...now, cohorts: { ...now.cohorts, [name]: def } });
   };
 
   const removeCohort = (name: string) => {
@@ -158,8 +161,10 @@ export function useCohortEdits(page: CohortEditsPage) {
       const c = await persist(st.as, def, evalOf(name), st.id);
       const now = docs.current.doc;
       if (now.cohorts?.[name]) {
-        // bookkeeping after a save, not an edit the reader would undo
-        docs.set({ ...now, cohorts: { ...now.cohorts, [name]: { ...now.cohorts[name], from: { saved: c.id, name: st.as, hash: cohortHash(def), savedAt: c.savedAt } } } }, { undoable: false });
+        // bookkeeping after a save, not an edit the reader would undo. What was saved may differ from
+        // what was asked by its id lists, now stored as sets: the copy takes those too.
+        const kept = cohortHash(c.def) === cohortHash(def) ? now.cohorts[name] : { ...c.def };
+        docs.set({ ...now, cohorts: { ...now.cohorts, [name]: { ...kept, from: { saved: c.id, name: st.as, hash: cohortHash(c.def), savedAt: c.savedAt } } } }, { undoable: false });
       }
     } catch (e: any) {
       setError("could not save \u201c" + name + "\u201d: " + (e?.message || e));

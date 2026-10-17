@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { ExploreCharts } from "./explore-charts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
+import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
 import { useLabTools, LAB_TOOL_NAMES } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import { useCustomDataState } from "./custom-data-panel.tsx";
@@ -225,7 +226,20 @@ export default function AnalysisPage() {
   // Saved cohorts and analyses belong to the signed-in user (lib/auth.ts): see use-saved.ts.
   const loggedIn = customState.unlocked;
   const savedArtifacts = useSavedArtifacts(customState.user?.id ?? null);
-  const { cohorts: saved, workspaces: spaces, saveCohort: persist, saveWorkspace: persistSpaces, removeWorkspace: removeSpace } = savedArtifacts;
+  const { cohorts: saved, workspaces: spaces, removeWorkspace: removeSpace } = savedArtifacts;
+  // What is saved never carries an inline id list: each is stored as an id set first, and the open
+  // document is given the same sets, so saving it again stores nothing new (id-sets-client.ts).
+  const persist: typeof savedArtifacts.saveCohort = async (name, def, lastEval, id) =>
+    savedArtifacts.saveCohort(name, await storeCohortLists(def, name), lastEval, id);
+  const withListsStored = async (d: AnalysisDoc): Promise<AnalysisDoc> => {
+    const c = await storeDocLists(d);
+    // bookkeeping on the way to a save, not an edit the reader would undo
+    if (c !== d && docs.current.doc === d) docs.set(c, { undoable: false });
+    return c;
+  };
+  const persistSpaces = async (name: string, d: AnalysisDoc) => savedArtifacts.saveWorkspace(name, await withListsStored(d));
+  /** a list entering the document is stored as an id set when the reader is signed in; inline otherwise */
+  const storeLists = async (def: CohortDef, name: string): Promise<CohortDef> => loggedIn ? storeCohortLists(def, name) : def;
   /** Saving needs the login: logged out, ask for it rather than fail. Returns true when saving may go ahead. */
   const canSave = (): boolean => {
     if (loggedIn) return true;
@@ -318,10 +332,10 @@ export default function AnalysisPage() {
   const exampleLink = (ex: DslExample) => examplesUrl ? examplesUrl + "/lab?doc=" + docParam(ex.doc) : docLink(ex.doc);
   const workspace = useWorkspace({ canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study,
     sharedSpaces: savedArtifacts.sharedWorkspaces,
-    saveShared: (id, name, d, version) => savedArtifacts.saveShared("workspace", id, name, d, version) });
+    saveShared: async (id, name, d, version) => savedArtifacts.saveShared("workspace", id, name, await withListsStored(d), version) });
   const { sharedOpen, openShared, confirmSharedSave, analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
   const savedReady = loggedIn && !savedArtifacts.cohortsState.pending && !savedArtifacts.cohortsState.error;
-  const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, study });
+  const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, storeLists, study });
   const { analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells } = cohortEdits;
   const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
   const { setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies } = exploreState;
@@ -490,6 +504,7 @@ export default function AnalysisPage() {
         }}
         onAdd={(name, def) => { if (chooser) addCohortToView(chooser, name, def); }}
         studies={analysisStudies()}
+        storeLists={storeLists}
         onExplore={() => { if (!chooser) return; const t = chooser; setChooser(null); openAddCohort(t); }}
         onLogin={requestLogin}
         cells={cellExplorerFor(doc.study || study)}

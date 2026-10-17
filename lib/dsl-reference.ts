@@ -1387,7 +1387,9 @@ beside \`set\` are its name and size as the page wrote them, shown on the cohort
 compiled. A set is its saver's and shared as saved cohorts are; reading one needs a signed-in request
 through the web app, so a document naming a set is refused, saying why, over MCP or without a
 sign-in — those carry their ids inline. Like an inline list, it never reaches a remote or
-aggregate-only participant.
+aggregate-only participant. The web app stores every list it makes as a set when its reader is
+signed in (a cohort picked on an oncoprint, donors from Cell Explorer, a pasted list), and every
+inline list still in a cohort or an analysis when it is saved, so what is saved names sets.
 
 ### OQL subset
 

@@ -210,7 +210,12 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   then names one ClickHouse external table per set and study, and `lib/ch.ts` uploads it only to
   the patient-level connection holding that study. A set is not read without a signed-in request
   (MCP, scripts), and an answer that reads one bypasses the result cache (`hasIdSets()`). Inline
-  lists are refused by name past `INLINE_ID_SQL_LIMIT` (`lib/cohort2.ts`).
+  lists are refused by name past `INLINE_ID_SQL_LIMIT` (`lib/cohort2.ts`). In the web app every
+  list becomes a set where the reader is signed in (`app/lab/id-sets-client.ts`): oncoprint
+  selections and Cell Explorer imports as they enter the document, and any list still inline when a
+  cohort or analysis is saved (the page's `persist`/`persistSpaces` wrappers, which give the open
+  document the same sets so a re-save stores nothing new). Inline lists stay valid DSL for MCP,
+  scripts and signed-out readers.
 - **Signing in** (`lib/auth.ts`, the header's Sign in) guards custom data, saved
   cohorts/analyses (`/api/artifacts`) and campaign changes; exploring, analyses, `?doc=` links and
   MCP need none. A deployment has ONE way in: an OpenID Connect provider (`lib/oidc.ts`;

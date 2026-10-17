@@ -39,13 +39,15 @@ export interface LibraryState {
 
 type Source = "analysis" | "library" | "explore" | "list" | "cells";
 
-export function AddCohortDialog({ target, analysis, library, studies, onAdd, onExplore, onLogin, onClose, cells }: {
+export function AddCohortDialog({ target, analysis, library, studies, storeLists, onAdd, onExplore, onLogin, onClose, cells }: {
   target: AddCohortTarget | null;
   /** the analysis's cohorts in its order (the colour each has in its summary), with their sizes once known */
   analysis: { name: string; def: CohortDef; count: number | null; views: string[] }[];
   library: LibraryState;
   /** the studies the analysis uses: a pasted bare id is looked up in each */
   studies: string[];
+  /** a cohort's inline id lists stored as id sets, where the reader is signed in (id-sets-client.ts) */
+  storeLists: (def: CohortDef, name: string) => Promise<CohortDef>;
   /** add a cohort to the view: an analysis cohort by name, or a library one with its definition */
   onAdd: (name: string, def?: CohortDef) => void;
   onExplore: () => void;
@@ -167,7 +169,7 @@ export function AddCohortDialog({ target, analysis, library, studies, onAdd, onE
         {source === "list" && <ListSource studies={studies} saved={library.saved} full={full} replaces={replaces} addTitle={addTitle}
           nameFor={libraryName} onAdd={onAdd} onLogin={onLogin} />}
         {source === "cells" && cells && <CellsSource cells={cells} full={full} replaces={replaces} addTitle={addTitle}
-          nameFor={libraryName} onAdd={onAdd} />}
+          nameFor={libraryName} storeLists={storeLists} onAdd={onAdd} />}
       </DialogContent>}
     </Dialog>
   );
@@ -178,9 +180,10 @@ export function AddCohortDialog({ target, analysis, library, studies, onAdd, onE
  * matched to the study's patients on the server (lib/cell-explorer-server.ts). The text stays in
  * this component while it is typed.
  */
-function CellsSource({ cells, full, replaces, addTitle, nameFor, onAdd }: {
+function CellsSource({ cells, full, replaces, addTitle, nameFor, storeLists, onAdd }: {
   cells: CellExplorerDataset; full: boolean; replaces: boolean; addTitle: (what: string) => string;
-  nameFor: (name: string, def: CohortDef) => string; onAdd: (name: string, def?: CohortDef) => void;
+  nameFor: (name: string, def: CohortDef) => string; storeLists: (def: CohortDef, name: string) => Promise<CohortDef>;
+  onAdd: (name: string, def?: CohortDef) => void;
 }) {
   const [text, setText] = useState("");
   const [name, setName] = useState("from Cell Explorer");
@@ -197,6 +200,14 @@ function CellsSource({ cells, full, replaces, addTitle, nameFor, onAdd }: {
     finally { setBusy(false); }
   };
   const as = found ? nameFor(name.trim() || "from Cell Explorer", found.def) : name.trim();
+  // the donors' patients are a list: stored as an id set before they enter the analysis
+  const add = async () => {
+    if (!found) return;
+    setBusy(true); setErr(null);
+    try { onAdd(as, await storeLists(found.def, as)); }
+    catch (e) { setErr(String((e as Error)?.message || e)); }
+    finally { setBusy(false); }
+  };
   return (
     <div className="acd-cells flex flex-col gap-2.5">
       <p className="note mt-0">
@@ -222,8 +233,8 @@ function CellsSource({ cells, full, replaces, addTitle, nameFor, onAdd }: {
         <div className="viewtb">
           <div className="tbz">
             <label className="tbfield">name <Input aria-label="cohort name" className="h-ctl w-56 text-md md:text-md" value={name} onChange={(e) => setName(e.target.value)} /></label>
-            <Button variant="outline" size="sm" className={TB} disabled={full} title={addTitle("“" + as + "”")}
-              onClick={() => onAdd(as, found.def)}>{replaces ? "Use" : <><Plus />Add</>}</Button>
+            <Button variant="outline" size="sm" className={TB} disabled={full || busy} title={addTitle("“" + as + "”")}
+              onClick={() => void add()}>{busy && <span className="spinner" />}{replaces ? "Use" : <><Plus />Add</>}</Button>
           </div>
         </div>
         {as !== (name.trim() || "from Cell Explorer") && <p className="meta m-0">added as “{as}”, since this analysis already has a different “{name.trim()}”</p>}

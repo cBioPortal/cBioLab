@@ -1,8 +1,9 @@
--- Writable store for saved cohorts and analysis workspaces — the one thing
--- that must NEVER live here is a patient or sample identifier. This table
--- holds only DSL definitions (rules), never frozen membership: see
--- docs/DATA-BOUNDARY.md and RATIONALE.md's "User state" section, which
--- deliberately deferred frozen-evaluation storage for exactly this reason.
+-- Writable store for saved cohorts and analysis workspaces: DSL definitions.
+-- A definition is a rule, not an evaluation: a saved cohort is re-run against
+-- today's data, never stored as its members. An explicit id list a definition
+-- names is kept in its own table as a stored id set (0006, lib/id-set-store.ts),
+-- which the definition names by id; the web app stores every list that way
+-- before saving.
 --
 -- Applied by `npm run db:migrate` (lib/migrate.ts), which runs this directory in name order and
 -- records each file in schema_migrations.
