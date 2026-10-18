@@ -1621,8 +1621,39 @@ export interface ClinicalRow {
  * on: an aggregate-only participant returns counts and never an identifier, so a
  * view built entirely from such participants moved no patient-level data at all.
  */
+/**
+ * One place an analysis's data came from: a database of this deployment, or a peer it reached
+ * over MCP, with the studies it answered for and what it reported about itself (lib/provenance.ts).
+ */
+export interface AnalysisSource {
+  /** as this deployment names it */
+  label: string;
+  /** a peer reached over MCP (the simulated one included) */
+  remote: boolean;
+  /** that peer's MCP endpoint */
+  url?: string;
+  /** what the peer calls itself, from its own answers — not this deployment's label for it */
+  reportedName?: string;
+  /** the commit the answering code runs, as it reports it */
+  build?: string;
+  /** when the peer first answered during this run */
+  answeredAt?: string;
+  /** each study it answered for, with when that study's data was last imported */
+  studies: { study: string; imported: string | null }[];
+}
+
+/** What a peer reports about itself in every federated answer (lib/provenance.ts). */
+export interface PeerSource {
+  name: string;
+  build: string;
+  /** the study answered for, and when its data was last imported there */
+  study?: string;
+  imported?: string | null;
+}
+
 export interface ViewParticipation {
-  studies: { study: string; mode: "patient-level" | "aggregate-only"; instance: string; remote?: boolean }[];
+  /** `source` indexes the result's `sources` */
+  studies: { study: string; mode: "patient-level" | "aggregate-only"; instance: string; remote?: boolean; source?: number }[];
   /** true only for views whose output IS patients (the oncoprint's columns) */
   requiresPatientLevel: boolean;
   /** the studies that answered with aggregates only */
@@ -1798,6 +1829,8 @@ export interface CoursePoint {
 }
 export interface AnalysisResult {
   study: string; involvedStudies: string[]; oncokbPin: string | null;
+  /** where the data came from: each database or MCP peer, and the studies it answered for */
+  sources?: AnalysisSource[];
   /** the parameters this run resolved, and any declared but never referenced */
   params?: Record<string, unknown>;
   unusedParams?: string[];

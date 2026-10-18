@@ -13,6 +13,7 @@ import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, 
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
 import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, type Resolver } from "./federation.ts";
 import { cantDraw } from "./view-coverage.ts";
+import { describeSources, sourceIndex } from "./provenance.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
@@ -322,14 +323,18 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   // ---- views --------------------------------------------------------------
   // Every view records which studies answered it and in what mode, so a reader
   // never has to infer from prose whether patient-level data was involved.
+  // each names its source in the result's `sources` (lib/provenance.ts)
+  const sourceOf = sourceIndex(involved, resolvers);
   const participationFor = (studies: string[], requiresPatientLevel: boolean): ViewParticipation => {
     const per = studies.map((s) => {
       const inst = resolvers[s] ? resolvers[s].instance : null;
+      const source = sourceOf.get(s);
       return {
         study: s,
         mode: (inst ? inst.mode : "patient-level") as "patient-level" | "aggregate-only",
         instance: inst ? inst.label : "unknown",
-        ...(inst && inst.id === "peer" ? { remote: true } : {})
+        ...(inst && inst.id === "peer" ? { remote: true } : {}),
+        ...(source != null ? { source } : {})
       };
     });
     return { studies: per, requiresPatientLevel, aggregateOnly: per.filter((x) => x.mode === "aggregate-only").map((x) => x.study) };
@@ -471,6 +476,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
 
   return {
     study: docStudy, involvedStudies: involved, oncokbPin: pin,
+    sources: await describeSources(involved, resolvers),
     // Echoed so a reader can see WHICH values produced these numbers, the same
     // reason the OncoKB pin is echoed. `unusedParams` catches a rename that
     // missed a reference: the run succeeds, so nothing else would say so.

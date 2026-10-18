@@ -22,6 +22,7 @@ import { allowedKinds, disclosedByThisInstance, PATIENT_KIND_NAMES, type Patient
 import { checkQuery, cleanQuery, type QueryColumn, type RowSource, type TableQuery } from "../lib/table-query.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { oncokbPin } from "../lib/annotation.ts";
+import { peerSource } from "../lib/provenance.ts";
 import { connections, directConnections } from "../lib/ch.ts";
 import { studiesFor } from "../lib/study-list.ts";
 import { catalogFor } from "../lib/study-catalog.ts";
@@ -206,7 +207,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
             (survivalCounts.length ? `, ${survivalCounts.length} survival strata` : "") +
             (pairCounts.length ? `, ${pairCounts.length} gene-pair tables` : "") +
             (attributeStats.length ? `, ${attributeStats.length} clinical attributes` : "") + " (no patient identifiers returned)" }],
-          structuredContent: payload
+          structuredContent: { ...payload, source: await peerSource(s) }
         };
       } catch (e) {
         return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
@@ -310,7 +311,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
           return {
             content: [{ type: "text" as const, text: `${table} rows for ${s} (${mode}) — patient-level, disclosed under MCP_DISCLOSE_PATIENTS (${PATIENT_KIND_NAMES[PEER_TABLES[table]]})` }],
-            structuredContent: { table, ...out, ...(annotated ? { oncokbPin: pin } : {}), queries: hideSql ? null : res.queries }
+            structuredContent: { table, ...out, ...(annotated ? { oncokbPin: pin } : {}), queries: hideSql ? null : res.queries, source: await peerSource(s) }
           };
         } catch (e) { return rejected(e); }
       });
@@ -331,7 +332,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
           return {
             content: [{ type: "text" as const, text: `timeline of ${patient} (${s}): ${t.events.length} events, ${t.samples.length} samples — patient-level, disclosed under MCP_DISCLOSE_PATIENTS` }],
-            structuredContent: { study: s, patient, events: t.events, samples: t.samples, queries: hideSql ? null : res.queries }
+            structuredContent: { study: s, patient, events: t.events, samples: t.samples, queries: hideSql ? null : res.queries, source: await peerSource(s) }
           };
         } catch (e) { return rejected(e); }
       });
@@ -365,7 +366,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
         return {
           content: [{ type: "text" as const, text: `facets for ${s}: ${facets.clinical.length} clinical attributes, ` +
             `${facets.genes.length} genes, ${facets.events.length} event types (aggregates only)` }],
-          structuredContent: facets as unknown as Record<string, unknown>
+          structuredContent: { ...facets, source: await peerSource(s) } as unknown as Record<string, unknown>
         };
       } catch (e) {
         return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
@@ -389,7 +390,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
         const studies = (await Promise.all(conns.map((c) => studiesFor(c)))).flat();
         return {
           content: [{ type: "text" as const, text: `${studies.length} studies held by this instance (counts only)` }],
-          structuredContent: { studies }
+          structuredContent: { studies, source: await peerSource() }
         };
       } catch (e) {
         return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
@@ -409,7 +410,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
         const cat = await catalogFor(s);
         return {
           content: [{ type: "text" as const, text: `catalog for ${s}: ${cat.types.length} event types, ${cat.totalPatients} patients` }],
-          structuredContent: cat as unknown as Record<string, unknown>
+          structuredContent: { ...cat, source: await peerSource(s) } as unknown as Record<string, unknown>
         };
       } catch (e) {
         return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
