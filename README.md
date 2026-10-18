@@ -61,6 +61,21 @@ Measured cost (`docs/DATA-BOUNDARY.md`, "Federation: where it stands"): about +0
 analysis for aggregate views on a small study, about +2 s for the patient-level views; on a large
 study the database's own time dominates.
 
+### Seeing it work
+
+Every federated call is logged at both ends (`lib/federation-log.ts`), in the server's output
+(on Vercel, the project's runtime logs) — the study and tool, never a patient:
+
+```
+[federation →] federated_aggregates study=nsclc_public_genie_bpc peer=https://cbiolab.vercel.app/api/mcp (this app, as its simulated peer) 214ms ok 0.9 kB
+[federation ←] federated_aggregates study=nsclc_public_genie_bpc caller=this app (answered as its simulated peer) 89ms HTTP 200 answered 1.1 kB
+[federation ←] federated_patient_timeline study=nsclc_public_genie_bpc (patient-level) caller=outside 461ms HTTP 200 REFUSED
+```
+
+`→` is this app asking a peer, `←` its `/api/mcp` answering; `caller=outside` is anyone else. An
+analysis answered from the result cache makes no calls, so it logs none. A `[boundary]` line means
+a query reached the simulated peer's database directly and was refused (`lib/ch.ts`) — a bug.
+
 ### Security notes
 
 - **No caller authentication yet.** Anyone who can reach a peer's `/api/mcp` can call it. On a
