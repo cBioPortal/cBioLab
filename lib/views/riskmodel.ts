@@ -113,6 +113,37 @@ export class RiskRefusal extends Error {
   }
 }
 
+/** A modelled patient's row, as the fit reads it: by position, without any identifier. */
+export interface RiskKeptRow { t: number; entry: number; ev: boolean; stratum: string; genes: string[]; panels: string[]; cov: string[]; half: number }
+
+/**
+ * Who of the rows `riskmodelRowsSql` returned is modelled, and who is left out and why — every
+ * exclusion counted. The fit and Table 1 both read their patients through this, so the same rows
+ * give the same patients in the same order.
+ */
+export function keepRiskRows(rows: Record<string, unknown>[], s: Pick<RiskFitSpec, "strata" | "covariates" | "anchor">) {
+  let notProfiled = 0, noStratum = 0, noCovariate = 0, noAnchor = 0, anchorAfterStart = 0, noFollowUp = 0;
+  const kept: RiskKeptRow[] = [];
+  rows.forEach((x) => {
+    const panels = ((x.panels as unknown as string[]) || []).map(String);
+    if (!panels.length) { notProfiled++; return; }
+    const st = s.strata ? String(x.stratum ?? "") : "";
+    if (s.strata && !st) { noStratum++; return; }
+    const cov = s.covariates.map((_, k) => String(x["c" + k] ?? ""));
+    if (cov.some((v) => !v)) { noCovariate++; return; }
+    let t = Number(x.m), entry = 0;
+    if (s.anchor) {
+      if (Number(x.anchored) !== 1) { noAnchor++; return; }
+      const off = Number(x.anchor_months);
+      if (off > 0) { anchorAfterStart++; return; }
+      entry = -off; t = t - off;
+      if (!(t > entry)) { noFollowUp++; return; }
+    }
+    kept.push({ t, entry, ev: Number(x.ev) === 1, stratum: st, genes: ((x.genes as unknown as string[]) || []).map(String), panels, cov, half: Number(x.half) });
+  });
+  return { kept, left: { notProfiled, noStratum, noCovariate, noAnchor, anchorAfterStart, noFollowUp } };
+}
+
 /** Fetch the cohort's rows and fit the ensemble. Throws RiskRefusal when the data cannot support a model. */
 /** the resolver a fit reads through: a patient-level participant (viewRows) with view aggregates (viewMeta) */
 type RiskResolver = PatientLevelCapable & ViewAggregateCapable;
@@ -123,26 +154,7 @@ export async function fitRiskmodel(r: RiskResolver, args: RiskFitArgs): Promise<
   const [rows, panelRows] = await riskViewRows(r, args);
   const logged = () => r.queries.slice(mark).map((q) => ({ label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}) }));
   const panelGenes = new Map(panelRows.map((x) => [String(x.panel), new Set((x.genes as unknown as string[]) || [])] as const));
-  // who is modelled, and who is left out and why — every exclusion is counted
-  let notProfiled = 0, noStratum = 0, noCovariate = 0, noAnchor = 0, anchorAfterStart = 0, noFollowUp = 0;
-  const kept: { t: number; entry: number; ev: boolean; stratum: string; genes: string[]; panels: string[]; cov: string[]; half: number }[] = [];
-  for (const x of rows) {
-    const panels = ((x.panels as unknown as string[]) || []).map(String);
-    if (!panels.length) { notProfiled++; continue; }
-    const st = s.strata ? String(x.stratum ?? "") : "";
-    if (s.strata && !st) { noStratum++; continue; }
-    const cov = s.covariates.map((_, k) => String(x["c" + k] ?? ""));
-    if (cov.some((v) => !v)) { noCovariate++; continue; }
-    let t = Number(x.m), entry = 0;
-    if (s.anchor) {
-      if (Number(x.anchored) !== 1) { noAnchor++; continue; }
-      const off = Number(x.anchor_months);
-      if (off > 0) { anchorAfterStart++; continue; }
-      entry = -off; t = t - off;
-      if (!(t > entry)) { noFollowUp++; continue; }
-    }
-    kept.push({ t, entry, ev: Number(x.ev) === 1, stratum: st, genes: ((x.genes as unknown as string[]) || []).map(String), panels, cov, half: Number(x.half) });
-  }
+  const { kept, left: { notProfiled, noStratum, noCovariate, noAnchor, anchorAfterStart, noFollowUp } } = keepRiskRows(rows, s);
   if (kept.length < 50) throw new RiskRefusal("has " + kept.length + " patients with a survival time, a mutation panel and every covariate on record; a risk model needs at least 50", logged(), true);
   // candidates: genes every modelled patient's panels cover (WES covers all), mutated often enough
   let covered = null as Set<string> | null;
@@ -237,6 +249,8 @@ export interface RiskGrouping {
   neverHeldOut: number;
   /** distinct held-out scores, and how many groups the cuts made */
   distinct: number; groupsMade: number;
+  /** each group's patients, as positions in the fit's subjects (no identifiers); not part of the result */
+  members: number[][];
 }
 
 /** The quantiles a view's groups are cut at: `n` equal groups, or the quantiles it names. */
@@ -313,7 +327,7 @@ export function groupRiskmodel(fit: RiskFit, qs: number[]): RiskGrouping {
   return { groups, logrank, refit, histogram: { edges: Array.from({ length: bins + 1 }, (_, k) => lo + k * w), counts },
     scale: { min: sorted[0], max: sorted[sorted.length - 1] },
     percentiles: Array.from({ length: 101 }, (_, k) => sorted[Math.min(sorted.length - 1, Math.floor(k / 100 * sorted.length))]),
-    neverHeldOut: fit.pool.length - poolScored.length, distinct, groupsMade };
+    neverHeldOut: fit.pool.length - poolScored.length, distinct, groupsMade, members };
 }
 
 // ---- the view ---------------------------------------------------------------------------------
