@@ -20,7 +20,7 @@ import { PartitionPanel, SplitForm, type SplitSpec } from "./partitions.tsx";
 import type { DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { requestLogin, referencedDatasets, unresolvedUploads } from "./custom-data-client.ts";
-import { CohortStudies, CohortEditMenu, SeriesSwatch, ViewHead } from "./view-chrome.tsx";
+import { AnalysisSources, CohortStudies, CohortEditMenu, SeriesSwatch, ViewHead } from "./view-chrome.tsx";
 import { cohortHash, shortHash } from "../../lib/cohort-hash.ts";
 import { sameJson } from "../../lib/same-json.ts";
 import { viewIsEmpty } from "../../lib/partition-arms.ts";
@@ -252,6 +252,7 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
               );
             })}
           </div>
+          <AnalysisSources sources={result?.sources} names={studyNames} />
         </section>
       )}
     </div>

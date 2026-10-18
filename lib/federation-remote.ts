@@ -19,7 +19,7 @@ import { loopbackOnlyConn, noteFailedQuery } from "./ch.ts";
 import { logOutbound } from "./federation-log.ts";
 import { PEER_TABLES, type RemotePatientRows, type PeerRowsRequest, type PeerRowsAnswer } from "./federation.ts";
 import { acceptedFromPeers, allowedKinds, PATIENT_KIND_NAMES, type PatientKind } from "./disclosure.ts";
-import type { PatientTimeline, PatientEvent, PatientSample } from "./types.ts";
+import type { PatientTimeline, PatientEvent, PatientSample, PeerSource } from "./types.ts";
 import type { StudyRow } from "./study-list.ts";
 import type { StudyCatalog } from "./study-catalog.ts";
 
@@ -207,10 +207,24 @@ export class RemoteAggregateResolver implements AggregateCapable {
    * aggregate SQL, marked as having executed on the peer rather than here.
    */
   readonly queries: QueryLogEntry[] = [];
+  /** what the peer said about itself in its first answer, and when (lib/provenance.ts) */
+  private reported: PeerSource | null = null;
+  private answeredAt: string | null = null;
   constructor(study: string, url: string, instance: Instance) {
     this.study = study;
     this.url = url;
     this.instance = instance;
+  }
+  /** Every call to the peer goes through here, so its first self-report is kept. */
+  protected async call<T = RemoteAggregates>(name: string, args: unknown): Promise<T> {
+    const r = await mcpCall<T>(this.url, name, args);
+    const src = (r as { source?: PeerSource } | null)?.source;
+    if (src && !this.reported) { this.reported = src; this.answeredAt = new Date().toISOString(); }
+    return r;
+  }
+  /** Where this study's peer is, and what it reported about itself (null before it answered). */
+  provenance(): { url: string; reported: PeerSource | null; answeredAt: string | null } {
+    return { url: this.url, reported: this.reported, answeredAt: this.answeredAt };
   }
   private remember(r: { cohortSql?: string | null; queries?: QueryLogEntry[] | null }): void {
     if (!r) return;
@@ -232,54 +246,54 @@ export class RemoteAggregateResolver implements AggregateCapable {
   }
   async count(def: CohortDef | null | undefined): Promise<number> {
     this.guard(def);
-    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {} });
+    const r = await this.call("federated_aggregates", { study: this.study, cohort: def || {} });
     this.remember(r);
     return r.count;
   }
   async geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]> {
     this.guard(def);
     if (!genes.length) return [];
-    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, genes });
+    const r = await this.call("federated_aggregates", { study: this.study, cohort: def || {}, genes });
     this.remember(r);
     return r.geneCounts;
   }
   async survivalCounts(def: CohortDef | null | undefined, endpoint = "OS", anchor?: SurvivalAnchor | null, columns?: EndpointColumns): Promise<SurvivalCount[]> {
     this.guard(def);
-    const r = await mcpCall(this.url, "federated_aggregates",
+    const r = await this.call("federated_aggregates",
       { study: this.study, cohort: def || {}, survival: true, endpoint, ...(anchor ? { anchor } : {}), ...(columns ? { endpointColumns: columns } : {}) });
     this.remember(r);
     return r.survivalCounts;
   }
   async survivalEndpoints(): Promise<string[]> {
     // the peer reports what IT can answer; asking costs one call with no cohort
-    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: {}, survivalEndpoints: true })
+    const r = await this.call("federated_aggregates", { study: this.study, cohort: {}, survivalEndpoints: true })
       .catch(() => ({ survivalEndpoints: [] as string[] }));
     return (r as { survivalEndpoints?: string[] }).survivalEndpoints || [];
   }
   async timelineSpan(def: CohortDef | null | undefined): Promise<TimelineSpan[]> {
     this.guard(def);
-    const r = await mcpCall(this.url, "federated_aggregates",
+    const r = await this.call("federated_aggregates",
       { study: this.study, cohort: def || {}, timelineSpan: true });
     this.remember(r);
     return r.timelineSpan || [];
   }
   async treatmentSequence(def: CohortDef | null | undefined, opts: SequenceOpts): Promise<SequenceFlow[]> {
     this.guard(def);
-    const r = await mcpCall(this.url, "federated_aggregates",
+    const r = await this.call("federated_aggregates",
       { study: this.study, cohort: def || {}, sequence: opts });
     this.remember(r);
     return r.treatmentSequence || [];
   }
   async sequenceKeys(def: CohortDef | null | undefined, eventType: string): Promise<{ key: string; label: string; patients: number; values: number }[]> {
     this.guard(def);
-    const r = await mcpCall(this.url, "federated_aggregates",
+    const r = await this.call("federated_aggregates",
       { study: this.study, cohort: def || {}, sequenceKeys: eventType });
     this.remember(r);
     return r.sequenceKeys || [];
   }
   async eventCourse(def: CohortDef | null | undefined, opts: CourseOpts): Promise<CourseCount[]> {
     this.guard(def);
-    const r = await mcpCall(this.url, "federated_aggregates",
+    const r = await this.call("federated_aggregates",
       { study: this.study, cohort: def || {}, course: opts });
     this.remember(r);
     return r.eventCourse || [];
@@ -304,14 +318,14 @@ export class RemoteAggregateResolver implements AggregateCapable {
   async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
     this.guard(def);
     if (!pairs.length) return [];
-    const r = await mcpCall(this.url, "federated_aggregates", { study: this.study, cohort: def || {}, pairs });
+    const r = await this.call("federated_aggregates", { study: this.study, cohort: def || {}, pairs });
     this.remember(r);
     return r.pairCounts || [];
   }
   async attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean; topValues?: number }): Promise<AttrStats[]> {
     this.guard(def);
     if (!attributes.length) return [];
-    const r = await mcpCall(this.url, "federated_aggregates",
+    const r = await this.call("federated_aggregates",
       { study: this.study, cohort: def || {}, attributes, ...(opts?.histograms ? { attributeHistograms: true } : {}),
         ...(opts?.topValues != null ? { attributeTopValues: opts.topValues } : {}) });
     this.remember(r);
@@ -320,7 +334,7 @@ export class RemoteAggregateResolver implements AggregateCapable {
   async profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]> {
     this.guard(def);
     if (!genes.length || !profileType) return [];
-    const r = await mcpCall(this.url, "federated_aggregates",
+    const r = await this.call("federated_aggregates",
       { study: this.study, cohort: def || {}, momentGenes: genes, profileType });
     this.remember(r);
     return r.profileMoments || [];
@@ -328,7 +342,7 @@ export class RemoteAggregateResolver implements AggregateCapable {
   async variantCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1): Promise<VariantReport> {
     this.guard(def);
     if (!genes.length) return { variants: [], totals: [], minCount };
-    const r = await mcpCall(this.url, "federated_aggregates",
+    const r = await this.call("federated_aggregates",
       { study: this.study, cohort: def || {}, variantGenes: genes, minCount });
     this.remember(r);
     return r.variantCounts || { variants: [], totals: [], minCount };
@@ -336,7 +350,7 @@ export class RemoteAggregateResolver implements AggregateCapable {
   async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1): Promise<LollipopReport> {
     this.guard(def);
     if (!genes.length) return { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: false };
-    const r = await mcpCall(this.url, "federated_aggregates",
+    const r = await this.call("federated_aggregates",
       { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount });
     this.remember(r);
     // a peer on an older build answers without these; refuse by name rather than draw nothing
@@ -347,7 +361,7 @@ export class RemoteAggregateResolver implements AggregateCapable {
   async pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]> {
     this.guard(def);
     if (!pairs.length || !profileType) return [];
-    const r = await mcpCall(this.url, "federated_aggregates",
+    const r = await this.call("federated_aggregates",
       { study: this.study, cohort: def || {}, pairs, profileType });
     this.remember(r);
     return r.pairMoments || [];
@@ -401,7 +415,7 @@ export class RemotePatientResolver extends RemoteAggregateResolver implements Re
     if (!this.patientKinds.has(kind))
       throw new Error("this instance does not accept " + PATIENT_KIND_NAMES[kind] + " from the peer serving " + this.study + " (PEER_MCP_PATIENT_LEVEL)");
     this.refuseIds(req.parts.map((p) => p.def));
-    const r = await this.disclosed(mcpCall<PeerRowsAnswer & { queries?: QueryLogEntry[] | null }>(this.peerUrl, "federated_patient_rows", {
+    const r = await this.disclosed(this.call<PeerRowsAnswer & { queries?: QueryLogEntry[] | null }>("federated_patient_rows", {
       study: this.study, table: req.table, parts: req.parts.map((p) => ({ cohort: p.cohort, cohortDef: p.def || {} })), source: this.instance.label,
       query: req.query, defaults: req.defaults, mode: req.mode,
       ...(req.limit != null ? { limit: req.limit } : {}), ...(req.offset != null ? { offset: req.offset } : {}), ...(req.column ? { column: req.column } : {}),
@@ -432,8 +446,8 @@ export class RemoteTimelineResolver extends RemotePatientResolver {
   async patientTimeline(patient: string): Promise<PatientTimeline> {
     if (!this.patientKinds.has("timeline"))
       throw new Error("this instance does not accept patient timelines from the peer serving " + this.study + " (PEER_MCP_PATIENT_LEVEL)");
-    const r = await this.disclosed(mcpCall<{ study: string; patient: string; events: unknown[]; samples: unknown[]; queries?: QueryLogEntry[] | null }>(
-      this.peerUrl, "federated_patient_timeline", { study: this.study, patient }), "timeline");
+    const r = await this.disclosed(this.call<{ study: string; patient: string; events: unknown[]; samples: unknown[]; queries?: QueryLogEntry[] | null }>(
+      "federated_patient_timeline", { study: this.study, patient }), "timeline");
     if (r.study !== this.study || r.patient !== patient) throw new Error("peer answered for " + r.study + "/" + r.patient + ", not " + this.study + "/" + patient);
     if (Array.isArray(r.queries)) for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, ms: q.ms, remote: true });
     const events = (Array.isArray(r.events) ? r.events : []).map(asEvent);

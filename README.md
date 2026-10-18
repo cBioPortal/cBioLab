@@ -72,7 +72,13 @@ Every federated call is logged at both ends (`lib/federation-log.ts`), in the se
 [federation ←] federated_patient_timeline study=nsclc_public_genie_bpc (patient-level) caller=outside 461ms HTTP 200 REFUSED
 ```
 
-`→` is this app asking a peer, `←` its `/api/mcp` answering; `caller=outside` is anyone else. An
+`→` is this app asking a peer, `←` its `/api/mcp` answering; `caller=outside` is anyone else.
+
+The answer says so too. Every analysis result lists its `sources` — each database of this
+deployment and each peer, with the peer's address, the name and build it reports about itself, when
+it answered, and when each study's data was imported there — and each view's `participation`
+points into that list. The Analysis tab shows it under the cohorts ("Data from: …"), and MCP's
+`run_analysis` text says it as well. An
 analysis answered from the result cache makes no calls, so it logs none. A `[boundary]` line means
 a query reached the simulated peer's database directly and was refused (`lib/ch.ts`) — a bug.
 

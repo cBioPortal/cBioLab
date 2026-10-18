@@ -4,7 +4,7 @@
 // so React keeps their state across the analysis page's renders.
 import { useEffect, useRef, useState } from "react";
 import { attributeLabel } from "../../lib/custom-data-names.ts";
-import type { ViewParticipation } from "../../lib/types.ts";
+import type { AnalysisSource, ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 import { SERIES, seriesStyle } from "../../lib/chart/style.ts";
 import { HIGHLIGHT_CAP, HIGHLIGHT_COLORS } from "../../lib/plot-highlight.ts";
@@ -487,6 +487,37 @@ export function CohortStudies({ ids, names }: { ids: string[]; names: Map<string
       <span className="cohortbox-study">{names.get(ids[0]) || ids[0]}</span>
       {more > 0 && <span className="cohortbox-more">+{more.toLocaleString()} more {more === 1 ? "study" : "studies"}</span>}
     </div>
+  );
+}
+
+/**
+ * Where an analysis's data came from (the result's `sources`): each database of this deployment and
+ * each peer reached over MCP, with what the peer reported about itself and when each study's data
+ * was imported. Said only when there is more than one source or a remote one; one local database
+ * is the default and goes without saying.
+ */
+export function AnalysisSources({ sources, names }: { sources?: AnalysisSource[]; names: Map<string, string> }) {
+  if (!sources || !(sources.length > 1 || sources.some((s) => s.remote))) return null;
+  const day = (t: string | null) => (t ? t.slice(0, 10) : "import date unknown");
+  const studies = (s: AnalysisSource) => s.studies.map((x) => (names.get(x.study) || x.study) + ", imported " + day(x.imported)).join("; ");
+  return (
+    <p data-tw className="text-xs text-muted-foreground mt-2.5 mb-0" aria-label="where this analysis's data came from">
+      <span className="font-semibold text-foreground">Data from:</span>{" "}
+      {sources.map((s, i) => {
+        const peer = s.remote ? [
+          "over MCP at " + (s.url || "an unknown address"),
+          s.reportedName ? "which calls itself “" + s.reportedName + "”" : "which has not described itself",
+          s.build ? "build " + s.build : null,
+          s.answeredAt ? "first answered " + new Date(s.answeredAt).toLocaleString() : null
+        ].filter(Boolean).join(", ") : "this deployment's own database" + (s.build ? ", build " + s.build : "");
+        return (
+          <span key={i} title={s.label + " — " + peer + "\n" + s.studies.map((x) => x.study + ": imported " + (x.imported || "unknown")).join("\n")}>
+            {i > 0 && " · "}<strong className="font-medium text-foreground">{s.label}</strong>
+            {" "}({s.remote ? "via MCP" + (s.reportedName && s.reportedName !== s.label ? ", calls itself “" + s.reportedName + "”" : "") : "local"}) — {studies(s)}
+          </span>
+        );
+      })}
+    </p>
   );
 }
 

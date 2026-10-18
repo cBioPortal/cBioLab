@@ -322,6 +322,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
    shareable `?doc=`/`?spec=` link. Two levels: the document panel shows each cohort's compiled
    SQL, and every view shows the aggregate queries that produced its numbers (resolvers log what
    they run; a peer returns its own log, marked as having executed there). OncoKB annotations are version-pinned (pin echoed in results).
+   Every result lists its `sources` (`lib/provenance.ts`): each database and MCP peer, with what a
+   peer reports about itself in every answer (name, build, each study's import date), and each
+   view's participation points into that list.
 3. **Compilers are single-study; federation happens at the analysis layer** with study-qualified
    ids. Cross-study: overlap is deliberately NOT deduplicated, vocabularies NOT harmonized —
    and views/captions must say so.
