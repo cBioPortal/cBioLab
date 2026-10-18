@@ -16,6 +16,7 @@ import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts,
 import { carriesPatientIds, studyRouting } from "./federation.ts";
 import { loopbackConnId, loopbackHeaders, loopbackUrl, servingAsLoopbackPeer } from "./loopback-peer.ts";
 import { loopbackOnlyConn, noteFailedQuery } from "./ch.ts";
+import { logOutbound } from "./federation-log.ts";
 import { PEER_TABLES, type RemotePatientRows, type PeerRowsRequest, type PeerRowsAnswer } from "./federation.ts";
 import { acceptedFromPeers, allowedKinds, PATIENT_KIND_NAMES, type PatientKind } from "./disclosure.ts";
 import type { PatientTimeline, PatientEvent, PatientSample } from "./types.ts";
@@ -121,7 +122,20 @@ export function peerPatientKinds(study: string): Set<PatientKind> {
  */
 async function mcpCall<T = RemoteAggregates>(url: string, name: string, args: unknown): Promise<T> {
   // a peer that refused or did not answer is a failed query: whatever this answer becomes is not cached
-  try { return await mcpCallOnce<T>(url, name, args); } catch (e) { noteFailedQuery(); throw e; }
+  const t0 = Date.now(), loopback = isLoopbackCall(url);
+  try {
+    const out = await mcpCallOnce<T>(url, name, args);
+    logOutbound(name, args, url, loopback, Date.now() - t0, { bytes: JSON.stringify(out).length });
+    return out;
+  } catch (e) {
+    logOutbound(name, args, url, loopback, Date.now() - t0, { error: String((e as Error)?.message || e) });
+    noteFailedQuery();
+    throw e;
+  }
+}
+/** Whether a call to `url` is this app calling itself, for the log; never throws. */
+function isLoopbackCall(url: string): boolean {
+  try { return Object.keys(loopbackHeaders(url)).length > 0; } catch { return false; }
 }
 async function mcpCallOnce<T>(url: string, name: string, args: unknown): Promise<T> {
   const headers: Record<string, string> = {
