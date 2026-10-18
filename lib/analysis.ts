@@ -6,10 +6,11 @@
 // oncoprint — the one view whose output is patients — carries the cohort SQL and
 // re-derives its columns inside the owning database.
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
+import { applyLocks, lockDate } from "./cohort-lock.ts";
 import { chQuery, STUDY, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { describeCohortDef } from "./cohort2.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, ViewParticipation, TemplateDoc, SplitBy } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
 import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, type Resolver } from "./federation.ts";
 import { cantDraw } from "./view-coverage.ts";
@@ -167,7 +168,7 @@ export interface PartitionProposalRequest {
 export async function resolveDocCohorts(input: unknown): Promise<{ paramsDoc: AnalysisDoc; doc: AnalysisDoc; docStudy: string }> {
   const { doc: paramsDoc } = resolveParams(upgradeDocument(input as AnalysisDoc).doc);
   const { doc: partitionedDoc } = expandSplitTree(paramsDoc as AnalysisDoc);
-  const extendsDoc = resolveExtends(partitionedDoc);
+  const extendsDoc = resolveExtends(applyLocks(partitionedDoc).doc);
   const docStudy = await resolveStudy(extendsDoc.study);
   const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, per, p) =>
     (await resolverFor(study, {})).attributeQuantile(refDef, attribute, per, p));
@@ -243,7 +244,10 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   const { doc: paramsDoc, params: usedParams, unused: unusedParams } = resolveParams(currentDoc);
   const authoredNames = Object.keys(paramsDoc.cohorts || {});
   const { doc: partitionedDoc, plans: partitionPlans } = expandSplitTree(paramsDoc);
-  const extendsDoc = resolveExtends(partitionedDoc);
+  // a locked cohort (and each locked arm) is its frozen set from here on; its definition is kept
+  // aside, run beside it to say how far the data has moved (lib/cohort-lock.ts)
+  const { doc: lockedDoc, live: liveDoc, locked } = applyLocks(partitionedDoc);
+  const extendsDoc = resolveExtends(lockedDoc);
   assertPartitionChildrenFit(extendsDoc.cohorts, partitionPlans);
   assertCustomDataPresent(extendsDoc);
   const docStudy = await resolveStudy(extendsDoc.study);
@@ -255,6 +259,10 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     const res = await resolverFor(study, {});
     return res.attributeQuantile(refDef, attribute, per, p);
   });
+  const live = Object.keys(locked).length
+    ? await resolveCohortPercentiles(resolveExtends(liveDoc), docStudy, async (study, refDef, attribute, per, p) =>
+      (await resolverFor(study, {})).attributeQuantile(refDef, attribute, per, p))
+    : null;
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
   const names = Object.keys(doc.cohorts || {});
   if (!names.length) throw new Error("document has no cohorts");
@@ -307,6 +315,29 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     };
   };
   for (const name of names) cohorts[name] = await evalCohortDef(doc.cohorts[name]);
+  // A locked cohort answers from its frozen patients; its definition is run beside them, so the
+  // reader is told how far the data has moved since, never left to notice.
+  const drift: Record<string, LockDrift> = {};
+  for (const [name, l] of Object.entries(locked)) {
+    if (!cohorts[name] || !live) continue;
+    const liveDef = live.cohorts[name];
+    const d: LockDrift = { cohort: l.cohort, at: l.lock.at, ...(l.lock.dataVersion ? { dataVersion: l.lock.dataVersion } : {}),
+      n: l.members.n, present: 0, now: 0, entered: 0, left: 0, newSamples: l.members.samples ? 0 : null };
+    try {
+      for (const s of cohorts[name].studies) {
+        const res = resolvers[s];
+        if (!(res instanceof PatientLevelResolver)) throw new Error(s + " is not held at patient level here");
+        const r = await res.lockDrift(doc.cohorts[name], liveDef, l.members.samples ?? null);
+        d.present += r.present; d.now += r.now; d.entered += r.entered; d.left += r.left;
+        if (d.newSamples != null) d.newSamples = r.newSamples == null ? null : d.newSamples + r.newSamples;
+      }
+    } catch (e) { d.error = "how far the data has moved could not be measured: " + ((e as Error)?.message || e); }
+    drift[name] = d;
+    const studies = cohorts[name].studies;
+    cohorts[name].text = "locked " + lockDate(l.lock.at) + ": " + l.members.n.toLocaleString("en-US") + " patient" + (l.members.n === 1 ? "" : "s") +
+      " who were " + describeCohortDef(liveDef) +
+      (studies.length > 1 ? " — across " + studies.length + " studies" : studies[0] !== docStudy ? " — in " + studies[0] : "");
+  }
   // The children of a partition are disjoint and cover the parent by construction; counting
   // them is the check that the construction held, so a mismatch is reported, never hidden.
   const partitionResults: NonNullable<AnalysisResult["splits"]> = {};
@@ -487,6 +518,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     cohorts: Object.fromEntries(names.map((n) => [n, {
       count: cohorts[n].count, text: cohorts[n].text,
       studies: cohorts[n].studies,
+      ...(drift[n] ? { lock: drift[n] } : {}),
       sql: Object.entries(cohorts[n].perStudy).map(([s, x]) => "-- " + s + "\n" + x.sql).join("\n\n-- combined at the analysis layer: each study is evaluated separately against its own\n" +
         "-- instance and the counts are ADDED; patient overlap across studies is not deduplicated.\n\n")
     }])),

@@ -5,7 +5,8 @@
 // open analysis reads, for add-cohort mode. A rename carries every view's reference along.
 import { useState } from "react";
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
-import type { AnalysisDoc, CohortDef, CohortSource, PartitionDef } from "../../lib/types.ts";
+import type { AnalysisDoc, CohortDef, CohortLock, CohortSource, PartitionDef } from "../../lib/types.ts";
+import { lockDate } from "../../lib/cohort-lock.ts";
 import { canonicalSplits, cohortHash } from "../../lib/cohort-hash.ts";
 import type { SavedCohort } from "./use-saved.ts";
 import type { SplitSpec } from "./partitions.tsx";
@@ -125,6 +126,8 @@ export function useCohortEdits(page: CohortEditsPage) {
     const s = cohortSource(name);
     if (!s || !s.src || !(s.state === "changed" || (s.state === "current" && s.edited))) return;
     const cur = doc.cohorts![name];
+    if (cur.lock && !s.src.def.lock && !confirm("“" + name + "” is locked to the " + cur.lock.n.toLocaleString() + " patients it had on " + lockDate(cur.lock.at) +
+      ". Taking the saved version's definition unlocks it, and it follows the data from then on. Go ahead?")) return;
     const next: CohortDef = { ...s.src.def, ...(cur.notes ? { notes: cur.notes } : {}), ...(cur.splits ? { splits: cur.splits } : {}),
       from: { saved: s.from.saved, name: s.srcName!, hash: s.now!, savedAt: s.src.savedAt } };
     docs.set({ ...doc, cohorts: { ...doc.cohorts, [name]: next } });
@@ -169,6 +172,40 @@ export function useCohortEdits(page: CohortEditsPage) {
     } catch (e: any) {
       setError("could not save \u201c" + name + "\u201d: " + (e?.message || e));
     }
+  };
+
+  // ---- locks: a cohort frozen to the patients it selects now (lib/cohort-lock.ts) ------------
+  /**
+   * Lock the cohorts named, or every cohort (the analysis as a whole, one moment for all of them).
+   * The server evaluates each definition and its split arms and keeps the patients as stored id
+   * sets; the document names them in each cohort's `lock`.
+   */
+  const lockCohorts = async (names?: string[]) => {
+    const res = await api.lock({ doc, ...(names ? { cohorts: names } : {}) });
+    const j = await res.json().catch(() => ({ error: res.statusText }));
+    if (!res.ok || j.error) { setError("could not lock: " + (j.error || res.statusText)); return; }
+    const now = docs.current.doc;
+    const cohorts = { ...now.cohorts };
+    for (const [n, lock] of Object.entries(j.locks as Record<string, CohortLock>)) if (cohorts[n]) cohorts[n] = { ...cohorts[n], lock };
+    docs.set({ ...now, cohorts, ...(names ? {} : { locked: { at: j.at, dataVersion: j.dataVersion, oncokbPin: j.oncokbPin } }) });
+  };
+  /** Unlock one cohort: it follows its definition again. The analysis is then no longer locked as a whole. */
+  const unlockCohort = (name: string) => {
+    const now = docs.current.doc;
+    const cur = now.cohorts?.[name];
+    if (!cur?.lock) return;
+    const { lock: _lock, ...rest } = cur;
+    const { locked: _locked, ...unlockedDoc } = now;
+    docs.set({ ...unlockedDoc, cohorts: { ...now.cohorts, [name]: rest } });
+  };
+  /** Unlock every cohort, and the analysis. */
+  const unlockAll = () => {
+    const now = docs.current.doc;
+    const { locked: _locked, ...unlockedDoc } = now;
+    docs.set({ ...unlockedDoc, cohorts: Object.fromEntries(Object.entries(now.cohorts || {}).map(([n, d]) => {
+      const { lock: _lock, ...rest } = d;
+      return [n, rest];
+    })) });
   };
 
   // ---- partitions: a cohort split into arms that add up to it ------------------------------
@@ -261,5 +298,5 @@ export function useCohortEdits(page: CohortEditsPage) {
     }
   };
 
-  return { cohortEditing, setCohortEditing, featureSaved, featureFromSelection, cohortFromSelection, removeCohort, runEdited, splitsFlat, setPartitionDef, removePartitionNamed, renamePartitionRow, splitCohortBy, analysisStudies, openCohortEdit, confirmCohortEdit, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells };
+  return { lockCohorts, unlockCohort, unlockAll, cohortEditing, setCohortEditing, featureSaved, featureFromSelection, cohortFromSelection, removeCohort, runEdited, splitsFlat, setPartitionDef, removePartitionNamed, renamePartitionRow, splitCohortBy, analysisStudies, openCohortEdit, confirmCohortEdit, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells };
 }

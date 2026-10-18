@@ -17,8 +17,11 @@ import { AccessError } from "./auth.ts";
 import { groupsOf, readableWhere, canRead, canShare, rightsOf, sharingOf, validateSharing, type Rights, type Shareable, type Sharing } from "./access.ts";
 import type { IdSetLevel, LoadedIdSet } from "./id-sets.ts";
 
-/** how the list was matched when it was saved */
-export interface IdSetSource { idsIn: number; unmatched: number; duplicates: number; multiStudy: number }
+/** how the list was matched when it was saved; for a lock's set, which cohort it froze and when */
+export interface IdSetSource {
+  idsIn: number; unmatched: number; duplicates: number; multiStudy: number;
+  lockOf?: { cohort: string; at: string; dataVersion?: string; oncokbPin?: string | null };
+}
 
 export interface IdSetMeta {
   id: string; name: string; owner: string; ownerEmail: string; level: IdSetLevel;
@@ -89,10 +92,12 @@ export async function readIdSet(principal: string, id: string): Promise<{ meta: 
 }
 
 /**
- * Save a set: members already matched to the studies' own ids (lib/id-sets-server.ts), as bare
- * ids per study. Empty studies are dropped; a set with no members at all is refused.
+ * Save a set: members already matched to the studies' own ids (lib/id-set-import.ts), as bare
+ * ids per study. Empty studies are dropped; a set with no members at all is refused unless
+ * `allowEmpty` (a lock freezing a cohort or arm that held nobody).
  */
-export async function saveIdSet(principal: string, input: { name: string; level: IdSetLevel; perStudy: Record<string, string[]>; source: IdSetSource }): Promise<IdSetMeta> {
+export async function saveIdSet(principal: string, input: { name: string; level: IdSetLevel; perStudy: Record<string, string[]>; source: IdSetSource },
+  opts: { allowEmpty?: boolean } = {}): Promise<IdSetMeta> {
   const name = String(input.name ?? "").trim().slice(0, 200);
   if (!name) throw new Error("a stored id set needs a name");
   if (input.level !== "patient" && input.level !== "sample") throw new Error("level must be 'patient' or 'sample'");
@@ -103,7 +108,8 @@ export async function saveIdSet(principal: string, input: { name: string; level:
   }
   const studies = Object.keys(perStudy);
   const count = studies.reduce((n, s) => n + perStudy[s].length, 0);
-  if (!count) throw new Error("none of the ids matched a " + input.level + " of the studies given; nothing to save");
+  // a pasted list that matched nothing is a mistake; a locked arm that held nobody is a fact (lib/cohort-lock-server.ts)
+  if (!count && !opts.allowEmpty) throw new Error("none of the ids matched a " + input.level + " of the studies given; nothing to save");
   if (count > ID_SET_MAX) throw new Error("a stored id set holds at most " + ID_SET_MAX.toLocaleString("en-US") + " ids; this one has " + count.toLocaleString("en-US"));
   const json = JSON.stringify(perStudy);
   const id = randomUUID();

@@ -10,8 +10,11 @@ import { requirePrincipal } from "./auth.ts";
 import { studyRouting, instanceForStudy } from "./federation.ts";
 import { peerForStudy } from "./federation-remote.ts";
 
-/** The most stored sets one request may name. */
-export const MAX_SETS_PER_REQUEST = 16;
+/**
+ * The most stored sets one request may name: a locked analysis names two per cohort and one per
+ * locked arm, and a document holds at most 48 cohorts with their arms.
+ */
+export const MAX_SETS_PER_REQUEST = 128;
 
 /**
  * Run `fn` with every stored set `body` names read for it (a no-op when it names none). A set

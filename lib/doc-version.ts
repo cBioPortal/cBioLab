@@ -14,7 +14,7 @@
 
 import { flattenSplits, viewDrawProblem } from "./partition-arms.ts";
 
-export const DOC_VERSION = "2.7";
+export const DOC_VERSION = "2.8";
 
 /** what upgrading a document did, reported in the result so a reader is told, not left to notice */
 export interface DocUpgrade {
@@ -201,13 +201,22 @@ function studyTrackRenamed(doc: AnyDoc, changes: string[]): AnyDoc {
  */
 const idSetsNamed = (doc: AnyDoc): AnyDoc => doc;
 
+/**
+ * 2.7 → 2.8: a cohort may be locked (`lock`, and the document's `locked`): evaluated from the
+ * patients it selected then, not from its definition. Nothing an older document says changes; the
+ * version exists so a 2.7 engine refuses a locked document rather than silently running the live
+ * definitions, which is exactly the drift a lock is there to stop.
+ */
+const cohortsLockable = (doc: AnyDoc): AnyDoc => doc;
+
 /** each step upgrades from the version before `to`; unversioned documents start at the first */
 const STEPS: { to: string; run: (doc: AnyDoc, changes: string[]) => AnyDoc }[] = [
   { to: "2.3", run: partitionsToSplits },
   { to: "2.4", run: splitsNoLongerReplace },
   { to: "2.5", run: viewsNameTheirCohorts },
   { to: "2.6", run: studyTrackRenamed },
-  { to: "2.7", run: idSetsNamed }
+  { to: "2.7", run: idSetsNamed },
+  { to: "2.8", run: cohortsLockable }
 ];
 
 /**

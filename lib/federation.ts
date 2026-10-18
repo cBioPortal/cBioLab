@@ -23,7 +23,7 @@ import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, Loop
 import { sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
-import { compileCohortDef, eventTypeMatchSql } from "./cohort2.ts";
+import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
@@ -1217,6 +1217,8 @@ export function carriesPatientIds(def: CohortDef | null | undefined): boolean {
     if ((o.kind === "sampleList" || o.kind === "patientList") && Array.isArray(o.ids) && o.ids.length > 0) return true;
     // a stored set is the same list kept on the server: the instance would be asked for its ids
     if ((o.kind === "sampleList" || o.kind === "patientList") && (o as { set?: unknown }).set !== undefined) return true;
+    // a locked cohort is its frozen patients' ids (lib/cohort-lock.ts)
+    if ((o as { lock?: unknown }).lock) return true;
     return Object.values(x).some(walk);
   };
   return walk(def);
@@ -1991,6 +1993,23 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   async members(def: CohortDef | null | undefined): Promise<string[]> {
     const r = await chQuery<ChRow>("SELECT pid FROM (" + this.cohortSql(def) + ")", this.instance.conn);
     return r.data.map((x) => x.pid);
+  }
+
+  /** The samples of a cohort's patients, as bare ids: what locking a cohort records beside its patients. */
+  async memberSamples(def: CohortDef | null | undefined): Promise<string[]> {
+    const r = await chQuery<ChRow>(memberSamplesSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
+    return r.data.map((x) => x.sid);
+  }
+
+  /**
+   * How far the data has moved from a locked cohort (lib/cohort-lock.ts): counts only, but over the
+   * frozen patients' ids, so patient-level only, as members() is.
+   */
+  async lockDrift(locked: CohortDef, live: CohortDef, samplesSet: string | null): Promise<{ present: number; now: number; entered: number; left: number; newSamples: number | null; sql: string }> {
+    const sql = lockDriftSql(this.cohortSql(locked), this.cohortSql(live), this.study, this.instance.conn.db, samplesSet);
+    const r = (await this.runLogged<ChRow>("lock: drift since locked", sql, this.instance.conn)).data[0];
+    const ns = Number(r.newSamples);
+    return { present: Number(r.present), now: Number(r.now), entered: Number(r.entered), left: Number(r.left), newSamples: ns < 0 ? null : ns, sql };
   }
 
   /**

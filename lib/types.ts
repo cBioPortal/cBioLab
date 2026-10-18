@@ -227,9 +227,36 @@ export interface CohortDef {
    * engine never reads it; the page compares it with the saved cohort to offer an update.
    */
   from?: CohortSource;
+  /** frozen to the patients it selected when it was locked (lib/cohort-lock.ts) */
+  lock?: CohortLock;
 }
 
 export interface CohortSource { saved: string; name: string; hash: string; savedAt?: string }
+
+/** A cohort's (or a split arm's) members when it was locked: stored id sets (lib/id-set-store.ts). */
+export interface LockedMembers {
+  /** a patient-level stored set: the patients it selected */
+  set: string;
+  n: number;
+  /** a sample-level stored set: those patients' samples then, what "new samples since" is measured against */
+  samples?: string;
+  nSamples?: number;
+}
+
+/**
+ * A cohort frozen to what its definition selected at one moment (lib/cohort-lock.ts). The engine
+ * evaluates the stored set; the definition is kept, and still run beside it, to say how far the
+ * data has moved since.
+ */
+export interface CohortLock extends LockedMembers {
+  /** when it was locked (ISO 8601) */
+  at: string;
+  /** the warehouse's data version then, and the OncoKB release the definition was read against */
+  dataVersion?: string;
+  oncokbPin?: string | null;
+  /** each split arm's own frozen members, keyed by its name under this cohort ("<split> / <arm>") */
+  children?: Record<string, LockedMembers>;
+}
 
 /**
  * One arm of a split: a name and the clause a patient must match to be in it. Arms are tested in
@@ -1529,11 +1556,32 @@ export interface AnalysisDoc {
    * local upload, sent by the browser that holds it.
    */
   uploads?: { as: string; dataset: string; version: number }[];
+  /** every cohort was locked at once, at this moment (lib/cohort-lock.ts): the analysis as of then */
+  locked?: { at: string; dataVersion?: string; oncokbPin?: string | null };
 }
 
 // ---------- results ---------------------------------------------------------
 export interface CohortResult {
   count: number; text: string; studies: string[]; sql: string;
+  /** for a locked cohort or arm: when, how many it froze, and how far the data has moved since */
+  lock?: LockDrift;
+}
+export interface LockDrift {
+  /** the locked cohort that holds the lock (this name, or the cohort a split arm belongs to) */
+  cohort: string;
+  at: string;
+  dataVersion?: string;
+  /** patients frozen, and of those how many the data still holds */
+  n: number;
+  present: number;
+  /** what the definition selects now, and how that differs from the frozen patients */
+  now: number;
+  entered: number;
+  left: number;
+  /** samples the frozen patients have now that they did not have when locked; null when not measured */
+  newSamples: number | null;
+  /** why the movement could not be measured (the frozen patients still answered) */
+  error?: string;
 }
 export interface CompareCell {
   cohort: string; profiled: number; any: number; driver: number;

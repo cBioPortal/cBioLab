@@ -1,6 +1,6 @@
 <!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.ts; regenerate with `npm run docs:gen`. -->
 
-# cbio-lab DSL (v2.7)
+# cbio-lab DSL (v2.8)
 
 One declarative JSON object — the **Analysis document** — describes everything cbio-lab does:
 which patients form each cohort, and which views compare them. The server compiles it to
@@ -11,7 +11,7 @@ SQL each cohort compiled to.
 ## Analysis document
 
 ```
-{ "dsl":     "2.7",                         // the document's version; see "Versions" below
+{ "dsl":     "2.8",                         // the document's version; see "Versions" below
   "study":   "<default study id>",            // validated against cancer_study
   "cohorts": { "<name>": cohortDef, ... },    // max 16 — the store every view's "cohorts" names from
   "views":   [ view, ... ],                   // max 6; each lists its own "cohorts": ["<name>", ...]
@@ -36,7 +36,10 @@ cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient 
                "lineGap"?: 90,                // derived-treatment-line gap, days
                "notes"?:   "<prose>",         // the analyst's own note on this cohort; never compiled
                "from"?:    { "saved": "<id>", "name": "<name>", "hash": "<sha256>", "savedAt"?: "<when>" },  // set by the page: the saved cohort this was copied from, and the hash of what was copied; never compiled
-               "splits"?:  { "<name>": splitDef } }  // divisions of this cohort into arms that add up to it
+               "splits"?:  { "<name>": splitDef },  // divisions of this cohort into arms that add up to it
+               "lock"?:    { "set": "<id set>", "n": N, "samples"?: "<id set>", "nSamples"?: N, "at": "<ISO time>",
+                             "dataVersion"?: "…", "oncokbPin"?: "…", "children"?: { "<split> / <arm>": { "set", "n" } } } }
+                                              // frozen to the patients it selected at "at" — see "Locked cohorts" below
 splitDef  := { "arms": [ { "name": "<label>", "where": clause, "splits"?: {…} } × 1-8 ],  // tested in order; first match wins; an arm may be split again
                "other"?: "<label>",            // the remainder's name, default "Other"
                "otherSplits"?: {…},            // splits of the remainder
@@ -87,7 +90,7 @@ Up to 16 authored cohorts and 48 cohorts in all, children included. Expanded bef
 each child `extends` its parent and runs in the parent's studies. (Not to be confused with the
 `{"kind":"split"}` leaf below, which selects the engine's fixed discovery or validation half.)
 
-**Versions.** A document carries `"dsl": "2.7"`. One written for an older version is
+**Versions.** A document carries `"dsl": "2.8"`. One written for an older version is
 upgraded when it is read — the result's `upgraded` says from which version and what changed
 (2.2 → 2.3 moved top-level `partitions` onto the cohorts they split as `splits`, and renamed
 their children from `"<partition> / <arm>"` to `"<cohort> / <partition> / <arm>"`, views
@@ -95,7 +98,7 @@ included; 2.3 → 2.4 ended "a split replaces what it splits" — a view that dr
 under 2.3 is given those arms by name, so it draws the same thing; 2.4 → 2.5 ended "a view with no
 `cohorts` draws every cohort" — such a view is given every authored cohort by name; 2.5 → 2.6 renamed
 the oncoprint's study track "Study of origin"; 2.6 → 2.7 let a list clause name a stored id set, and
-changes nothing an older document says) — and saving it writes the new
+2.7 → 2.8 let a cohort be locked; neither changes anything an older document says) — and saving it writes the new
 version. One with no `dsl` is read the same way, so
 leaving it out is harmless. One written for a NEWER version than the server reads is refused,
 rather than silently ignoring what it does not understand.
@@ -127,6 +130,22 @@ error — so the list itself never needs to be split up by study. These two leav
 kind of clause that can **never** leave for a remote or aggregate-only participant: an id-carrying
 cohort is refused before any request is made, the same guarantee `docs/DATA-BOUNDARY.md`
 describes for every other identifier-bearing path.
+
+**Locked cohorts.** A cohort can be frozen to the patients its definition selects at one moment,
+so an analysis stops drifting as patients are added to the data: `lock` names the stored id set
+of those patients (and of their samples), when it was taken, the data version and OncoKB release
+then, and, under `children`, the frozen patients of each of its split arms by name. The engine
+evaluates the set, not the definition; the definition stays as the record of how the cohort was
+made, and is still run beside the set, so the result's `cohorts[name].lock` says how far the
+data has moved: what the definition selects `now`, who it would add (`entered`) or drop
+(`left`), how many frozen patients the data still holds (`present` of `n`), and how many
+samples those patients have that they did not have then (`newSamples` — a lock freezes
+patients, and views read every sample of them). A split arm added after the lock is evaluated
+inside the frozen cohort, so arms still add up to it. The document's `locked` says every cohort
+was locked at once, one moment for all. Locks are taken by `POST /api/lock` (`{doc, cohorts?}`,
+every cohort when none are named) or the page — a cohort's menu, or "Lock all cohorts" — and need a
+sign-in, since the sets are the reader's. Unlocking is removing `lock`. Values recorded about
+the frozen patients (a re-called mutation, an edited clinical field) are read as they are now.
 
 **Stored id sets.** A long list is saved once on the server — `POST /api/id-sets` with
 `{name, level:"sample"|"patient", studies, ids}`, or "+ Add cohort" → "From a list of ids" — and

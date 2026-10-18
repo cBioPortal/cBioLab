@@ -1541,6 +1541,49 @@ async function main() {
       steps.saved && steps.copy && steps.oneSet && steps.nothingToSave && steps.stillCounted, JSON.stringify(steps));
     await ctx.close();
   }
+  // Locking: "Lock all cohorts" freezes every cohort and its split arms at one moment; the counts
+  // do not change, each cohort says it is locked and that nothing has moved since, the document
+  // names the frozen sets and when; a cohort unlocks on its own, and the analysis is then no
+  // longer locked as a whole.
+  if (LOGIN) {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const sp = await ctx.newPage();
+    let steps = {};
+    try {
+      await signIn(ctx, "locks." + LOGIN);
+      const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
+      const counts = async () => sp.$$eval(".cohortbox-head", (hs) => hs.map((h) => h.innerText.replace(/\s+/g, " ")));
+      const doc = { dsl: "2.8", study: "msk_chord_2024", cohorts: {
+        "KRAS NSCLC": { all: [{ kind: "oql", q: "KRAS: MUT" }, { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }],
+          splits: { g12c: { arms: [{ name: "G12C", where: { kind: "oql", q: "KRAS: G12C" } }] } } },
+        "EGFR": { all: [{ kind: "oql", q: "EGFR: MUT" }] } },
+        views: [{ kind: "survival", cohorts: ["KRAS NSCLC", "EGFR"] }] };
+      await sp.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify(doc)).toString("base64url"), { waitUntil: "domcontentloaded" });
+      await sp.waitForFunction(() => document.querySelectorAll(".cohortbox-head strong").length === 2, null, { timeout: 180000 });
+      const before = await counts();
+      await sp.locator(".lockall").click();
+      await sp.waitForSelector(".lockdrift", { timeout: 180000 });
+      await sp.waitForFunction(() => document.querySelectorAll(".lockdrift").length === 2, null, { timeout: 180000 });
+      const d = await docOf();
+      const k = d.cohorts["KRAS NSCLC"].lock || {};
+      steps.locked = !!d.locked?.at && /^[0-9a-f-]{36}$/.test(k.set || "") && /^[0-9a-f-]{36}$/.test(k.samples || "") && k.at === d.locked.at && d.cohorts.EGFR.lock?.at === d.locked.at;
+      steps.arms = Object.keys(k.children || {}).some((c) => c.startsWith("g12c / "));
+      steps.sameCounts = JSON.stringify(await counts()) === JSON.stringify(before);
+      const lines = await sp.$$eval(".lockline", (ls) => ls.map((l) => l.innerText.replace(/\s+/g, " ")));
+      steps.unchanged = lines.length === 2 && lines.every((l) => /locked \d+ \w+ \d{4}/.test(l) && /unchanged since/.test(l));
+      steps.header = /locked \d+ \w+ \d{4}/.test(await sp.locator(".analysislock").innerText());
+      const gear = sp.locator(".cohortbox", { hasText: "EGFR" }).locator(".cohortgear");
+      await gear.click();
+      await sp.locator("[data-slot=popover-content]").getByRole("button", { name: "unlock", exact: true }).click();
+      await sp.waitForFunction(() => document.querySelectorAll(".lockline").length === 1, null, { timeout: 60000 });
+      const d2 = await docOf();
+      steps.unlockedOne = !d2.cohorts.EGFR.lock && !!d2.cohorts["KRAS NSCLC"].lock && !d2.locked;
+      steps.lockAllBack = await sp.locator(".lockall").isVisible();
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("locking all cohorts freezes them and their arms at one moment, keeps the counts, says nothing moved since; one cohort unlocks on its own",
+      steps.locked && steps.arms && steps.sameCounts && steps.unchanged && steps.header && steps.unlockedOne && steps.lockAllBack, JSON.stringify(steps));
+    await ctx.close();
+  }
   // A cohort with something to save — never saved, or re-split since — offers "save" in its gear
   // menu; saving makes the analysis's copy name the saved cohort as its source, and the item goes.
   if (LOGIN) {

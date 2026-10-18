@@ -4,10 +4,13 @@
 // document names custom data that is not here. The page holds the state; each section reads it
 // and the page's actions from one AnalysisCtx.
 import { useState } from "react";
-import { Braces, LoaderCircle, Play, Plus, Redo2, Save, Undo2, X } from "lucide-react";
+import { Braces, LoaderCircle, Lock, Play, Plus, Redo2, Save, Undo2, X } from "lucide-react";
+import { lockDate } from "../../lib/cohort-lock.ts";
+import type { CohortLock, LockDrift } from "../../lib/types.ts";
 import { Button } from "../_ui/button";
 import { CHIP } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
+import { TB } from "../_ui/toolbar.ts";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Textarea } from "../_ui/textarea";
 import CohortPills from "./pills";
@@ -61,6 +64,12 @@ export interface AnalysisCtx {
   /** whether a cohort has anything to save to the library, and the action that saves it */
   cohortSaveState: (name: string) => CohortSaveState | null;
   saveCohortToLibrary: (name: string) => Promise<void>;
+  /** lock the cohorts named, or every one (the analysis); unlock one, or all (lib/cohort-lock.ts) */
+  lockCohorts: (names?: string[]) => Promise<void>;
+  unlockCohort: (name: string) => void;
+  unlockAll: () => void;
+  /** whether the reader may store id sets (signed in); asks them to sign in when not */
+  canSave: () => boolean;
   /** the single-cell dataset a cohort's patients can be opened in (lib/cell-explorer.ts), and opening it */
   cohortCells: (name: string) => import("../../lib/cell-explorer.ts").CellExplorerDataset | null;
   openCohortCells: (name: string) => Promise<void>;
@@ -158,7 +167,13 @@ function EmptyViewCard({ ctx, vi }: { ctx: AnalysisCtx; vi: number }) {
 }
 
 export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
-  const { busy, catalogAttrs, cohortCells, cohortSaveState, cohortSource, doc, openCohortCells, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, saveCohortToLibrary, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, updateFromSaved, upgradeNote, viewTitle } = ctx;
+  const { busy, canSave, catalogAttrs, cohortCells, cohortSaveState, cohortSource, doc, lockCohorts, openCohortCells, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, saveCohortToLibrary, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, unlockAll, unlockCohort, updateFromSaved, upgradeNote, viewTitle } = ctx;
+  const [lockingAll, setLockingAll] = useState(false);
+  const lockAll = async () => {
+    if (!canSave()) return;
+    setLockingAll(true);
+    try { await lockCohorts(); } finally { setLockingAll(false); }
+  };
   const [cohortOpen, setCohortOpen] = useState<Set<string>>(() => new Set());
   const names = Object.keys(doc.cohorts || {});
   const flat = splitsFlat();
@@ -181,6 +196,19 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
         <section className="cohortsum" aria-label="cohorts in this analysis">
           <h2 className="vtitle flex items-center gap-2.5 mb-4">
             Cohorts in this analysis <span className="plain meta">— add one from a view</span>{busy && <span className="spinner" />}
+            <span className="analysislock ml-auto flex items-center gap-2 text-sm font-normal normal-case tracking-normal">
+              {doc.locked
+                ? <>
+                    <span className="inline-flex items-center gap-1 text-muted-foreground" title={"every cohort, and its split arms, frozen at once to the patients it selected then" +
+                      (doc.locked.dataVersion ? "\ndata version then: " + doc.locked.dataVersion : "")}>
+                      <Lock className="size-3.5" />locked {lockDate(doc.locked.at)}</span>
+                    <Button variant="link" size="inline" className="text-sm" disabled={busy} onClick={unlockAll}
+                      title="every cohort follows its definition again">unlock all</Button>
+                  </>
+                : <Button variant="outline" size="sm" className={cn(TB, "lockall")} disabled={busy || lockingAll} onClick={() => void lockAll()}
+                    title="freeze every cohort, and its split arms, at this moment to the patients it selects now, so the analysis stays the same as patients are added to the data">
+                    {lockingAll ? <span className="spinner" /> : <Lock />}Lock all cohorts</Button>}
+            </span>
           </h2>
           <div className="cohortlist">
             {names.map((n, i) => {
@@ -201,6 +229,7 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                       save={toSave && { onSave: () => saveCohortToLibrary(n), label: toSave.action === "create" ? "save to library" : "save changes to library",
                         title: toSave.action === "create" ? "save “" + toSave.as + "” to your library, to add it to other analyses"
                           : "write this cohort's definition and splits over “" + toSave.as + "” in your library" }}
+                      lock={{ locked: !!doc.cohorts?.[n]?.lock, onLock: async () => { if (canSave()) await lockCohorts([n]); }, onUnlock: () => unlockCohort(n) }}
                       cells={cohortCells(n)} onCells={() => openCohortCells(n)}
                       menuId={"cohort:" + n} menuStore={menuOpenRef.current} />
                     <div className="cohortbox-head">
@@ -208,6 +237,7 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                       {c ? <><strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span></>
                         : busy ? <span className="skeleton cohortsum-skel" /> : null}
                     </div>
+                    {doc.cohorts?.[n]?.lock && <LockLine lock={doc.cohorts[n].lock!} drift={c?.lock} />}
                     <CohortStudies ids={c?.studies && c.studies.length ? c.studies : [doc.cohorts?.[n]?.study || doc.study || result?.study].filter(Boolean) as string[]}
                       names={studyNames} />
                     {doc.cohorts?.[n] && <CohortPills def={doc.cohorts[n]} onCustomData={showClauseData(n)} />}
@@ -257,6 +287,32 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
       )}
     </div>
   </>;
+}
+
+/**
+ * A locked cohort's lock, and how far the data has moved since: what its definition would select
+ * now, who that would add or drop, frozen patients no longer in the data, and their new samples.
+ */
+function LockLine({ lock, drift }: { lock: CohortLock; drift?: LockDrift }) {
+  const nf = (x: number) => x.toLocaleString();
+  const parts: string[] = [];
+  if (drift && !drift.error) {
+    if (drift.entered || drift.left)
+      parts.push("its definition now selects " + nf(drift.now) + (drift.entered ? " (+" + nf(drift.entered) + " new" : " (") +
+        (drift.entered && drift.left ? ", " : "") + (drift.left ? "−" + nf(drift.left) + " no longer" : "") + ")");
+    if (drift.present < drift.n) parts.push(nf(drift.n - drift.present) + " of the locked patients are no longer in the data");
+    if (drift.newSamples) parts.push(nf(drift.newSamples) + " new sample" + (drift.newSamples === 1 ? "" : "s") + " of these patients, which views include");
+  }
+  return (
+    <p className="lockline m-0 mb-1.5 flex flex-wrap items-baseline gap-x-2 text-sm text-muted-foreground"
+      title={"frozen " + lock.at + (lock.dataVersion ? "\ndata version then: " + lock.dataVersion : "") + (lock.oncokbPin ? "\nOncoKB " + lock.oncokbPin : "")}>
+      <span className="inline-flex items-center gap-1 text-foreground"><Lock className="size-3.5" />locked {lockDate(lock.at)}</span>
+      {!drift ? null
+        : drift.error ? <span className="text-destructive">{drift.error}</span>
+        : parts.length ? <span className="lockdrift">since then: {parts.join("; ")}</span>
+        : <span className="lockdrift">unchanged since: its definition still selects exactly these patients</span>}
+    </p>
+  );
 }
 
 export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {

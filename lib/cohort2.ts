@@ -20,6 +20,7 @@ import { clinicalValueFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { idSetTable, idSetIfLoaded, ID_SET_UUID } from "./id-sets.ts";
+import { lockClause } from "./cohort-lock.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
@@ -409,6 +410,36 @@ function patientListLeafSql(leaf: PatientListLeaf, ctx: Ctx): string {
   return basePatientsSql(ctx.study, dbOf(ctx)) + "\n    AND " + member;
 }
 
+/** The samples, as bare ids, of the patients `patientsSql` selects in `study`: what a lock records beside them. */
+export function memberSamplesSql(patientsSql: string, study: string, db: string): string {
+  return "SELECT DISTINCT " + PID("sample_unique_id", study) + " AS sid\n" +
+    "  FROM " + db + ".sample_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND " + PID("patient_unique_id", study) + " IN (SELECT pid FROM (" + patientsSql + "))";
+}
+
+/**
+ * How far the data has moved from a locked cohort, in `study`: of the frozen patients
+ * (`lockedSql`) how many the data still holds, what the definition (`liveSql`) selects now, who it
+ * would add and who it would drop, and how many samples the frozen patients have that were not
+ * theirs when locked (`samplesSet`, the lock's sample set; null when the lock recorded none).
+ */
+export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string, samplesSet: string | null): string {
+  const pid = PID("patient_unique_id", study), sid = PID("sample_unique_id", study);
+  let newSamples = "toInt64(-1)";
+  if (samplesSet) {
+    const table = idSetTable(samplesSet, study, "sample");
+    newSamples = "(SELECT count() FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study) +
+      " AND " + pid + " IN (SELECT pid FROM locked)" + (table ? " AND " + sid + " NOT IN (SELECT id FROM " + table + ")" : "") + ")";
+  }
+  return "WITH locked AS (" + lockedSql + "),\n     live AS (" + liveSql + ")\n" +
+    "SELECT (SELECT count() FROM locked) AS present,\n" +
+    "       (SELECT count() FROM live) AS now,\n" +
+    "       (SELECT count() FROM live WHERE pid NOT IN (SELECT pid FROM locked)) AS entered,\n" +
+    "       (SELECT count() FROM locked WHERE pid NOT IN (SELECT pid FROM live)) AS left,\n" +
+    "       " + newSamples + " AS newSamples";
+}
+
 // The salt is part of what every held-out result means: changing it reshuffles every
 // discovery/validation partition ever reported. test/cohort.test.ts pins it.
 export const SPLIT_SALT = "cohort-lab-split-v1";
@@ -478,7 +509,9 @@ function normalizeSugar(def: CohortDef): CohortDef {
 // def -> SQL producing the cohort's patient stable ids (column: pid)
 export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin, profiles, gaProfiles, study = STUDY, db }: Partial<CompileCtx> = {}): string {
   if (!def) return basePatientsSql(study, db || DB);
-  const d = normalizeSugar(def);
+  // a locked cohort is its frozen patients wherever it is compiled, not only inside runAnalysis
+  // (which has already made it so, lib/cohort-lock.ts): Explore, an oncoprint spec, a link
+  const d = def.lock ? { ...normalizeSugar(def), all: [lockClause(def.lock)] } : normalizeSugar(def);
   const clauses = d.all;
   // No clauses means every patient in the study — the same thing an absent
   // definition means, and a legitimate cohort (it is the denominator for

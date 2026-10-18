@@ -6,7 +6,7 @@
 // They return the Response, as fetch does: a caller still decides how to read it (JSON, the
 // binary contract, a file) and what an error status means for it.
 import type {
-  AnalysisBody, NotebookBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody, CellExplorerBody,
+  AnalysisBody, NotebookBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody, CellExplorerBody, LockBody,
 } from "../../lib/api-schemas.ts";
 import { withCustomData, type UploadBinding } from "./custom-data-client.ts";
 import type { ArtifactKind } from "../../lib/artifacts.ts";
@@ -59,6 +59,10 @@ export const api = {
     post("/api/cell-explorer", body.mode === "link" ? await withCustomData(body) : body, opts.signal),
   partition: async (body: PartitionBody, opts: Opts = {}) =>
     post("/api/partition", await withCustomData(body), opts.signal),
+
+  /** Lock cohorts of the document: those named, or every one. Answers each cohort's lock (lib/cohort-lock-server.ts). */
+  lock: async (body: LockBody, opts: Opts = {}) =>
+    post("/api/lock", await withCustomData(body), opts.signal),
 
   /** One page of a table view, or the values one of its columns takes. */
   viewPage: async (body: ViewPageBody, opts: Opts = {}) =>

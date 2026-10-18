@@ -114,10 +114,16 @@ export function idSetRefsIn(x: unknown): string[] {
     if (!v || typeof v !== "object" || seen.has(v)) return;
     seen.add(v);
     if (Array.isArray(v)) { v.forEach(walk); return; }
-    const o = v as { kind?: unknown; set?: unknown };
+    const o = v as { kind?: unknown; set?: unknown; lock?: unknown };
     if ((o.kind === "sampleList" || o.kind === "patientList") && o.set !== undefined) {
       if (typeof o.set !== "string" || !ID_SET_UUID.test(o.set)) throw new Error(o.kind + " clause: set must be a stored id set's id (a uuid), got " + JSON.stringify(o.set));
       out.add(o.set);
+    }
+    // a locked cohort's frozen patients and samples, and each locked arm's (lib/cohort-lock.ts)
+    if (o.lock && typeof o.lock === "object") {
+      const l = o.lock as { set?: unknown; samples?: unknown; children?: Record<string, { set?: unknown; samples?: unknown }> };
+      for (const m of [l, ...Object.values(l.children && typeof l.children === "object" ? l.children : {})])
+        for (const x of [m?.set, m?.samples]) if (typeof x === "string" && ID_SET_UUID.test(x)) out.add(x);
     }
     Object.values(v).forEach(walk);
   };

@@ -120,6 +120,13 @@ export const TableRequest = z.object({
   ...customData,
 });
 
+/** POST /api/lock — lock cohorts of a document: those named, or every one (the analysis as a whole). */
+export const LockRequest = z.object({
+  doc: DocEnvelope,
+  cohorts: z.array(z.string()).min(1).optional(),
+  ...customData,
+});
+
 /** A spec or a document goes out with the fields the envelope does not name. */
 type Open<T> = T & Record<string, unknown>;
 export type AnalysisBody = z.input<typeof AnalysisRequest>;
@@ -133,6 +140,7 @@ export type CellExplorerBody = z.input<typeof CellExplorerRequest>;
 export type MembersBody = z.input<typeof MembersRequest>;
 export type ViewPageBody = z.input<typeof ViewPageRequest>;
 export type TableBody = z.input<typeof TableRequest>;
+export type LockBody = z.input<typeof LockRequest>;
 
 /**
  * The body, checked against its envelope, with its defaults filled in and every field the
