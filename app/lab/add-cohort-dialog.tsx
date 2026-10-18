@@ -264,7 +264,8 @@ function ListSource({ studies, saved, full, replaces, addTitle, nameFor, onAdd, 
 }) {
   const [text, setText] = useState("");
   const [level, setLevel] = useState<"sample" | "patient">("sample");
-  const [name, setName] = useState("from a list");
+  // no default: a list's name is how it is found again, in the analysis and the library
+  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<SavedSet | null>(null);
@@ -274,7 +275,7 @@ function ListSource({ studies, saved, full, replaces, addTitle, nameFor, onAdd, 
   const save = async () => {
     setBusy(true); setErr(null); setDone(null);
     try {
-      const res = await api.idSets.create({ name: name.trim() || "from a list", level, studies, ids });
+      const res = await api.idSets.create({ name: name.trim(), level, studies, ids });
       const j = await res.json();
       if (!res.ok || j.error) throw new Error(j.error || res.statusText);
       setDone(j);
@@ -310,10 +311,11 @@ function ListSource({ studies, saved, full, replaces, addTitle, nameFor, onAdd, 
         onChange={(e) => { setText(e.target.value); setDone(null); }} />
       <div className="viewtb">
         <div className="tbz">
-          <label className="tbfield">name <Input aria-label="set name" className="h-ctl w-56 text-md md:text-md" value={name}
+          <label className="tbfield">name <Input aria-label="set name" className="h-ctl w-56 text-md md:text-md" value={name} placeholder="name this list…"
             onChange={(e) => { setName(e.target.value); setDone(null); }} /></label>
-          <Button variant="outline" size="sm" className={cn(TB, "idsetsave")} disabled={busy || !ids.length || !studies.length}
-            title={!studies.length ? "the analysis names no study to match the ids in" : !ids.length ? "paste some ids first" : undefined}
+          <Button variant="outline" size="sm" className={cn(TB, "idsetsave")} disabled={busy || !ids.length || !studies.length || !name.trim()}
+            title={!studies.length ? "the analysis names no study to match the ids in" : !ids.length ? "paste some ids first"
+              : !name.trim() ? "name the list first: it is how it is found again, in the analysis and your library" : undefined}
             onClick={() => void save()}>
             {busy && <span className="spinner" />}Match and save {ids.length ? ids.length.toLocaleString() + " id" + (ids.length === 1 ? "" : "s") : ""}</Button>
         </div>

@@ -40,6 +40,16 @@ async function main() {
   // development sign-in and passes the email to sign in as here; signed out, the store must refuse.
   const LOGIN = process.env.E2E_LOGIN_EMAIL || "";
   const signIn = (ctx, email = LOGIN) => ctx.request.post(BASE + "/api/auth/dev", { data: { email } });
+  /** a cohort card's "save to library…" dialog: optionally rename, then save; answers what it said saving does */
+  const saveToLibraryDialog = async (p, as) => {
+    const dlg = p.locator("[role=dialog].savelibrarydialog");
+    await dlg.waitFor({ timeout: 30000 });
+    if (as != null) await dlg.locator("#savelibraryname").fill(as);
+    const said = (await dlg.locator("p").last().innerText()).trim();
+    await dlg.locator("button[type=submit]").click();
+    await dlg.waitFor({ state: "detached", timeout: 60000 });
+    return said;
+  };
   {
     const anon = await browser.newContext();
     const r = await anon.request.get(BASE + "/api/artifacts?kind=cohort");
@@ -1521,7 +1531,8 @@ async function main() {
         if ((await gear.getAttribute("data-state")) !== "open") await gear.click();
         await sp.locator("[data-slot=popover-content]").getByRole("button", { name: label, exact: true }).click();
       };
-      await save("save to library");
+      await save("save to library…");
+      await saveToLibraryDialog(sp);
       await sp.waitForFunction((n) => { try { return !!JSON.parse(document.querySelector("#docjson").value).cohorts[n].from; } catch { return false; } }, name, { timeout: 60000 });
       const art = ((await (await ctx.request.get(BASE + "/api/artifacts?kind=cohort")).json()).artifacts || []).find((a) => a.name === name);
       const savedLeaf = art?.definition?.all?.[0] || {};
@@ -1608,30 +1619,51 @@ async function main() {
       };
       const savedDef = async () => {
         const j = await (await ctx.request.get(BASE + "/api/artifacts?kind=cohort")).json();
-        return (j.artifacts || []).find((a) => a.name === name);
+        return (j.artifacts || []).find((a) => a.name === libName);
       };
+      // saved under a name of the reader's choosing, not necessarily the analysis's
+      const libName = name + " (library)";
       await open({ dsl: "2.5", study: "msk_chord_2024", cohorts: { [name]: { all: [{ kind: "oql", q: "KRAS: MUT" }] } }, views: [{ kind: "survival", cohorts: [name] }] });
       let m = await menuItems();
-      steps.offered = m.items.some((t) => t.trim() === "save to library");
-      await sp.locator("[data-slot=popover-content]").getByRole("button", { name: "save to library", exact: true }).click();
-      await sp.waitForFunction((n) => { try { return !!JSON.parse(document.querySelector("#docjson").value).cohorts[n].from; } catch { return false; } }, name, { timeout: 60000 });
+      steps.offered = m.items.some((t) => t.trim() === "save to library…");
+      await sp.locator("[data-slot=popover-content]").getByRole("button", { name: "save to library…", exact: true }).click();
+      steps.said = /Saves a new cohort/.test(await saveToLibraryDialog(sp, libName));
+      // saved under another name, the cohort takes it in the analysis too, its view following
+      await sp.waitForFunction((n) => { try { return !!JSON.parse(document.querySelector("#docjson").value).cohorts[n].from; } catch { return false; } }, libName, { timeout: 60000 });
       const a1 = await savedDef();
-      steps.saved = !!a1 && (await docOf()).cohorts[name].from.saved === a1.id;
+      const afterSave = await docOf();
+      steps.saved = !!a1 && afterSave.cohorts[libName].from.saved === a1.id && afterSave.cohorts[libName].from.name === libName;
+      steps.renamed = !afterSave.cohorts[name] && afterSave.views[0].cohorts.includes(libName);
+      steps.badge = (await sp.locator(".cohortbox", { hasText: libName }).locator(".srcbadge").innerText()).trim() === "in library";
       m = await menuItems();
       steps.goneAfter = !m.items.some((t) => /^save/.test(t.trim()));
       const d = await docOf();
-      d.cohorts[name].splits = { sex: { arms: [{ name: "Female", where: { kind: "clinical", attribute: "SEX", values: ["Female"] } }] } };
+      d.cohorts[libName].splits = { sex: { arms: [{ name: "Female", where: { kind: "clinical", attribute: "SEX", values: ["Female"] } }] } };
       await open(d);
       m = await menuItems();
-      steps.offeredAfterSplit = m.items.some((t) => t.trim() === "save changes to library");
-      await sp.locator("[data-slot=popover-content]").getByRole("button", { name: "save changes to library", exact: true }).click();
+      steps.offeredAfterSplit = m.items.some((t) => t.trim() === "save changes to library…");
+      await sp.locator("[data-slot=popover-content]").getByRole("button", { name: "save changes to library…", exact: true }).click();
+      steps.saidUpdate = /Updates your saved cohort/.test(await saveToLibraryDialog(sp));
       for (let i = 0; i < 60 && !(await savedDef())?.definition?.splits; i++) await sp.waitForTimeout(1000);
       const a2 = await savedDef();
       steps.splitSaved = !!a2 && a2.id === a1.id && !!a2.definition.splits?.sex && !a2.definition.from;
+      // a different cohort that only shares the saved one's name is not its earlier version: it is
+      // offered as a new save, and the dialog warns that saving under that name replaces the other
+      await open({ dsl: "2.8", study: "msk_chord_2024", cohorts: { [libName]: { all: [{ kind: "oql", q: "EGFR: MUT" }] } }, views: [{ kind: "survival", cohorts: [libName] }] });
+      const gear2 = sp.locator(".cohortbox", { hasText: libName }).locator(".cohortgear");
+      await gear2.click();
+      const items2 = await sp.locator("[data-slot=popover-content]").getByRole("button").allInnerTexts();
+      steps.sameNameIsNew = items2.some((t) => t.trim() === "save to library…") && !items2.some((t) => /save changes/.test(t));
+      await sp.locator("[data-slot=popover-content]").getByRole("button", { name: "save to library…", exact: true }).click();
+      const dlg = sp.locator("[role=dialog].savelibrarydialog");
+      await dlg.waitFor({ timeout: 30000 });
+      steps.warnsReplace = /already have a saved cohort/.test(await dlg.locator("p").last().innerText()) && (await dlg.locator("button[type=submit]").innerText()).trim() === "Replace";
+      await dlg.getByRole("button", { name: "Cancel" }).click();
       await ctx.request.delete(BASE + "/api/artifacts/" + a1.id);
     } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
-    ok("a cohort that is unsaved, or re-split since saving, offers save in its menu, and saving records it as the source",
-      steps.offered && steps.saved && steps.goneAfter && steps.offeredAfterSplit && steps.splitSaved, JSON.stringify(steps));
+    ok("a cohort that is unsaved, or re-split since saving, offers save in its menu; saving asks for its library name, takes that name in the analysis and records it as the source",
+      steps.offered && steps.said && steps.saved && steps.renamed && steps.badge && steps.goneAfter && steps.offeredAfterSplit && steps.saidUpdate && steps.splitSaved
+        && steps.sameNameIsNew && steps.warnsReplace, JSON.stringify(steps));
     await ctx.close();
   }
   // The study picker STAGES. Ticking boxes must not query: assembling a

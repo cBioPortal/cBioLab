@@ -614,7 +614,7 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
   /** the single-cell dataset this cohort's patients can be opened in, when its study has one */
   cells?: { label: string } | null;
   onCells?: () => Promise<void>;
-  /** saving the cohort to the library, offered only while it has something to save */
+  /** saving the cohort to the library (opening its naming dialog), offered only while it has something to save */
   save?: { onSave: () => Promise<void>; label: string; title: string } | null;
   /** the split form; `done` closes this menu. A cohort may have several splits — each view draws one */
   split?: (done: () => void) => React.ReactNode;
@@ -631,7 +631,7 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
       {(close) => <>
         {save && !splitting && <>
           <MenuItem disabled={busy || saving} title={save.title}
-            onClick={async () => { setSaving(true); try { await save.onSave(); } finally { setSaving(false); } }}>
+            onClick={async () => { setSaving(true); try { await save.onSave(); close(); } finally { setSaving(false); } }}>
             <Save />{save.label}{saving && <span className="spinner ml-1.5" />}</MenuItem>
           <MenuSeparator />
         </>}

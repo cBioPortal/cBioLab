@@ -138,7 +138,7 @@ export function useCohortEdits(page: CohortEditsPage) {
    * is nothing to save, or while the saved cohorts are not known (logged out, loading). A cohort
    * copied from a saved one saves back over it once edited here or re-split; one whose saved
    * version has changed since is not offered, since saving would discard that change. A cohort
-   * with no source matches a saved cohort by name.
+   * with no source is saved as a new one.
    */
   const cohortSaveState = (name: string): CohortSaveState | null => {
     const def = doc.cohorts?.[name];
@@ -149,25 +149,44 @@ export function useCohortEdits(page: CohortEditsPage) {
       if (s.state !== "current") return null;
       return s.edited || canonicalSplits(def) !== canonicalSplits(s.src!.def) ? { action: "update", id: s.src!.id, as: s.srcName! } : null;
     }
+    // Not copied from a saved cohort: saving makes a new one. A saved cohort that only shares its
+    // name (default names repeat: "selection", "from Cell Explorer") is not this one's earlier
+    // version; the save dialog says so and offers to replace it. One identical to it is already saved.
     const same = saved[name];
-    if (!same) return { action: "create", as: name };
-    return cohortHash(def) !== cohortHash(same.def) || canonicalSplits(def) !== canonicalSplits(same.def)
-      ? { action: "update", id: same.id, as: name } : null;
+    if (same && cohortHash(def) === cohortHash(same.def) && canonicalSplits(def) === canonicalSplits(same.def)) return null;
+    return { action: "create", as: name };
   };
-  /** Save a cohort to the library (cohortSaveState says where); the analysis's copy then names it as its source. */
-  const saveCohortToLibrary = async (name: string) => {
+  /**
+   * Save a cohort to the library under `as` (default: where cohortSaveState says): over the saved
+   * cohort it would update when `as` is that one's name, over another saved cohort already named
+   * `as`, else as a new one. The analysis's copy then names it as its source.
+   */
+  const saveCohortToLibrary = async (name: string, as?: string) => {
     const st = cohortSaveState(name);
     const cur = doc.cohorts?.[name];
     if (!st || !cur) return;
     const { from: _from, ...def } = cur;
+    const target = as ?? st.as;
+    const id = target === st.as ? st.id : saved[target]?.id;
     try {
-      const c = await persist(st.as, def, evalOf(name), st.id);
+      const c = await persist(target, def, evalOf(name), id);
       const now = docs.current.doc;
       if (now.cohorts?.[name]) {
-        // bookkeeping after a save, not an edit the reader would undo. What was saved may differ from
-        // what was asked by its id lists, now stored as sets: the copy takes those too.
+        // What was saved may differ from what was asked by its id lists, now stored as sets: the
+        // copy takes those too, and names the saved cohort as its source.
         const kept = cohortHash(c.def) === cohortHash(def) ? now.cohorts[name] : { ...c.def };
-        docs.set({ ...now, cohorts: { ...now.cohorts, [name]: { ...kept, from: { saved: c.id, name: st.as, hash: cohortHash(c.def), savedAt: c.savedAt } } } }, { undoable: false });
+        const linked: CohortDef = { ...kept, from: { saved: c.id, name: target, hash: cohortHash(c.def), savedAt: c.savedAt } };
+        // Saved under another name, the cohort takes that name here too (as "edit…" renames it,
+        // views drawing it included) — unless the analysis already has a cohort of that name.
+        const rename = target !== name && !now.cohorts[target];
+        if (!rename) {
+          // bookkeeping after a save, not an edit the reader would undo
+          docs.set({ ...now, cohorts: { ...now.cohorts, [name]: linked } }, { undoable: false });
+          if (target !== name) setToast("saved to your library as “" + target + "”; this analysis already has a cohort named that, so this one keeps the name “" + name + "”");
+        } else {
+          const cohorts = Object.fromEntries(Object.entries(now.cohorts).map(([k, v]) => k === name ? [target, linked] : [k, v]));
+          docs.set({ ...now, cohorts, views: renameInViews(now.views, name, target) as AnalysisDoc["views"] });
+        }
       }
     } catch (e: any) {
       setError("could not save \u201c" + name + "\u201d: " + (e?.message || e));

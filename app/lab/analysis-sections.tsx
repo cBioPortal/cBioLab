@@ -11,6 +11,7 @@ import { Button } from "../_ui/button";
 import { CHIP } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 import { TB } from "../_ui/toolbar.ts";
+import { SaveToLibraryDialog } from "./dialogs.tsx";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Textarea } from "../_ui/textarea";
 import CohortPills from "./pills";
@@ -63,7 +64,7 @@ export interface AnalysisCtx {
   updateFromSaved: (name: string) => void;
   /** whether a cohort has anything to save to the library, and the action that saves it */
   cohortSaveState: (name: string) => CohortSaveState | null;
-  saveCohortToLibrary: (name: string) => Promise<void>;
+  saveCohortToLibrary: (name: string, as?: string) => Promise<void>;
   /** lock the cohorts named, or every one (the analysis); unlock one, or all (lib/cohort-lock.ts) */
   lockCohorts: (names?: string[]) => Promise<void>;
   unlockCohort: (name: string) => void;
@@ -167,8 +168,10 @@ function EmptyViewCard({ ctx, vi }: { ctx: AnalysisCtx; vi: number }) {
 }
 
 export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
-  const { busy, canSave, catalogAttrs, cohortCells, cohortSaveState, cohortSource, doc, lockCohorts, openCohortCells, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, saveCohortToLibrary, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, unlockAll, unlockCohort, updateFromSaved, upgradeNote, viewTitle } = ctx;
+  const { busy, canSave, saved, catalogAttrs, cohortCells, cohortSaveState, cohortSource, doc, lockCohorts, openCohortCells, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, saveCohortToLibrary, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, unlockAll, unlockCohort, updateFromSaved, upgradeNote, viewTitle } = ctx;
   const [lockingAll, setLockingAll] = useState(false);
+  /** the cohort whose "save to library…" dialog is open */
+  const [savingToLibrary, setSavingToLibrary] = useState<string | null>(null);
   const lockAll = async () => {
     if (!canSave()) return;
     setLockingAll(true);
@@ -226,7 +229,7 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                       onEdit={() => openCohortEdit(n)} onRemove={() => removeCohort(n)}
                       split={(done: () => void) => <SplitForm cohort={n} attrs={catalogAttrs()} busy={busy} onSplit={splitCohortBy} onDone={done} />}
                       splitCount={splits.length}
-                      save={toSave && { onSave: () => saveCohortToLibrary(n), label: toSave.action === "create" ? "save to library" : "save changes to library",
+                      save={toSave && { onSave: async () => setSavingToLibrary(n), label: toSave.action === "create" ? "save to library…" : "save changes to library…",
                         title: toSave.action === "create" ? "save “" + toSave.as + "” to your library, to add it to other analyses"
                           : "write this cohort's definition and splits over “" + toSave.as + "” in your library" }}
                       lock={{ locked: !!doc.cohorts?.[n]?.lock, onLock: async () => { if (canSave()) await lockCohorts([n]); }, onUnlock: () => unlockCohort(n) }}
@@ -247,25 +250,25 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                         {views.length ? "in " + views.join(", ") : "in no view"}
                       </span>
                       {src && <button className={"srcbadge" + (src.state === "changed" ? " changed" : "")} aria-expanded={open} onClick={toggle}
-                        title={src.state === "changed" ? "the saved cohort “" + src.srcName + "” has changed since this copy was made — open to compare and update"
-                          : src.state === "deleted" ? "copied from a saved cohort “" + src.from.name + "” that has since been deleted"
-                          : "copied from the saved cohort “" + src.from.name + "”"}>
-                        {src.state === "changed" ? "saved version changed" : src.state === "deleted" ? "source deleted" : "#" + shortHash(src.from.hash)}</button>}
+                        title={src.state === "changed" ? "your saved cohort “" + src.srcName + "” has changed since this one was linked to it — open to compare and update"
+                          : src.state === "deleted" ? "linked to a saved cohort “" + src.from.name + "” that has since been deleted"
+                          : "linked to your saved cohort “" + (src.srcName || src.from.name) + "” (#" + shortHash(src.from.hash) + ") — open for details"}>
+                        {src.state === "changed" ? "saved version changed" : src.state === "deleted" ? "source deleted" : "in library"}</button>}
                     </div>
                     {open && src && (
                       <div className="cohortsrc meta">
-                        <span>Copied from saved cohort <strong>“{src.from.name}”</strong>{src.from.savedAt ? " (saved " + src.from.savedAt + ")" : ""}
+                        <span>Linked to your saved cohort <strong>“{src.from.name}”</strong>{src.from.savedAt ? " (saved " + src.from.savedAt + ")" : ""}
                           {" "}· definition <code title={src.from.hash}>#{shortHash(src.from.hash)}</code>.</span>
                         {src.state === "unknown" && <span> {loggedIn ? "Checking the saved cohort…" : "Sign in to compare it with the saved cohort."}</span>}
-                        {src.state === "deleted" && <span> That saved cohort has since been deleted; this copy is unaffected.</span>}
+                        {src.state === "deleted" && <span> That saved cohort has since been deleted; this one is unaffected.</span>}
                         {(src.state === "current" || src.state === "changed") && src.srcName !== src.from.name && <span> It is now named “{src.srcName}”.</span>}
                         {src.state === "current" && !src.edited && <span> The saved cohort is unchanged.</span>}
-                        {src.edited && <span> This copy has been edited here since (now <code>#{shortHash(cohortHash(doc.cohorts![n]))}</code>).</span>}
+                        {src.edited && <span> This one has been edited here since (now <code>#{shortHash(cohortHash(doc.cohorts![n]))}</code>).</span>}
                         {src.state === "changed" && <span className="cohortsrc-changed"> The saved cohort has changed since (now <code title={src.now}>#{shortHash(src.now!)}</code>, saved {src.src!.savedAt}).</span>}
                         {(src.state === "changed" || (src.state === "current" && src.edited)) && <>
                           {src.state === "changed" && <div className="cohortsrc-new"><span className="meta">The saved version:</span> <CohortPills def={src.src!.def} /></div>}
                           <Button variant="outline" size="sm" className="h-ctl" disabled={busy} onClick={() => updateFromSaved(n)}
-                            title={"replace this copy's definition with the saved cohort's; every view drawing “" + n + "” re-runs"}>
+                            title={"replace this cohort's definition with the saved cohort's; every view drawing “" + n + "” re-runs"}>
                             {src.state === "changed" ? "Update to the saved version" : "Revert to the saved version"}</Button>
                         </>}
                       </div>
@@ -285,6 +288,11 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
           <AnalysisSources sources={result?.sources} names={studyNames} />
         </section>
       )}
+      {savingToLibrary && (() => {
+        const st = cohortSaveState(savingToLibrary);
+        return st && <SaveToLibraryDialog cohort={savingToLibrary} initial={st.as} updates={st.action === "update" ? st.as : null}
+          taken={Object.keys(saved)} onSave={(as) => saveCohortToLibrary(savingToLibrary, as)} onClose={() => setSavingToLibrary(null)} />;
+      })()}
     </div>
   </>;
 }
