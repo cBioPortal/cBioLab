@@ -1073,6 +1073,15 @@ async function main() {
       ok("risk model: draws the 0–10 score and the volcano", /score \(0–10\)/.test(await text()) && /Selection frequency against mean hazard ratio/.test(await text()));
       const askew = await misalignedControls(page, ".riskmodel-tb");
       ok("risk model: its controls share one height and centre line", askew.length === 0, askew.join(" | "));
+      // the fitting settings sit in the view's settings menu; a value the menu does not offer still shows
+      await page.locator(".risksettingsbtn").click();
+      const settings = page.locator("[data-slot=popover-content]");
+      await settings.waitFor({ timeout: 10000 });
+      const runsShown = (await settings.locator(".setrow", { hasText: "runs" }).locator("[role=combobox]").innerText()).trim();
+      const settingsText = (await settings.innerText()).replace(/\s+/g, " ");
+      await page.keyboard.press("Escape");
+      ok("risk model: penalty, runs and validation are in the settings menu, showing the document's runs",
+        runsShown === "2" && /penalty/.test(settingsText) && /validate on held-out half/.test(settingsText), "runs " + JSON.stringify(runsShown));
       let requests = 0;
       page.on("request", (r) => { if (r.url().includes("/api/analysis")) requests++; });
       await page.locator(".riskmodel-tb label.tbfield", { hasText: "label genes" }).locator("[role=combobox]").click();
