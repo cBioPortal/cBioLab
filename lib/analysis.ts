@@ -6,7 +6,7 @@
 // oncoprint — the one view whose output is patients — carries the cohort SQL and
 // re-derives its columns inside the owning database.
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
-import { applyLocks, lockDate } from "./cohort-lock.ts";
+import { applyLocks, lockDate, lockSamples } from "./cohort-lock.ts";
 import { chQuery, STUDY, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { describeCohortDef } from "./cohort2.ts";
@@ -322,12 +322,12 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     if (!cohorts[name] || !live) continue;
     const liveDef = live.cohorts[name];
     const d: LockDrift = { cohort: l.cohort, at: l.lock.at, ...(l.lock.dataVersion ? { dataVersion: l.lock.dataVersion } : {}),
-      n: l.members.n, present: 0, now: 0, entered: 0, left: 0, newSamples: l.members.samples ? 0 : null };
+      n: l.members.n, present: 0, now: 0, entered: 0, left: 0, newSamples: lockSamples(l.members) ? 0 : null };
     try {
       for (const s of cohorts[name].studies) {
         const res = resolvers[s];
         if (!(res instanceof PatientLevelResolver)) throw new Error(s + " is not held at patient level here");
-        const r = await res.lockDrift(doc.cohorts[name], liveDef, l.members.samples ?? null);
+        const r = await res.lockDrift(doc.cohorts[name], liveDef, lockSamples(l.members));
         d.present += r.present; d.now += r.now; d.entered += r.entered; d.left += r.left;
         if (d.newSamples != null) d.newSamples = r.newSamples == null ? null : d.newSamples + r.newSamples;
       }

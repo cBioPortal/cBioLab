@@ -29,30 +29,43 @@ export interface LoadedIdSet {
   level: IdSetLevel;
   count: number;
   perStudy: Record<string, string[]>;
+  /** a lock's other lists in the same set: "samples" (sample ids), "arm:<split> / <arm>" (patient ids) */
+  parts?: Record<string, Record<string, string[]>>;
 }
+
+/** The level of a set's part: the set's own for its main list, samples for "samples", patients for an arm. */
+function partLevel(s: LoadedIdSet, part: string): IdSetLevel {
+  return !part ? s.level : part === "samples" ? "sample" : "patient";
+}
+const membersOf = (s: LoadedIdSet, part: string): Record<string, string[]> | undefined => part ? s.parts?.[part] : s.perStudy;
 
 interface IdSetCtx {
   sets: Map<string, LoadedIdSet>;
   /** study -> the connection id of the patient-level instance holding it */
   studyConn: Map<string, string>;
-  /** external table name -> what it uploads, and where it may go */
-  tables: Map<string, { set: string; study: string; data?: string }>;
+  /** external table name -> what it uploads (a set's main list or one of its parts), and where it may go */
+  tables: Map<string, { set: string; study: string; part: string; data?: string }>;
 }
 const store = new AsyncLocalStorage<IdSetCtx>();
 
 export const ID_SET_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const ID_SET_STRUCTURE = "id String";
 
-/** The external table holding one set's ids for one study. Stable, so its SQL can be read and cached by name. */
-export function idSetTableName(set: string, study: string): string {
-  return "_idset_" + set.replace(/-/g, "") + "_" + createHash("sha256").update(study).digest("hex").slice(0, 10);
+/** The external table holding one set's ids (or one part's) for one study. Stable, so its SQL can be read and cached by name. */
+export function idSetTableName(set: string, study: string, part = ""): string {
+  const h = (x: string, n: number) => createHash("sha256").update(x).digest("hex").slice(0, n);
+  return "_idset_" + set.replace(/-/g, "") + "_" + h(study, 10) + (part ? "_" + h(part, 8) : "");
 }
 
 /** Run `fn` with these sets readable by the compiler. */
 export function withIdSets<T>(sets: LoadedIdSet[], studyConn: Map<string, string>, fn: () => Promise<T>): Promise<T> {
   if (!sets.length) return fn();
-  const tables = new Map<string, { set: string; study: string }>();
-  for (const s of sets) for (const study of Object.keys(s.perStudy)) tables.set(idSetTableName(s.id, study), { set: s.id, study });
+  const tables = new Map<string, { set: string; study: string; part: string }>();
+  for (const s of sets) {
+    for (const study of Object.keys(s.perStudy)) tables.set(idSetTableName(s.id, study), { set: s.id, study, part: "" });
+    for (const [part, m] of Object.entries(s.parts || {}))
+      for (const study of Object.keys(m)) tables.set(idSetTableName(s.id, study, part), { set: s.id, study, part });
+  }
   return store.run({ sets: new Map(sets.map((s) => [s.id, s])), studyConn, tables }, fn);
 }
 
@@ -79,14 +92,17 @@ export function idSetIfLoaded(set: string): LoadedIdSet | null {
 }
 
 /**
- * The table a compiled statement reads one set's ids for `study` from, or null when the set holds
- * no ids for that study (most of a cross-study set belongs to the other studies of the fan-out).
+ * The table a compiled statement reads one set's ids — or one of its parts' — for `study` from, or
+ * null when it holds no ids for that study (most of a cross-study set belongs to the other studies
+ * of the fan-out).
  */
-export function idSetTable(set: string, study: string, level: IdSetLevel): string | null {
+export function idSetTable(set: string, study: string, level: IdSetLevel, part = ""): string | null {
   const s = loadedIdSet(set);
-  if (s.level !== level)
-    throw new Error("stored id set “" + s.name + "” holds " + s.level + " ids; name it in a " + s.level + "List clause, not a " + level + "List");
-  return s.perStudy[study]?.length ? idSetTableName(set, study) : null;
+  if (part && !s.parts?.[part]) throw new Error("stored id set “" + s.name + "” has no part “" + part + "”");
+  const l = partLevel(s, part);
+  if (l !== level)
+    throw new Error("stored id set “" + s.name + "”" + (part ? " (" + part + ")" : "") + " holds " + l + " ids; name it in a " + l + "List clause, not a " + level + "List");
+  return membersOf(s, part)?.[study]?.length ? idSetTableName(set, study, part) : null;
 }
 
 const tsv = (s: string) => s.replace(/\\/g, "\\\\").replace(/\t/g, "\\t").replace(/\n/g, "\\n").replace(/\r/g, "\\r");
@@ -100,7 +116,7 @@ export function idSetExternalsFor(query: string, connId: string): { name: string
     if (!new RegExp("(^|[^A-Za-z0-9_])" + name + "([^A-Za-z0-9_]|$)").test(query)) continue;
     if (s.studyConn.get(t.study) !== connId)
       throw new Error("stored id set " + t.set + " holds patient-level ids for " + t.study + ", which cannot be sent to instance '" + connId + "'");
-    t.data ??= s.sets.get(t.set)!.perStudy[t.study].map(tsv).join("\n") + "\n";
+    t.data ??= membersOf(s.sets.get(t.set)!, t.part)![t.study].map(tsv).join("\n") + "\n";
     out.push({ name, structure: ID_SET_STRUCTURE, data: t.data });
   }
   return out;

@@ -129,6 +129,19 @@ export function idSetContract(backend: string): void {
       await assert.rejects(readIdSet(P, meta.id), /was deleted on \d{4}-\d{2}-\d{2}/);
     });
 
+    test("a lock is one row: its patients, and its samples and arms as parts, read back exactly", async () => {
+      const meta = await saveIdSet(P, { ...input("locked"), parts: { samples: { s1: ["S-1-T", "S-2-T"] }, "arm:sex / Female": { s1: ["S-1"] }, "arm:sex / Male": {} } }, { allowEmpty: true });
+      assert.equal(meta.kind, "lock");
+      assert.deepEqual(meta.parts, { samples: 2, "arm:sex / Female": 1, "arm:sex / Male": 0 });
+      const r = await readIdSet(P, meta.id);
+      assert.deepEqual(r.parts?.samples, { s1: ["S-1-T", "S-2-T"] });
+      assert.deepEqual(r.parts?.["arm:sex / Female"], { s1: ["S-1"] });
+      assert.equal((await loadIdSetForRequest(P, meta.id)).parts?.["arm:sex / Female"]?.s1?.[0], "S-1");
+      assert.equal((await saveIdSet(P, input("plain"))).kind, "list");
+      await assert.rejects(dbQuery("update id_set set parts_gz = null where id = $1", [meta.id]), /members are immutable/);
+      await assert.rejects(dbQuery("update id_set set parts = '{}'::jsonb where id = $1", [meta.id]), /members are immutable/);
+    });
+
     test("its members cannot be changed or the row deleted, though its sharing can", async () => {
       const meta = await saveIdSet(P, input("frozen"));
       await assert.rejects(dbQuery("update id_set set id_count = 99 where id = $1", [meta.id]), /members are immutable/);

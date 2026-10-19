@@ -61,10 +61,11 @@ export interface ClinicalLeaf {
  * `set` instead of `ids` names a stored id set (lib/id-set-store.ts) by its id: the same list,
  * kept on the server, so the document carries a uuid however many ids the set holds. `label` and
  * `n` are its name and size as the page wrote them, for the cohort's pill; never compiled — the
- * readback names the set from the store.
+ * readback names the set from the store. `part` names one of a lock's other lists in that set
+ * (a split arm's patients, "arm:<split> / <arm>"); the engine writes it, from a cohort's `lock`.
  */
-export interface SampleListLeaf { kind: "sampleList"; ids?: string[]; set?: string; label?: string; n?: number }
-export interface PatientListLeaf { kind: "patientList"; ids?: string[]; set?: string; label?: string; n?: number }
+export interface SampleListLeaf { kind: "sampleList"; ids?: string[]; set?: string; part?: string; label?: string; n?: number }
+export interface PatientListLeaf { kind: "patientList"; ids?: string[]; set?: string; part?: string; label?: string; n?: number }
 /**
  * A fixed, engine-owned half of the study's patients: a salted hash of the study-qualified
  * patient id decides the half, so the partition is reproducible, identical for every caller,
@@ -233,12 +234,19 @@ export interface CohortDef {
 
 export interface CohortSource { saved: string; name: string; hash: string; savedAt?: string }
 
-/** A cohort's (or a split arm's) members when it was locked: stored id sets (lib/id-set-store.ts). */
+/**
+ * A cohort's (or a split arm's) members when it was locked, in a stored id set (lib/id-set-store.ts).
+ * A lock is one set: the cohort's patients are its main list, and beside them, as named parts, the
+ * patients' samples ("samples") and each arm's patients (`part`, "arm:<split> / <arm>").
+ */
 export interface LockedMembers {
-  /** a patient-level stored set: the patients it selected */
+  /** the stored set holding the patients */
   set: string;
+  /** the part of `set` holding them, for an arm; absent for the cohort itself */
+  part?: string;
   n: number;
-  /** a sample-level stored set: those patients' samples then, what "new samples since" is measured against */
+  /** how many samples those patients had then, kept in the set's "samples" part — what "new samples
+   *  since" is measured against. Locks made before parts name a separate sample-level set here. */
   samples?: string;
   nSamples?: number;
 }

@@ -37,8 +37,8 @@ cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient 
                "notes"?:   "<prose>",         // the analyst's own note on this cohort; never compiled
                "from"?:    { "saved": "<id>", "name": "<name>", "hash": "<sha256>", "savedAt"?: "<when>" },  // set by the page: the saved cohort this was copied from, and the hash of what was copied; never compiled
                "splits"?:  { "<name>": splitDef },  // divisions of this cohort into arms that add up to it
-               "lock"?:    { "set": "<id set>", "n": N, "samples"?: "<id set>", "nSamples"?: N, "at": "<ISO time>",
-                             "dataVersion"?: "…", "oncokbPin"?: "…", "children"?: { "<split> / <arm>": { "set", "n" } } } }
+               "lock"?:    { "set": "<id set>", "n": N, "nSamples"?: N, "at": "<ISO time>", "dataVersion"?: "…", "oncokbPin"?: "…",
+                             "children"?: { "<split> / <arm>": { "set", "part": "arm:<split> / <arm>", "n" } } } }
                                               // frozen to the patients it selected at "at" — see "Locked cohorts" below
 splitDef  := { "arms": [ { "name": "<label>", "where": clause, "splits"?: {…} } × 1-8 ],  // tested in order; first match wins; an arm may be split again
                "other"?: "<label>",            // the remainder's name, default "Other"
@@ -133,8 +133,10 @@ describes for every other identifier-bearing path.
 
 **Locked cohorts.** A cohort can be frozen to the patients its definition selects at one moment,
 so an analysis stops drifting as patients are added to the data: `lock` names the stored id set
-of those patients (and of their samples), when it was taken, the data version and OncoKB release
-then, and, under `children`, the frozen patients of each of its split arms by name. The engine
+holding those patients, when it was taken, the data version and OncoKB release then, and, under
+`children`, each split arm by name. The lock is ONE set: beside the patients it keeps, as named
+parts, their samples (`"samples"`, `nSamples` of them) and each arm's patients (`part`:
+`"arm:<split> / <arm>"`). The engine
 evaluates the set, not the definition; the definition stays as the record of how the cohort was
 made, and is still run beside the set, so the result's `cohorts[name].lock` says how far the
 data has moved: what the definition selects `now`, who it would add (`entered`) or drop

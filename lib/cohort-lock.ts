@@ -16,8 +16,15 @@
 import type { AnalysisDoc, CohortDef, CohortLock, LockedMembers } from "./types.ts";
 
 /** The clause a locked cohort or arm compiles to: its patients when it was locked. */
-export function lockClause(m: LockedMembers): { kind: "patientList"; set: string } {
-  return { kind: "patientList", set: m.set };
+export function lockClause(m: LockedMembers): { kind: "patientList"; set: string; part?: string } {
+  return { kind: "patientList", set: m.set, ...(m.part ? { part: m.part } : {}) };
+}
+
+/** Where a lock's samples are, to measure new samples against: its set's "samples" part, a separate
+ *  set (locks made before parts), or nowhere (an arm's lock records none). */
+export function lockSamples(m: LockedMembers): { set: string; part: string } | null {
+  if (m.samples) return { set: m.samples, part: "" };
+  return m.nSamples != null && !m.part ? { set: m.set, part: "samples" } : null;
 }
 
 /** What a locked name is evaluated from, and what its definition still says. */
@@ -65,6 +72,7 @@ function validMembers(m: unknown, name: string): LockedMembers {
   const x = (m && typeof m === "object" ? m : {}) as Partial<LockedMembers>;
   if (typeof x.set !== "string" || !UUID.test(x.set)) throw new Error("cohort “" + name + "” is locked, but its lock names no stored set of patients");
   if (!Number.isInteger(x.n) || (x.n as number) < 0) throw new Error("cohort “" + name + "” is locked, but its lock does not say how many patients it froze");
+  if (x.part !== undefined && (typeof x.part !== "string" || !x.part)) throw new Error("cohort “" + name + "” is locked, but its lock names a part that is not a name");
   return x as LockedMembers;
 }
 

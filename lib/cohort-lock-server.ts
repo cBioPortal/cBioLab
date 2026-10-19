@@ -60,8 +60,8 @@ export async function lockCohorts(principal: string, input: { doc: unknown; coho
     }
     return { study, res };
   };
-  /** one cohort's or arm's members now, per study, saved as a stored set (and its samples, when asked) */
-  const freeze = async (name: string, owner: string, withSamples: boolean): Promise<LockedMembers> => {
+  /** one cohort's or arm's members now, per study: its patients, and their samples when asked */
+  const members = async (name: string, withSamples: boolean) => {
     const def = doc.cohorts[name];
     const patients: Record<string, string[]> = {}, samples: Record<string, string[]> = {};
     for (const s of cohortStudies(def, docStudy)) {
@@ -69,23 +69,29 @@ export async function lockCohorts(principal: string, input: { doc: unknown; coho
       patients[study] = await res.members(def);
       if (withSamples) samples[study] = await res.memberSamples(def);
     }
-    const label = name + " — locked " + lockDate(at);
-    const count = (m: Record<string, string[]>) => Object.values(m).reduce((n, x) => n + x.length, 0);
-    const source = (ids: number) => ({ idsIn: ids, unmatched: 0, duplicates: 0, multiStudy: 0, lockOf: lockOf(owner) });
-    const p = await saveIdSet(principal, { name: label, level: "patient", perStudy: patients, source: source(count(patients)) }, { allowEmpty: true });
-    if (!withSamples) return { set: p.id, n: p.count };
-    const sm = await saveIdSet(principal, { name: label + " (samples)", level: "sample", perStudy: samples, source: source(count(samples)) }, { allowEmpty: true });
-    return { set: p.id, n: p.count, samples: sm.id, nSamples: sm.count };
+    return { patients, samples };
   };
+  const size = (m: Record<string, string[]>) => Object.values(m).reduce((n, x) => n + new Set(x).size, 0);
 
   const locks: Record<string, CohortLock> = {};
   for (const name of names) {
-    const top = await freeze(name, name, true);
+    // ONE stored set per locked cohort: its patients, and as parts their samples and each arm's patients
+    const top = await members(name, true);
+    const parts: Record<string, Record<string, string[]>> = { samples: top.samples };
     const children: Record<string, LockedMembers> = {};
     // its split arms, at every depth: "<name> / <split> / <arm>[ / <split> / <arm> …]"
-    for (const child of Object.keys(doc.cohorts).filter((n) => n.startsWith(name + " / ") && !authored.includes(n)))
-      children[child.slice(name.length + 3)] = await freeze(child, name, false);
-    locks[name] = { ...top, at, dataVersion: version, oncokbPin: pin ?? null, ...(Object.keys(children).length ? { children } : {}) };
+    for (const child of Object.keys(doc.cohorts).filter((n) => n.startsWith(name + " / ") && !authored.includes(n))) {
+      const rel = child.slice(name.length + 3), part = "arm:" + rel;
+      parts[part] = (await members(child, false)).patients;
+      children[rel] = { set: "", part, n: size(parts[part]) };
+    }
+    const set = await saveIdSet(principal, {
+      name: name + " — locked " + lockDate(at), level: "patient", perStudy: top.patients, parts,
+      source: { idsIn: size(top.patients), unmatched: 0, duplicates: 0, multiStudy: 0, lockOf: lockOf(name) },
+    }, { allowEmpty: true });
+    for (const c of Object.values(children)) c.set = set.id;
+    locks[name] = { set: set.id, n: set.count, nSamples: set.parts?.samples ?? 0, at, dataVersion: version, oncokbPin: pin ?? null,
+      ...(Object.keys(children).length ? { children } : {}) };
   }
   return { at, dataVersion: version, oncokbPin: pin ?? null, locks };
 }

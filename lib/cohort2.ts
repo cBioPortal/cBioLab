@@ -376,9 +376,11 @@ function listMembership(leaf: SampleListLeaf | PatientListLeaf, ctx: Ctx, col: s
   const { kind } = leaf;
   if (leaf.set !== undefined && leaf.ids !== undefined) throw new Error(kind + " clause takes ids or a stored set, not both");
   const level = kind === "sampleList" ? "sample" : "patient";
+  if (leaf.part !== undefined && leaf.set === undefined) throw new Error(kind + " clause: part names a part of a stored set, so it needs set");
   if (leaf.set !== undefined) {
     if (typeof leaf.set !== "string" || !ID_SET_UUID.test(leaf.set)) throw new Error(kind + " clause: set must be a stored id set's id (a uuid)");
-    const table = idSetTable(leaf.set, ctx.study, level);
+    if (leaf.part !== undefined && (typeof leaf.part !== "string" || !leaf.part)) throw new Error(kind + " clause: part must name a part of the set");
+    const table = idSetTable(leaf.set, ctx.study, level, leaf.part ?? "");
     return table && PID(col, ctx.study) + " IN (SELECT id FROM " + table + ")";
   }
   requireQualifiedIds(leaf.ids, kind);
@@ -422,13 +424,13 @@ export function memberSamplesSql(patientsSql: string, study: string, db: string)
  * How far the data has moved from a locked cohort, in `study`: of the frozen patients
  * (`lockedSql`) how many the data still holds, what the definition (`liveSql`) selects now, who it
  * would add and who it would drop, and how many samples the frozen patients have that were not
- * theirs when locked (`samplesSet`, the lock's sample set; null when the lock recorded none).
+ * theirs when locked (`samples`, where the lock keeps them; null when it recorded none).
  */
-export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string, samplesSet: string | null): string {
+export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string, samples: { set: string; part: string } | null): string {
   const pid = PID("patient_unique_id", study), sid = PID("sample_unique_id", study);
   let newSamples = "toInt64(-1)";
-  if (samplesSet) {
-    const table = idSetTable(samplesSet, study, "sample");
+  if (samples) {
+    const table = idSetTable(samples.set, study, "sample", samples.part);
     newSamples = "(SELECT count() FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study) +
       " AND " + pid + " IN (SELECT pid FROM locked)" + (table ? " AND " + sid + " NOT IN (SELECT id FROM " + table + ")" : "") + ")";
   }

@@ -17,7 +17,7 @@ const db: PGlite = await startPostgres();
 
 describe("migrations", () => {
   test("apply in order to an empty database, and again without harm", async () => {
-    assert.deepEqual(migrationFiles(), ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql", "0004_users.sql", "0005_sharing.sql", "0006_id_sets.sql"]);
+    assert.deepEqual(migrationFiles(), ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql", "0004_users.sql", "0005_sharing.sql", "0006_id_sets.sql", "0007_id_set_parts.sql"]);
     const tables = async () => (await db.query<{ t: string }>(
       "select table_name as t from information_schema.tables where table_schema = 'public' order by 1")).rows.map((r) => r.t);
     const before = await tables();

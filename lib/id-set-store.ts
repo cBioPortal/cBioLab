@@ -25,6 +25,10 @@ export interface IdSetSource {
 
 export interface IdSetMeta {
   id: string; name: string; owner: string; ownerEmail: string; level: IdSetLevel;
+  /** "list": ids someone gave; "lock": what a cohort selected when locked, with its other parts */
+  kind: "list" | "lock";
+  /** a lock's other lists and their sizes: "samples", "arm:<split> / <arm>" */
+  parts: Record<string, number> | null;
   studies: string[]; count: number; perStudy: Record<string, number>; sha256: string; source: IdSetSource;
   createdAt: string; updatedAt: string; deletedAt: string | null;
   sharing: Sharing & { groupName: string | null };
@@ -33,7 +37,7 @@ export interface IdSetMeta {
 }
 
 interface SetRow extends Shareable {
-  id: string; name: string; level: IdSetLevel; studies: string[]; id_count: number; per_study: Record<string, number>;
+  id: string; name: string; level: IdSetLevel; kind: "list" | "lock"; parts: Record<string, number> | null; studies: string[]; id_count: number; per_study: Record<string, number>;
   sha256: string; source: IdSetSource; created_at: string; updated_at: string; deleted_at: string | null;
   owner_email: string; group_name: string | null;
 }
@@ -41,7 +45,7 @@ interface SetRow extends Shareable {
 /** The most ids one set holds: what one upload may hold (lib/custom-data-server.ts RESOLVE_LIMIT). */
 export const ID_SET_MAX = 250_000;
 
-const ROW = "select s.id, s.name, s.owner_id, s.level, s.studies, s.id_count, s.per_study, s.sha256, s.source, s.visibility, s.group_id," +
+const ROW = "select s.id, s.name, s.owner_id, s.level, s.kind, s.parts, s.studies, s.id_count, s.per_study, s.sha256, s.source, s.visibility, s.group_id," +
   " s.group_can_edit, s.created_at, s.updated_at, s.deleted_at, u.email as owner_email, g.name as group_name from id_set s" +
   " left join app_user u on u.id = s.owner_id left join user_group g on g.id = s.group_id";
 
@@ -49,7 +53,7 @@ const ROW = "select s.id, s.name, s.owner_id, s.level, s.studies, s.id_count, s.
 const iso = (x: unknown): string => x instanceof Date ? x.toISOString() : String(x);
 
 const metaOf = (r: SetRow, principal: string, groups: Set<string>): IdSetMeta => ({
-  id: r.id, name: r.name, owner: r.owner_id ?? "", ownerEmail: r.owner_email ?? "", level: r.level,
+  id: r.id, name: r.name, owner: r.owner_id ?? "", ownerEmail: r.owner_email ?? "", level: r.level, kind: r.kind ?? "list", parts: r.parts ?? null,
   studies: r.studies, count: r.id_count, perStudy: r.per_study, sha256: r.sha256, source: r.source,
   createdAt: iso(r.created_at), updatedAt: iso(r.updated_at), deletedAt: r.deleted_at ? iso(r.deleted_at) : null,
   sharing: { ...sharingOf(r), groupName: r.group_name }, rights: rightsOf(principal, r, groups)
@@ -82,42 +86,58 @@ export async function getIdSet(principal: string, id: string): Promise<IdSetMeta
   return metaOf(r, principal, groups);
 }
 
-/** One set's members, per study. Refuses a deleted set; logged. */
-export async function readIdSet(principal: string, id: string): Promise<{ meta: IdSetMeta; perStudy: Record<string, string[]> }> {
+type PerStudy = Record<string, string[]>;
+const unpack = <T,>(gz: Buffer | null): T | null => gz ? JSON.parse(gunzipSync(Buffer.from(gz)).toString("utf8")) : null;
+
+/** One set's members, per study, and a lock's other parts. Refuses a deleted set; logged. */
+export async function readIdSet(principal: string, id: string): Promise<{ meta: IdSetMeta; perStudy: PerStudy; parts: Record<string, PerStudy> | null }> {
   const { r, groups } = await readable(principal, id);
   if (r.deleted_at) throw new AccessError("stored id set “" + r.name + "” was deleted on " + iso(r.deleted_at).slice(0, 10), 410);
-  const [{ ids_gz }] = await dbQuery<{ ids_gz: Buffer }>("select ids_gz from id_set where id = $1", [r.id]);
+  const [{ ids_gz, parts_gz }] = await dbQuery<{ ids_gz: Buffer; parts_gz: Buffer | null }>("select ids_gz, parts_gz from id_set where id = $1", [r.id]);
   await log(principal, "read", r.id);
-  return { meta: metaOf(r, principal, groups), perStudy: JSON.parse(gunzipSync(Buffer.from(ids_gz)).toString("utf8")) };
+  return { meta: metaOf(r, principal, groups), perStudy: unpack<PerStudy>(ids_gz)!, parts: unpack<Record<string, PerStudy>>(parts_gz) };
 }
+
+/** Distinct, sorted ids per study, empty studies dropped. */
+function tidy(m: PerStudy): PerStudy {
+  const out: PerStudy = {};
+  for (const study of Object.keys(m).sort()) {
+    const ids = [...new Set(m[study].map(String))].sort();
+    if (ids.length) out[study] = ids;
+  }
+  return out;
+}
+const sizeOf = (m: PerStudy) => Object.values(m).reduce((n, x) => n + x.length, 0);
 
 /**
  * Save a set: members already matched to the studies' own ids (lib/id-set-import.ts), as bare
  * ids per study. Empty studies are dropped; a set with no members at all is refused unless
  * `allowEmpty` (a lock freezing a cohort or arm that held nobody).
  */
-export async function saveIdSet(principal: string, input: { name: string; level: IdSetLevel; perStudy: Record<string, string[]>; source: IdSetSource },
+export async function saveIdSet(principal: string, input: { name: string; level: IdSetLevel; perStudy: Record<string, string[]>; source: IdSetSource;
+  /** a lock's other lists, kept in the same row (db/migrations/0007) */
+  parts?: Record<string, PerStudy> },
   opts: { allowEmpty?: boolean } = {}): Promise<IdSetMeta> {
   const name = String(input.name ?? "").trim().slice(0, 200);
   if (!name) throw new Error("a stored id set needs a name");
   if (input.level !== "patient" && input.level !== "sample") throw new Error("level must be 'patient' or 'sample'");
-  const perStudy: Record<string, string[]> = {};
-  for (const study of Object.keys(input.perStudy).sort()) {
-    const ids = [...new Set(input.perStudy[study].map(String))].sort();
-    if (ids.length) perStudy[study] = ids;
-  }
+  const perStudy = tidy(input.perStudy);
   const studies = Object.keys(perStudy);
-  const count = studies.reduce((n, s) => n + perStudy[s].length, 0);
+  const count = sizeOf(perStudy);
+  const parts = input.parts ? Object.fromEntries(Object.entries(input.parts).map(([k, m]) => [k, tidy(m)])) : null;
   // a pasted list that matched nothing is a mistake; a locked arm that held nobody is a fact (lib/cohort-lock-server.ts)
   if (!count && !opts.allowEmpty) throw new Error("none of the ids matched a " + input.level + " of the studies given; nothing to save");
   if (count > ID_SET_MAX) throw new Error("a stored id set holds at most " + ID_SET_MAX.toLocaleString("en-US") + " ids; this one has " + count.toLocaleString("en-US"));
   const json = JSON.stringify(perStudy);
   const id = randomUUID();
+  const partsJson = parts ? JSON.stringify(parts) : null;
   await dbQuery(
-    "insert into id_set (id, name, owner_id, level, studies, id_count, per_study, ids_gz, sha256, source)" +
-    " values ($1::uuid, $2, $3::uuid, $4, $5::text[], $6::int, $7::jsonb, $8::bytea, $9, $10::jsonb)",
+    "insert into id_set (id, name, owner_id, level, studies, id_count, per_study, ids_gz, sha256, source, kind, parts, parts_gz)" +
+    " values ($1::uuid, $2, $3::uuid, $4, $5::text[], $6::int, $7::jsonb, $8::bytea, $9, $10::jsonb, $11, $12::jsonb, $13::bytea)",
     [id, name, principal, input.level, studies, count, JSON.stringify(Object.fromEntries(studies.map((s) => [s, perStudy[s].length]))),
-      gzipSync(json, { level: 6 }), createHash("sha256").update(json).digest("hex"), JSON.stringify(input.source)]);
+      gzipSync(json, { level: 6 }), createHash("sha256").update(json + (partsJson ?? "")).digest("hex"), JSON.stringify(input.source),
+      parts ? "lock" : "list", parts ? JSON.stringify(Object.fromEntries(Object.entries(parts).map(([k, m]) => [k, sizeOf(m)]))) : null,
+      partsJson ? gzipSync(partsJson, { level: 6 }) : null]);
   await log(principal, "create", id);
   return metaOf((await one(id))!, principal, await groupsOf(principal));
 }
@@ -177,7 +197,8 @@ export async function loadIdSetForRequest(principal: string, id: string): Promis
   if (hit && (accessSeen.get(who) ?? 0) > now - ACCESS_TTL_MS) return hit;
   const r = await readIdSet(principal, id);   // checks access, refuses a deleted set, logs
   accessSeen.set(who, now);
-  const entry: LoadedIdSet = hit ?? { id: r.meta.id, name: r.meta.name, level: r.meta.level, count: r.meta.count, perStudy: r.perStudy };
+  const entry: LoadedIdSet = hit ?? { id: r.meta.id, name: r.meta.name, level: r.meta.level, count: r.meta.count, perStudy: r.perStudy,
+    ...(r.parts ? { parts: r.parts } : {}) };
   cache.delete(id); cache.set(id, entry);
   while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
   return entry;

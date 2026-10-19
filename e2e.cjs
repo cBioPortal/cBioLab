@@ -1635,13 +1635,16 @@ async function main() {
       await sp.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify(doc)).toString("base64url"), { waitUntil: "domcontentloaded" });
       await sp.waitForFunction(() => document.querySelectorAll(".cohortbox-head strong").length === 2, null, { timeout: 180000 });
       const before = await counts();
+      const setsBefore = ((await (await ctx.request.get(BASE + "/api/id-sets")).json()).sets || []).length;
       await sp.locator(".lockall").click();
       await sp.waitForSelector(".lockdrift", { timeout: 180000 });
       await sp.waitForFunction(() => document.querySelectorAll(".lockdrift").length === 2, null, { timeout: 180000 });
       const d = await docOf();
       const k = d.cohorts["KRAS NSCLC"].lock || {};
-      steps.locked = !!d.locked?.at && /^[0-9a-f-]{36}$/.test(k.set || "") && /^[0-9a-f-]{36}$/.test(k.samples || "") && k.at === d.locked.at && d.cohorts.EGFR.lock?.at === d.locked.at;
-      steps.arms = Object.keys(k.children || {}).some((c) => c.startsWith("g12c / "));
+      steps.locked = !!d.locked?.at && /^[0-9a-f-]{36}$/.test(k.set || "") && k.nSamples > 0 && !k.samples && k.at === d.locked.at && d.cohorts.EGFR.lock?.at === d.locked.at;
+      // its arms are parts of its one set, not sets of their own: one row per locked cohort
+      steps.arms = Object.entries(k.children || {}).some(([c, m]) => c.startsWith("g12c / ") && m.set === k.set && m.part === "arm:" + c);
+      steps.oneRowEach = ((await (await ctx.request.get(BASE + "/api/id-sets")).json()).sets || []).length === setsBefore + 2;
       steps.sameCounts = JSON.stringify(await counts()) === JSON.stringify(before);
       const lines = await sp.$$eval(".lockline", (ls) => ls.map((l) => l.innerText.replace(/\s+/g, " ")));
       steps.unchanged = lines.length === 2 && lines.every((l) => /locked \d+ \w+ \d{4}/.test(l) && /unchanged since/.test(l));
@@ -1655,7 +1658,7 @@ async function main() {
       steps.lockAllBack = await sp.locator(".lockall").isVisible();
     } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
     ok("locking all cohorts freezes them and their arms at one moment, keeps the counts, says nothing moved since; one cohort unlocks on its own",
-      steps.locked && steps.arms && steps.sameCounts && steps.unchanged && steps.header && steps.unlockedOne && steps.lockAllBack, JSON.stringify(steps));
+      steps.locked && steps.arms && steps.oneRowEach && steps.sameCounts && steps.unchanged && steps.header && steps.unlockedOne && steps.lockAllBack, JSON.stringify(steps));
     await ctx.close();
   }
   // A cohort with something to save — never saved, or re-split since — offers "save" in its gear
