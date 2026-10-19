@@ -68,6 +68,7 @@ export function useLibrary(page: LibraryPage) {
    *  between them ("manage on the Saved tab"); one tab, two sub-tabs instead. */
   const [cohortsSubTab, setCohortsSubTab] = useState<"cohorts" | "analyses">("cohorts");
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
+  const [exQuery, setExQuery] = useState("");           // Examples tab search
   const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>" / "shared:<id>"
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
 
@@ -130,5 +131,5 @@ export function useLibrary(page: LibraryPage) {
     try { await persist(ex.name, ex.def, lastEval); } catch { /* the Examples tab has no error banner of its own */ }
   };
 
-  return { cohortsSubTab, setCohortsSubTab, exTag, setExTag, picked, setPicked, exEvals, setExEvals, analyzePicked, togglePick, runDocExample, docLink, previewExample, saveExample };
+  return { cohortsSubTab, setCohortsSubTab, exTag, setExTag, exQuery, setExQuery, picked, setPicked, exEvals, setExEvals, analyzePicked, togglePick, runDocExample, docLink, previewExample, saveExample };
 }

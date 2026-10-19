@@ -1,12 +1,17 @@
 "use client";
-// The Examples tab: the documented analyses (lib/dsl-reference.ts EXAMPLES), filtered by tag. The
-// tag belongs to the page, which keeps it while this unmounts. The examples are written against the
+// The Examples tab: the documented analyses (lib/dsl-reference.ts EXAMPLES), filtered by one view kind
+// or topic (lib/example-features.ts) and by a search over their text. Both belong to the page, which
+// keeps them while this unmounts; the search box keeps its own draft and hands it over after a pause,
+// so a keystroke re-renders this tab, not the page. The examples are written against the
 // public warehouse's studies; where this deployment's database does not hold them (EXAMPLES_URL,
 // lib/site.ts), Run opens each on the deployment that does, after saying the reader is leaving.
-import { useState } from "react";
-import { Check, ExternalLink, Link2, Play } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, ExternalLink, Link2, Play, Search } from "lucide-react";
 import { EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
+import { exampleFeatures, matchesSearch, studiesOf } from "../../lib/example-features.ts";
 import { Button } from "../_ui/button";
+import { Input } from "../_ui/input";
+import { cn } from "../../lib/cn";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { usePublicEnv } from "../_env/public-env-context.tsx";
 import { parseExamplesUrl } from "../../lib/site.ts";
@@ -14,11 +19,11 @@ import { parseExamplesUrl } from "../../lib/site.ts";
 /** a tag filter: an outline chip, filled while it is the one shown */
 const TAG = "group rounded-pill px-2.5 text-sm font-normal aria-pressed:border-link aria-pressed:bg-link aria-pressed:text-card aria-pressed:hover:bg-link/90 aria-pressed:hover:text-card";
 const TAG_N = "text-muted-foreground group-aria-pressed:text-card/80";
-const TAGS = [...new Set(EXAMPLES.flatMap(e => e.tags || []))].sort();
-const viewKinds = (ex: DslExample): string[] => [...new Set((ex.doc.views || []).map(v => String(v.kind)))];
-const studiesOf = (ex: DslExample): string[] => [...new Set(Object.values(ex.doc.cohorts || {})
-  .flatMap((c: any) => (c && c.studies) || (c && c.study ? [c.study] : []))
-  .concat(ex.doc.study ? [ex.doc.study] : []))];
+const FEATURES = new Map(EXAMPLES.map(e => [e, exampleFeatures(e)]));
+const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
+const VIEWS = [...new Set([...FEATURES.values()].flatMap(f => f.views))].sort(byName);
+const TOPICS = [...new Set([...FEATURES.values()].flatMap(f => f.topics))].sort(byName);
+const has = (ex: DslExample, t: string) => { const f = FEATURES.get(ex)!; return f.views.includes(t) || f.topics.includes(t); };
 
 const hostOf = (url: string) => { try { return new URL(url).host; } catch { return url; } };
 
@@ -30,9 +35,12 @@ export function useExamplesUrl(): { examplesUrl: string | null; examplesUrlError
   catch (e) { return { examplesUrl: null, examplesUrlError: String((e as Error)?.message || e) }; }
 }
 
-export function ExamplesTab({ tag, onTag, busy, onRun, link, elsewhere, elsewhereError, onError }: {
+export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, elsewhere, elsewhereError, onError }: {
   tag: string;
   onTag: (t: string) => void;
+  /** the search over titles, descriptions and pills */
+  query: string;
+  onQuery: (q: string) => void;
   busy: boolean;
   onRun: (ex: DslExample) => void;
   /** the example's shareable ?doc= link — on the deployment that runs it */
@@ -52,7 +60,26 @@ export function ExamplesTab({ tag, onTag, busy, onRun, link, elsewhere, elsewher
     try { await navigator.clipboard.writeText(link(ex)); setCopied(ex.title); setTimeout(() => setCopied(null), 1800); }
     catch { onError("could not copy to clipboard"); }
   };
-  const shown = tag === "all" ? EXAMPLES : EXAMPLES.filter(e => (e.tags || []).includes(tag));
+  const [draft, setDraft] = useState(query);
+  const latest = useRef(draft);
+  latest.current = draft;
+  useEffect(() => {
+    if (draft === query) return;
+    const t = setTimeout(() => onQuery(draft), 250);
+    return () => clearTimeout(t);
+  }, [draft, query, onQuery]);
+  // hand a draft still waiting on its pause to the page when the tab is left
+  useEffect(() => () => onQuery(latest.current), [onQuery]);
+  const searched = EXAMPLES.filter(e => matchesSearch(e, draft));
+  const shown = tag === "all" ? searched : searched.filter(e => has(e, tag));
+  const chip = (t: string) => {
+    const n = searched.filter(e => has(e, t)).length;
+    return (
+      <Button key={t} variant="outline" size="xs" className={cn(TAG, n === 0 && "opacity-50")} aria-pressed={tag === t} onClick={() => onTag(tag === t ? "all" : t)}>
+        {t} <span className={TAG_N}>{n}</span>
+      </Button>
+    );
+  };
 
   return (
     <div>
@@ -71,29 +98,43 @@ export function ExamplesTab({ tag, onTag, busy, onRun, link, elsewhere, elsewher
             in a new tab.
           </p>
         )}
-        <div className="extags">
+        <div data-tw className="mt-2.5 flex flex-wrap items-center gap-2.5">
+          <div className="relative w-full max-w-md">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input type="search" className="exsearch h-8 bg-card pl-8 text-md md:text-md" aria-label="search examples"
+              placeholder="search titles, descriptions and pills" value={draft} onChange={(e) => setDraft(e.target.value)} />
+          </div>
+          <span className="exshown text-sm text-muted-foreground">
+            {shown.length === EXAMPLES.length ? `${EXAMPLES.length} examples` : `${shown.length} of ${EXAMPLES.length} examples`}
+          </span>
           <Button variant="outline" size="xs" className={TAG} aria-pressed={tag === "all"} onClick={() => onTag("all")}>
-            all <span className={TAG_N}>{EXAMPLES.length}</span>
+            all <span className={TAG_N}>{searched.length}</span>
           </Button>
-          {TAGS.map(t => (
-            <Button key={t} variant="outline" size="xs" className={TAG} aria-pressed={tag === t} onClick={() => onTag(t)}>
-              {t} <span className={TAG_N}>{EXAMPLES.filter(e => (e.tags || []).includes(t)).length}</span>
-            </Button>
-          ))}
         </div>
+        <div className="extags exfacet"><span className="exfacet-l">views</span>{VIEWS.map(chip)}</div>
+        <div className="extags exfacet"><span className="exfacet-l">topics</span>{TOPICS.map(chip)}</div>
       </div>
+
+      {shown.length === 0 && (
+        <div className="card exempty">
+          No examples match{draft.trim() && <> “{draft.trim()}”</>}{tag !== "all" && <> under <strong>{tag}</strong></>}.{" "}
+          {draft && <Button variant="link" size="inline" onClick={() => setDraft("")}>clear the search</Button>}
+          {draft && tag !== "all" && " or "}
+          {tag !== "all" && <Button variant="link" size="inline" onClick={() => onTag("all")}>show all</Button>}
+        </div>
+      )}
 
       <div className="exgrid">
         {shown.map(ex => {
           const cohortNames = Object.keys(ex.doc.cohorts || {});
           const studies = studiesOf(ex);
-          const kinds = viewKinds(ex);
+          const { views, topics } = FEATURES.get(ex)!;
           return (
             <div className="card excard" key={ex.title}>
               <h3>{ex.title}</h3>
               <div className="extags small">
-                {kinds.map(k => <span key={k} className="vkind">{k}</span>)}
-                {(ex.tags || []).filter(t => !kinds.includes(t)).map(t => <span key={t} className="extag is-static">{t}</span>)}
+                {views.map(k => <span key={k} className="vkind" title="a view this example draws">{k}</span>)}
+                {topics.map(t => <span key={t} className="extag is-static">{t}</span>)}
               </div>
               {ex.demonstrates && <p className="exdem">{ex.demonstrates}</p>}
               {ex.customData?.length ? <p className="meta flush">

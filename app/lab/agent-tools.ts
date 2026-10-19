@@ -8,6 +8,7 @@
 import { exposeTools, type AgentTool, type Json } from "../../lib/webmcp.ts";
 import { analysisText } from "../../lib/result-text.ts";
 import { AGENT_GRAMMAR, EXAMPLES, type DslExample } from "../../lib/dsl-reference.ts";
+import { exampleFeatures } from "../../lib/example-features.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, ExploreResult, PartitionDef } from "../../lib/types.ts";
 import { withoutPartition, editSplits, splitKey } from "../../lib/partition-arms.ts";
 import { api } from "./api.ts";
@@ -211,9 +212,9 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
         const j = await (await api.studies()).json();
         return (j.studies || j).map((s: any) => ({ id: s.id, name: s.name, cancerType: s.cancerType, patients: s.patients, samples: s.samples, timelinePatients: s.timelinePatients }));
       } },
-    { name: "list_examples", description: "The worked example analyses in the gallery: title and what each demonstrates. Load one with analysis_load_example.",
+    { name: "list_examples", description: "The worked example analyses in the gallery: title, what each demonstrates, the view kinds it draws (`views`) and its topics (`topics`). Load one with analysis_load_example.",
       inputSchema: { type: "object", properties: {} },
-      run: async () => EXAMPLES.map((e) => ({ title: e.title, demonstrates: e.demonstrates, tags: e.tags })) },
+      run: async () => EXAMPLES.map((e) => ({ title: e.title, demonstrates: e.demonstrates, ...exampleFeatures(e) })) },
 
     // ---- edit --------------------------------------------------------------------------
     { name: "analysis_set_document", description: "Replace the whole Analysis document. The engine runs it first; if it rejects the document (or any view errors), the page is left unchanged and the reason is returned.",

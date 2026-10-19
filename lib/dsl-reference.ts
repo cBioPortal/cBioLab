@@ -49,7 +49,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Lung adenocarcinoma: a four-view workup",
     demonstrates: "One document, four views: the same two cohorts asked genomically, clinically, temporally and structurally. This is what the analysis document is FOR \u2014 not one chart, but a whole workup that travels as a single object.",
-    tags: ["multi-view", "compare", "clinical", "survival", "cooccurrence"],
+    tags: ["multi-view", "log-rank"],
     note: "EGFR-mutant versus KRAS-mutant lung adenocarcinoma \u2014 the two dominant, mutually exclusive driver classes. Co-alteration frequencies, how the groups differ clinically, how they differ in survival (with a log-rank test), and which driver pairs co-occur within the EGFR arm. Every view is computed from aggregates each site could return without disclosing a patient.",
     doc: {
       study: "msk_chord_2024",
@@ -74,8 +74,8 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "One cohort, five ways: the colorectal hotspot workup",
     demonstrates: "A single cohort put through five different views at once \u2014 including the lollipop \u2014 to show that the views compose rather than compete. Nothing here is re-queried per chart; each view asks its own aggregate of the same compiled cohort.",
-    tags: ["multi-view", "lollipop", "hotspots", "cooccurrence", "clinical", "oncoprint"],
-    note: "Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 12/13, BRAF V600E, PIK3CA E545K/H1047R), which pairs co-occur or exclude each other, how the mutated and wild-type groups differ clinically, and an oncoprint of the same patients. minCount is set so no site returns a change carried by fewer than three patients.",
+    tags: ["multi-view", "lollipop"],
+    note: "Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 12/13, BRAF V600E, PIK3CA E545K/H1047R), which pairs co-occur or exclude each other, which other drivers each group carries, how the mutated and wild-type groups differ clinically, and how they differ in survival. minCount is set so no site returns a change carried by fewer than three patients.",
     doc: {
       study: "msk_chord_2024",
       cohorts: {
@@ -101,7 +101,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Federated end to end: two studies, four views",
     demonstrates: "The full federated story in one document \u2014 cohorts spanning two studies, with every view falling back on aggregates that each site can compute in its own database: pooled gene counts, additive moments, per-site survival triples and per-site 2\u00d72 tables.",
-    tags: ["multi-view", "federation", "survival", "log-rank", "cooccurrence", "clinical"],
+    tags: ["multi-view", "log-rank", "stratified"],
     note: "TP53-mutant versus wild-type across MSK-CHORD and MSK-MET. The log-rank is stratified by study, the co-occurrence test is Cochran\u2013Mantel\u2013Haenszel across the two sites, and the clinical comparison pools counts and moments \u2014 all from per-site aggregates. Run with either study aggregate-only and the numbers do not change.",
     doc: {
       study: "msk_chord_2024",
@@ -121,7 +121,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Genomic status via OQL, compared",
     demonstrates: "The base case the others build on: two cohorts defined genomically, compared gene by gene with panel-aware denominators, then followed to death.",
-    tags: ["compare", "survival", "OQL"],
+    tags: ["OQL"],
     note: "STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it includes not-profiled unless you add a profiled clause). Two views: co-alteration frequencies and overall survival.",
     doc: {
       study: "msk_chord_2024",
@@ -135,7 +135,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Multivariate Cox: gene status alongside a clinical covariate",
     demonstrates: "More than one covariate at once, unlike KM's single categorical split -- fit from real per-patient rows within this one local study, so a continuous or clinical covariate can sit next to a gene's alteration status in the same model.",
-    tags: ["cox", "survival", "forest-plot", "OQL"],
+    tags: ["forest-plot", "OQL"],
     note: "Overall survival regressed on TP53 mutation status and reported gender, over the whole study. The forest plot reports one hazard ratio per covariate level, each measured against its own reference: a mutated-vs-not covariate always defaults to \"Not mutated\", any other categorical defaults to its most common level.",
     doc: {
       study: "msk_chord_2024",
@@ -149,7 +149,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Clinical + timeline event composition",
     demonstrates: "A cohort no attribute filter could express \u2014 it depends on the ORDER of events in a patient's timeline.",
-    tags: ["compare", "timeline"],
+    tags: ["timeline-events", "temporal"],
     note: "Never-smokers whose timeline shows progression within 180 days after first immunotherapy. The event leaf is the v1 timeline sub-DSL embedded as a clause.",
     doc: {
       study: "msk_chord_2024",
@@ -168,7 +168,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Derived filters: enough follow-up to answer the question",
     demonstrates: "Filters computed from the SHAPE of the data instead of a study's own words. Event-type names and attribute keys differ study to study, so anything keyed on them works nowhere in particular; dates and gene symbols are the same everywhere.",
-    tags: ["derived", "timeline", "temporal", "survival", "clinical"],
+    tags: ["derived", "timeline-events", "temporal"],
     note: "Any question about an outcome is only honest among patients observed long enough to have one. This contrasts patients with at least two years of follow-up past the study's own day 0 against those with under six months — a distinction no clinical attribute in this study records, and one that needs no knowledge of how this study names its events.",
     doc: {
       study: "msk_chord_2024",
@@ -185,7 +185,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Progression on immunotherapy: during, versus absent",
     demonstrates: "Two temporal relations that look similar and mean opposite things. DURING asks whether progression was recorded inside a treatment interval; NOT_FOLLOWED_BY asks whether it was absent for a year afterwards \u2014 and only counts patients whose follow-up actually covers that year.",
-    tags: ["timeline", "temporal", "compare", "clinical", "survival"],
+    tags: ["timeline-events", "temporal"],
     note: "Patients who progressed while on immunotherapy (1,423) versus those with no progression recorded in the year after starting it (534). The second cohort sets observed:true, so \"no progression\" means the follow-up was there and nothing was recorded \u2014 not that the patient was lost to follow-up. Without that guard the cohort would be far larger and largely meaningless.",
     doc: {
       study: "msk_chord_2024",
@@ -209,7 +209,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Derived treatment lines: who reaches a third line?",
     demonstrates: "Treatment lines are not a column in the data \u2014 they are synthesised at query time by interval-merging systemic therapy with a gap rule. The line number is then an ordinary attribute you can filter on, and NOT around a line selector expresses \"never got that far\".",
-    tags: ["timeline", "temporal", "treatment-lines", "survival", "clinical"],
+    tags: ["timeline-events", "temporal", "treatment-lines"],
     note: "Patients who reached a third line of therapy (3,088) versus those who had a first line and never a second (13,620), with lines derived on a 90-day gap. Changing lineGap changes both cohorts \u2014 the line boundary is a modelling choice, made explicit rather than baked into the data. READ THE SURVIVAL CURVE WITH CARE: reaching a third line requires surviving long enough to receive one, so this comparison carries immortal time bias and the modest separation it shows (medians 48.1 vs 43.1 months) is not evidence that more lines help. The engine cannot detect this \u2014 it is a property of how the cohorts were defined, not of the data, which is exactly why the definition travels with the result.",
     doc: {
       study: "msk_chord_2024",
@@ -234,7 +234,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Held-out replication: one question, two halves of the patients",
     demonstrates: "The split leaf. The engine divides every study's patients into two fixed halves by a salted hash of the patient id, so a finding made on one half can be checked on patients it never touched \u2014 the replication step a hypothesis campaign (/campaign) automates, and the one a single-dataset analysis usually has to skip.",
-    tags: ["split", "replication", "timeline", "compare"],
+    tags: ["split", "replication", "timeline-events"],
     note: "NSCLC patients who progressed within 180 days of first immunotherapy versus those with no progression in the year after it, each divided into the discovery and validation halves. STK11 is altered more often in early failures on both halves; KEAP1 separates the groups on the discovery half only. The halves are the same for every caller and every run, and the salt is pinned by a test, so a result reported on one half can always be re-checked on the other.",
     doc: {
       study: "msk_chord_2024",
@@ -269,7 +269,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "True first line: fast progression versus durable control",
     demonstrates: "The prior-treatment guard. \"First line\" ordinarily means first line OBSERVED HERE \u2014 about a fifth of these patients were treated elsewhere first. priorGuard restricts to those flagged treatment-naive, which is the difference between a real first-line claim and an artefact of where the patient was referred from.",
-    tags: ["timeline", "temporal", "prior-guard", "survival", "compare"],
+    tags: ["timeline-events", "temporal", "prior-guard"],
     note: "Among treatment-naive patients starting first-line chemotherapy: progression recorded within 180 days (3,319) versus none in that window with follow-up to prove it (6,584). BEFORE takes a window; NOT_FOLLOWED_BY takes the same window and asks for its absence. Drop priorGuard and both cohorts grow by roughly the share of patients pre-treated elsewhere.",
     doc: {
       study: "msk_chord_2024",
@@ -293,7 +293,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Lab thresholds over time: PSA above 100",
     demonstrates: "A numeric predicate on a repeated measurement. The cohort is defined by a lab value ever crossing a threshold, and its complement is built by wrapping the same selector in NOT alongside \"was measured at all\" \u2014 so the comparison is against patients genuinely tested, not against patients with no PSA record.",
-    tags: ["timeline", "temporal", "lab-values", "compare", "survival"],
+    tags: ["timeline-events", "temporal", "lab-values"],
     note: "PSA recorded above 100 ng/ml at any point (879) versus PSA measured but never above 100 (3,250). The second cohort deliberately requires a PSA test to exist: comparing against everyone else would silently contrast the tested with the untested, which is a selection effect rather than a finding.",
     doc: {
       study: "msk_chord_2024",
@@ -320,7 +320,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "any / not / genomicData",
     demonstrates: "Boolean structure: OR inside a clause, NOT around a leaf, and a copy-number threshold expressed as a continuous range.",
-    tags: ["compare", "boolean"],
+    tags: ["boolean"],
     note: "Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep deletions expressed as a continuous copy-number threshold.",
     doc: {
       study: "msk_chord_2024",
@@ -339,7 +339,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Cross-study federation with an oncoprint",
     demonstrates: "One cohort spanning two studies. Overlap is NOT deduplicated and vocabularies are NOT harmonized \u2014 the view says so rather than hiding it.",
-    tags: ["oncoprint", "federation"],
+    tags: [],
     note: "One cohort unioned across two studies (members are study-qualified; overlap is NOT deduplicated), rendered as a federated oncoprint with a categorical and a numeric clinical track, columns sorted by cancer type then descending age. The \u201cStudy of origin\u201d track is added automatically.",
     doc: {
       study: "msk_chord_2024",
@@ -353,7 +353,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Molecular heatmap tracks, sorted by expression",
     demonstrates: "Continuous molecular values as tracks, with the track label doubling as the sort key.",
-    tags: ["oncoprint", "heatmap"],
+    tags: ["heatmap", "expression"],
     note: "ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene tracks, columns sorted by descending ERBB2 expression. Z-scores render on a fixed diverging \u00b13 ramp; the track label (gene + short profile name) is the sort key.",
     doc: {
       study: "brca_tcga_pan_can_atlas_2018",
@@ -368,7 +368,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "A plot of 13,000 samples, drawn as density",
     demonstrates: "The portal's Plots tab fetches every point to the browser. This one counts them in the database and sends the counts, so the same picture draws for a hundred cases or four hundred thousand.",
-    tags: ["plot", "scale"],
+    tags: ["scale"],
     note: "Tumour mutational burden against fraction of the genome altered, over every sample of a TP53-mutant cohort. The figure is a density field: the samples are counted into a 240x160 grid, and only the occupied cells travel. Pearson, Spearman and the fitted line are computed over EVERY sample inside ClickHouse, so they describe the whole cohort rather than the points that happened to be painted last. The second view groups the same measure by TP53 mutation class, as quartiles with Tukey whiskers.",
     doc: {
       study: "msk_chord_2024",
@@ -388,7 +388,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Highlight cohorts on a plot: KRAS G12C and STK11 against 25,000 patients",
     demonstrates: "A `highlight` on a plot view: other cohorts drawn over the plotted one, each in its own colour, so the cases you care about are visible against a density that no longer has individual points.",
-    tags: ["plot", "highlight", "scale"],
+    tags: ["highlight", "scale"],
     note: "Age against tumour mutational burden for every patient in MSK-CHORD (24,947 with both), drawn as a grey density. KRAS G12C (1,113 patients) and STK11-mutant (1,206) are drawn over it as points, each in its own colour. The coefficients and the fitted line are still those of the whole cohort. The second view groups the same measure by cancer type: KRAS G12C is again points, while TP53-mutant patients (13,105) are too many for points, so they are drawn as a narrow box per group beside the cohort's own box, and the caption says why.",
     doc: {
       study: "msk_chord_2024",
@@ -413,7 +413,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "A highlight that reaches beyond the plotted cohort",
     demonstrates: "A highlight's cases are the plotted cohort's cases that are also in it. Patients of the highlight outside the plotted cohort are counted in the caption, not drawn.",
-    tags: ["plot", "highlight"],
+    tags: ["highlight"],
     note: "Non-small cell lung cancer in MSK-CHORD (7,809 patients), with KRAS G12C highlighted. 916 of the 1,113 KRAS G12C patients have a lung sample; the other 197 are outside the plotted cohort, and the caption says so. The second view counts samples instead of patients, so a patient with two sequenced samples is drawn twice.",
     doc: {
       study: "msk_chord_2024",
@@ -436,7 +436,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Highlights across two studies",
     demonstrates: "A highlight on a federated plot: each study answers for its own cases, and the points are pooled onto one figure.",
-    tags: ["plot", "highlight", "federation"],
+    tags: ["highlight"],
     note: "TCGA lung adenocarcinoma and squamous cell carcinoma pooled (1,053 patients). KRAS-mutant (175) and TP53-mutant (699) patients are drawn over the pooled plot of age against tumour mutational burden; each study returns its own highlighted cases. In the second view, KRAS-mutant patients are drawn over the TMB distribution by sex. If any study in a highlight could not show individual cases, the whole highlight would be drawn as an aggregate, never half points and half cells.",
     doc: {
       study: "luad_tcga_pan_can_atlas_2018",
@@ -460,7 +460,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "OQL on a plot axis: STK11 or KEAP1 mutant lung cancer",
     demonstrates: "An alteration axis written as an OQL query — several genes, Altered when a case matches any of them — used as a box plot's groups and as a colour.",
-    tags: ["plot", "OQL"],
+    tags: ["OQL"],
     note: "Non-small cell lung cancer in MSK-CHORD (7,809 patients). The first view groups tumour mutational burden by the OQL query `STK11: MUT; KEAP1: MUT`: 1,535 patients are Altered (a mutation in either gene), the same count as a cohort defined by that OQL, and 6,274 are Unaltered. The second view groups by sample type and colours each violin by the same query, counting samples rather than patients.",
     doc: {
       study: "msk_chord_2024",
@@ -481,7 +481,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Merged gene rows: a pathway as one track",
     demonstrates: "Several genes drawn as one row, the way cBioPortal's [TP53 MDM2 MDM4] does, with the members kept alongside so the pooling is visible.",
-    tags: ["oncoprint", "merged tracks"],
+    tags: ["merged-tracks"],
     note: "Pancreatic adenocarcinoma. The first row pools TP53, MDM2 and MDM4: it is altered where any of them is, and its denominator is the union of the three genes' panels \u2014 not their intersection, and not the whole cohort. TP53 is drawn again on its own underneath, so the difference the other two make is readable rather than asserted. A row's members are listed in its tooltip and in the contract's `members` field.",
     doc: {
       study: "msk_chord_2024",
@@ -496,7 +496,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "A federated z-score reference on an oncoprint",
     demonstrates: "The sharpest form of the argument: a site that discloses no patients \u2014 and so draws no columns \u2014 still defines the scale those columns are read against, from three totals per gene.",
-    tags: ["oncoprint", "federation", "z-reference"],
+    tags: ["heatmap", "z-reference"],
     note: "A heatmap track with reference:\"federation\" is scored against a distribution pooled from EVERY participating study, including instances that disclose no patients and therefore contribute no columns — each returns three totals per gene (n, sum, sum of squares), which is enough to define the reference. Run with luad_tcga_pan_can_atlas_2018 aggregate-only, its patients are absent from the columns while its 510 patients still shape what the drawn columns mean.",
     doc: {
       study: "brca_tcga_pan_can_atlas_2018",
@@ -511,7 +511,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "The clinical course: who is still on treatment, and when",
     demonstrates: "Timeline data finally DRAWN rather than only filtered on. The two things that make a temporal chart honest are both enforced by the engine: every patient is lined up on a real clinical landmark rather than a study-specific day 0, and the denominator is who was still under observation \u2014 not the whole cohort.",
-    tags: ["course", "temporal", "timeline", "anchor", "at-risk"],
+    tags: ["timeline-events", "temporal", "anchor", "at-risk"],
     note: "MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Treatment carries real start/stop dates so it is drawn as a state patients are IN; surgery has no duration, so it is the share with a surgery in that bin \u2014 a distinction read from the data's shape, not from the event's name. Note surgery peaking BEFORE time zero: resection typically precedes first systemic therapy. The at-risk row under the axis is the denominator, and it falls steeply \u2014 a curve read without it would be badly misleading.",
     doc: {
       study: "msk_chord_2024",
@@ -551,7 +551,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "What comes after what: lines of therapy, and what ending a path means",
     demonstrates: "The question the clinical-course view CANNOT answer \u2014 that chart asks 'on treatment, yes or no', so a seamless switch between drugs never moves the line. And the reason a sequence diagram usually misleads: most paths end because the RECORD ends, not because the patient stopped, so the two endings are drawn as separate terminals.",
-    tags: ["sequence", "sankey", "temporal", "lines-of-therapy", "censoring", "attrition"],
+    tags: ["sankey", "temporal", "treatment-lines", "censoring"],
     note: "MSK-CHORD therapy lines by TP53 status, 90-day gap, two panels on one scale. Read the grey blocks first, and read them as TWO things: the darker terminal is patients the study watched for at least a line gap who began no further therapy; the lighter one is patients whose records simply stop, about whom nothing can be concluded. Over half of all paths end censored \u2014 collapsing them together (as a plain Sankey does) would turn record-keeping into an apparent clinical decision. The real signal is in first line: TP53 wild-type receives far more hormone therapy than TP53-mutant, which is what hormone-receptor-positive disease looks like. Lines are the one definition every line count shares: systemic-therapy records only, so 'Prior Medications to MSK' (a provenance marker rather than a therapy), radiation and bone treatment are not lines \u2014 they co-occur with almost everything, so leaving them in would explode the combination space. The caption says which records were used; a document that wants them anyway says so with lineClasses.",
     doc: {
       study: "msk_chord_2024",
@@ -568,7 +568,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Lollipop plot: mutations by protein position, with a suppression floor",
     demonstrates: "Lollipop data, and the one place small cells genuinely bite: minCount is applied by each site BEFORE anything is returned, because a coordinator filtering what it already received is theatre.",
-    tags: ["hotspots", "lollipop", "suppression"],
+    tags: ["lollipop", "suppression"],
     note: "Hotspots in colorectal cancer, drawn the way cBioPortal's mutation tab draws them: one stem per codon, its height the distinct patient + protein change pairs there, with the protein's Pfam domains on the backbone — so KRAS spikes at codons 12-13 and BRAF at V600. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.",
     doc: {
       study: "msk_chord_2024",
@@ -581,7 +581,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Co-expression from sums alone",
     demonstrates: "A correlation depends on the data only through six running totals, so it federates exactly \u2014 the pooled answer equals the centralized one rather than approximating it.",
-    tags: ["coexpression", "federation"],
+    tags: ["federable"],
     note: "Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.",
     doc: {
       study: "brca_tcga_pan_can_atlas_2018",
@@ -593,7 +593,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Clinical attributes compared between cohorts",
     demonstrates: "Welch's t from (n, sum, sum of squares): three additive totals per site, so pooled mean and variance are exact and no individual value is transmitted.",
-    tags: ["clinical", "federation"],
+    tags: ["federable"],
     note: "How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.",
     doc: {
       study: "msk_chord_2024",
@@ -607,7 +607,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Co-occurrence and mutual exclusivity in NSCLC",
     demonstrates: "Four counts per gene pair per site. Denominators are the patients each site's OWN panels profiled for both genes \u2014 something pooled exports get wrong.",
-    tags: ["cooccurrence", "federation"],
+    tags: ["federable"],
     note: "Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.",
     doc: {
       study: "msk_chord_2024",
@@ -620,7 +620,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Survival from first chemotherapy, left-truncated",
     demonstrates: "Re-anchoring the survival clock to a timeline event, and the correction that makes it honest. The study measures OS from its own day 0 (first sequencing); anchoring at first chemotherapy moves the clock earlier, so patients are unobservable until day 0 and enter the risk set then — without that, every patient would appear to survive from chemotherapy to sequencing, which is precisely what got them into the study.",
-    tags: ["survival", "timeline", "temporal", "left-truncation", "anchor"],
+    tags: ["timeline-events", "temporal", "left-truncation", "anchor"],
     note: "TP53-mutant vs wild-type, overall survival measured from each patient's first chemotherapy rather than from sequencing. Patients whose first chemotherapy falls after day 0, or who never had chemotherapy, are excluded rather than given negative follow-up. The result reports how long after the anchor patients became observable, so an anchor that is matching earlier events than intended shows up as a long tail.",
     doc: {
       study: "msk_chord_2024",
@@ -635,7 +635,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Study-stratified survival across two studies",
     demonstrates: "The log-rank statistic is a sum over strata, so sites can BE the strata \u2014 which is better methodology than pooling, not merely more private.",
-    tags: ["survival", "log-rank", "federation"],
+    tags: ["log-rank", "stratified"],
     note: "TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.",
     doc: {
       study: "msk_chord_2024",
@@ -665,7 +665,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Splits: a cohort divided into arms that add up to it",
     demonstrates: "A cohort's `splits` divide it into child cohorts that are disjoint and together exactly the parent: arms are tested in order and the first match wins, patients matching none go to a remainder, and patients an arm cannot be decided for (here, not profiled for KRAS) get their own child instead of being counted as wild-type. The result checks that the children add up to the parent; a view naming the split compares its arms.",
-    tags: ["cohort-structure", "splits", "compare", "survival"],
+    tags: ["cohort-structure", "splits"],
     note: "Non-small cell lung cancer split by KRAS allele: G12C first, then any other KRAS mutation, then wild-type. Because G12C is tested first, \"other KRAS\" needs no hand-written \"and not G12C\". 916 + 1,278 + 5,615 = 7,809, the whole cohort, with nobody unprofiled for KRAS in this study. STK11 and KEAP1 are enriched in both KRAS-mutant arms and TP53 in wild-type — the known co-mutation pattern — while overall survival does not differ significantly across the three arms (k-group log-rank p≈0.1).",
     doc: {
       study: "msk_chord_2024",
@@ -685,7 +685,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Median/IQR and a rank-sum test, single-study only",
     demonstrates: "Why a second test earns its place: MSI_SCORE is right-skewed here, so Welch's t (which compares means) calls it significant while the Mann-Whitney rank-sum (which compares typical values) does not — the mean is being pulled by a few high-MSI outliers, not by a real shift in the bulk of each group. Both are shown; neither is hidden in favour of the other.",
-    tags: ["clinical", "median", "rank-sum", "single-study"],
+    tags: ["median", "rank-sum", "single-study"],
     note: "APC-mutant colorectal cancer, split by liver metastasis. Alongside mean/SD, numeric attributes report an exact median/IQR and a Mann-Whitney U — available here only because both cohorts stay within one study (crc_apc_impact_2020): median and rank are not additive across sites the way (n, Σx, Σx²) is, so this is refused rather than approximated the moment a cohort spans more than one study.",
     doc: {
       study: "crc_apc_impact_2020",
@@ -699,7 +699,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Cox with a gene-SET covariate: any of three genes, one term",
     demonstrates: "A Cox covariate naming a gene SET (`genes`, not `gene`) instead of one gene at a time — \"is any of TP53/KRAS/PIK3CA mutated\" as a single pathway-style term, the way a paper actually reasons about a gene panel, without fitting one covariate per gene.",
-    tags: ["cox", "alteration", "gene-set"],
+    tags: ["gene-sets", "forest-plot"],
     note: "Every patient in the study, one term: mutated in any of TP53/KRAS/PIK3CA versus none of them. Compiles to a single hugo_gene_symbol IN (...) — the same shape as a single-gene covariate, just with a broader gene list, so it costs nothing extra downstream (dummy-coding, the forest plot, the reference-level override all just work).",
     doc: {
       study: "crc_apc_impact_2020",
@@ -710,7 +710,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Cox stratified by cohort: does a gene's hazard ratio hold up in both arms?",
     demonstrates: "`stratifyByCohort` fits each named cohort as its own independent Cox model instead of pooling them — the right tool when a covariate's EFFECT, not just the case mix, might genuinely differ between cohorts. The forest plot draws one panel per cohort on a shared hazard-ratio scale, so the difference (or agreement) is visible directly rather than averaged away.",
-    tags: ["cox", "survival", "forest-plot", "stratified"],
+    tags: ["forest-plot", "stratified"],
     note: "APC mutation status regressed on overall survival, separately in the MSI-high and MSS arms of the same study. Pooled, APC reads HR=0.61 (95% CI 0.48-0.78) — a real effect, but stratifying shows it is almost entirely a microsatellite-stable-population effect (MSS: HR=0.54, p<0.0001) that does not reach significance in the small MSI-high arm (HR=0.87, 95% CI 0.31-2.44, n=27) — a pooled fit alone would not have shown that the effect is concentrated in one subgroup.",
     doc: {
       study: "crc_apc_impact_2020",
@@ -724,7 +724,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Logistic regression: does APC status predict MSI-high status?",
     demonstrates: "A `logistic` view: a BINARY outcome regressed on covariates, reported as odds ratios — the same forest-plot shape as `cox`, but for \"did X happen\" rather than \"when did X happen\", so there's no endpoint/months convention. `outcomeEvent` says which observed value of a categorical outcome is the event; every other observed value is disclosed as collapsed into \"not event\" rather than silently merged.",
-    tags: ["logistic", "forest-plot", "odds-ratio"],
+    tags: ["forest-plot", "odds-ratio"],
     note: "MSI_TYPE = Instable (vs every other observed value: Stable, Indeterminate, Do not report) regressed on APC mutation status. APC-mutant patients have substantially lower odds of MSI-high status (OR=0.28, 95% CI 0.13-0.63, p=0.0018) — consistent with APC-driven CRC typically arising through the chromosomal-instability pathway rather than the mismatch-repair-deficient pathway MSI-high status marks.",
     doc: {
       study: "crc_apc_impact_2020",
@@ -736,7 +736,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "splitBy: one cohort, auto-split into an arm per receptor subtype",
     demonstrates: "`splitBy` turns one named cohort into an arm per distinct value of a categorical attribute, live from the data, instead of hand-writing one cohort per value. The arms are scoped to this one view — they never touch the document's own cohort list — but still carry full provenance (each arm's own compiled count/SQL) in the result.",
-    tags: ["splitBy", "compare", "cohorts"],
+    tags: ["splitBy", "cohort-structure"],
     note: "\"all patients\" split by RECEPTOR_STATUS_PRIMARY gives the same 4 clinically standard subtypes a hand-written 4-cohort document would (HR+/HER2-, Triple Negative, HR+/HER2+, HR-/HER2+), plus a few small ones this study also records (HR+/HER2_Unknown, Unk/ND, HR+/HER2_Equivocal) — all within the default 8-arm cap, so nothing here needs pooling into \"Other\". TP53 reads 26.8%/90.4%/49.2%/77% across the four main subtypes, matching the published literature on triple-negative breast cancer's markedly higher TP53 mutation rate.",
     doc: {
       study: "breast_msk_2018",
@@ -747,7 +747,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "splitBy: gene mutation status, without hand-writing the mutant/wildtype pair",
     demonstrates: "splitBy's second shape — `{cohort, gene}` — makes the same one-view, never-touches-the-document's-cohort-list arms as the attribute shape, but for a gene's mutation status: exactly two arms, no live query needed to know their names in advance (unlike an attribute's values, which must be discovered from the data).",
-    tags: ["splitBy", "survival", "gene"],
+    tags: ["splitBy", "log-rank"],
     note: "\"all patients\" split by APC mutation status gives the same two arms a hand-written {\"kind\":\"oql\",\"q\":\"APC: MUT\"} cohort pair would (325 mutant, 146 wildtype) — APC-mutant patients have better overall survival (median 25.6mo vs 17.9mo, log-rank p=9.1e-5), matching this study's own headline finding (see the crc_apc_impact_2020 Cox example above) from a single view, no separate cohorts to define.",
     doc: {
       study: "crc_apc_impact_2020",
@@ -758,7 +758,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "splitBy: a list of OQL queries, arms that overlap and a disclosed \"Other\"",
     demonstrates: "splitBy's third shape — `{cohort, oql}` — reaches anything OQL can express, not just one gene's plain mutation status: each query becomes its own arm, named from the query text. Arms are not forced into a partition — a patient matching more than one query counts toward each — so the result discloses `overlapCount`; anyone matching none of the queries falls into an \"Other\" arm alongside the named ones.",
-    tags: ["splitBy", "compare", "oql"],
+    tags: ["splitBy", "OQL"],
     note: "\"all patients\" split by [\"TP53: MUT\", \"KRAS: MUT\"] gives 13,105 TP53-mutant, 7,115 KRAS-mutant, and 9,019 in neither (\"Other\") — summing to more than the 24,950-patient base cohort because 4,289 patients carry both mutations, which the result discloses as `splitBy.overlapCount` rather than leaving the arm counts to look inconsistent on their own (13,105 + 7,115 − 4,289 + 9,019 = 24,950, exactly the base count).",
     doc: {
       study: "msk_chord_2024",
@@ -769,7 +769,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Survival split three ways: the k-group log-rank",
     demonstrates: "3+ cohorts in a survival view now get a real test — the k-group log-rank generalization (a (k-1)-df chi-squared from the full covariance matrix, the same statistic R's survdiff() reports) — instead of only a picture with no way to say whether the split is real.",
-    tags: ["survival", "log-rank", "k-group"],
+    tags: ["log-rank", "k-group"],
     note: "MSI status in three groups (stable / instable / indeterminate) instead of the usual two-arm split. The test asks whether the three curves differ AT ALL, not which pair does — a different question from running the 2-arm test three times pairwise, which would need its own multiple-testing correction.",
     doc: {
       study: "crc_apc_impact_2020",
@@ -784,7 +784,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "A missing alteration type is disclosed, never a false negative",
     demonstrates: "sarcoma_msk_2022 has no copy-number data at all (0 of 7,494 samples). MDM2 amplification is well-differentiated liposarcoma's defining alteration, so a naive tool would report 0% altered here and look confidently wrong. This one instead says so.",
-    tags: ["compare", "panel-aware", "data-quality"],
+    tags: ["panel-aware", "data-quality"],
     note: "TP53 (a real mutation hotspot here) and MDM2 (never assayed for copy-number in this study) side by side. Both show 0%-or-real altered figures, but only the view's note — and each cell's per-type breakdown (mutation/CNA/structural-variant counts, visible on hover in the app) — reveals that MDM2's 0% means \"never checked\" while TP53's is a real, profiled result.",
     doc: {
       study: "sarcoma_msk_2022",
@@ -797,7 +797,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Four receptor subtypes, one real test: Welch's ANOVA",
     demonstrates: "A numeric attribute compared across 3+ cohorts now gets a real test (Welch's ANOVA, plus Kruskal-Wallis alongside it since this stays within one study) instead of being skipped outright — the same k-group treatment this DSL's categorical and survival tests already got.",
-    tags: ["clinical", "anova", "kruskal-wallis", "k-group"],
+    tags: ["anova", "kruskal-wallis", "k-group"],
     note: "Breast cancer's four receptor subtypes, compared on genomic instability (FRACTION_GENOME_ALTERED) and mutation burden (TMB_NONSYNONYMOUS). Triple-negative's markedly higher genomic instability is exactly the known biology, and both the parametric (ANOVA) and rank-based (Kruskal-Wallis) tests agree emphatically; TMB does not differ significantly by subtype here, and again both tests agree.",
     doc: {
       study: "breast_msk_2018",
@@ -813,7 +813,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "A non-standard survival endpoint, named directly",
     demonstrates: "ucec_msk_2018 declares no <X>_MONTHS/<X>_STATUS pair at all — its outcome lives in PFS_MONTHS_FIRST_LINE_TX/PROGRESSION_STATUS instead, so the usual endpoint prefix shorthand finds nothing. monthsAttribute/statusAttribute name the real columns directly.",
-    tags: ["survival", "endpoint", "data-quality"],
+    tags: ["endpoint", "data-quality"],
     note: "MSI-H vs MSS endometrial cancer, progression-free survival from first-line treatment — the study's actual recorded outcome, reachable only because the exact column names are given rather than assumed from an OS/PFS/DFS-style prefix.",
     doc: {
       study: "ucec_msk_2018",
@@ -827,7 +827,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Top 20% TMB, within one cancer type: a percentile cutoff",
     demonstrates: "Reproducing Samstein et al.'s TMB-and-immunotherapy finding needed \"the top 20% of TMB, specifically among NSCLC patients\" — a cancer-type-specific percentile, not a hardcoded number. percentileOf scopes the live-resolved threshold to another cohort in this document instead of the whole (pan-cancer) study.",
-    tags: ["clinical", "percentile", "cutoff", "survival"],
+    tags: ["percentile", "cutoff"],
     note: "tmb_mskcc_2018 is pan-cancer, so a plain percentile would mix histologies with very different baseline TMB. \"NSCLC high-TMB\"/\"NSCLC low-TMB\" both restrict to NSCLC first, then split on whether TMB is at or above the 80th percentile COMPUTED WITHIN THAT NSCLC POPULATION (percentileOf:\"NSCLC\") — the readback shows the resolved number and what it was a percentile of, not just a bare threshold.",
     doc: {
       study: "tmb_mskcc_2018",
@@ -848,7 +848,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Cohort attrition: which criterion removed whom",
     demonstrates: "An `attrition` view: the CONSORT-style flow a clinicogenomic paper reports before any result — the study base, then the patients left after each clause of the cohort, in the order written, with how many that clause alone removed. Each step is the cohort a reader would get by stopping there, compiled and counted like any other cohort, so the last box is the cohort's own count by construction.",
-    tags: ["attrition", "consort", "cohort-definition"],
+    tags: ["consort"],
     note: "KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six months of follow-up, beside KRAS wild-type lung adenocarcinoma. The G12C arm loses most of its patients to the genotype, and a further 78 to the follow-up requirement — the kind of step a reader needs to see before trusting a survival curve drawn from what is left.",
     doc: {
       study: "msk_chord_2024",
@@ -870,7 +870,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Genome-wide copy number: colorectal against breast",
     demonstrates: "A `genome` view: the copy-number SEGMENTS (33M of them in this warehouse, unused by every other view) binned along the genome, as the share of each cohort's segmented samples gained or lost in each bin, with a per-bin Fisher test between exactly two cohorts. Each bin's denominator is the samples whose segmentation actually covers it, the same panel-aware rule every per-gene frequency follows.",
-    tags: ["genome", "copy-number", "segments"],
+    tags: ["copy-number", "segments"],
     note: "Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal pattern is all there — 20q gained in 60%, 13q in 42%, 8q in 32%, 18q lost in 54% — beside breast cancer's 1q and 8q gains and 16q loss. The strip underneath marks every bin where the two differ at q < 0.05, coloured by which cohort is higher.",
     doc: {
       study: "msk_impact_50k_2026",
@@ -884,7 +884,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Oncogenic signalling pathways: colorectal against pancreatic",
     demonstrates: "A `pathways` view: the ten canonical pathways of Sanchez-Vega et al. (Cell 2018) as the share of each cohort with an OncoKB driver in at least one member gene — over the UNION of the members' panels, the oncoprint's merged-row rule — beside each pathway's most-altered members, each with its own panel-aware denominator. A member gene no panel covered is listed as never profiled, not counted as unaltered.",
-    tags: ["pathways", "gene-sets", "compare"],
+    tags: ["gene-sets"],
     note: "Colorectal and pancreatic cancer in MSK-CHORD. WNT separates them almost completely (82% against 8%, nearly all APC); RTK-RAS is higher in pancreatic cancer (84%, KRAS 81%), and so is the cell cycle (39%, CDKN2A 33%); PI3K and NOTCH (FBXW7) are colorectal. The canonical pathways also show how much a targeted panel misses: 56 of WNT's 68 genes are on no panel here.",
     doc: {
       study: "msk_chord_2024",
@@ -898,7 +898,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Differential expression and enrichment: basal-like against luminal A breast cancer",
     demonstrates: "A `diffexpr` view: every gene's Welch t-test between two cohorts on one molecular profile, from three running totals per gene and cohort (n, Σv, Σv²) — additive, so exact across sites and never a single value sent — drawn as a volcano, then preranked GSEA of the same t ranking against the 50 MSigDB Hallmark sets, significance by seeded gene-set permutation so a shared link reproduces it.",
-    tags: ["diffexpr", "volcano", "gsea", "expression"],
+    tags: ["volcano", "gsea", "expression"],
     note: "TCGA PanCancer Atlas breast cancer, PAM50 basal-like against luminal A, on mRNA z-scores. The luminal genes (ESR1, PGR, FOXA1, GATA3) and the basal ones (FOXC1, and proliferation — MKI67, CDC20, AURKB) come out as expected, and so does the enrichment: E2F targets, the G2M checkpoint and MYC targets in basal-like tumours, early estrogen response in luminal A.",
     doc: {
       study: "brca_tcga_pan_can_atlas_2018",
@@ -912,7 +912,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Paired samples: what differs between a patient's primary and metastasis",
     demonstrates: "A `paired` view: among patients with both a primary and a metastatic sample, per gene, how often a driver is on both, only the primary or only the metastasis — counted only where each side's own panel covered the gene — with an exact McNemar test of whether discordance runs one way. A patient-level comparison computed entirely inside the database; only the four counts per gene leave it.",
-    tags: ["paired", "metastasis", "evolution"],
+    tags: ["metastasis", "evolution"],
     note: "MSK-IMPACT, the 2,278 patients sequenced at both a primary and a metastatic site. Truncal drivers agree (TP53 78% concordant); what the metastasis alone carries is the resistance biology — ESR1 mutations (49 metastasis-only against 7 primary-only) and AR alterations (71 against 1), both selected under hormone therapy — and MYC amplification and CDKN2A loss.",
     doc: {
       study: "msk_impact_50k_2026",
@@ -923,7 +923,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Paired samples, every gene: what the metastasis carries that the primary does not",
     demonstrates: "A `paired` view with no `genes`: it scans every gene with a driver in some patient sampled at both a primary and a metastatic site, tests each with an exact McNemar test, takes Benjamini–Hochberg q across all of them, and draws the most one-sided — the question asked without guessing the answer's genes first.",
-    tags: ["paired", "metastasis", "evolution", "scan"],
+    tags: ["metastasis", "evolution", "scan"],
     note: "MSK-IMPACT again, the 2,278 patients with both kinds of sample, but no gene list. Of 347 genes with a discordant patient, the scan puts AR (71 metastasis-only against 1 primary-only) and ESR1 (49 against 7) first — the hormone-therapy resistance genes the hand-picked version above had to be told to look at — followed by MYC, NKX3-1 and PTEN.",
     doc: {
       study: "msk_impact_50k_2026",
@@ -934,7 +934,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Before and after treatment, pooled across studies that label it differently",
     demonstrates: "A `paired` view whose `pairBy.studies` gives each study its own before/after attribute and values — five studies, five spellings — so their patients pool into one before-vs-after count per gene, scanned across every driver gene, with `labels` naming the sides.",
-    tags: ["paired", "treatment", "resistance", "federation", "scan"],
+    tags: ["treatment", "resistance", "scan"],
     note: "111 patients with a sample on each side across gastroesophageal (two studies), breast (alpelisib, and a second cohort) and bladder cancer. At this size nothing survives correction across the 278 genes tested — the honest answer — and the most one-sided genes run the other way: CCND1 and MYC amplifications seen before treatment and not after (10 and 10 patients against 1 and 2), as a lower-purity post-treatment sample would also show. Read it as a lead, not a finding; the same view over a large serially sampled cohort is where acquired resistance would show.",
     doc: {
       study: "egc_msk_2017",
@@ -950,7 +950,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Clonality, LOH and genome doubling from FACETS",
     demonstrates: "A `clonality` view: the FACETS allele-specific copy number this warehouse holds for MSK-IMPACT (1.9M mutation calls no other view reads) — per gene, how often a cohort's driver mutations are clonal or subclonal and whether the mutated locus lost its other allele, beside each cohort's whole-genome doubling rate and purity and ploidy distributions, from FACETS-QC-passing samples.",
-    tags: ["clonality", "facets", "loh", "wgd"],
+    tags: ["facets", "loh", "wgd"],
     note: "Colorectal against breast cancer. Tumour suppressors show the classic second hit — TP53 is ~88% clonal with its other allele lost 77–89% of the time, CDH1 in breast 95% — while the oncogene KRAS rarely loses its partner. PIK3CA is markedly more often subclonal in colorectal cancer (68% clonal) than in breast (84%), in keeping with a later event there. Around a third of both cohorts' tumours have doubled their genome.",
     doc: {
       study: "msk_impact_50k_2026",
@@ -964,7 +964,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Brain metastasis, with death as a competing risk",
     demonstrates: "An `incidence` view: the cumulative incidence of a timeline event (here the first radiology-reported brain metastasis) with death as a competing risk — Aalen–Johansen, not 1 − Kaplan–Meier, which treats the dead as still at risk and so overstates incidence exactly where death is common. The table sets the two side by side; Gray's test compares the cohorts by permutation of their (entry, time, cause) tallies, which are all a site sends.",
-    tags: ["incidence", "competing-risks", "survival", "timeline"],
+    tags: ["competing-risks", "timeline-events"],
     note: "MSK-CHORD, from each patient's day 0, among those without a brain metastasis by then. At five years 24.7% of NSCLC patients have one — where 1 − Kaplan–Meier would have said 30.4% — against 20.6% in breast and 10.8% in colorectal cancer (1 − KM: 14.4%, a third too high, because so many colorectal patients die first).",
     doc: {
       study: "msk_chord_2024",
@@ -979,7 +979,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "PSA response to hormone therapy, by TP53 status",
     demonstrates: "A `labs` view: a lab value's course from a treatment start, as % change from each patient's own baseline — median and interquartile band per 4-week bin, from histograms, so any site can contribute — with the best response, the share meeting a response threshold (here PCWG3's PSA50, counted exactly), and a waterfall of every patient's best change where the participant may disclose patient-level values.",
-    tags: ["labs", "response", "waterfall", "timeline"],
+    tags: ["response", "waterfall", "timeline-events", "lab-values"],
     note: "Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a median of more than 95% within three months in both groups, but 93.0% of TP53 wild-type patients reach PSA50 against 85.8% of TP53-mutant ones (Fisher p = 1.4e-6), and the mutant group's upper quartile turns back upward within a year.",
     doc: {
       study: "msk_chord_2024",
@@ -999,7 +999,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "A survival risk model from mutated genes in lung cancer",
     demonstrates: "A `riskmodel` view: an elastic-net Cox model of survival on every mutated gene that all the cohort's panels cover, fitted on random two-thirds of the patients and scored on the held-out third, repeatedly (OncoCast's ensemble) — so each patient's risk score comes from models that never saw them — with the held-out C-index, the genes kept most often, Kaplan-Meier curves of the risk groups, and each group's clinical and genomic makeup (Table 1).",
-    tags: ["riskmodel", "machine learning", "survival", "cox"],
+    tags: ["machine-learning", "table-1"],
     note: "Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 and TP53 as adverse and EGFR as favourable, as the literature does, and its risk thirds separate clearly; a held-out C-index near 0.61 says mutations alone predict survival only modestly. Five runs keep the example quick; OncoCast recommends fifty. " +
       "Its Table 1 (`describe`) shows who is in each third: the high-risk third is more often male, a former or current smoker and at stage 4 than the low-risk third. KEAP1 and TP53 are marked “in the model” — the score is built from them, so their enrichment is by construction and gets no q-value — and ZFHX3, which not every panel covers, is counted over each group's patients whose panel does.",
     doc: {
@@ -1012,22 +1012,9 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
-    title: "A survival risk model from mutated genes in lung cancer",
-    demonstrates: "A `riskmodel` view: an elastic-net Cox model of survival on every mutated gene that all the cohort's panels cover, fitted on random two-thirds of the patients and scored on the held-out third, repeatedly (OncoCast's ensemble) — so each patient's risk score comes from models that never saw them — with the held-out C-index, the genes kept most often, and Kaplan-Meier curves of the risk groups.",
-    tags: ["riskmodel", "machine learning", "survival", "cox"],
-    note: "Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 and TP53 as adverse and EGFR as favourable, as the literature does, and its risk thirds separate clearly; a held-out C-index near 0.61 says mutations alone predict survival only modestly. Five runs keep the example quick; OncoCast recommends fifty.",
-    doc: {
-      study: "msk_chord_2024",
-      cohorts: {
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
-      },
-      views: [{ kind: "riskmodel", cohorts: ["NSCLC"], runs: 5 }]
-    }
-  },
-  {
     title: "Custom data: a curated biopsy site on every sample",
     demonstrates: "An uploaded, sample-level annotation (`custom:luad-biopsy-site/BIOPSY_SITE`) used like the study's own attributes: as a cohort filter, an oncoprint track that orders the columns, a plot axis, and a `splitBy` that compares gene frequencies across sites. The rows are demo data bundled with the app, so this example runs without logging in; a real upload is stored on the server.",
-    tags: ["custom data", "splitBy", "oncoprint", "plot"],
+    tags: ["splitBy"],
     note: "luad_mskimpact_2021 is 93 EGFR-mutant lung adenocarcinomas with 186 primary and metastatic samples. The demo upload gives every sample a BIOPSY_SITE, grouped from the study's own SAMPLE_TYPE and free-text METASTATIC_SITE the way a reviewer would (scripts/gen-custom-demo.ts), standing in for a clinician-curated annotation. \"CNS met\" filters on it: 8 patients. Ordered by site, the oncoprint puts each patient's primary and metastases in their own groups. Fraction of the genome altered has a median of 0.47 in the 11 CNS samples and 0.36 in liver, against 0.21 in the 76 primaries. Split by site, TP53 is altered in 7 of 8 CNS-met patients (87.5%) against 65.6% of the patients with a primary sample. The split arms overlap, because a patient whose primary and metastasis were both sequenced belongs to both arms. With 8 to 61 patients per arm, these are illustrations, not findings.",
     customData: [LUAD_BIOPSY_SITE_DEMO],
     doc: {
@@ -1050,7 +1037,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)",
     demonstrates: "Features summarised from a study's single-cell RNA-seq, uploaded as six custom datasets (five patient-level, one sample-level) and read beside its genomics: oncoprint tracks, box plots against the mutational signature, a scatter between two cell compartments, and a sample-level plot by tumour site. The rows are demo data bundled with the app, so this example runs without logging in.",
-    tags: ["custom data", "single-cell", "plot", "oncoprint"],
+    tags: ["single-cell"],
     note: "msk_spectrum_tme_2022 is 42 untreated high-grade serous ovarian cancers; 41 had scRNA-seq at several anatomical sites. scripts/gen-spectrum-sc-demo.py reads the public CELLxGENE cell annotations (cell states, per-cell pathway scores, per-cell 6p allele fraction) and summarises them per patient (solid sites pooled; ADX_ adnexal, NADX_ non-adnexal) and per cBioPortal sample (the scRNA-seq site of the same patient, 61 of 82 samples). Dysfunctional T/NK cells (TNK_DYSFUNC) have a median of 10.8% of T/NK cells in the 16 HRD-Dup tumours against 6.0% in the 14 FBI tumours, and naive/central-memory cells the reverse (7.5% against 11.1%), as in the paper's Fig. 4b. In adnexal cancer cells, JAK-STAT pathway activity has a median of 0.03 in HRD-Dup against -0.57 in FBI (Fig. 3e), and cancer-cell and T/NK-cell JAK-STAT correlate across patients (Spearman 0.74, Fig. 4e). Clonal 6p loss of heterozygosity (over 80% of cancer cells) is called in 4 patients, 3 of them HRD-Dup — the paper reports 4 of 41. By site, T cells are a median 43% of immune cells in the 22 adnexal samples against 54% in the 18 omental ones. These are summaries of public cell metadata, not the paper's statistical models.",
     customData: SPECTRUM_SC_DEMO,
     doc: {
@@ -1081,7 +1068,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Composition: T and NK cell states by mutational signature (MSK SPECTRUM)",
     demonstrates: "A `composition` view, the stacked-bar panels of single-cell papers: each patient's T/NK cells split into ten states (custom data, one attribute per state), ordered by the dysfunctional CXCL13+ CD8 share, each signature's mean beside its patients, and a matrix of every state in each signature against the other two. A second view does the same per sample from the study's own generic-assay cell-type fractions.",
-    tags: ["composition", "custom data", "single-cell"],
+    tags: ["single-cell"],
     note: "The 36 SPECTRUM patients with a consensus signature other than Undetermined, split as the paper splits them. Dysfunctional CXCL13+ CD8 T cells are a mean 7.0% of T/NK cells in the 16 HRD-Dup patients against 4.9% in HRD-Del and 4.4% in FBI, and naive CD4 cells the reverse (15.2% against 19.6% and 20.1%) — the direction of the paper's Fig. 4b. The clearest single difference is cycling T/NK cells, higher in HRD-Dup (8.6% against 5.7%; Welch p = 0.003, q = 0.08 across the 30 comparisons); none reaches q < 0.05 at this size, which the matrix shows as no outlined dot. Per sample, from the study's cell-type fractions, T cells are 24% of HRD-Dup samples' cells against 32% of FBI's. The paper fits a binomial model on cell counts with site and sort as covariates; this view compares shares between groups and says so.",
     customData: SPECTRUM_SC_DEMO,
     doc: {
@@ -1113,7 +1100,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)",
     demonstrates: "Single-cell data brought in without a study-specific script: scripts/gen-singlecell-summary.py proposed the mapping from a Cell Explorer dataset to this study (donor_id is the patient, the HTAN Specimen ID the sample) and summarised the cell labels per sample. The first view draws those custom data; the second the study's own generic-assay cell-type fractions, for comparison.",
-    tags: ["composition", "custom data", "single-cell"],
+    tags: ["single-cell"],
     note: "crc_hta11_htan_2021 is 52 patients with colorectal polyps (Chen et al., Cell 2021). The summary covers 55 of its 61 samples; its counts equal the study's own absolute_counts profile for all 670 sample and cell-type pairs it reports. Per sample, adenoma-specific cells (ASC) are 32.1% of the epithelium in the 30 conventional adenomas against 4.1% in the 20 serrated polyps (q = 2e-5), and serrated-specific cells (SSC) 1.5% against 19.7% (q = 0.003): the two paths to malignancy the paper describes. Stem cells (STM) differ little here (3.1% against 2.5%). The study's own fractions, over every cell type, give the same picture (ASC 29.9% against 3.7%). Cohorts are patients, so a patient with polyps of both types counts in both; 5 of the 52 have both.",
     customData: HTA11_SC_DEMO,
     doc: {
@@ -1133,7 +1120,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Cancer types summary: RAS genes across 50,000 tumours",
     demonstrates: "A `cancertypes` view, cBioPortal's Cancer Types Summary: the share of samples altered in at least one of a gene list per cancer type, each bar split by mutation, amplification, deep deletion, structural variant or several at once, over the samples profiled for at least one of the genes. Small cancer types are pooled into one named bar, not dropped.",
-    tags: ["cancertypes", "frequency", "pan-cancer"],
+    tags: ["frequency", "pan-cancer"],
     note: "KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.",
     doc: {
       study: "msk_impact_50k_2026",
@@ -1144,7 +1131,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Cohort overlap: how four groups share their patients",
     demonstrates: "An `overlap` view, the portal's Overlap tab drawn as an UpSet plot: for every combination of cohorts, the patients in exactly those cohorts and no other. Each study answers with one count per combination, and every cohort's size here equals its own count.",
-    tags: ["overlap", "upset", "cohorts"],
+    tags: ["upset"],
     note: "TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.",
     doc: {
       study: "msk_chord_2024",
@@ -1160,7 +1147,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Alteration enrichment: what separates colorectal from pancreatic tumours",
     demonstrates: "An `enrichment` view, the portal's Genomic Alterations tab: every gene's mutation frequency in two cohorts, counted in samples over the samples profiled for that gene, with a Fisher test per gene and Benjamini–Hochberg across all of them, drawn as a volcano beside a table. MSI-high tumours are excluded from both cohorts, because hypermutated tumours enrich almost every gene at once.",
-    tags: ["enrichment", "volcano", "compare"],
+    tags: ["volcano"],
     note: "Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TCF7L2, PIK3CA, FBXW7 and SOX9 mark colorectal cancer; KRAS and CDKN2A mark pancreatic cancer.",
     doc: {
       study: "msk_chord_2024",
@@ -1178,7 +1165,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Mutational signatures: what UV light and tobacco leave behind",
     demonstrates: "An `assays` view, the portal's generic-assay comparison tabs: every entity of one generic-assay profile — here the 30 COSMIC v2 mutational signatures — compared between two cohorts with Welch's t on each cohort's n, mean and variance, Benjamini–Hochberg across the signatures, drawn as a volcano of the difference in mean contribution beside a table. A categorical profile such as arm-level copy number is compared the same way with a chi-squared test.",
-    tags: ["assays", "signatures", "volcano", "compare"],
+    tags: ["signatures", "volcano"],
     note: "Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.",
     doc: {
       study: "msk_impact_50k_2026",
@@ -1192,7 +1179,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Co-expression: the genes that rise and fall with ESR1",
     demonstrates: "A `correlates` view, the portal's Co-expression tab: one gene's mRNA against every gene's across a cohort, Spearman's ρ and Pearson's r computed from sums each database returns — n, Σx, Σy, Σxy, Σx², Σy² on the values and on their ranks — so no expression value leaves it, ranked by ρ with Benjamini–Hochberg across all genes.",
-    tags: ["correlates", "co-expression", "expression"],
+    tags: ["expression"],
     note: "TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.",
     doc: {
       study: "brca_tcga_pan_can_atlas_2018",
@@ -1203,7 +1190,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "Clinical data: every pancreatic cancer sample, oldest patients first",
     demonstrates: "A `table` view, the portal's Clinical Data tab: one row per sample of the cohort's patients with every clinical attribute the study records, sorted by one of them, the first rows on screen and every row as a download. Its rows are patients, so only a study that may disclose patients lists them; any other is named with how many it holds.",
-    tags: ["table", "clinical", "download"],
+    tags: ["data-table", "download"],
     note: "Pancreatic cancer in MSK-CHORD, sorted by age, highest first.",
     doc: {
       study: "msk_chord_2024",
@@ -1214,7 +1201,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis",
     demonstrates: "A `timeline` view, the portal's patient-view Timeline: the chosen patient's clinical events as tracks — treatment nested by subtype and agent, lab tests as line charts, samples as numbered markers — with the list of the cohort's patients to choose from (a table: searchable, sortable, downloadable). `patient` names who is drawn; `collapsed` folds a track's sub-tracks into one row. Beside it, an `alterations` view of the same patient: their mutations, copy-number alterations and structural variants, as the portal's patient page lists them under the timeline. Both name a patient, so only a study that may disclose patients takes part.",
-    tags: ["timeline", "alterations", "patient", "table"],
+    tags: ["data-table", "patient"],
     note: "MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.",
     doc: {
       study: "msk_chord_2024",
@@ -1226,7 +1213,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "A patient's mutations, copy-number alterations and structural variants",
     demonstrates: "An `alterations` view, the portal's patient-view genomic tables: three tables in one view — Mutations, Copy Number Alterations, Structural Variants — for the chosen patient, with the cohort's patients listed to choose from. Each table has its own query under its own key (`mutations`, `cna`, `sv`: columns, search, filters, sort, rows); the top-level query is the patient list's. A variant, call or event is one row however many of the patient's samples carry it. Only a study that may disclose patients takes part.",
-    tags: ["alterations", "patient", "table", "mutations", "cna", "sv"],
+    tags: ["data-table", "patient", "cna", "sv"],
     note: "MSK-CHORD prostate cancer patients, those with the most structural variants first; P-0024249's tables, mutations kept to OncoKB-oncogenic calls.",
     doc: {
       study: "msk_chord_2024",
@@ -1238,7 +1225,7 @@ export const EXAMPLES: DslExample[] = [
   {
     title: "KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first",
     demonstrates: "A table view's query: `columns` picks what is shown, `filters` keeps rows — a regular expression on protein change, a range on allele frequency — and `sort` orders them, all in the database across the whole table. The caveat says how many rows the query kept of how many; the download holds every kept row with every column. The same fields work on the `table` view.",
-    tags: ["mutations", "table", "filter"],
+    tags: ["data-table", "filter"],
     note: "MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.",
     doc: {
       study: "msk_chord_2024",
