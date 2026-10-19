@@ -32,6 +32,9 @@ const PRESETS: { label: string; g: Groups }[] = [
   { label: "Top 20%", g: { cuts: [80] } }, { label: "Top 10%", g: { cuts: [90] } },
 ];
 
+/** equal-quantile groups by their usual names (the presets' words) */
+const EQUAL_NAMES: Record<number, string> = { 2: "halves (median)", 3: "tertiles", 4: "quartiles", 5: "quintiles" };
+
 /** the view's groups as the dialog holds them: cuts as whole percentiles */
 export function groupsOf(spec: { groups?: number; cuts?: number[] }): Groups {
   return spec.cuts ? { cuts: spec.cuts.map((c) => Math.round(c * 100)) } : { groups: spec.groups ?? 3 };
@@ -47,11 +50,13 @@ export function RiskGroupsButton({ spec, m, busy, onApply }: {
 }) {
   const [open, setOpen] = useState(false);
   const g = groupsOf(spec);
-  const text = "cuts" in g ? "cut at " + g.cuts.join(", ") + "%" : g.groups + " equal groups";
+  // the button is the way in; what the groups are now is drawn in the figure and said in its title
+  const now = "cuts" in g ? "cut at the " + g.cuts.join(", ") + "th percentile" + (g.cuts.length > 1 ? "s" : "") + " of the risk score"
+    : (EQUAL_NAMES[g.groups] ?? g.groups + " equal groups") + ": equal shares of patients by risk score, tied scores kept together";
   return <>
     <Button variant="outline" size="sm" className={TB + " riskgroupsbtn"} disabled={busy || !m}
-      title={!m ? "waiting for the model: the groups are cut from its scores" : "choose where the risk groups are cut"} onClick={() => setOpen(true)}>
-      groups: {text}
+      title={!m ? "waiting for the model: the groups are cut from its scores" : now + " — click to change"} onClick={() => setOpen(true)}>
+      groups
     </Button>
     {open && m && <RiskGroupsDialog m={m} initial={g} onClose={() => setOpen(false)}
       onApply={(next) => { onApply("cuts" in next ? { cuts: next.cuts.map((c) => c / 100), groups: undefined } : { groups: next.groups === 3 ? undefined : next.groups, cuts: undefined }); setOpen(false); }} />}

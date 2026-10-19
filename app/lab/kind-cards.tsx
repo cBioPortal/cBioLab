@@ -11,10 +11,13 @@ import { TimelineBody } from "./timeline-body";
 import { AlterationsBody } from "./alterations-body";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
-import { OptionSelect } from "../_ui/choice.tsx";
+import { Choice, OptionSelect } from "../_ui/choice.tsx";
 import { FIELD } from "../_ui/toolbar.ts";
 import { RISK_LABEL_ABOVE } from "../../lib/figures/riskmodel.ts";
+import { RiskTable1Button } from "./risk-table1-dialog.tsx";
 import { RiskGroupsButton } from "./risk-groups-dialog.tsx";
+import { GearMenu } from "../_ui/gear-menu";
+import { Settings2 } from "lucide-react";
 
 /**
  * A text field that keeps what is being typed to itself and hands the page the value only on
@@ -118,6 +121,37 @@ export interface KindCardCtx {
 
 /** the risk model's covariate menus, open or shut, by view (a viewport state, not the document's) */
 const RISK_MENUS = new Map<string, boolean>();
+/** the runs the model settings offer (OncoCast recommends 50 or more) */
+const RISK_RUN_STEPS = [5, 10, 20, 50];
+const RISK_PENALTIES: [string, string][] = [["1", "lasso"], ["0.5", "elastic net"], ["0.1", "mostly ridge"]];
+
+/**
+ * The risk model's fitting settings, set once and rarely changed, behind the view's settings menu
+ * (the sequence and course views' idiom) so the toolbar keeps to what a reader works with.
+ */
+function RiskModelSettings({ vi, spec, busy, patch }: { vi: number; spec: any; busy: boolean; patch: (p: Record<string, unknown>) => void }) {
+  const alpha = String(spec.alpha ?? 0.5), runs = String(spec.runs ?? 10);
+  const penalties = RISK_PENALTIES.some(([v]) => v === alpha) ? RISK_PENALTIES : [[alpha, "alpha " + alpha] as [string, string], ...RISK_PENALTIES];
+  const runSteps = RISK_RUN_STEPS.map(String);
+  return (
+    <GearMenu menuId={"risk-settings:" + vi} menuStore={RISK_MENUS} wide className="risksettingsbtn" contentClassName="gap-1.5 px-2.5 py-2" title="risk model options"
+      label={<><Settings2 />settings</>}>
+      <div className="setrow" title="the lasso share of the penalty: lasso keeps fewer genes, ridge keeps all of them shrunk">
+        <span className="meta">penalty</span>
+        <Choice className="flex-1" value={alpha} disabled={busy} onChange={(v) => patch({ alpha: Number(v) })} options={penalties} />
+      </div>
+      <div className="setrow" title="random two-thirds / one-third splits; each patient's score is the mean over the runs that held them out (OncoCast recommends 50 or more)">
+        <span className="meta">runs</span>
+        <Choice className="flex-1" value={runs} disabled={busy} onChange={(v) => patch({ runs: Number(v) })}
+          options={(runSteps.includes(runs) ? runSteps : [runs, ...runSteps]).map((r) => [r, r] as const)} />
+      </div>
+      <label className="chk" title="train only on the discovery half of the engine's fixed split, and report the groups, table and C-index on the validation half, which the model never saw">
+        <Checkbox checked={!!spec.validate} disabled={busy} onCheckedChange={(on) => patch({ validate: (on === true) || undefined })} /> validate on held-out half
+      </label>
+    </GearMenu>
+  );
+}
+
 /** the volcano's label thresholds the card offers */
 const RISK_LABEL_STEPS = [0.1, 0.25, 0.5, 0.75, 0.9, 1];
 
@@ -417,8 +451,6 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
               {cats.map((a) => <option key={a} value={a}>{a}</option>)}
             </OptionSelect>
           </label>
-        </div>
-        <div className="tbz"><span className="tbl">adjust</span>
           <PickMenu label="covariates" title="clinical attributes always kept in the model, never penalised (at most 6): numbers as they are, categories against their commonest value. Prefer an age at diagnosis to an age at last contact, which makes longer survivors look older"
             options={c.attrs.filter((a) => a.attribute !== spec.strata).map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind === "num" ? "number" : "category" }))}
             chosen={spec.covariates || []} max={6} busy={busy} menuId={"risk-cov:" + c.vi} menuStore={RISK_MENUS}
@@ -443,20 +475,9 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
           </>}
         </div>
         <div className="tbz"><span className="tbl">model</span>
-          <label className="chk" title="train only on the discovery half of the engine's fixed held-out split, and report the groups, table and C-index on the validation half, which the model never saw">
-            <Checkbox checked={!!spec.validate} disabled={busy} onCheckedChange={(on) => patch({ validate: (on === true) || undefined })} /> validate on held-out half
-          </label>
-          <label className="tbfield" title="the l1 share of the penalty: lasso keeps fewer genes, ridge keeps all of them shrunk">
-            penalty <OptionSelect value={String(spec.alpha ?? 0.5)} disabled={busy} onValueChange={(v) => patch({ alpha: Number(v) })}>
-              <option value="1">lasso</option><option value="0.5">elastic net</option><option value="0.1">mostly ridge</option>
-            </OptionSelect>
-          </label>
-          <label className="tbfield" title="random two-thirds / one-third splits; each patient's score is the mean over the runs that held them out (OncoCast recommends 50 or more)">
-            runs <OptionSelect value={String(spec.runs ?? 10)} disabled={busy} onValueChange={(v) => patch({ runs: Number(v) })}>
-              {[5, 10, 20, 50].map((r) => <option key={r} value={r}>{r}</option>)}
-            </OptionSelect>
-          </label>
+          <RiskModelSettings vi={c.vi} spec={spec} busy={busy} patch={patch} />
           <RiskGroupsButton spec={spec} m={c.v?.riskmodel} busy={busy} onApply={patch} />
+          <RiskTable1Button vi={c.vi} spec={spec} m={c.v?.riskmodel} busy={busy} attrs={c.attrs} docJson={c.docJson} onPatch={patch} />
         </div>
         <div className="tbz"><span className="tbl">view</span>
           <label className="tbfield" title="the volcano names the genes the model kept in at least this share of its runs; the rest are drawn unnamed">

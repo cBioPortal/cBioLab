@@ -2161,5 +2161,82 @@
     "sort": "mutational_signatures_contribution_v2_Signature7"
    }
   ]
+ },
+ "riskmodel-table1-full": {
+  "study": "msk_chord_2024",
+  "cohorts": {
+   "Non-small cell lung cancer, sequenced, with overall survival on record": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ],
+      "per": "sample"
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "riskmodel",
+    "cohorts": [
+     "Non-small cell lung cancer, sequenced, with overall survival on record"
+    ],
+    "runs": 2,
+    "groups": 5,
+    "strata": "SMOKING_PREDICTIONS_3_CLASSES",
+    "covariates": [
+     "GENDER"
+    ],
+    "describe": {
+     "attributes": [
+      "SMOKING_PREDICTIONS_3_CLASSES",
+      "GENDER",
+      "STAGE_HIGHEST_RECORDED",
+      "RACE",
+      "ETHNICITY",
+      "SAMPLE_TYPE",
+      "MSI_TYPE",
+      "CLINICAL_GROUP",
+      "CLINICAL_SUMMARY",
+      "PATHOLOGICAL_GROUP",
+      "CANCER_TYPE_DETAILED",
+      "ICD_O_HISTOLOGY_DESCRIPTION",
+      "CURRENT_AGE_DEID",
+      "TMB_NONSYNONYMOUS",
+      "FRACTION_GENOME_ALTERED",
+      "MUTATION_COUNT",
+      "OS_STATUS",
+      "OS_MONTHS",
+      "PRIOR_MED_TO_MSK",
+      "HISTORY_OF_PDL1"
+     ],
+     "genes": [
+      "KEAP1",
+      "TP53",
+      "STK11",
+      "EGFR",
+      "KRAS",
+      "SMARCA4",
+      "NFE2L2",
+      "ZFHX3",
+      "SMARCA2",
+      "PTPRD",
+      "EPHA3",
+      "TGFBR2",
+      "PTEN",
+      "CDKN2A",
+      "RB1",
+      "ARID1A",
+      "NF1",
+      "BRAF",
+      "MET",
+      "NOTAGENE1"
+     ]
+    }
+   }
+  ]
  }
 }

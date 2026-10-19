@@ -1,9 +1,9 @@
 // Risk model figure: the risk groups' survival curves and the genes the model kept.
 import {
   palette, frame, caption, linear, log, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, label, textWidth,
-  seriesStyle, SERIES, esc, fmtInt, fmtNum, fmtPct, fmtShare, fmtRatio, fmtP, fmtMonths, FS, SW, type SvgOpts
+  seriesStyle, SERIES, esc, fmtInt, fmtNum, fmtPct, fmtShare, fmtRatio, fmtP, fmtQ, fmtMonths, FS, SW, type SvgOpts
 } from "../svg-kit.ts";
-import type { ViewResult } from "../types.ts";
+import type { ViewResult, RiskTable1 } from "../types.ts";
 import { stepPath } from "../chart/marks.ts";
 import { plotHeight } from "./survival.ts";
 import { timeScale, timeTitle } from "../chart/time.ts";
@@ -170,6 +170,34 @@ function riskVolcano(m: Risk, p: ReturnType<typeof palette>, x0: number, y0: num
  * The risk model: Kaplan–Meier curves of the risk groups, then the genes the model kept most
  * often with their mean hazard ratio (a bar on a log scale about 1), then what the numbers rest on.
  */
+/**
+ * Table 1 in words, for the figure's caption: the figure does not draw it (the page shows it in a
+ * dialog), so an image that travels alone still says what it holds and what it found.
+ */
+export function table1Words(t: RiskTable1): string {
+  const groups = t.groups.map((g) => g.name.replace(/ risk$/, "")).join(" / ");
+  const shown = t.rows.filter((r) => r.kind !== "skipped");
+  const share = (n: number, of: number) => of ? fmtPct(100 * n / of) : "–";
+  const summary = (r: typeof shown[number]): string => {
+    if (r.kind === "gene") return r.name + " mutated in " + r.perGroup.map((c) => share(c.altered, c.profiled)).join(" / ") + " of patients whose panels cover it";
+    if (r.kind === "num") return r.name + " median " + r.perGroup.map((c) => c.median == null ? "–" : fmtNum(c.median)).join(" / ");
+    const top = r.levels[0];
+    return r.name + " " + top.value + " in " + top.counts.map((n, gi) => share(n, top.counts[gi] + r.levels.slice(1).reduce((s, l) => s + l.counts[gi], 0))).join(" / ");
+  };
+  const stat = (r: typeof shown[number]) => r.q != null ? " (" + fmtQ(r.q) + ")" : r.p != null ? " (" + fmtP(r.p) + ")" : r.untested ? " (not tested: " + r.untested + ")" : "";
+  const open = shown.filter((r) => r.role !== "in the model" && r.role !== "outcome");
+  const differ = open.filter((r) => r.q != null && r.q < 0.05), rest = open.filter((r) => !differ.includes(r));
+  const built = shown.filter((r) => r.role === "in the model" || r.role === "outcome");
+  const set = t.rows.filter((r) => r.kind === "skipped");
+  return "Table 1 (not drawn; in the result) compares the groups (" + groups + ", " + t.groups.map((g) => fmtInt(g.n)).join(" / ") + " patients" +
+    (t.reportedOn === "validation half" ? ", the validation half" : "") + ") on " + shown.length + " rows, each tested across groups (χ² or Kruskal–Wallis), q-values Benjamini–Hochberg over " + t.tested + " of them; a category's share is of the patients with a value. " +
+    (differ.length ? "Differ at q < 0.05: " + differ.map((r) => summary(r) + stat(r)).join("; ") + ". " : "No open row differs at q < 0.05. ") +
+    (rest.length ? "Not at q < 0.05: " + rest.map((r) => summary(r) + stat(r)).join("; ") + ". " : "") +
+    (built.length ? "Different by construction, so no q-value: " + built.map((r) => summary(r) + " (" + r.role + (r.p != null ? ", " + fmtP(r.p) : "") + ")").join("; ") + ". " : "") +
+    (t.omitted.length ? "Left out of the default attributes: " + t.omitted.map((o) => o.name + " (" + o.why + ")").join("; ") + ". " : "") +
+    (set.length ? "Set aside: " + set.map((r) => r.name + " (" + (r as { skipped: string }).skipped + ")").join("; ") + ". " : "");
+}
+
 export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
   const m = v.riskmodel!;
   const p = palette(o.theme);
@@ -294,6 +322,7 @@ export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
     (m.candidates > m.features.length ? " " + fmtInt(m.candidates - m.features.length) + " of the " + fmtInt(m.candidates) + " candidate genes were never kept, so are not on the volcano." : "") +
     (left.length ? " Left out: " + left.join("; ") + "." : "") +
     (m.features.length > shown.length ? " " + (m.features.length - shown.length) + " more genes were kept in at least one run; they are in the result, not drawn." : "") +
+    (m.table1 ? " " + table1Words(m.table1) : "") +
     " " + (v.caveat || "");
   const cap = caption(text, W, yy + 4, p.muted);
   return frame(W, yy + 4 + cap.height + 8, out.join("") + cap.svg, p.bg, grown,
