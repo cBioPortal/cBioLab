@@ -229,8 +229,18 @@ export default function AnalysisPage() {
   const { cohorts: saved, workspaces: spaces, removeWorkspace: removeSpace } = savedArtifacts;
   // What is saved never carries an inline id list: each is stored as an id set first, and the open
   // document is given the same sets, so saving it again stores nothing new (id-sets-client.ts).
-  const persist: typeof savedArtifacts.saveCohort = async (name, def, lastEval, id) =>
-    savedArtifacts.saveCohort(name, await storeCohortLists(def, name), lastEval, id);
+  // A saved cohort names its study: one that inherited the analysis's would, in the library, take
+  // whatever study the next analysis it joins uses. It is pinned to the one it was running in (a
+  // template's, its parameter's current value).
+  const runningStudy = (): string => {
+    const s = doc.study;
+    const v = typeof s === "string" && s.startsWith("$") ? doc.params?.[s.slice(1)] : s;
+    return typeof v === "string" && v ? v : study;
+  };
+  const persist: typeof savedArtifacts.saveCohort = async (name, def, lastEval, id) => {
+    const pinned: CohortDef = def.study || def.studies?.length ? def : { ...def, study: runningStudy() };
+    return savedArtifacts.saveCohort(name, await storeCohortLists(pinned, name), lastEval, id);
+  };
   const withListsStored = async (d: AnalysisDoc): Promise<AnalysisDoc> => {
     const c = await storeDocLists(d);
     // bookkeeping on the way to a save, not an edit the reader would undo

@@ -1633,6 +1633,8 @@ async function main() {
       const a1 = await savedDef();
       const afterSave = await docOf();
       steps.saved = !!a1 && afterSave.cohorts[libName].from.saved === a1.id && afterSave.cohorts[libName].from.name === libName;
+      // it named no study (it ran in the analysis's): saved, it names that one, and so does the analysis's copy
+      steps.studyPinned = a1?.definition?.study === "msk_chord_2024" && afterSave.cohorts[libName].study === "msk_chord_2024";
       steps.renamed = !afterSave.cohorts[name] && afterSave.views[0].cohorts.includes(libName);
       steps.badge = (await sp.locator(".cohortbox", { hasText: libName }).locator(".srcbadge").innerText()).trim() === "in library";
       m = await menuItems();
@@ -1662,7 +1664,7 @@ async function main() {
       await ctx.request.delete(BASE + "/api/artifacts/" + a1.id);
     } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
     ok("a cohort that is unsaved, or re-split since saving, offers save in its menu; saving asks for its library name, takes that name in the analysis and records it as the source",
-      steps.offered && steps.said && steps.saved && steps.renamed && steps.badge && steps.goneAfter && steps.offeredAfterSplit && steps.saidUpdate && steps.splitSaved
+      steps.offered && steps.said && steps.saved && steps.studyPinned && steps.renamed && steps.badge && steps.goneAfter && steps.offeredAfterSplit && steps.saidUpdate && steps.splitSaved
         && steps.sameNameIsNew && steps.warnsReplace, JSON.stringify(steps));
     await ctx.close();
   }
