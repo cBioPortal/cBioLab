@@ -15,6 +15,9 @@ import { cn } from "../../lib/cn";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { usePublicEnv } from "../_env/public-env-context.tsx";
 import { parseExamplesUrl } from "../../lib/site.ts";
+import type { CohortDef } from "../../lib/types.ts";
+import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
+import CohortPills from "./pills";
 
 /** a tag filter: an outline chip, filled while it is the one shown */
 const TAG = "group rounded-pill px-2.5 text-sm font-normal aria-pressed:border-link aria-pressed:bg-link aria-pressed:text-card aria-pressed:hover:bg-link/90 aria-pressed:hover:text-card";
@@ -35,7 +38,16 @@ export function useExamplesUrl(): { examplesUrl: string | null; examplesUrlError
   catch (e) { return { examplesUrl: null, examplesUrlError: String((e as Error)?.message || e) }; }
 }
 
-export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, elsewhere, elsewhereError, onError }: {
+/** An example cohort: a definition to preview, analyse or save, one per kind of clause. */
+export type ExampleCohort = { name: string; desc: string; def: CohortDef };
+export type ExampleEval = { count?: number; error?: string; busy?: boolean } | null;
+
+export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, elsewhere, elsewhereError, onError, cohorts }: {
+  /** the example cohorts' tab: each previewed, analysed or saved on its own */
+  cohorts: {
+    examples: ExampleCohort[]; evals: Record<string, ExampleEval>; study: string; canSave: boolean;
+    onPreview: (ex: ExampleCohort) => void; onAnalyze: (ex: ExampleCohort) => void; onSave: (ex: ExampleCohort) => void;
+  };
   tag: string;
   onTag: (t: string) => void;
   /** the search over titles, descriptions and pills */
@@ -52,6 +64,7 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
   onError: (msg: string) => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [sub, setSub] = useState<"analyses" | "cohorts">("analyses");
   // the example whose Run is waiting on the reader's go-ahead to leave this site
   const [leaving, setLeaving] = useState<DslExample | null>(null);
   const run = (ex: DslExample) => { if (elsewhere) setLeaving(ex); else onRun(ex); };
@@ -83,6 +96,14 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
 
   return (
     <div>
+      <Tabs value={sub} onValueChange={(v) => setSub(v as typeof sub)} className="mb-3">
+        <TabsList aria-label="examples" className="h-8">
+          <TabsTrigger value="analyses" className="px-3 text-md">Analyses</TabsTrigger>
+          <TabsTrigger value="cohorts" className="px-3 text-md">Cohorts</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {sub === "cohorts" && <ExampleCohorts {...cohorts} />}
+      {sub === "analyses" && <>
       <div className="card">
         <h2>Examples <span className="plain">— every one of these is executed by the test gate</span></h2>
         <p className="note exintro">
@@ -164,6 +185,7 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
           );
         })}
       </div>
+      </>}
       {leaving && elsewhere && (
         <Dialog open onOpenChange={(open) => { if (!open) setLeaving(null); }}>
           <DialogContent data-tw className="leavedialog gap-3 sm:max-w-md">
@@ -184,6 +206,43 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
           </DialogContent>
         </Dialog>
       )}
+    </div>
+  );
+}
+
+/**
+ * The example cohorts, one per kind of clause: each previewed (its size), analysed on its own, or
+ * saved to the library. One with no study runs in the study the page is on.
+ */
+function ExampleCohorts({ examples, evals, study, canSave, onPreview, onAnalyze, onSave }: {
+  examples: ExampleCohort[]; evals: Record<string, ExampleEval>; study: string; canSave: boolean;
+  onPreview: (ex: ExampleCohort) => void; onAnalyze: (ex: ExampleCohort) => void; onSave: (ex: ExampleCohort) => void;
+}) {
+  return (
+    <div className="card excohorts">
+      <h2>Example cohorts <span className="plain">— one for each kind of clause; those that name no study run in {study}</span></h2>
+      {examples.map((ex) => {
+        const ev = evals[ex.name];
+        const where = ex.def.studies?.length ? ex.def.studies.join(" + ") : ex.def.study || study;
+        return (
+          <div key={ex.name} className="listrow">
+            <div className="listrow-head">
+              <strong>{ex.name}</strong>
+              <span className="meta">{ex.desc}</span>
+              <span className="meta">{where}</span>
+              {ev && ev.count != null && <span className="meta"><strong>{ev.count.toLocaleString()}</strong> pts</span>}
+              {ev && ev.busy && <span className="spinner" />}
+              <span className="spacer" />
+              <Button variant="link" size="inline" onClick={() => onPreview(ex)}>preview</Button>
+              <Button variant="link" size="inline" onClick={() => onAnalyze(ex)}>analyze</Button>
+              <Button variant="link" size="inline" onClick={() => onSave(ex)}
+                title={canSave ? "save it to your library" : "sign in to save it to your library"}>save to library</Button>
+            </div>
+            {ev && ev.error && <div className="error">{ev.error}</div>}
+            <div className="listrow-body"><CohortPills def={ex.def} /></div>
+          </div>
+        );
+      })}
     </div>
   );
 }

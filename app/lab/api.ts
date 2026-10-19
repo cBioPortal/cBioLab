@@ -6,7 +6,7 @@
 // They return the Response, as fetch does: a caller still decides how to read it (JSON, the
 // binary contract, a file) and what an error status means for it.
 import type {
-  AnalysisBody, NotebookBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody, CellExplorerBody,
+  AnalysisBody, NotebookBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody, CellExplorerBody, LockBody,
 } from "../../lib/api-schemas.ts";
 import { withCustomData, type UploadBinding } from "./custom-data-client.ts";
 import type { ArtifactKind } from "../../lib/artifacts.ts";
@@ -60,6 +60,10 @@ export const api = {
   partition: async (body: PartitionBody, opts: Opts = {}) =>
     post("/api/partition", await withCustomData(body), opts.signal),
 
+  /** Lock cohorts of the document: those named, or every one. Answers each cohort's lock (lib/cohort-lock-server.ts). */
+  lock: async (body: LockBody, opts: Opts = {}) =>
+    post("/api/lock", await withCustomData(body), opts.signal),
+
   /** One page of a table view, or the values one of its columns takes. */
   viewPage: async (body: ViewPageBody, opts: Opts = {}) =>
     post("/api/view-page", await withCustomData(body), opts.signal),
@@ -82,6 +86,16 @@ export const api = {
     remove: (id: string) => fetch("/api/artifacts/" + id, { method: "DELETE" }),
     /** who it is shared with (its owner only); answers { artifact, warnings } */
     share: (id: string, sharing: Sharing) => send("PUT", "/api/artifacts/" + id + "/sharing", sharing),
+  },
+
+  /** Stored id sets (lib/id-set-store.ts): cohorts given as long lists of ids, kept on the server and named by id. */
+  idSets: {
+    list: (opts: Opts = {}) => fetch("/api/id-sets", { signal: opts.signal }),
+    /** match `ids` ("<study>:<id>" or bare, looked up in every study given) and save the matches; answers what did not match */
+    create: (body: { name: string; level: "sample" | "patient"; studies: string[]; ids: string[] }) => post("/api/id-sets", body),
+    remove: (id: string) => fetch("/api/id-sets/" + id, { method: "DELETE" }),
+    /** who it is shared with (its owner only) */
+    share: (id: string, sharing: Sharing) => send("PUT", "/api/id-sets/" + id + "/sharing", sharing),
   },
 
   /** Groups (lib/groups.ts): the reader's, and managing one. */

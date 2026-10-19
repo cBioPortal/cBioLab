@@ -64,6 +64,40 @@ export function SaveCohortDialog({ initial, meta, onSave, onClose }: {
   );
 }
 
+/**
+ * A cohort card's "save to library…": the name it is saved under, prefilled with the library name it
+ * would take. Says what saving does — a new saved cohort, the one it came from updated, or another
+ * saved cohort of that name replaced — before it is done.
+ */
+export function SaveToLibraryDialog({ cohort, initial, updates, taken, onSave, onClose }: {
+  /** the cohort's name in this analysis */
+  cohort: string;
+  initial: string;
+  /** the saved cohort this one would update when saved under its name, if any */
+  updates: string | null;
+  /** the names of the reader's saved cohorts */
+  taken: string[];
+  onSave: (name: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const n = name.trim();
+  const replaces = !!n && n !== updates && taken.includes(n);
+  const what = !n ? "" : n === updates ? "Updates your saved cohort “" + n + "” with this definition."
+    : replaces ? "You already have a saved cohort named “" + n + "”: saving replaces it with this one."
+    : "Saves a new cohort “" + n + "” to your library.";
+  return (
+    <FormDialog className="savelibrarydialog" title={"Save “" + cohort + "” to your library"} onClose={onClose}
+      onSubmit={async () => { if (!n || busy) return; setBusy(true); try { await onSave(n); onClose(); } finally { setBusy(false); } }}
+      footer={<CancelSave onClose={onClose} disabled={!n || busy} label={busy ? "Saving…" : replaces ? "Replace" : "Save"} />}>
+      <Label className={META} htmlFor="savelibraryname">Name in your library</Label>
+      <Input id="savelibraryname" className={FIELD} value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="cohort name…" />
+      <p className={cn(META, "m-0", replaces && "text-destructive")}>{what}</p>
+    </FormDialog>
+  );
+}
+
 /** Explore's "Save as feature": the name of the yes/no attribute the current filters become. */
 export function SaveFeatureDialog({ initial, meta, onSave, onClose }: {
   initial: string; meta: string; onSave: (name: string) => void; onClose: () => void;

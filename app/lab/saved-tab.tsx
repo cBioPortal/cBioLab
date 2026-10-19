@@ -7,6 +7,11 @@ import CohortPills, { type OnCustomData } from "./pills";
 import { ShareDialog, sharingLabel } from "./share-dialog.tsx";
 import { useGroups } from "./use-groups.ts";
 import { shareServerDataset } from "./custom-data-client.ts";
+import { api } from "./api.ts";
+import { ListCohortDialog } from "./list-cohort.tsx";
+import { cn } from "../../lib/cn";
+import { TB } from "../_ui/toolbar.ts";
+import { Plus, Save } from "lucide-react";
 import type { ArtifactKind } from "../../lib/artifacts.ts";
 import type { Sharing } from "../../lib/access.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
@@ -17,8 +22,6 @@ import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 
-export type ExampleCohort = { name: string; desc: string; def: CohortDef };
-export type ExampleEval = { count?: number; error?: string; busy?: boolean } | null;
 
 const OWN = "yours, shared as each says";
 
@@ -43,22 +46,22 @@ function ListStatus({ state, what, empty, isEmpty }: { state: ListState; what: s
 }
 
 export function SavedTab({
-  login, onLogin, sub, onSub, examples, picked, onTogglePick, onClearPicked, onAnalyze,
-  evals, onPreview, onSaveExample, saved, onOpenWorkspace, onOpenShared, onDeleteWorkspace, wsError, onCustomData,
+  login, onLogin, sub, onSub, picked, onTogglePick, onClearPicked, onAnalyze,
+  studies, onNewFromList, saved, onOpenWorkspace, onOpenShared, onDeleteWorkspace, wsError, onCustomData,
 }: {
   login: ServerState;
   onLogin: () => void;
   sub: "cohorts" | "analyses";
   onSub: (s: "cohorts" | "analyses") => void;
-  examples: ExampleCohort[];
-  /** keys "ex:<name>" / "saved:<name>" */
+  /** keys "saved:<name>" / "shared:<id>" */
   picked: string[];
   onTogglePick: (key: string) => void;
   onClearPicked: () => void;
   onAnalyze: () => void;
-  evals: Record<string, ExampleEval>;
-  onPreview: (ex: ExampleCohort) => void;
-  onSaveExample: (ex: ExampleCohort) => void;
+  /** the studies a new cohort from a list may be matched in */
+  studies: { id: string; name: string }[];
+  /** save a cohort made from a list of ids to the library */
+  onNewFromList: (name: string, def: CohortDef) => Promise<void>;
   /** open an analysis someone shared with the reader, by id */
   onOpenShared: (id: string) => void;
   saved: SavedArtifacts;
@@ -69,6 +72,7 @@ export function SavedTab({
 }) {
   const groups = useGroups(login.user?.id ?? null);
   const [sharing, setSharing] = useState<{ kind: ArtifactKind; id: string; name: string; sharing: Sharing } | null>(null);
+  const [newList, setNewList] = useState(false);
   if (!login.loaded) return <div className="card"><Waiting what="your sign-in" /></div>;
   if (!login.unlocked) return <div className="card">
     <p className="flush">Saved cohorts and analyses are your own.{" "}
@@ -103,33 +107,14 @@ export function SavedTab({
         {picked.length > 0 && <Button variant="link" size="inline" onClick={onClearPicked}>clear</Button>}
       </div>
 
-      <h2 className="savedsec">Examples</h2>
-      {examples.map(ex => {
-        const ev = evals[ex.name];
-        return (
-          <div key={ex.name} className="listrow">
-            <div className="listrow-head">
-              <label className="pick">
-                <Checkbox checked={picked.includes("ex:" + ex.name)} onCheckedChange={() => onTogglePick("ex:" + ex.name)} />
-                <strong>{ex.name}</strong>
-              </label>
-              <span className="meta">{ex.desc}</span>
-              {ev && ev.count != null && <span className="meta"><strong>{ev.count.toLocaleString()}</strong> pts</span>}
-              {ev && ev.busy && <span className="spinner" />}
-              <span className="spacer" />
-              <Button variant="link" size="inline" onClick={() => onPreview(ex)}>preview</Button>
-              <Button variant="link" size="inline" onClick={() => onSaveExample(ex)}>save</Button>
-            </div>
-            {ev && ev.error && <div className="error">{ev.error}</div>}
-          </div>
-        );
-      })}
-
-      <h2 className="savedsec">
-        Saved cohorts <span className="plain">— {OWN}. Tick any to include above; delete here.</span>
+      <h2 className="savedsec flex items-center gap-2.5">
+        <span>Saved cohorts <span className="plain">— {OWN}. Tick any to include above; delete here.</span></span>
+        <Button variant="outline" size="sm" className={cn(TB, "newlistcohort ml-auto")} onClick={() => setNewList(true)}
+          title="make a cohort from a pasted list of sample or patient ids, saved straight to your library">
+          <Plus />New cohort from a list of ids…</Button>
       </h2>
       <ListStatus state={saved.cohortsState} what="saved cohorts" isEmpty={!Object.keys(saved.cohorts).length}
-        empty="Nothing saved yet — save an example above, build one on the Explore page, or ask chat." />
+        empty="Nothing saved yet — build one on the Explore page, make one from a list of ids, save one from an analysis, or ask chat." />
       {byNewest(saved.cohorts).map(([n, c]) => (
         <div key={n} className="listrow">
           <div className="listrow-head">
@@ -207,10 +192,21 @@ export function SavedTab({
       </div>}
     </div>}
 
+    {newList && <ListCohortDialog title="New cohort from a list of ids" chooseFrom={studies} saved="ready"
+      doneLabel={<><Save />Save to your library</>} doneTitle={(as) => "save “" + as + "” to your library"}
+      nameFor={(n) => { if (!saved.cohorts[n]) return n; for (let i = 2; ; i++) if (!saved.cohorts[n + " (" + i + ")"]) return n + " (" + i + ")"; }}
+      onDone={onNewFromList} onLogin={onLogin} onClose={() => setNewList(false)} />}
+
     {sharing && <ShareDialog kind={sharing.kind === "workspace" ? "analysis" : "cohort"} name={sharing.name} sharing={sharing.sharing}
       groups={groups.groups} groupsError={groups.error}
       onSave={(s) => saved.share(sharing.kind, sharing.id, s)}
-      onShareDatasets={async (ids, s) => { for (const id of ids) await shareServerDataset(id, s); }}
+      onShareDatasets={async (items, s) => {
+        for (const w of items) {
+          if (w.kind !== "idSet") { await shareServerDataset(w.id, s); continue; }
+          const res = await api.idSets.share(w.id, s);
+          if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || res.statusText);
+        }
+      }}
       onClose={() => setSharing(null)} />}
   </div>;
 }

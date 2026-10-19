@@ -9,7 +9,7 @@ import { VIEW_HELP } from "../../lib/view-help.ts";
 import { SERIES, seriesStyle } from "../../lib/chart/style.ts";
 import { HIGHLIGHT_CAP, HIGHLIGHT_COLORS } from "../../lib/plot-highlight.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
-import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, Pencil, Plus, Save, Split, StickyNote, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, Lock, LockOpen, Pencil, Plus, Save, Split, StickyNote, Trash2, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
@@ -607,12 +607,14 @@ export function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, on
  * "Cohorts" heading for why that is deliberately a separate, unscoped piece
  * of work.
  */
-export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCount = 0, save, cells, onCells, menuId, menuStore }: {
+export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCount = 0, save, lock, cells, onCells, menuId, menuStore }: {
   busy?: boolean; canEdit: boolean; onEdit: () => void; onRemove: () => void;
+  /** freezing the cohort to the patients it selects now (lib/cohort-lock.ts), or following its definition again */
+  lock?: { locked: boolean; onLock: () => Promise<void>; onUnlock: () => void };
   /** the single-cell dataset this cohort's patients can be opened in, when its study has one */
   cells?: { label: string } | null;
   onCells?: () => Promise<void>;
-  /** saving the cohort to the library, offered only while it has something to save */
+  /** saving the cohort to the library (opening its naming dialog), offered only while it has something to save */
   save?: { onSave: () => Promise<void>; label: string; title: string } | null;
   /** the split form; `done` closes this menu. A cohort may have several splits — each view draws one */
   split?: (done: () => void) => React.ReactNode;
@@ -622,13 +624,14 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
 }) {
   const [splitting, setSplitting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [locking, setLocking] = useState(false);
   return (
     <GearMenu menuId={menuId} menuStore={menuStore} className="cohortgear" label={<Ellipsis />} title="edit this cohort" ariaLabel="edit this cohort"
       wide={splitting} onOpenChange={(o) => { if (!o) setSplitting(false); }}>
       {(close) => <>
         {save && !splitting && <>
           <MenuItem disabled={busy || saving} title={save.title}
-            onClick={async () => { setSaving(true); try { await save.onSave(); } finally { setSaving(false); } }}>
+            onClick={async () => { setSaving(true); try { await save.onSave(); close(); } finally { setSaving(false); } }}>
             <Save />{save.label}{saving && <span className="spinner ml-1.5" />}</MenuItem>
           <MenuSeparator />
         </>}
@@ -637,6 +640,15 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
             onClick={() => setSplitting(true)}><Split />{splitCount ? "split another way…" : "split into arms…"}</MenuItem>
           <MenuSeparator />
         </>)}
+        {lock && !splitting && <>
+          {lock.locked
+            ? <MenuItem disabled={busy} title="follow the definition again: patients who match it from now on join, and those who stop matching leave"
+                onClick={() => { close(); lock.onUnlock(); }}><LockOpen />unlock</MenuItem>
+            : <MenuItem disabled={busy || locking} title="freeze this cohort, and its split arms, to the patients it selects now, so it stays the same as patients are added to the data"
+                onClick={async () => { setLocking(true); try { await lock.onLock(); close(); } finally { setLocking(false); } }}>
+                <Lock />lock to these patients{locking && <span className="spinner ml-1.5" />}</MenuItem>}
+          <MenuSeparator />
+        </>}
         {cells && onCells && !splitting && <>
           <MenuItem disabled={busy} title={"open this cohort's patients' cells in Cell Explorer: " + cells.label}
             onClick={() => { close(); void onCells(); }}><ExternalLink />open cells in Cell Explorer</MenuItem>

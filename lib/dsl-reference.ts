@@ -1283,7 +1283,10 @@ cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient 
                "lineGap"?: 90,                // derived-treatment-line gap, days
                "notes"?:   "<prose>",         // the analyst's own note on this cohort; never compiled
                "from"?:    { "saved": "<id>", "name": "<name>", "hash": "<sha256>", "savedAt"?: "<when>" },  // set by the page: the saved cohort this was copied from, and the hash of what was copied; never compiled
-               "splits"?:  { "<name>": splitDef } }  // divisions of this cohort into arms that add up to it
+               "splits"?:  { "<name>": splitDef },  // divisions of this cohort into arms that add up to it
+               "lock"?:    { "set": "<id set>", "n": N, "nSamples"?: N, "at": "<ISO time>", "dataVersion"?: "…", "oncokbPin"?: "…",
+                             "children"?: { "<split> / <arm>": { "set", "part": "arm:<split> / <arm>", "n" } } } }
+                                              // frozen to the patients it selected at "at" — see "Locked cohorts" below
 splitDef  := { "arms": [ { "name": "<label>", "where": clause, "splits"?: {…} } × 1-8 ],  // tested in order; first match wins; an arm may be split again
                "other"?: "<label>",            // the remainder's name, default "Other"
                "otherSplits"?: {…},            // splits of the remainder
@@ -1340,7 +1343,9 @@ upgraded when it is read — the result's \`upgraded\` says from which version a
 their children from \`"<partition> / <arm>"\` to \`"<cohort> / <partition> / <arm>"\`, views
 included; 2.3 → 2.4 ended "a split replaces what it splits" — a view that drew a split cohort's arms
 under 2.3 is given those arms by name, so it draws the same thing; 2.4 → 2.5 ended "a view with no
-\`cohorts\` draws every cohort" — such a view is given every authored cohort by name) — and saving it writes the new
+\`cohorts\` draws every cohort" — such a view is given every authored cohort by name; 2.5 → 2.6 renamed
+the oncoprint's study track "Study of origin"; 2.6 → 2.7 let a list clause name a stored id set, and
+2.7 → 2.8 let a cohort be locked; neither changes anything an older document says) — and saving it writes the new
 version. One with no \`dsl\` is read the same way, so
 leaving it out is harmless. One written for a NEWER version than the server reads is refused,
 rather than silently ignoring what it does not understand.
@@ -1353,8 +1358,8 @@ rather than silently ignoring what it does not understand.
 | \`clinical\` | \`{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}\` | clinical attribute; predicate is \`values:[≤50]\` (OR), \`range:{gt,gte,lt,lte}\` (numeric via toFloat64OrNull), or \`op\`(\`= != > >= < <=\`)+\`value\`; \`per:"sample"\` = patient matches if ANY sample matches. \`op\`+\`percentile\` (0-1) resolves \`value\` LIVE from a percentile of the attribute's distribution instead of a literal number — e.g. \`{"op":">=","percentile":0.8}\` = "at or above the 80th percentile" ("top 20%"). \`percentileOf\`:"\<cohort name\>" scopes the reference population to another cohort in this document (e.g. "top 20% TMB **within NSCLC**", not the whole study); both the leaf's own cohort and, if given, \`percentileOf\`'s cohort must resolve to a single study, and \`percentileOf\` may not itself use \`percentile\` (no chaining). Resolved once, live, before compilation — the readback shows the resolved number and what it was a percentile of. **Custom data:** an attribute the reader uploaded is named \`custom:<dataset>/<COLUMN>\` (e.g. \`custom:brain-mets/MET_SITE\`) and works here and in every view exactly like the study's own — oncoprint \`clinical\` tracks, \`splitBy.attribute\`, \`clinical\` views, plot axes. Uploads are stored on the server, readable once logged in, and pinned by version in the document's \`uploads\`; a document naming a dataset the request cannot read is refused, never answered as if no patient had a value. Patient-level studies only |
 | \`derived\` | \`{"kind":"derived","metric":"followupMonths"|"historyMonths"|"alteredGenes"|"lines"|"treatmentSpan","range":{gte?,gt?,lte?,lt?},"eventType"?,"lineGap"?:90,"lineClasses"?}\` | filters on a value computed from the **shape** of the data rather than a study's vocabulary. Event-type names and attribute keys are study-specific \u2014 this database spells one concept \`Treatment\` in 87 studies and \`TREATMENT\` in 10, and the key MSK-CHORD calls \`SUBTYPE\` exists in only 27 of 131 timeline studies \u2014 so these read dates and gene symbols instead and mean the same thing everywhere. \`followupMonths\`: how far the timeline runs past its own day 0. \`historyMonths\`: how much predates it. \`alteredGenes\`: distinct genes altered (panel size bounds it, so not comparable across studies with different panels). \`lines\` and \`treatmentSpan\` are the deliberate exception \u2014 they need \`eventType\` (which timeline event stands for "a therapy" here; Explore proposes one from the study's own catalog), because there is no vocabulary-free way to ask "how many lines of treatment". \`lines\`: the number of treatment lines, by the one line definition the \`sequence\` view and "Treatment line (derived)" share (systemic-therapy records of that event type, a \`lineGap\`-day gap; \`lineClasses\` \`"all"\` or a class list widens it). \`treatmentSpan\`: months from the first to the last record of that event type |
 | \`event\` | \`{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}\` | timeline sub-DSL (below) |
-| \`sampleList\` | \`{"kind":"sampleList","ids":["<study>:<id>", ...]}\` | explicit, cross-study list of sample ids — up to ~22,000 total (measured ClickHouse query-size ceiling; not enforced as a hard cap yet) |
-| \`patientList\` | \`{"kind":"patientList","ids":["<study>:<id>", ...]}\` | explicit, cross-study list of patient ids, same shape and ceiling |
+| \`sampleList\` | \`{"kind":"sampleList","ids":["<study>:<id>", ...]}\` or \`{"kind":"sampleList","set":"<id set>"}\` | explicit, cross-study list of sample ids: inline in \`ids\` (up to about 200 KB of ids per study, roughly 10,000 — refused by name past that), or a **stored id set** named by \`set\`, of any size up to 250,000 (see below) |
+| \`patientList\` | \`{"kind":"patientList","ids":["<study>:<id>", ...]}\` or \`{"kind":"patientList","set":"<id set>"}\` | explicit, cross-study list of patient ids, same two forms and limits |
 | \`profiled\` | \`{"kind":"profiled","type":"MUTATION"\\|"CNA"\\|"SV"}\` | patient has a sample on a gene panel for that data type — combine with \`not\` to separate wild-type from not-profiled |
 | \`caseList\` | \`{"kind":"caseList","id":"sequenced"}\` | portal sample list; bare ids get the study prefix |
 | \`genomicData\` | \`{"kind":"genomicData","gene":G,"profileType":P,"range"\\|"values"}\` | continuous per-gene values (cna, mrna z-scores, …); unknown profiles error listing what the study has |
@@ -1372,6 +1377,40 @@ error — so the list itself never needs to be split up by study. These two leav
 kind of clause that can **never** leave for a remote or aggregate-only participant: an id-carrying
 cohort is refused before any request is made, the same guarantee \`docs/DATA-BOUNDARY.md\`
 describes for every other identifier-bearing path.
+
+**Locked cohorts.** A cohort can be frozen to the patients its definition selects at one moment,
+so an analysis stops drifting as patients are added to the data: \`lock\` names the stored id set
+holding those patients, when it was taken, the data version and OncoKB release then, and, under
+\`children\`, each split arm by name. The lock is ONE set: beside the patients it keeps, as named
+parts, their samples (\`"samples"\`, \`nSamples\` of them) and each arm's patients (\`part\`:
+\`"arm:<split> / <arm>"\`). The engine
+evaluates the set, not the definition; the definition stays as the record of how the cohort was
+made, and is still run beside the set, so the result's \`cohorts[name].lock\` says how far the
+data has moved: what the definition selects \`now\`, who it would add (\`entered\`) or drop
+(\`left\`), how many frozen patients the data still holds (\`present\` of \`n\`), and how many
+samples those patients have that they did not have then (\`newSamples\` — a lock freezes
+patients, and views read every sample of them). A split arm added after the lock is evaluated
+inside the frozen cohort, so arms still add up to it. The document's \`locked\` says every cohort
+was locked at once, one moment for all. Locks are taken by \`POST /api/lock\` (\`{doc, cohorts?}\`,
+every cohort when none are named) or the page — a cohort's menu, or "Lock all cohorts" — and need a
+sign-in, since the sets are the reader's. Unlocking is removing \`lock\`. Values recorded about
+the frozen patients (a re-called mutation, an edited clinical field) are read as they are now.
+
+**Stored id sets.** A long list is saved once on the server — \`POST /api/id-sets\` with
+\`{name, level:"sample"|"patient", studies, ids}\`, or "+ Add cohort" → "From a list of ids" — and
+named by its id: \`{"kind":"sampleList","set":"<id>"}\`. The ids are matched to the studies' own
+samples or patients when the set is saved (the answer says how many matched nothing); a set's
+members never change, so a document naming one always means the same cases, and a different list
+is a new set. The set travels to ClickHouse as an external table beside each statement that reads
+it, never as SQL text, so its size does not touch the 256 KB statement limit an inline list
+meets, and the document, its \`?doc=\` link and every request carry only the id. \`label\` and \`n\`
+beside \`set\` are its name and size as the page wrote them, shown on the cohort's pill and never
+compiled. A set is its saver's and shared as saved cohorts are; reading one needs a signed-in request
+through the web app, so a document naming a set is refused, saying why, over MCP or without a
+sign-in — those carry their ids inline. Like an inline list, it never reaches a remote or
+aggregate-only participant. The web app stores every list it makes as a set when its reader is
+signed in (a cohort picked on an oncoprint, donors from Cell Explorer, a pasted list), and every
+inline list still in a cohort or an analysis when it is saved, so what is saved names sets.
 
 ### OQL subset
 
@@ -1938,7 +1977,12 @@ Leaf kinds:
   (~20% of patients had prior treatment elsewhere, ~20% undetermined).
 - {"kind":"sampleList"|"patientList","ids":["<study>:<id>",...]} — explicit, cross-study list; ids
   are "<study>:<bare-id>" (colon, matching the legacy portal's convention — not the database's
-  internal underscore, since a bare id may contain one).
+  internal underscore, since a bare id may contain one). A list the page saved on the server is
+  {"kind":"sampleList"|"patientList","set":"<id>","label":"…","n":N}: keep such a clause as it is
+  (copy it whole when reusing the cohort) — its ids are not in the document.
+- A cohort with "lock" is frozen to the patients it selected when locked: the engine evaluates the
+  lock, not "all". Leave "lock" as it is; editing "all" does not change who is in a locked cohort
+  (the result's cohorts[name].lock reports what "all" selects now). Remove "lock" to unlock it.
 - {"kind":"clinical",...} also supports "values":[...] (OR across values), "range":{"gte":60,"lt":80}
   (numeric), and "per":"sample" (patient matches if ANY sample matches — say so when used).
   "op"+"percentile" (0-1, e.g. {"op":">=","percentile":0.8}) resolves "value" live from a

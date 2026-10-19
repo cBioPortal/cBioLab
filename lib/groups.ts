@@ -78,8 +78,8 @@ export async function deleteGroup(principal: string, id: string): Promise<void> 
   const unshare = (t: string) =>
     "update " + t + " set visibility = case when visibility = 'group' then 'private' else visibility end," +
     " group_id = null, group_can_edit = false where group_id = $1";
-  await dbQuery("with a as (" + unshare("saved_artifacts") + " returning 1), d as (" + unshare("custom_dataset") + " returning 1)" +
-    " delete from user_group where id = $1", [id]);
+  await dbQuery("with a as (" + unshare("saved_artifacts") + " returning 1), d as (" + unshare("custom_dataset") + " returning 1)," +
+    " s as (" + unshare("id_set") + " returning 1) delete from user_group where id = $1", [id]);
 }
 
 /** Add someone by email (signed in yet or not); an existing member keeps their role unless one is given. */

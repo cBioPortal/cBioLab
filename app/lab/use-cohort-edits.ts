@@ -5,7 +5,8 @@
 // open analysis reads, for add-cohort mode. A rename carries every view's reference along.
 import { useState } from "react";
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
-import type { AnalysisDoc, CohortDef, CohortSource, PartitionDef } from "../../lib/types.ts";
+import type { AnalysisDoc, CohortDef, CohortLock, CohortSource, PartitionDef } from "../../lib/types.ts";
+import { lockDate } from "../../lib/cohort-lock.ts";
 import { canonicalSplits, cohortHash } from "../../lib/cohort-hash.ts";
 import type { SavedCohort } from "./use-saved.ts";
 import type { SplitSpec } from "./partitions.tsx";
@@ -37,13 +38,15 @@ export interface CohortEditsPage {
   /** the login's saved cohorts, and whether they have arrived */
   saved: Record<string, SavedCohort>;
   savedReady: boolean;
+  /** a cohort's inline id lists stored as id sets, where the reader is signed in (id-sets-client.ts) */
+  storeLists: (def: CohortDef, name: string) => Promise<CohortDef>;
   persist: (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"], id?: string) => Promise<SavedCohort>;
   /** a cohort's last evaluation, kept with it when saved */
   evalOf: (name: string) => SavedCohort["lastEval"];
 }
 
 export function useCohortEdits(page: CohortEditsPage) {
-  const { doc, docs, evalOf, persist, proposePartition, saved, savedReady, setError, setToast, study } = page;
+  const { doc, docs, evalOf, persist, proposePartition, saved, savedReady, setError, setToast, storeLists, study } = page;
 
   // ---- editing a cohort's name/note (the gear menu's "edit…") -------------
   const [cohortEditing, setCohortEditing] = useState<string | null>(null); // the name AS IT IS in doc.cohorts right now
@@ -85,8 +88,9 @@ export function useCohortEdits(page: CohortEditsPage) {
     let name = sel.name || "selection";
     for (let i = 2; taken.has(name); i++) name = (sel.name || "selection") + " " + i;
     const qualified = ids.map(id => one + ":" + id);
-    const d: AnalysisDoc = { ...doc, cohorts: { ...doc.cohorts, [name]: { all: [{ kind: "patientList", ids: qualified }] } } };
-    docs.set(d);
+    const def = await storeLists({ all: [{ kind: "patientList", ids: qualified }] }, name);
+    const now = docs.current.doc;
+    docs.set({ ...now, cohorts: { ...now.cohorts, [name]: def } });
   };
 
   const removeCohort = (name: string) => {
@@ -122,6 +126,8 @@ export function useCohortEdits(page: CohortEditsPage) {
     const s = cohortSource(name);
     if (!s || !s.src || !(s.state === "changed" || (s.state === "current" && s.edited))) return;
     const cur = doc.cohorts![name];
+    if (cur.lock && !s.src.def.lock && !confirm("“" + name + "” is locked to the " + cur.lock.n.toLocaleString() + " patients it had on " + lockDate(cur.lock.at) +
+      ". Taking the saved version's definition unlocks it, and it follows the data from then on. Go ahead?")) return;
     const next: CohortDef = { ...s.src.def, ...(cur.notes ? { notes: cur.notes } : {}), ...(cur.splits ? { splits: cur.splits } : {}),
       from: { saved: s.from.saved, name: s.srcName!, hash: s.now!, savedAt: s.src.savedAt } };
     docs.set({ ...doc, cohorts: { ...doc.cohorts, [name]: next } });
@@ -132,7 +138,7 @@ export function useCohortEdits(page: CohortEditsPage) {
    * is nothing to save, or while the saved cohorts are not known (logged out, loading). A cohort
    * copied from a saved one saves back over it once edited here or re-split; one whose saved
    * version has changed since is not offered, since saving would discard that change. A cohort
-   * with no source matches a saved cohort by name.
+   * with no source is saved as a new one.
    */
   const cohortSaveState = (name: string): CohortSaveState | null => {
     const def = doc.cohorts?.[name];
@@ -143,27 +149,82 @@ export function useCohortEdits(page: CohortEditsPage) {
       if (s.state !== "current") return null;
       return s.edited || canonicalSplits(def) !== canonicalSplits(s.src!.def) ? { action: "update", id: s.src!.id, as: s.srcName! } : null;
     }
+    // Not copied from a saved cohort: saving makes a new one. A saved cohort that only shares its
+    // name (default names repeat: "selection", "from Cell Explorer") is not this one's earlier
+    // version; the save dialog says so and offers to replace it. One identical to it is already saved.
     const same = saved[name];
-    if (!same) return { action: "create", as: name };
-    return cohortHash(def) !== cohortHash(same.def) || canonicalSplits(def) !== canonicalSplits(same.def)
-      ? { action: "update", id: same.id, as: name } : null;
+    if (same && cohortHash(def) === cohortHash(same.def) && canonicalSplits(def) === canonicalSplits(same.def)) return null;
+    return { action: "create", as: name };
   };
-  /** Save a cohort to the library (cohortSaveState says where); the analysis's copy then names it as its source. */
-  const saveCohortToLibrary = async (name: string) => {
+  /**
+   * Save a cohort to the library under `as` (default: where cohortSaveState says): over the saved
+   * cohort it would update when `as` is that one's name, over another saved cohort already named
+   * `as`, else as a new one. The analysis's copy then names it as its source.
+   */
+  const saveCohortToLibrary = async (name: string, as?: string) => {
     const st = cohortSaveState(name);
     const cur = doc.cohorts?.[name];
     if (!st || !cur) return;
     const { from: _from, ...def } = cur;
+    const target = as ?? st.as;
+    const id = target === st.as ? st.id : saved[target]?.id;
     try {
-      const c = await persist(st.as, def, evalOf(name), st.id);
+      const c = await persist(target, def, evalOf(name), id);
       const now = docs.current.doc;
       if (now.cohorts?.[name]) {
-        // bookkeeping after a save, not an edit the reader would undo
-        docs.set({ ...now, cohorts: { ...now.cohorts, [name]: { ...now.cohorts[name], from: { saved: c.id, name: st.as, hash: cohortHash(def), savedAt: c.savedAt } } } }, { undoable: false });
+        // What was saved may differ from what was asked by its id lists, now stored as sets: the
+        // copy takes those too, and names the saved cohort as its source.
+        const kept = cohortHash(c.def) === cohortHash(def) ? now.cohorts[name] : { ...c.def };
+        const linked: CohortDef = { ...kept, from: { saved: c.id, name: target, hash: cohortHash(c.def), savedAt: c.savedAt } };
+        // Saved under another name, the cohort takes that name here too (as "edit…" renames it,
+        // views drawing it included) — unless the analysis already has a cohort of that name.
+        const rename = target !== name && !now.cohorts[target];
+        if (!rename) {
+          // bookkeeping after a save, not an edit the reader would undo
+          docs.set({ ...now, cohorts: { ...now.cohorts, [name]: linked } }, { undoable: false });
+          if (target !== name) setToast("saved to your library as “" + target + "”; this analysis already has a cohort named that, so this one keeps the name “" + name + "”");
+        } else {
+          const cohorts = Object.fromEntries(Object.entries(now.cohorts).map(([k, v]) => k === name ? [target, linked] : [k, v]));
+          docs.set({ ...now, cohorts, views: renameInViews(now.views, name, target) as AnalysisDoc["views"] });
+        }
       }
     } catch (e: any) {
       setError("could not save \u201c" + name + "\u201d: " + (e?.message || e));
     }
+  };
+
+  // ---- locks: a cohort frozen to the patients it selects now (lib/cohort-lock.ts) ------------
+  /**
+   * Lock the cohorts named, or every cohort (the analysis as a whole, one moment for all of them).
+   * The server evaluates each definition and its split arms and keeps the patients as stored id
+   * sets; the document names them in each cohort's `lock`.
+   */
+  const lockCohorts = async (names?: string[]) => {
+    const res = await api.lock({ doc, ...(names ? { cohorts: names } : {}) });
+    const j = await res.json().catch(() => ({ error: res.statusText }));
+    if (!res.ok || j.error) { setError("could not lock: " + (j.error || res.statusText)); return; }
+    const now = docs.current.doc;
+    const cohorts = { ...now.cohorts };
+    for (const [n, lock] of Object.entries(j.locks as Record<string, CohortLock>)) if (cohorts[n]) cohorts[n] = { ...cohorts[n], lock };
+    docs.set({ ...now, cohorts, ...(names ? {} : { locked: { at: j.at, dataVersion: j.dataVersion, oncokbPin: j.oncokbPin } }) });
+  };
+  /** Unlock one cohort: it follows its definition again. The analysis is then no longer locked as a whole. */
+  const unlockCohort = (name: string) => {
+    const now = docs.current.doc;
+    const cur = now.cohorts?.[name];
+    if (!cur?.lock) return;
+    const { lock: _lock, ...rest } = cur;
+    const { locked: _locked, ...unlockedDoc } = now;
+    docs.set({ ...unlockedDoc, cohorts: { ...now.cohorts, [name]: rest } });
+  };
+  /** Unlock every cohort, and the analysis. */
+  const unlockAll = () => {
+    const now = docs.current.doc;
+    const { locked: _locked, ...unlockedDoc } = now;
+    docs.set({ ...unlockedDoc, cohorts: Object.fromEntries(Object.entries(now.cohorts || {}).map(([n, d]) => {
+      const { lock: _lock, ...rest } = d;
+      return [n, rest];
+    })) });
   };
 
   // ---- partitions: a cohort split into arms that add up to it ------------------------------
@@ -256,5 +317,5 @@ export function useCohortEdits(page: CohortEditsPage) {
     }
   };
 
-  return { cohortEditing, setCohortEditing, featureSaved, featureFromSelection, cohortFromSelection, removeCohort, runEdited, splitsFlat, setPartitionDef, removePartitionNamed, renamePartitionRow, splitCohortBy, analysisStudies, openCohortEdit, confirmCohortEdit, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells };
+  return { lockCohorts, unlockCohort, unlockAll, cohortEditing, setCohortEditing, featureSaved, featureFromSelection, cohortFromSelection, removeCohort, runEdited, splitsFlat, setPartitionDef, removePartitionNamed, renamePartitionRow, splitCohortBy, analysisStudies, openCohortEdit, confirmCohortEdit, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells };
 }

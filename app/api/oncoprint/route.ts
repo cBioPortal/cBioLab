@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const sp = new URL(req.url).searchParams;
     // a provenance request is answered with the queries that built the (cached) contract
     const provenance = sp.get("provenance") === "1";
-    const contract = await withRequestCustomData(customData, () => cachedContract(spec, { provenance }), { refs: customRefs, req });
+    const contract = await withRequestCustomData(customData, () => cachedContract(spec, { provenance }), { refs: customRefs, req, uses: spec });
     const engineMs = Date.now() - t0;
     const fmt = sp.get("format");
     if (fmt === "svg" || fmt === "tsv") {

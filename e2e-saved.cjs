@@ -43,7 +43,7 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       await page.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
       await page.getByText("loading saved cohorts").waitFor({ timeout: 120000 });
       const claimsEmpty = await page.getByText("Nothing saved yet").count();
-      const usable = await page.getByRole("button", { name: "preview" }).first().isEnabled();
+      const usable = await page.locator(".newlistcohort").isEnabled();
       release(); await page.unroute(LIST);
       await page.getByText("loading saved cohorts").waitFor({ state: "detached", timeout: 60000 });
       ok("a saved list that is loading says so, and the tab stays usable", claimsEmpty === 0 && usable,
@@ -66,16 +66,20 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       ok("a saved list that failed names the error and retries", claimsEmpty === 0, "claims empty: " + !!claimsEmpty);
     }
 
-    // saving an example twice under its name: one stored cohort, listed once
+    // saving an example cohort (Examples page, Cohorts) twice under its name: one stored cohort, listed once
     {
-      const first = page.locator("label.pick").first();
-      const name = (await first.innerText()).trim();
-      const row = first.locator("xpath=../..");
-      await row.getByRole("button", { name: "save" }).click();
-      await page.locator("label.pick", { hasText: name }).nth(1).waitFor({ timeout: 120000 });
-      await row.getByRole("button", { name: "save" }).click();
+      await page.goto(BASE + "/lab?tab=examples", { waitUntil: "domcontentloaded" });
+      await page.getByRole("tab", { name: "Cohorts", exact: true }).click();
+      const row = page.locator(".excohorts .listrow").first();
+      const name = (await row.locator("strong").first().innerText()).trim();
+      await row.getByRole("button", { name: "save to library" }).click();
+      for (let i = 0; i < 120 && (await savedCount(name)) < 1; i++) await page.waitForTimeout(500);
+      await row.getByRole("button", { name: "save to library" }).click();
       await page.waitForTimeout(2500);
-      const stored = await savedCount(name), listed = await page.locator("label.pick", { hasText: name }).count() - 1;
+      const stored = await savedCount(name);
+      await page.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
+      await page.locator("label.pick", { hasText: name }).first().waitFor({ timeout: 120000 });
+      const listed = await page.locator("label.pick", { hasText: name }).count();
       ok("saving a cohort under a name it has updates it", stored === 1 && listed === 1, "stored " + stored + ", listed " + listed);
     }
 

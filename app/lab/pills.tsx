@@ -95,6 +95,9 @@ function leafText(leaf: any) {
   if (k === "genomicData") return `${leaf.gene} ${leaf.profileType} ` + (leaf.range ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ") : "");
   if (k === "genericAssay") return `${leaf.entity} ` + JSON.stringify(leaf.range || leaf.values);
   if (k === "sampleList" || k === "patientList") {
+    // a stored set: its name and size as the page wrote them beside the reference (never compiled)
+    if (typeof leaf.set === "string")
+      return (leaf.label ? "“" + leaf.label + "”" : "stored set") + (typeof leaf.n === "number" ? ` · ${leaf.n.toLocaleString()} listed` : "");
     const ids = leaf.ids || [];
     const studies = new Set(ids.map((s: string) => String(s).split(":")[0]).filter(Boolean));
     return `${ids.length} listed` + (studies.size > 1 ? ` (${studies.size} studies)` : "");

@@ -38,6 +38,7 @@ import { oncokbPin } from "./annotation.ts";
 import { runAnalysis } from "./analysis.ts";
 import { buildContract } from "./oncoprint.ts";
 import { hasCustomData } from "./custom-data.ts";
+import { hasIdSets } from "./id-sets.ts";
 import { riskFitDirect, type RiskFit, type RiskFitArgs } from "./views/riskmodel.ts";
 import type { AnalysisDoc, AnalysisResult, Contract, OncoprintSpec } from "./types.ts";
 
@@ -108,7 +109,7 @@ async function countDirect(conn: ChConn, sql: string): Promise<number> {
 }
 export async function cachedCount(conn: ChConn, sql: string): Promise<number> {
   // a statement over uploaded data belongs to its uploader, never to the shared cache
-  if (hasCustomData()) return countDirect(conn, sql);
+  if (hasCustomData() || hasIdSets()) return countDirect(conn, sql);
   return throughCache(async () => countEntry(conn.id, sql, await dataVersion()), () => countDirect(conn, sql));
 }
 
@@ -135,7 +136,7 @@ async function riskFitEntry(args: RiskFitArgs, _version: string): Promise<string
 export async function cachedRiskFit(a: RiskFitArgs & { patients: number }): Promise<RiskFit> {
   const { patients, ...args } = a;
   // a fit over uploaded data belongs to its uploader, never to the shared cache
-  if (hasCustomData() || patients > RISK_FIT_CACHE_MAX_PATIENTS) return riskFitDirect(args);
+  if (hasCustomData() || hasIdSets() || patients > RISK_FIT_CACHE_MAX_PATIENTS) return riskFitDirect(args);
   return throughCache(async () => riskFitEntry(args, await dataVersion()), () => riskFitDirect(args));
 }
 
@@ -150,7 +151,7 @@ async function analysisEntry(doc: AnalysisDoc, oncoprint: "svg" | "spec", _versi
 export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg" | "spec" } = {}): Promise<AnalysisResult> {
   const oncoprint = opts.oncoprint ?? "svg";
   // an answer that depends on uploaded data belongs to its uploader, never to the shared cache
-  if (hasCustomData()) return runAnalysis(doc, { oncoprint });
+  if (hasCustomData() || hasIdSets()) return runAnalysis(doc, { oncoprint });
   return throughCache(async () => analysisEntry(doc, oncoprint, await dataVersion()), () => runAnalysis(doc, { oncoprint, ...ROUTE_OPTS }));
 }
 
@@ -166,6 +167,6 @@ async function contractEntry(spec: OncoprintSpec, provenance: boolean, _version:
 export async function cachedContract(spec: OncoprintSpec, opts: { provenance?: boolean } = {}): Promise<Contract> {
   const provenance = !!opts.provenance;
   const direct = () => buildContract(spec, provenance ? { log: [], provenance } : {});
-  if (hasCustomData()) return direct();
+  if (hasCustomData() || hasIdSets()) return direct();
   return throughCache(async () => contractEntry(spec, provenance, await dataVersion()), direct);
 }

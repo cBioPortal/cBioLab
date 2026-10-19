@@ -1,7 +1,7 @@
 "use client";
-// "+ Add cohort" on a view: one dialog with the three places a cohort comes from — the analysis's
-// own cohorts, the library (the login's saved cohorts and the built-in examples), and Explore,
-// where a new one is built and comes back to this view.
+// "+ Add cohort" on a view: one dialog with the places a cohort comes from — the analysis's own
+// cohorts, the library (the login's saved cohorts and those shared with them), Explore, where a new
+// one is built and comes back to this view, and a pasted list of ids, saved as a stored id set.
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import type { CohortDef } from "../../lib/types.ts";
@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { TB } from "../_ui/toolbar.ts";
 import { Textarea } from "../_ui/textarea";
 import { api } from "./api.ts";
+import { ListSource, addLabel, type SignInState } from "./list-cohort.tsx";
 import type { CellExplorerDataset } from "../../lib/cell-explorer.ts";
 
 export interface AddCohortTarget {
@@ -29,20 +30,23 @@ export interface AddCohortTarget {
 
 export interface LibraryState {
   /** saved cohorts are the signed-in reader's: "locked" when signed out, "off" where there is no sign-in */
-  saved: "off" | "locked" | "loading" | "ready" | "error";
+  saved: SignInState;
   savedError?: string | null;
   /** the login's saved cohorts: `id` is the artifact's, which survives a rename */
   cohorts: { id: string; name: string; def: CohortDef; savedAt: string }[];
-  examples: { name: string; desc: string; def: CohortDef }[];
 }
 
-type Source = "analysis" | "library" | "explore" | "cells";
+type Source = "analysis" | "library" | "explore" | "list" | "cells";
 
-export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, onLogin, onClose, cells }: {
+export function AddCohortDialog({ target, analysis, library, studies, storeLists, onAdd, onExplore, onLogin, onClose, cells }: {
   target: AddCohortTarget | null;
   /** the analysis's cohorts in its order (the colour each has in its summary), with their sizes once known */
   analysis: { name: string; def: CohortDef; count: number | null; views: string[] }[];
   library: LibraryState;
+  /** the studies the analysis uses: a pasted bare id is looked up in each */
+  studies: string[];
+  /** a cohort's inline id lists stored as id sets, where the reader is signed in (id-sets-client.ts) */
+  storeLists: (def: CohortDef, name: string) => Promise<CohortDef>;
   /** add a cohort to the view: an analysis cohort by name, or a library one with its definition */
   onAdd: (name: string, def?: CohortDef) => void;
   onExplore: () => void;
@@ -92,7 +96,6 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
     );
   };
   const saved = library.cohorts.filter((c) => match(c.name));
-  const examples = library.examples.filter((c) => match(c.name) || match(c.desc));
 
   return (
     <Dialog open={!!target} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -110,6 +113,7 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
             <TabsTrigger value="analysis" className="px-3 text-md">In this analysis <span className="text-muted-foreground">{available.length}</span></TabsTrigger>
             <TabsTrigger value="library" className="px-3 text-md">Library</TabsTrigger>
             <TabsTrigger value="explore" className="px-3 text-md">Build in Explore</TabsTrigger>
+            <TabsTrigger value="list" className="px-3 text-md">From a list of ids</TabsTrigger>
             {cells && <TabsTrigger value="cells" className="px-3 text-md">From Cell Explorer</TabsTrigger>}
           </TabsList>
         </Tabs>
@@ -138,7 +142,6 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
 
         {source === "library" && <>
           <Input className="h-8 text-md md:text-md" placeholder="search the library…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-          <h4 className="acd-h">Your saved cohorts</h4>
           {library.saved === "off" ? <p className="note">This deployment has no sign-in, so it keeps no saved cohorts.</p>
             : library.saved === "locked" ? <p className="note"><Button variant="link" size="inline" className="text-md" onClick={onLogin}>Sign in</Button> to see your saved cohorts.</p>
             : library.saved === "loading" ? <p className="note"><span className="spinner" /> loading your saved cohorts…</p>
@@ -146,9 +149,6 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
             : !library.cohorts.length ? <p className="note">You have no saved cohorts yet — save one from Explore (“Save as a cohort”).</p>
             : !saved.length ? <p className="note">No saved cohort matches “{q}”.</p>
             : <ul className="acd-list">{saved.map((c) => libraryRow(c.name, c.def, "saved " + c.savedAt, { id: c.id, savedAt: c.savedAt }))}</ul>}
-          <h4 className="acd-h">Examples</h4>
-          {examples.length ? <ul className="acd-list">{examples.map((c) => libraryRow(c.name, c.def, c.desc))}</ul>
-            : <p className="note">No example matches “{q}”.</p>}
         </>}
 
         {source === "explore" && (
@@ -160,8 +160,10 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
             <Button disabled={full} title={full ? addTitle("") : undefined} onClick={onExplore}>Open Explore</Button>
           </div>
         )}
+        {source === "list" && <ListSource studies={studies} saved={library.saved} disabled={full} doneTitle={(as) => addTitle("“" + as + "”")}
+          doneLabel={addLabel(replaces)} nameFor={libraryName} onDone={(as, def) => onAdd(as, def)} onLogin={onLogin} />}
         {source === "cells" && cells && <CellsSource cells={cells} full={full} replaces={replaces} addTitle={addTitle}
-          nameFor={libraryName} onAdd={onAdd} />}
+          nameFor={libraryName} storeLists={storeLists} onAdd={onAdd} />}
       </DialogContent>}
     </Dialog>
   );
@@ -172,9 +174,10 @@ export function AddCohortDialog({ target, analysis, library, onAdd, onExplore, o
  * matched to the study's patients on the server (lib/cell-explorer-server.ts). The text stays in
  * this component while it is typed.
  */
-function CellsSource({ cells, full, replaces, addTitle, nameFor, onAdd }: {
+function CellsSource({ cells, full, replaces, addTitle, nameFor, storeLists, onAdd }: {
   cells: CellExplorerDataset; full: boolean; replaces: boolean; addTitle: (what: string) => string;
-  nameFor: (name: string, def: CohortDef) => string; onAdd: (name: string, def?: CohortDef) => void;
+  nameFor: (name: string, def: CohortDef) => string; storeLists: (def: CohortDef, name: string) => Promise<CohortDef>;
+  onAdd: (name: string, def?: CohortDef) => void;
 }) {
   const [text, setText] = useState("");
   const [name, setName] = useState("from Cell Explorer");
@@ -191,6 +194,14 @@ function CellsSource({ cells, full, replaces, addTitle, nameFor, onAdd }: {
     finally { setBusy(false); }
   };
   const as = found ? nameFor(name.trim() || "from Cell Explorer", found.def) : name.trim();
+  // the donors' patients are a list: stored as an id set before they enter the analysis
+  const add = async () => {
+    if (!found) return;
+    setBusy(true); setErr(null);
+    try { onAdd(as, await storeLists(found.def, as)); }
+    catch (e) { setErr(String((e as Error)?.message || e)); }
+    finally { setBusy(false); }
+  };
   return (
     <div className="acd-cells flex flex-col gap-2.5">
       <p className="note mt-0">
@@ -216,8 +227,8 @@ function CellsSource({ cells, full, replaces, addTitle, nameFor, onAdd }: {
         <div className="viewtb">
           <div className="tbz">
             <label className="tbfield">name <Input aria-label="cohort name" className="h-ctl w-56 text-md md:text-md" value={name} onChange={(e) => setName(e.target.value)} /></label>
-            <Button variant="outline" size="sm" className={TB} disabled={full} title={addTitle("“" + as + "”")}
-              onClick={() => onAdd(as, found.def)}>{replaces ? "Use" : <><Plus />Add</>}</Button>
+            <Button variant="outline" size="sm" className={TB} disabled={full || busy} title={addTitle("“" + as + "”")}
+              onClick={() => void add()}>{busy && <span className="spinner" />}{replaces ? "Use" : <><Plus />Add</>}</Button>
           </div>
         </div>
         {as !== (name.trim() || "from Cell Explorer") && <p className="meta m-0">added as “{as}”, since this analysis already has a different “{name.trim()}”</p>}

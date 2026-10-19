@@ -42,7 +42,8 @@ arithmetic is identical whether a participant is a local connection or a remote
 peer, so the transport cannot change a result.
 
 **3. `carriesPatientIds()` guards the one clause that carries identifiers.** A
-`patients` leaf embeds explicit ids into compiled SQL. It is refused for
+`sampleList`/`patientList` leaf embeds explicit ids into compiled SQL, or names a
+stored set whose ids travel beside it. It is refused for
 aggregate-only participants — checked in the resolver, again in the remote
 client *before any network call*, and independently by the peer's own MCP tool,
 which does not trust the caller to have checked.
@@ -283,6 +284,26 @@ suite fail. A test that cannot fail is decoration.
   rows uploaded for another study on that same connection still travel to it
   (filtered by study in SQL), since that instance already holds patient-level
   data for the study they belong to.
+
+- **Stored id sets are patient-level too, and follow the same rules.** A long
+  `sampleList`/`patientList` is saved on the server (`lib/id-set-store.ts`,
+  `db/migrations/0006`) and named by a document as `"set": "<id>"`, so the ids
+  are in neither the document, its `?doc=` link nor the request. A route reads
+  the sets its body names as the request's signed-in principal
+  (`withRequestIdSets` in `lib/id-sets-server.ts`, reached through
+  `withRequestCustomData`), and each study's ids go only to the connection of
+  the patient-level instance holding that study: `lib/ch.ts` uploads a set's
+  table (`idSetExternalsFor` in `lib/id-sets.ts`) only with a statement that
+  names it, and refuses any other connection. `carriesPatientIds()` counts a
+  `set` as identifiers, so such a cohort is refused for an aggregate-only or
+  remote participant before any request is made. Sets are owned and shared by
+  `lib/access.ts`, their members are immutable (a trigger), deletion is a soft
+  delete that a document naming the set reports, every read and write is logged
+  (`id_set_access_log`), and answers that read one are never written to the
+  shared result cache (`hasIdSets()`). Without a signed-in request (MCP, a script,
+  a signed-out link) a set is not read at all, and the clause is refused by name.
+  Covered by `test/id-sets.test.ts` and `idSetContract` in
+  `test/support/store-contracts.ts`.
 
 ## If you are about to weaken this
 
