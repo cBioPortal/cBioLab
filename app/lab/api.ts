@@ -6,7 +6,7 @@
 // They return the Response, as fetch does: a caller still decides how to read it (JSON, the
 // binary contract, a file) and what an error status means for it.
 import type {
-  AnalysisBody, NotebookBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody, CellExplorerBody,
+  AnalysisBody, NotebookBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody, CellExplorerBody, SingleCellBody,
 } from "../../lib/api-schemas.ts";
 import { withCustomData, type UploadBinding } from "./custom-data-client.ts";
 import type { ArtifactKind } from "../../lib/artifacts.ts";
@@ -57,6 +57,8 @@ export const api = {
   /** A cohort's cells as a Cell Explorer link (mode "link"), or a pasted Cell Explorer link or donor ids as a cohort (mode "import"). */
   cellExplorer: async (body: CellExplorerBody, opts: Opts = {}) =>
     post("/api/cell-explorer", body.mode === "link" ? await withCustomData(body) : body, opts.signal),
+  /** The single-cell review page: Cell Explorer's catalog, a crosswalk of a dataset's values to a study, the study's own cell counts. */
+  singlecell: (body: SingleCellBody, opts: Opts = {}) => post("/api/singlecell", body, opts.signal),
   partition: async (body: PartitionBody, opts: Opts = {}) =>
     post("/api/partition", await withCustomData(body), opts.signal),
 

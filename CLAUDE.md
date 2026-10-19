@@ -159,7 +159,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   back into a `patientList` cohort ("+ Add cohort" → From Cell Explorer). The study→dataset
   registry is `CELL_EXPLORER_DATASETS`. Both directions name patients, so both answer only from a
   patient-level instance. A link names only the donors Cell Explorer's catalog lists for the dataset.
-- **Single-cell summaries for any Cell Explorer dataset** — `scripts/gen-singlecell-summary.py`:
+- **Single-cell summaries for any Cell Explorer dataset** — `lib/singlecell/` (zarr reading, the summary; browser-safe),
+  `lib/singlecell-server.ts` (catalog, crosswalk, reference counts), the review page `/singlecell` and its CLI
+  `scripts/gen-singlecell-summary.ts`, one implementation:
   `propose <slug> <study>` drafts a config (patient and sample columns, the crosswalk to the study's
   ids — direct or through a sample attribute — and candidate label and score columns, dropping columns
   that never vary within a sample); `build <config>` writes per-patient and per-sample custom datasets
