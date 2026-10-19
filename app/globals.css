@@ -655,6 +655,9 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .extag.on { background: var(--accent-ink); border-color: var(--accent-ink); color: var(--bg); }
 .extag.on .meta { color: var(--bg); opacity: 0.8; }
 .extag.is-static { cursor: default; }
+.exfacet { align-items: baseline; }
+.exfacet-l { font-size: var(--t-xs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; min-width: 3.6rem; }
+.exempty { color: var(--muted); }
 .vkind {
   font-size: var(--t-xs); padding: 0.1rem 0.45rem; border-radius: var(--r-pill); white-space: nowrap;
   background: color-mix(in oklab, var(--accent-ink) 16%, transparent); color: var(--accent-ink);

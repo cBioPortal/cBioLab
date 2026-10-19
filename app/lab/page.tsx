@@ -312,7 +312,7 @@ export default function AnalysisPage() {
   const toolActions = useToolActions({ doc, docs, goTab, persistSpaces, queryClient, setError, setStudy, setValidating, study });
   const { commitDoc, proposePartition, saveAs, validateDoc } = toolActions;
   const library = useLibrary({ docs, evalDef, goTab, persist, saved, sharedSaved: savedArtifacts.sharedCohorts, setError, setStudy, study });
-  const { analyzePicked, cohortsSubTab, docLink, exEvals, exTag, picked, previewExample, runDocExample, saveExample, setCohortsSubTab, setExTag, setPicked, togglePick } = library;
+  const { analyzePicked, cohortsSubTab, docLink, exEvals, exQuery, exTag, picked, previewExample, runDocExample, saveExample, setCohortsSubTab, setExQuery, setExTag, setPicked, togglePick } = library;
   // where the gallery examples run (EXAMPLES_URL): here, or a deployment that holds their studies
   const { examplesUrl, examplesUrlError } = useExamplesUrl();
   const exampleLink = (ex: DslExample) => examplesUrl ? examplesUrl + "/lab?doc=" + docParam(ex.doc) : docLink(ex.doc);
@@ -468,7 +468,7 @@ export default function AnalysisPage() {
           wsError={wsError} onCustomData={showClauseData} />}
 
         {/* ================= Examples tab ================= */}
-        {tab === "examples" && <ExamplesTab tag={exTag} onTag={setExTag} busy={busy}
+        {tab === "examples" && <ExamplesTab tag={exTag} onTag={setExTag} query={exQuery} onQuery={setExQuery} busy={busy}
           onRun={runDocExample} link={exampleLink} elsewhere={examplesUrl} elsewhereError={examplesUrlError} onError={setError} />}
 
         {/* ================= Analysis tab ================= */}

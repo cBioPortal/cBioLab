@@ -865,6 +865,23 @@ async function main() {
       ok("examples gallery lists every documented example",
         nCards === EXAMPLES.length, nCards + " cards vs " + EXAMPLES.length + " examples");
 
+      // a view-kind chip keeps every example that draws that view; the search narrows it further
+      {
+        const { exampleFeatures, matchesSearch } = await import("./lib/example-features.ts");
+        const wantKind = EXAMPLES.filter(e => exampleFeatures(e).views.includes("survival"));
+        const wantBoth = wantKind.filter(e => matchesSearch(e, "TP53 stratified"));
+        await page.locator(".exfacet button", { hasText: /^survival \d/ }).click();
+        const nKind = await page.locator(".excard").count();
+        await page.locator(".exsearch").fill("TP53 stratified");
+        await page.waitForFunction((n) => document.querySelectorAll(".excard").length === n, wantBoth.length, { timeout: 5000 }).catch(() => {});
+        const nBoth = await page.locator(".excard").count();
+        ok("examples filter by view kind and search their text",
+          nKind === wantKind.length && nBoth === wantBoth.length && nBoth > 0 && nBoth < nKind,
+          `survival: ${nKind} of ${wantKind.length}; + "TP53 stratified": ${nBoth} of ${wantBoth.length}`);
+        await page.locator(".exsearch").fill("");
+        await page.getByRole("button", { name: /^all \d+$/ }).click();
+      }
+
       // one launch per federated view kind, asserting the view's own markup appears
       const launches = [
         ["Co-occurrence and mutual exclusivity in NSCLC", ".tend", "cooccurrence"],
