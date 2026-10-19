@@ -29,7 +29,7 @@ const TABLE1_MENUS = new Map<string, boolean>();
 
 const sameDescribe = (a: Describe | undefined, b: Describe | undefined) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
-/** The toolbar zone: a button opening Table 1, every risk group side by side. */
+/** The toolbar's button opening Table 1, every risk group side by side (it sits beside the groups button). */
 export function RiskTable1Button({ vi, spec, m, busy, attrs, docJson, onPatch }: {
   vi: number; spec: { describe?: Describe }; m: RiskmodelResult | undefined; busy: boolean;
   attrs: { attribute: string; kind: string }[]; docJson?: () => string;
@@ -37,15 +37,15 @@ export function RiskTable1Button({ vi, spec, m, busy, attrs, docJson, onPatch }:
 }) {
   const [open, setOpen] = useState(false);
   const why = !m ? "waiting for the model: Table 1 describes its risk groups" : !docJson ? "no document to run Table 1 from" : null;
-  return <div className="tbz"><span className="tbl">groups</span>
+  return <>
     <Button variant="outline" size="sm" className={TB + " risktable1btn"} disabled={busy || !!why}
       title={why ?? "who is in each risk group: clinical values and mutation rates, the groups side by side"} onClick={() => setOpen(true)}>
-      Table 1
+      table 1
     </Button>
     {spec.describe && <span className="text-sm text-muted-foreground" title="this view's document names Table 1's rows, so a link reproduces it">· in the document</span>}
     {open && m && docJson && <RiskTable1Dialog vi={vi} saved={spec.describe} m={m} attrs={attrs} docJson={docJson}
       onPatch={onPatch} onClose={() => setOpen(false)} />}
-  </div>;
+  </>;
 }
 
 /** Table 1 for a draft `describe`: the view's own result when the draft is what the document holds, else this view run once more with it. */

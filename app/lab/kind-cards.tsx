@@ -458,8 +458,8 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
             </OptionSelect>
           </label>
           <RiskGroupsButton spec={spec} m={c.v?.riskmodel} busy={busy} onApply={patch} />
+          <RiskTable1Button vi={c.vi} spec={spec} m={c.v?.riskmodel} busy={busy} attrs={c.attrs} docJson={c.docJson} onPatch={patch} />
         </div>
-        <RiskTable1Button vi={c.vi} spec={spec} m={c.v?.riskmodel} busy={busy} attrs={c.attrs} docJson={c.docJson} onPatch={patch} />
         <div className="tbz"><span className="tbl">view</span>
           <label className="tbfield" title="the volcano names the genes the model kept in at least this share of its runs; the rest are drawn unnamed">
             label genes kept in ≥ <OptionSelect value={String(labelAbove)} disabled={busy} onValueChange={(v) => patch({ labelAbove: Number(v) === RISK_LABEL_ABOVE ? undefined : Number(v) })}>

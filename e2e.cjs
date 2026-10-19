@@ -1105,7 +1105,7 @@ async function main() {
       await dlg.locator(".riskgroupsapply").click();
       await page.waitForFunction(() => { const l = document.querySelector("svg[aria-label^='Risk model']")?.getAttribute("aria-label") || ""; return /Low risk, High risk$/.test(l); }, null, { timeout: 120000 });
       const ms = Date.now() - t0;
-      ok("risk model: Apply is one request, and the button then names the cut", requests === 1 && /cut at 80%/.test(await page.locator(".riskgroupsbtn").innerText()), requests + " requests, " + ms + " ms");
+      ok("risk model: Apply is one request, and the button's title then names the cut", requests === 1 && /cut at the 80th percentile/.test(await page.locator(".riskgroupsbtn").getAttribute("title")), requests + " requests, " + ms + " ms");
       ok("risk model: the caveat says the cuts were chosen", /The cuts were chosen in the view, at the 80th percentile/.test(await text()));
       // the same model regrouped is the cached fit: a seed nothing else here fits, then the same with a cut
       const post = async (view) => (await (await ctx.request.post(BASE + "/api/analysis", { data: { ...doc, views: [{ ...doc.views[0], runs: 5, seed: 7, ...view }] } })).json()).views[0];
