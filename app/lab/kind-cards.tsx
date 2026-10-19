@@ -14,6 +14,7 @@ import { Input } from "../_ui/input";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { FIELD } from "../_ui/toolbar.ts";
 import { RISK_LABEL_ABOVE } from "../../lib/figures/riskmodel.ts";
+import { RiskTable1Button } from "./risk-table1-dialog.tsx";
 import { RiskGroupsButton } from "./risk-groups-dialog.tsx";
 
 /**
@@ -458,6 +459,7 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
           </label>
           <RiskGroupsButton spec={spec} m={c.v?.riskmodel} busy={busy} onApply={patch} />
         </div>
+        <RiskTable1Button vi={c.vi} spec={spec} m={c.v?.riskmodel} busy={busy} attrs={c.attrs} docJson={c.docJson} onPatch={patch} />
         <div className="tbz"><span className="tbl">view</span>
           <label className="tbfield" title="the volcano names the genes the model kept in at least this share of its runs; the rest are drawn unnamed">
             label genes kept in ≥ <OptionSelect value={String(labelAbove)} disabled={busy} onValueChange={(v) => patch({ labelAbove: Number(v) === RISK_LABEL_ABOVE ? undefined : Number(v) })}>
