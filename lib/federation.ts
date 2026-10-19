@@ -19,7 +19,7 @@
 // for the transport — a real deployment swaps in a second connection
 // (data-level federation) or an MCP client to a remote cbio-lab
 // (document-level federation) behind the same interface.
-import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, type ChConn } from "./ch.ts";
+import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
@@ -183,6 +183,15 @@ export const routingCollisions: string[] = [];
 export const restrictedStudies = new Set<string>();
 export async function studyRouting(): Promise<Map<string, ChConn>> {
   if (_routing) return _routing;
+  // One build at a time, shared by every caller that arrives while it runs: a cold request asks
+  // for hundreds of studies' routes at once, and each starting its own build sent hundreds of
+  // queries (and, with a simulated peer, hundreds of MCP calls) for one answer. The build answers
+  // them all, so no one reader's cancellation stops it.
+  return _routingBuild ??= withChContext({}, buildRouting).finally(() => { _routingBuild = null; });
+}
+let _routingBuild: Promise<Map<string, ChConn>> | null = null;
+
+async function buildRouting(): Promise<Map<string, ChConn>> {
   const map = new Map<string, ChConn>();
   let complete = true;
   for (const conn of connections()) {
