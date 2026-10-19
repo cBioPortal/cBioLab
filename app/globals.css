@@ -389,10 +389,22 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .viewtb { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin-top: var(--s3); }
 .tbz { display: flex; align-items: center; gap: var(--s2); flex-wrap: nowrap; min-width: 0; }
 .tbz + .tbz { border-left: 1px solid var(--line); padding-left: var(--s3); }
+/* a toolbar organised into labelled sections reads as units: each section holding more than a lone
+   control is a tinted box, its label in ink, so a section label is never mistaken for the field labels
+   beside it and a section that wraps to a new line keeps its edge. A toolbar with no section labels (a
+   table's pager, a patient navigator) has no sections to tell apart and keeps its plain dividers. */
+.viewtb:has(> .tbz > .tbl) { column-gap: var(--s2); }
+.viewtb:has(> .tbz > .tbl) > .tbz:has(> :nth-child(2)) {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: 3px 6px;
+}
 .tbl {
   font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--muted); cursor: help; user-select: none;
 }
+/* beside the boxes, a section that is a lone control (a menu) needs no divider of its own */
+.viewtb:has(> .tbz > .tbl) > .tbz + .tbz:not(:has(> :nth-child(2))) { border-left: 0; padding-left: 0; }
+.viewtb > .tbz > .tbl { letter-spacing: 0.08em; font-weight: 600; color: var(--ink); }
 /* one height for everything in the strip, so the row has a single baseline */
 .viewtb select, .viewtb .zoomctl, .viewtb .chk {
   height: var(--ctl-h); font-size: var(--t-md);
