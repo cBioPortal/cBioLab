@@ -5,6 +5,7 @@ import { ExploreCharts } from "./explore-charts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
+import type { SignInState } from "./list-cohort.tsx";
 import { useLabTools, LAB_TOOL_NAMES } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import { useCustomDataState } from "./custom-data-panel.tsx";
@@ -336,7 +337,7 @@ export default function AnalysisPage() {
   const toolActions = useToolActions({ doc, docs, goTab, persistSpaces, queryClient, setError, setStudy, setValidating, study });
   const { commitDoc, proposePartition, saveAs, validateDoc } = toolActions;
   const library = useLibrary({ docs, evalDef, goTab, persist, saved, sharedSaved: savedArtifacts.sharedCohorts, setError, setStudy, study });
-  const { analyzePicked, cohortsSubTab, docLink, exEvals, exQuery, exTag, picked, previewExample, runDocExample, saveExample, setCohortsSubTab, setExQuery, setExTag, setPicked, togglePick } = library;
+  const { analyzeExampleCohort, analyzePicked, cohortsSubTab, docLink, exEvals, exQuery, exTag, picked, previewExample, runDocExample, saveExample, setCohortsSubTab, setExQuery, setExTag, setPicked, togglePick } = library;
   // where the gallery examples run (EXAMPLES_URL): here, or a deployment that holds their studies
   const { examplesUrl, examplesUrlError } = useExamplesUrl();
   const exampleLink = (ex: DslExample) => examplesUrl ? examplesUrl + "/lab?doc=" + docParam(ex.doc) : docLink(ex.doc);
@@ -361,7 +362,7 @@ export default function AnalysisPage() {
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
   const viewCtx = { VIEW_KINDS, docHistory, study, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, noteEdit, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   /** what the Analysis tab's sections read and the actions they take (app/lab/analysis-sections.tsx) */
-  const analysisCtx: AnalysisCtx = { lockCohorts, unlockCohort, unlockAll, canSave, VIEW_KINDS, addView, docHistory, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortCells, cohortSaveState, cohortSource, openCohortCells, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, removeViews, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
+  const analysisCtx: AnalysisCtx = { lockCohorts, unlockCohort, unlockAll, canSave, analysisStudies, requestLogin, signIn: (!customState.enabled ? "off" : !loggedIn ? "locked" : "ready") as SignInState, VIEW_KINDS, addView, docHistory, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortCells, cohortSaveState, cohortSource, openCohortCells, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, removeViews, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
   // what the page offers the researcher's AI assistant (app/lab/agent-tools.ts), current every render
   const webmcp = useLabTools({
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
@@ -485,14 +486,16 @@ export default function AnalysisPage() {
 
         {/* ================= Saved tab ================= */}
         {tab === "cohorts" && <SavedTab login={customState} onLogin={requestLogin}
-          sub={cohortsSubTab} onSub={setCohortsSubTab} examples={EXAMPLES}
+          sub={cohortsSubTab} onSub={setCohortsSubTab}
           picked={picked} onTogglePick={togglePick} onClearPicked={() => setPicked([])} onAnalyze={analyzePicked}
-          evals={exEvals} onPreview={previewExample} onSaveExample={saveExample}
+          studies={studies} onNewFromList={async (name, def) => { await persist(name, def, null); }}
           saved={savedArtifacts} onOpenWorkspace={openWorkspace} onOpenShared={openShared} onDeleteWorkspace={deleteWorkspace}
           wsError={wsError} onCustomData={showClauseData} />}
 
         {/* ================= Examples tab ================= */}
         {tab === "examples" && <ExamplesTab tag={exTag} onTag={setExTag} query={exQuery} onQuery={setExQuery} busy={busy}
+          cohorts={{ examples: EXAMPLES, evals: exEvals, study, canSave: loggedIn, onPreview: (ex) => void previewExample(ex), onAnalyze: analyzeExampleCohort,
+            onSave: (ex) => { if (canSave()) void saveExample(ex); } }}
           onRun={runDocExample} link={exampleLink} elsewhere={examplesUrl} elsewhereError={examplesUrlError} onError={setError} />}
 
         {/* ================= Analysis tab ================= */}
@@ -510,7 +513,6 @@ export default function AnalysisPage() {
             : savedArtifacts.cohortsState.pending ? "loading" : savedArtifacts.cohortsState.error ? "error" : "ready",
           savedError: savedArtifacts.cohortsState.error,
           cohorts: Object.entries(saved).map(([name, x]) => ({ id: x.id, name, def: x.def, savedAt: x.savedAt })),
-          examples: EXAMPLES,
         }}
         onAdd={(name, def) => { if (chooser) addCohortToView(chooser, name, def); }}
         studies={analysisStudies()}

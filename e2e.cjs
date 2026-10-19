@@ -718,7 +718,10 @@ async function main() {
       ok("an explicit ?tab= beats the document's default tab",
         (await page.locator("[aria-label='lab sections'] [role=tab][aria-selected=true]").innerText()).trim() === "Examples");
 
-      // Cohorts tab: tick cohorts, submit them together. No per-row "add" links.
+      // Cohorts tab: tick cohorts, submit them together. No per-row "add" links. The example
+      // cohorts live on the Examples page, so two saved cohorts are what get ticked here.
+      for (const [n, q] of [["e2e pick KRAS " + scheme, "KRAS: MUT"], ["e2e pick TP53 " + scheme, "TP53: MUT"]])
+        await page.context().request.post(BASE + "/api/artifacts", { data: { kind: "cohort", name: n, definition: { study: "msk_chord_2024", all: [{ kind: "oql", q }] } } });
       await page.goto(BASE + "/lab");
       await page.getByRole("tab", { name: "Saved", exact: true }).click();
       await page.waitForSelector(".pick [role=checkbox]", { timeout: 240000 });
@@ -1507,6 +1510,66 @@ async function main() {
     } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
     ok("a pasted list of ids is matched, saved as a stored id set and named by the cohort; only its signed-in owner can read it",
       steps.matched && steps.named && steps.counted && steps.noIds && steps.signedOut && steps.otherUser && steps.deleted, JSON.stringify(steps));
+    await ctx.close();
+  }
+  // A cohort from a list of ids can be made in the library (choosing its study) and from the
+  // analysis's cohort panel (no view needed); example cohorts live only on the Examples page.
+  if (LOGIN) {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const sp = await ctx.newPage();
+    let steps = {};
+    try {
+      await signIn(ctx, "lists2." + LOGIN);
+      const ex = await (await ctx.request.get(BASE + "/api/custom-data/example?study=msk_chord_2024")).json();
+      const patients = ex.patients || [];
+      const fill = async (dlg, name) => {
+        await dlg.getByRole("tab", { name: "patients" }).click();
+        await dlg.locator("textarea").fill(patients.join("\n"));
+        await dlg.locator("input[aria-label='set name']").fill(name);
+        await dlg.locator(".idsetsave").click();
+        await dlg.locator(".idsetresult").waitFor({ timeout: 60000 });
+        await dlg.locator(".idsetdone").click();
+        await dlg.waitFor({ state: "detached", timeout: 60000 });
+      };
+      // the library: no analysis around it, so the study is chosen
+      await sp.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
+      await sp.locator(".newlistcohort").click();
+      const lib = sp.locator("[role=dialog].listcohortdialog");
+      await lib.waitFor({ timeout: 30000 });
+      steps.needsStudy = await lib.locator(".idsetsave").isDisabled();
+      await lib.getByRole("combobox").click();
+      await sp.getByRole("option", { name: /\(msk_chord_2024\)/ }).click();
+      const libName = "e2e library list " + Date.now();
+      await fill(lib, libName);
+      const art = ((await (await ctx.request.get(BASE + "/api/artifacts?kind=cohort")).json()).artifacts || []).find((a) => a.name === libName);
+      const leaf = art?.definition?.all?.[0] || {};
+      steps.inLibrary = !!art && leaf.kind === "patientList" && /^[0-9a-f-]{36}$/.test(leaf.set || "") && art.definition.study === "msk_chord_2024";
+      steps.noExamplesInSaved = (await sp.locator("h2.savedsec", { hasText: /^Examples/ }).count()) === 0;
+      // the analysis's cohort panel, with no view yet
+      await sp.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify({ dsl: "2.8", study: "msk_chord_2024", cohorts: {}, views: [] })).toString("base64url"), { waitUntil: "domcontentloaded" });
+      await sp.locator(".fromlist").click();
+      const pane = sp.locator("[role=dialog].listcohortdialog");
+      await pane.waitFor({ timeout: 30000 });
+      await fill(pane, "e2e panel list");
+      await sp.waitForSelector(".cohortbox .cohortbox-head strong", { timeout: 120000 });
+      const d = JSON.parse(await sp.locator("#docjson").inputValue());
+      steps.inAnalysis = d.cohorts["e2e panel list"]?.all?.[0]?.kind === "patientList" && (d.views || []).length === 0
+        && (await sp.locator(".cohortbox-head").first().innerText()).replace(/\s+/g, "").includes(String(patients.length));
+      // example cohorts: on the Examples page's Cohorts tab, and not in "+ Add cohort"'s library
+      // (an analysis with no cohorts, so a new view waits for one)
+      await sp.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify({ dsl: "2.8", study: "msk_chord_2024", cohorts: {}, views: [] })).toString("base64url"), { waitUntil: "domcontentloaded" });
+      await sp.locator(".addview button:has-text('Survival')").click();
+      await sp.locator(".emptyview .emptyview-body button").first().click();
+      await sp.getByRole("tab", { name: "Library" }).click();
+      steps.noExamplesInDialog = (await sp.locator(".addcohortdialog .acd-row", { hasText: "STK11-driver" }).count()) === 0;
+      await sp.keyboard.press("Escape");
+      await sp.goto(BASE + "/lab?tab=examples", { waitUntil: "domcontentloaded" });
+      await sp.getByRole("tab", { name: "Cohorts", exact: true }).click();
+      steps.examplesTab = (await sp.locator(".excohorts .listrow", { hasText: "STK11-driver" }).count()) > 0;
+      if (art) await ctx.request.delete(BASE + "/api/artifacts/" + art.id);
+    } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+    ok("a cohort from a list of ids can be made in the library (study chosen) and from the cohort panel; example cohorts are only on the Examples page",
+      steps.needsStudy && steps.inLibrary && steps.noExamplesInSaved && steps.inAnalysis && steps.noExamplesInDialog && steps.examplesTab, JSON.stringify(steps));
     await ctx.close();
   }
   // Nothing is saved with an inline id list: saving a cohort that carries one stores the list as an

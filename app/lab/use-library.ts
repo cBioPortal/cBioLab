@@ -15,7 +15,6 @@ import type { SavedCohort, Shared } from "./use-saved.ts";
 const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
 
 interface Example { name: string; desc: string; def: CohortDef }
-/** The Saved tab's example cohorts: definitions to preview, save or analyse, one per kind of clause. */
 /** A document as a ?doc= value: base64url of its UTF-8 JSON, as the page reads it back. */
 export function docParam(d: AnalysisDoc | TemplateDoc): string {
   return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
@@ -83,9 +82,7 @@ export function useLibrary(page: LibraryPage) {
       const rest = key.slice(key.indexOf(":") + 1);
       const other = key.startsWith("shared:") ? sharedSaved.find((x) => x.id === rest) : undefined;
       let name = other ? other.name : rest;
-      const def = key.startsWith("ex:") ? (EXAMPLES.find((e) => e.name === name) || {}).def
-        : other ? other.item.def
-        : (saved[name] || {}).def;
+      const def = other ? other.item.def : (saved[name] || {}).def;
       // someone else's cohort may share a name with one already chosen: say whose it is
       if (other && chosen.some(([n]) => n === name)) name += " (" + (other.owner.name || other.owner.email) + ")";
       if (def) chosen.push([name, def]);
@@ -104,6 +101,15 @@ export function useLibrary(page: LibraryPage) {
   };
   const togglePick = (key: string) =>
     setPicked((p) => p.includes(key) ? p.filter((x) => x !== key) : [...p, key]);
+
+  /** A fresh analysis of one example cohort, as Analyze does for the explored cohort: no views yet. */
+  const analyzeExampleCohort = (ex: { name: string; def: CohortDef }) => {
+    const s = ex.def.study || ex.def.studies?.[0] || study;
+    docs.replace({ dsl: DOC_VERSION, study: s, cohorts: { [ex.name]: ex.def }, views: [] });
+    setStudy(s);
+    setError(null);
+    goTab("analysis");
+  };
 
   /** Load a documented example into the Analysis tab and run it. */
   const runDocExample = (ex: DslExample) => {
@@ -131,5 +137,5 @@ export function useLibrary(page: LibraryPage) {
     try { await persist(ex.name, ex.def, lastEval); } catch { /* the Examples tab has no error banner of its own */ }
   };
 
-  return { cohortsSubTab, setCohortsSubTab, exTag, setExTag, exQuery, setExQuery, picked, setPicked, exEvals, setExEvals, analyzePicked, togglePick, runDocExample, docLink, previewExample, saveExample };
+  return { cohortsSubTab, setCohortsSubTab, exTag, setExTag, exQuery, setExQuery, picked, setPicked, exEvals, setExEvals, analyzePicked, togglePick, runDocExample, docLink, previewExample, saveExample, analyzeExampleCohort };
 }

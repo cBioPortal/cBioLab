@@ -12,6 +12,7 @@ import { CHIP } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 import { TB } from "../_ui/toolbar.ts";
 import { SaveToLibraryDialog } from "./dialogs.tsx";
+import { ListCohortDialog, type SignInState } from "./list-cohort.tsx";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Textarea } from "../_ui/textarea";
 import CohortPills from "./pills";
@@ -71,6 +72,10 @@ export interface AnalysisCtx {
   unlockAll: () => void;
   /** whether the reader may store id sets (signed in); asks them to sign in when not */
   canSave: () => boolean;
+  signIn: SignInState;
+  requestLogin: () => void;
+  /** the studies the analysis uses: a pasted bare id is looked up in each */
+  analysisStudies: () => string[];
   /** the single-cell dataset a cohort's patients can be opened in (lib/cell-explorer.ts), and opening it */
   cohortCells: (name: string) => import("../../lib/cell-explorer.ts").CellExplorerDataset | null;
   openCohortCells: (name: string) => Promise<void>;
@@ -168,10 +173,13 @@ function EmptyViewCard({ ctx, vi }: { ctx: AnalysisCtx; vi: number }) {
 }
 
 export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
-  const { busy, canSave, saved, catalogAttrs, cohortCells, cohortSaveState, cohortSource, doc, lockCohorts, openCohortCells, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, saveCohortToLibrary, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, unlockAll, unlockCohort, updateFromSaved, upgradeNote, viewTitle } = ctx;
+  const { busy, canSave, saved, signIn, requestLogin, analysisStudies, docs, catalogAttrs, cohortCells, cohortSaveState, cohortSource, doc, lockCohorts, openCohortCells, loggedIn, menuOpenRef, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, result, saveCohortToLibrary, setPartitionDef, setUpgradeNote, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, unlockAll, unlockCohort, updateFromSaved, upgradeNote, viewTitle } = ctx;
   const [lockingAll, setLockingAll] = useState(false);
   /** the cohort whose "save to library…" dialog is open */
   const [savingToLibrary, setSavingToLibrary] = useState<string | null>(null);
+  const [fromList, setFromList] = useState(false);
+  /** a pasted list's cohort joins the analysis under its name, or the next free one */
+  const freeName = (n: string) => { const have = docs.current.doc.cohorts || {}; if (!have[n]) return n; for (let i = 2; ; i++) if (!have[n + " (" + i + ")"]) return n + " (" + i + ")"; };
   const lockAll = async () => {
     if (!canSave()) return;
     setLockingAll(true);
@@ -195,11 +203,14 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
       {/* The analysis's cohorts are not its top level: each view names the ones it draws, and these
           cards summarise them — each with the views that draw it and the saved cohort it was copied
           from. Cohorts come in through a view's "+ Add cohort". */}
-      {names.length > 0 && (
+      {(names.length > 0 || doc.study) && (
         <section className="cohortsum" aria-label="cohorts in this analysis">
           <h2 className="vtitle flex items-center gap-2.5 mb-4">
             Cohorts in this analysis <span className="plain meta">— add one from a view</span>{busy && <span className="spinner" />}
-            <span className="analysislock ml-auto flex items-center gap-2 text-sm font-normal normal-case tracking-normal">
+            <span className="ml-auto flex items-center gap-2 text-sm font-normal normal-case tracking-normal">
+            <Button variant="outline" size="sm" className={cn(TB, "fromlist")} disabled={busy} onClick={() => setFromList(true)}
+              title="add a cohort made from a pasted list of sample or patient ids to this analysis"><Plus />From a list of ids…</Button>
+            {names.length > 0 && <span className="analysislock flex items-center gap-2">
               {doc.locked
                 ? <>
                     <span className="inline-flex items-center gap-1 text-muted-foreground" title={"every cohort, and its split arms, frozen at once to the patients it selected then" +
@@ -211,8 +222,10 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                 : <Button variant="outline" size="sm" className={cn(TB, "lockall")} disabled={busy || lockingAll} onClick={() => void lockAll()}
                     title="freeze every cohort, and its split arms, at this moment to the patients it selects now, so the analysis stays the same as patients are added to the data">
                     {lockingAll ? <span className="spinner" /> : <Lock />}Lock all cohorts</Button>}
+            </span>}
             </span>
           </h2>
+          {!names.length && <p className="note mt-0">No cohorts yet: add one to a view with its “+ Add cohort”, or make one from a list of ids.</p>}
           <div className="cohortlist">
             {names.map((n, i) => {
               const c = result?.cohorts[n];
@@ -288,6 +301,10 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
           <AnalysisSources sources={result?.sources} names={studyNames} />
         </section>
       )}
+      {fromList && <ListCohortDialog title="Add a cohort from a list of ids" studies={analysisStudies()} saved={signIn}
+        doneLabel={<><Plus />Add to the analysis</>} doneTitle={(as) => "add “" + as + "” to this analysis; it is in no view until you add it to one"}
+        nameFor={freeName} onLogin={requestLogin} onClose={() => setFromList(false)}
+        onDone={async (as, def) => { const now = docs.current.doc; docs.set({ ...now, cohorts: { ...now.cohorts, [as]: def } }); }} />}
       {savingToLibrary && (() => {
         const st = cohortSaveState(savingToLibrary);
         return st && <SaveToLibraryDialog cohort={savingToLibrary} initial={st.as} updates={st.action === "update" ? st.as : null}
