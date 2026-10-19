@@ -14,7 +14,9 @@ import { kaplanMeier, logRankK } from "../stats.ts";
 import { riskmodelMethod } from "../method.ts";
 import type { ViewRun } from "./run.ts";
 import { overLimit, refuse } from "./shared.ts";
-import { RISK_LABEL_ABOVE, riskGroupNames } from "../figures/riskmodel.ts";
+import { RISK_LABEL_ABOVE, RISK_FIGURE_GENES, riskGroupNames } from "../figures/riskmodel.ts";
+import { tableAttributesSql } from "../clinical-table.ts";
+import { buildTable1, table1DefaultCandidates, TABLE1_MAX_ATTRIBUTES, TABLE1_MAX_GENES, type Table1Patient } from "./riskmodel-table1.ts";
 
 const RISK_MAX_RUNS = 100;
 /** patients x runs past which one request would not finish inside the analysis route's time limit */
@@ -41,13 +43,13 @@ export interface RiskFitSpec {
 }
 
 /**
- * The view's settings that decide only how its groups are cut and drawn, never the model: the one
+ * The view's settings that decide only how its groups are cut, drawn and described (Table 1), never the model: the one
  * list a setting must be on to be left out of the fit's cache key. Everything else in the view —
  * including any setting added later — is in the key, so a setting nobody thought about costs at
  * worst a needless refit, never a fit served for a different model. A setting goes here only if
  * riskFitSpec does not read it (test/riskmodel-groups.test.ts checks each one).
  */
-export const RISK_PRESENTATION_KEYS = ["groups", "cuts", "labelAbove", "note", "cohorts"] as const;
+export const RISK_PRESENTATION_KEYS = ["groups", "cuts", "labelAbove", "note", "cohorts", "describe"] as const;
 
 /** The view without its presentation settings, keys sorted: the part of the fit's key the view gives. */
 export function riskModelView(view: RiskmodelView): RiskmodelView {
@@ -119,12 +121,12 @@ export interface RiskKeptRow { t: number; entry: number; ev: boolean; stratum: s
 /**
  * Who of the rows `riskmodelRowsSql` returned is modelled, and who is left out and why — every
  * exclusion counted. The fit and Table 1 both read their patients through this, so the same rows
- * give the same patients in the same order.
+ * give the same patients in the same order. `at[k]` is kept patient k's position in `rows`.
  */
 export function keepRiskRows(rows: Record<string, unknown>[], s: Pick<RiskFitSpec, "strata" | "covariates" | "anchor">) {
   let notProfiled = 0, noStratum = 0, noCovariate = 0, noAnchor = 0, anchorAfterStart = 0, noFollowUp = 0;
-  const kept: RiskKeptRow[] = [];
-  rows.forEach((x) => {
+  const kept: RiskKeptRow[] = [], at: number[] = [];
+  rows.forEach((x, row) => {
     const panels = ((x.panels as unknown as string[]) || []).map(String);
     if (!panels.length) { notProfiled++; return; }
     const st = s.strata ? String(x.stratum ?? "") : "";
@@ -140,8 +142,9 @@ export function keepRiskRows(rows: Record<string, unknown>[], s: Pick<RiskFitSpe
       if (!(t > entry)) { noFollowUp++; return; }
     }
     kept.push({ t, entry, ev: Number(x.ev) === 1, stratum: st, genes: ((x.genes as unknown as string[]) || []).map(String), panels, cov, half: Number(x.half) });
+    at.push(row);
   });
-  return { kept, left: { notProfiled, noStratum, noCovariate, noAnchor, anchorAfterStart, noFollowUp } };
+  return { kept, at, left: { notProfiled, noStratum, noCovariate, noAnchor, anchorAfterStart, noFollowUp } };
 }
 
 /** Fetch the cohort's rows and fit the ensemble. Throws RiskRefusal when the data cannot support a model. */
@@ -207,12 +210,15 @@ export async function fitRiskmodel(r: RiskResolver, args: RiskFitArgs): Promise<
   };
 }
 
-/** The fit's two queries, through the patient-level resolver alone (test/boundary.test.ts sweeps their SQL). */
-function riskViewRows(r: RiskResolver, args: RiskFitArgs) {
+/**
+ * The fit's two queries — and Table 1's, which are the same with its attributes added — through the
+ * patient-level resolver alone (test/boundary.test.ts sweeps their SQL).
+ */
+function riskViewRows(r: RiskResolver, args: RiskFitArgs, table1?: { describe: string[] }) {
   const s = riskFitSpec(args.view, args.compile.oncokbPin);
   return Promise.all([
-    r.viewRows("riskmodel:rows", args.def, (c, st, d) => riskmodelRowsSql(c, st, d, { endpoint: s.endpoint, columns: s.columns ?? undefined, strata: s.strata,
-      covariates: s.covariates, driverPin: s.driverPin, anchor: s.anchor })),
+    r.viewRows(table1 ? "riskmodel:table1" : "riskmodel:rows", args.def, (c, st, d) => riskmodelRowsSql(c, st, d, { endpoint: s.endpoint, columns: s.columns ?? undefined, strata: s.strata,
+      covariates: s.covariates, driverPin: s.driverPin, anchor: s.anchor, ...(table1 ? { describe: table1.describe } : {}) })),
     r.viewMeta("riskmodel:panels", (st, d) => riskmodelPanelGenesSql(st, d)),
   ]);
 }
@@ -330,6 +336,44 @@ export function groupRiskmodel(fit: RiskFit, qs: number[]): RiskGrouping {
     neverHeldOut: fit.pool.length - poolScored.length, distinct, groupsMade, members };
 }
 
+// ---- Table 1 ----------------------------------------------------------------------------------
+
+/**
+ * Table 1, the groups' clinical and genomic makeup (counted and tested by lib/views/riskmodel-table1.ts).
+ * Reads the fit's own rows again with Table 1's attributes added and keeps them as the fit did, and
+ * refuses unless they are the fit's patients in the fit's order — every survival time, entry and
+ * event the same — so each group's members are exactly the patients its curve drew.
+ */
+export async function riskTable1(r: RiskResolver, args: RiskFitArgs, fit: RiskFit, g: RiskGrouping, describe: NonNullable<RiskmodelView["describe"]>) {
+  const s = riskFitSpec(args.view, args.compile.oncokbPin), mark = r.queries.length;
+  const logged = () => r.queries.slice(mark).map((q) => ({ label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}) }));
+  const metaRows = await r.viewMeta("riskmodel:table1-attributes", (st, d) => tableAttributesSql(st, d));
+  const meta = new Map(metaRows.map((m) => [String(m.id), { id: String(m.id), numeric: String(m.datatype).toUpperCase() === "NUMBER", patient: Number(m.patient) === 1 }] as const));
+  const attrs = describe.attributes ? [...new Set(describe.attributes)]
+    : table1DefaultCandidates(metaRows.map((m) => String(m.id)), { covariates: s.covariates, strata: s.strata });
+  const fetched = attrs.filter((a) => meta.has(a));
+  const [rows, panelRows] = await riskViewRows(r, args, { describe: fetched });
+  const { kept, at } = keepRiskRows(rows, s);
+  const same = kept.length === fit.n && kept.every((k, i) => k.t === fit.subjects.time[i] && k.entry === fit.subjects.entry[i] && (k.ev ? 1 : 0) === fit.subjects.event[i]);
+  if (!same) throw new RiskRefusal("Table 1 could not be matched to the model's patients: the cohort's rows changed after the model was fitted (" + kept.length + " patients now, " + fit.n + " then); run the view again", logged());
+  const col = new Map(fetched.map((a, k) => [a, k] as const));
+  const cell = (x: Record<string, unknown>, p: string, a: string) => col.has(a) ? x[p + col.get(a)] : undefined;
+  const patients: Table1Patient[] = kept.map((k, i) => {
+    const x = rows[at[i]];
+    return { panels: k.panels, genes: k.genes, d: attrs.map((a) => String(cell(x, "d", a) ?? "")), r: attrs.map((a) => String(cell(x, "r", a) ?? "")), u: attrs.map((a) => Number(cell(x, "u", a) ?? 0)) };
+  });
+  const months = s.columns?.months ?? s.endpoint + "_MONTHS", status = s.columns?.status ?? s.endpoint + "_STATUS";
+  const { table, histograms } = buildTable1({
+    study: args.study, reportedOn: fit.validated ? "validation half" : "held-out scores", measure: s.measure,
+    groups: g.groups.map((x, gi) => ({ name: x.name, members: g.members[gi] })), patients,
+    attributes: attrs.map((name) => ({ name, meta: meta.get(name) ?? null })), attributesDefault: !describe.attributes,
+    genes: describe.genes ? [...new Set(describe.genes)] : fit.features.slice(0, RISK_FIGURE_GENES).map((f) => f.gene), genesDefault: !describe.genes,
+    panelGenes: new Map(panelRows.map((x) => [String(x.panel), new Set((x.genes as unknown as string[]) || [])] as const)),
+    model: { genes: fit.features.map((f) => f.gene), covariates: s.covariates, strata: s.strata, outcome: [months, status] },
+  });
+  return { table, histograms, queries: logged() };
+}
+
 // ---- the view ---------------------------------------------------------------------------------
 
 /** 0.8 → "80th", 0.333 → "33.3rd" */
@@ -395,6 +439,16 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
   { const e = overLimit("a risk model", RISK_MAX_COVARIATES, covNames.length); if (e) return refuse("riskmodel", ctx, e.replace("at most " + RISK_MAX_COVARIATES, "at most " + RISK_MAX_COVARIATES + " covariates")); }
   if (new Set(covNames).size !== covNames.length || (strata && covNames.includes(strata))) return refuse("riskmodel", ctx, "a covariate is listed twice, or is also the stratum");
   if (view.anchor && !view.anchor.eventType) return refuse("riskmodel", ctx, "anchor needs eventType, the timeline event each patient's clock starts at");
+  const describe = view.describe;
+  if (describe != null) {
+    const isList = (x: unknown) => x == null || (Array.isArray(x) && x.every((v) => typeof v === "string"));
+    if (typeof describe !== "object" || Array.isArray(describe) || !isList(describe.attributes) || !isList(describe.genes))
+      return refuse("riskmodel", ctx, "describe is { attributes?: [names], genes?: [symbols] }, each list optional (left out, Table 1 uses its default)");
+    for (const a of describe.attributes || []) if (!/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) return refuse("riskmodel", ctx, "“" + a.slice(0, 40) + "” is not a clinical attribute's name");
+    for (const x of describe.genes || []) if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{0,39}$/.test(x)) return refuse("riskmodel", ctx, "“" + x.slice(0, 40) + "” is not a gene symbol");
+    const e = overLimit("Table 1", TABLE1_MAX_ATTRIBUTES, (describe.attributes || []).length) || overLimit("Table 1", TABLE1_MAX_GENES, (describe.genes || []).length);
+    if (e) return refuse("riskmodel", ctx, e.replace("at most " + TABLE1_MAX_ATTRIBUTES, "at most " + TABLE1_MAX_ATTRIBUTES + ((describe.attributes || []).length > TABLE1_MAX_ATTRIBUTES ? " attributes" : " genes")));
+  }
   if (cohorts[name].count * runs > RISK_WORK_LIMIT)
     return refuse("riskmodel", ctx, "a risk model fits at most " + RISK_WORK_LIMIT.toLocaleString("en-US") + " patients × runs in one request; “" + name + "” has " +
       cohorts[name].count.toLocaleString("en-US") + " patients, so at most " + Math.max(1, Math.floor(RISK_WORK_LIMIT / Math.max(1, cohorts[name].count))) + " runs (or narrow the cohort)");
@@ -409,6 +463,14 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
     return e.queries.length ? { ...out, queries: e.queries.map((q) => ({ study, ...q })) } : out;
   }
   const g = groupRiskmodel(fit, groupQuantiles(cutsChosen ? { cuts: cutsChosen } : { groups: nGroups }));
+  let t1: Awaited<ReturnType<typeof riskTable1>> | null = null;
+  if (describe) {
+    try { t1 = await riskTable1(r, args, fit, g, describe); }
+    catch (e) {
+      if (!(e instanceof RiskRefusal)) throw e;
+      return { ...refuse("riskmodel", ctx, e.message), queries: [...fit.queries, ...e.queries].map((q) => ({ study, ...q })) };
+    }
+  }
 
   const cs = [...fit.cIndexRuns].filter((c) => Number.isFinite(c)).sort((x, y) => x - y);
   const pct = (f: number) => cs.length ? cs[Math.min(cs.length - 1, Math.round(f * (cs.length - 1)))] : NaN;
@@ -423,11 +485,12 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
       validationEvents: fit.validation.filter((i) => fit.subjects.event[i] === 1).length, cIndex: fit.validationCIndex! } : null,
     cIndex: { median: pct(0.5), q1: pct(0.25), q3: pct(0.75), values: fit.cIndexRuns },
     features: fit.features, groups: g.groups, logrank: g.logrank, refit: g.refit, histogram: g.histogram, scale: g.scale, percentiles: g.percentiles, labelAbove, cutsChosen,
+    ...(t1 ? { table1: t1.table } : {}),
   };
   return {
-    kind: "riskmodel", cohorts: vNames, riskmodel: result, queries: fit.queries.map((q) => ({ study, ...q })),
+    kind: "riskmodel", cohorts: vNames, riskmodel: result, queries: [...fit.queries, ...(t1 ? t1.queries : [])].map((q) => ({ study, ...q })),
     method: riskmodelMethod({ study, cohort: name, cohortPatients: cohorts[name].count, rowsReturned: fit.rowsReturned, r: result,
-      lambdas: RISK_LAMBDAS, folds: RISK_FOLDS, testShare: RISK_TEST_SHARE }),
+      lambdas: RISK_LAMBDAS, folds: RISK_FOLDS, testShare: RISK_TEST_SHARE, table1Histograms: t1 ? t1.histograms : [] }),
     participation: ctx.participationFor([study], true),
     caveat: "Association, not cause: a gene's weight is its link to " + endpoint + " with the other candidates" + (fit.covariates.length ? " and the covariates" : "") +
       " held fixed, in this cohort" + (strata ? ", within each " + strata : "") + ". " +
@@ -441,6 +504,7 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
       "Genes outside the panels every patient was sequenced on are not candidates, so a patient is never counted as wild-type for a gene they were not tested for. " +
       (g.groupsMade < asked ? "Asked for " + asked + " groups, made " + g.groupsMade + ": the scores take only " + g.distinct + " distinct values, and patients with the same score stay in the same group. " : "") +
       (g.distinct < 20 && g.groupsMade === asked ? "The scores take only " + g.distinct + " distinct values, so the groups can be unequal in size: patients with the same score stay together. " : "") +
+      (t1 ? "Table 1 describes the patients the curves draw; its rows marked “in the model” (the model's genes and covariates) and “outcome” differ between the groups by construction, so they get no q-value and are left out of the correction. " : "") +
       "The C-index ignores delayed entry. Seeded (seed " + seed + "): the same document gives the same model.",
   };
 }

@@ -134,7 +134,8 @@ describe("the fit's cache key", () => {
 
   test("the settings left out only cut and draw the groups: the model's settings do not read them", () => {
     for (const k of RISK_PRESENTATION_KEYS) {
-      const changed = { ...base, [k]: k === "cohorts" ? ["B"] : k === "cuts" ? [0.8] : k === "note" ? "other" : k === "labelAbove" ? 0.9 : 5 } as RiskmodelView;
+      const changed = { ...base, [k]: k === "cohorts" ? ["B"] : k === "cuts" ? [0.8] : k === "note" ? "other" : k === "labelAbove" ? 0.9
+        : k === "describe" ? { attributes: ["STAGE"], genes: ["KEAP1"] } : 5 } as RiskmodelView;
       assert.equal(key(changed), key(base), k + " is left out of the key");
       assert.deepEqual(riskFitSpec(changed, "v7"), riskFitSpec(base, "v7"), k + " must not change what the fit reads");
     }

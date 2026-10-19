@@ -949,6 +949,10 @@ export interface RiskmodelRowsOpts {
   driverPin?: string | null;
   /** re-anchor the clock at a timeline event, with the delayed entry that implies */
   anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" } | null;
+  /** Table 1's clinical attributes, returned as d0, d1, … (the folded value: the patient's, or the
+   *  first sample's), r0, r1, … (that value as spelled) and u0, u1, … (how many distinct folded
+   *  values the patient's samples hold) */
+  describe?: string[];
 }
 
 /**
@@ -962,9 +966,9 @@ export interface RiskmodelRowsOpts {
  * patients needs their rows.
  */
 export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o: RiskmodelRowsOpts): string {
-  const { endpoint, columns, strata = null, covariates = [], driverPin = null, anchor = null } = o;
+  const { endpoint, columns, strata = null, covariates = [], driverPin = null, anchor = null, describe = [] } = o;
   if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
-  for (const a of [strata, ...covariates]) if (a && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'");
+  for (const a of [strata, ...covariates, ...describe]) if (a && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'");
   const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
   const pid = pidOf("patient_unique_id", study);
   const attrs = [...(strata ? [strata] : []), ...covariates];
@@ -1022,16 +1026,31 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
       "    AND " + foldedEqualsSql("ce.event_type", anchor.eventType) + "\n" + anchorAttr +
       "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
       "  GROUP BY pid\n" +
+      ")" : "") +
+    (describe.length ?
+      ",\ndescr AS (\n" +
+      "  SELECT " + pid + " AS pid,\n" +
+      describe.map((a, k) => {
+        const is = "attribute_name = " + sq(a), fold = clinicalValueFoldSql("attribute_value");
+        return "         argMinIf(" + fold + ", sample_unique_id, " + is + ") AS d" + k + ", argMinIf(attribute_value, sample_unique_id, " + is + ") AS r" + k +
+          ", uniqExactIf(" + fold + ", " + is + ") AS u" + k;
+      }).join(",\n") + "\n" +
+      "  FROM " + clinicalTable(db, describe) + "\n" +
+      "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name IN (" + describe.map(sq).join(",") + ") AND trimBoth(attribute_value) != ''\n" +
+      "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+      "  GROUP BY pid\n" +
       ")" : "") + "\n" +
     "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes" +
     (strata ? ", attrs.a0 AS stratum" : "") +
     covariates.map((_, k) => ", attrs.a" + (k + (strata ? 1 : 0)) + " AS c" + k).join("") +
-    (anchor ? ", anch.hit AS anchored, round(anch.day / 30.4375, 4) AS anchor_months" : "") + "\n" +
+    (anchor ? ", anch.hit AS anchored, round(anch.day / 30.4375, 4) AS anchor_months" : "") +
+    describe.map((_, k) => ", descr.d" + k + " AS d" + k + ", descr.r" + k + " AS r" + k + ", descr.u" + k + " AS u" + k).join("") + "\n" +
     "FROM os\n" +
     "  LEFT JOIN panels ON panels.pid = os.pid\n" +
     "  LEFT JOIN mut ON mut.pid = os.pid\n" +
     (attrs.length ? "  LEFT JOIN attrs ON attrs.pid = os.pid\n" : "") +
     (anchor ? "  LEFT JOIN anch ON anch.pid = os.pid\n" : "") +
+    (describe.length ? "  LEFT JOIN descr ON descr.pid = os.pid\n" : "") +
     "WHERE os.months IS NOT NULL AND os.months > 0\n" +
     // a fixed order: the ensemble's seeded splits are drawn over row positions, so the same
     // document gives the same model only if the rows come back in the same order. The id orders

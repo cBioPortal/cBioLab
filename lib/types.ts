@@ -963,6 +963,54 @@ export interface RiskmodelView {
   /** the volcano names the genes kept in at least this share of runs (0 to 1, default 0.5); drawn in
    *  the browser from the whole result, so changing it re-runs nothing */
   labelAbove?: number;
+  /** Table 1: the risk groups' clinical and genomic makeup, tested across groups. Present, the view
+   *  computes it; a list left out is the default (the study's leading attributes; the genes the
+   *  model kept most often) */
+  describe?: { attributes?: string[]; genes?: string[] };
+}
+
+/** Why a Table 1 row differs between the risk groups by construction, or is the model's stratum. */
+export type RiskTable1Role = "in the model" | "outcome" | "stratum" | null;
+
+interface RiskTable1Test {
+  /** null when the row cannot be tested (the reason in `untested`) */
+  test: "chi-squared" | "Kruskal-Wallis" | null; statistic: number | null; df: number | null; p: number | null;
+  /** Benjamini–Hochberg across the tested rows that are not in the model or the outcome; null for those */
+  q: number | null;
+  untested?: string;
+}
+
+export type RiskTable1Row =
+  | ({ kind: "cat"; name: string; per: "patient" | "sample"; role: RiskTable1Role;
+      /** every value recorded among the groups' patients, commonest first, with its count per group */
+      levels: { value: string; counts: number[] }[];
+      /** per group, patients with no value recorded */
+      missing: number[];
+      /** patients whose samples hold more than one value (counted under their first sample's) */
+      multiValued: number; minExpected: number | null } & RiskTable1Test)
+  | ({ kind: "num"; name: string; per: "patient" | "sample"; role: RiskTable1Role;
+      perGroup: { n: number; median: number | null; q1: number | null; q3: number | null; missing: number }[];
+      multiValued: number } & RiskTable1Test)
+  | ({ kind: "gene"; name: string; role: RiskTable1Role;
+      /** per group: patients with the gene mutated, patients whose panels cover it, and those whose do not */
+      perGroup: { altered: number; profiled: number; notProfiled: number }[]; minExpected: number | null } & RiskTable1Test)
+  | { kind: "skipped"; name: string; what: "attribute" | "gene"; skipped: string };
+
+export interface RiskTable1 {
+  /** the patients described: the same as the groups' curves */
+  reportedOn: "held-out scores" | "validation half";
+  groups: { name: string; n: number }[];
+  /** the gene rows count mutations as the model does */
+  measure: "any" | "driver";
+  /** what the table holds, as a document would name it — what "Add to document" writes */
+  describe: { attributes: string[]; genes: string[] };
+  /** the default lists were used (no list named in the view) */
+  defaults: { attributes: boolean; genes: boolean };
+  rows: RiskTable1Row[];
+  /** attributes the default rule considered and left out, with why */
+  omitted: { name: string; why: string }[];
+  /** rows in the Benjamini–Hochberg family */
+  tested: number;
 }
 
 export interface RiskmodelResult {
@@ -1009,6 +1057,8 @@ export interface RiskmodelResult {
   /** the held-out score (raw) at each whole percentile 0…100 of the scores the cuts are placed on,
    *  the rank a cut at that quantile starts from — what the risk-groups dialog places its handles by */
   percentiles: number[];
+  /** with `describe`: Table 1, the groups' makeup */
+  table1?: RiskTable1;
 }
 
 export interface LabsView {
