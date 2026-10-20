@@ -35,7 +35,7 @@ a hover lands on an arbitrary one. So:
   combines the patient's samples by a stated rule: a number is their mean, a category their common
   value or "Multiple" where they differ, an alteration counts if any sample has it, and the caption
   says how many patients had more than one sample.
-- **At or under `POINTS_CAP` (5,000), every case is a point** (`allPoints`, default true), on a
+- **At or under `POINTS_CAP` (10,000), every case is a point** (`allPoints`, default true), on a
   scatter as on a box — the portal's picture, and what most single studies get.
 - **Over the cap, the crowd is density, and point layers draw chosen subsets in colour over it.**
   `points` is an ordered list of at most four layers (`lib/plot-layers.ts`):
@@ -78,8 +78,21 @@ One commit per item; `npm test` and a focused check per item; the gate before ea
 5. **Done.** Show one layer alone: each layer is a group in the SVG tagged with its place in the
    list (its cases an earlier layer drew are a hidden group of their own), and a row of buttons
    above the figure steps the rest back with one CSS rule; Esc restores. Browser state only.
-6. **Measure the cap.** SVG draw time and payload at 5k, 10k, 20k and 50k points on msk_chord;
-   set `POINTS_CAP` from it.
+6. **Done.** The cap, measured. The plot renderer drew a scatter and a box at n points
+   (synthetic values, real-shaped ids), and headless Chrome on the dev server (6 cores, no GPU)
+   inserted and painted each SVG, median of 3:
+
+   | points | paint, scatter / box | one hover hit-test | JSON (raw / gzip) |
+   |---|---|---|---|
+   | 5,000 | 84 / 117 ms | 0.4 ms | 220 / 35 KB |
+   | 10,000 | 180 / 190 ms | 1.7 ms | 440 / 70 KB |
+   | 20,000 | 352 / 337 ms | 3.2 ms | 880 / 140 KB |
+   | 50,000 | 904 / 752 ms | 7 ms | 2.2 MB / 350 KB |
+
+   Building the SVG string is 25–190 ms and not the limit; painting is, at about 18 ms per
+   thousand points, paid again on every redraw (a resize, a re-run). `POINTS_CAP` is 10,000, which
+   keeps a redraw near 200 ms on this machine (a laptop with a GPU is faster). Hover will go
+   through one overlay (item 9), so per-circle hit-testing does not set the cap.
 7. **Multiple genes.** An alteration axis whose OQL has several statements gets one category per
    statement (overlaps as their own category, never assigned arbitrarily), and commas separate
    statements as well as `;` and newlines.

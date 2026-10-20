@@ -10,6 +10,7 @@ import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { PlotData, ViewResult } from "../lib/types.ts";
 
 type Calls = string[];
+const CAP = POINTS_CAP.toLocaleString("en-US");
 const EXTENT = { x0: 0, x1: 100, y0: 0, y1: 50 };
 const scatter = (): PlotData => ({ shape: "scatter", n: 1000, x: { label: "AGE", kind: "num" }, y: { label: "TMB", kind: "num" },
   extent: { ...EXTENT }, grid: [240, 160], bins: [{ bx: 1, by: 1, n: 1000 }],
@@ -83,7 +84,7 @@ describe("a highlight on one study", () => {
     assert.match(r.note!, /statistics are over the whole plotted cohort/);
   });
 
-  test("past the cap the same cases come back as cells on the plot's own grid and extent, never the first 5,000", async () => {
+  test("past the cap the same cases come back as cells on the plot's own grid and extent, never the first POINTS_CAP", async () => {
     const calls: Calls = [];
     const r = await run({ s: fake("patient-level", calls, { points: null }) });
     const h = r.plot!.layers![0];
@@ -92,7 +93,7 @@ describe("a highlight on one study", () => {
     assert.deepEqual(h.bins, [{ bx: 2, by: 3, n: 7 }]);
     assert.equal(h.n, 7);
     assert.ok(calls.includes("bins [240,160] " + JSON.stringify(EXTENT)), "the highlight is binned on the scatter's grid: " + calls.join("; "));
-    assert.match(r.note!, /drawn as shaded cells \(more than 5,000 cases/);
+    assert.match(r.note!, new RegExp("drawn as shaded cells \\(more than " + CAP + " cases"));
   });
 
   test("an aggregate-only participant is never asked for points, and its highlight is an aggregate", async () => {
@@ -226,7 +227,7 @@ describe("rule layers", () => {
     for (const extra of [{}, { allPoints: false }]) {
       const r = await run({ s: fake("patient-level", []) }, { points: [{ rule: "outliers" }], extra });
       assert.deepEqual([r.plot!.layers![0].shown, r.plot!.layers![0].why],
-        ["none", "at or under 5,000 cases there is no density for them to stand out of"], JSON.stringify(extra));
+        ["none", "at or under " + CAP + " cases there is no density for them to stand out of"], JSON.stringify(extra));
     }
   });
 

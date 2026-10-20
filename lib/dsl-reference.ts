@@ -17,11 +17,15 @@
 // ============================================================================
 
 import { DOC_VERSION } from "./doc-version.ts";
+import { POINTS_CAP } from "./plot-layers.ts";
 import type { TemplateDoc } from "./types.ts";
 import type { CustomDataset } from "./custom-data-names.ts";
 import { LUAD_BIOPSY_SITE_DEMO } from "./custom-data-demo.ts";
 import { SPECTRUM_SC_DEMO } from "./spectrum-sc-demo.ts";
 import { HTA11_SC_DEMO } from "./hta11-sc-demo.ts";
+
+/** the plot's points cap as the docs print it */
+const POINTS_CAP_TEXT = POINTS_CAP.toLocaleString("en-US");
 
 export const DSL_VERSION = DOC_VERSION;
 
@@ -1522,7 +1526,7 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | \`logistic\` | \`outcome:axis, outcomeEvent?:"<level>", covariates:[axis, ...(max 8)], cohorts:[names]\` | multivariate logistic regression: a BINARY outcome (not time-to-event \u2014 no endpoint/months convention here) regressed on several covariates at once, reported as odds ratios with Wald confidence intervals, drawn as a forest plot the same shape as \`cox\`'s. \`outcome\` is a plot axis, exactly like a covariate (clinical, molecular, or alteration status). A categorical outcome (a clinical attribute, or an alteration axis) needs \`outcomeEvent\` naming which observed value counts as the event (1) \u2014 every other observed value collapses into "not event" (0), and which values got collapsed is disclosed in the caveat; omitting it, or naming a value never observed, is refused with the actual observed values listed rather than guessed at. A numeric outcome must already be coded exactly 0/1 (refused otherwise) and must NOT be given \`outcomeEvent\`. Covariates use the exact same dummy-coding and reference-level rules as \`cox\` (see above): a mutated-vs-not axis defaults to \`\"Not mutated\"\`, others default to the most frequent level, \`reference\` overrides either. Same patient-level-only boundary as \`cox\` |
 | \`course\` | \`eventTypes:[\u22646], anchor?:{eventType,key?,value?,occurrence?}, binMonths?:3, fromMonths?:-12, toMonths?:60, cohorts:[names]\` | the **clinical course**: per time bin, the share of the cohort in each event state. Two things it refuses to fake. (1) The denominator is the patients still under observation in that bin \u2014 first recorded event to last contact (the later of their last event and their OS follow-up) \u2014 never the whole cohort, which would make a curve fall merely because follow-up ran out. (2) \`anchor\` is optional for one study but **required across studies**: day 0 is birth in some studies and first sequencing in others, and nothing in the schema records which, so raw day 0 compares incomparable clocks. Event types that carry real durations are drawn as a state the patient is IN; the rest as an event that HAPPENED \u2014 read from the data, not from the name. Bins are half-open [t, t+w). Event-name spellings differing only in case are folded (\`Treatment\`/\`TREATMENT\`) and the fold is named in the caveat; nothing else is merged |
 | \`sequence\` | \`labelKey?:"SUBTYPE", eventType?:"treatment", lineClasses?:"systemic"|"all"|[classes], exclude?:[values], lineGap?:90, maxSteps?:3, topN?:8, cohorts:[names]\` | **what follows what**: therapy transitions as lines, drawn as a Sankey. Records are first grouped into LINES \u2014 therapies less than \`lineGap\` days apart are one line, labelled by their whole combination (sorted, so \`A + B\` and \`B + A\` are one regimen). That grouping is the point: a patient has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision. Paths that end flow into TWO explicit terminals, never one: **no further line** (the study watched for at least one \`lineGap\` and saw no further therapy) and **record ends here** (it did not, so nothing can be concluded). Measured on MSK-CHORD, 68% of patients have under three months of observation after their last therapy and the median is 15 days \u2014 so collapsing the two would turn record-keeping into an apparent clinical decision. Flows out of a node sum to it, so nobody vanishes. Up to two cohorts are drawn as panels sharing one scale and one colour per regimen. Lines are the shared definition (see "Treatment line (derived)" above): systemic-therapy records by default, \`lineClasses\` \`"all"\` for every treatment record or a list of class names for your own; \`labelKey\` only names a line\u2019s therapies (e.g. AGENT), it never decides which records form lines. \`exclude\` drops records by label value, matched ignoring case. More than two cohorts is refused |
-| \`plot\` | \`x:axis, y:axis, unit?:"sample"\\|"patient", bins?:[240,160], allPoints?:true, points?:[layer(max 4)], colorBy?:axis, ringBy?:axis, cohorts:[names]\` | two axes over the same cases, aggregated **inside the database**: a scatter comes back as counts per grid cell, a box as quartiles per group, two categoricals as a contingency table. The payload is a few kilobytes whatever the cohort's size. A point is a sample, as on cBioPortal's Plots tab; \`unit:"patient"\` makes it a patient, combining a patient's samples: a numeric value is their mean, a category their common value or "Multiple" where they differ, an alteration counts if any sample has it, and the caption says how many patients had more than one sample. Every case is a point up to 5,000 (\`allPoints: false\` turns that off), from a participant that may show cases; \`points\` lists up to four subsets drawn in colour over it — \`{rule:"outliers"}\` (the default), \`{rule:"extremes",axis,n}\`, \`{rule:"trend",n}\`, \`{cohort}\` — see **Points** below |
+| \`plot\` | \`x:axis, y:axis, unit?:"sample"\\|"patient", bins?:[240,160], allPoints?:true, points?:[layer(max 4)], colorBy?:axis, ringBy?:axis, cohorts:[names]\` | two axes over the same cases, aggregated **inside the database**: a scatter comes back as counts per grid cell, a box as quartiles per group, two categoricals as a contingency table. The payload is a few kilobytes whatever the cohort's size. A point is a sample, as on cBioPortal's Plots tab; \`unit:"patient"\` makes it a patient, combining a patient's samples: a numeric value is their mean, a category their common value or "Multiple" where they differ, an alteration counts if any sample has it, and the caption says how many patients had more than one sample. Every case is a point up to ${POINTS_CAP_TEXT} (\`allPoints: false\` turns that off), from a participant that may show cases; \`points\` lists up to four subsets drawn in colour over it — \`{rule:"outliers"}\` (the default), \`{rule:"extremes",axis,n}\`, \`{rule:"trend",n}\`, \`{cohort}\` — see **Points** below |
 | \`attrition\` | \`cohorts:[names] (≤6)\` | **cohort attrition**, CONSORT-style: for each cohort, the study base and then the patients left after each clause of its \`all\`, in the order written, with how many that clause alone removed. Each step is evaluated as its own cohort (the first k clauses ANDed), with the same compiler and the same per-study counts, so the last step is the cohort's own count by construction — a mismatch is reported, never smoothed over. The order of clauses changes the path, never the final count. Counts only, so every participant (aggregate-only and remote included) can answer; across studies the counts are summed and overlap is not deduplicated |
 | \`genome\` | \`binMb?:2, threshold?:0.2, includeX?:false, cohorts:[names] (≤4)\` | **genome-wide copy-number frequency** from the copy-number SEGMENTS: the share of each cohort's segmented samples gained (log2 segment mean ≥ \`threshold\`) or lost (≤ −\`threshold\`) in every \`binMb\`-megabase bin (1–50) along chromosomes 1–22 (and X with \`includeX\` — its log ratio mostly records sex, so it is off by default), drawn as gains up and losses down, one panel per cohort. Each bin's denominator is the samples whose segmentation covers it — a bin nothing covers is drawn as unmeasured, never as copy-neutral. A bin takes the value of the segment over its midpoint, so an event narrower than a bin can be missed; the caption says so. Unit is the SAMPLE, not the patient. Exactly two cohorts add a per-bin two-sided Fisher test (gains and losses separately, Benjamini–Hochberg across bins), drawn as a strip coloured by which cohort is higher. Studies on different reference genomes (hg19/hg38) are refused rather than drawn on one axis. Counts only; a remote peer cannot answer yet and is named as left out |
 | \`pathways\` | \`pathways?:[names], sets?:[{name, genes:[≤40]} ×≤4], measure?:"driver"\|"any", topGenes?:6, cohorts:[names] (≤4)\` | **oncogenic signalling pathways**: the ten canonical pathways of Sanchez-Vega et al. (Cell 2018, Table S3: RTK-RAS, PI3K, TP53, Cell cycle, MYC, WNT, NOTCH, Hippo, TGF-β, NRF2 — 334 genes), and/or the document's own \`sets\`, each as the share of the cohort with at least one member altered. \`measure\` defaults to \`"driver"\` (OncoKB-annotated drivers, as the paper counted curated oncogenic events; refused without an annotation pin) or \`"any"\`. A pathway's denominator is the patients profiled for at least ONE member (the union of the members' panels, the oncoprint's merged-row rule, computed in the database with the same event table, CNA rule and driver join as \`compare\`, so a one-gene set equals that gene's own count); each member's % is over the patients profiled for THAT gene. The \`topGenes\` most-altered members are drawn per pathway; the rest are pooled as "+N more altered", and members on no participating panel are listed as never profiled. Two cohorts add Fisher tests with BH q across pathways, and separately across member genes. Counts only; a remote peer cannot answer yet and is named |
@@ -1619,20 +1623,20 @@ uses, not yet built for a box); its quartiles are a size-weighted approximation 
 same one Explore's federated numeric histograms already disclose.
 
 **Points: every case when it is a drawing, the outliers when it is not.** cBioPortal draws every
-case as a point. So does this, up to 5,000 cases, on a scatter as on a box, and only when the
+case as a point. So does this, up to ${POINTS_CAP_TEXT} cases, on a scatter as on a box, and only when the
 study is one this participant may see cases in — the points carry case ids, so they come from the
 same entitlement that lets a patient-level participant list cohort members, and an aggregate-only
 participant has no method that could return them. The jitter across a box is fixed per case, so
 the figure does not move between the server SVG, the browser and the Python package.
 
-Past 5,000 the crowd is drawn as density — a quarter of a million dots is a solid block, and a
+Past ${POINTS_CAP_TEXT} the crowd is drawn as density — a quarter of a million dots is a solid block, and a
 hover on it would land on an arbitrary case — and, by default, the **outliers** are a point layer
 over it (see **Points**): on a box, the
 values beyond each group's Tukey whiskers, drawn over a **violin** (from per-group bins) that stops
 at the whiskers; on a scatter, the cases in **sparse cells** of the grid — every cell holding at
-most 3 cases (fewer, if that is what keeps the points under 5,000) is drawn as its cases instead of
+most 3 cases (fewer, if that is what keeps the points under ${POINTS_CAP_TEXT}) is drawn as its cases instead of
 as a shade. Both subsets are chosen in the database, against the same grid and whiskers the figure
-draws, and if a subset is itself past 5,000 none of it is drawn, never the first 5,000. With
+draws, and if a subset is itself past ${POINTS_CAP_TEXT} none of it is drawn, never the first ${POINTS_CAP_TEXT}. With
 \`allPoints: false\` and \`points: []\`, or from a participant that may not disclose a case, the
 figure is density alone.
 The caption always says which it drew, how many points, and why there are none when there are
@@ -1663,7 +1667,7 @@ or per sample following the plot's \`unit\`. Because it is a categorical axis, i
 \`colorBy\`/\`ringBy\` and as a Cox or logistic covariate, where "Unaltered" is the reference level.
 OQL is for alteration axes only: a molecular axis stays one gene's value.
 
-**Points.** Every case is a point when there are at most 5,000 of them and every study may show
+**Points.** Every case is a point when there are at most ${POINTS_CAP_TEXT} of them and every study may show
 cases (\`allPoints: false\` draws the density alone at any size). Over that the plotted cohort is a
 density, and \`points\` lists the subsets worth seeing one by one, each drawn in its own colour with
 the plotted cohort turned grey beneath them (at most four layers, in order):
@@ -1675,7 +1679,7 @@ grid cell holding at most 3 cases, left unshaded under its points); \`{"rule": "
 \`{"cohort": "KRAS G12C"}\` — the plotted cohort's cases that are also in that cohort (how many of its
 patients fall outside the plotted cohort is stated, and they are not drawn). The default is
 \`[{"rule": "outliers"}]\`; \`[]\` draws none. A case in two layers is drawn by the first, and the
-caption counts what each layer left to an earlier one. Every layer shares one 5,000-point budget,
+caption counts what each layer left to an earlier one. Every layer shares one ${POINTS_CAP_TEXT}-point budget,
 and a layer is never cut to its first cases: a cohort layer past the budget, or from a study that
 may not show cases, is drawn as an aggregate on the plot's own scale (cells on the scatter's grid,
 or a narrow box per group), and a rule layer is not drawn — the caption says which and why.
@@ -1902,7 +1906,7 @@ export const AGENT_GRAMMAR = `Document shape:
                //        | {"source":"alteration","gene":G,"by":"mutated|mutationType|cna|driver"?}
                //        | {"source":"alteration","genes":[G,...(2-20)],"by":"mutated"?}  // any-of-N as one category; only "mutated"
                //        | {"source":"alteration","oql":"KRAS: G12C; STK11: MUT"}  // Altered (matches any entry) vs Unaltered
-               // two numeric axes -> scatter (binned; every case a point up to 5,000, else sparse-cell outliers); one categorical -> box;
+               // two numeric axes -> scatter (binned; every case a point up to ${POINTS_CAP_TEXT}, else sparse-cell outliers); one categorical -> box;
                // two categorical -> a contingency table
              {"kind":"attrition","cohorts":[names?(max 6)]},
              {"kind":"genome","binMb":2,"threshold":0.2,"includeX":false,"cohorts":[names?(max 4)]},

@@ -16,6 +16,8 @@ import { CHIP, FIELD } from "../_ui/toolbar.ts";
 import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
 
 type Update = (fn: (view: any) => any) => void;
+/** the points cap as the controls print it */
+const CAP = POINTS_CAP.toLocaleString("en-US");
 
 function LogToggle({ spec, side, numeric, busy, update }: { spec: any; side: "x" | "y"; numeric: boolean; busy: boolean; update: Update }) {
   const axis = spec[side];
@@ -71,7 +73,7 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
 }) {
   const has = (f: (l: PointLayerSpec) => boolean) => layers.some(f);
   const offers: [string, string, PointLayerSpec][] = [];
-  if (!has((l) => "rule" in l && l.rule === "outliers")) offers.push(["outliers", "outliers (past 5,000 cases)", { rule: "outliers" }]);
+  if (!has((l) => "rule" in l && l.rule === "outliers")) offers.push(["outliers", "outliers (past " + CAP + " cases)", { rule: "outliers" }]);
   for (const side of ["x", "y"] as const)
     if (plot?.[side].kind === "num" && !has((l) => "rule" in l && l.rule === "extremes" && l.axis === side))
       offers.push(["extremes:" + side, "top and bottom " + POINT_RULE_N + " by " + axisName(side), { rule: "extremes", axis: side }]);
@@ -179,11 +181,11 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohor
                 <span className="axfield-name text-sm font-semibold text-foreground"
                   title="subsets of the plotted cases drawn in their own colour over it; the first layer draws a case two share">Points</span>
                 <label className="chk text-md text-foreground" title={overCap
-                  ? "this plot has " + plot!.n.toLocaleString() + " " + unit + "s, more than 5,000, so it is drawn as density whatever this says"
-                  : "every case as a point when there are at most 5,000 and the study may show cases; off draws the density alone"}>
+                  ? "this plot has " + plot!.n.toLocaleString() + " " + unit + "s, more than " + CAP + ", so it is drawn as density whatever this says"
+                  : "every case as a point when there are at most " + CAP + " and the study may show cases; off draws the density alone"}>
                   <Checkbox checked={spec.allPoints !== false} disabled={busy || overCap}
                     onCheckedChange={(c) => update((vv) => { const n = { ...vv }; if (c === true) delete n.allPoints; else n.allPoints = false; return n; })} />
-                  every {unit} (up to 5,000)
+                  every {unit} (up to {CAP})
                 </label>
                 <PointLayers layers={layers} plot={plot} cohortOptions={cohortOptions} axisName={axisName} busy={busy}
                   onChange={(next) => update((vv) => ({ ...vv, points: next }))} />

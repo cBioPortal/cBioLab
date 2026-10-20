@@ -4,8 +4,11 @@
 /**
  * How many cases a plot draws as points before it stops being a drawing: at or under it every case
  * is a point; past it the plotted cohort is density, and the point layers share this many points.
+ * Set from a measurement (docs/plot-case-level.md): an SVG of n points paints in about 18 ms per
+ * thousand on the dev server's headless Chrome, so 10,000 keeps a redraw near 200 ms; the points
+ * travel as about 44 bytes each.
  */
-export const POINTS_CAP = 5000;
+export const POINTS_CAP = 10000;
 /** layers one plot may draw: each takes a colour of its own, and past four they stop being told apart */
 export const POINT_LAYER_CAP = 4;
 /** a layer's colour, by its place in the view's list */
