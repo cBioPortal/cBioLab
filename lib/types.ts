@@ -549,11 +549,18 @@ export interface PlotView {
   /** the grid a scatter is binned onto (default 240 x 160) */
   bins?: [number, number];
   /**
-   * Draw the values over a box plot's boxes when there are few enough of them and the study is
-   * one this participant may see cases in (default true). Above the cap, or from an
-   * aggregate-only participant, the same values are drawn as a density instead.
+   * Every case is a point when there are at most 5,000 of them and the reader may see cases
+   * (default true); false draws the density alone at any size.
    */
-  points?: boolean;
+  allPoints?: boolean;
+  /**
+   * Subsets of the plotted cohort's cases drawn in colour over the plot, in order (at most 4): the
+   * outliers (past the cap: a box's values beyond its whiskers, a scatter's sparse cells), the
+   * extremes on an axis, the cases furthest from the fitted line, or a cohort's cases. Default
+   * [{rule:"outliers"}]; [] draws none. A case in two layers is drawn by the first. Every layer
+   * shares one 5,000-point budget; a cohort layer past it is drawn as density cells or boxes.
+   */
+  points?: PointLayerSpec[];
   /**
    * Colour the values by a category, as the portal's "Color samples by" does: `colorBy` fills
    * each point, `ringBy` rings it, so a case that is both amplified and mutated stays legible.
@@ -561,13 +568,6 @@ export interface PlotView {
    */
   colorBy?: PlotAxis;
   ringBy?: PlotAxis;
-  /**
-   * Cohorts drawn over the plotted one (at most 4), each in its own colour: the plotted cohort's
-   * cases that are also in it, as points when this participant may see cases and there are few
-   * enough, otherwise as density cells (scatter) or a box per group. The plotted cohort's
-   * statistics are unchanged; the figure says how many of each highlight it drew.
-   */
-  highlight?: string[];
 }
 export interface CooccurrenceView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
@@ -1522,6 +1522,7 @@ export interface AlterationsResult extends TableRows<string | number | null> {
   oncokbPin: string | null;
 }
 import type { PlotAxis, PlotData } from "./plot.ts";
+import type { PointLayerSpec } from "./plot-layers.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView

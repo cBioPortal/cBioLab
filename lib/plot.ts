@@ -61,13 +61,8 @@ export type PlotShape = "scatter" | "box" | "table" | "waterfall";
 export const CATEGORY_CAP = 150;
 /** the grid a scatter is binned onto: the payload is bounded by this, never by the cohort */
 export const DEFAULT_BINS: [number, number] = [240, 160];
-/**
- * How many points a box plot will draw over its boxes before it stops being a drawing. Above
- * this the same values come back as a violin: 290,000 jittered dots are a solid block, and the
- * density is both smaller to send and what the reader was looking for.
- */
-export const POINTS_CAP = 5000;
-export { HIGHLIGHT_CAP, HIGHLIGHT_COLORS, HIGHLIGHT_BASE } from "./plot-highlight.ts";
+export { POINTS_CAP, POINT_LAYER_CAP, LAYER_COLORS, LAYER_BASE, DEFAULT_POINT_LAYERS, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "./plot-layers.ts";
+import { POINTS_CAP, POINT_RULE_N_MAX } from "./plot-layers.ts";
 export { isAbsent, jitterFor } from "./plot-draw.ts";
 import { isAbsent } from "./plot-draw.ts";
 /**
@@ -492,6 +487,38 @@ export function plotPointsSql(numSel: string, catSel: string, cohortSql: string,
     "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
 }
 
+/**
+ * A ranked layer's points, WITH their case ids: the `n` highest and `n` lowest values of one axis
+ * (per group on a box), or on a scatter the `n` cases furthest from the fitted line. Returns ids,
+ * so like plotPointsSql it stays out of lib/federation.ts's aggregate builders and is reachable
+ * only from `PatientLevelResolver`. Bounded by `n`, so no cap is needed.
+ */
+export function plotRankedPointsSql(xSel: string, ySel: string, cohortSql: string, shape: "scatter" | "box",
+  numFirst: boolean, rank: PointRank): string {
+  const n = Math.max(1, Math.min(POINT_RULE_N_MAX, Math.round(rank.n)));
+  const head = pairIdCte(xSel, ySel, cohortSql);
+  if (shape === "box") {
+    // the numeric axis is the value, the categorical one the group, whichever the document put first
+    const cols = numFirst ? "id, y AS g, x AS v" : "id, x AS g, y AS v";
+    return head + "SELECT * FROM (\n" +
+      "  (SELECT " + cols + " FROM pair ORDER BY v DESC, id LIMIT " + n + " BY g)\n  UNION DISTINCT\n" +
+      "  (SELECT " + cols + " FROM pair ORDER BY v ASC, id LIMIT " + n + " BY g))";
+  }
+  if (rank.by === "residual")
+    return head + "SELECT id, x, y FROM pair ORDER BY abs(y - (" + num(rank.intercept) + " + " + num(rank.slope) + " * x)) DESC, id LIMIT " + n;
+  const col = rank.by;
+  return head + "SELECT * FROM (\n" +
+    "  (SELECT id, x, y FROM pair ORDER BY " + col + " DESC, id LIMIT " + n + ")\n  UNION DISTINCT\n" +
+    "  (SELECT id, x, y FROM pair ORDER BY " + col + " ASC, id LIMIT " + n + "))";
+}
+
+/** the pair of axes per case, keeping the case id: the start of every id-returning plot query */
+const pairIdCte = (x: string, y: string, cohortSql: string) =>
+  "WITH cohort AS (" + cohortSql + "),\n" +
+  "     xs AS (" + x + "),\n" +
+  "     ys AS (" + y + "),\n" +
+  "     pair AS (SELECT xs.id AS id, xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)\n";
+
 /** one group's whiskers, which is all a box's outlier query needs to know about it */
 export interface Whiskers { g: string; loWhisker: number; hiWhisker: number }
 
@@ -624,17 +651,42 @@ export interface PlotPoint { id: string; g: string; v: number; c?: string; r?: s
 /** one drawn scatter case, with its id */
 export interface PlotXYPoint { id: string; x: number; y: number }
 /**
- * Which cases a plot draws as points, and why the rest are not. `all`: every case. `outliers`:
- * over the points cap, the values beyond a box's whiskers or the cases in a scatter's sparse
- * cells, over the density of the rest. `none`: density alone, and `why` says why.
+ * Whether the plotted cohort's own cases are drawn as points. `all`: every case, at or under the
+ * points cap. `none`: density alone, and `why` says why. Subsets drawn in colour over it are the
+ * view's point layers (`PlotLayer`).
  */
 export interface PointSet {
-  rule: "all" | "outliers" | "none";
+  rule: "all" | "none";
   /** points drawn */
   drawn: number;
-  /** a scatter's outliers: every cell holding at most this many cases is drawn as its cases */
-  cellMax?: number;
   why?: string;
+}
+
+/** how a ranked layer orders the cases: by one axis's value (per group on a box), or by distance from the fitted line */
+export type PointRank = { by: "x" | "y"; n: number } | { by: "residual"; n: number; slope: number; intercept: number };
+
+/** A point layer as drawn: what it holds, how many of its cases are on the figure, and as what. */
+export interface PlotLayer {
+  kind: "outliers" | "extremes" | "trend" | "cohort";
+  /** what the key calls it */
+  label: string;
+  color: string;
+  /** a cohort layer: the cohort, its patients, and how many of them are in the plotted cohort */
+  name?: string;
+  patients?: number;
+  inPlot?: number;
+  /** the layer's cases with a value on both axes, in the plot's unit */
+  n: number;
+  /** points drawn, once cases an earlier layer already drew are left to it */
+  drawn?: number;
+  shown: "points" | "density" | "boxes" | "none";
+  /** why it is not drawn as points, when it is not */
+  why?: string;
+  points?: HighlightPoint[];
+  bins?: { bx: number; by: number; n: number }[];
+  groups?: PlotGroup[];
+  /** a scatter's outliers: the cells holding at most this many cases, left unshaded under their points */
+  cellMax?: number;
 }
 
 export interface PlotRequest {
@@ -644,26 +696,6 @@ export interface PlotRequest {
 }
 /** one highlighted case: a scatter's (x, y), or a box's group and value */
 export type HighlightPoint = { id: string; x: number; y: number } | { id: string; g: string; v: number };
-/**
- * A cohort drawn over the plotted one. Its cases are the plotted cohort's cases that are also in
- * it; each is a point when an entitled participant can name them and there are few enough,
- * otherwise the same cases as an aggregate (cells on the scatter's grid, or a box per group).
- */
-export interface PlotHighlight {
-  name: string;
-  color: string;
-  /** patients in the highlight cohort, and how many of them are in the plotted cohort */
-  patients: number;
-  inPlot: number;
-  /** cases drawn (in the plot's unit): those with a value on both axes */
-  n: number;
-  shown: "points" | "density" | "boxes" | "none";
-  /** why it is not drawn as points, when it is not */
-  why?: string;
-  points?: HighlightPoint[];
-  bins?: { bx: number; by: number; n: number }[];
-  groups?: PlotGroup[];
-}
 export interface PlotGroup { g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number; loWhisker: number; hiWhisker: number }
 export interface PlotData {
   shape: "scatter" | "box" | "table";
@@ -677,11 +709,11 @@ export interface PlotData {
   stats?: { pearson: number | null; spearman: number | null; slope: number | null; intercept: number | null;
             pPearson: number | null; pSpearman: number | null };
   groups?: PlotGroup[];
-  /** the values behind the boxes: every one when few enough and the reader may see cases, else the outliers */
+  /** the values behind the boxes: every one, when few enough and the reader may see cases */
   points?: PlotPoint[];
-  /** a scatter's cases drawn as points: every one when few enough, else those in sparse cells */
+  /** a scatter's cases drawn as points: every one, when few enough and the reader may see cases */
   xyPoints?: PlotXYPoint[];
-  /** which rule chose the points, how many, and why there are none when there are none */
+  /** whether the plotted cohort's own cases are points, how many, and why not when they are not */
   pointSet?: PointSet;
   violin?: { g: string; b: number; n: number; c?: string }[];
   /** what the colours mean: the fill category, the ring category, and the key to draw */
@@ -695,9 +727,8 @@ export interface PlotData {
   overlay?: "points" | "violin" | "none";
   cells?: { cx: string; cy: string; n: number }[];
   note?: string;
-  /** cases in the cohort, and how many carry each axis — what the inner join left out, and why */
   /** cases in the cohort, how many have each axis, and (patient mode) how many patients have several samples */
   coverage?: { total: number; nx: number; ny: number; multi?: number };
-  /** cohorts drawn over this one, in the view's order */
-  highlights?: PlotHighlight[];
+  /** the point layers drawn over the plot, in the view's order (the first holds a case two share) */
+  layers?: PlotLayer[];
 }

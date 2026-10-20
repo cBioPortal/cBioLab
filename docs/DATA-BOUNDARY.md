@@ -86,7 +86,7 @@ of …"). One rule decides it, `lib/view-coverage.ts`: the engine refuses by it 
 (`lib/analysis.ts`), and the page does not offer such a view (the add-view buttons, disabled with
 the reason) or such a cohort (its row in a view's cohort picker). Where every patient is counted
 and only a per-patient detail is withheld — the labs waterfall's bars, composition's per-case
-bars, a plot highlight drawn as density — the view is drawn and says what is withheld.
+bars, a plot's cohort layer drawn as density — the view is drawn and says what is withheld.
 
 ## Opt-in patient-level federation (per study and kind of data)
 

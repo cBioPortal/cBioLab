@@ -150,7 +150,7 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
             {hasKindCard(spec.kind as string) && <KindCardControls c={mc} />}
             {spec.kind === "plot" && <PlotControls spec={spec} plot={v && !v.error ? v.plot : undefined} attrs={catalog.attrs} profiles={catalog.profiles}
               loading={catalog.loading} busy={busy} update={(fn) => edit(vi, fn(spec))}
-              highlightOptions={Object.keys(doc.cohorts || {}).filter((n) => n !== drawn[0]).map((n) => ({ name: n, label: n, depth: 0 }))}>
+              cohortOptions={Object.keys(doc.cohorts || {}).filter((n) => n !== drawn[0]).map((n) => ({ name: n, label: n, depth: 0 }))}>
               {figureArea}
             </PlotControls>}
             {spec.kind !== "plot" && figureArea}

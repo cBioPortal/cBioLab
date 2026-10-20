@@ -573,6 +573,25 @@ async function main() {
       } catch (e) { sideWhat = String(e.message).split("\n")[0]; }
       ok("a plot's axes are defined in a sidebar beside the figure, and Swap axes swaps them", sideOk, sideWhat);
 
+      // Point layers: the sidebar lists the view's layers (the outliers by default) and adds one to
+      // the document; the figure's key then names it.
+      let layerWhat = "no plot rendered", layerOk = false;
+      try {
+        const chips = async () => page.locator(".plot-side .plot-layer").allInnerTexts();
+        const before = await chips();
+        await page.locator(".plot-side .plot-layers [role=combobox]").click();
+        await page.locator("[role=option]", { hasText: "furthest from the fit" }).click();
+        await page.waitForFunction(() => {
+          try { const v = JSON.parse(document.querySelector("#docjson").value).views[0];
+            return Array.isArray(v.points) && v.points.some((l) => l.rule === "trend"); } catch { return false; }
+        }, null, { timeout: 30000 });
+        await page.waitForFunction(() => /furthest from the fit \(/.test(document.querySelector(".figwidth svg")?.textContent || ""), null, { timeout: 300000 });
+        const after = await chips();
+        layerOk = before.length === 1 && /outliers/.test(before[0]) && after.length === 2;
+        layerWhat = "before " + JSON.stringify(before) + " -> after " + JSON.stringify(after) + "; the key names the new layer";
+      } catch (e) { layerWhat = String(e.message).split("\n")[0]; }
+      ok("a plot's point layers are listed in the sidebar, and adding one draws it with a key entry", layerOk, layerWhat);
+
       // The oncoprint's gear keeps ONLY the link out to cBioPortal; genes moved
       // to a named button and a modal, so the gear is not where editing hides.
       let gearSplit = "no oncoprint rendered", gearOk = false;

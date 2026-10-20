@@ -7,9 +7,8 @@ import { attributeLabel } from "../../lib/custom-data-names.ts";
 import type { AnalysisSource, ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 import { SERIES, seriesStyle } from "../../lib/chart/style.ts";
-import { HIGHLIGHT_CAP, HIGHLIGHT_COLORS } from "../../lib/plot-highlight.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
-import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, Lock, LockOpen, Pencil, Plus, Save, Split, StickyNote, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, Lock, LockOpen, Pencil, Plus, Save, Split, StickyNote, Trash2 } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
@@ -170,43 +169,6 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
           {!stacked && groupBy}
         </>;
       })()}
-    </span>
-  );
-}
-
-/**
- * A plot's highlight cohorts: one chip per cohort in the view's list, in its figure colour, and a
- * select offering the document's other cohorts until the cap is reached. Order is colour, so a
- * removed chip shifts the ones after it to the next colour, as the figure does.
- */
-export function HighlightPicker({ chosen, options, busy, onChange, stacked }: {
-  chosen: string[];
-  /** in a sidebar: no run label (the field has its own name) and the select takes the full width */
-  stacked?: boolean;
-  /** cohorts that may be highlighted: every cohort but the plotted one */
-  options: { name: string; label: string; depth: number }[];
-  busy?: boolean;
-  onChange: (next: string[]) => void;
-}) {
-  const left = options.filter((o) => !chosen.includes(o.name));
-  return (
-    <span className="hlpick">
-      {!stacked && <span className="tbl" title="other cohorts drawn over this one, each in its own colour">highlight</span>}
-      {chosen.map((n, i) => (
-        <span key={n} className="hlchip" title={"“" + n + "” drawn over the plotted cohort"}>
-          <span className="hldot" style={{ background: HIGHLIGHT_COLORS[i] }} />
-          <span className="hlname">{n}</span>
-          <Button type="button" variant="ghost" size="icon-xs" className="size-4 text-muted-foreground [&_svg:not([class*='size-'])]:size-3" disabled={busy}
-            aria-label={"stop highlighting " + n} onClick={() => onChange(chosen.filter((x) => x !== n))}><X /></Button>
-        </span>
-      ))}
-      {chosen.length < HIGHLIGHT_CAP && left.length > 0 && (
-        <OptionSelect className={stacked ? "w-full max-w-none" : "max-w-40"} value="" disabled={busy} ariaLabel="add a cohort to highlight"
-          onValueChange={(v) => { if (v) onChange([...chosen, v]); }}>
-          <option value="">{chosen.length ? "+ another" : "+ cohort"}</option>
-          {left.map((o) => <option key={o.name} value={o.name}>{"\u00a0".repeat(o.depth * 2) + o.label}</option>)}
-        </OptionSelect>
-      )}
     </span>
   );
 }

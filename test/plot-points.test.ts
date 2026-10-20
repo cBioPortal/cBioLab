@@ -1,7 +1,7 @@
-// Which cases a plot draws as points: every case at or under the cap, the outliers over it (a
-// box's values beyond its whiskers, a scatter's sparse cells), none from a participant that may
-// not show cases. The resolvers are fakes that record their calls, so the test can say what was
-// asked of whom, and what was NOT.
+// Which cases a plot draws as points: every case at or under the cap; over it the default outliers
+// layer (a box's values beyond its whiskers, a scatter's sparse cells); none from a participant
+// that may not show cases. The resolvers are fakes that record their calls, so the test can say
+// what was asked of whom, and what was NOT.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runPlot } from "../lib/views/plot.ts";
@@ -83,8 +83,10 @@ describe("a scatter's points", () => {
     assert.equal(calls.length, 1, "over the cap the every-case query is not run");
     assert.deepEqual(calls[0].extra, { grid: [240, 160], extent: EXTENT, cellMax: OUTLIER_CELL_MAX });
     assert.equal(calls[0].cap, POINTS_CAP);
-    assert.deepEqual(r.plot!.pointSet, { rule: "outliers", drawn: 1, cellMax: OUTLIER_CELL_MAX });
-    assert.match(r.note!, /1 sample in cells holding at most 3 is drawn as points; the other 5,999 samples as shaded cells/);
+    assert.deepEqual(r.plot!.pointSet, { rule: "none", drawn: 0, why: "more than 5,000 cases" });
+    const l = r.plot!.layers![0];
+    assert.deepEqual([l.kind, l.shown, l.n, l.drawn, l.cellMax], ["outliers", "points", 1, 1, OUTLIER_CELL_MAX]);
+    assert.match(r.note!, /outliers: 1 sample in cells holding at most 3, left unshaded under them/);
     assert.match(r.note!, /coefficients are over every sample/);
   });
 
@@ -95,7 +97,8 @@ describe("a scatter's points", () => {
     assert.equal(calls.length, 0, "nothing is fetched to be thrown away");
     assert.equal(r.plot!.pointSet!.rule, "none");
     assert.equal(r.plot!.xyPoints, undefined);
-    assert.match(r.note!, /5,001 samples sit alone in a cell, more than the 5,000 drawn as points, so none is/);
+    assert.equal(r.plot!.layers![0].shown, "none");
+    assert.match(r.note!, /outliers: not drawn, the cases alone in a cell are more than the 5,000 points left to draw/);
   });
 
   test("an aggregate-only participant is never asked, and the caption names it", async () => {
@@ -104,13 +107,15 @@ describe("a scatter's points", () => {
     assert.equal(calls.length, 0);
     assert.deepEqual(r.plot!.pointSet, { rule: "none", drawn: 0, why: "s may not show individual cases" });
     assert.match(r.note!, /No case is drawn as a point: s may not show individual cases/);
+    assert.match(r.note!, /outliers: not drawn, s may not show individual cases/);
   });
 
-  test("points: false asks for none", async () => {
+  test("allPoints: false and no layers ask for none", async () => {
     const calls: Call[] = [];
-    const r = await run(fake("patient-level", calls, () => scatter(10, [{ bx: 0, by: 0, n: 10 }])), { points: false });
+    const r = await run(fake("patient-level", calls, () => scatter(10, [{ bx: 0, by: 0, n: 10 }])), { allPoints: false, points: [] });
     assert.equal(calls.length, 0);
     assert.equal(r.plot!.pointSet!.rule, "none");
+    assert.equal(r.plot!.layers, undefined);
   });
 });
 
@@ -129,15 +134,16 @@ describe("a box's points", () => {
     assert.equal(calls.length, 1, "over the cap the every-value query is not run");
     assert.deepEqual(calls[0].extra, [{ g: "A", n: POINTS_CAP + 1, lo: 0, hi: 100, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 12 }]);
     assert.equal(r.plot!.overlay, "violin", "the violin stays: the outliers are drawn over it");
-    assert.deepEqual(r.plot!.pointSet, { rule: "outliers", drawn: 1 });
-    assert.match(r.note!, /1 value beyond the whiskers is drawn as points/);
+    assert.equal(r.plot!.pointSet!.rule, "none");
+    assert.deepEqual([r.plot!.layers![0].kind, r.plot!.layers![0].drawn], ["outliers", 1]);
+    assert.match(r.note!, /outliers: 1 value beyond the whiskers/);
   });
 
   test("more outliers than the cap: none, never the first 5,000", async () => {
     const calls: Call[] = [];
     const r = await run(fake("patient-level", calls, () => box(POINTS_CAP * 3), { outliers: null }));
     assert.equal(r.plot!.points, undefined);
-    assert.equal(r.plot!.pointSet!.rule, "none");
-    assert.match(r.note!, /More than 5,000 values lie beyond the whiskers, too many to draw as points/);
+    assert.equal(r.plot!.layers![0].shown, "none");
+    assert.match(r.note!, /outliers: not drawn, more than 5,000 values lie beyond the whiskers/);
   });
 });

@@ -187,8 +187,8 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
           (pd.overlay === "points" ? `\n  Values are drawn as individual points.`
             : pd.overlay === "violin" ? `\n  Values are drawn as a DENSITY, not points — either above the point cap or from a participant that discloses no cases.`
             : "") +
-          // a highlight drawn as boxes is a second set of quartiles the figure shows and the note does not
-          (pd.highlights || []).filter((h) => h.groups && h.groups.length).map((h) => `\n  Highlight “${h.name}”:\n` +
+          // a cohort layer drawn as boxes is a second set of quartiles the figure shows and the note does not
+          (pd.layers || []).filter((h) => h.groups && h.groups.length).map((h) => `\n  Point layer “${h.name}”:\n` +
             h.groups!.slice(0, 12).map((g) => `    ${g.g}: median ${g.median.toFixed(2)} (IQR ${g.q1.toFixed(2)}–${g.q3.toFixed(2)}, n=${g.n.toLocaleString()})`).join("\n")).join("") +
           caveatOf(v) + noteOf(v));
       } else {

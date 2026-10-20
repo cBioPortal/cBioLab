@@ -27,13 +27,13 @@ import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql } f
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
-  highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql,
+  highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql,
   type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape,
-  type PlotXYPoint, type SparseCells, type Whiskers } from "./plot.ts";
+  type PlotXYPoint, type SparseCells, type Whiskers, type PointRank } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
 export * from "./federation-views.ts";
 export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
-export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotHighlight, HighlightPoint } from "./plot.ts";
+export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotLayer, HighlightPoint } from "./plot.ts";
 import { impactSql } from "./lollipop.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
@@ -1280,7 +1280,9 @@ export interface PatientLevelCapable extends AggregateCapable {
   plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number, outside?: Whiskers[]): Promise<PlotPoint[] | null>;
   /** a scatter's cases (every one, or those in `sparse` cells), with their case ids; null past the cap */
   plotScatterPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number, sparse?: SparseCells): Promise<PlotXYPoint[] | null>;
-  /** a highlight cohort's points over the plot, with their case ids; null past the cap */
+  /** a ranked layer's points (the extremes on an axis, or the cases furthest from the fit), with their case ids */
+  plotRankedPoints(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind, rank: PointRank): Promise<HighlightPoint[]>;
+  /** a cohort layer's points over the plot, with their case ids; null past the cap */
   plotHighlightPoints(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     cap?: number): Promise<HighlightPoint[] | null>;
   readonly instance: Instance & { mode: "patient-level" };
@@ -1991,7 +1993,23 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   }
 
   /**
-   * A highlight's points: the plotted cohort's cases that are also in `highlight`, each with its
+   * A ranked layer's points with their case ids: the highest and lowest values of one axis (per
+   * group on a box), or on a scatter the cases furthest from the fitted line. Case-level, so here
+   * and nowhere else, for the reason plotPoints is; bounded by the rank's `n`.
+   */
+  async plotRankedPoints(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind, rank: PointRank): Promise<HighlightPoint[]> {
+    const ctx = this.plotCtx(def, spec);
+    const shape = plotShape(xk, yk);
+    if (shape !== "scatter" && shape !== "box") return [];
+    const r = await this.runLogged<ChRow>("plot:layer:" + rank.by,
+      plotRankedPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, shape, xk === "num", rank), this.instance.conn);
+    return shape === "scatter"
+      ? r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y) }))
+      : r.data.map((p) => ({ id: String(p.id), g: String(p.g), v: Number(p.v) }));
+  }
+
+  /**
+   * A cohort layer's points: the plotted cohort's cases that are also in `highlight`, each with its
    * case id — (x, y) on a scatter, (group, value) on a box. Case-level, so here and nowhere else,
    * for the reason plotPoints is. null when there are more than `cap`: the caller draws the same
    * cases as an aggregate rather than the first `cap` of them.

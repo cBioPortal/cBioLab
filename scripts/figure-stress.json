@@ -964,8 +964,10 @@
      "gene": "TP53",
      "by": "mutationType"
     },
-    "highlight": [
-     "KRAS mut"
+    "points": [
+     {
+      "cohort": "KRAS mut"
+     }
     ]
    }
   ]

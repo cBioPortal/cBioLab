@@ -7,7 +7,7 @@
 import type { ViewResult } from "../types.ts";
 import type { PlotData } from "../plot.ts";
 import { isAbsent, jitterFor } from "../plot-draw.ts";
-import { HIGHLIGHT_BASE } from "../plot-highlight.ts";
+import { LAYER_BASE } from "../plot-layers.ts";
 import {
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, bandLabels, legend, label,
   textWidth, fmtInt, fmtNum, fmtP, FS, SW, SERIES, OTHER, type Scale, type SvgOpts, type LegendItem
@@ -18,7 +18,7 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * The radius of every case drawn as a point on a plot — scatter or box, the plotted cohort or a
- * highlight, five points or five thousand — so a dot means the same thing on every figure.
+ * point layer, five points or five thousand — so a dot means the same thing on every figure.
  */
 export const PLOT_POINT_R = 2.5;
 
@@ -59,16 +59,18 @@ export function plotSvg(v: ViewResult, o: SvgOpts): string {
   return "";
 }
 
-/** the highlight cohorts' key: one dot per highlight drawn, its name and how many cases it holds */
-function highlightItems(d: PlotData): LegendItem[] {
-  return (d.highlights || []).filter((h) => h.shown !== "none")
-    .map((h) => ({ label: h.name + " (" + fmtInt(h.n) + ")", color: h.color, kind: "dot" as const }));
+/** the point layers' key: one dot per layer drawn, what it holds and how many cases */
+function layerItems(d: PlotData): LegendItem[] {
+  return (d.layers || []).filter((l) => l.shown !== "none")
+    .map((l) => ({ label: l.label + " (" + fmtInt(l.n) + ")", color: l.color, kind: "dot" as const }));
 }
+/** the layers drawn at all: with any, the plotted cohort steps back to a grey so their colours read */
+const drawnLayers = (d: PlotData) => (d.layers || []).filter((l) => l.shown !== "none");
 
 function scatter(v: ViewResult, d: PlotData, W: number, p: Pal): string {
   const { x0, x1, y0, y1 } = d.extent!, [gx, gy] = d.grid!;
-  const hs = d.highlights || [];
-  const base = hs.length ? HIGHLIGHT_BASE : SERIES[0];
+  const hs = drawnLayers(d);
+  const base = hs.length ? LAYER_BASE : SERIES[0];
   const st = d.stats;
   const statLine = st ? [st.pearson != null ? "Pearson r = " + fmtNum(st.pearson, 2) + " (" + fmtP(st.pPearson ?? 1) + ")" : "",
     st.spearman != null ? "Spearman ρ = " + fmtNum(st.spearman, 2) + " (" + fmtP(st.pSpearman ?? 1) + ")" : ""].filter(Boolean).join("   ·   ") : "";
@@ -93,16 +95,16 @@ function scatter(v: ViewResult, d: PlotData, W: number, p: Pal): string {
     `<rect x="${r1(L + b.bx * cw)}" y="${r1(T + PLOT - (b.by + 1) * ch)}" width="${r1(Math.max(cw, 0.8))}" ` +
     `height="${r1(Math.max(ch, 0.8))}" fill="${fill}" fill-opacity="${r1(opacity * 100) / 100}"/>`;
   // Cells whose cases are drawn as points are not also shaded: every case, or the sparse
-  // cells (at most cellMax cases) the outlier points stand in for.
-  const ps = d.pointSet;
-  const shaded = ps?.rule === "all" && d.xyPoints?.length ? []
-    : ps?.rule === "outliers" && ps.cellMax ? d.bins!.filter((b) => b.n > ps.cellMax!) : d.bins!;
-  // under highlights the plotted cohort is a floor-raised grey, so its faintest cells still read
+  // cells (at most cellMax cases) an outliers layer stands in for.
+  const cellMax = hs.find((l) => l.kind === "outliers" && l.shown === "points")?.cellMax;
+  const shaded = d.pointSet?.rule === "all" && d.xyPoints?.length ? []
+    : cellMax ? d.bins!.filter((b) => b.n > cellMax) : d.bins!;
+  // under point layers the plotted cohort is a floor-raised grey, so its faintest cells still read
   for (const b of shaded) out.push(cell(b, base, hs.length ? 0.3 + 0.7 * shade(b.n) : shade(b.n)));
   const own = d.xyPoints || [];
   for (const pt of own)
     out.push(`<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${base}" fill-opacity="0.7"/>`);
-  // a highlight too large to draw as points is cells on the same grid, shaded by its own densest cell
+  // a cohort layer too large to draw as points is cells on the same grid, shaded by its own densest cell
   for (const h of hs) if (h.shown === "density" && h.bins) {
     const hMax = Math.max(1, ...h.bins.map((b) => b.n));
     for (const b of h.bins) out.push(cell(b, h.color, 0.3 + 0.7 * Math.log1p(b.n) / Math.log1p(hMax)));
@@ -119,8 +121,8 @@ function scatter(v: ViewResult, d: PlotData, W: number, p: Pal): string {
   out.push(`<rect x="${L}" y="${T}" width="${r1(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}" stroke-width="${SW.line}"/>`);
 
   let y = T + PLOT + bottomAxisHeight(xTitle) + 8;
-  const hk = highlightItems(d);
-  if (hk.length) { const lg = legend(hk, 8, y, W - 16, p, { title: "highlighted" }); out.push(lg.svg); y += lg.height + 4; }
+  const hk = layerItems(d);
+  if (hk.length) { const lg = legend(hk, 8, y, W - 16, p, { title: "point layers" }); out.push(lg.svg); y += lg.height + 4; }
   const cap = caption((v.note ? v.note + "  " : "") + (shaded.length
     ? "Darker is more " + (d.n > 1 ? "cases" : "case") + "; the shade is logarithmic." + (own.length ? " Each dot is one case." : "")
     : "Each dot is one case.") +
@@ -133,15 +135,15 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
   // scrolls) rather than dropping the smaller groups, whose cases would otherwise be missing from
   // a figure that still claims the full count.
   const gs = d.groups!;
-  const hs = d.highlights || [];
-  const base = hs.length ? HIGHLIGHT_BASE : SERIES[0];
+  const hs = drawnLayers(d);
+  const base = hs.length ? LAYER_BASE : SERIES[0];
   const numAxis = d.x.kind === "num" ? d.x : d.y, catAxis = d.x.kind === "num" ? d.y : d.x;
   const numTitle = axisTitle(numAxis), catTitle = axisTitle(catAxis);
   const T = 12, R = 16, PLOT = plotHeight(W0);
   // The axis spans the whiskers and the points beyond them, but reaches at most one whisker
   // span further each way: one TMB of 570 would otherwise flatten every box to a line. A point
   // past that is pinned to the frame's edge as a triangle and counted in the caption.
-  const ptVals = (d.points || []).map((pt) => pt.v);
+  const ptVals = [...(d.points || []), ...hs.flatMap((l) => l.points || [])].flatMap((pt) => "v" in pt ? [pt.v] : []);
   const wLo = Math.min(...gs.map((g) => g.loWhisker)), wHi = Math.max(...gs.map((g) => g.hiWhisker));
   const wSpan = Math.max(1e-9, wHi - wLo);
   const lo = Math.max(Math.min(wLo, ...ptVals), wLo - wSpan), hi = Math.min(Math.max(wHi, ...ptVals), wHi + wSpan);
@@ -203,6 +205,7 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
       `L${r1(px)} ${r1(ty)} Z" fill="${fill}" stroke="${p.bg}" stroke-width="0.5"/>`;
   };
   const inAxis = (val: number) => Math.max(vlo, Math.min(vhi, val));
+  const categorised = colorKey.length > 0 || ringKey.length > 0;
 
   gs.forEach((g, i) => {
     const cx = L + bw * (i + 0.5), half = Math.min(24, bw * 0.32);
@@ -212,7 +215,7 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
       const [vx0, vx1] = d.violinExtent || [lo, hi];
       const binW = (vx1 - vx0) / vBins;
       // with the outliers drawn as points, the density stops at this group's whiskers
-      const [cLo, cHi] = d.pointSet?.rule === "outliers" ? [g.loWhisker, g.hiWhisker] : [vlo, vhi];
+      const [cLo, cHi] = hs.some((l) => l.kind === "outliers" && l.shown === "points") ? [g.loWhisker, g.hiWhisker] : [vlo, vhi];
       for (const [b, byClass] of cells) {
         const vLo = vx0 + b * binW, vHi = vLo + binW;
         if (vHi < cLo || vLo > cHi) continue;
@@ -255,8 +258,8 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
       `fill="${base}" fill-opacity="${d.overlay === "none" ? 0.25 : 0.1}" stroke="${base}"><title>${esc(g.g)}: median ${fmtNum(g.median)}, ` +
       `quartiles ${fmtNum(g.q1)}–${fmtNum(g.q3)}, n = ${fmtInt(g.n)}</title></rect>`);
     out.push(`<line x1="${r1(cx - half)}" y1="${r1(ys(g.median))}" x2="${r1(cx + half)}" y2="${r1(ys(g.median))}" stroke="${base}" stroke-width="2"/>`);
-    // highlights over the box: a narrow box of their own (side by side when several), then their
-    // points at the same fixed jitter the plotted cohort's points use
+    // cohort layers past the budget: a narrow box of their own (side by side when several); then every
+    // layer's points at the same fixed jitter the plotted cohort's points use
     const boxed = hs.filter((h) => h.shown === "boxes");
     boxed.forEach((h, j) => {
       const hg = h.groups!.find((x) => x.g === g.g);
@@ -266,8 +269,9 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
         `<rect x="${r1(hx - hw / 2)}" y="${r1(ys(hg.q3))}" width="${r1(hw)}" height="${r1(Math.max(1, ys(hg.q1) - ys(hg.q3)))}" fill="${h.color}" fill-opacity="0.85"/>` +
         `<line x1="${r1(hx - hw / 2 - 1)}" y1="${r1(ys(hg.median))}" x2="${r1(hx + hw / 2 + 1)}" y2="${r1(ys(hg.median))}" stroke="${p.ink}" stroke-width="1.5"/>`);
     });
-    // a highlighted value past the axis is pinned to the frame's edge as a triangle pointing off
-    // it, and counted in the caption, rather than drawn outside the figure
+    // A layer's value past the axis is pinned to the frame's edge as a triangle pointing off it, and
+    // counted in the caption, rather than drawn outside the figure. With the cases coloured by a
+    // category, a layer is a ring round the case, so fill and ring each keep one meaning.
     for (const h of hs) if (h.shown === "points") {
       const rH = PLOT_POINT_R;
       for (const pt of h.points!) if ("g" in pt && pt.g === g.g) {
@@ -277,7 +281,9 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
           out.push(edgeMark(px, pt.v > vhi, rH, h.color));
           continue;
         }
-        out.push(`<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${rH}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`);
+        out.push(categorised
+          ? `<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${r1(rH + 1.4)}" fill="none" stroke="${h.color}" stroke-width="1.4"/>`
+          : `<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${rH}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`);
       }
     }
   });
@@ -303,8 +309,8 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
     if (ringOthers.size) items.push({ label: otherLabel(ringOthers.size, false), color: OTHER, kind: "dot", opacity: 0.6 });
     const lg = legend(items, 8, y, W - 16, p, { title: (d.ringLabel || "ring") + " (ring)" }); out.push(lg.svg); y += lg.height;
   }
-  const hk = highlightItems(d);
-  if (hk.length) { const lg = legend(hk, 8, y, W - 16, p, { title: "highlighted" }); out.push(lg.svg); y += lg.height; }
+  const hk = layerItems(d);
+  if (hk.length) { const lg = legend(hk, 8, y, W - 16, p, { title: "point layers" }); out.push(lg.svg); y += lg.height; }
   y += 4;
   // the engine's note leads, as it does under the scatter: it is where the view says what it drew
   // over and what it had to leave out
@@ -314,8 +320,8 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
       : "") +
     (ptOffScale ? " " + fmtInt(ptOffScale) + " value" + (ptOffScale === 1 ? " lies" : "s lie") + " more than a whisker span" +
       " past the whiskers and " + (ptOffScale === 1 ? "is" : "are") + " drawn as a triangle at the frame's edge." : "") +
-    (offScale ? " " + fmtInt(offScale) + " highlighted value" + (offScale === 1 ? " lies" : "s lie") +
-      " beyond the axis and " + (offScale === 1 ? "is" : "are") + " drawn as a triangle at the frame's edge." : ""), W, y, p.muted);
+    (offScale ? " " + fmtInt(offScale) + (offScale === 1 ? " value of a point layer lies" : " values of point layers lie") +
+      " more than a whisker span past the whiskers and " + (offScale === 1 ? "is" : "are") + " drawn as a triangle at the frame's edge." : ""), W, y, p.muted);
   return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, W > W0, "Plot — " + numTitle + " by " + catTitle);
 }
 
