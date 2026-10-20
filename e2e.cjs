@@ -568,7 +568,7 @@ async function main() {
           try { const v = JSON.parse(document.querySelector("#docjson").value).views[0];
             return v.x.attribute === "FRACTION_GENOME_ALTERED" && v.y.attribute === "MUTATION_COUNT"; } catch { return false; }
         }, null, { timeout: 30000 });
-        sideOk = blocks.join(",") === "Horizontal axis,Vertical axis" && names.join(",") === "Data type,Clinical attribute" && !!beside && heights.length === 1;
+        sideOk = blocks.join(",") === "Horizontal axis,Vertical axis" && names.join(",") === "Data,Clinical attribute" && !!beside && heights.length === 1;
         sideWhat = "blocks " + blocks.join(",") + "; fields " + names.join(",") + "; figure beside: " + beside + "; select heights " + heights.join(",") + "; swap rewrote x/y";
       } catch (e) { sideWhat = String(e.message).split("\n")[0]; }
       ok("a plot's axes are defined in a sidebar beside the figure, and Swap axes swaps them", sideOk, sideWhat);

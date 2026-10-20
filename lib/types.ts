@@ -1523,6 +1523,7 @@ export interface AlterationsResult extends TableRows<string | number | null> {
 }
 import type { PlotAxis, PlotData } from "./plot.ts";
 import type { PointLayerSpec } from "./plot-layers.ts";
+import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
@@ -2177,5 +2178,7 @@ export interface ExploreResult {
   totals?: { patients: number; samples: number };
   caseLists: { id: string; name: string; n: number }[];
   profiles: string[]; gaProfiles: string[];
+  /** every profile as the studies describe them (genetic_profile), for a plot axis's Data picker */
+  profileCatalog?: ProfileInfo[];
   stats: { ms: number; perStudy?: Record<string, number | null> };
 }

@@ -187,7 +187,7 @@ export function CorrelatesBody({ v, docJson }: { v: ViewResult; docJson?: () => 
   const [sel, setSel] = useState<CoRow | null>(null);
   const picked = sel && rows.includes(sel) ? sel : [...rows].sort((a, b) => a.q - b.q || Math.abs(b.rho ?? 0) - Math.abs(a.rho ?? 0))[0] || null;
   const plot = usePairPlot(docJson, r.cohort, picked ? { kind: "plot", unit: "patient",
-    x: { source: "molecular", profileType: r.profileType, gene: r.gene }, y: { source: "molecular", profileType: r.otherProfile, gene: picked.gene } } : null);
+    x: { source: "profile", profile: r.profileType, gene: r.gene }, y: { source: "profile", profile: r.otherProfile, gene: picked.gene } } : null);
   const cols: Col<CoRow>[] = [
     { key: "gene", label: "Correlated Gene", value: (g) => g.gene, render: (g) => <strong>{g.gene}</strong> },
     { key: "cytoband", label: "Cytoband", value: (g) => g.cytoband || null },

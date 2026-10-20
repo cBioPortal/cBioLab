@@ -1,5 +1,6 @@
 // The contract between runAnalysis and the view runners: the context each view gets, and the refusal
 // that skips timing.
+import type { ProfileInfo } from "../profile-catalog.ts";
 import type { AnalysisDoc, ViewResult, ViewParticipation } from "../types.ts";
 import type { Resolver } from "../federation.ts";
 import type { RiskFit, RiskFitArgs } from "./riskmodel.ts";
@@ -27,7 +28,7 @@ export interface ViewRun {
   participationFor: (studies: string[], requiresPatientLevel: boolean) => ViewParticipation;
   pin: string | null;
   /** the molecular and generic-assay profiles a study holds (runAnalysis's cached inventory) */
-  studyProfiles: (study: string) => Promise<{ profiles: string[]; gaProfiles: string[] }>;
+  studyProfiles: (study: string) => Promise<{ profiles: string[]; gaProfiles: string[]; catalog?: ProfileInfo[] }>;
   /** a paged view's page (the mutation and clinical tables): rows offset to offset + limit of its one global order */
   page?: { offset: number; limit: number };
   /** a table view's column whose values to return instead of rows (what its filter offers) */

@@ -37,7 +37,7 @@ test("an axis that would read a whole profile is refused by name", () => {
     /needs one gene.*name the gene you mean/s);
   assert.throws(() => validateAxis({ source: "alteration" } as never, "y"), /needs a gene, a gene set, or an OQL query/);
   assert.throws(() => validateAxis({ source: "alateration", gene: "APC" } as never, "covariate 1"),
-    /unknown source 'alateration' — use one of clinical, molecular, alteration, none/);
+    /unknown source 'alateration' — use one of clinical, profile, molecular, alteration, none/);
   assert.throws(() => validateAxis({ source: "clinical", attribute: "not a name!" }, "x"), /not a clinical attribute name/);
   assert.throws(() => validateAxis({ source: "alteration", gene: "TP53", by: "driver" } as never, "x"), /not supported yet/);
   validateAxis(num, "x");   // the ordinary cases do not throw

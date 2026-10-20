@@ -14,6 +14,7 @@ import { MethodPanel } from "./method-panel.tsx";
 import { viewRequest } from "./use-analysis.ts";
 import { AxisPicker, ViewHelpButton, SplitByNote, PickMenu, CohortPicker, DrawnCohorts, ViewHead, ViewMenu, Latency, SeriesSwatch, Participation } from "./view-chrome.tsx";
 import { ViewFigure } from "./figure.tsx";
+import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 import { PlotControls } from "./plot-controls.tsx";
 import { Plus, Settings2, X } from "lucide-react";
 import { Button } from "../_ui/button";
@@ -56,6 +57,8 @@ export interface ViewCtx {
   catalogAttrs: () => { attribute: string; kind: string }[];
   attrsLoading: () => boolean;
   profileOptions: () => string[];
+  /** the studies' profiles as they describe them, for a plot axis's Data picker */
+  profileCatalog: () => ProfileInfo[];
   assayOptions: () => string[];
   viewEvents: () => EventOption[];
   drawsOwnHead: (v: any) => boolean;
@@ -124,9 +127,9 @@ function placement({ result, moveView, removeView, noteEdit }: ViewCtx, vi: numb
 
 /** A regression view's covariates: each an axis, with the reference level its ratio is measured
  *  against once the fit has seen more than one level. */
-function CovariateList({ covariates, ratio, observedLevels, busy, attrs, profiles, loading, onChange, onRemove, onAdd }: {
+function CovariateList({ covariates, ratio, observedLevels, busy, attrs, catalog, loading, onChange, onRemove, onAdd }: {
   covariates: any[]; ratio: "hazard" | "odds"; observedLevels: (ci: number) => string[]; busy: boolean;
-  attrs: { attribute: string; kind: string }[]; profiles: string[]; loading: boolean;
+  attrs: { attribute: string; kind: string }[]; catalog: ProfileInfo[]; loading: boolean;
   onChange: (ci: number, next: any) => void; onRemove: (ci: number) => void; onAdd: () => void;
 }) {
   return (
@@ -136,7 +139,7 @@ function CovariateList({ covariates, ratio, observedLevels, busy, attrs, profile
         return (
           <span key={ci} className="covrow">
             <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={attrs}
-              profiles={profiles} loading={loading} busy={busy}
+              catalog={catalog} loading={loading} busy={busy}
               onChange={(next) => onChange(ci, next)} />
             {levels.length > 1 && <label className="tbfield" title={(ratio === "hazard" ? "the level a hazard ratio" : "the level an odds ratio") + " is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)"}>
               ref <Choice size="ctl" value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
@@ -489,7 +492,7 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
 }
 
 function CoxCard({ ctx, v, vi }: CardProps) {
-  const { attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, doc, docView, menuOpenRef, patchView, profileOptions, trackAttrs } = ctx;
+  const { attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, doc, docView, menuOpenRef, patchView, profileCatalog, trackAttrs } = ctx;
   return <>
     {v.kind === "cox" && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Cox regression" cohorts={cohortChoice(vi, docView(vi))} {...placement(ctx, vi)}
@@ -541,7 +544,7 @@ function CoxCard({ ctx, v, vi }: CardProps) {
               stratify by cohort
             </label>
             <CovariateList covariates={covariates} ratio="hazard" observedLevels={observedLevels} busy={busy}
-              attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()}
+              attrs={catalogAttrs()} catalog={profileCatalog()} loading={attrsLoading()}
               onChange={setCovariate} onRemove={removeCovariate} onAdd={addCovariate} />
           </div>
         );
@@ -578,7 +581,7 @@ function KindCard({ ctx, v, vi }: CardProps) {
 }
 
 function LogisticCard({ ctx, v, vi }: CardProps) {
-  const { attrsLoading, busy, catalogAttrs, cohortChoice, doc, docView, menuOpenRef, patchView, profileOptions, trackAttrs } = ctx;
+  const { attrsLoading, busy, catalogAttrs, cohortChoice, doc, docView, menuOpenRef, patchView, profileCatalog, trackAttrs } = ctx;
   return <>
     {v.kind === "logistic" && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Logistic regression" cohorts={cohortChoice(vi, docView(vi))} {...placement(ctx, vi)}
@@ -614,7 +617,7 @@ function LogisticCard({ ctx, v, vi }: CardProps) {
           <div className="basis wraps">
             <span className="meta">outcome</span>
             <AxisPicker side="outcome" axis={sv.outcome || { source: "clinical", attribute: "" }} attrs={catalogAttrs()}
-              profiles={profileOptions()} loading={attrsLoading()} busy={busy}
+              catalog={profileCatalog()} loading={attrsLoading()} busy={busy}
               onChange={(next) => patchView(vi, { outcome: next })} />
             {!outcomeIsAlteration && <label className="tbfield" title="which observed value of the outcome counts as the event (1); every other observed value is treated as 'not event' and disclosed in the caveat. Required for a categorical outcome; not used for a numeric one, which must already be coded 0/1">
               event <Input type="text" list={"outcome-levels-" + vi} disabled={busy} className="h-ctl w-36 bg-card text-md md:text-md"
@@ -625,7 +628,7 @@ function LogisticCard({ ctx, v, vi }: CardProps) {
               </datalist>
             </label>}
             <CovariateList covariates={covariates} ratio="odds" observedLevels={observedLevels} busy={busy}
-              attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()}
+              attrs={catalogAttrs()} catalog={profileCatalog()} loading={attrsLoading()}
               onChange={setCovariate} onRemove={removeCovariate} onAdd={addCovariate} />
           </div>
         );
@@ -650,7 +653,7 @@ function SequenceKeyHint({ ctx, v, vi }: CardProps) {
 
 /** a numeric plot axis on a log scale: log10(v + 1), so a zero stays on the axis (lib/plot.ts) */
 function PlotCard({ ctx, v, vi }: CardProps) {
-  const { attrsLoading, busy, catalogAttrs, cohortChoice, docView, menuOpenRef, profileOptions, updateView } = ctx;
+  const { attrsLoading, busy, catalogAttrs, cohortChoice, docView, menuOpenRef, profileCatalog, updateView } = ctx;
   // every cohort the document evaluates, but the plotted one and a split (which stands for several groups, not one set of cases)
   const ch = cohortChoice(vi, docView(vi), 1);
   const cohortOptions = ch.nodes.filter((nd) => nd.kind !== "split" && nd.name !== ch.drawn[0])
@@ -659,7 +662,7 @@ function PlotCard({ ctx, v, vi }: CardProps) {
     {v.kind === "plot" && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={ch} {...placement(ctx, vi)}
         sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "sample")}s</> : "two axes over the same cases"} />
-      <PlotControls spec={docView(vi)} plot={v.plot} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
+      <PlotControls spec={docView(vi)} plot={v.plot} attrs={catalogAttrs()} catalog={profileCatalog()} loading={attrsLoading()} busy={busy}
         cohortOptions={cohortOptions} update={(fn) => updateView(vi, fn)}>
         <ViewFigure v={v} empty={v.plot?.note || "nothing to draw"} />
       </PlotControls>

@@ -487,6 +487,24 @@ export const EXAMPLES: DslExample[] = [
     }
   },
   {
+    title: "Plot axes from the study's own profiles: ERBB2 copy number against expression",
+    demonstrates: "A `profile` axis: one gene in one of the study's molecular profiles, read as the study describes the profile — discrete copy number as its levels, expression as a number, mutations by type.",
+    tags: ["profiles"],
+    note: "TCGA breast cancer (PanCancer Atlas), every sample. The first view groups ERBB2 mRNA z-scores (relative to all samples) by ERBB2's GISTIC copy-number call, from Shallow deletion to Amplification: the 122 amplified samples sit far above the rest. The second groups fraction of genome altered by TP53's mutation type from the study's mutation profile; the 18 samples not in that profile are Not profiled, not counted as unmutated.",
+    doc: {
+      study: "brca_tcga_pan_can_atlas_2018",
+      cohorts: { "all samples": { all: [] } },
+      views: [
+        { kind: "plot", cohorts: ["all samples"], unit: "sample",
+          x: { source: "profile", profile: "gistic", gene: "ERBB2" },
+          y: { source: "profile", profile: "rna_seq_v2_mrna_median_all_sample_Zscores", gene: "ERBB2" } },
+        { kind: "plot", cohorts: ["all samples"], unit: "sample",
+          x: { source: "profile", profile: "mutations", gene: "TP53" },
+          y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" } }
+      ]
+    }
+  },
+  {
     title: "Merged gene rows: a pathway as one track",
     demonstrates: "Several genes drawn as one row, the way cBioPortal's [TP53 MDM2 MDM4] does, with the members kept alongside so the pooling is visible.",
     tags: ["merged-tracks"],
@@ -1589,13 +1607,28 @@ column id or a filter that does not suit its column is refused with the ids acce
 
 ### Plot axes
 
-An axis is one of four things, and the pair decides the shape — the portal's own rule:
+An axis is a clinical attribute, one of the study's own molecular profiles, or a query across genes,
+and the pair decides the shape — the portal's own rule:
 
 | \`source\` | shape of the axis | fields |
 | --- | --- | --- |
 | \`clinical\` | number or category, **as the study declared it** | \`attribute\` |
-| \`molecular\` | number | \`profileType\`, \`gene\` |
-| \`alteration\` | category | \`gene\` **or** \`genes\` (2-20), \`by\`: \`"mutationType"\` (default) \\| \`"mutated"\` \\| \`"cna"\` |
+| \`profile\` | **as the study describes the profile** (below) | \`profile\` (its id without the study prefix), \`gene\`, \`by\` for a mutation profile, \`log\` for numbers |
+| \`alteration\` | category | \`oql\` (below), or \`genes\` (2-20, any mutated) |
+
+**A profile axis** reads one gene in one of the study's profiles, and what it is follows from the
+study's own description of that profile (\`genetic_profile\`: its alteration type and datatype), never
+from its name: a **mutation** profile (MAF) groups cases by mutation type, or with \`by: "mutated"\`
+mutated or not; a **structural-variant** profile by whether the case has one; a **discrete
+copy-number** profile by its own calls (Deep deletion, Shallow deletion, Diploid, Gain,
+Amplification, drawn in that order); and a **continuous** one (mRNA, z-scores, log2 copy number,
+protein) is a number. A case with no mutation, SV or high-level call in the gene is the wild-type
+answer only when it is profiled for that gene; otherwise it is **Not profiled**. A profile a study
+does not have is refused with the list it does have, and one that two pooled studies describe
+differently is refused, never read as one thing. Generic-assay profiles (methylation, arm-level copy
+number, …) are not plot axes yet. The engine runs a profile axis as the lower-level forms it
+resolves to, which a document may also give directly: \`{"source":"molecular","profileType","gene",
+"discrete"?}\` and \`{"source":"alteration","gene","by":"mutationType"|"mutated"|"cna"|"sv"}\`.
 
 number × number draws a **density scatter**, number × category a **box**, category × category a
 **contingency table**. Every statistic is computed where the rows are and is therefore exact over
@@ -1609,7 +1642,7 @@ inventing a second mechanism. Only \`by:"mutated"\` (the default when \`genes\` 
 supported for a set — combining several genes' mutation TYPES or copy-number states into one
 category has no single honest reading, so that combination is refused rather than guessed at.
 
-Two things are refused rather than approximated. A molecular axis **must name one gene** — a
+Two things are refused rather than approximated. A profile axis **must name one gene** — a
 whole profile is 630 million values in this warehouse, and reading them to draw one picture is
 never what was meant. And a categorical axis with more than 150 distinct values is refused,
 because a truncated contingency table is a wrong one.
@@ -1675,7 +1708,7 @@ profiled by the same rule (at most ${OQL_STATEMENT_CAP} statements). It is the s
 EXP/PROT thresholds), and it matches per patient or per sample following the plot's \`unit\`.
 Because it is a categorical axis, it also works as \`colorBy\`/\`ringBy\` and as a Cox or logistic
 covariate, where "Unaltered" is the reference level.
-OQL is for alteration axes only: a molecular axis stays one gene's value.
+OQL is for alteration axes only: a profile axis stays one gene in one profile.
 
 **Points.** Every case is a point when there are at most ${POINTS_CAP_TEXT} of them and every study may show
 cases (\`allPoints: false\` draws the density alone at any size). Over that the plotted cohort is a
@@ -1912,8 +1945,10 @@ export const AGENT_GRAMMAR = `Document shape:
                // <layer> = {"rule":"outliers"} | {"rule":"extremes","axis":"x|y","n":50?} | {"rule":"trend","n":50?} | {"cohort":C}
                //   default [{"rule":"outliers"}]; [] draws none; the first layer draws a case two share
                // <axis> = {"source":"clinical","attribute":A,"log":?}
-               //        | {"source":"molecular","profileType":P,"gene":G,"log":?}
-               //        | {"source":"alteration","gene":G,"by":"mutated|mutationType|cna|driver"?}
+               //        | {"source":"profile","profile":P,"gene":G,"by":"mutationType|mutated"?,"log":?}
+               //            // P is one of the study's profiles; what it is (mutations, SVs, discrete or
+               //            // continuous copy number, mRNA, protein) comes from the study's own description
+               //        | {"source":"alteration","gene":G,"by":"mutated|mutationType|cna|sv"?}  // what a profile axis resolves to
                //        | {"source":"alteration","genes":[G,...(2-20)],"by":"mutated"?}  // any-of-N as one category; only "mutated"
                //        | {"source":"alteration","oql":"KRAS: G12C, STK11: MUT","by":"any|statement"?}
                //            // any: Altered / Unaltered / Not profiled; statement: one group per statement (max 6)

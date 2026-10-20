@@ -6,7 +6,8 @@ import { isPatientLevel, type EndpointColumns } from "../federation.ts";
 import { axisLabel, validateAxis, OQL_UNALTERED, type AxisKind } from "../plot.ts";
 import { coxMethod, type CoxTrace } from "../method.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
-import { overLimit } from "./shared.ts";
+import { overLimit, studyCatalogs } from "./shared.ts";
+import { resolveProfileAxis } from "../plot-profile.ts";
 
 export interface CoxColumn { axisIndex: number; label: string; reference?: string; level?: string }
 /**
@@ -69,10 +70,15 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
     endpointColumns = { months: monthsAttr, status: statusAttr };
   }
   const endpointLabel = endpointColumns ? endpointColumns.months + "/" + endpointColumns.status : endpoint;
-  const covariates = Array.isArray(cx.covariates) ? cx.covariates : [];
+  let covariates = Array.isArray(cx.covariates) ? cx.covariates : [];
   if (!covariates.length) return untimed({ kind: "cox", endpoint, error: "a cox view needs at least one covariate" });
   { const e = overLimit("a cox view", 8, covariates.length); if (e) return untimed({ kind: "cox", endpoint, error: e.replace("at most 8", "at most 8 covariates") }); }
-  try { covariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1))); }
+  try {
+    // a profile covariate is read as the studies describe the profile; its reference level stays
+    const catalogs = await studyCatalogs(c, vStudies);
+    covariates = covariates.map((cv, i) => ({ ...resolveProfileAxis(cv, "covariate " + (i + 1), catalogs), ...(cv.reference != null ? { reference: cv.reference } : {}) }));
+    covariates.forEach((cv, i) => validateAxis(cv, "covariate " + (i + 1)));
+  }
   catch (e) { return untimed({ kind: "cox", endpoint, error: (e as Error).message }); }
   const rawCutoff = cx.cutoffMonths;
   let cutoffMonths: number | undefined;

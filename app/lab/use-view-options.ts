@@ -9,6 +9,7 @@ import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import type { ExploreResult } from "../../lib/types.ts";
+import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 import type { StudyInfo, TrackAttrs } from "./use-catalogs.ts";
 import { cantDraw, cohortStudies } from "../../lib/view-coverage.ts";
 
@@ -94,6 +95,8 @@ export function useViewOptions(page: ViewOptionsPage) {
   const attrsLoading = (): boolean => !catalogAttrs().length && (trackAttrsLoading || exploreBusy);
   /** continuous molecular profiles for an axis picker: Explore's if loaded, else the shared catalog's */
   const profileOptions = (): string[] => (explore && explore.profiles && explore.profiles.length ? explore.profiles : trackAttrs.profiles);
+  /** every profile as the studies describe them, for a plot axis's Data picker: Explore's if loaded, else the shared catalog's */
+  const profileCatalog = (): ProfileInfo[] => (explore && explore.profileCatalog && explore.profileCatalog.length ? explore.profileCatalog : trackAttrs.profileCatalog);
   const assayOptions = (): string[] => (explore && explore.gaProfiles && explore.gaProfiles.length ? explore.gaProfiles : trackAttrs.gaProfiles);
 
   const contProfile = (): string | null => {
@@ -176,5 +179,5 @@ export function useViewOptions(page: ViewOptionsPage) {
     return [...new Set([...fromExplore, ...legacy])].slice(0, 60);
   };
 
-  return { viewGenes, viewAttrs, viewEvents, catalogAttrs, numericAttrs, attrsLoading, profileOptions, assayOptions, contProfile, noSurvivalWhy, VIEW_KINDS, drawsOwnHead, GENE_VIEWS, geneChoices, cantDrawCohort };
+  return { viewGenes, viewAttrs, viewEvents, catalogAttrs, numericAttrs, attrsLoading, profileOptions, profileCatalog, assayOptions, contProfile, noSurvivalWhy, VIEW_KINDS, drawsOwnHead, GENE_VIEWS, geneChoices, cantDrawCohort };
 }

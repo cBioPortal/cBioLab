@@ -3,9 +3,12 @@
 // molecular profiles, generic-assay profiles and clinical attributes (most covered first).
 import { useEffect, useState } from "react";
 import { api } from "../lab/api.ts";
+import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 
 export interface StudyKnown {
   profiles: string[]; gaProfiles: string[]; clinical: string[];
+  /** every profile as the study describes it, for a plot axis's Data picker */
+  profileCatalog: ProfileInfo[];
   /** the clinical attributes with their kind and coverage, for the oncoprint's Tracks menu */
   attrs: { attribute: string; kind: string; patients: number }[];
   /** the study's display name and size, for the page header */
@@ -30,6 +33,7 @@ export function useStudyKnown(study: string): { known: StudyKnown | null; error:
         const attrs = sorted.map((c) => ({ attribute: c.attribute, kind: c.kind || "cat", patients: c.patients || 0 }));
         const meta = ((st.studies || []) as { id: string; name: string }[]).find((x) => x.id === study);
         setKnown({ profiles: (j.profiles || []).filter((p: string) => p !== "cna"), gaProfiles: j.gaProfiles || [], clinical, attrs,
+          profileCatalog: j.profileCatalog || [],
           name: meta?.name || study, patients: j.totals?.patients || 0, samples: j.totals?.samples || 0 });
       })
       .catch((e) => setError(String(e)));
@@ -37,8 +41,12 @@ export function useStudyKnown(study: string): { known: StudyKnown | null; error:
   return { known, error };
 }
 
-/** an mRNA profile for expression, preferring values over z-scores */
-export function expressionProfile(profiles: string[]): string | null {
-  const m = profiles.filter((p) => /mrna|rna_seq/i.test(p));
-  return m.find((p) => !/zscore/i.test(p)) || m[0] || null;
+/** an mRNA profile for expression, as the study describes its profiles: values before z-scores */
+export function expressionProfile(catalog: ProfileInfo[]): string | null {
+  const m = catalog.filter((p) => p.type === "MRNA_EXPRESSION").sort((a, b) => a.order - b.order);
+  return (m.find((p) => p.datatype === "CONTINUOUS") || m.find((p) => p.datatype === "Z-SCORE") || m[0])?.profile || null;
+}
+/** the study's discrete copy-number profile (GISTIC, or a panel study's calls) */
+export function discreteCnaProfile(catalog: ProfileInfo[]): string | null {
+  return catalog.find((p) => p.type === "COPY_NUMBER_ALTERATION" && p.datatype === "DISCRETE")?.profile || null;
 }

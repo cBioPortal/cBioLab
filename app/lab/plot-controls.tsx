@@ -13,6 +13,7 @@ import { Choice, OptionSelect } from "../_ui/choice.tsx";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
 import { CHIP, FIELD } from "../_ui/toolbar.ts";
+import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
 
 type Update = (fn: (view: any) => any) => void;
@@ -21,7 +22,7 @@ const CAP = POINTS_CAP.toLocaleString("en-US");
 
 function LogToggle({ spec, side, numeric, busy, update }: { spec: any; side: "x" | "y"; numeric: boolean; busy: boolean; update: Update }) {
   const axis = spec[side];
-  if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular")) return null;
+  if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular" && axis.source !== "profile")) return null;
   return (
     <label className="chk text-md text-foreground" title="draw this axis on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out">
       <Checkbox checked={!!axis.log} disabled={busy}
@@ -112,13 +113,15 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
   );
 }
 
-export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohortOptions, update, children }: {
+export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohortOptions, update, children }: {
   /** the view as the document holds it */
   spec: any;
   /** the last result's plot: which shape is on screen, each axis's name and kind, how many cases it shows, its layers */
   plot?: { shape: string; n: number; x: { kind: string; label: string }; y: { kind: string; label: string }; coverage?: { total: number };
     layers?: { label: string; color: string; n: number; shown: string }[] };
-  attrs: { attribute: string; kind: string }[]; profiles: string[]; loading?: boolean; busy: boolean;
+  attrs: { attribute: string; kind: string }[];
+  /** the studies' profiles as they describe them, for each axis's Data picker */
+  catalog: ProfileInfo[]; loading?: boolean; busy: boolean;
   /** the cohorts a point layer may be: every one but the plotted one and a split */
   cohortOptions: { name: string; label: string; depth: number }[];
   update: Update;
@@ -145,7 +148,7 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohor
   const boxTransposed = plot?.shape === "box" && plot.x.kind === "num";
   const boxDrawn = plot?.shape === "box" && !boxTransposed;
   const axisFields = (side: "x" | "y") => <>
-    <AxisPicker side={side} stacked axis={spec[side]} attrs={attrs} profiles={profiles} loading={loading} busy={busy}
+    <AxisPicker side={side} stacked axis={spec[side]} attrs={attrs} catalog={catalog} loading={loading} busy={busy}
       onChange={(a) => update((vv) => ({ ...vv, [side]: a }))} />
     <LogToggle spec={spec} side={side} numeric={plot?.[side].kind === "num"} busy={busy} update={update} />
   </>;
@@ -202,11 +205,11 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohor
           {(plot?.shape === "box" || drawn.length > 0) && <div className="viewtb mt-0 mb-2.5">
             {plot?.shape === "box" && <><div className="tbz">
               <span className="tbl" title="colours each group's violin and points by a category">colour samples by</span>
-              <AxisPicker side="fill" axis={spec.colorBy} allowNone categorical attrs={attrs} profiles={profiles} loading={loading} busy={busy}
+              <AxisPicker side="fill" axis={spec.colorBy} allowNone categorical attrs={attrs} catalog={catalog} loading={loading} busy={busy}
                 onChange={(a) => update((vv) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
             </div>
             <div className="tbz">
-              <AxisPicker side="ring" axis={spec.ringBy} allowNone categorical attrs={attrs} profiles={profiles} loading={loading} busy={busy}
+              <AxisPicker side="ring" axis={spec.ringBy} allowNone categorical attrs={attrs} catalog={catalog} loading={loading} busy={busy}
                 onChange={(a) => update((vv) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
             </div></>}
             {drawn.length > 0 && <div className="tbz plot-solo">

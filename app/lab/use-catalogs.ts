@@ -9,6 +9,7 @@ import type { StudyAccess } from "../../lib/view-coverage.ts";
 import { api } from "./api.ts";
 import { customDataKey } from "./custom-data-client.ts";
 import { isCustomAttr } from "../../lib/custom-data-names.ts";
+import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 
 export type StudyInfo = {
   id: string; name: string; cancerType?: string; patients: number; samples: number; timelinePatients: number;
@@ -23,10 +24,12 @@ export type TrackAttrs = {
   profiles: string[];
   /** generic-assay profiles (the assays view) */
   gaProfiles: string[];
+  /** every profile as the studies describe them, once per profile id (a plot axis's Data picker) */
+  profileCatalog: ProfileInfo[];
 };
 
 const NO_STUDIES: StudyInfo[] = [];
-const NO_TRACKS: TrackAttrs = { key: "", attrs: [], profiles: [], gaProfiles: [] };
+const NO_TRACKS: TrackAttrs = { key: "", attrs: [], profiles: [], gaProfiles: [], profileCatalog: [] };
 
 async function answer(res: Response) {
   const j = await res.json();
@@ -75,6 +78,7 @@ export function useTrackAttrs(result: AnalysisResult | null): { trackAttrs: Trac
       const seen = new Map<string, { kind: string; patients: number }>(); // attribute -> kind + how many carry it
       const profs = new Set<string>();
       const gas = new Set<string>();
+      const described = new Map<string, ProfileInfo>();
       for (const j of js) if (j) {
         if (j.clinical) for (const a of j.clinical) {
           const prev = seen.get(a.attribute);
@@ -82,6 +86,7 @@ export function useTrackAttrs(result: AnalysisResult | null): { trackAttrs: Trac
         }
         for (const p of j.profiles || []) if (p !== "cna") profs.add(p); // discrete cna isn't a heatmap
         for (const p of j.gaProfiles || []) gas.add(p);
+        for (const p of (j.profileCatalog || []) as ProfileInfo[]) if (!described.has(p.profile)) described.set(p.profile, p);
       }
       // the reader's own uploads first, then most-covered first, the way the portal orders its picker
       return {
@@ -89,7 +94,7 @@ export function useTrackAttrs(result: AnalysisResult | null): { trackAttrs: Trac
         attrs: [...seen.entries()].map(([attribute, v]) => ({ attribute, ...v }))
           .sort((x, y) => Number(isCustomAttr(y.attribute)) - Number(isCustomAttr(x.attribute)) ||
             y.patients - x.patients || (x.attribute < y.attribute ? -1 : 1)),
-        profiles: [...profs].sort(), gaProfiles: [...gas].sort(),
+        profiles: [...profs].sort(), gaProfiles: [...gas].sort(), profileCatalog: [...described.values()],
       } as TrackAttrs;
     },
   });

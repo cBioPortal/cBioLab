@@ -29,7 +29,22 @@ const OQL_PROFILED_TYPES: Partial<Record<string, ("MUTATION" | "CNA" | "SV")[]>>
 /** what goes on one axis */
 export type PlotAxis =
   | { source: "clinical"; attribute: string; log?: boolean }
-  | { source: "molecular"; profileType: string; gene: string; log?: boolean }
+  /**
+   * One of the study's own molecular profiles, by its id without the study prefix, and a gene. What
+   * the axis is follows from the profile's own type and datatype (lib/profile-catalog.ts): a
+   * mutation profile groups cases by mutation type (or `by: "mutated"`), a structural-variant
+   * profile by whether the case has one, a discrete copy-number profile by its levels, and a
+   * continuous one (expression, z-scores, log2 copy number, protein) is a number. Resolved against
+   * the study before it runs (lib/plot-profile.ts) into the forms below; a profile the study does
+   * not have is refused by name.
+   */
+  | { source: "profile"; profile: string; gene: string; by?: "mutationType" | "mutated"; log?: boolean }
+  /**
+   * The forms a profile axis resolves to, which the engine runs, and which a document may also give
+   * directly: one gene's value in a profile (`discrete` reads it as copy-number levels), and below,
+   * a gene's alterations from the event table. `label` is what the figure calls the axis.
+   */
+  | { source: "molecular"; profileType: string; gene: string; log?: boolean; discrete?: boolean; label?: string }
   /**
    * `genes` (2+) asks "is ANY of these altered" as one categorical — a pathway rollup (e.g. a
    * DDR gene set) instead of one gene at a time — and only for `by:"mutated"`: combining several
@@ -48,8 +63,8 @@ export type PlotAxis =
    */
   | { source: "alteration"; oql: string; by?: "any" | "statement" }
   | { source: "none" };
-export type AlterationBy = "mutated" | "mutationType" | "cna";
-const AXIS_SOURCES: readonly string[] = ["clinical", "molecular", "alteration", "none"] satisfies PlotAxis["source"][];
+export type AlterationBy = "mutated" | "mutationType" | "cna" | "sv";
+const AXIS_SOURCES: readonly string[] = ["clinical", "profile", "molecular", "alteration", "none"] satisfies PlotAxis["source"][];
 /** an alteration axis given as an OQL query, rather than as genes */
 function isOqlAxis(a: PlotAxis): a is { source: "alteration"; oql: string; by?: "any" | "statement" } {
   return a.source === "alteration" && "oql" in a && a.oql != null;
@@ -125,7 +140,11 @@ export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
 /** what an axis is called on the figure */
 export function axisLabel(a: PlotAxis): string {
   if (a.source === "clinical") return a.log ? "log10(" + a.attribute + " + 1)" : a.attribute;
-  if (a.source === "molecular") return a.log ? "log10(" + a.gene + " " + a.profileType + " + 1)" : a.gene + " " + a.profileType;
+  if (a.source === "molecular") {
+    const name = a.label || a.gene + " " + a.profileType;
+    return a.log ? "log10(" + name + " + 1)" : name;
+  }
+  if (a.source === "profile") return a.gene + " " + a.profile;
   if (isOqlAxis(a)) {
     const q = oqlStatements(a.oql).join("; ");
     return (q.length > 48 ? q.slice(0, 47) + "…" : q) + (a.by === "statement" ? " (OQL, by line)" : " (OQL)");
@@ -133,7 +152,7 @@ export function axisLabel(a: PlotAxis): string {
   if (a.source === "alteration") {
     const genes = alterationGenes(a);
     const name = genes.length > 1 ? (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") : genes[0];
-    return name + (a.by === "cna" ? " copy number" : a.by === "mutationType" ? " mutation type" : " mutation status");
+    return name + (a.by === "cna" ? " copy number" : a.by === "sv" ? " structural variant" : a.by === "mutationType" ? " mutation type" : " mutation status");
   }
   return "ordered cases";
 }
@@ -145,7 +164,8 @@ export function axisLabel(a: PlotAxis): string {
  */
 export function axisKind(a: PlotAxis, clinicalKind?: (attr: string) => "num" | "cat" | undefined): AxisKind {
   if (a.source === "none") return "none";
-  if (a.source === "molecular") return "num";
+  if (a.source === "profile") throw new Error("a profile axis is read only once resolved against the study's profiles (lib/plot-profile.ts)");
+  if (a.source === "molecular") return a.discrete ? "cat" : "num";
   if (a.source === "alteration") return "cat";
   const k = clinicalKind ? clinicalKind(a.attribute) : undefined;
   if (!k) throw new Error("clinical attribute '" + a.attribute + "' is not declared by this study, so its type is unknown");
@@ -158,6 +178,13 @@ export function validateAxis(a: PlotAxis, which: string): void {
     throw new Error(which + " axis: unknown source '" + String(a.source).slice(0, 40) + "' — use one of " + AXIS_SOURCES.join(", "));
   if (a.source === "clinical" && !ATTR_RE.test(String(a.attribute || "")))
     throw new Error(which + " axis: '" + a.attribute + "' is not a clinical attribute name");
+  if (a.source === "profile") {
+    if (!PROFILE_RE.test(String(a.profile || ""))) throw new Error(which + " axis: '" + a.profile + "' is not a profile");
+    if (!GENE_RE.test(String(a.gene || "").toUpperCase()))
+      throw new Error(which + " axis: a profile axis reads one gene; name it");
+    if (a.by != null && a.by !== "mutationType" && a.by !== "mutated")
+      throw new Error(which + " axis: a mutation profile groups by \"mutationType\" or \"mutated\"; not " + JSON.stringify(a.by));
+  }
   if (a.source === "molecular") {
     if (!PROFILE_RE.test(String(a.profileType || ""))) throw new Error(which + " axis: '" + a.profileType + "' is not a profile type");
     // A molecular axis without a gene would ask the database for every gene of every case —
@@ -242,6 +269,21 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     return "SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), " + combined + ") AS v FROM (\n" + own + "\n  UNION ALL\n" + other + "\n) GROUP BY id";
   }
 
+  if (a.source === "molecular" && a.discrete) {
+    // A discrete copy-number profile's own calls, one level per case, labelled as the portal labels
+    // them; a value outside the five levels is its own category, as written. In patient mode a
+    // patient whose samples disagree is "Multiple", the rule every categorical axis follows.
+    const gene = String(a.gene).toUpperCase();
+    const level = "multiIf(x = -2, 'Deep deletion', x = -1, 'Shallow deletion', x = 0, 'Diploid', x = 1, 'Gain', x = 2, 'Amplification', toString(x))";
+    return "SELECT id, if(uniqExact(lv) > 1, " + sq(MULTIPLE) + ", any(lv)) AS v FROM (\n" +
+      "SELECT " + strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study) + " AS id, " + level.replace(/\bx\b/g, "toFloat64OrNull(ga.alteration_value)") + " AS lv\n" +
+      "FROM " + db + ".genetic_alteration_derived ga\n" +
+      "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
+      "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(a.profileType) +
+      " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
+      "  AND toFloat64OrNull(ga.alteration_value) IS NOT NULL AND " + inCohort("sd.patient_unique_id") + ")\n" +
+      "GROUP BY id";
+  }
   if (a.source === "molecular") {
     const gene = String(a.gene).toUpperCase();
     // patient mode averages a patient's samples, the same rule the oncoprint's heatmap uses; a
@@ -290,19 +332,29 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     const events = "SELECT sample_unique_id, mutation_type, variant_type, cna_alteration\n" +
       "     FROM " + db + ".genomic_event_derived\n" +
       "     WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")";
+    const hit = by === "cna" ? "abs(g.cna_alteration) >= 2" : by === "sv" ? "g.variant_type = 'structural_variant'" : "g.variant_type = 'mutation'";
     const value = by === "cna"
       ? "if(countIf(g.cna_alteration >= 2) > 0, 'Amplification', if(countIf(g.cna_alteration <= -2) > 0, 'Deep deletion', 'Neutral'))"
+      : by === "sv"
+        ? "if(countIf(" + hit + ") > 0, 'Structural variant', 'No structural variant')"
       : by === "mutationType"
         // one class per case; a case carrying two of them is its own honest category
         ? "multiIf(countIf(g.variant_type = 'mutation') = 0, 'Not mutated'," +
           " length(groupUniqArrayIf(" + MUT_CLASS + ", g.variant_type = 'mutation')) > 1, 'Multiple'," +
           " arrayElement(groupUniqArrayIf(" + MUT_CLASS + ", g.variant_type = 'mutation'), 1))"
         : "if(countIf(g.variant_type = 'mutation') > 0, 'Mutated', 'Not mutated')";
-    return "SELECT " + idCol + " AS id, " + value + " AS v\n" +
+    // A case with no such alteration is "not mutated" (neutral, no SV) only when it is profiled for
+    // every gene of the axis in that alteration type; otherwise it is "Not profiled", never counted
+    // as wild type (the panel-aware rule). The case column is alt_case, not id, for the reason the
+    // OQL axis's is oql_case.
+    const type = by === "cna" ? "CNA" as const : by === "sv" ? "SV" as const : "MUTATION" as const;
+    const profiled = genes.map((g) => "alt_case IN (SELECT profiled_id FROM (" + profiledCasesSql(g, type, { study, db, unit: ctx.unit }) + "))").join(" AND ");
+    return "SELECT alt_case AS id, if(hits = 0 AND NOT (" + profiled + "), " + sq(OQL_NOT_PROFILED) + ", v0) AS v FROM (\n" +
+      "SELECT " + idCol + " AS alt_case, " + value + " AS v0, countIf(" + hit + ") AS hits\n" +
       "FROM " + db + ".sample_derived sd\n" +
       "LEFT JOIN (\n     " + events + "\n) g ON g.sample_unique_id = sd.sample_unique_id\n" +
       "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + inCohort("sd.patient_unique_id") + "\n" +
-      "GROUP BY id";
+      "GROUP BY alt_case)";
   }
   throw new Error("axis source '" + (a as { source: string }).source + "' cannot be selected");
 }

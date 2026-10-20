@@ -7,7 +7,8 @@ import { axisLabel, validateAxis, type AxisKind } from "../plot.ts";
 import { logisticMethod, type CoxTrace } from "../method.ts";
 import { buildCoxColumns } from "./cox.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
-import { overLimit } from "./shared.ts";
+import { overLimit, studyCatalogs } from "./shared.ts";
+import { resolveProfileAxis } from "../plot-profile.ts";
 
 export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;
@@ -15,8 +16,15 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
   // (buildCoxColumns, the same reference-level rules), same patient-level-only boundary —
   // but a binary outcome rather than a time-to-event one, so there is no endpoint/months
   // convention here: the outcome is just another axis, exactly like a covariate.
-  const lv = view as LogisticView;
-  try { validateAxis(lv.outcome, "outcome"); }
+  let lv = view as LogisticView;
+  try {
+    // profile axes are read as the studies describe the profile
+    const catalogs = await studyCatalogs(c, vStudies);
+    lv = { ...lv, outcome: resolveProfileAxis(lv.outcome, "outcome", catalogs),
+      ...(Array.isArray(lv.covariates) ? { covariates: lv.covariates.map((cv, i) => ({ ...resolveProfileAxis(cv, "covariate " + (i + 1), catalogs),
+        ...((cv as { reference?: string }).reference != null ? { reference: (cv as { reference?: string }).reference } : {}) })) } : {}) };
+    validateAxis(lv.outcome, "outcome");
+  }
   catch (e) { return untimed({ kind: "logistic", error: (e as Error).message }); }
   const outcomeLabel = axisLabel(lv.outcome);
   // alteration/molecular axes are deterministically categorical/numeric without a DB round

@@ -13,6 +13,8 @@ import { GeneQueryDialog } from "../_genes/GeneQueryDialog.tsx";
 import type { GeneQueryMode, QueryCheck } from "../../lib/gene-query.ts";
 import { oqlStatements } from "../../lib/oql-parse.ts";
 import { ALTERATION_GENE_SET_CAP, OQL_STATEMENT_CAP } from "../../lib/plot-oql.ts";
+import { plottableProfiles, profileGroup, profileUse, type ProfileInfo } from "../../lib/profile-catalog.ts";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "../_ui/select";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
@@ -89,25 +91,27 @@ function QueryButton({ mode, value, max, title, description, busy, onApply }: {
 }
 
 /**
- * One axis of a plot. The source decides what else is asked for: a clinical attribute, a gene
- * in a molecular profile, or a gene's alterations. It is the same vocabulary the engine uses,
- * so what the reader picks is what the document says.
+ * One axis of a plot. Its Data is one choice from a grouped list: a clinical attribute, each of the
+ * study's own profiles under its alteration type (named as the study names it), or a query across
+ * genes (OQL, a gene set). What the choice needs next follows from it: an attribute; a gene, and for
+ * a mutation profile how to group the mutations; or the query.
  */
-export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChange, allowNone, categorical, stacked }: {
+export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange, allowNone, categorical, stacked }: {
   side: string; axis: any; busy?: boolean;
-  attrs: { attribute: string; kind: string }[]; profiles: string[];
+  attrs: { attribute: string; kind: string }[];
+  /** the studies' profiles as they describe them (lib/profile-catalog.ts) */
+  catalog: ProfileInfo[];
   /** the attribute/profile catalog is still being fetched: its select waits with a loader */
   loading?: boolean;
   onChange: (a: any) => void;
   /** a colour is optional in a way an axis is not */
   allowNone?: boolean;
-  /** colours come from categories, so a molecular value is not on offer */
+  /** colours come from categories, so a profile of numbers is not on offer */
   categorical?: boolean;
   /** one labelled field per row at the box's full width (a plot's axis sidebar), not a toolbar run */
   stacked?: boolean;
 }) {
   const a = axis || {};
-  const src = axis ? (a.source || "clinical") : "none";
   const set = (next: any) => onChange(next);
   const w = stacked ? "w-full max-w-none" : "max-w-44";
   /** a control with its name above it when stacked; inline, the toolbar's side label names the run */
@@ -115,103 +119,109 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
     stacked ? <div className="axfield flex flex-col gap-1"><span className="axfield-name text-sm font-semibold text-foreground">{name}</span>
       {extra ? <div className="flex min-w-0 gap-1">{control}{extra}</div> : control}</div>
       : <>{control}{extra}</>;
-  const srcName: Record<string, string> = { clinical: "Clinical attribute", molecular: "Molecular profile", alteration: "Genes" };
+  const profiles = plottableProfiles(catalog);
+  const offered = (p: ProfileInfo) => { const u = profileUse(p); return !categorical || u === "mutation" || u === "sv" || u === "discrete" || u === "assayCategory"; };
+  // what the axis holds, as one of the Data list's values; a form the document gives directly
+  // (a molecular profile, a gene's alterations) shows as the profile it reads
+  const byUse = (u: string) => profiles.find((p) => profileUse(p) === u)?.profile;
+  const data: string = !axis ? "none"
+    : a.source === "clinical" ? "clinical"
+    : a.source === "profile" ? "profile:" + a.profile
+    : a.source === "molecular" ? "profile:" + a.profileType
+    : a.source === "alteration" && a.oql != null ? "oql"
+    : a.source === "alteration" && Array.isArray(a.genes) && a.genes.length > 1 ? "genes"
+    : a.source === "alteration" ? "profile:" + (byUse(a.by === "cna" ? "discrete" : a.by === "sv" ? "sv" : "mutation") || "")
+    : "clinical";
+  const current = data.startsWith("profile:") ? catalog.find((p) => "profile:" + p.profile === data) : undefined;
+  const use = current ? profileUse(current) : null;
+  const gene = String(a.gene || (Array.isArray(a.genes) ? a.genes[0] : "") || (a.oql ? (/^\s*([A-Za-z0-9.-]+)/.exec(a.oql) || [])[1] || "" : "") || "TP53").toUpperCase();
+  const choose = (v: string) => {
+    if (v === "none") return set(undefined);
+    if (v === "clinical") return set({ source: "clinical", attribute: a.attribute || (attrs[0] || {}).attribute || "" });
+    if (v === "oql") return set({ source: "alteration", oql: a.oql || gene + ": MUT" });
+    if (v === "genes") return set({ source: "alteration", genes: Array.isArray(a.genes) && a.genes.length > 1 ? a.genes : [gene], by: "mutated" });
+    const p = catalog.find((x) => "profile:" + x.profile === v);
+    if (p) set({ source: "profile", profile: p.profile, gene, ...(profileUse(p) === "mutation" ? { by: a.by === "mutated" ? "mutated" : "mutationType" } : {}) });
+  };
+  // the Data list: the profiles grouped under their type, in the study's own order
+  const groups: { label: string; items: { value: string; label: string; disabled?: string }[] }[] = [];
+  groups.push({ label: "Clinical", items: [{ value: "clinical", label: "Clinical attribute" }] });
+  for (const p of profiles) {
+    if (!offered(p)) continue;
+    const g = profileGroup(p);
+    const at = groups.find((x) => x.label === g) || (groups.push({ label: g, items: [] }), groups[groups.length - 1]);
+    const assay = p.type === "GENERIC_ASSAY";
+    at.items.push({ value: "profile:" + p.profile, label: p.name, ...(assay ? { disabled: "generic assays (" + p.name + ") come to plot axes next" } : {}) });
+  }
+  groups.push({ label: "Across genes", items: [{ value: "oql", label: "OQL query" }, { value: "genes", label: "Gene set (mutated in any)" }] });
+  const dataPicker = loading && !catalog.length && !attrs.length ? <Waiting what="profiles" /> : (
+    <Select value={data} onValueChange={choose} disabled={busy}>
+      <SelectTrigger size="sm" aria-label={side + " data"} title={current ? current.name : "what this axis measures"}
+        className={cn("h-ctl gap-1 bg-card px-2 text-md data-[size=sm]:h-ctl [&_svg:not([class*='size-'])]:size-3.5 [&>span]:truncate", w)}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="max-h-96">
+        {allowNone && <SelectItem value="none" className="text-md">none</SelectItem>}
+        {!groups.some((g) => g.items.some((i) => i.value === data)) && data !== "none" &&
+          <SelectItem value={data} className="text-md">{data.replace(/^profile:/, "")} (not in this study)</SelectItem>}
+        {groups.map((g) => (
+          <SelectGroup key={g.label}>
+            <SelectLabel className="text-xs font-semibold text-muted-foreground">{g.label}</SelectLabel>
+            {g.items.map((i) => <SelectItem key={i.value} value={i.value} disabled={!!i.disabled} title={i.disabled || i.label} className="text-md">{i.label}</SelectItem>)}
+          </SelectGroup>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+  const isOql = data === "oql", isSet = data === "genes";
+  const genes: string[] = Array.isArray(a.genes) && a.genes.length ? a.genes : a.gene ? [a.gene] : [];
+  const commitGenes = (next: string[]) => set(next.length > 1 ? { source: "alteration", genes: next, by: "mutated" } : { source: "alteration", genes: next.slice(0, 1), by: "mutated" });
   return (
     <span className={stacked ? "axispick-stack flex flex-col gap-2.5" : "axispick"}>
       {!stacked && <span className="tbl">{side}</span>}
-      {field("Data type", <OptionSelect className={w} value={src} disabled={busy} title="what this axis measures" ariaLabel={side + " data type"}
-        onValueChange={(v) => {
-          const s = v;
-          // Keep whatever this axis last held for each source (spreading `a` rather than
-          // starting fresh), so switching away and back round-trips instead of always
-          // reverting to the catalog's first entry — a molecular axis already did this for
-          // its gene; clinical's attribute and molecular's profile now do too.
-          set(s === "none" ? undefined
-            : s === "clinical" ? { ...a, source: "clinical", attribute: a.attribute || (attrs[0] || {}).attribute || "" }
-            : s === "molecular" ? { ...a, source: "molecular", profileType: a.profileType || profiles[0] || "", gene: a.gene || "TP53" }
-            : { ...a, source: "alteration", gene: a.gene || "TP53", by: a.by || "mutationType" });
-        }}>
-        {allowNone && <option value="none">none</option>}
-        <option value="clinical">clinical</option>
-        {!categorical && <option value="molecular">molecular</option>}
-        <option value="alteration">alteration</option>
-      </OptionSelect>)}
-      {src === "clinical" && loading && !attrs.length && field(srcName.clinical, <Waiting what="attributes" />)}
-      {src === "clinical" && !(loading && !attrs.length) && field(srcName.clinical,
+      {field("Data", dataPicker)}
+      {data === "clinical" && loading && !attrs.length && field("Clinical attribute", <Waiting what="attributes" />)}
+      {data === "clinical" && !(loading && !attrs.length) && field("Clinical attribute",
         <OptionSelect className={w} value={a.attribute || ""} disabled={busy} title="which clinical attribute" ariaLabel={side + " clinical attribute"}
           onValueChange={(v) => set({ ...a, attribute: v })}>
           {!attrs.some((x) => x.attribute === a.attribute) && <option value={a.attribute || ""}>{a.attribute || "(none)"}</option>}
           {attrs.map((x) => <option key={x.attribute} value={x.attribute}>{attributeLabel(x.attribute)}{x.kind === "num" ? "" : " (categorical)"}</option>)}
         </OptionSelect>
       )}
-      {src === "molecular" && <>
-        {field(srcName.molecular, loading && !profiles.length ? <Waiting what="profiles" /> :
-        <OptionSelect className={w} value={a.profileType || ""} disabled={busy} title="which molecular profile" ariaLabel={side + " molecular profile"}
-          onValueChange={(v) => set({ ...a, profileType: v })}>
-          {!profiles.includes(a.profileType || "") && <option value={a.profileType || ""}>{a.profileType || "(none)"}</option>}
-          {profiles.map((pt) => <option key={pt} value={pt}>{pt}</option>)}
-        </OptionSelect>)}
-        {field("Gene", <GeneInput gene={a.gene || ""} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined} onCommit={(gene) => set({ ...a, gene })} />,
-          <QueryButton mode="genes" value={a.gene || ""} max={1} busy={busy} title="Gene for this axis"
-            description="The gene whose value in the profile this axis reads." onApply={(_t, c) => set({ ...a, gene: c.genes[0] || "" })} />)}
-      </>}
-      {src === "alteration" && (() => {
-        const isOql = a.oql != null;
-        const genes: string[] = a.genes && a.genes.length ? a.genes : a.gene ? [a.gene] : [];
-        const isSet = !isOql && genes.length > 1;
-        const groupBy = <OptionSelect className={w} value={isOql ? (a.by === "statement" ? "oqlEach" : "oql") : a.by || (isSet ? "mutated" : "mutationType")} disabled={busy}
-            ariaLabel={side + " alteration grouping"}
-            title={isOql ? (a.by === "statement" ? "a group for each line of the query; a case matching two is their pair, none Unaltered (or Not profiled)"
-              : "Altered when a case matches any line of the query; Unaltered when it matches none and is profiled for every gene, else Not profiled")
-              : isSet ? "a gene set is \"mutated vs not\", or write it as an OQL query" : "how the gene's alterations are grouped"}
-            onValueChange={(v) => {
-              const by = v;
-              // to OQL: the genes become a query (a bare gene is "any alteration"); from OQL: the
-              // query's first gene, so a round trip keeps the gene
-              if (by === "oql" || by === "oqlEach") {
-                const oql = isOql ? a.oql : genes.length ? genes.join("; ") : "TP53: MUT";
-                set(by === "oqlEach" ? { source: "alteration", oql, by: "statement" } : { source: "alteration", oql });
-              }
-              else if (isOql) set({ source: "alteration", gene: (/^\s*([A-Za-z0-9.-]+)/.exec(a.oql) || [])[1]?.toUpperCase() || "TP53", by });
-              else set({ ...a, by });
-            }}>
-            <option value="mutationType" disabled={isSet}>mutation type</option>
+      {current && use !== "assayNumber" && use !== "assayCategory" && <>
+        {field("Gene", <GeneInput gene={gene} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined}
+            onCommit={(g) => set({ ...(a.source === "profile" ? a : { source: "profile", profile: current.profile }), gene: g })} />,
+          <QueryButton mode="genes" value={gene} max={1} busy={busy} title="Gene for this axis"
+            description={"The gene whose " + current.name + " this axis reads. To compare several genes, choose OQL query or Gene set under Data."}
+            onApply={(_t, c) => set({ ...(a.source === "profile" ? a : { source: "profile", profile: current.profile }), gene: c.genes[0] || "" })} />)}
+        {use === "mutation" && field("Plot mutations by",
+          <OptionSelect className={w} value={a.by === "mutated" ? "mutated" : "mutationType"} disabled={busy} ariaLabel={side + " mutations by"}
+            title="group the cases by their mutation's type, or by whether they have one"
+            onValueChange={(v) => set({ source: "profile", profile: current.profile, gene, by: v })}>
+            <option value="mutationType">mutation type</option>
             <option value="mutated">mutated vs not</option>
-            <option value="cna" disabled={isSet}>copy number</option>
-            <option value="oql">matches OQL (any line)</option>
-            <option value="oqlEach">OQL, one group per line</option>
-          </OptionSelect>;
-        // stacked, the grouping comes first: it decides whether the box below takes genes or a query
-        return <>
-          {stacked && field("Group cases by", groupBy)}
-          {field(isOql ? "OQL query" : "Gene(s)", isOql
-            ? <OqlInput query={a.oql} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined} onCommit={(oql) => set({ ...a, source: "alteration", oql })} />
-            : <GeneSetInput genes={genes} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined}
-                onCommit={(next) => {
-                  // A gene SET (2+) only supports "mutated vs not" — combining several genes'
-                  // mutation types or copy-number states into one category has no honest reading,
-                  // so switching to a set falls back to that rather than leaving an axis the
-                  // engine would refuse.
-                  const by = next.length > 1 && a.by && a.by !== "mutated" ? "mutated" : a.by;
-                  set(next.length > 1 ? { ...a, gene: undefined, genes: next, by }
-                    : { ...a, genes: undefined, gene: next[0] || "", by });
-                }} />,
-            isOql
-              ? <QueryButton mode="oql" value={oqlStatements(a.oql).join("\n")} busy={busy} title="OQL for this axis"
-                  max={a.by === "statement" ? OQL_STATEMENT_CAP : 30}
-                  description={a.by === "statement" ? "Each line is its own group; a case matching two is their pair. A bare gene means any alteration in it."
-                    : "A case is Altered if any line matches. A bare gene means any alteration in it; add OQL to be specific."}
-                  onApply={(text) => set({ ...a, source: "alteration", oql: oqlStatements(text).join(", ") })} />
-              : <QueryButton mode="genes" value={genes.join(" ")} max={ALTERATION_GENE_SET_CAP} busy={busy} title="Genes for this axis"
-                  description="One gene, or several: a case counts as mutated when any of them is. For anything finer, group cases by OQL."
-                  onApply={(_t, c) => {
-                    const next = c.genes;
-                    const by = next.length > 1 && a.by && a.by !== "mutated" ? "mutated" : a.by;
-                    set(next.length > 1 ? { ...a, gene: undefined, genes: next, by } : { ...a, genes: undefined, gene: next[0] || "", by });
-                  }} />)}
-          {!stacked && groupBy}
-        </>;
-      })()}
+          </OptionSelect>)}
+      </>}
+      {isOql && <>
+        {field("Group cases by",
+          <OptionSelect className={w} value={a.by === "statement" ? "statement" : "any"} disabled={busy} ariaLabel={side + " OQL grouping"}
+            title={a.by === "statement" ? "a group for each line of the query; a case matching two is their pair, none Unaltered (or Not profiled)"
+              : "Altered when a case matches any line of the query; Unaltered when it matches none and is profiled for every gene, else Not profiled"}
+            onValueChange={(v) => set(v === "statement" ? { source: "alteration", oql: a.oql, by: "statement" } : { source: "alteration", oql: a.oql })}>
+            <option value="any">any line (Altered or not)</option>
+            <option value="statement">one group per line</option>
+          </OptionSelect>)}
+        {field("OQL query", <OqlInput query={a.oql} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined} onCommit={(oql) => set({ ...a, source: "alteration", oql })} />,
+          <QueryButton mode="oql" value={oqlStatements(a.oql || "").join("\n")} busy={busy} title="OQL for this axis"
+            max={a.by === "statement" ? OQL_STATEMENT_CAP : 30}
+            description={a.by === "statement" ? "Each line is its own group; a case matching two is their pair. A bare gene means any alteration in it."
+              : "A case is Altered if any line matches. A bare gene means any alteration in it; add OQL to be specific."}
+            onApply={(text) => set({ ...a, source: "alteration", oql: oqlStatements(text).join(", ") })} />)}
+      </>}
+      {isSet && field("Genes", <GeneSetInput genes={genes} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined} onCommit={commitGenes} />,
+        <QueryButton mode="genes" value={genes.join(" ")} max={ALTERATION_GENE_SET_CAP} busy={busy} title="Genes for this axis"
+          description="A case counts as mutated when any of these genes is. For anything finer, choose OQL query under Data."
+          onApply={(_t, c) => commitGenes(c.genes)} />)}
     </span>
   );
 }

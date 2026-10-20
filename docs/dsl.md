@@ -334,13 +334,28 @@ column id or a filter that does not suit its column is refused with the ids acce
 
 ### Plot axes
 
-An axis is one of four things, and the pair decides the shape — the portal's own rule:
+An axis is a clinical attribute, one of the study's own molecular profiles, or a query across genes,
+and the pair decides the shape — the portal's own rule:
 
 | `source` | shape of the axis | fields |
 | --- | --- | --- |
 | `clinical` | number or category, **as the study declared it** | `attribute` |
-| `molecular` | number | `profileType`, `gene` |
-| `alteration` | category | `gene` **or** `genes` (2-20), `by`: `"mutationType"` (default) \| `"mutated"` \| `"cna"` |
+| `profile` | **as the study describes the profile** (below) | `profile` (its id without the study prefix), `gene`, `by` for a mutation profile, `log` for numbers |
+| `alteration` | category | `oql` (below), or `genes` (2-20, any mutated) |
+
+**A profile axis** reads one gene in one of the study's profiles, and what it is follows from the
+study's own description of that profile (`genetic_profile`: its alteration type and datatype), never
+from its name: a **mutation** profile (MAF) groups cases by mutation type, or with `by: "mutated"`
+mutated or not; a **structural-variant** profile by whether the case has one; a **discrete
+copy-number** profile by its own calls (Deep deletion, Shallow deletion, Diploid, Gain,
+Amplification, drawn in that order); and a **continuous** one (mRNA, z-scores, log2 copy number,
+protein) is a number. A case with no mutation, SV or high-level call in the gene is the wild-type
+answer only when it is profiled for that gene; otherwise it is **Not profiled**. A profile a study
+does not have is refused with the list it does have, and one that two pooled studies describe
+differently is refused, never read as one thing. Generic-assay profiles (methylation, arm-level copy
+number, …) are not plot axes yet. The engine runs a profile axis as the lower-level forms it
+resolves to, which a document may also give directly: `{"source":"molecular","profileType","gene",
+"discrete"?}` and `{"source":"alteration","gene","by":"mutationType"|"mutated"|"cna"|"sv"}`.
 
 number × number draws a **density scatter**, number × category a **box**, category × category a
 **contingency table**. Every statistic is computed where the rows are and is therefore exact over
@@ -354,7 +369,7 @@ inventing a second mechanism. Only `by:"mutated"` (the default when `genes` is u
 supported for a set — combining several genes' mutation TYPES or copy-number states into one
 category has no single honest reading, so that combination is refused rather than guessed at.
 
-Two things are refused rather than approximated. A molecular axis **must name one gene** — a
+Two things are refused rather than approximated. A profile axis **must name one gene** — a
 whole profile is 630 million values in this warehouse, and reading them to draw one picture is
 never what was meant. And a categorical axis with more than 150 distinct values is refused,
 because a truncated contingency table is a wrong one.
@@ -420,7 +435,7 @@ profiled by the same rule (at most 6 statements). It is the same OQL a cohort's 
 EXP/PROT thresholds), and it matches per patient or per sample following the plot's `unit`.
 Because it is a categorical axis, it also works as `colorBy`/`ringBy` and as a Cox or logistic
 covariate, where "Unaltered" is the reference level.
-OQL is for alteration axes only: a molecular axis stays one gene's value.
+OQL is for alteration axes only: a profile axis stays one gene in one profile.
 
 **Points.** Every case is a point when there are at most 10,000 of them and every study may show
 cases (`allPoints: false` draws the density alone at any size). Over that the plotted cohort is a
@@ -2271,7 +2286,57 @@ Non-small cell lung cancer in MSK-CHORD (7,809 patients). The first view groups 
 }
 ```
 
-### Example 21: Merged gene rows: a pathway as one track
+### Example 21: Plot axes from the study's own profiles: ERBB2 copy number against expression
+
+TCGA breast cancer (PanCancer Atlas), every sample. The first view groups ERBB2 mRNA z-scores (relative to all samples) by ERBB2's GISTIC copy-number call, from Shallow deletion to Amplification: the 122 amplified samples sit far above the rest. The second groups fraction of genome altered by TP53's mutation type from the study's mutation profile; the 18 samples not in that profile are Not profiled, not counted as unmutated.
+
+```json
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "all samples": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "plot",
+      "cohorts": [
+        "all samples"
+      ],
+      "unit": "sample",
+      "x": {
+        "source": "profile",
+        "profile": "gistic",
+        "gene": "ERBB2"
+      },
+      "y": {
+        "source": "profile",
+        "profile": "rna_seq_v2_mrna_median_all_sample_Zscores",
+        "gene": "ERBB2"
+      }
+    },
+    {
+      "kind": "plot",
+      "cohorts": [
+        "all samples"
+      ],
+      "unit": "sample",
+      "x": {
+        "source": "profile",
+        "profile": "mutations",
+        "gene": "TP53"
+      },
+      "y": {
+        "source": "clinical",
+        "attribute": "FRACTION_GENOME_ALTERED"
+      }
+    }
+  ]
+}
+```
+
+### Example 22: Merged gene rows: a pathway as one track
 
 Pancreatic adenocarcinoma. The first row pools TP53, MDM2 and MDM4: it is altered where any of them is, and its denominator is the union of the three genes' panels — not their intersection, and not the whole cohort. TP53 is drawn again on its own underneath, so the difference the other two make is readable rather than asserted. A row's members are listed in its tooltip and in the contract's `members` field.
 
@@ -2327,7 +2392,7 @@ Pancreatic adenocarcinoma. The first row pools TP53, MDM2 and MDM4: it is altere
 }
 ```
 
-### Example 22: A federated z-score reference on an oncoprint
+### Example 23: A federated z-score reference on an oncoprint
 
 A heatmap track with reference:"federation" is scored against a distribution pooled from EVERY participating study, including instances that disclose no patients and therefore contribute no columns — each returns three totals per gene (n, sum, sum of squares), which is enough to define the reference. Run with luad_tcga_pan_can_atlas_2018 aggregate-only, its patients are absent from the columns while its 510 patients still shape what the drawn columns mean.
 
@@ -2369,7 +2434,7 @@ A heatmap track with reference:"federation" is scored against a distribution poo
 }
 ```
 
-### Example 23: The clinical course: who is still on treatment, and when
+### Example 24: The clinical course: who is still on treatment, and when
 
 MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Treatment carries real start/stop dates so it is drawn as a state patients are IN; surgery has no duration, so it is the share with a surgery in that bin — a distinction read from the data's shape, not from the event's name. Note surgery peaking BEFORE time zero: resection typically precedes first systemic therapy. The at-risk row under the axis is the denominator, and it falls steeply — a curve read without it would be badly misleading.
 
@@ -2423,7 +2488,7 @@ MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Trea
 }
 ```
 
-### Example 24: A reusable workup: one template, retargeted in a single edit
+### Example 25: A reusable workup: one template, retargeted in a single edit
 
 The gene list appears once, in `params`, and every view refers to it as `$genes`; the study likewise. Change either and all three figures follow. The rule is only that a value which is exactly "$name" is replaced by that parameter — no interpolation, no expressions — so the resolved document is an ordinary one and compiles to exactly the SQL you would get by typing the values in. A `$name` with no declaration is a loud error naming the path, and a parameter declared but never referenced is reported back, which is what catches a rename that missed a reference. `notes` and each view’s `note` travel with the document.
 
@@ -2484,7 +2549,7 @@ The gene list appears once, in `params`, and every view refers to it as `$genes`
 }
 ```
 
-### Example 25: What comes after what: lines of therapy, and what ending a path means
+### Example 26: What comes after what: lines of therapy, and what ending a path means
 
 MSK-CHORD therapy lines by TP53 status, 90-day gap, two panels on one scale. Read the grey blocks first, and read them as TWO things: the darker terminal is patients the study watched for at least a line gap who began no further therapy; the lighter one is patients whose records simply stop, about whom nothing can be concluded. Over half of all paths end censored — collapsing them together (as a plain Sankey does) would turn record-keeping into an apparent clinical decision. The real signal is in first line: TP53 wild-type receives far more hormone therapy than TP53-mutant, which is what hormone-receptor-positive disease looks like. Lines are the one definition every line count shares: systemic-therapy records only, so 'Prior Medications to MSK' (a provenance marker rather than a therapy), radiation and bone treatment are not lines — they co-occur with almost everything, so leaving them in would explode the combination space. The caption says which records were used; a document that wants them anyway says so with lineClasses.
 
@@ -2531,7 +2596,7 @@ MSK-CHORD therapy lines by TP53 status, 90-day gap, two panels on one scale. Rea
 }
 ```
 
-### Example 26: Lollipop plot: mutations by protein position, with a suppression floor
+### Example 27: Lollipop plot: mutations by protein position, with a suppression floor
 
 Hotspots in colorectal cancer, drawn the way cBioPortal's mutation tab draws them: one stem per codon, its height the distinct patient + protein change pairs there, with the protein's Pfam domains on the backbone — so KRAS spikes at codons 12-13 and BRAF at V600. minCount is applied by each site before anything is returned — with it set to 3, a change carried by one or two patients never leaves the database holding it, which is where small-cell suppression belongs.
 
@@ -2570,7 +2635,7 @@ Hotspots in colorectal cancer, drawn the way cBioPortal's mutation tab draws the
 }
 ```
 
-### Example 27: Co-expression from sums alone
+### Example 28: Co-expression from sums alone
 
 Pearson correlation between gene pairs in TCGA breast cancer. A correlation depends on the data only through six running totals, so each site can contribute without transmitting a single expression value — and because the totals add, the federated answer is exact rather than approximate. ERBB2/GRB7 (adjacent on the 17q12 amplicon) comes out near 0.87.
 
@@ -2606,7 +2671,7 @@ Pearson correlation between gene pairs in TCGA breast cancer. A correlation depe
 }
 ```
 
-### Example 28: Clinical attributes compared between cohorts
+### Example 29: Clinical attributes compared between cohorts
 
 How TP53-mutant and wild-type tumors differ clinically. Categorical attributes are compared with a chi-squared over the full value vocabulary; numeric ones with Welch's t computed from three additive totals per site (n, sum, sum of squares) rather than from any transmitted value. An attribute the study does not declare is reported as skipped, not silently dropped.
 
@@ -2656,7 +2721,7 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
 }
 ```
 
-### Example 29: Co-occurrence and mutual exclusivity in NSCLC
+### Example 30: Co-occurrence and mutual exclusivity in NSCLC
 
 Pairwise associations among lung cancer driver genes. Each site returns four counts per pair — both altered, one, the other, neither — among the patients its own panels profiled for BOTH genes, and nothing else; the coordinator does the inference. Reproduces the textbook pattern: STK11/KEAP1 co-occur, EGFR/KRAS and EGFR/ALK are mutually exclusive.
 
@@ -2696,7 +2761,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
 }
 ```
 
-### Example 30: Survival from first chemotherapy, left-truncated
+### Example 31: Survival from first chemotherapy, left-truncated
 
 TP53-mutant vs wild-type, overall survival measured from each patient's first chemotherapy rather than from sequencing. Patients whose first chemotherapy falls after day 0, or who never had chemotherapy, are excluded rather than given negative follow-up. The result reports how long after the anchor patients became observable, so an anchor that is matching earlier events than intended shows up as a long tail.
 
@@ -2745,7 +2810,7 @@ TP53-mutant vs wild-type, overall survival measured from each patient's first ch
 }
 ```
 
-### Example 31: Study-stratified survival across two studies
+### Example 32: Study-stratified survival across two studies
 
 TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers with (months, event, n) counts only — no survival time for any individual crosses an instance boundary — and because the log-rank statistic is a sum over strata, those counts are enough to compute the test STRATIFIED by study: each study is compared only against itself. The unstratified pooled p is reported alongside, since the two can disagree when case mix differs between sites.
 
@@ -2796,7 +2861,7 @@ TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers w
 }
 ```
 
-### Example 32: extends: a nested cohort without repeating its parent's filter
+### Example 33: extends: a nested cohort without repeating its parent's filter
 
 APC-mutant colorectal cancer, then the same population restricted to liver metastasis — without re-stating the APC clause. `compare` shows both share the same APC-mutant base, so a difference between them is attributable to the liver-mets split, not to two independently-typed cohort definitions quietly drifting apart.
 
@@ -2842,7 +2907,7 @@ APC-mutant colorectal cancer, then the same population restricted to liver metas
 }
 ```
 
-### Example 33: Splits: a cohort divided into arms that add up to it
+### Example 34: Splits: a cohort divided into arms that add up to it
 
 Non-small cell lung cancer split by KRAS allele: G12C first, then any other KRAS mutation, then wild-type. Because G12C is tested first, "other KRAS" needs no hand-written "and not G12C". 916 + 1,278 + 5,615 = 7,809, the whole cohort, with nobody unprofiled for KRAS in this study. STK11 and KEAP1 are enriched in both KRAS-mutant arms and TP53 in wild-type — the known co-mutation pattern — while overall survival does not differ significantly across the three arms (k-group log-rank p≈0.1).
 
@@ -2906,7 +2971,7 @@ Non-small cell lung cancer split by KRAS allele: G12C first, then any other KRAS
 }
 ```
 
-### Example 34: Median/IQR and a rank-sum test, single-study only
+### Example 35: Median/IQR and a rank-sum test, single-study only
 
 APC-mutant colorectal cancer, split by liver metastasis. Alongside mean/SD, numeric attributes report an exact median/IQR and a Mann-Whitney U — available here only because both cohorts stay within one study (crc_apc_impact_2020): median and rank are not additive across sites the way (n, Σx, Σx²) is, so this is refused rather than approximated the moment a cohort spans more than one study.
 
@@ -2961,7 +3026,7 @@ APC-mutant colorectal cancer, split by liver metastasis. Alongside mean/SD, nume
 }
 ```
 
-### Example 35: Cox with a gene-SET covariate: any of three genes, one term
+### Example 36: Cox with a gene-SET covariate: any of three genes, one term
 
 Every patient in the study, one term: mutated in any of TP53/KRAS/PIK3CA versus none of them. Compiles to a single hugo_gene_symbol IN (...) — the same shape as a single-gene covariate, just with a broader gene list, so it costs nothing extra downstream (dummy-coding, the forest plot, the reference-level override all just work).
 
@@ -2995,7 +3060,7 @@ Every patient in the study, one term: mutated in any of TP53/KRAS/PIK3CA versus 
 }
 ```
 
-### Example 36: Cox stratified by cohort: does a gene's hazard ratio hold up in both arms?
+### Example 37: Cox stratified by cohort: does a gene's hazard ratio hold up in both arms?
 
 APC mutation status regressed on overall survival, separately in the MSI-high and MSS arms of the same study. Pooled, APC reads HR=0.61 (95% CI 0.48-0.78) — a real effect, but stratifying shows it is almost entirely a microsatellite-stable-population effect (MSS: HR=0.54, p<0.0001) that does not reach significance in the small MSI-high arm (HR=0.87, 95% CI 0.31-2.44, n=27) — a pooled fit alone would not have shown that the effect is concentrated in one subgroup.
 
@@ -3046,7 +3111,7 @@ APC mutation status regressed on overall survival, separately in the MSI-high an
 }
 ```
 
-### Example 37: Logistic regression: does APC status predict MSI-high status?
+### Example 38: Logistic regression: does APC status predict MSI-high status?
 
 MSI_TYPE = Instable (vs every other observed value: Stable, Indeterminate, Do not report) regressed on APC mutation status. APC-mutant patients have substantially lower odds of MSI-high status (OR=0.28, 95% CI 0.13-0.63, p=0.0018) — consistent with APC-driven CRC typically arising through the chromosomal-instability pathway rather than the mismatch-repair-deficient pathway MSI-high status marks.
 
@@ -3081,7 +3146,7 @@ MSI_TYPE = Instable (vs every other observed value: Stable, Indeterminate, Do no
 }
 ```
 
-### Example 38: splitBy: one cohort, auto-split into an arm per receptor subtype
+### Example 39: splitBy: one cohort, auto-split into an arm per receptor subtype
 
 "all patients" split by RECEPTOR_STATUS_PRIMARY gives the same 4 clinically standard subtypes a hand-written 4-cohort document would (HR+/HER2-, Triple Negative, HR+/HER2+, HR-/HER2+), plus a few small ones this study also records (HR+/HER2_Unknown, Unk/ND, HR+/HER2_Equivocal) — all within the default 8-arm cap, so nothing here needs pooling into "Other". TP53 reads 26.8%/90.4%/49.2%/77% across the four main subtypes, matching the published literature on triple-negative breast cancer's markedly higher TP53 mutation rate.
 
@@ -3109,7 +3174,7 @@ MSI_TYPE = Instable (vs every other observed value: Stable, Indeterminate, Do no
 }
 ```
 
-### Example 39: splitBy: gene mutation status, without hand-writing the mutant/wildtype pair
+### Example 40: splitBy: gene mutation status, without hand-writing the mutant/wildtype pair
 
 "all patients" split by APC mutation status gives the same two arms a hand-written {"kind":"oql","q":"APC: MUT"} cohort pair would (325 mutant, 146 wildtype) — APC-mutant patients have better overall survival (median 25.6mo vs 17.9mo, log-rank p=9.1e-5), matching this study's own headline finding (see the crc_apc_impact_2020 Cox example above) from a single view, no separate cohorts to define.
 
@@ -3133,7 +3198,7 @@ MSI_TYPE = Instable (vs every other observed value: Stable, Indeterminate, Do no
 }
 ```
 
-### Example 40: splitBy: a list of OQL queries, arms that overlap and a disclosed "Other"
+### Example 41: splitBy: a list of OQL queries, arms that overlap and a disclosed "Other"
 
 "all patients" split by ["TP53: MUT", "KRAS: MUT"] gives 13,105 TP53-mutant, 7,115 KRAS-mutant, and 9,019 in neither ("Other") — summing to more than the 24,950-patient base cohort because 4,289 patients carry both mutations, which the result discloses as `splitBy.overlapCount` rather than leaving the arm counts to look inconsistent on their own (13,105 + 7,115 − 4,289 + 9,019 = 24,950, exactly the base count).
 
@@ -3164,7 +3229,7 @@ MSI_TYPE = Instable (vs every other observed value: Stable, Indeterminate, Do no
 }
 ```
 
-### Example 41: Survival split three ways: the k-group log-rank
+### Example 42: Survival split three ways: the k-group log-rank
 
 MSI status in three groups (stable / instable / indeterminate) instead of the usual two-arm split. The test asks whether the three curves differ AT ALL, not which pair does — a different question from running the 2-arm test three times pairwise, which would need its own multiple-testing correction.
 
@@ -3223,7 +3288,7 @@ MSI status in three groups (stable / instable / indeterminate) instead of the us
 }
 ```
 
-### Example 42: A missing alteration type is disclosed, never a false negative
+### Example 43: A missing alteration type is disclosed, never a false negative
 
 TP53 (a real mutation hotspot here) and MDM2 (never assayed for copy-number in this study) side by side. Both show 0%-or-real altered figures, but only the view's note — and each cell's per-type breakdown (mutation/CNA/structural-variant counts, visible on hover in the app) — reveals that MDM2's 0% means "never checked" while TP53's is a real, profiled result.
 
@@ -3259,7 +3324,7 @@ TP53 (a real mutation hotspot here) and MDM2 (never assayed for copy-number in t
 }
 ```
 
-### Example 43: Four receptor subtypes, one real test: Welch's ANOVA
+### Example 44: Four receptor subtypes, one real test: Welch's ANOVA
 
 Breast cancer's four receptor subtypes, compared on genomic instability (FRACTION_GENOME_ALTERED) and mutation burden (TMB_NONSYNONYMOUS). Triple-negative's markedly higher genomic instability is exactly the known biology, and both the parametric (ANOVA) and rank-based (Kruskal-Wallis) tests agree emphatically; TMB does not differ significantly by subtype here, and again both tests agree.
 
@@ -3334,7 +3399,7 @@ Breast cancer's four receptor subtypes, compared on genomic instability (FRACTIO
 }
 ```
 
-### Example 44: A non-standard survival endpoint, named directly
+### Example 45: A non-standard survival endpoint, named directly
 
 MSI-H vs MSS endometrial cancer, progression-free survival from first-line treatment — the study's actual recorded outcome, reachable only because the exact column names are given rather than assumed from an OS/PFS/DFS-style prefix.
 
@@ -3382,7 +3447,7 @@ MSI-H vs MSS endometrial cancer, progression-free survival from first-line treat
 }
 ```
 
-### Example 45: Top 20% TMB, within one cancer type: a percentile cutoff
+### Example 46: Top 20% TMB, within one cancer type: a percentile cutoff
 
 tmb_mskcc_2018 is pan-cancer, so a plain percentile would mix histologies with very different baseline TMB. "NSCLC high-TMB"/"NSCLC low-TMB" both restrict to NSCLC first, then split on whether TMB is at or above the 80th percentile COMPUTED WITHIN THAT NSCLC POPULATION (percentileOf:"NSCLC") — the readback shows the resolved number and what it was a percentile of, not just a bare threshold.
 
@@ -3455,7 +3520,7 @@ tmb_mskcc_2018 is pan-cancer, so a plain percentile would mix histologies with v
 }
 ```
 
-### Example 46: Cohort attrition: which criterion removed whom
+### Example 47: Cohort attrition: which criterion removed whom
 
 KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six months of follow-up, beside KRAS wild-type lung adenocarcinoma. The G12C arm loses most of its patients to the genotype, and a further 78 to the follow-up requirement — the kind of step a reader needs to see before trusting a survival curve drawn from what is left.
 
@@ -3532,7 +3597,7 @@ KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six mont
 }
 ```
 
-### Example 47: Genome-wide copy number: colorectal against breast
+### Example 48: Genome-wide copy number: colorectal against breast
 
 Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal pattern is all there — 20q gained in 60%, 13q in 42%, 8q in 32%, 18q lost in 54% — beside breast cancer's 1q and 8q gains and 16q loss. The strip underneath marks every bin where the two differ at q < 0.05, coloured by which cohort is higher.
 
@@ -3578,7 +3643,7 @@ Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal 
 }
 ```
 
-### Example 48: Oncogenic signalling pathways: colorectal against pancreatic
+### Example 49: Oncogenic signalling pathways: colorectal against pancreatic
 
 Colorectal and pancreatic cancer in MSK-CHORD. WNT separates them almost completely (82% against 8%, nearly all APC); RTK-RAS is higher in pancreatic cancer (84%, KRAS 81%), and so is the cell cycle (39%, CDKN2A 33%); PI3K and NOTCH (FBXW7) are colorectal. The canonical pathways also show how much a targeted panel misses: 56 of WNT's 68 genes are on no panel here.
 
@@ -3623,7 +3688,7 @@ Colorectal and pancreatic cancer in MSK-CHORD. WNT separates them almost complet
 }
 ```
 
-### Example 49: Differential expression and enrichment: basal-like against luminal A breast cancer
+### Example 50: Differential expression and enrichment: basal-like against luminal A breast cancer
 
 TCGA PanCancer Atlas breast cancer, PAM50 basal-like against luminal A, on mRNA z-scores. The luminal genes (ESR1, PGR, FOXA1, GATA3) and the basal ones (FOXC1, and proliferation — MKI67, CDC20, AURKB) come out as expected, and so does the enrichment: E2F targets, the G2M checkpoint and MYC targets in basal-like tumours, early estrogen response in luminal A.
 
@@ -3667,7 +3732,7 @@ TCGA PanCancer Atlas breast cancer, PAM50 basal-like against luminal A, on mRNA 
 }
 ```
 
-### Example 50: Paired samples: what differs between a patient's primary and metastasis
+### Example 51: Paired samples: what differs between a patient's primary and metastasis
 
 MSK-IMPACT, the 2,278 patients sequenced at both a primary and a metastatic site. Truncal drivers agree (TP53 78% concordant); what the metastasis alone carries is the resistance biology — ESR1 mutations (49 metastasis-only against 7 primary-only) and AR alterations (71 against 1), both selected under hormone therapy — and MYC amplification and CDKN2A loss.
 
@@ -3700,7 +3765,7 @@ MSK-IMPACT, the 2,278 patients sequenced at both a primary and a metastatic site
 }
 ```
 
-### Example 51: Paired samples, every gene: what the metastasis carries that the primary does not
+### Example 52: Paired samples, every gene: what the metastasis carries that the primary does not
 
 MSK-IMPACT again, the 2,278 patients with both kinds of sample, but no gene list. Of 347 genes with a discordant patient, the scan puts AR (71 metastasis-only against 1 primary-only) and ESR1 (49 against 7) first — the hormone-therapy resistance genes the hand-picked version above had to be told to look at — followed by MYC, NKX3-1 and PTEN.
 
@@ -3724,7 +3789,7 @@ MSK-IMPACT again, the 2,278 patients with both kinds of sample, but no gene list
 }
 ```
 
-### Example 52: Before and after treatment, pooled across studies that label it differently
+### Example 53: Before and after treatment, pooled across studies that label it differently
 
 111 patients with a sample on each side across gastroesophageal (two studies), breast (alpelisib, and a second cohort) and bladder cancer. At this size nothing survives correction across the 278 genes tested — the honest answer — and the most one-sided genes run the other way: CCND1 and MYC amplifications seen before treatment and not after (10 and 10 patients against 1 and 2), as a lower-purity post-treatment sample would also show. Read it as a lead, not a finding; the same view over a large serially sampled cohort is where acquired resistance would show.
 
@@ -3788,7 +3853,7 @@ MSK-IMPACT again, the 2,278 patients with both kinds of sample, but no gene list
 }
 ```
 
-### Example 53: Clonality, LOH and genome doubling from FACETS
+### Example 54: Clonality, LOH and genome doubling from FACETS
 
 Colorectal against breast cancer. Tumour suppressors show the classic second hit — TP53 is ~88% clonal with its other allele lost 77–89% of the time, CDH1 in breast 95% — while the oncogene KRAS rarely loses its partner. PIK3CA is markedly more often subclonal in colorectal cancer (68% clonal) than in breast (84%), in keeping with a later event there. Around a third of both cohorts' tumours have doubled their genome.
 
@@ -3842,7 +3907,7 @@ Colorectal against breast cancer. Tumour suppressors show the classic second hit
 }
 ```
 
-### Example 54: Brain metastasis, with death as a competing risk
+### Example 55: Brain metastasis, with death as a competing risk
 
 MSK-CHORD, from each patient's day 0, among those without a brain metastasis by then. At five years 24.7% of NSCLC patients have one — where 1 − Kaplan–Meier would have said 30.4% — against 20.6% in breast and 10.8% in colorectal cancer (1 − KM: 14.4%, a third too high, because so many colorectal patients die first).
 
@@ -3910,7 +3975,7 @@ MSK-CHORD, from each patient's day 0, among those without a brain metastasis by 
 }
 ```
 
-### Example 55: PSA response to hormone therapy, by TP53 status
+### Example 56: PSA response to hormone therapy, by TP53 status
 
 Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a median of more than 95% within three months in both groups, but 93.0% of TP53 wild-type patients reach PSA50 against 85.8% of TP53-mutant ones (Fisher p = 1.4e-6), and the mutant group's upper quartile turns back upward within a year.
 
@@ -3971,7 +4036,7 @@ Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a med
 }
 ```
 
-### Example 56: A survival risk model from mutated genes in lung cancer
+### Example 57: A survival risk model from mutated genes in lung cancer
 
 Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 and TP53 as adverse and EGFR as favourable, as the literature does, and its risk thirds separate clearly; a held-out C-index near 0.61 says mutations alone predict survival only modestly. Five runs keep the example quick; OncoCast recommends fifty. Its Table 1 (`describe`) shows who is in each third: the high-risk third is more often male, a former or current smoker and at stage 4 than the low-risk third. KEAP1 and TP53 are marked “in the model” — the score is built from them, so their enrichment is by construction and gets no q-value — and ZFHX3, which not every panel covers, is counted over each group's patients whose panel does.
 
@@ -4017,7 +4082,7 @@ Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 a
 }
 ```
 
-### Example 57: Custom data: a curated biopsy site on every sample
+### Example 58: Custom data: a curated biopsy site on every sample
 
 luad_mskimpact_2021 is 93 EGFR-mutant lung adenocarcinomas with 186 primary and metastatic samples. The demo upload gives every sample a BIOPSY_SITE, grouped from the study's own SAMPLE_TYPE and free-text METASTATIC_SITE the way a reviewer would (scripts/gen-custom-demo.ts), standing in for a clinician-curated annotation. "CNS met" filters on it: 8 patients. Ordered by site, the oncoprint puts each patient's primary and metastases in their own groups. Fraction of the genome altered has a median of 0.47 in the 11 CNS samples and 0.36 in liver, against 0.21 in the 76 primaries. Split by site, TP53 is altered in 7 of 8 CNS-met patients (87.5%) against 65.6% of the patients with a primary sample. The split arms overlap, because a patient whose primary and metastasis were both sequenced belongs to both arms. With 8 to 61 patients per arm, these are illustrations, not findings.
 
@@ -4100,7 +4165,7 @@ Runs on custom data: `luad-biopsy-site` (LUAD biopsy site (demo), 186 samples, c
 }
 ```
 
-### Example 58: Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)
+### Example 59: Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)
 
 msk_spectrum_tme_2022 is 42 untreated high-grade serous ovarian cancers; 41 had scRNA-seq at several anatomical sites. scripts/gen-spectrum-sc-demo.py reads the public CELLxGENE cell annotations (cell states, per-cell pathway scores, per-cell 6p allele fraction) and summarises them per patient (solid sites pooled; ADX_ adnexal, NADX_ non-adnexal) and per cBioPortal sample (the scRNA-seq site of the same patient, 61 of 82 samples). Dysfunctional T/NK cells (TNK_DYSFUNC) have a median of 10.8% of T/NK cells in the 16 HRD-Dup tumours against 6.0% in the 14 FBI tumours, and naive/central-memory cells the reverse (7.5% against 11.1%), as in the paper's Fig. 4b. In adnexal cancer cells, JAK-STAT pathway activity has a median of 0.03 in HRD-Dup against -0.57 in FBI (Fig. 3e), and cancer-cell and T/NK-cell JAK-STAT correlate across patients (Spearman 0.74, Fig. 4e). Clonal 6p loss of heterozygosity (over 80% of cancer cells) is called in 4 patients, 3 of them HRD-Dup — the paper reports 4 of 41. By site, T cells are a median 43% of immune cells in the 22 adnexal samples against 54% in the 18 omental ones. These are summaries of public cell metadata, not the paper's statistical models.
 
@@ -4217,7 +4282,7 @@ Runs on custom data: `spectrum-sc-composition` (SPECTRUM scRNA: cell-type compos
 }
 ```
 
-### Example 59: Composition: T and NK cell states by mutational signature (MSK SPECTRUM)
+### Example 60: Composition: T and NK cell states by mutational signature (MSK SPECTRUM)
 
 The 36 SPECTRUM patients with a consensus signature other than Undetermined, split as the paper splits them. Dysfunctional CXCL13+ CD8 T cells are a mean 7.0% of T/NK cells in the 16 HRD-Dup patients against 4.9% in HRD-Del and 4.4% in FBI, and naive CD4 cells the reverse (15.2% against 19.6% and 20.1%) — the direction of the paper's Fig. 4b. The clearest single difference is cycling T/NK cells, higher in HRD-Dup (8.6% against 5.7%; Welch p = 0.003, q = 0.08 across the 30 comparisons); none reaches q < 0.05 at this size, which the matrix shows as no outlined dot. Per sample, from the study's cell-type fractions, T cells are 24% of HRD-Dup samples' cells against 32% of FBI's. The paper fits a binomial model on cell counts with site and sort as covariates; this view compares shares between groups and says so.
 
@@ -4297,7 +4362,7 @@ Runs on custom data: `spectrum-sc-composition` (SPECTRUM scRNA: cell-type compos
 }
 ```
 
-### Example 60: Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)
+### Example 61: Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)
 
 crc_hta11_htan_2021 is 52 patients with colorectal polyps (Chen et al., Cell 2021). The summary covers 55 of its 61 samples; its counts equal the study's own absolute_counts profile for all 670 sample and cell-type pairs it reports. Per sample, adenoma-specific cells (ASC) are 32.1% of the epithelium in the 30 conventional adenomas against 4.1% in the 20 serrated polyps (q = 2e-5), and serrated-specific cells (SSC) 1.5% against 19.7% (q = 0.003): the two paths to malignancy the paper describes. Stem cells (STM) differ little here (3.1% against 2.5%). The study's own fractions, over every cell type, give the same picture (ASC 29.9% against 3.7%). Cohorts are patients, so a patient with polyps of both types counts in both; 5 of the 52 have both.
 
@@ -4366,7 +4431,7 @@ Runs on custom data: `hta11-sc-p` (HTAN Vanderbilt colorectal polyp scRNA-seq (C
 }
 ```
 
-### Example 61: Cancer types summary: RAS genes across 50,000 tumours
+### Example 62: Cancer types summary: RAS genes across 50,000 tumours
 
 KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.
 
@@ -4395,7 +4460,7 @@ KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appen
 }
 ```
 
-### Example 62: Cohort overlap: how four groups share their patients
+### Example 63: Cohort overlap: how four groups share their patients
 
 TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.
 
@@ -4465,7 +4530,7 @@ TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD.
 }
 ```
 
-### Example 63: Alteration enrichment: what separates colorectal from pancreatic tumours
+### Example 64: Alteration enrichment: what separates colorectal from pancreatic tumours
 
 Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TCF7L2, PIK3CA, FBXW7 and SOX9 mark colorectal cancer; KRAS and CDKN2A mark pancreatic cancer.
 
@@ -4530,7 +4595,7 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
 }
 ```
 
-### Example 64: Mutational signatures: what UV light and tobacco leave behind
+### Example 65: Mutational signatures: what UV light and tobacco leave behind
 
 Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.
 
@@ -4576,7 +4641,7 @@ Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature 
 }
 ```
 
-### Example 65: Co-expression: the genes that rise and fall with ESR1
+### Example 66: Co-expression: the genes that rise and fall with ESR1
 
 TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.
 
@@ -4601,7 +4666,7 @@ TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up be
 }
 ```
 
-### Example 66: Clinical data: every pancreatic cancer sample, oldest patients first
+### Example 67: Clinical data: every pancreatic cancer sample, oldest patients first
 
 Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 
@@ -4638,7 +4703,7 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 }
 ```
 
-### Example 67: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
+### Example 68: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
 
 MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.
 
@@ -4691,7 +4756,7 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
 }
 ```
 
-### Example 68: A patient's mutations, copy-number alterations and structural variants
+### Example 69: A patient's mutations, copy-number alterations and structural variants
 
 MSK-CHORD prostate cancer patients, those with the most structural variants first; P-0024249's tables, mutations kept to OncoKB-oncogenic calls.
 
@@ -4739,7 +4804,7 @@ MSK-CHORD prostate cancer patients, those with the most structural variants firs
 }
 ```
 
-### Example 69: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
+### Example 70: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
 
 MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.
 
