@@ -7,15 +7,16 @@
 import { ViewFigure } from "../lab/figure.tsx";
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, AnalysisResult, View } from "../../lib/types";
-import { SERIES } from "../../lib/svg-kit";
 import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
-import { KindCardBody, KindCardControls, hasKindCard, drawsOwnWaiting } from "../lab/kind-cards";
+import { KindCardBody, KindCardControls, hasKindCard, drawsOwnWaiting, figureView } from "../lab/kind-cards";
 import { dataPart } from "../_oncoprint/view-display.ts";
 import { OncoprintCard, type TrackCatalog } from "../_oncoprint/OncoprintCard.tsx";
 import type { PageTab } from "./page-doc";
 import { api } from "../lab/api.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
-import { LINE_TAB, LINE_TABS, SEG_TAB, SEG_TABS } from "../_ui/toolbar.ts";
+import { LINE_TABS, PAGE_TAB, SEG_TAB, SEG_TABS } from "../_ui/toolbar.ts";
+import { ViewHead } from "../lab/view-chrome.tsx";
+import { PlotControls } from "../lab/plot-controls.tsx";
 import { cn } from "../../lib/cn";
 
 type Patch = Record<string, unknown>;
@@ -23,8 +24,8 @@ type Patch = Record<string, unknown>;
 
 type TabState = { sent: string; result?: AnalysisResult; error?: string; loading: boolean };
 
-export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCounts, catalog }: {
-  doc: AnalysisDoc; tabs: PageTab[]; titles: string[]; left: string[];
+export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, catalog }: {
+  doc: AnalysisDoc; tabs: PageTab[]; titles: string[];
   /** what the oncoprint's Tracks menu can offer: the study's attributes and profiles */
   catalog: TrackCatalog;
   /** the open tab, "Title" or "Title › Sub" */
@@ -37,6 +38,8 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
 }) {
   const [state, setState] = useState<Record<string, TabState>>({});
   const gen = useRef<Record<string, number>>({});
+  // which header menus are open, kept outside the cards so a re-render does not close them
+  const menus = useRef(new Map<string, boolean>());
   const views = doc.views || [];
 
   const [mainTitle, subTitle] = open.split(" › ");
@@ -71,51 +74,50 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
     const mine = link(idx.map((j) => j === i ? next : views[j]), k);
     onDoc({ ...doc, views: views.map((v, j) => { const m = idx.indexOf(j); return m >= 0 ? mine[m] : v; }) });
   };
-  const counts = Object.values(state).find((s) => s.result)?.result?.cohorts;
   const st = state[key];
   const spinning = (k: string) => Object.entries(state).some(([x, s]) => (x === k || x.startsWith(k + " › ")) && s.loading);
+  const chooser = tab && !sub ? tab.chooser : undefined;
+  const chooseFrom = (o: string) => {
+    const next = chooser!.apply(idx.map((i) => views[i]), o);
+    onDoc({ ...doc, views: views.map((v, j) => { const k = idx.indexOf(j); return k >= 0 ? next[k] : v; }) });
+  };
   return (
     <div className="portal">
-      <div className="portal-cohorts">
-        <strong className="meta">Groups:</strong>
-        {Object.keys(doc.cohorts || {}).map((n, i) => (
-          <span key={n} className="portal-group" style={{ background: SERIES[i % SERIES.length] }}>{n}{counts && counts[n] ? " (" + counts[n].count.toLocaleString() + ")" : ""}</span>
-        ))}
-        {left.length > 0 && <span className="meta">left out: {left.join("; ")}</span>}
-      </div>
-      <Tabs value={tab?.title ?? ""} onValueChange={onOpen} className="my-3">
+      <Tabs data-tw value={tab?.title ?? ""} onValueChange={onOpen} className="mb-4">
         <TabsList variant="line" aria-label="results tabs" className={LINE_TABS}>
           {tabs.map((t) => (
-            <TabsTrigger key={t.title} value={t.title} className={LINE_TAB}>
+            <TabsTrigger key={t.title} value={t.title} className={PAGE_TAB}>
               {t.title}{spinning(t.title) && <span className="spinner" />}
             </TabsTrigger>
           ))}
         </TabsList>
       </Tabs>
-      {tab?.sub && (
-        <Tabs value={sub?.title ?? ""} onValueChange={(v) => onOpen(tab.title + " › " + v)} className="-mt-1 mb-3">
-          <TabsList variant="line" aria-label={tab.title + " tabs"} className={LINE_TABS}>
-            {tab.sub.map((t) => (
-              <TabsTrigger key={t.title} value={t.title} className={cn(LINE_TAB, "px-2.5 pt-1 pb-1 text-sm")}>
-                {t.title}{spinning(tab.title + " › " + t.title) && <span className="spinner" />}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+      {(tab?.sub || chooser) && (
+        <div className="viewtb mt-0 mb-4">
+          {tab?.sub && (
+            <div className="tbz">
+              <Tabs value={sub?.title ?? ""} onValueChange={(v) => onOpen(tab.title + " › " + v)}>
+                <TabsList aria-label={tab.title + " tabs"} className={SEG_TABS}>
+                  {tab.sub.map((t) => (
+                    <TabsTrigger key={t.title} value={t.title} className={SEG_TAB}>
+                      {t.title}{spinning(tab.title + " › " + t.title) && <span className="spinner" />}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+          )}
+          {chooser && (
+            <div className="tbz"><span className="tbl">{chooser.label}</span>
+              <Tabs value={chooser.value(idx.map((i) => views[i]))} onValueChange={chooseFrom}>
+                <TabsList aria-label={chooser.label} className={SEG_TABS}>
+                  {chooser.options.map((o) => <TabsTrigger key={o} value={o} className={cn(SEG_TAB, "font-mono")}>{o}</TabsTrigger>)}
+                </TabsList>
+              </Tabs>
+            </div>
+          )}
+        </div>
       )}
-      {tab && !sub && tab.chooser && (() => {
-        const ch = tab.chooser, mine = idx.map((i) => views[i]), on = ch.value(mine);
-        return (
-          <div className="portal-chooser">
-            <span className="meta">{ch.label}</span>
-            <Tabs value={on} onValueChange={(o) => { const next = ch.apply(mine, o); onDoc({ ...doc, views: views.map((v, j) => { const k = idx.indexOf(j); return k >= 0 ? next[k] : v; }) }); }}>
-              <TabsList aria-label={ch.label} className={SEG_TABS}>
-                {ch.options.map((o) => <TabsTrigger key={o} value={o} className={SEG_TAB}>{o}</TabsTrigger>)}
-              </TabsList>
-            </Tabs>
-          </div>
-        );
-      })()}
       {idx.map((vi, i) => {
         const spec = views[vi] as unknown as Record<string, unknown>;
         // a result belongs to the request that produced it; while a newer one runs, the cover says so
@@ -130,17 +132,22 @@ export function PortalTabs({ doc, tabs, titles, left, open, onOpen, onDoc, onCou
           ? <OncoprintCard view={spec} spec={v.spec} uploads={doc.uploads} busy={busy} cohortNames={Object.keys(doc.cohorts || {})} catalog={catalog}
               onView={(n) => edit(vi, n as unknown as View)} note={v.note} studies={v.studies} />
           : v && !v.error ? KindCardBody({ c: { ...mc, v } }) : null;
+        const drawn = Array.isArray(spec.cohorts) ? (spec.cohorts as string[]) : Object.keys(doc.cohorts || {});
         return (
-          <section key={key + vi} className="card viewcard portal-view">
-            {idx.length > 1 && <h3 className="vtitle">{titles[vi]}</h3>}
-            {hasKindCard(spec.kind) && <KindCardControls c={mc} />}
+          <section key={key + vi} className={cn("card viewcard", busy && !v && "viewloading")} aria-busy={busy || undefined}>
+            <ViewHead menuStore={menus.current} v={v && !v.error ? v : { kind: spec.kind }} title={titles[vi]}
+              sub={drawn.length ? drawn.join(drawn.length === 2 ? " vs " : ", ") : undefined} />
+            {hasKindCard(spec.kind as string) && <KindCardControls c={mc} />}
+            {spec.kind === "plot" && <PlotControls spec={spec} plot={v && !v.error ? v.plot : undefined} attrs={catalog.attrs} profiles={catalog.profiles}
+              loading={catalog.loading} busy={busy} update={(fn) => edit(vi, fn(spec))}
+              highlightOptions={Object.keys(doc.cohorts || {}).filter((n) => n !== drawn[0]).map((n) => ({ name: n, label: n, depth: 0 }))} />}
             {busy && !v && <div className="skeleton skeleton-view" />}
             {busy && v && !(drawsOwnWaiting(v.kind) && !v.error) && <div className="view-updating"><span className="spinner" /> updating…</div>}
             {!busy && st?.error && <p className="note">{st.error}</p>}
             {v && v.error && <p className="note">{v.error}</p>}
             {v && !v.error && (body
               ? <>{body}{v.caveat && <p className="note vfoot">{v.caveat}</p>}</>
-              : <ViewFigure v={v} />)}
+              : <ViewFigure v={figureView(spec, v)} />)}
           </section>
         );
       })}

@@ -9,6 +9,9 @@ export const CHIP = "rounded-pill px-2.5 text-sm font-normal aria-pressed:border
 /** a text or number field in a view toolbar */
 export const FIELD = "h-ctl bg-card text-md md:text-md";
 
+/** a page's own sections (the lab's Explore / Saved / Analysis, a portal page's tabs): a line tab one step larger than LINE_TAB */
+export const PAGE_TAB = "h-auto flex-none rounded-none px-3.5 pt-2 pb-1.5 text-base leading-normal after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary";
+
 /** a row of page tabs underlined by a rule (TabsList variant "line"), and one of its tabs */
 export const LINE_TABS = "w-full flex-wrap justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto";
 export const LINE_TAB = "h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary";
