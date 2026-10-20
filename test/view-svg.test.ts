@@ -404,16 +404,16 @@ describe("plot point layers: subsets drawn over the plotted cohort", () => {
     assert.match(svg, /1 value of a point layer lies more than a whisker span past the/);
   });
 
-  test("each layer is a group tagged with its place in the list, its shared cases a hidden group of their own", () => {
+  test("each layer is a group tagged with its place in the list, its shared cases hidden groups by the layer that drew them", () => {
     const svg = viewToSvg(scatter([
       hl({ points: [{ id: "a", x: 10, y: 5 }] }),
-      hl({ name: "S", color: LAYER_COLORS[1], points: [{ id: "b", x: 20, y: 8 }], shared: [{ id: "a", x: 10, y: 5 }] }),
+      hl({ name: "S", color: LAYER_COLORS[1], points: [{ id: "b", x: 20, y: 8 }], shared: [{ id: "a", x: 10, y: 5 }], sharedOwners: [0] }),
     ]))!;
     assert.match(svg, /<g data-layer="base">/);
     assert.match(svg, /<g data-layer="0"><circle/);
     assert.match(svg, /<g data-layer="1"><circle[^>]*fill="#0072B2"/);
-    assert.match(svg, /<g data-layer="1" data-shared="" display="none"><circle cx="[^"]*" cy="[^"]*" r="2.5" fill="#0072B2"/,
-      "the case layer 0 drew is drawn for layer 1 too, hidden until that layer is shown alone");
+    assert.match(svg, /<g data-layer="1" data-shared="" data-owner="0" display="none"><circle cx="[^"]*" cy="[^"]*" r="2.5" fill="#0072B2"/,
+      "the case layer 0 drew is drawn for layer 1 too, hidden until layer 0 is hidden");
   });
 
   test("with the cases coloured by a category, a layer is a ring round the case, not a second fill", () => {

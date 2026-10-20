@@ -760,8 +760,10 @@ export interface PlotLayer {
   n: number;
   /** points drawn, once cases an earlier layer already drew are left to it */
   drawn?: number;
-  /** the layer's cases an earlier layer drew: hidden on the figure, shown when the reader picks this layer alone */
+  /** the layer's cases an earlier layer drew: hidden on the figure, shown when the layer that drew them is hidden */
   shared?: HighlightPoint[];
+  /** for each shared case, the place in the list of the layer that drew it */
+  sharedOwners?: number[];
   shown: "points" | "density" | "boxes" | "none";
   /** why it is not drawn as points, when it is not */
   why?: string;

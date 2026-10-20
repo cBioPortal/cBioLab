@@ -132,7 +132,8 @@ async function pointLayers(pv: PlotView, data: PlotData, c: ViewRun, cn: string,
   const def = c.doc.cohorts[cn];
   const xk = data.x.kind, yk = data.y.kind;
   const closed = sites.filter((s) => !isPatientLevel(c.resolvers[s]));
-  const seen = new Set<string>();
+  // each drawn case, and the layer (its place in the list) that drew it
+  const seen = new Map<string, number>();
   let budget = POINTS_CAP;
   const out: PlotLayer[] = [];
   for (const [i, l] of specs.entries()) {
@@ -147,10 +148,12 @@ async function pointLayers(pv: PlotView, data: PlotData, c: ViewRun, cn: string,
     const { layer, keys } = picked;
     if (layer.shown === "points" && layer.points && keys) {
       const kept = layer.points.filter((_, j) => !seen.has(keys[j]));
-      const shared = layer.points.filter((_, j) => seen.has(keys[j]));
-      for (const k of keys) seen.add(k);
-      layer.drawn = kept.length; layer.points = kept;
-      if (shared.length) layer.shared = shared;
+      const sharedAt = keys.map((k, j) => seen.has(k) ? j : -1).filter((j) => j >= 0);
+      const owners = sharedAt.map((j) => seen.get(keys[j])!);
+      for (const k of keys) if (!seen.has(k)) seen.set(k, i);
+      layer.drawn = kept.length;
+      if (sharedAt.length) { layer.shared = sharedAt.map((j) => layer.points![j]); layer.sharedOwners = owners; }
+      layer.points = kept;
       budget -= kept.length;
     }
     out.push(layer);

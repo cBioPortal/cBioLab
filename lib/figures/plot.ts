@@ -5,7 +5,7 @@
 // picture draws for a hundred cases or four hundred thousand. The only cases drawn one by one are
 // the points the engine chose (every case under the cap, the outliers over it), at most POINTS_CAP.
 import type { ViewResult } from "../types.ts";
-import type { HighlightPoint, PlotData } from "../plot.ts";
+import type { HighlightPoint, PlotData, PlotLayer } from "../plot.ts";
 import { isAbsent, jitterFor } from "../plot-draw.ts";
 import { LAYER_BASE } from "../plot-layers.ts";
 import {
@@ -67,12 +67,18 @@ function layerItems(d: PlotData): LegendItem[] {
 /** the layers drawn at all: with any, the plotted cohort steps back to a grey so their colours read */
 const drawnLayers = (d: PlotData) => (d.layers || []).filter((l) => l.shown !== "none");
 /**
- * One layer's marks as a group tagged with its place in the view's list, so a page can show that
- * layer alone; `base` is the plotted cohort. A layer's cases an earlier layer drew are a second,
- * hidden group the page reveals only when that layer stands alone.
+ * One layer's marks as a group tagged with its place in the view's list, so a page can hide it;
+ * `base` is the plotted cohort. A layer's cases an earlier layer drew are hidden groups, one per
+ * layer that drew them (`owner`), which the page shows when that owner is hidden.
  */
-const layerGroup = (key: number | "base", marks: string[], shared = false) =>
-  marks.length ? `<g data-layer="${key}"${shared ? ` data-shared="" display="none"` : ""}>${marks.join("")}</g>` : "";
+const layerGroup = (key: number | "base", marks: string[], owner?: number) =>
+  marks.length ? `<g data-layer="${key}"${owner != null ? ` data-shared="" data-owner="${owner}" display="none"` : ""}>${marks.join("")}</g>` : "";
+/** a layer's shared cases, grouped by the layer that drew each */
+function sharedGroups(h: PlotLayer, key: number, mark: (pt: HighlightPoint) => string[]): string {
+  const by = new Map<number, string[]>();
+  (h.shared || []).forEach((pt, i) => { const o = h.sharedOwners?.[i] ?? 0; (by.get(o) ?? by.set(o, []).get(o)!).push(...mark(pt)); });
+  return [...by.entries()].map(([o, marks]) => layerGroup(key, marks, o)).join("");
+}
 
 function scatter(v: ViewResult, d: PlotData, W: number, p: Pal): string {
   const { x0, x1, y0, y1 } = d.extent!, [gx, gy] = d.grid!;
@@ -122,7 +128,7 @@ function scatter(v: ViewResult, d: PlotData, W: number, p: Pal): string {
     }
     if (h.shown === "points") {
       out.push(layerGroup(key, h.points!.flatMap((pt) => "x" in pt ? [dot(pt, h.color)] : [])));
-      out.push(layerGroup(key, (h.shared || []).flatMap((pt) => "x" in pt ? [dot(pt, h.color)] : []), true));
+      out.push(sharedGroups(h, key, (pt) => "x" in pt ? [dot(pt, h.color)] : []));
     }
   }
   // the fitted line, over every case rather than over what is visible, clipped to the frame
@@ -304,7 +310,7 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
       });
       const key = d.layers!.indexOf(h);
       out.push(layerGroup(key, marks(h.points!, true)));
-      out.push(layerGroup(key, marks(h.shared || [], false), true));
+      out.push(sharedGroups(h, key, (pt) => marks([pt], false)));
     }
   });
   out.push(`<line x1="${L}" y1="${T + PLOT}" x2="${W - R}" y2="${T + PLOT}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);

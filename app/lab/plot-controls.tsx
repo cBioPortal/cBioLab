@@ -14,7 +14,7 @@ import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
 import { CHIP, FIELD } from "../_ui/toolbar.ts";
 import type { ProfileInfo } from "../../lib/profile-catalog.ts";
-import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
+import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_BASE, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
 
 type Update = (fn: (view: any) => any) => void;
 /** the points cap as the controls print it */
@@ -129,18 +129,26 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
   children: React.ReactNode;
 }) {
   const layers: PointLayerSpec[] = Array.isArray(spec.points) ? spec.points : DEFAULT_POINT_LAYERS;
-  // One layer shown alone, the rest stepped back: a reading gesture, kept in the browser like a
-  // hover (invariant 9), and dropped when the layers drawn change.
+  // Which of the plotted cohort and its layers are hidden: a reading gesture, kept in the browser
+  // like a hover (invariant 9), and dropped when the layers drawn change.
   const drawn = (plot?.layers || []).map((l, i) => ({ ...l, i })).filter((l) => l.shown !== "none");
   const drawnKey = drawn.map((l) => l.i + ":" + l.label).join("|");
-  const [solo, setSolo] = useState<number | null>(null);
-  useEffect(() => setSolo(null), [drawnKey]);
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => setHidden([]), [drawnKey]);
   useEffect(() => {
-    if (solo == null) return;
-    const off = (e: KeyboardEvent) => { if (e.key === "Escape") setSolo(null); };
+    if (!hidden.length) return;
+    const off = (e: KeyboardEvent) => { if (e.key === "Escape") setHidden([]); };
     window.addEventListener("keydown", off);
     return () => window.removeEventListener("keydown", off);
-  }, [solo]);
+  }, [hidden]);
+  const toggle = (k: string) => setHidden((h) => h.includes(k) ? h.filter((x) => x !== k) : [...h, k]);
+  const chip = (k: string, color: string, text: string) => {
+    const shown = !hidden.includes(k);
+    return <Button key={k} type="button" variant="outline" size="xs" className={cn(CHIP, "h-ctl gap-1.5", !shown && "text-muted-foreground line-through")} aria-pressed={shown}
+      title={shown ? "hide " + text + " (Esc shows everything)" : "show " + text} onClick={() => toggle(k)}>
+      <span className="size-2.5 flex-none rounded-full" style={{ background: color, opacity: shown ? 1 : 0.35 }} />{text}
+    </Button>;
+  };
   const axisName = (side: "x" | "y") => plot?.[side].label || side;
   const unit = spec.unit || "sample";
   // A box is drawn with its categories across, whichever axis the document holds them on, so a
@@ -213,17 +221,12 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
                 onChange={(a) => update((vv) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
             </div></>}
             {drawn.length > 0 && <div className="tbz plot-solo">
-              <span className="tbl" title="this browser only: show one layer alone, the rest stepped back; Esc shows them all">show</span>
-              {drawn.map((l) => (
-                <Button key={l.i} type="button" variant="outline" size="xs" className={cn(CHIP, "h-ctl gap-1.5")} aria-pressed={solo === l.i}
-                  title={solo === l.i ? "show every layer again (Esc)" : "show “" + l.label + "” alone"}
-                  onClick={() => setSolo(solo === l.i ? null : l.i)}>
-                  <span className="size-2.5 flex-none rounded-full" style={{ background: l.color }} />{l.label} ({l.n.toLocaleString()})
-                </Button>
-              ))}
+              <span className="tbl" title="this browser only: hide or show the plotted cases and each layer; Esc shows everything">show</span>
+              {chip("base", LAYER_BASE, "all " + unit + "s (" + plot!.n.toLocaleString() + ")")}
+              {drawn.map((l) => chip(String(l.i), l.color, l.label + " (" + l.n.toLocaleString() + ")"))}
             </div>}
           </div>}
-          <div className="plot-figure" data-solo={solo ?? undefined}>{children}</div>
+          <div className="plot-figure" data-hide={hidden.length ? hidden.join(" ") : undefined}>{children}</div>
         </div>
       </div>
     </div>

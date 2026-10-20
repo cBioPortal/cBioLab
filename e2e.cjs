@@ -592,24 +592,31 @@ async function main() {
       } catch (e) { layerWhat = String(e.message).split("\n")[0]; }
       ok("a plot's point layers are listed in the sidebar, and adding one draws it with a key entry", layerOk, layerWhat);
 
-      // Showing one layer alone is instant and the browser's own: the others step back, Esc restores.
+      // Hiding the plotted cases or a layer is instant and the browser's own: its group steps back,
+      // a case it drew reappears in the next layer holding it, Esc shows everything.
       let soloWhat = "no layer buttons", soloOk = false;
       try {
-        // every group, a layer's shared cases included: [layer, opacity, display]
         const groups = () => page.evaluate(() => [...document.querySelectorAll(".plot-figure g[data-layer]")]
-          .map((g) => [g.getAttribute("data-layer"), getComputedStyle(g).opacity, getComputedStyle(g).display]));
+          .map((g) => [g.getAttribute("data-layer") + (g.hasAttribute("data-shared") ? "<" + g.getAttribute("data-owner") : ""), getComputedStyle(g).opacity, getComputedStyle(g).display]));
         const docBefore = await page.locator("#docjson").inputValue();
-        await page.locator(".plot-solo button").last().click();
-        const solo = await page.locator(".plot-figure").getAttribute("data-solo");
-        const alone = await groups();
+        const chips = page.locator(".plot-solo button");
+        const names = await chips.allInnerTexts();
+        await chips.nth(1).click();          // the first layer
+        const hid = await groups();
+        await chips.first().click();         // the plotted cases too
+        const both = await groups();
         await page.keyboard.press("Escape");
         const back = await groups();
-        soloOk = solo != null && alone.some(([k]) => k === solo) &&
-          alone.every(([k, o, d]) => k === solo ? o === "1" && d !== "none" : o !== "1") &&
-          back.every(([, o]) => o === "1") && (await page.locator("#docjson").inputValue()) === docBefore;
-        soloWhat = "layer " + solo + " alone " + JSON.stringify(alone) + "; after Esc " + JSON.stringify(back) + "; document unchanged";
+        const of = (gs, k) => gs.filter(([key]) => key === k);
+        soloOk = /^all samples/.test(names[0]) && names.length >= 2 &&
+          of(hid, "0").every(([, o]) => o !== "1") && of(hid, "base").every(([, o]) => o === "1") &&
+          hid.filter(([k]) => /<0$/.test(k)).every(([, o, d]) => o === "1" && d !== "none") &&
+          of(both, "base").every(([, o]) => o !== "1") &&
+          back.filter(([k]) => !k.includes("<")).every(([, o]) => o === "1") &&
+          (await page.locator("#docjson").inputValue()) === docBefore;
+        soloWhat = "chips " + JSON.stringify(names) + "; first layer hidden " + JSON.stringify(hid) + "; after Esc " + JSON.stringify(back) + "; document unchanged";
       } catch (e) { soloWhat = String(e.message).split("\n")[0]; }
-      ok("clicking a layer's button shows it alone, Esc shows every layer, and the document is untouched", soloOk, soloWhat);
+      ok("the plotted cases and each layer can be hidden from their chips, shared cases follow, Esc shows everything, and the document is untouched", soloOk, soloWhat);
 
       // An OQL axis is edited through the app's gene query dialog: it opens with one line per
       // statement, and what it applies is the axis's query.

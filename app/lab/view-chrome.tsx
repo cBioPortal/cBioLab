@@ -173,9 +173,9 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
         {!groups.some((g) => g.items.some((i) => i.value === data)) && data !== "none" &&
           <SelectItem value={data} className="text-md">{data.replace(/^profile:/, "")} (not in this study)</SelectItem>}
         {groups.map((g, gi) => (
-          <SelectGroup key={g.label} className={cn(gi > 0 && "mt-1 border-t pt-1")}>
-            <SelectLabel className="mx-1 rounded-xs bg-muted px-2 py-1 text-xs font-semibold text-foreground">{g.label}</SelectLabel>
-            {g.items.map((i) => <SelectItem key={i.value} value={i.value} disabled={!!i.disabled} title={i.disabled || i.label} className="pl-5 text-md">{i.label}</SelectItem>)}
+          <SelectGroup key={g.label} className={cn(gi > 0 && "mt-1.5")}>
+            <SelectLabel className="px-2 pt-1 pb-0.5 text-md font-semibold text-foreground">{g.label}</SelectLabel>
+            {g.items.map((i) => <SelectItem key={i.value} value={i.value} disabled={!!i.disabled} title={i.disabled || i.label} className="pl-6 text-md">{i.label}</SelectItem>)}
           </SelectGroup>
         ))}
       </SelectContent>

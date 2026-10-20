@@ -1235,17 +1235,18 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 }
 .menu-aside > .meta { display: block; }
 
-/* a plot's point layers: one shown alone, the rest stepped back, and the cases it shares with an
-   earlier layer revealed (app/lab/plot-controls.tsx; the groups are lib/figures/plot.ts's) */
-.plot-figure[data-solo] g[data-layer] { opacity: 0.08; }
-.plot-figure[data-solo="0"] g[data-layer="0"],
-.plot-figure[data-solo="1"] g[data-layer="1"],
-.plot-figure[data-solo="2"] g[data-layer="2"],
-.plot-figure[data-solo="3"] g[data-layer="3"] { opacity: 1; }
-.plot-figure[data-solo="0"] g[data-layer="0"][data-shared],
-.plot-figure[data-solo="1"] g[data-layer="1"][data-shared],
-.plot-figure[data-solo="2"] g[data-layer="2"][data-shared],
-.plot-figure[data-solo="3"] g[data-layer="3"][data-shared] { display: inline; }
+/* a plot's point layers: the plotted cases and each layer hidden or shown, and a case a hidden
+   layer drew shown in the next layer that holds it (app/lab/plot-controls.tsx; the groups are
+   lib/figures/plot.ts's) */
+.plot-figure[data-hide~="base"] g[data-layer="base"],
+.plot-figure[data-hide~="0"] g[data-layer="0"],
+.plot-figure[data-hide~="1"] g[data-layer="1"],
+.plot-figure[data-hide~="2"] g[data-layer="2"],
+.plot-figure[data-hide~="3"] g[data-layer="3"] { opacity: 0.08; }
+.plot-figure[data-hide~="0"] g[data-shared][data-owner="0"],
+.plot-figure[data-hide~="1"] g[data-shared][data-owner="1"],
+.plot-figure[data-hide~="2"] g[data-shared][data-owner="2"],
+.plot-figure[data-hide~="3"] g[data-shared][data-owner="3"] { display: inline; }
 /* a plot's axis controls: source, then whatever that source needs */
 .axispick { display: inline-flex; align-items: center; gap: var(--s1); }
 
