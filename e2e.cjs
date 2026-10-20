@@ -611,6 +611,29 @@ async function main() {
       } catch (e) { soloWhat = String(e.message).split("\n")[0]; }
       ok("clicking a layer's button shows it alone, Esc shows every layer, and the document is untouched", soloOk, soloWhat);
 
+      // An OQL axis is edited through the app's gene query dialog: it opens with one line per
+      // statement, and what it applies is the axis's query.
+      let oqlWhat = "no OQL axis", oqlOk = false;
+      try {
+        await page.goto(BASE + "/lab?tab=analysis&doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
+          study: "msk_chord_2024", cohorts: { All: { all: [] } },
+          views: [{ kind: "plot", cohorts: ["All"], x: { source: "alteration", oql: "KRAS: G12C, STK11: MUT", by: "statement" },
+            y: { source: "clinical", attribute: "TMB_NONSYNONYMOUS" } }]
+        })).toString("base64")));
+        await page.waitForSelector(".plot-side", { timeout: 300000 });
+        await page.getByRole("button", { name: "OQL for this axis" }).click();
+        const dlg = page.locator("[role=dialog]");
+        await dlg.waitFor({ timeout: 30000 });
+        const opened = await dlg.locator("textarea").inputValue();
+        await dlg.locator("textarea").fill("KRAS: G12C\nSTK11: MUT\nKEAP1: MUT");
+        await dlg.getByRole("button", { name: /^Apply/ }).click({ timeout: 30000 });
+        await page.waitForFunction(() => /KEAP1/.test(JSON.parse(document.querySelector("#docjson").value).views[0].x.oql), null, { timeout: 30000 });
+        const x = await page.evaluate(() => JSON.parse(document.querySelector("#docjson").value).views[0].x);
+        oqlOk = opened === "KRAS: G12C\nSTK11: MUT" && x.oql === "KRAS: G12C, STK11: MUT, KEAP1: MUT" && x.by === "statement";
+        oqlWhat = "opened " + JSON.stringify(opened) + " -> axis " + JSON.stringify(x);
+      } catch (e) { oqlWhat = String(e.message).split("\n")[0]; }
+      ok("a plot's OQL axis is edited in the gene query dialog, and its lines become the axis's statements", oqlOk, oqlWhat);
+
       // The oncoprint's gear keeps ONLY the link out to cBioPortal; genes moved
       // to a named button and a modal, so the gear is not where editing hides.
       let gearSplit = "no oncoprint rendered", gearOk = false;

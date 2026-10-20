@@ -245,7 +245,7 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
                     <span className="block text-xs text-muted-foreground">{h.means}</span>
                   </button>
                 ))}
-                <p className="mt-1.5 mb-0 text-xs text-muted-foreground">Entries on separate lines (or split by “;”) are alternatives: a patient is altered if any of them matches. {OQL_REFUSED}</p>
+                <p className="mt-1.5 mb-0 text-xs text-muted-foreground">Entries on separate lines (or split by “;” or “,”) are alternatives: a patient is altered if any of them matches. {OQL_REFUSED}</p>
               </div>
             ) : (
               <div className="flex flex-col gap-2 text-sm text-muted-foreground">

@@ -17,7 +17,7 @@ import { DB } from "./ch.ts";
 import { STYLE } from "./oncoprint-style.ts";
 import { clinicalTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { parseOql, oqlCasesSql } from "./oql.ts";
-import { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP } from "./plot-oql.ts";
+import { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP, ALTERATION_GENE_SET_CAP } from "./plot-oql.ts";
 import { oqlStatements } from "./oql-parse.ts";
 import { profiledCasesSql } from "./cohort2.ts";
 
@@ -54,7 +54,7 @@ const AXIS_SOURCES: readonly string[] = ["clinical", "molecular", "alteration", 
 function isOqlAxis(a: PlotAxis): a is { source: "alteration"; oql: string; by?: "any" | "statement" } {
   return a.source === "alteration" && "oql" in a && a.oql != null;
 }
-export { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP };
+export { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP, ALTERATION_GENE_SET_CAP };
 
 /** every gene named on an alteration axis, singular or set, uppercased */
 function alterationGenes(a: { gene?: string; genes?: string[] }): string[] {
@@ -62,8 +62,6 @@ function alterationGenes(a: { gene?: string; genes?: string[] }): string[] {
 }
 /** a patient-mode category for a patient whose samples carry different values */
 export const MULTIPLE = "Multiple";
-/** a gene-set alteration axis takes at most this many genes */
-export const ALTERATION_GENE_SET_CAP = 20;
 export type AxisKind = "num" | "cat" | "none";
 export type PlotShape = "scatter" | "box" | "table" | "waterfall";
 

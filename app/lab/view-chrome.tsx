@@ -8,7 +8,11 @@ import type { AnalysisSource, ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 import { SERIES, seriesStyle } from "../../lib/chart/style.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
-import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, Lock, LockOpen, Pencil, Plus, Save, Split, StickyNote, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, ListChecks, Lock, LockOpen, Pencil, Plus, Save, Split, StickyNote, Trash2 } from "lucide-react";
+import { GeneQueryDialog } from "../_genes/GeneQueryDialog.tsx";
+import type { GeneQueryMode, QueryCheck } from "../../lib/gene-query.ts";
+import { oqlStatements } from "../../lib/oql-parse.ts";
+import { ALTERATION_GENE_SET_CAP, OQL_STATEMENT_CAP } from "../../lib/plot-oql.ts";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
@@ -68,6 +72,23 @@ export function Participation({ p }: { p?: ViewParticipation }) {
 }
 
 /**
+ * Beside a field that takes genes or OQL, the app's gene query dialog: search, a check of every
+ * entry as it is typed, alias fixes and remembered lists. The field stays editable as text; the
+ * dialog hands back what it applied.
+ */
+function QueryButton({ mode, value, max, title, description, busy, onApply }: {
+  mode: GeneQueryMode; value: string; max: number; title: string; description: string; busy?: boolean;
+  onApply: (text: string, check: QueryCheck) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return <>
+    <Button type="button" variant="outline" size="icon-sm" className="size-ctl flex-none" disabled={busy}
+      aria-label={title} title={title + ": search genes and gene sets, and check every entry"} onClick={() => setOpen(true)}><ListChecks /></Button>
+    <GeneQueryDialog open={open} onOpenChange={setOpen} title={title} description={description} mode={mode} value={value} max={max} onApply={onApply} />
+  </>;
+}
+
+/**
  * One axis of a plot. The source decides what else is asked for: a clinical attribute, a gene
  * in a molecular profile, or a gene's alterations. It is the same vocabulary the engine uses,
  * so what the reader picks is what the document says.
@@ -90,8 +111,10 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
   const set = (next: any) => onChange(next);
   const w = stacked ? "w-full max-w-none" : "max-w-44";
   /** a control with its name above it when stacked; inline, the toolbar's side label names the run */
-  const field = (name: string, control: React.ReactNode) =>
-    stacked ? <div className="axfield flex flex-col gap-1"><span className="axfield-name text-sm font-semibold text-foreground">{name}</span>{control}</div> : control;
+  const field = (name: string, control: React.ReactNode, extra?: React.ReactNode) =>
+    stacked ? <div className="axfield flex flex-col gap-1"><span className="axfield-name text-sm font-semibold text-foreground">{name}</span>
+      {extra ? <div className="flex min-w-0 gap-1">{control}{extra}</div> : control}</div>
+      : <>{control}{extra}</>;
   const srcName: Record<string, string> = { clinical: "Clinical attribute", molecular: "Molecular profile", alteration: "Genes" };
   return (
     <span className={stacked ? "axispick-stack flex flex-col gap-2.5" : "axispick"}>
@@ -128,7 +151,9 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
           {!profiles.includes(a.profileType || "") && <option value={a.profileType || ""}>{a.profileType || "(none)"}</option>}
           {profiles.map((pt) => <option key={pt} value={pt}>{pt}</option>)}
         </OptionSelect>)}
-        {field("Gene", <GeneInput gene={a.gene || ""} busy={busy} className={stacked ? w : undefined} onCommit={(gene) => set({ ...a, gene })} />)}
+        {field("Gene", <GeneInput gene={a.gene || ""} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined} onCommit={(gene) => set({ ...a, gene })} />,
+          <QueryButton mode="genes" value={a.gene || ""} max={1} busy={busy} title="Gene for this axis"
+            description="The gene whose value in the profile this axis reads." onApply={(_t, c) => set({ ...a, gene: c.genes[0] || "" })} />)}
       </>}
       {src === "alteration" && (() => {
         const isOql = a.oql != null;
@@ -160,8 +185,8 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
         return <>
           {stacked && field("Group cases by", groupBy)}
           {field(isOql ? "OQL query" : "Gene(s)", isOql
-            ? <OqlInput query={a.oql} busy={busy} className={stacked ? w : undefined} onCommit={(oql) => set({ ...a, source: "alteration", oql })} />
-            : <GeneSetInput genes={genes} busy={busy} className={stacked ? w : undefined}
+            ? <OqlInput query={a.oql} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined} onCommit={(oql) => set({ ...a, source: "alteration", oql })} />
+            : <GeneSetInput genes={genes} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined}
                 onCommit={(next) => {
                   // A gene SET (2+) only supports "mutated vs not" — combining several genes'
                   // mutation types or copy-number states into one category has no honest reading,
@@ -170,7 +195,20 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
                   const by = next.length > 1 && a.by && a.by !== "mutated" ? "mutated" : a.by;
                   set(next.length > 1 ? { ...a, gene: undefined, genes: next, by }
                     : { ...a, genes: undefined, gene: next[0] || "", by });
-                }} />)}
+                }} />,
+            isOql
+              ? <QueryButton mode="oql" value={oqlStatements(a.oql).join("\n")} busy={busy} title="OQL for this axis"
+                  max={a.by === "statement" ? OQL_STATEMENT_CAP : 30}
+                  description={a.by === "statement" ? "Each line is its own group; a case matching two is their pair. A bare gene means any alteration in it."
+                    : "A case is Altered if any line matches. A bare gene means any alteration in it; add OQL to be specific."}
+                  onApply={(text) => set({ ...a, source: "alteration", oql: oqlStatements(text).join(", ") })} />
+              : <QueryButton mode="genes" value={genes.join(" ")} max={ALTERATION_GENE_SET_CAP} busy={busy} title="Genes for this axis"
+                  description="One gene, or several: a case counts as mutated when any of them is. For anything finer, group cases by OQL."
+                  onApply={(_t, c) => {
+                    const next = c.genes;
+                    const by = next.length > 1 && a.by && a.by !== "mutated" ? "mutated" : a.by;
+                    set(next.length > 1 ? { ...a, gene: undefined, genes: next, by } : { ...a, genes: undefined, gene: next[0] || "", by });
+                  }} />)}
           {!stacked && groupBy}
         </>;
       })()}
