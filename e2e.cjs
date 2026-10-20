@@ -592,6 +592,25 @@ async function main() {
       } catch (e) { layerWhat = String(e.message).split("\n")[0]; }
       ok("a plot's point layers are listed in the sidebar, and adding one draws it with a key entry", layerOk, layerWhat);
 
+      // Showing one layer alone is instant and the browser's own: the others step back, Esc restores.
+      let soloWhat = "no layer buttons", soloOk = false;
+      try {
+        // every group, a layer's shared cases included: [layer, opacity, display]
+        const groups = () => page.evaluate(() => [...document.querySelectorAll(".plot-figure g[data-layer]")]
+          .map((g) => [g.getAttribute("data-layer"), getComputedStyle(g).opacity, getComputedStyle(g).display]));
+        const docBefore = await page.locator("#docjson").inputValue();
+        await page.locator(".plot-solo button").last().click();
+        const solo = await page.locator(".plot-figure").getAttribute("data-solo");
+        const alone = await groups();
+        await page.keyboard.press("Escape");
+        const back = await groups();
+        soloOk = solo != null && alone.some(([k]) => k === solo) &&
+          alone.every(([k, o, d]) => k === solo ? o === "1" && d !== "none" : o !== "1") &&
+          back.every(([, o]) => o === "1") && (await page.locator("#docjson").inputValue()) === docBefore;
+        soloWhat = "layer " + solo + " alone " + JSON.stringify(alone) + "; after Esc " + JSON.stringify(back) + "; document unchanged";
+      } catch (e) { soloWhat = String(e.message).split("\n")[0]; }
+      ok("clicking a layer's button shows it alone, Esc shows every layer, and the document is untouched", soloOk, soloWhat);
+
       // The oncoprint's gear keeps ONLY the link out to cBioPortal; genes moved
       // to a named button and a modal, so the gear is not where editing hides.
       let gearSplit = "no oncoprint rendered", gearOk = false;

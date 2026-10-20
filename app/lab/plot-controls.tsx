@@ -12,7 +12,7 @@ import { Checkbox } from "../_ui/checkbox";
 import { Choice, OptionSelect } from "../_ui/choice.tsx";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
-import { FIELD } from "../_ui/toolbar.ts";
+import { CHIP, FIELD } from "../_ui/toolbar.ts";
 import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
 
 type Update = (fn: (view: any) => any) => void;
@@ -113,8 +113,9 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
 export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohortOptions, update, children }: {
   /** the view as the document holds it */
   spec: any;
-  /** the last result's plot: which shape is on screen, each axis's name and kind, how many cases it shows */
-  plot?: { shape: string; n: number; x: { kind: string; label: string }; y: { kind: string; label: string }; coverage?: { total: number } };
+  /** the last result's plot: which shape is on screen, each axis's name and kind, how many cases it shows, its layers */
+  plot?: { shape: string; n: number; x: { kind: string; label: string }; y: { kind: string; label: string }; coverage?: { total: number };
+    layers?: { label: string; color: string; n: number; shown: string }[] };
   attrs: { attribute: string; kind: string }[]; profiles: string[]; loading?: boolean; busy: boolean;
   /** the cohorts a point layer may be: every one but the plotted one and a split */
   cohortOptions: { name: string; label: string; depth: number }[];
@@ -123,6 +124,18 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohor
   children: React.ReactNode;
 }) {
   const layers: PointLayerSpec[] = Array.isArray(spec.points) ? spec.points : DEFAULT_POINT_LAYERS;
+  // One layer shown alone, the rest stepped back: a reading gesture, kept in the browser like a
+  // hover (invariant 9), and dropped when the layers drawn change.
+  const drawn = (plot?.layers || []).map((l, i) => ({ ...l, i })).filter((l) => l.shown !== "none");
+  const drawnKey = drawn.map((l) => l.i + ":" + l.label).join("|");
+  const [solo, setSolo] = useState<number | null>(null);
+  useEffect(() => setSolo(null), [drawnKey]);
+  useEffect(() => {
+    if (solo == null) return;
+    const off = (e: KeyboardEvent) => { if (e.key === "Escape") setSolo(null); };
+    window.addEventListener("keydown", off);
+    return () => window.removeEventListener("keydown", off);
+  }, [solo]);
   const axisName = (side: "x" | "y") => plot?.[side].label || side;
   const unit = spec.unit || "sample";
   // A box is drawn with its categories across, whichever axis the document holds them on, so a
@@ -184,8 +197,8 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohor
           </p>}
           {/* colour and ring split a box's violin and points; a scatter's density and a contingency
               have no per-case colour, so the controls appear only with a box on screen */}
-          {plot?.shape === "box" && <div className="viewtb mt-0 mb-2.5">
-            <div className="tbz">
+          {(plot?.shape === "box" || drawn.length > 0) && <div className="viewtb mt-0 mb-2.5">
+            {plot?.shape === "box" && <><div className="tbz">
               <span className="tbl" title="colours each group's violin and points by a category">colour samples by</span>
               <AxisPicker side="fill" axis={spec.colorBy} allowNone categorical attrs={attrs} profiles={profiles} loading={loading} busy={busy}
                 onChange={(a) => update((vv) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
@@ -193,9 +206,19 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohor
             <div className="tbz">
               <AxisPicker side="ring" axis={spec.ringBy} allowNone categorical attrs={attrs} profiles={profiles} loading={loading} busy={busy}
                 onChange={(a) => update((vv) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
-            </div>
+            </div></>}
+            {drawn.length > 0 && <div className="tbz plot-solo">
+              <span className="tbl" title="this browser only: show one layer alone, the rest stepped back; Esc shows them all">show</span>
+              {drawn.map((l) => (
+                <Button key={l.i} type="button" variant="outline" size="xs" className={cn(CHIP, "h-ctl gap-1.5")} aria-pressed={solo === l.i}
+                  title={solo === l.i ? "show every layer again (Esc)" : "show “" + l.label + "” alone"}
+                  onClick={() => setSolo(solo === l.i ? null : l.i)}>
+                  <span className="size-2.5 flex-none rounded-full" style={{ background: l.color }} />{l.label} ({l.n.toLocaleString()})
+                </Button>
+              ))}
+            </div>}
           </div>}
-          {children}
+          <div className="plot-figure" data-solo={solo ?? undefined}>{children}</div>
         </div>
       </div>
     </div>

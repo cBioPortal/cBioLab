@@ -136,8 +136,10 @@ async function pointLayers(pv: PlotView, data: PlotData, c: ViewRun, cn: string,
     const { layer, keys } = picked;
     if (layer.shown === "points" && layer.points && keys) {
       const kept = layer.points.filter((_, j) => !seen.has(keys[j]));
+      const shared = layer.points.filter((_, j) => seen.has(keys[j]));
       for (const k of keys) seen.add(k);
       layer.drawn = kept.length; layer.points = kept;
+      if (shared.length) layer.shared = shared;
       budget -= kept.length;
     }
     out.push(layer);
