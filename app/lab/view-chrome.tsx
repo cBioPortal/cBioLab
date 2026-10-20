@@ -12,7 +12,7 @@ import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, ListChecks, Lock, LockOpen,
 import { GeneQueryDialog } from "../_genes/GeneQueryDialog.tsx";
 import type { GeneQueryMode, QueryCheck } from "../../lib/gene-query.ts";
 import { oqlStatements } from "../../lib/oql-parse.ts";
-import { ALTERATION_GENE_SET_CAP, OQL_STATEMENT_CAP } from "../../lib/plot-oql.ts";
+import { OQL_STATEMENT_CAP } from "../../lib/plot-oql.ts";
 import { plottableProfiles, profileGroup, profileUse, type ProfileInfo } from "../../lib/profile-catalog.ts";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "../_ui/select";
 import { Button } from "../_ui/button";
@@ -93,7 +93,7 @@ function QueryButton({ mode, value, max, title, description, busy, onApply }: {
 /**
  * One axis of a plot. Its Data is one choice from a grouped list: a clinical attribute, each of the
  * study's own profiles under its alteration type (named as the study names it), or a query across
- * genes (OQL, a gene set). What the choice needs next follows from it: an attribute; a gene, and for
+ * genes (an OQL query). What the choice needs next follows from it: an attribute; a gene, and for
  * a mutation profile how to group the mutations; or the query.
  */
 export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange, allowNone, categorical, stacked }: {
@@ -129,7 +129,8 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
     : a.source === "profile" ? "profile:" + a.profile
     : a.source === "molecular" ? "profile:" + a.profileType
     : a.source === "alteration" && a.oql != null ? "oql"
-    : a.source === "alteration" && Array.isArray(a.genes) && a.genes.length > 1 ? "genes"
+    // a gene set (any mutated) shows as the OQL query that asks the same
+    : a.source === "alteration" && Array.isArray(a.genes) && a.genes.length > 1 ? "oql"
     : a.source === "alteration" ? "profile:" + (byUse(a.by === "cna" ? "discrete" : a.by === "sv" ? "sv" : "mutation") || "")
     : "clinical";
   const current = data.startsWith("profile:") ? catalog.find((p) => "profile:" + p.profile === data) : undefined;
@@ -139,7 +140,6 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
     if (v === "none") return set(undefined);
     if (v === "clinical") return set({ source: "clinical", attribute: a.attribute || (attrs[0] || {}).attribute || "" });
     if (v === "oql") return set({ source: "alteration", oql: a.oql || gene + ": MUT" });
-    if (v === "genes") return set({ source: "alteration", genes: Array.isArray(a.genes) && a.genes.length > 1 ? a.genes : [gene], by: "mutated" });
     const p = catalog.find((x) => "profile:" + x.profile === v);
     if (p) set({ source: "profile", profile: p.profile, gene, ...(profileUse(p) === "mutation" ? { by: a.by === "mutated" ? "mutated" : "mutationType" } : {}) });
   };
@@ -153,7 +153,7 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
     const assay = p.type === "GENERIC_ASSAY";
     at.items.push({ value: "profile:" + p.profile, label: p.name, ...(assay ? { disabled: "generic assays (" + p.name + ") come to plot axes next" } : {}) });
   }
-  groups.push({ label: "Across genes", items: [{ value: "oql", label: "OQL query" }, { value: "genes", label: "Gene set (mutated in any)" }] });
+  groups.push({ label: "Across genes", items: [{ value: "oql", label: "OQL query" }] });
   const dataPicker = loading && !catalog.length && !attrs.length ? <Waiting what="profiles" /> : (
     <Select value={data} onValueChange={choose} disabled={busy}>
       <SelectTrigger size="sm" aria-label={side + " data"} title={current ? current.name : "what this axis measures"}
@@ -173,9 +173,9 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
       </SelectContent>
     </Select>
   );
-  const isOql = data === "oql", isSet = data === "genes";
-  const genes: string[] = Array.isArray(a.genes) && a.genes.length ? a.genes : a.gene ? [a.gene] : [];
-  const commitGenes = (next: string[]) => set(next.length > 1 ? { source: "alteration", genes: next, by: "mutated" } : { source: "alteration", genes: next.slice(0, 1), by: "mutated" });
+  const isOql = data === "oql";
+  // the query as the OQL field shows it: the axis's own, or a gene set's equivalent ("any mutated")
+  const oql: string = a.oql != null ? a.oql : Array.isArray(a.genes) ? a.genes.map((g: string) => String(g).toUpperCase() + ": MUT").join(", ") : "";
   return (
     <span className={stacked ? "axispick-stack flex flex-col gap-2.5" : "axispick"}>
       {!stacked && <span className="tbl">{side}</span>}
@@ -192,7 +192,7 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
         {field("Gene", <GeneInput gene={gene} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined}
             onCommit={(g) => set({ ...(a.source === "profile" ? a : { source: "profile", profile: current.profile }), gene: g })} />,
           <QueryButton mode="genes" value={gene} max={1} busy={busy} title="Gene for this axis"
-            description={"The gene whose " + current.name + " this axis reads. To compare several genes, choose OQL query or Gene set under Data."}
+            description={"The gene whose " + current.name + " this axis reads. To compare several genes, choose OQL query under Data."}
             onApply={(_t, c) => set({ ...(a.source === "profile" ? a : { source: "profile", profile: current.profile }), gene: c.genes[0] || "" })} />)}
         {use === "mutation" && field("Plot mutations by",
           <OptionSelect className={w} value={a.by === "mutated" ? "mutated" : "mutationType"} disabled={busy} ariaLabel={side + " mutations by"}
@@ -207,21 +207,18 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
           <OptionSelect className={w} value={a.by === "statement" ? "statement" : "any"} disabled={busy} ariaLabel={side + " OQL grouping"}
             title={a.by === "statement" ? "a group for each line of the query; a case matching two is their pair, none Unaltered (or Not profiled)"
               : "Altered when a case matches any line of the query; Unaltered when it matches none and is profiled for every gene, else Not profiled"}
-            onValueChange={(v) => set(v === "statement" ? { source: "alteration", oql: a.oql, by: "statement" } : { source: "alteration", oql: a.oql })}>
+            onValueChange={(v) => set(v === "statement" ? { source: "alteration", oql, by: "statement" } : { source: "alteration", oql })}>
             <option value="any">any line (Altered or not)</option>
             <option value="statement">one group per line</option>
           </OptionSelect>)}
-        {field("OQL query", <OqlInput query={a.oql} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined} onCommit={(oql) => set({ ...a, source: "alteration", oql })} />,
-          <QueryButton mode="oql" value={oqlStatements(a.oql || "").join("\n")} busy={busy} title="OQL for this axis"
+        {field("OQL query", <OqlInput query={oql} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined}
+            onCommit={(q) => set({ source: "alteration", oql: q, ...(a.by === "statement" ? { by: "statement" } : {}) })} />,
+          <QueryButton mode="oql" value={oqlStatements(oql).join("\n")} busy={busy} title="OQL for this axis"
             max={a.by === "statement" ? OQL_STATEMENT_CAP : 30}
             description={a.by === "statement" ? "Each line is its own group; a case matching two is their pair. A bare gene means any alteration in it."
               : "A case is Altered if any line matches. A bare gene means any alteration in it; add OQL to be specific."}
-            onApply={(text) => set({ ...a, source: "alteration", oql: oqlStatements(text).join(", ") })} />)}
+            onApply={(text) => set({ source: "alteration", oql: oqlStatements(text).join(", "), ...(a.by === "statement" ? { by: "statement" } : {}) })} />)}
       </>}
-      {isSet && field("Genes", <GeneSetInput genes={genes} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined} onCommit={commitGenes} />,
-        <QueryButton mode="genes" value={genes.join(" ")} max={ALTERATION_GENE_SET_CAP} busy={busy} title="Genes for this axis"
-          description="A case counts as mutated when any of these genes is. For anything finer, choose OQL query under Data."
-          onApply={(_t, c) => commitGenes(c.genes)} />)}
     </span>
   );
 }
@@ -245,32 +242,6 @@ export function GeneInput({ gene, busy, onCommit, className }: { gene: string; b
         setDraft(v);
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => onCommit(v), 500);
-      }}
-      onBlur={() => commit(draft)} />
-  );
-}
-
-/**
- * One gene, or a gene SET typed as a comma-separated list ("TP53,KRAS,PIK3CA") — an alteration
- * axis's "is ANY of these altered" covariate. Same debounce-before-commit shape as GeneInput, for
- * the same reason: committing every keystroke would briefly make an empty or half-typed gene
- * list the shareable link, which the compiler then rejects.
- */
-export function GeneSetInput({ genes, busy, onCommit, className }: { genes: string[]; busy?: boolean; onCommit: (genes: string[]) => void; className?: string }) {
-  const joined = genes.join(",");
-  const [draft, setDraft] = useState(joined);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => setDraft(joined), [joined]);
-  const parse = (v: string) => v.split(",").map((g) => g.trim().toUpperCase()).filter(Boolean);
-  const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(parse(v)); };
-  return (
-    <Input className={cn(FIELD, "w-auto max-w-56 min-w-22 px-1.5 uppercase", className)} value={draft} disabled={busy} placeholder="gene, or gene,gene,... for a set" size={Math.max(8, Math.min(30, draft.length + 2))}
-      title={'one gene, or a comma-separated gene set ("is any of these altered")'}
-      onChange={(e) => {
-        const v = e.target.value.toUpperCase();
-        setDraft(v);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => onCommit(parse(v)), 500);
       }}
       onBlur={() => commit(draft)} />
   );
