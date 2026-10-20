@@ -5,7 +5,7 @@ import type { ViewResult, LogisticView, LogisticCoefficient } from "../types.ts"
 import { isPatientLevel } from "../federation.ts";
 import { axisLabel, validateAxis, type AxisKind } from "../plot.ts";
 import { logisticMethod, type CoxTrace } from "../method.ts";
-import { buildCoxColumns } from "./cox.ts";
+import { buildCoxColumns, notProfiledNote } from "./cox.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
 import { overLimit, studyCatalogs } from "./shared.ts";
 import { resolveProfileAxis } from "../plot-profile.ts";
@@ -53,7 +53,7 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
   const lRawRows: RawLogisticRow[] = [];
   let outcomeKind: AxisKind | null = null;
   let lKinds: AxisKind[] | null = null;
-  let lPatientLevelTotal = 0;
+  let lPatientLevelTotal = 0, lNotProfiled = 0;
   const lPerStudy: CoxTrace["perStudy"] = [];
   for (const n of vNames) {
     for (const st of cohorts[n].studies) {
@@ -63,11 +63,12 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
         continue;
       }
       lPatientLevelTotal += cohorts[n].perStudy[st]?.count || 0;
-      const { rows, outcomeKind: ok, kinds: k } = await res.logisticRows(doc.cohorts[n], lv.outcome, lCovariates);
+      const { rows, outcomeKind: ok, kinds: k, notProfiled: np } = await res.logisticRows(doc.cohorts[n], lv.outcome, lCovariates);
       if (!outcomeKind) outcomeKind = ok;
       if (!lKinds) lKinds = k;
+      lNotProfiled += np;
       for (const r of rows) lRawRows.push({ ...r, study: st });
-      lPerStudy.push({ study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0, rows: rows.length });
+      lPerStudy.push({ study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0, rows: rows.length, ...(np ? { notProfiled: np } : {}) });
     }
   }
   if (!lRawRows.length) {
@@ -124,7 +125,7 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
   try { lFit = logisticRegression(logisticInput); }
   catch (e) { return untimed({ kind: "logistic", cohorts: vNames, error: (e as Error).message }); }
 
-  const lMissing = lPatientLevelTotal - lFit.n;
+  const lMissing = lPatientLevelTotal - lFit.n - lNotProfiled;
   const lCoefficients: LogisticCoefficient[] = lColumns.map((col, i) => ({
     label: col.label, ...(col.reference ? { reference: col.reference } : {}), ...(col.level ? { level: col.level } : {}),
     axisIndex: col.axisIndex,
@@ -138,6 +139,7 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
       (outcomeKindFinal === "cat" ? " = " + lv.outcomeEvent : "") + " (" + lColumns.length + " term" + (lColumns.length === 1 ? "" : "s") + ")." +
       (outcomeOther.length ? " Every other observed value of " + outcomeLabel + " (" + outcomeOther.join(", ") + ") was treated as “not event.”" : "") +
       (lMissing > 0 ? " " + lMissing + " patient" + (lMissing === 1 ? "" : "s") + " from patient-level participants lacked the outcome or a covariate and were excluded." : "") +
+      notProfiledNote(lNotProfiled).replace("the gene of a covariate", "the gene of the outcome or a covariate") +
       (vStudies.length > 1 ? " Clinical-attribute vocabularies and declared types are NOT harmonized across studies." : "") +
       (lExcludedRemote.length
         ? " " + lExcludedRemote.map((e) => e.study + " (" + e.patients + " patients)").join(", ") +
