@@ -1507,6 +1507,86 @@ async function main() {
     await ctx.close();
   }
 
+  // From the study list to a gene query's results: a study row's query icon opens the gene query
+  // dialog for that study, and its Submit opens the Results page with the study and the query.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    try {
+      await page.goto(BASE + "/lab?tab=explore", { waitUntil: "domcontentloaded" });
+      await page.locator(".study-row:not(.study-head)").first().waitFor({ timeout: 120000 });
+      const header = page.locator("button.querygenes");
+      const none = { disabled: await header.isDisabled(), why: await header.getAttribute("title") };
+      await page.getByLabel("search studies").fill("coadread_tcga_pub");
+      await page.getByRole("button", { name: "query genes in coadread_tcga_pub", exact: true }).click();
+      const dlg = page.locator("[role=dialog].gene-query-dialog");
+      await dlg.locator("textarea").fill("KRAS: MUT\nBRAF");
+      await page.waitForFunction(() => { const b = [...document.querySelectorAll("[role=dialog].gene-query-dialog button")].find((x) => x.textContent === "Submit query"); return b && !b.disabled; }, null, { timeout: 60000 });
+      await dlg.getByRole("button", { name: "Submit query" }).click();
+      await page.waitForURL(/\/portal\/results\?/, { timeout: 60000 });
+      const q = new URL(page.url()).searchParams;
+      await page.locator("[role=tab]").filter({ hasText: /^Oncoprint$/ }).first().waitFor({ timeout: 120000 });
+      ok("study list: a study's query icon opens the gene dialog, and Submit opens its Results page",
+        none.disabled && /select a study/.test(none.why || "") && q.get("study") === "coadread_tcga_pub" && q.get("genes") === "KRAS: MUT\nBRAF",
+        "header with no study: " + JSON.stringify(none) + " · results " + q.get("study") + " / " + JSON.stringify(q.get("genes")));
+    } catch (e) {
+      ok("study list: a study's query icon opens the gene dialog, and Submit opens its Results page", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("study list query: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+
+  // The Results page over a selection: Comparison's Altered against the PROFILED unaltered, the rest named; several
+  // studies pooled with Explore's filters; cBioPortal's cross-study expression rule; the study cap.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const enc = (x) => Buffer.from(JSON.stringify(x)).toString("base64url");
+    const settle = async () => {
+      await page.locator(".viewcard").first().waitFor({ timeout: 240000 });
+      await page.waitForFunction(() => /profiled patients altered/.test(document.body.innerText), null, { timeout: 240000 });
+    };
+    const groups = async () => Object.fromEntries((await page.locator("section[data-tw] .rounded-pill.border").allInnerTexts())
+      .map((t) => t.trim().split(/\s+/)).filter((w) => w.length >= 2).map((w) => [w.slice(0, -1).join(" "), Number(w[w.length - 1].replace(/,/g, ""))]));
+    const tabs = async () => page.locator("[aria-label='results tabs'] [role=tab]").allInnerTexts();
+    try {
+      await page.goto(BASE + "/portal/results?study=brca_tcga&genes=" + encodeURIComponent("KRAS\nTP53: MUT"), { waitUntil: "domcontentloaded" });
+      await settle();
+      const g = await groups(), text = await page.locator("section[data-tw]").first().innerText();
+      const left = Number((/([\d,]+) queried patients? (?:was|were) not profiled/.exec(text) || [])[1]?.replace(/,/g, ""));
+      const profiled = Number((/of ([\d,]+) profiled patients/.exec(text) || [])[1]?.replace(/,/g, ""));
+      ok("results: Unaltered is the profiled patients the query misses, and the rest are named, not compared",
+        g.Altered > 0 && g.Unaltered > 0 && left > 0 && g.Altered + g.Unaltered === profiled && profiled + left === g.Queried,
+        JSON.stringify(g) + " · profiled " + profiled + " · not profiled " + left);
+      await page.goto(BASE + "/portal/results?studies=brca_tcga_pan_can_atlas_2018,coadread_tcga_pan_can_atlas_2018&filters=" +
+        enc([{ kind: "clinical", attribute: "SEX", values: ["Female"] }]) + "&genes=KRAS", { waitUntil: "domcontentloaded" });
+      await settle();
+      const t2 = await tabs(), s2 = await page.locator("section[data-tw]").first().innerText();
+      ok("results: several studies pooled under Explore's filters; co-expression is for one study, and says so",
+        /2 studies/.test(s2) && /patients after filters/.test(s2) && /SEX/.test(s2) && t2.includes("Plots") && !t2.includes("Co-expression") && /Co-expression \(one study at a time\)/.test(s2),
+        t2.join(", ") + " · " + s2.replace(/\s+/g, " ").slice(0, 160));
+      await page.goto(BASE + "/portal/results?studies=coadread_tcga_pub,luad_tcga_pan_can_atlas_2018&genes=KRAS", { waitUntil: "domcontentloaded" });
+      await settle();
+      await page.getByRole("tab", { name: "Plots" }).click();
+      await page.locator(".viewcard svg").first().waitFor({ timeout: 120000 });
+      // the plot's axis sidebar: the vertical axis falls back to a clinical attribute, and no expression is on offer
+      const bar = (await page.locator(".viewcard").first().innerText()).replace(/\s+/g, " ");
+      ok("results: expression is not compared across studies outside the PanCancer Atlas (cBioPortal's rule)",
+        /Vertical axis Data Clinical attribute/.test(bar) && !/mrna|expression/i.test(bar) && /cannot be compared across the selected studies/.test(await page.locator("section[data-tw]").first().innerText()), bar.slice(0, 200));
+      await page.goto(BASE + "/portal/results?studies=" + Array.from({ length: 51 }, (_, i) => "s" + i).join(",") + "&genes=KRAS", { waitUntil: "domcontentloaded" });
+      const capped = await page.locator(".error").first().innerText({ timeout: 60000 }).catch(() => "");
+      ok("results: past the study cap the query is refused, naming the limit", /at most 50 studies; 51 are selected/.test(capped), capped);
+    } catch (e) {
+      ok("results: the selection, profiled groups and cross-study rule", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("results selection: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+
   // Patient-data boundary gate: aggregate-only participants must never emit or
   // receive patient identifiers. See docs/DATA-BOUNDARY.md.
   try {

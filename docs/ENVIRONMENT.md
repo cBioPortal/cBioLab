@@ -106,7 +106,9 @@ see the security notes below.
 |---|---|---|
 | `APP_BASE_URL` | `https://cohort-lab.vercel.app` (MCP links), the request's origin (notebooks) | this site's public address, in the links MCP results and exported notebooks carry. Set it on any deployment not at that address |
 | `EXAMPLES_URL` | — | on an instance whose database is not the public warehouse, a deployment that holds the gallery's studies (e.g. `https://cbiolab.vercel.app`): the Examples tab opens each example there, after saying the reader is leaving, instead of running it here |
-| `PUBLIC_ENV` | `EXAMPLES_URL` | the variables written into the page for the browser, comma-separated. Read per request, so one image serves every deployment; a name that looks like a secret (`PASSWORD`, `SECRET`, `KEY`, `TOKEN`, `CREDENTIAL`) is refused |
+| `RESULTS_MAX_STUDIES` | `50` | the most studies one gene query (the Results page) covers; Explore's "Query genes…" and the page refuse more, naming the limit |
+| `CROSS_STUDY_EXPRESSION` | `pancan` | when expression data (mRNA, microRNA, protein) may be compared across studies on the Results page, as cBioPortal's `enable_cross_study_expression`: `pancan` (every study a TCGA PanCancer Atlas study), `all` or `none`. Elsewhere Plots offers no expression axes and Co-expression covers one study only |
+| `PUBLIC_ENV` | `EXAMPLES_URL,RESULTS_MAX_STUDIES,CROSS_STUDY_EXPRESSION` | the variables written into the page for the browser, comma-separated. Read per request, so one image serves every deployment; a name that looks like a secret (`PASSWORD`, `SECRET`, `KEY`, `TOKEN`, `CREDENTIAL`) is refused |
 
 ## The assistant (chat sidebar)
 

@@ -13,6 +13,17 @@ export interface OqlSpec {
 }
 export interface OqlEntry { gene: string; specs: OqlSpec[] }
 
+/**
+ * The data a patient must have been profiled for before an OQL alteration can be said NOT to be
+ * there — the panel-aware rule that keeps "not profiled" out of "unaltered". An alteration type
+ * missing here (EXP, PROT) has no profiling condition in this engine.
+ */
+export const OQL_PROFILE: Partial<Record<OqlSpecType, ("MUTATION" | "CNA" | "SV")[]>> = {
+  MUT: ["MUTATION"], CNA: ["CNA"], SV: ["SV"],
+  // "altered at all" is only decidable as false for a patient profiled for every type
+  ANY: ["MUTATION", "CNA", "SV"]
+};
+
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
 const CLASS_MAP: Record<string, string> = {
   MISSENSE: "missense", NONSENSE: "nonsense", NONSTART: "nonstart", NONSTOP: "nonstop", FRAMESHIFT: "frameshift",

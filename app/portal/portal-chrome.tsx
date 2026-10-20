@@ -35,8 +35,10 @@ function GroupChip({ name, i, n }: { name: string; i: number; n?: number }) {
  * genes), the headline answer beside it, and the groups every tab compares — with what the page
  * left out for this study, so a missing tab is never silent.
  */
-export function PortalSummary({ eyebrow, title, study, detail, genes, groups, counts, left, stat, action, children }: {
-  eyebrow: string; title: string; study: string; detail?: React.ReactNode; genes?: string[];
+export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes, groups, counts, left, stat, action, children }: {
+  eyebrow: string; title: string;
+  /** the study id, or the ids summarised; `studyTitle` lists them all */
+  study: string; studyTitle?: string; detail?: React.ReactNode; genes?: string[];
   groups: string[]; counts: Record<string, number> | null; left: string[];
   /** the headline number, right of the title */
   stat?: { value: number; of: number; label: string } | null;
@@ -52,7 +54,7 @@ export function PortalSummary({ eyebrow, title, study, detail, genes, groups, co
           <div className="text-sm font-semibold tracking-[0.12em] text-muted-foreground uppercase">{eyebrow}</div>
           <h2 className="mt-1 mb-1.5 font-serif text-xl font-semibold">{title}</h2>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-md text-muted-foreground">
-            <span className="font-mono text-sm">{study}</span>
+            <span className="font-mono text-sm" title={studyTitle}>{study}</span>
             {detail && <><span aria-hidden="true">·</span>{detail}</>}
             {genes && genes.length > 0 && <>
               <span aria-hidden="true">·</span>

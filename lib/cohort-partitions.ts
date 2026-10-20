@@ -22,7 +22,8 @@
 // ordinary cohort that `extends` its parent, so by the time anything compiles a cohort there is
 // no partition left to know about.
 import type { AnalysisDoc, Clause, CohortDef, Leaf, PartitionDef, ProfiledLeaf } from "./types.ts";
-import { parseOql, type OqlSpecType } from "./oql.ts";
+import { parseOql } from "./oql.ts";
+import { OQL_PROFILE } from "./oql-parse.ts";
 
 export const PARTITION_MAX_ARMS = 8;
 export const PARTITION_SEP = " / ";
@@ -40,11 +41,6 @@ export interface PartitionPlan {
   unchecked: string[];
 }
 
-const OQL_PROFILE: Partial<Record<OqlSpecType, ProfiledLeaf["type"][]>> = {
-  MUT: ["MUTATION"], CNA: ["CNA"], SV: ["SV"],
-  // "altered at all" is only decidable as false for a patient profiled for every type
-  ANY: ["MUTATION", "CNA", "SV"]
-};
 const PROFILE_WORD: Record<ProfiledLeaf["type"], string> = { MUTATION: "mutations", CNA: "copy number", SV: "structural variants" };
 
 interface Evaluability { leaves: Leaf[]; unchecked: string[] }
