@@ -35,6 +35,25 @@ describe("clause-count bounds are still enforced", () => {
   });
 });
 
+describe("profiled: a gene list is its genes' clauses AND-ed, in one clause", () => {
+  // one gene's clause SQL, without the parentheses a compiled cohort puts around each clause
+  const one = (gene: string) => compileCohortDef({ all: [{ kind: "profiled", type: "MUTATION", gene }] }, ctx).slice(1, -1);
+  test("genes:[A,B] compiles to exactly A's clause INTERSECT B's", () => {
+    const list = compileCohortDef({ all: [{ kind: "profiled", type: "MUTATION", genes: ["kras", "NRAS", "KRAS"] }] }, ctx);
+    assert.equal(list, "((" + one("KRAS") + ")\n  INTERSECT DISTINCT\n(" + one("NRAS") + "))", "upper-cased and deduplicated, each gene its own panel check");
+  });
+  test("it reads back naming every gene", () => {
+    assert.match(describeCohortDef({ all: [{ kind: "profiled", type: "CNA", genes: ["KRAS", "NRAS"] }] }), /profiled for KRAS, NRAS CNA/);
+  });
+  test("refused: both gene and genes, an empty list, more than 32 genes, a bad symbol", () => {
+    assert.throws(() => compileCohortDef({ all: [{ kind: "profiled", type: "MUTATION", gene: "KRAS", genes: ["NRAS"] }] }, ctx), /`gene` or `genes`, not both/);
+    assert.throws(() => compileCohortDef({ all: [{ kind: "profiled", type: "MUTATION", genes: [] }] }, ctx), /at least one gene/);
+    const many = Array.from({ length: 33 }, (_, i) => "G" + i);
+    assert.throws(() => compileCohortDef({ all: [{ kind: "profiled", type: "MUTATION", genes: many }] }, ctx), /at most 32 genes; this names 33/);
+    assert.throws(() => compileCohortDef({ all: [{ kind: "profiled", type: "MUTATION", genes: ["KRAS", "bad gene!"] }] }, ctx), /invalid gene symbol/);
+  });
+});
+
 describe("not: over an any: group (De Morgan's in one clause)", () => {
   const group = { any: [{ kind: "oql" as const, q: "MLH1: MUT" }, { kind: "oql" as const, q: "MSH2: MUT" }] };
 

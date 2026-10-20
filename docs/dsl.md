@@ -1,6 +1,6 @@
 <!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.ts; regenerate with `npm run docs:gen`. -->
 
-# cbio-lab DSL (v2.8)
+# cbio-lab DSL (v2.9)
 
 One declarative JSON object — the **Analysis document** — describes everything cbio-lab does:
 which patients form each cohort, and which views compare them. The server compiles it to
@@ -11,7 +11,7 @@ SQL each cohort compiled to.
 ## Analysis document
 
 ```
-{ "dsl":     "2.8",                         // the document's version; see "Versions" below
+{ "dsl":     "2.9",                         // the document's version; see "Versions" below
   "study":   "<default study id>",            // validated against cancer_study
   "cohorts": { "<name>": cohortDef, ... },    // max 16 — the store every view's "cohorts" names from
   "views":   [ view, ... ],                   // max 6; each lists its own "cohorts": ["<name>", ...]
@@ -90,7 +90,7 @@ Up to 16 authored cohorts and 48 cohorts in all, children included. Expanded bef
 each child `extends` its parent and runs in the parent's studies. (Not to be confused with the
 `{"kind":"split"}` leaf below, which selects the engine's fixed discovery or validation half.)
 
-**Versions.** A document carries `"dsl": "2.8"`. One written for an older version is
+**Versions.** A document carries `"dsl": "2.9"`. One written for an older version is
 upgraded when it is read — the result's `upgraded` says from which version and what changed
 (2.2 → 2.3 moved top-level `partitions` onto the cohorts they split as `splits`, and renamed
 their children from `"<partition> / <arm>"` to `"<cohort> / <partition> / <arm>"`, views
@@ -113,7 +113,7 @@ rather than silently ignoring what it does not understand.
 | `event` | `{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}` | timeline sub-DSL (below) |
 | `sampleList` | `{"kind":"sampleList","ids":["<study>:<id>", ...]}` or `{"kind":"sampleList","set":"<id set>"}` | explicit, cross-study list of sample ids: inline in `ids` (up to about 200 KB of ids per study, roughly 10,000 — refused by name past that), or a **stored id set** named by `set`, of any size up to 250,000 (see below) |
 | `patientList` | `{"kind":"patientList","ids":["<study>:<id>", ...]}` or `{"kind":"patientList","set":"<id set>"}` | explicit, cross-study list of patient ids, same two forms and limits |
-| `profiled` | `{"kind":"profiled","type":"MUTATION"\|"CNA"\|"SV"}` | patient has a sample on a gene panel for that data type — combine with `not` to separate wild-type from not-profiled |
+| `profiled` | `{"kind":"profiled","type":"MUTATION"\|"CNA"\|"SV", "gene"?:"KRAS" \| "genes"?:["KRAS","NRAS"]}` | patient has a sample on a gene panel for that data type — with `gene`, a panel covering that gene (or whole-exome); with `genes` (≤32), covering every one of them, the same as one `gene` clause per gene in a single clause. Combine with `not` to separate wild-type from not-profiled: `not` alone keeps patients never tested for the gene |
 | `caseList` | `{"kind":"caseList","id":"sequenced"}` | portal sample list; bare ids get the study prefix |
 | `genomicData` | `{"kind":"genomicData","gene":G,"profileType":P,"range"\|"values"}` | continuous per-gene values (cna, mrna z-scores, …); unknown profiles error listing what the study has |
 | `genericAssay` | `{"kind":"genericAssay","profileType":P,"entity":E,"range"\|"values"}` | generic assay values (mutational signatures, …) |

@@ -250,9 +250,21 @@ export function profiledCasesSql(gene: string, type: "MUTATION" | "CNA" | "SV", 
     "      SELECT gene_panel_id FROM " + o.db + ".gene_panel_to_gene_derived WHERE gene = " + sq(g) + "))";
 }
 
+/** the most genes one profiled clause names: a gene list's own limit (lib/gene-tracks.ts) */
+export const PROFILED_MAX_GENES = 32;
+
 function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): string {
   const t = PROFILED_TYPE[String(leaf.type || "").toUpperCase()];
   if (!t) throw new Error("profiled clause: type must be MUTATION, CNA, or SV");
+  // A gene list is its genes' clauses AND-ed: the same patients as one clause per gene
+  if (leaf.genes != null) {
+    if (leaf.gene != null) throw new Error("profiled clause: give `gene` or `genes`, not both");
+    if (!Array.isArray(leaf.genes) || !leaf.genes.length) throw new Error("profiled clause: `genes` must list at least one gene");
+    const genes = [...new Set(leaf.genes.map((g) => String(g).toUpperCase().trim()))];
+    if (genes.length > PROFILED_MAX_GENES)
+      throw new Error("profiled clause: at most " + PROFILED_MAX_GENES + " genes; this names " + genes.length);
+    return genes.map((gene) => "(" + profiledLeafSql({ kind: "profiled", type: leaf.type, gene }, ctx) + ")").join("\n  INTERSECT DISTINCT\n");
+  }
   const db = dbOf(ctx);
   // Optional gene narrowing, resolved through the SAME panel tables as the
   // gene-table denominator: a sample is profiled for a gene when its panel
@@ -559,7 +571,7 @@ function leafText(leaf: any): string {
       (leaf.percentile != null ? " (" + Math.round(leaf.percentile * 100) + "th percentile" + (leaf.percentileOf ? " of " + leaf.percentileOf : "") + ")" : ""));
     return leaf.attribute + " " + bits.join(" ") + (leaf.per === "sample" ? " (any sample)" : "");
   }
-  if (leaf.kind === "profiled") return "profiled for " + (leaf.gene ? String(leaf.gene).toUpperCase() + " " : "") + leaf.type;
+  if (leaf.kind === "profiled") return "profiled for " + (leaf.genes?.length ? leaf.genes.map((g: string) => String(g).toUpperCase()).join(", ") + " " : leaf.gene ? String(leaf.gene).toUpperCase() + " " : "") + leaf.type;
   if (leaf.kind === "derived") {
     const r = (leaf as any).range || {};
     const parts = [r.gte != null ? "\u2265 " + r.gte : null, r.gt != null ? "> " + r.gt : null,
