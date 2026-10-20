@@ -48,6 +48,9 @@ export function legendFor(values: string[], ring = false): { label: string; colo
 }
 
 const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
+/** a plot's coverage row: the cohort's cases, each axis's, and (patient mode) the patients with several samples */
+const coverageOf = (row: Record<string, unknown>): NonNullable<PlotData["coverage"]> =>
+  ({ total: Number(row.total || 0), nx: Number(row.nx || 0), ny: Number(row.ny || 0), ...(row.multi != null ? { multi: Number(row.multi) } : {}) });
 import type { CohortDef, CompileCtx, ChRow, ChResult, PatientTimeline } from "./types.ts";
 import type { StudyAccess } from "./view-coverage.ts";
 import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } from "./patient-timeline.ts";
@@ -1392,7 +1395,7 @@ export interface FederatedPlotCapable {
   plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]>;
   plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
-    Promise<{ total: number; nx: number; ny: number }>;
+    Promise<NonNullable<PlotData["coverage"]>>;
   /** a highlight's patients that are in the plotted cohort, here — a count */
   plotHighlightCount(def: CohortDef | null | undefined, highlight: CohortDef): Promise<number>;
   /** a highlight's cases as cells on the plotted scatter's own grid and extent */
@@ -1694,7 +1697,7 @@ abstract class BaseResolver implements AggregateCapable {
     const label = { x: { label: axisLabel(spec.x), kind: xk, ...logOf(spec.x) }, y: { label: axisLabel(spec.y), kind: yk, ...logOf(spec.y) } };
     // alongside the plot's own queries, never failing it: a missing coverage just means no note
     const coverage = this.runLogged<ChRow>("plot:coverage", plotCoverageSql(xSel, ySel, ctx), conn)
-      .then((r) => ({ total: Number(r.data[0]?.total || 0), nx: Number(r.data[0]?.nx || 0), ny: Number(r.data[0]?.ny || 0) }))
+      .then((r) => coverageOf(r.data[0] || {}))
       .catch(() => undefined);
     const done = async (d: PlotData): Promise<PlotData> => { const c = await coverage; return c ? { ...d, coverage: c } : d; };
 
@@ -1791,12 +1794,11 @@ abstract class BaseResolver implements AggregateCapable {
 
   /** This site's cases, and how many carry each axis — summed across sites by lib/views/plot.ts. */
   async plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
-    Promise<{ total: number; nx: number; ny: number }> {
+    Promise<NonNullable<PlotData["coverage"]>> {
     const ctx = this.plotCtx(def, spec);
     const r = await this.runLogged<ChRow>("plot:coverage",
       plotCoverageSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx), this.instance.conn);
-    const row = r.data[0] || {};
-    return { total: Number(row.total || 0), nx: Number(row.nx || 0), ny: Number(row.ny || 0) };
+    return coverageOf(r.data[0] || {});
   }
 
   /** Pass 1 of a federated numeric pair: this site's count and extent (plotBinsSql's `extent` arg). */

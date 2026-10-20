@@ -58,7 +58,7 @@ function run(resolvers: Record<string, unknown>, opts: {
     participationFor: (studies: string[]) => ({ studies: studies.map((s) => ({ study: s, mode: "patient-level", instance: "" })), requiresPatientLevel: false, aggregateOnly: [] }),
     pin: null, studyProfiles: async () => ({ profiles: [], gaProfiles: [] }),
   } as unknown as ViewRun;
-  const view = { kind: "plot", cohorts: ["All"], x: { source: "clinical", attribute: "AGE" }, y: { source: "clinical", attribute: "TMB" },
+  const view = { kind: "plot", unit: "patient", cohorts: ["All"], x: { source: "clinical", attribute: "AGE" }, y: { source: "clinical", attribute: "TMB" },
     ...(opts.highlight !== undefined ? { highlight: opts.highlight } : { highlight: ["R"] }) };
   return runPlot(view as never, c).then((r) => ("result" in (r as object) ? (r as { result: ViewResult }).result : r as ViewResult));
 }

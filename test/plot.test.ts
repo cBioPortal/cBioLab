@@ -4,7 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotBinsSql, plotBoxSql, plotCountSql,
   plotShape, plotStatsSql, plotTableSql, plotPointsSql, plotViolinSql, categoryColor, isAbsent,
-  tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS , coverageNote, plotScatterPointsSql } from "../lib/plot.ts";
+  tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS , coverageNote, combineNote, plotCoverageSql, plotScatterPointsSql, type PlotData } from "../lib/plot.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
 
 const ctx = { study: "x", db: "db", unit: "sample" as const, cohortSql: "SELECT pid FROM p" };
@@ -130,6 +130,26 @@ test("sample mode and patient mode ask different questions of the same table", (
   // a numeric axis casts, a categorical one does not
   assert.match(asSample, /toFloat64OrNull/);
   assert.equal(/toFloat64OrNull/.test(axisSelect(cat, ctx, "cat")), false);
+});
+
+test("patient mode combines a patient's samples by a stated rule, never by whichever row comes first", () => {
+  const n = axisSelect(num, { ...ctx, unit: "patient" }, "num"), c = axisSelect(cat, { ...ctx, unit: "patient" }, "cat");
+  // the patient's own row wins; otherwise a number is the samples' mean, a category their common value or "Multiple"
+  assert.match(n, /if\(countIf\(pref = 1\) > 0, anyIf\(v, pref = 1\), avgIf\(v, pref = 0\)\)/);
+  assert.match(c, /uniqExactIf\(v, pref = 0\) > 1, 'Multiple', anyIf\(v, pref = 0\)/);
+  assert.doesNotMatch(n + c, /argMax/, "argMax over equal preferences picks an arbitrary sample");
+  // in sample mode the patient's value is one row per sample, so the same rule copies it unchanged
+  assert.match(axisSelect(num, ctx, "num"), /avgIf\(v, pref = 0\)/);
+});
+
+test("patient mode's coverage counts the patients with several samples, and the caption says how they were combined", () => {
+  const pc = { ...ctx, unit: "patient" as const };
+  assert.match(plotCoverageSql("SELECT 1 AS id, 1 AS v", "SELECT 1 AS id, 1 AS v", pc), /HAVING count\(\) > 1\)\) AS multi/);
+  assert.doesNotMatch(plotCoverageSql("SELECT 1 AS id, 1 AS v", "SELECT 1 AS id, 1 AS v", ctx), /AS multi/, "sample mode has nothing to combine");
+  const d = { n: 10, x: { label: "A", kind: "num" }, y: { label: "B", kind: "num" }, coverage: { total: 10, nx: 10, ny: 10, multi: 3 } } as unknown as PlotData;
+  assert.match(combineNote(d, "patient"), /^3 patients have more than one sample: a numeric value is the mean of their samples', a category the samples' common value or “Multiple” where they differ, and an alteration counts if any sample has it\.$/);
+  assert.equal(combineNote(d, "sample"), "");
+  assert.equal(combineNote({ ...d, coverage: { ...d.coverage!, multi: 0 } }, "patient"), "");
 });
 
 test("an alteration axis answers for every case in the cohort, not only the altered ones", () => {

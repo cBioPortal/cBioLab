@@ -50,6 +50,8 @@ export { OQL_ALTERED, OQL_UNALTERED };
 function alterationGenes(a: { gene?: string; genes?: string[] }): string[] {
   return (a.genes && a.genes.length ? a.genes : a.gene != null ? [a.gene] : []).map((g) => String(g).toUpperCase());
 }
+/** a patient-mode category for a patient whose samples carry different values */
+export const MULTIPLE = "Multiple";
 /** a gene-set alteration axis takes at most this many genes */
 export const ALTERATION_GENE_SET_CAP = 20;
 export type AxisKind = "num" | "cat" | "none";
@@ -204,8 +206,10 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
   const inCohort = (col: string) => strip(col, study) + " IN (SELECT pid FROM cohort)";
 
   if (a.source === "clinical") {
-    // patient rows and sample rows both exist; in sample mode a patient's value repeats across
-    // that patient's samples, in patient mode a sample's value stands in for the patient.
+    // Patient rows and sample rows both exist, and a case's own kind of row wins. In sample mode a
+    // patient's value repeats across that patient's samples. In patient mode the patient's samples
+    // are combined: a number is their mean, a category is the samples' common value, or "Multiple"
+    // when they differ (combineNote says so in the caption).
     // Only the study knows whether the attribute is a number, so the caller says which.
     const val = kind === "num" ? logOf(a, "toFloat64OrNull(attribute_value)") : "attribute_value";
     const valCd = kind === "num" ? logOf(a, "toFloat64OrNull(cd.attribute_value)") : "cd.attribute_value";
@@ -225,7 +229,9 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
         "  FROM " + clinicalTable(db, [a.attribute]) + "\n" +
         "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(a.attribute) +
         " AND attribute_value != ''" + defined(val) + "\n    AND type = 'sample' AND " + inCohort("patient_unique_id");
-    return "SELECT id, argMax(v, pref) AS v FROM (\n" + own + "\n  UNION ALL\n" + other + "\n) GROUP BY id";
+    const combined = kind === "num" ? "avgIf(v, pref = 0)"
+      : "if(uniqExactIf(v, pref = 0) > 1, " + sq(MULTIPLE) + ", anyIf(v, pref = 0))";
+    return "SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), " + combined + ") AS v FROM (\n" + own + "\n  UNION ALL\n" + other + "\n) GROUP BY id";
   }
 
   if (a.source === "molecular") {
@@ -317,7 +323,22 @@ export function plotCoverageSql(xSel: string, ySel: string, ctx: AxisCtx): strin
     : "SELECT pid AS id FROM cohort";
   return "WITH cohort AS (" + ctx.cohortSql + "),\n     cases AS (" + universe + "),\n" +
     "     xs AS (" + xSel + "),\n     ys AS (" + ySel + ")\n" +
-    "SELECT count() AS total, countIf(id IN (SELECT id FROM xs)) AS nx, countIf(id IN (SELECT id FROM ys)) AS ny FROM cases";
+    "SELECT count() AS total, countIf(id IN (SELECT id FROM xs)) AS nx, countIf(id IN (SELECT id FROM ys)) AS ny" +
+    (ctx.unit === "sample" ? "" : ",\n  (SELECT count() FROM (SELECT patient_unique_id FROM " + db + ".sample_derived\n" +
+      "    WHERE cancer_study_identifier = " + sq(ctx.study) + " AND " + strip("patient_unique_id", ctx.study) + " IN (SELECT pid FROM cohort)\n" +
+      "    GROUP BY patient_unique_id HAVING count() > 1)) AS multi") +
+    " FROM cases";
+}
+
+/**
+ * In patient mode, how a patient's several samples became one point: said whenever the cohort has
+ * such patients, since every kind of axis combines them by its own rule. Empty in sample mode.
+ */
+export function combineNote(d: PlotData, unit: "patient" | "sample"): string {
+  const m = d.coverage?.multi;
+  if (unit !== "patient" || !m) return "";
+  return m.toLocaleString("en-US") + " patient" + (m === 1 ? " has" : "s have") + " more than one sample: a numeric value is the mean of " +
+    (m === 1 ? "its" : "their") + " samples', a category the samples' common value or \u201c" + MULTIPLE + "\u201d where they differ, and an alteration counts if any sample has it.";
 }
 
 /** The sentence a plot leads its caption with when the pair left cases out; empty when none were. */
@@ -675,7 +696,8 @@ export interface PlotData {
   cells?: { cx: string; cy: string; n: number }[];
   note?: string;
   /** cases in the cohort, and how many carry each axis — what the inner join left out, and why */
-  coverage?: { total: number; nx: number; ny: number };
+  /** cases in the cohort, how many have each axis, and (patient mode) how many patients have several samples */
+  coverage?: { total: number; nx: number; ny: number; multi?: number };
   /** cohorts drawn over this one, in the view's order */
   highlights?: PlotHighlight[];
 }

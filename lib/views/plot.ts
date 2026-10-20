@@ -3,7 +3,7 @@
 import type { PlotView, ViewResult } from "../types.ts";
 import { pearsonFromMoments, regressionFromMoments, type Moments } from "../stats.ts";
 import { isPatientLevel, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable } from "../federation.ts";
-import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, HIGHLIGHT_CAP, HIGHLIGHT_COLORS, OUTLIER_CELL_MAX, tukey, coverageNote, sparseCellMax,
+import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, HIGHLIGHT_CAP, HIGHLIGHT_COLORS, OUTLIER_CELL_MAX, tukey, coverageNote, combineNote, sparseCellMax,
   type PlotData, type PlotGroup, type PlotHighlight, type PlotRequest } from "../plot.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
 
@@ -200,7 +200,8 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
   const pv = view as PlotView;
   const cn = vNames[0];
   const sites = cohorts[cn].studies;
-  const unit = pv.unit === "sample" ? "sample" as const : "patient" as const;
+  // a point is a sample unless the view asks for patients, as on cBioPortal's Plots tab
+  const unit = pv.unit === "patient" ? "patient" as const : "sample" as const;
   const spec = { x: pv.x, y: pv.y, unit,
     ...(pv.colorBy ? { colorBy: pv.colorBy } : {}), ...(pv.ringBy ? { ringBy: pv.ringBy } : {}) };
   const bins: [number, number] = Array.isArray(pv.bins) && pv.bins.length === 2
@@ -218,7 +219,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const pr: ViewResult = {
         kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [coverageNote(data, unit), shapeNote, highlightNote(hs, unit)].filter(Boolean).join(" ") || undefined
+        note: [coverageNote(data, unit), combineNote(data, unit), shapeNote, highlightNote(hs, unit)].filter(Boolean).join(" ") || undefined
       };
       return pr;
     } else {
@@ -322,13 +323,14 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       // each site counts its own cases and their axes; the sums are exact. A failed count fails the
       // view: dropping the coverage note would hide how many cases the figure leaves out
       const covs = await Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk)));
-      data.coverage = covs.reduce<{ total: number; nx: number; ny: number }>(
-        (a, c) => ({ total: a.total + c.total, nx: a.nx + c.nx, ny: a.ny + c.ny }), { total: 0, nx: 0, ny: 0 });
+      data.coverage = covs.reduce<NonNullable<PlotData["coverage"]>>(
+        (a, c) => ({ total: a.total + c.total, nx: a.nx + c.nx, ny: a.ny + c.ny, ...(c.multi != null || a.multi != null ? { multi: (a.multi || 0) + (c.multi || 0) } : {}) }),
+        { total: 0, nx: 0, ny: 0 });
       const hs = await highlightLayers(pv, data, c, cn, sites, spec);
       if (hs.length) data.highlights = hs;
       const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [coverageNote(data, unit), data.note, highlightNote(hs, unit)].filter(Boolean).join(" ") || undefined };
+        note: [coverageNote(data, unit), combineNote(data, unit), data.note, highlightNote(hs, unit)].filter(Boolean).join(" ") || undefined };
       return pr;
     }
   } catch (e) {

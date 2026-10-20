@@ -51,7 +51,7 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, highl
   children: React.ReactNode;
 }) {
   const chosen: string[] = Array.isArray(spec.highlight) ? spec.highlight : [];
-  const unit = spec.unit || "patient";
+  const unit = spec.unit || "sample";
   // A box is drawn with its categories across, whichever axis the document holds them on, so a
   // box whose categories sit on y shows its "vertical" axis across. Swapping makes the two agree.
   const boxTransposed = plot?.shape === "box" && plot.x.kind === "num";
@@ -82,9 +82,9 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, highl
             <div className="axfield flex flex-col gap-1">
               <span className="axfield-name text-sm font-semibold text-foreground">Each point is a</span>
               <Choice size="ctl" className="w-full" value={unit} disabled={busy}
-                title="what a point is; patient mode averages a patient's samples"
+                title="what a point is: a sample, or a patient with its samples combined (a number's mean, a category's common value or Multiple)"
                 onChange={(u) => update((vv) => ({ ...vv, unit: u }))}
-                options={[["patient", "patient"], ["sample", "sample"]]} />
+                options={[["sample", "sample"], ["patient", "patient"]]} />
             </div>
             {plot?.shape !== "table" && (highlightOptions.length > 0 || chosen.length > 0) && (
               <div className="axfield flex flex-col gap-1">

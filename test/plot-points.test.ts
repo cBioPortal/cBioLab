@@ -84,8 +84,8 @@ describe("a scatter's points", () => {
     assert.deepEqual(calls[0].extra, { grid: [240, 160], extent: EXTENT, cellMax: OUTLIER_CELL_MAX });
     assert.equal(calls[0].cap, POINTS_CAP);
     assert.deepEqual(r.plot!.pointSet, { rule: "outliers", drawn: 1, cellMax: OUTLIER_CELL_MAX });
-    assert.match(r.note!, /1 patient in cells holding at most 3 is drawn as points; the other 5,999 patients as shaded cells/);
-    assert.match(r.note!, /coefficients are over every patient/);
+    assert.match(r.note!, /1 sample in cells holding at most 3 is drawn as points; the other 5,999 samples as shaded cells/);
+    assert.match(r.note!, /coefficients are over every sample/);
   });
 
   test("when even the lone cases are more than the cap, none is drawn and the caption says why", async () => {
@@ -95,7 +95,7 @@ describe("a scatter's points", () => {
     assert.equal(calls.length, 0, "nothing is fetched to be thrown away");
     assert.equal(r.plot!.pointSet!.rule, "none");
     assert.equal(r.plot!.xyPoints, undefined);
-    assert.match(r.note!, /5,001 patients sit alone in a cell, more than the 5,000 drawn as points, so none is/);
+    assert.match(r.note!, /5,001 samples sit alone in a cell, more than the 5,000 drawn as points, so none is/);
   });
 
   test("an aggregate-only participant is never asked, and the caption names it", async () => {

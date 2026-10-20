@@ -544,7 +544,7 @@ export interface PlotView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string;
   kind: "plot"; x: PlotAxis; y: PlotAxis; cohorts?: string[];
-  /** what a point is (default "sample"); patient mode averages a patient's samples */
+  /** what a point is (default "sample"); patient mode combines a patient's samples (mean, common value or "Multiple", any alteration) */
   unit?: "patient" | "sample";
   /** the grid a scatter is binned onto (default 240 x 160) */
   bins?: [number, number];
