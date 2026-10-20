@@ -621,6 +621,8 @@ async function main() {
             y: { source: "clinical", attribute: "TMB_NONSYNONYMOUS" } }]
         })).toString("base64")));
         await page.waitForSelector(".plot-side", { timeout: 300000 });
+        // genes and OQL are chosen in the dialog only: the axis holds no free-text field
+        const freeText = await page.locator(".plot-side .plot-axis input").count();
         await page.getByRole("button", { name: "OQL for this axis" }).click();
         const dlg = page.locator("[role=dialog]");
         await dlg.waitFor({ timeout: 30000 });
@@ -629,8 +631,8 @@ async function main() {
         await dlg.getByRole("button", { name: /^Apply/ }).click({ timeout: 30000 });
         await page.waitForFunction(() => /KEAP1/.test(JSON.parse(document.querySelector("#docjson").value).views[0].x.oql), null, { timeout: 30000 });
         const x = await page.evaluate(() => JSON.parse(document.querySelector("#docjson").value).views[0].x);
-        oqlOk = opened === "KRAS: G12C\nSTK11: MUT" && x.oql === "KRAS: G12C, STK11: MUT, KEAP1: MUT" && x.by === "statement";
-        oqlWhat = "opened " + JSON.stringify(opened) + " -> axis " + JSON.stringify(x);
+        oqlOk = freeText === 0 && opened === "KRAS: G12C\nSTK11: MUT" && x.oql === "KRAS: G12C, STK11: MUT, KEAP1: MUT" && x.by === "statement";
+        oqlWhat = "free-text fields " + freeText + "; opened " + JSON.stringify(opened) + " -> axis " + JSON.stringify(x);
       } catch (e) { oqlWhat = String(e.message).split("\n")[0]; }
       ok("a plot's OQL axis is edited in the gene query dialog, and its lines become the axis's statements", oqlOk, oqlWhat);
 

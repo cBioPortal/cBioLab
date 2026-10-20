@@ -2,7 +2,7 @@
 // The chrome every view card shares, and the small controls inside it: the header (ViewHead), its
 // menus, the cohort and value pickers, the axis picker, the gene inputs. Module-level components,
 // so React keeps their state across the analysis page's renders.
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { attributeLabel } from "../../lib/custom-data-names.ts";
 import type { AnalysisSource, ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
@@ -16,7 +16,6 @@ import { OQL_STATEMENT_CAP } from "../../lib/plot-oql.ts";
 import { plottableProfiles, profileGroup, profileUse, type ProfileInfo } from "../../lib/profile-catalog.ts";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "../_ui/select";
 import { Button } from "../_ui/button";
-import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { FIELD } from "../_ui/toolbar.ts";
@@ -74,21 +73,30 @@ export function Participation({ p }: { p?: ViewParticipation }) {
 }
 
 /**
- * Beside a field that takes genes or OQL, the app's gene query dialog: search, a check of every
- * entry as it is typed, alias fixes and remembered lists. The field stays editable as text; the
- * dialog hands back what it applied.
+ * A field that takes genes or OQL, entered only through the app's gene query dialog (search, a check
+ * of every entry, alias fixes, remembered lists): it shows the value and opens the dialog when
+ * clicked or typed into, so a half-typed or misspelt gene never reaches the document. It does not
+ * open on focus alone, because the dialog hands focus back to it on closing.
  */
-function QueryButton({ mode, value, max, title, description, busy, onApply }: {
-  mode: GeneQueryMode; value: string; max: number; title: string; description: string; busy?: boolean;
-  onApply: (text: string, check: QueryCheck) => void;
+function QueryField({ mode, value, shown, placeholder, max, title, description, busy, className, onApply }: {
+  mode: GeneQueryMode; value: string; shown: string; placeholder: string; max: number; title: string; description: string;
+  busy?: boolean; className?: string; onApply: (text: string, check: QueryCheck) => void;
 }) {
   const [open, setOpen] = useState(false);
   return <>
-    <Button type="button" variant="outline" size="icon-sm" className="size-ctl flex-none" disabled={busy}
-      aria-label={title} title={title + ": search genes and gene sets, and check every entry"} onClick={() => setOpen(true)}><ListChecks /></Button>
+    <button type="button" disabled={busy} aria-haspopup="dialog" aria-label={title + (shown ? ": " + shown : "")}
+      title={(shown || placeholder) + " — click to choose"}
+      className={cn(FIELD, "flex min-w-0 items-center gap-1.5 rounded-md border border-input px-1.5 text-left shadow-xs outline-none",
+        "hover:border-primary focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50", className)}
+      onClick={() => setOpen(true)}
+      onKeyDown={(e) => { if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setOpen(true); } }}>
+      <span className={cn("min-w-0 flex-1 truncate", !shown && "text-muted-foreground")}>{shown || placeholder}</span>
+      <ListChecks className="size-3.5 flex-none text-muted-foreground" aria-hidden="true" />
+    </button>
     <GeneQueryDialog open={open} onOpenChange={setOpen} title={title} description={description} mode={mode} value={value} max={max} onApply={onApply} />
   </>;
 }
+
 
 /**
  * One axis of a plot. Its Data is one choice from a grouped list: a clinical attribute, each of the
@@ -164,10 +172,10 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
         {allowNone && <SelectItem value="none" className="text-md">none</SelectItem>}
         {!groups.some((g) => g.items.some((i) => i.value === data)) && data !== "none" &&
           <SelectItem value={data} className="text-md">{data.replace(/^profile:/, "")} (not in this study)</SelectItem>}
-        {groups.map((g) => (
-          <SelectGroup key={g.label}>
-            <SelectLabel className="text-xs font-semibold text-muted-foreground">{g.label}</SelectLabel>
-            {g.items.map((i) => <SelectItem key={i.value} value={i.value} disabled={!!i.disabled} title={i.disabled || i.label} className="text-md">{i.label}</SelectItem>)}
+        {groups.map((g, gi) => (
+          <SelectGroup key={g.label} className={cn(gi > 0 && "mt-1 border-t pt-1")}>
+            <SelectLabel className="mx-1 rounded-xs bg-muted px-2 py-1 text-xs font-semibold text-foreground">{g.label}</SelectLabel>
+            {g.items.map((i) => <SelectItem key={i.value} value={i.value} disabled={!!i.disabled} title={i.disabled || i.label} className="pl-5 text-md">{i.label}</SelectItem>)}
           </SelectGroup>
         ))}
       </SelectContent>
@@ -189,9 +197,8 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
         </OptionSelect>
       )}
       {current && use !== "assayNumber" && use !== "assayCategory" && <>
-        {field("Gene", <GeneInput gene={gene} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined}
-            onCommit={(g) => set({ ...(a.source === "profile" ? a : { source: "profile", profile: current.profile }), gene: g })} />,
-          <QueryButton mode="genes" value={gene} max={1} busy={busy} title="Gene for this axis"
+        {field("Gene", <QueryField mode="genes" value={gene} shown={gene} placeholder="choose a gene" max={1} busy={busy}
+            className={stacked ? "w-full" : "w-28"} title="Gene for this axis"
             description={"The gene whose " + current.name + " this axis reads. To compare several genes, choose OQL query under Data."}
             onApply={(_t, c) => set({ ...(a.source === "profile" ? a : { source: "profile", profile: current.profile }), gene: c.genes[0] || "" })} />)}
         {use === "mutation" && field("Plot mutations by",
@@ -211,65 +218,14 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
             <option value="any">any line (Altered or not)</option>
             <option value="statement">one group per line</option>
           </OptionSelect>)}
-        {field("OQL query", <OqlInput query={oql} busy={busy} className={stacked ? "min-w-0 flex-1" : undefined}
-            onCommit={(q) => set({ source: "alteration", oql: q, ...(a.by === "statement" ? { by: "statement" } : {}) })} />,
-          <QueryButton mode="oql" value={oqlStatements(oql).join("\n")} busy={busy} title="OQL for this axis"
+        {field("OQL query", <QueryField mode="oql" value={oqlStatements(oql).join("\n")} shown={oqlStatements(oql).join(", ")} placeholder="choose genes or OQL"
+            className={stacked ? "w-full" : "w-56"} busy={busy} title="OQL for this axis"
             max={a.by === "statement" ? OQL_STATEMENT_CAP : 30}
             description={a.by === "statement" ? "Each line is its own group; a case matching two is their pair. A bare gene means any alteration in it."
               : "A case is Altered if any line matches. A bare gene means any alteration in it; add OQL to be specific."}
             onApply={(text) => set({ source: "alteration", oql: oqlStatements(text).join(", "), ...(a.by === "statement" ? { by: "statement" } : {}) })} />)}
       </>}
     </span>
-  );
-}
-
-/**
- * A gene name typed into a plot axis, debounced before it reaches the document/URL. Committing
- * on every keystroke (as the rest of this axis picker does for selects) meant an in-progress
- * edit — including the empty string between deleting the old gene and typing the new one —
- * briefly became the shareable link, which the compiler then rejects ("a molecular axis needs
- * one gene"). A short pause before committing keeps that mid-edit state local to the input.
- */
-export function GeneInput({ gene, busy, onCommit, className }: { gene: string; busy?: boolean; onCommit: (gene: string) => void; className?: string }) {
-  const [draft, setDraft] = useState(gene);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => setDraft(gene), [gene]);
-  const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(v); };
-  return (
-    <Input className={cn(FIELD, "w-22 px-1.5 uppercase", className)} value={draft} disabled={busy} placeholder="gene" aria-label="gene"
-      onChange={(e) => {
-        const v = e.target.value.toUpperCase();
-        setDraft(v);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => onCommit(v), 500);
-      }}
-      onBlur={() => commit(draft)} />
-  );
-}
-
-/**
- * An OQL query typed into an alteration axis ("KRAS: G12C; STK11: MUT"), committed after a pause,
- * on Enter or on leaving the box — like the gene inputs, so a half-typed query never becomes the
- * shareable link. The engine checks it and the view says what it refused.
- */
-export function OqlInput({ query, busy, onCommit, className }: { query: string; busy?: boolean; onCommit: (oql: string) => void; className?: string }) {
-  const [draft, setDraft] = useState(query);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => setDraft(query), [query]);
-  const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); if (v.trim() && v !== query) onCommit(v.trim()); };
-  return (
-    <Input className={cn(FIELD, "w-auto max-w-88 px-1.5", className)} value={draft} disabled={busy} placeholder="KRAS: G12C, STK11: MUT" spellCheck={false}
-      size={Math.max(16, Math.min(44, draft.length + 2))}
-      title={"OQL, one statement per line, ';' or ',' — e.g. KRAS: G12C, STK11: MUT, EGFR: AMP, TP53: DRIVER, ERBB2: EXP>2. " +
-        "Grouped by any line (Altered or not) or one group per line, as chosen beside it."}
-      onChange={(e) => {
-        const v = e.target.value;
-        setDraft(v);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => commit(v), 900);
-      }}
-      onKeyDown={(e) => { if (e.key === "Enter") commit(draft); }}
-      onBlur={() => commit(draft)} />
   );
 }
 
