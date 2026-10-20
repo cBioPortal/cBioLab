@@ -18,6 +18,7 @@
 
 import { DOC_VERSION } from "./doc-version.ts";
 import { POINTS_CAP } from "./plot-layers.ts";
+import { OQL_STATEMENT_CAP } from "./plot-oql.ts";
 import type { TemplateDoc } from "./types.ts";
 import type { CustomDataset } from "./custom-data-names.ts";
 import { LUAD_BIOPSY_SITE_DEMO } from "./custom-data-demo.ts";
@@ -463,9 +464,9 @@ export const EXAMPLES: DslExample[] = [
   },
   {
     title: "OQL on a plot axis: STK11 or KEAP1 mutant lung cancer",
-    demonstrates: "An alteration axis written as an OQL query — several genes, Altered when a case matches any of them — used as a box plot's groups and as a colour.",
+    demonstrates: "An alteration axis written as an OQL query — several genes, Altered when a case matches any of them, or one group per statement — used as a box plot's groups and as a colour.",
     tags: ["OQL"],
-    note: "Non-small cell lung cancer in MSK-CHORD (7,809 patients). The first view groups tumour mutational burden by the OQL query `STK11: MUT; KEAP1: MUT`: 1,535 patients are Altered (a mutation in either gene), the same count as a cohort defined by that OQL, and 6,274 are Unaltered. The second view groups by sample type and colours each violin by the same query, counting samples rather than patients.",
+    note: "Non-small cell lung cancer in MSK-CHORD (7,809 patients). The first view groups tumour mutational burden by the OQL query `STK11: MUT; KEAP1: MUT`: 1,535 patients are Altered (a mutation in either gene), the same count as a cohort defined by that OQL, and 6,274 are Unaltered. The second view groups by sample type and colours each violin by the same query, counting samples rather than patients. The third gives each statement of `STK11: MUT, KEAP1: MUT, KRAS: G12C` its own group, over samples: 620 KRAS G12C, 459 KEAP1, 377 STK11, 403 with both STK11 and KEAP1 (median TMB 8.6 against 4.1 for the 5,720 with none), the other pairs as their own groups and 109 matching all three. None of these lung samples is on a panel without the three genes, so no group is Not profiled.",
     doc: {
       study: "msk_chord_2024",
       cohorts: {
@@ -478,7 +479,10 @@ export const EXAMPLES: DslExample[] = [
         { kind: "plot", unit: "sample", cohorts: ["NSCLC"], allPoints: false, points: [],
           x: { source: "clinical", attribute: "SAMPLE_TYPE" },
           y: { source: "clinical", attribute: "TMB_NONSYNONYMOUS" },
-          colorBy: { source: "alteration", oql: "STK11: MUT; KEAP1: MUT" } }
+          colorBy: { source: "alteration", oql: "STK11: MUT; KEAP1: MUT" } },
+        { kind: "plot", unit: "sample", cohorts: ["NSCLC"],
+          x: { source: "alteration", oql: "STK11: MUT, KEAP1: MUT, KRAS: G12C", by: "statement" },
+          y: { source: "clinical", attribute: "TMB_NONSYNONYMOUS" } }
       ]
     }
   },
@@ -1658,13 +1662,19 @@ bin's width is shared out between the classes in it. That stays an aggregate, so
 may not disclose a case can still colour its plot. The key is capped at 12 classes.
 
 **OQL on an axis.** An alteration axis can be an OQL query instead of genes:
-\`{"source":"alteration","oql":"KRAS: G12C; STK11: MUT"}\`. Each case is **Altered** when it matches
-any entry — the portal's own reading of a multi-gene query — and **Unaltered** otherwise; every
-case of the cohort is one or the other, so the unaltered are counted rather than missing. It is
-the same OQL a cohort's \`oql\` leaf takes (mutation classes and protein changes, AMP/HOMDEL,
-FUSION, DRIVER against the pinned OncoKB version, EXP/PROT thresholds), and it matches per patient
-or per sample following the plot's \`unit\`. Because it is a categorical axis, it also works as
-\`colorBy\`/\`ringBy\` and as a Cox or logistic covariate, where "Unaltered" is the reference level.
+\`{"source":"alteration","oql":"KRAS: G12C, STK11: MUT"}\`, its statements separated by a comma, a
+semicolon or a new line (as in a cohort's \`oql\` leaf). Each case is **Altered** when it matches any
+statement — the portal's own reading of a multi-gene query — and **Unaltered** when it matches none
+and is profiled for every statement's gene in the alteration types that statement asks about; a
+case whose gene panel omits one of them is **Not profiled**, never counted as wild type (the
+panel-aware rule of \`docs/PERFORMANCE.md\`). Every case of the cohort is one of the three, so none is
+missing. With \`"by": "statement"\` each statement is its own group, named as written: a case matching
+two is the pair ("KRAS: G12C + STK11: MUT"), three or more "3 or more lines", none Unaltered or Not
+profiled by the same rule (at most ${OQL_STATEMENT_CAP} statements). It is the same OQL a cohort's \`oql\` leaf takes
+(mutation classes and protein changes, AMP/HOMDEL, FUSION, DRIVER against the pinned OncoKB version,
+EXP/PROT thresholds), and it matches per patient or per sample following the plot's \`unit\`.
+Because it is a categorical axis, it also works as \`colorBy\`/\`ringBy\` and as a Cox or logistic
+covariate, where "Unaltered" is the reference level.
 OQL is for alteration axes only: a molecular axis stays one gene's value.
 
 **Points.** Every case is a point when there are at most ${POINTS_CAP_TEXT} of them and every study may show
@@ -1905,7 +1915,8 @@ export const AGENT_GRAMMAR = `Document shape:
                //        | {"source":"molecular","profileType":P,"gene":G,"log":?}
                //        | {"source":"alteration","gene":G,"by":"mutated|mutationType|cna|driver"?}
                //        | {"source":"alteration","genes":[G,...(2-20)],"by":"mutated"?}  // any-of-N as one category; only "mutated"
-               //        | {"source":"alteration","oql":"KRAS: G12C; STK11: MUT"}  // Altered (matches any entry) vs Unaltered
+               //        | {"source":"alteration","oql":"KRAS: G12C, STK11: MUT","by":"any|statement"?}
+               //            // any: Altered / Unaltered / Not profiled; statement: one group per statement (max 6)
                // two numeric axes -> scatter (binned; every case a point up to ${POINTS_CAP_TEXT}, else sparse-cell outliers); one categorical -> box;
                // two categorical -> a contingency table
              {"kind":"attrition","cohorts":[names?(max 6)]},

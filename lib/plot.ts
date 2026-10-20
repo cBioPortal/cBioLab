@@ -17,7 +17,14 @@ import { DB } from "./ch.ts";
 import { STYLE } from "./oncoprint-style.ts";
 import { clinicalTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { parseOql, oqlCasesSql } from "./oql.ts";
-import { OQL_ALTERED, OQL_UNALTERED } from "./plot-oql.ts";
+import { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP } from "./plot-oql.ts";
+import { oqlStatements } from "./oql-parse.ts";
+import { profiledCasesSql } from "./cohort2.ts";
+
+/** the alteration types a statement must be profiled in before "not matched" can mean "not altered" */
+const OQL_PROFILED_TYPES: Partial<Record<string, ("MUTATION" | "CNA" | "SV")[]>> = {
+  MUT: ["MUTATION"], CNA: ["CNA"], SV: ["SV"], ANY: ["MUTATION", "CNA", "SV"]
+};
 
 /** what goes on one axis */
 export type PlotAxis =
@@ -32,19 +39,22 @@ export type PlotAxis =
   | { source: "alteration"; gene: string; by?: AlterationBy }
   | { source: "alteration"; genes: string[]; by?: "mutated" }
   /**
-   * An OQL query as one category: "Altered" when the case matches any entry, the portal's own
-   * reading of a multi-gene query, "Unaltered" otherwise. Per patient (any of its samples) or per
-   * sample, following the plot's unit.
+   * An OQL query, its statements separated by ";", a new line or ",". `by: "any"` (the default)
+   * is one category: "Altered" when the case matches any statement, the portal's own reading of a
+   * multi-gene query, "Unaltered" when it matches none and is profiled for every statement's gene,
+   * "Not profiled" otherwise. `by: "statement"` gives each statement its own group, a case
+   * matching two a group of the pair, three or more "3 or more lines", none "Unaltered" or "Not
+   * profiled" by the same rule. Per patient (any of its samples) or per sample, following the unit.
    */
-  | { source: "alteration"; oql: string }
+  | { source: "alteration"; oql: string; by?: "any" | "statement" }
   | { source: "none" };
 export type AlterationBy = "mutated" | "mutationType" | "cna";
 const AXIS_SOURCES: readonly string[] = ["clinical", "molecular", "alteration", "none"] satisfies PlotAxis["source"][];
 /** an alteration axis given as an OQL query, rather than as genes */
-function isOqlAxis(a: PlotAxis): a is { source: "alteration"; oql: string } {
+function isOqlAxis(a: PlotAxis): a is { source: "alteration"; oql: string; by?: "any" | "statement" } {
   return a.source === "alteration" && "oql" in a && a.oql != null;
 }
-export { OQL_ALTERED, OQL_UNALTERED };
+export { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP };
 
 /** every gene named on an alteration axis, singular or set, uppercased */
 function alterationGenes(a: { gene?: string; genes?: string[] }): string[] {
@@ -119,8 +129,8 @@ export function axisLabel(a: PlotAxis): string {
   if (a.source === "clinical") return a.log ? "log10(" + a.attribute + " + 1)" : a.attribute;
   if (a.source === "molecular") return a.log ? "log10(" + a.gene + " " + a.profileType + " + 1)" : a.gene + " " + a.profileType;
   if (isOqlAxis(a)) {
-    const q = a.oql.trim().replace(/\s*[;\n]\s*/g, "; ");
-    return (q.length > 48 ? q.slice(0, 47) + "…" : q) + " (OQL)";
+    const q = oqlStatements(a.oql).join("; ");
+    return (q.length > 48 ? q.slice(0, 47) + "…" : q) + (a.by === "statement" ? " (OQL, by line)" : " (OQL)");
   }
   if (a.source === "alteration") {
     const genes = alterationGenes(a);
@@ -158,10 +168,15 @@ export function validateAxis(a: PlotAxis, which: string): void {
       throw new Error(which + " axis: a molecular axis needs one gene. Plotting a whole profile would read every gene of every case; name the gene you mean.");
   }
   if (isOqlAxis(a)) {
-    if ("gene" in a || "genes" in a || "by" in a)
-      throw new Error(which + " axis: an OQL axis is the query alone; drop gene, genes and by");
+    if ("gene" in a || "genes" in a)
+      throw new Error(which + " axis: an OQL axis is the query alone; drop gene and genes");
+    if (a.by != null && a.by !== "any" && a.by !== "statement")
+      throw new Error(which + " axis: an OQL axis groups by \"any\" (Altered or not) or \"statement\" (one group per line); not " + JSON.stringify(a.by));
     try { parseOql(String(a.oql)); }
     catch (e) { throw new Error(which + " axis: " + (e as Error).message, { cause: e }); }
+    const n = oqlStatements(String(a.oql)).length;
+    if (a.by === "statement" && n > OQL_STATEMENT_CAP)
+      throw new Error(which + " axis: one group per line takes at most " + OQL_STATEMENT_CAP + " lines; this query has " + n);
     return;
   }
   if (a.source === "alteration") {
@@ -245,14 +260,30 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
   }
 
   if (isOqlAxis(a)) {
-    // every case in the cohort, so "unaltered" is counted rather than missing
-    const matched = oqlCasesSql(a.oql, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study, db, unit: ctx.unit });
+    // Every case in the cohort, so "unaltered" is counted rather than missing. Each statement is
+    // matched on its own, and a case it did not match is "Unaltered" only when it is profiled for
+    // that statement's gene in every alteration type the statement asks about (panel-aware, as a
+    // cohort split decides it); a sample whose panel omits the gene is never counted as wild type.
+    // each statement names its group as typed, its gene in capitals
+    const statements = oqlStatements(a.oql).map((st) => st.replace(/^[A-Za-z0-9.-]+/, (g) => g.toUpperCase()).replace(/\s+/g, " "));
     const idCol = strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study);
-    return "SELECT " + idCol + " AS id, if(" + idCol + " IN (SELECT pid FROM (" + matched + ")), " +
-      sq(OQL_ALTERED) + ", " + sq(OQL_UNALTERED) + ") AS v\n" +
-      "FROM " + db + ".sample_derived sd\n" +
-      "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + inCohort("sd.patient_unique_id") + "\n" +
-      "GROUP BY id";
+    const o = { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study, db, unit: ctx.unit };
+    // the case column is `oql_case`, not `id`: ClickHouse would otherwise resolve `id` to another axis's alias
+    const matched = statements.map((st) => "oql_case IN (SELECT pid FROM (" + oqlCasesSql(st, o) + "))");
+    const profiled = statements.map((st) => {
+      const types = [...new Set(parseOql(st)[0].specs.flatMap((sp) => OQL_PROFILED_TYPES[sp.type] || []))];
+      const gene = parseOql(st)[0].gene;
+      // expression and protein thresholds read a value, not a panel: a case with no value is not matched, and not "not profiled"
+      return types.length ? types.map((t) => "oql_case IN (SELECT profiled_id FROM (" + profiledCasesSql(gene, t, { study, db, unit: ctx.unit }) + "))").join(" AND ") : "1";
+    });
+    const none = "if(" + profiled.map((p) => "(" + p + ")").join(" AND ") + ", " + sq(OQL_UNALTERED) + ", " + sq(OQL_NOT_PROFILED) + ")";
+    const value = a.by === "statement"
+      ? "multiIf(length(hit) = 0, " + none + ", length(hit) = 1, hit[1], length(hit) = 2, concat(hit[1], ' + ', hit[2]), " + sq(OQL_SEVERAL) + ")"
+      : "if(length(hit) > 0, " + sq(OQL_ALTERED) + ", " + none + ")";
+    return "SELECT oql_case AS id, " + value + " AS v FROM (\n" +
+      "SELECT oql_case, arrayFilter((l, m) -> m, [" + statements.map(sq).join(", ") + "], [" + matched.join(", ") + "]) AS hit FROM (\n" +
+      "SELECT DISTINCT " + idCol + " AS oql_case FROM " + db + ".sample_derived sd\n" +
+      "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + inCohort("sd.patient_unique_id") + "))";
   }
   if (a.source === "alteration") {
     const genes = alterationGenes(a), by = a.by || "mutated";

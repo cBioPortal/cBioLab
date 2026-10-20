@@ -134,28 +134,33 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
         const isOql = a.oql != null;
         const genes: string[] = a.genes && a.genes.length ? a.genes : a.gene ? [a.gene] : [];
         const isSet = !isOql && genes.length > 1;
-        const groupBy = <OptionSelect className={w} value={isOql ? "oql" : a.by || (isSet ? "mutated" : "mutationType")} disabled={busy}
+        const groupBy = <OptionSelect className={w} value={isOql ? (a.by === "statement" ? "oqlEach" : "oql") : a.by || (isSet ? "mutated" : "mutationType")} disabled={busy}
             ariaLabel={side + " alteration grouping"}
-            title={isOql ? "Altered when a case matches any line of the query, Unaltered otherwise"
+            title={isOql ? (a.by === "statement" ? "a group for each line of the query; a case matching two is their pair, none Unaltered (or Not profiled)"
+              : "Altered when a case matches any line of the query; Unaltered when it matches none and is profiled for every gene, else Not profiled")
               : isSet ? "a gene set is \"mutated vs not\", or write it as an OQL query" : "how the gene's alterations are grouped"}
             onValueChange={(v) => {
               const by = v;
               // to OQL: the genes become a query (a bare gene is "any alteration"); from OQL: the
               // query's first gene, so a round trip keeps the gene
-              if (by === "oql") set({ source: "alteration", oql: genes.length ? genes.join("; ") : "TP53: MUT" });
+              if (by === "oql" || by === "oqlEach") {
+                const oql = isOql ? a.oql : genes.length ? genes.join("; ") : "TP53: MUT";
+                set(by === "oqlEach" ? { source: "alteration", oql, by: "statement" } : { source: "alteration", oql });
+              }
               else if (isOql) set({ source: "alteration", gene: (/^\s*([A-Za-z0-9.-]+)/.exec(a.oql) || [])[1]?.toUpperCase() || "TP53", by });
               else set({ ...a, by });
             }}>
             <option value="mutationType" disabled={isSet}>mutation type</option>
             <option value="mutated">mutated vs not</option>
             <option value="cna" disabled={isSet}>copy number</option>
-            <option value="oql">matches OQL</option>
+            <option value="oql">matches OQL (any line)</option>
+            <option value="oqlEach">OQL, one group per line</option>
           </OptionSelect>;
         // stacked, the grouping comes first: it decides whether the box below takes genes or a query
         return <>
           {stacked && field("Group cases by", groupBy)}
           {field(isOql ? "OQL query" : "Gene(s)", isOql
-            ? <OqlInput query={a.oql} busy={busy} className={stacked ? w : undefined} onCommit={(oql) => set({ source: "alteration", oql })} />
+            ? <OqlInput query={a.oql} busy={busy} className={stacked ? w : undefined} onCommit={(oql) => set({ ...a, source: "alteration", oql })} />
             : <GeneSetInput genes={genes} busy={busy} className={stacked ? w : undefined}
                 onCommit={(next) => {
                   // A gene SET (2+) only supports "mutated vs not" — combining several genes'
@@ -234,10 +239,10 @@ export function OqlInput({ query, busy, onCommit, className }: { query: string; 
   useEffect(() => setDraft(query), [query]);
   const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); if (v.trim() && v !== query) onCommit(v.trim()); };
   return (
-    <Input className={cn(FIELD, "w-auto max-w-88 px-1.5", className)} value={draft} disabled={busy} placeholder="KRAS: G12C; STK11: MUT" spellCheck={false}
+    <Input className={cn(FIELD, "w-auto max-w-88 px-1.5", className)} value={draft} disabled={busy} placeholder="KRAS: G12C, STK11: MUT" spellCheck={false}
       size={Math.max(16, Math.min(44, draft.length + 2))}
-      title={"OQL, one gene per line or ';' — e.g. KRAS: G12C; STK11: MUT; EGFR: AMP; TP53: DRIVER; ERBB2: EXP>2. " +
-        "A case is Altered when it matches any of them."}
+      title={"OQL, one statement per line, ';' or ',' — e.g. KRAS: G12C, STK11: MUT, EGFR: AMP, TP53: DRIVER, ERBB2: EXP>2. " +
+        "Grouped by any line (Altered or not) or one group per line, as chosen beside it."}
       onChange={(e) => {
         const v = e.target.value;
         setDraft(v);

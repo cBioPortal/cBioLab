@@ -93,9 +93,13 @@ One commit per item; `npm test` and a focused check per item; the gate before ea
    thousand points, paid again on every redraw (a resize, a re-run). `POINTS_CAP` is 10,000, which
    keeps a redraw near 200 ms on this machine (a laptop with a GPU is faster). Hover will go
    through one overlay (item 9), so per-circle hit-testing does not set the cap.
-7. **Multiple genes.** An alteration axis whose OQL has several statements gets one category per
-   statement (overlaps as their own category, never assigned arbitrarily), and commas separate
-   statements as well as `;` and newlines.
+7. **Done.** Multiple genes. An OQL axis's statements are separated by ",", ";" or a new line
+   (everywhere OQL is read). `by: "statement"` gives each statement its own group, a case matching
+   two the pair, three or more "3 or more lines". Either way a case matching nothing is
+   "Unaltered" only when it is profiled for every statement's gene (panel-aware), otherwise "Not
+   profiled". On msk_chord, KRAS G12C and RRAGC (on 20,048 of 25,040 samples' panels): 1,111 /
+   61 / 3 both / 19,115 Unaltered / 4,750 Not profiled, equal to a direct query; the 4,750 were
+   counted as Unaltered before.
 8. **Colour by gene per case** (phase 2). `colorBy: { source: "gene", gene }`: fill from the case's
    highest-priority mutation (oncoprint priority, driver/VUS by the pinned OncoKB), ring from
    CNA/SV, "not profiled" its own class (panel coverage, reuse the oncoprint's). On scatters too;

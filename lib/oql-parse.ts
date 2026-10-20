@@ -27,11 +27,18 @@ const REJECT: Record<string, string> = {
   SOMATIC: "SOMATIC modifier is not supported (all stored mutations are somatic/unknown)"
 };
 
+/** what separates one OQL statement from the next: a semicolon, a new line or a comma */
+export const OQL_SEPARATOR = /[;\n,]/;
+/** a query's statements as typed, trimmed, empty ones dropped */
+export function oqlStatements(q: string): string[] {
+  return q.split(OQL_SEPARATOR).map((s) => s.trim()).filter(Boolean);
+}
+
 // -> [{gene, specs: [{type:'MUT'|'CNA'|'SV'|'ANY', pchange?, cls?, cna?, driver}]}]
 export function parseOql(q: string): OqlEntry[] {
   if (typeof q !== "string" || !q.trim()) throw new Error("empty OQL");
   if (q.length > 1000) throw new Error("OQL too long");
-  const entries = q.split(/[;\n]/).map(s => s.trim()).filter(Boolean);
+  const entries = oqlStatements(q);
   // Each entry compiles to its own UNION-DISTINCT'd subquery (see below), so cost scales
   // roughly linearly rather than sitting at a wall near any particular number — 30 covers a
   // full pathway gene set (e.g. a 20-30 gene DDR panel) with room to spare, not a measured
