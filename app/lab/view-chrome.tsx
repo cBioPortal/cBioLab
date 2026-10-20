@@ -197,10 +197,16 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
         </OptionSelect>
       )}
       {current && use !== "assayNumber" && use !== "assayCategory" && <>
-        {field("Gene", <QueryField mode="genes" value={gene} shown={gene} placeholder="choose a gene" max={1} busy={busy}
+        {field("Gene", <QueryField mode="genes" value={gene} shown={gene} placeholder="choose a gene" busy={busy}
             className={stacked ? "w-full" : "w-28"} title="Gene for this axis"
-            description={"The gene whose " + current.name + " this axis reads. To compare several genes, choose OQL query under Data."}
-            onApply={(_t, c) => set({ ...(a.source === "profile" ? a : { source: "profile", profile: current.profile }), gene: c.genes[0] || "" })} />)}
+            // a mutation axis reads one gene; several become an OQL query with a group per gene
+            max={use === "mutation" ? OQL_STATEMENT_CAP : 1}
+            description={use === "mutation"
+              ? "The gene whose mutations this axis groups. Apply several to give each its own group: the axis becomes an OQL query, one group per gene."
+              : "The gene whose " + current.name + " this axis reads. To compare several genes, choose OQL query under Data."}
+            onApply={(_t, c) => c.genes.length > 1 && use === "mutation"
+              ? set({ source: "alteration", oql: c.genes.map((g) => g + ": MUT").join(", "), by: "statement" })
+              : set({ ...(a.source === "profile" ? a : { source: "profile", profile: current.profile }), gene: c.genes[0] || "" })} />)}
         {use === "mutation" && field("Plot mutations by",
           <OptionSelect className={w} value={a.by === "mutated" ? "mutated" : "mutationType"} disabled={busy} ariaLabel={side + " mutations by"}
             title="group the cases by their mutation's type, or by whether they have one"
