@@ -133,6 +133,16 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
               onView={(n) => edit(vi, n as unknown as View)} note={v.note} studies={v.studies} />
           : v && !v.error ? KindCardBody({ c: { ...mc, v } }) : null;
         const drawn = Array.isArray(spec.cohorts) ? (spec.cohorts as string[]) : Object.keys(doc.cohorts || {});
+        // the figure and what covers it while it waits; a plot holds it beside its axis sidebar
+        const figureArea = <>
+          {busy && !v && <div className="skeleton skeleton-view" />}
+          {busy && v && !(drawsOwnWaiting(v.kind) && !v.error) && <div className="view-updating"><span className="spinner" /> updating…</div>}
+          {!busy && st?.error && <p className="note">{st.error}</p>}
+          {v && v.error && <p className="note">{v.error}</p>}
+          {v && !v.error && (body
+            ? <>{body}{v.caveat && <p className="note vfoot">{v.caveat}</p>}</>
+            : <ViewFigure v={figureView(spec, v)} />)}
+        </>;
         return (
           <section key={key + vi} className={cn("card viewcard", busy && !v && "viewloading")} aria-busy={busy || undefined}>
             <ViewHead menuStore={menus.current} v={v && !v.error ? v : { kind: spec.kind }} title={titles[vi]}
@@ -140,14 +150,10 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
             {hasKindCard(spec.kind as string) && <KindCardControls c={mc} />}
             {spec.kind === "plot" && <PlotControls spec={spec} plot={v && !v.error ? v.plot : undefined} attrs={catalog.attrs} profiles={catalog.profiles}
               loading={catalog.loading} busy={busy} update={(fn) => edit(vi, fn(spec))}
-              highlightOptions={Object.keys(doc.cohorts || {}).filter((n) => n !== drawn[0]).map((n) => ({ name: n, label: n, depth: 0 }))} />}
-            {busy && !v && <div className="skeleton skeleton-view" />}
-            {busy && v && !(drawsOwnWaiting(v.kind) && !v.error) && <div className="view-updating"><span className="spinner" /> updating…</div>}
-            {!busy && st?.error && <p className="note">{st.error}</p>}
-            {v && v.error && <p className="note">{v.error}</p>}
-            {v && !v.error && (body
-              ? <>{body}{v.caveat && <p className="note vfoot">{v.caveat}</p>}</>
-              : <ViewFigure v={figureView(spec, v)} />)}
+              cohortOptions={Object.keys(doc.cohorts || {}).filter((n) => n !== drawn[0]).map((n) => ({ name: n, label: n, depth: 0 }))}>
+              {figureArea}
+            </PlotControls>}
+            {spec.kind !== "plot" && figureArea}
           </section>
         );
       })}

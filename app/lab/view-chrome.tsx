@@ -7,9 +7,8 @@ import { attributeLabel } from "../../lib/custom-data-names.ts";
 import type { AnalysisSource, ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
 import { SERIES, seriesStyle } from "../../lib/chart/style.ts";
-import { HIGHLIGHT_CAP, HIGHLIGHT_COLORS } from "../../lib/plot-highlight.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
-import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, Lock, LockOpen, Pencil, Plus, Save, Split, StickyNote, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, Lock, LockOpen, Pencil, Plus, Save, Split, StickyNote, Trash2 } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
@@ -73,7 +72,7 @@ export function Participation({ p }: { p?: ViewParticipation }) {
  * in a molecular profile, or a gene's alterations. It is the same vocabulary the engine uses,
  * so what the reader picks is what the document says.
  */
-export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChange, allowNone, categorical }: {
+export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChange, allowNone, categorical, stacked }: {
   side: string; axis: any; busy?: boolean;
   attrs: { attribute: string; kind: string }[]; profiles: string[];
   /** the attribute/profile catalog is still being fetched: its select waits with a loader */
@@ -83,14 +82,21 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
   allowNone?: boolean;
   /** colours come from categories, so a molecular value is not on offer */
   categorical?: boolean;
+  /** one labelled field per row at the box's full width (a plot's axis sidebar), not a toolbar run */
+  stacked?: boolean;
 }) {
   const a = axis || {};
   const src = axis ? (a.source || "clinical") : "none";
   const set = (next: any) => onChange(next);
+  const w = stacked ? "w-full max-w-none" : "max-w-44";
+  /** a control with its name above it when stacked; inline, the toolbar's side label names the run */
+  const field = (name: string, control: React.ReactNode) =>
+    stacked ? <div className="axfield flex flex-col gap-1"><span className="axfield-name text-sm font-semibold text-foreground">{name}</span>{control}</div> : control;
+  const srcName: Record<string, string> = { clinical: "Clinical attribute", molecular: "Molecular profile", alteration: "Genes" };
   return (
-    <span className="axispick">
-      <span className="tbl">{side}</span>
-      <OptionSelect className="max-w-44" value={src} disabled={busy} title="what this axis measures"
+    <span className={stacked ? "axispick-stack flex flex-col gap-2.5" : "axispick"}>
+      {!stacked && <span className="tbl">{side}</span>}
+      {field("Data type", <OptionSelect className={w} value={src} disabled={busy} title="what this axis measures" ariaLabel={side + " data type"}
         onValueChange={(v) => {
           const s = v;
           // Keep whatever this axis last held for each source (spreading `a` rather than
@@ -106,42 +112,30 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
         <option value="clinical">clinical</option>
         {!categorical && <option value="molecular">molecular</option>}
         <option value="alteration">alteration</option>
-      </OptionSelect>
-      {src === "clinical" && loading && !attrs.length && <Waiting what="attributes" />}
-      {src === "clinical" && !(loading && !attrs.length) && (
-        <OptionSelect className="max-w-44" value={a.attribute || ""} disabled={busy} title="which clinical attribute"
+      </OptionSelect>)}
+      {src === "clinical" && loading && !attrs.length && field(srcName.clinical, <Waiting what="attributes" />)}
+      {src === "clinical" && !(loading && !attrs.length) && field(srcName.clinical,
+        <OptionSelect className={w} value={a.attribute || ""} disabled={busy} title="which clinical attribute" ariaLabel={side + " clinical attribute"}
           onValueChange={(v) => set({ ...a, attribute: v })}>
           {!attrs.some((x) => x.attribute === a.attribute) && <option value={a.attribute || ""}>{a.attribute || "(none)"}</option>}
           {attrs.map((x) => <option key={x.attribute} value={x.attribute}>{attributeLabel(x.attribute)}{x.kind === "num" ? "" : " (categorical)"}</option>)}
         </OptionSelect>
       )}
       {src === "molecular" && <>
-        {loading && !profiles.length ? <Waiting what="profiles" /> :
-        <OptionSelect className="max-w-44" value={a.profileType || ""} disabled={busy} title="which molecular profile"
+        {field(srcName.molecular, loading && !profiles.length ? <Waiting what="profiles" /> :
+        <OptionSelect className={w} value={a.profileType || ""} disabled={busy} title="which molecular profile" ariaLabel={side + " molecular profile"}
           onValueChange={(v) => set({ ...a, profileType: v })}>
           {!profiles.includes(a.profileType || "") && <option value={a.profileType || ""}>{a.profileType || "(none)"}</option>}
           {profiles.map((pt) => <option key={pt} value={pt}>{pt}</option>)}
-        </OptionSelect>}
-        <GeneInput gene={a.gene || ""} busy={busy} onCommit={(gene) => set({ ...a, gene })} />
+        </OptionSelect>)}
+        {field("Gene", <GeneInput gene={a.gene || ""} busy={busy} className={stacked ? w : undefined} onCommit={(gene) => set({ ...a, gene })} />)}
       </>}
       {src === "alteration" && (() => {
         const isOql = a.oql != null;
         const genes: string[] = a.genes && a.genes.length ? a.genes : a.gene ? [a.gene] : [];
         const isSet = !isOql && genes.length > 1;
-        return <>
-          {isOql
-            ? <OqlInput query={a.oql} busy={busy} onCommit={(oql) => set({ source: "alteration", oql })} />
-            : <GeneSetInput genes={genes} busy={busy}
-                onCommit={(next) => {
-                  // A gene SET (2+) only supports "mutated vs not" — combining several genes'
-                  // mutation types or copy-number states into one category has no honest reading,
-                  // so switching to a set falls back to that rather than leaving an axis the
-                  // engine would refuse.
-                  const by = next.length > 1 && a.by && a.by !== "mutated" ? "mutated" : a.by;
-                  set(next.length > 1 ? { ...a, gene: undefined, genes: next, by }
-                    : { ...a, genes: undefined, gene: next[0] || "", by });
-                }} />}
-          <OptionSelect className="max-w-44" value={isOql ? "oql" : a.by || (isSet ? "mutated" : "mutationType")} disabled={busy}
+        const groupBy = <OptionSelect className={w} value={isOql ? "oql" : a.by || (isSet ? "mutated" : "mutationType")} disabled={busy}
+            ariaLabel={side + " alteration grouping"}
             title={isOql ? "Altered when a case matches any line of the query, Unaltered otherwise"
               : isSet ? "a gene set is \"mutated vs not\", or write it as an OQL query" : "how the gene's alterations are grouped"}
             onValueChange={(v) => {
@@ -156,44 +150,25 @@ export function AxisPicker({ side, axis, attrs, profiles, busy, loading, onChang
             <option value="mutated">mutated vs not</option>
             <option value="cna" disabled={isSet}>copy number</option>
             <option value="oql">matches OQL</option>
-          </OptionSelect>
+          </OptionSelect>;
+        // stacked, the grouping comes first: it decides whether the box below takes genes or a query
+        return <>
+          {stacked && field("Group cases by", groupBy)}
+          {field(isOql ? "OQL query" : "Gene(s)", isOql
+            ? <OqlInput query={a.oql} busy={busy} className={stacked ? w : undefined} onCommit={(oql) => set({ source: "alteration", oql })} />
+            : <GeneSetInput genes={genes} busy={busy} className={stacked ? w : undefined}
+                onCommit={(next) => {
+                  // A gene SET (2+) only supports "mutated vs not" — combining several genes'
+                  // mutation types or copy-number states into one category has no honest reading,
+                  // so switching to a set falls back to that rather than leaving an axis the
+                  // engine would refuse.
+                  const by = next.length > 1 && a.by && a.by !== "mutated" ? "mutated" : a.by;
+                  set(next.length > 1 ? { ...a, gene: undefined, genes: next, by }
+                    : { ...a, genes: undefined, gene: next[0] || "", by });
+                }} />)}
+          {!stacked && groupBy}
         </>;
       })()}
-    </span>
-  );
-}
-
-/**
- * A plot's highlight cohorts: one chip per cohort in the view's list, in its figure colour, and a
- * select offering the document's other cohorts until the cap is reached. Order is colour, so a
- * removed chip shifts the ones after it to the next colour, as the figure does.
- */
-export function HighlightPicker({ chosen, options, busy, onChange }: {
-  chosen: string[];
-  /** cohorts that may be highlighted: every cohort but the plotted one */
-  options: { name: string; label: string; depth: number }[];
-  busy?: boolean;
-  onChange: (next: string[]) => void;
-}) {
-  const left = options.filter((o) => !chosen.includes(o.name));
-  return (
-    <span className="hlpick">
-      <span className="tbl" title="other cohorts drawn over this one, each in its own colour">highlight</span>
-      {chosen.map((n, i) => (
-        <span key={n} className="hlchip" title={"“" + n + "” drawn over the plotted cohort"}>
-          <span className="hldot" style={{ background: HIGHLIGHT_COLORS[i] }} />
-          <span className="hlname">{n}</span>
-          <Button type="button" variant="ghost" size="icon-xs" className="size-4 text-muted-foreground [&_svg:not([class*='size-'])]:size-3" disabled={busy}
-            aria-label={"stop highlighting " + n} onClick={() => onChange(chosen.filter((x) => x !== n))}><X /></Button>
-        </span>
-      ))}
-      {chosen.length < HIGHLIGHT_CAP && left.length > 0 && (
-        <OptionSelect className="max-w-40" value="" disabled={busy} aria-label="add a cohort to highlight"
-          onValueChange={(v) => { if (v) onChange([...chosen, v]); }}>
-          <option value="">{chosen.length ? "+ another" : "+ cohort"}</option>
-          {left.map((o) => <option key={o.name} value={o.name}>{"\u00a0".repeat(o.depth * 2) + o.label}</option>)}
-        </OptionSelect>
-      )}
     </span>
   );
 }
@@ -205,13 +180,13 @@ export function HighlightPicker({ chosen, options, busy, onChange }: {
  * briefly became the shareable link, which the compiler then rejects ("a molecular axis needs
  * one gene"). A short pause before committing keeps that mid-edit state local to the input.
  */
-export function GeneInput({ gene, busy, onCommit }: { gene: string; busy?: boolean; onCommit: (gene: string) => void }) {
+export function GeneInput({ gene, busy, onCommit, className }: { gene: string; busy?: boolean; onCommit: (gene: string) => void; className?: string }) {
   const [draft, setDraft] = useState(gene);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => setDraft(gene), [gene]);
   const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(v); };
   return (
-    <Input className={cn(FIELD, "w-22 px-1.5 uppercase")} value={draft} disabled={busy} placeholder="gene"
+    <Input className={cn(FIELD, "w-22 px-1.5 uppercase", className)} value={draft} disabled={busy} placeholder="gene" aria-label="gene"
       onChange={(e) => {
         const v = e.target.value.toUpperCase();
         setDraft(v);
@@ -228,7 +203,7 @@ export function GeneInput({ gene, busy, onCommit }: { gene: string; busy?: boole
  * the same reason: committing every keystroke would briefly make an empty or half-typed gene
  * list the shareable link, which the compiler then rejects.
  */
-export function GeneSetInput({ genes, busy, onCommit }: { genes: string[]; busy?: boolean; onCommit: (genes: string[]) => void }) {
+export function GeneSetInput({ genes, busy, onCommit, className }: { genes: string[]; busy?: boolean; onCommit: (genes: string[]) => void; className?: string }) {
   const joined = genes.join(",");
   const [draft, setDraft] = useState(joined);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -236,7 +211,7 @@ export function GeneSetInput({ genes, busy, onCommit }: { genes: string[]; busy?
   const parse = (v: string) => v.split(",").map((g) => g.trim().toUpperCase()).filter(Boolean);
   const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); onCommit(parse(v)); };
   return (
-    <Input className={cn(FIELD, "w-auto max-w-56 min-w-22 px-1.5 uppercase")} value={draft} disabled={busy} placeholder="gene, or gene,gene,... for a set" size={Math.max(8, Math.min(30, draft.length + 2))}
+    <Input className={cn(FIELD, "w-auto max-w-56 min-w-22 px-1.5 uppercase", className)} value={draft} disabled={busy} placeholder="gene, or gene,gene,... for a set" size={Math.max(8, Math.min(30, draft.length + 2))}
       title={'one gene, or a comma-separated gene set ("is any of these altered")'}
       onChange={(e) => {
         const v = e.target.value.toUpperCase();
@@ -253,13 +228,13 @@ export function GeneSetInput({ genes, busy, onCommit }: { genes: string[]; busy?
  * on Enter or on leaving the box — like the gene inputs, so a half-typed query never becomes the
  * shareable link. The engine checks it and the view says what it refused.
  */
-export function OqlInput({ query, busy, onCommit }: { query: string; busy?: boolean; onCommit: (oql: string) => void }) {
+export function OqlInput({ query, busy, onCommit, className }: { query: string; busy?: boolean; onCommit: (oql: string) => void; className?: string }) {
   const [draft, setDraft] = useState(query);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => setDraft(query), [query]);
   const commit = (v: string) => { if (timer.current) clearTimeout(timer.current); if (v.trim() && v !== query) onCommit(v.trim()); };
   return (
-    <Input className={cn(FIELD, "w-auto max-w-88 px-1.5")} value={draft} disabled={busy} placeholder="KRAS: G12C; STK11: MUT" spellCheck={false}
+    <Input className={cn(FIELD, "w-auto max-w-88 px-1.5", className)} value={draft} disabled={busy} placeholder="KRAS: G12C; STK11: MUT" spellCheck={false}
       size={Math.max(16, Math.min(44, draft.length + 2))}
       title={"OQL, one gene per line or ';' — e.g. KRAS: G12C; STK11: MUT; EGFR: AMP; TP53: DRIVER; ERBB2: EXP>2. " +
         "A case is Altered when it matches any of them."}

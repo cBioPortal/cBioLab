@@ -47,7 +47,7 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
     const cohort: CohortDef = { ...(studies.length > 1 ? { studies } : {}), all: (draft ? draft.all : []) as CohortDef["all"] };
     const views: View[] = [];
     if (ep) views.push({ kind: "survival", endpoint: ep });
-    if (hasScatter) views.push({ kind: "plot", unit: "sample", x: { source: "clinical", attribute: X_ATTR, log: true }, y: { source: "clinical", attribute: Y_ATTR }, bins: [48, 32] });
+    if (hasScatter) views.push({ kind: "plot", unit: "sample", x: { source: "clinical", attribute: X_ATTR, log: true }, y: { source: "clinical", attribute: Y_ATTR }, bins: [48, 32], allPoints: false, points: [] });
     // a superseded request is cancelled, so the server stops its queries instead of finishing them
     const ac = new AbortController();
     api.analysis({ study: studies[0], cohorts: { Selected: cohort }, views }, { signal: ac.signal })

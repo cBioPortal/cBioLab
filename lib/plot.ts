@@ -50,6 +50,8 @@ export { OQL_ALTERED, OQL_UNALTERED };
 function alterationGenes(a: { gene?: string; genes?: string[] }): string[] {
   return (a.genes && a.genes.length ? a.genes : a.gene != null ? [a.gene] : []).map((g) => String(g).toUpperCase());
 }
+/** a patient-mode category for a patient whose samples carry different values */
+export const MULTIPLE = "Multiple";
 /** a gene-set alteration axis takes at most this many genes */
 export const ALTERATION_GENE_SET_CAP = 20;
 export type AxisKind = "num" | "cat" | "none";
@@ -59,15 +61,17 @@ export type PlotShape = "scatter" | "box" | "table" | "waterfall";
 export const CATEGORY_CAP = 150;
 /** the grid a scatter is binned onto: the payload is bounded by this, never by the cohort */
 export const DEFAULT_BINS: [number, number] = [240, 160];
-/**
- * How many points a box plot will draw over its boxes before it stops being a drawing. Above
- * this the same values come back as a violin: 290,000 jittered dots are a solid block, and the
- * density is both smaller to send and what the reader was looking for.
- */
-export const POINTS_CAP = 5000;
-export { HIGHLIGHT_CAP, HIGHLIGHT_COLORS, HIGHLIGHT_BASE } from "./plot-highlight.ts";
+export { POINTS_CAP, POINT_LAYER_CAP, LAYER_COLORS, LAYER_BASE, DEFAULT_POINT_LAYERS, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "./plot-layers.ts";
+import { POINTS_CAP, POINT_RULE_N_MAX } from "./plot-layers.ts";
 export { isAbsent, jitterFor } from "./plot-draw.ts";
 import { isAbsent } from "./plot-draw.ts";
+/**
+ * Over the points cap, a scatter cell holding at most this many cases is drawn as its cases
+ * rather than as a shade: the sparse fringe of the density, which is where the outliers are.
+ * The threshold actually used is the largest value up to this whose points fit under the cap
+ * (`sparseCellMax`).
+ */
+export const OUTLIER_CELL_MAX = 3;
 /** bins per group in a violin */
 export const VIOLIN_BINS = 40;
 /** distinct colours a legend can carry before it stops being a legend */
@@ -197,8 +201,10 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
   const inCohort = (col: string) => strip(col, study) + " IN (SELECT pid FROM cohort)";
 
   if (a.source === "clinical") {
-    // patient rows and sample rows both exist; in sample mode a patient's value repeats across
-    // that patient's samples, in patient mode a sample's value stands in for the patient.
+    // Patient rows and sample rows both exist, and a case's own kind of row wins. In sample mode a
+    // patient's value repeats across that patient's samples. In patient mode the patient's samples
+    // are combined: a number is their mean, a category is the samples' common value, or "Multiple"
+    // when they differ (combineNote says so in the caption).
     // Only the study knows whether the attribute is a number, so the caller says which.
     const val = kind === "num" ? logOf(a, "toFloat64OrNull(attribute_value)") : "attribute_value";
     const valCd = kind === "num" ? logOf(a, "toFloat64OrNull(cd.attribute_value)") : "cd.attribute_value";
@@ -218,7 +224,9 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
         "  FROM " + clinicalTable(db, [a.attribute]) + "\n" +
         "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(a.attribute) +
         " AND attribute_value != ''" + defined(val) + "\n    AND type = 'sample' AND " + inCohort("patient_unique_id");
-    return "SELECT id, argMax(v, pref) AS v FROM (\n" + own + "\n  UNION ALL\n" + other + "\n) GROUP BY id";
+    const combined = kind === "num" ? "avgIf(v, pref = 0)"
+      : "if(uniqExactIf(v, pref = 0) > 1, " + sq(MULTIPLE) + ", anyIf(v, pref = 0))";
+    return "SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), " + combined + ") AS v FROM (\n" + own + "\n  UNION ALL\n" + other + "\n) GROUP BY id";
   }
 
   if (a.source === "molecular") {
@@ -310,7 +318,22 @@ export function plotCoverageSql(xSel: string, ySel: string, ctx: AxisCtx): strin
     : "SELECT pid AS id FROM cohort";
   return "WITH cohort AS (" + ctx.cohortSql + "),\n     cases AS (" + universe + "),\n" +
     "     xs AS (" + xSel + "),\n     ys AS (" + ySel + ")\n" +
-    "SELECT count() AS total, countIf(id IN (SELECT id FROM xs)) AS nx, countIf(id IN (SELECT id FROM ys)) AS ny FROM cases";
+    "SELECT count() AS total, countIf(id IN (SELECT id FROM xs)) AS nx, countIf(id IN (SELECT id FROM ys)) AS ny" +
+    (ctx.unit === "sample" ? "" : ",\n  (SELECT count() FROM (SELECT patient_unique_id FROM " + db + ".sample_derived\n" +
+      "    WHERE cancer_study_identifier = " + sq(ctx.study) + " AND " + strip("patient_unique_id", ctx.study) + " IN (SELECT pid FROM cohort)\n" +
+      "    GROUP BY patient_unique_id HAVING count() > 1)) AS multi") +
+    " FROM cases";
+}
+
+/**
+ * In patient mode, how a patient's several samples became one point: said whenever the cohort has
+ * such patients, since every kind of axis combines them by its own rule. Empty in sample mode.
+ */
+export function combineNote(d: PlotData, unit: "patient" | "sample"): string {
+  const m = d.coverage?.multi;
+  if (unit !== "patient" || !m) return "";
+  return m.toLocaleString("en-US") + " patient" + (m === 1 ? " has" : "s have") + " more than one sample: a numeric value is the mean of " +
+    (m === 1 ? "its" : "their") + " samples', a category the samples' common value or \u201c" + MULTIPLE + "\u201d where they differ, and an alteration counts if any sample has it.";
 }
 
 /** The sentence a plot leads its caption with when the pair left cases out; empty when none were. */
@@ -358,21 +381,51 @@ export function plotMomentsSql(xSel: string, ySel: string, cohortSql: string): s
  */
 export function plotBinsSql(xSel: string, ySel: string, cohortSql: string, bins: [number, number] = DEFAULT_BINS,
   extent?: { x0: number; x1: number; y0: number; y1: number }): string {
-  const [bx, by] = [Math.max(2, Math.min(600, Math.round(bins[0]))), Math.max(2, Math.min(600, Math.round(bins[1])))];
+  const [bx, by] = clampGrid(bins);
   const eCte = extent
     ? ",    e AS (SELECT " + num(extent.x0) + " AS x0, " + num(extent.x1) + " AS x1, " +
         num(extent.y0) + " AS y0, " + num(extent.y1) + " AS y1)\n"
     : ",    e AS (SELECT min(x) x0, max(x) x1, min(y) y0, max(y) y1 FROM pair)\n";
   return pairCte(xSel, ySel, cohortSql) + eCte +
-    "SELECT least(" + (bx - 1) + ", toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * " + bx + "))) AS bx,\n" +
-    "       least(" + (by - 1) + ", toUInt32(floor((y - y0) / nullIf(y1 - y0, 0) * " + by + "))) AS by,\n" +
+    "SELECT " + binIndex("x", bx) + " AS bx,\n" +
+    "       " + binIndex("y", by) + " AS by,\n" +
     "       count() AS n\n" +
     "FROM pair, e GROUP BY bx, by";
 }
 
-/** a finite number as a SQL literal — extents cross this module's boundary as numbers, never strings */
+/** the grid a request asks for, held to what a figure can draw */
+function clampGrid(bins: [number, number]): [number, number] {
+  return [Math.max(2, Math.min(600, Math.round(bins[0]))), Math.max(2, Math.min(600, Math.round(bins[1])))];
+}
+
+/**
+ * Which of `n` cells a value falls in, against the extent CTE `e`. One expression for the
+ * density and for the sparse-cell points, so a point is never assigned a cell the density did
+ * not count it in.
+ */
+function binIndex(col: "x" | "y", n: number): string {
+  return "least(" + (n - 1) + ", toUInt32(floor((" + col + " - " + col + "0) / nullIf(" + col + "1 - " + col + "0, 0) * " + n + ")))";
+}
+
+/**
+ * The cell threshold for a scatter's outlier points: the largest k up to `max` such that every
+ * case in a cell of at most k cases fits under `cap` points. 0 when even the cells of one case
+ * hold more than `cap` — then no subset is drawn, and the caller says so rather than drawing
+ * some of them.
+ */
+export function sparseCellMax(bins: { n: number }[], cap: number, max = OUTLIER_CELL_MAX): number {
+  let k = 0;
+  for (let t = 1; t <= max; t++) {
+    const cases = bins.reduce((a, b) => b.n <= t ? a + b.n : a, 0);
+    if (cases > cap) break;
+    k = t;
+  }
+  return k;
+}
+
+/** a finite number as a SQL literal — extents and whiskers cross this module's boundary as numbers, never strings */
 function num(x: number): string {
-  if (!Number.isFinite(x)) throw new Error("plotBinsSql: extent must be finite numbers");
+  if (!Number.isFinite(x)) throw new Error("a plot's extent and whiskers must be finite numbers");
   return String(x);
 }
 
@@ -420,7 +473,7 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
  * site has no method that could call it — see docs/DATA-BOUNDARY.md.
  */
 export function plotPointsSql(numSel: string, catSel: string, cohortSql: string, cap = POINTS_CAP,
-  colorSel?: string, ringSel?: string): string {
+  colorSel?: string, ringSel?: string, outside?: Whiskers[]): string {
   return "WITH cohort AS (" + cohortSql + "),\n" +
     "     vs AS (" + numSel + "),\n" +
     "     gs AS (" + catSel + ")" +
@@ -430,7 +483,56 @@ export function plotPointsSql(numSel: string, catSel: string, cohortSql: string,
     "FROM vs INNER JOIN gs ON gs.id = vs.id" +
     (colorSel ? "\n  LEFT JOIN cs ON cs.id = vs.id" : "") +
     (ringSel ? "\n  LEFT JOIN rs ON rs.id = vs.id" : "") + "\n" +
+    (outside ? outsideWhiskers(outside) + "\n" : "") +
     "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
+}
+
+/**
+ * A ranked layer's points, WITH their case ids: the `n` highest and `n` lowest values of one axis
+ * (per group on a box), or on a scatter the `n` cases furthest from the fitted line. Returns ids,
+ * so like plotPointsSql it stays out of lib/federation.ts's aggregate builders and is reachable
+ * only from `PatientLevelResolver`. Bounded by `n`, so no cap is needed.
+ */
+export function plotRankedPointsSql(xSel: string, ySel: string, cohortSql: string, shape: "scatter" | "box",
+  numFirst: boolean, rank: PointRank): string {
+  const n = Math.max(1, Math.min(POINT_RULE_N_MAX, Math.round(rank.n)));
+  const head = pairIdCte(xSel, ySel, cohortSql);
+  if (shape === "box") {
+    // the numeric axis is the value, the categorical one the group, whichever the document put first
+    const cols = numFirst ? "id, y AS g, x AS v" : "id, x AS g, y AS v";
+    return head + "SELECT * FROM (\n" +
+      "  (SELECT " + cols + " FROM pair ORDER BY v DESC, id LIMIT " + n + " BY g)\n  UNION DISTINCT\n" +
+      "  (SELECT " + cols + " FROM pair ORDER BY v ASC, id LIMIT " + n + " BY g))";
+  }
+  if (rank.by === "residual")
+    return head + "SELECT id, x, y FROM pair ORDER BY abs(y - (" + num(rank.intercept) + " + " + num(rank.slope) + " * x)) DESC, id LIMIT " + n;
+  const col = rank.by;
+  return head + "SELECT * FROM (\n" +
+    "  (SELECT id, x, y FROM pair ORDER BY " + col + " DESC, id LIMIT " + n + ")\n  UNION DISTINCT\n" +
+    "  (SELECT id, x, y FROM pair ORDER BY " + col + " ASC, id LIMIT " + n + "))";
+}
+
+/** the pair of axes per case, keeping the case id: the start of every id-returning plot query */
+const pairIdCte = (x: string, y: string, cohortSql: string) =>
+  "WITH cohort AS (" + cohortSql + "),\n" +
+  "     xs AS (" + x + "),\n" +
+  "     ys AS (" + y + "),\n" +
+  "     pair AS (SELECT xs.id AS id, xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)\n";
+
+/** one group's whiskers, which is all a box's outlier query needs to know about it */
+export interface Whiskers { g: string; loWhisker: number; hiWhisker: number }
+
+/**
+ * WHERE a value lies beyond its own group's Tukey whiskers. The whiskers were computed by the
+ * box query and cross back in as literals, a group label quoted and a bound a finite number. A
+ * group not listed has no whiskers to be outside of, so none of its values match.
+ */
+function outsideWhiskers(ws: Whiskers[]): string {
+  if (!ws.length) return "WHERE 0";
+  const at = "indexOf([" + ws.map((w) => sq(w.g)).join(", ") + "], gs.v)";
+  const arr = (f: (w: Whiskers) => number) => "[" + ws.map((w) => num(f(w))).join(", ") + "]";
+  return "WHERE " + at + " > 0 AND (vs.v < arrayElement(" + arr((w) => w.loWhisker) + ", " + at + ")" +
+    " OR vs.v > arrayElement(" + arr((w) => w.hiWhisker) + ", " + at + "))";
 }
 
 /**
@@ -453,15 +555,30 @@ export function plotHighlightCountSql(cohortSql: string, highlightSql: string): 
  * Like plotPointsSql it returns identifiers, so it stays out of lib/federation.ts's aggregate
  * builders and is reachable only from `PatientLevelResolver`.
  */
-export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: string, cap = POINTS_CAP): string {
-  return "WITH cohort AS (" + cohortSql + "),\n" +
+export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: string, cap = POINTS_CAP,
+  sparse?: SparseCells): string {
+  const limit = "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
+  if (!sparse) return "WITH cohort AS (" + cohortSql + "),\n" +
     "     xs AS (" + xSel + "),\n" +
     "     ys AS (" + ySel + ")\n" +
     "SELECT xs.id AS id, xs.v AS x, ys.v AS y\n" +
-    "FROM xs INNER JOIN ys ON ys.id = xs.id\n" +
-    "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
+    "FROM xs INNER JOIN ys ON ys.id = xs.id\n" + limit;
+  // the cases of every cell holding at most `cellMax` of them, binned exactly as plotBinsSql
+  // bins the density over the same extent and grid
+  const [bx, by] = clampGrid(sparse.grid), e = sparse.extent;
+  if (!(sparse.cellMax >= 1)) throw new Error("plotScatterPointsSql: cellMax must be at least 1");
+  return "WITH cohort AS (" + cohortSql + "),\n" +
+    "     xs AS (" + xSel + "),\n" +
+    "     ys AS (" + ySel + "),\n" +
+    "     e AS (SELECT " + num(e.x0) + " AS x0, " + num(e.x1) + " AS x1, " + num(e.y0) + " AS y0, " + num(e.y1) + " AS y1),\n" +
+    "     c AS (SELECT xs.id AS id, xs.v AS x, ys.v AS y, " + binIndex("x", bx) + " AS bx, " + binIndex("y", by) + " AS by\n" +
+    "           FROM xs INNER JOIN ys ON ys.id = xs.id, e),\n" +
+    "     sparse AS (SELECT bx, by FROM c GROUP BY bx, by HAVING count() <= " + Math.round(sparse.cellMax) + ")\n" +
+    "SELECT id, x, y FROM c WHERE (bx, by) IN (SELECT bx, by FROM sparse)\n" + limit;
 }
 
+/** which cells of a scatter's density are drawn as their cases: the plot's own grid and extent, and the threshold */
+export interface SparseCells { grid: [number, number]; extent: { x0: number; x1: number; y0: number; y1: number }; cellMax: number }
 
 /** the contingency table, one row per occupied cell */
 export function plotTableSql(xSel: string, ySel: string, cohortSql: string): string {
@@ -531,6 +648,46 @@ function lgamma(z: number): number {
 /** what a plot asks for; the shape it draws as is decided from the axes, not requested */
 /** one drawn value, with its case id and whatever it is coloured by */
 export interface PlotPoint { id: string; g: string; v: number; c?: string; r?: string }
+/** one drawn scatter case, with its id */
+export interface PlotXYPoint { id: string; x: number; y: number }
+/**
+ * Whether the plotted cohort's own cases are drawn as points. `all`: every case, at or under the
+ * points cap. `none`: density alone, and `why` says why. Subsets drawn in colour over it are the
+ * view's point layers (`PlotLayer`).
+ */
+export interface PointSet {
+  rule: "all" | "none";
+  /** points drawn */
+  drawn: number;
+  why?: string;
+}
+
+/** how a ranked layer orders the cases: by one axis's value (per group on a box), or by distance from the fitted line */
+export type PointRank = { by: "x" | "y"; n: number } | { by: "residual"; n: number; slope: number; intercept: number };
+
+/** A point layer as drawn: what it holds, how many of its cases are on the figure, and as what. */
+export interface PlotLayer {
+  kind: "outliers" | "extremes" | "trend" | "cohort";
+  /** what the key calls it */
+  label: string;
+  color: string;
+  /** a cohort layer: the cohort, its patients, and how many of them are in the plotted cohort */
+  name?: string;
+  patients?: number;
+  inPlot?: number;
+  /** the layer's cases with a value on both axes, in the plot's unit */
+  n: number;
+  /** points drawn, once cases an earlier layer already drew are left to it */
+  drawn?: number;
+  shown: "points" | "density" | "boxes" | "none";
+  /** why it is not drawn as points, when it is not */
+  why?: string;
+  points?: HighlightPoint[];
+  bins?: { bx: number; by: number; n: number }[];
+  groups?: PlotGroup[];
+  /** a scatter's outliers: the cells holding at most this many cases, left unshaded under their points */
+  cellMax?: number;
+}
 
 export interface PlotRequest {
   x: PlotAxis; y: PlotAxis; unit?: "patient" | "sample"; bins?: [number, number];
@@ -539,26 +696,6 @@ export interface PlotRequest {
 }
 /** one highlighted case: a scatter's (x, y), or a box's group and value */
 export type HighlightPoint = { id: string; x: number; y: number } | { id: string; g: string; v: number };
-/**
- * A cohort drawn over the plotted one. Its cases are the plotted cohort's cases that are also in
- * it; each is a point when an entitled participant can name them and there are few enough,
- * otherwise the same cases as an aggregate (cells on the scatter's grid, or a box per group).
- */
-export interface PlotHighlight {
-  name: string;
-  color: string;
-  /** patients in the highlight cohort, and how many of them are in the plotted cohort */
-  patients: number;
-  inPlot: number;
-  /** cases drawn (in the plot's unit): those with a value on both axes */
-  n: number;
-  shown: "points" | "density" | "boxes" | "none";
-  /** why it is not drawn as points, when it is not */
-  why?: string;
-  points?: HighlightPoint[];
-  bins?: { bx: number; by: number; n: number }[];
-  groups?: PlotGroup[];
-}
 export interface PlotGroup { g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number; loWhisker: number; hiWhisker: number }
 export interface PlotData {
   shape: "scatter" | "box" | "table";
@@ -572,8 +709,12 @@ export interface PlotData {
   stats?: { pearson: number | null; spearman: number | null; slope: number | null; intercept: number | null;
             pPearson: number | null; pSpearman: number | null };
   groups?: PlotGroup[];
-  /** the values behind the boxes: points when few enough and the reader may see cases, else a density */
+  /** the values behind the boxes: every one, when few enough and the reader may see cases */
   points?: PlotPoint[];
+  /** a scatter's cases drawn as points: every one, when few enough and the reader may see cases */
+  xyPoints?: PlotXYPoint[];
+  /** whether the plotted cohort's own cases are points, how many, and why not when they are not */
+  pointSet?: PointSet;
   violin?: { g: string; b: number; n: number; c?: string }[];
   /** what the colours mean: the fill category, the ring category, and the key to draw */
   colorLabel?: string;
@@ -586,8 +727,8 @@ export interface PlotData {
   overlay?: "points" | "violin" | "none";
   cells?: { cx: string; cy: string; n: number }[];
   note?: string;
-  /** cases in the cohort, and how many carry each axis — what the inner join left out, and why */
-  coverage?: { total: number; nx: number; ny: number };
-  /** cohorts drawn over this one, in the view's order */
-  highlights?: PlotHighlight[];
+  /** cases in the cohort, how many have each axis, and (patient mode) how many patients have several samples */
+  coverage?: { total: number; nx: number; ny: number; multi?: number };
+  /** the point layers drawn over the plot, in the view's order (the first holds a case two share) */
+  layers?: PlotLayer[];
 }

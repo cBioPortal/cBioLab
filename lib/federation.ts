@@ -27,12 +27,13 @@ import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql } f
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
-  highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql,
-  type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape } from "./plot.ts";
+  highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql,
+  type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape,
+  type PlotXYPoint, type SparseCells, type Whiskers, type PointRank } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
 export * from "./federation-views.ts";
 export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
-export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotHighlight, HighlightPoint } from "./plot.ts";
+export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotLayer, HighlightPoint } from "./plot.ts";
 import { impactSql } from "./lollipop.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
@@ -47,6 +48,9 @@ export function legendFor(values: string[], ring = false): { label: string; colo
 }
 
 const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
+/** a plot's coverage row: the cohort's cases, each axis's, and (patient mode) the patients with several samples */
+const coverageOf = (row: Record<string, unknown>): NonNullable<PlotData["coverage"]> =>
+  ({ total: Number(row.total || 0), nx: Number(row.nx || 0), ny: Number(row.ny || 0), ...(row.multi != null ? { multi: Number(row.multi) } : {}) });
 import type { CohortDef, CompileCtx, ChRow, ChResult, PatientTimeline } from "./types.ts";
 import type { StudyAccess } from "./view-coverage.ts";
 import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } from "./patient-timeline.ts";
@@ -1272,9 +1276,13 @@ export interface QueryLogEntry { label: string; sql: string; ms?: number; remote
 
 /** Additionally available when the instance permits patient-level access. */
 export interface PatientLevelCapable extends AggregateCapable {
-  /** the values behind a box plot, with their case ids — the entitlement, in one method */
-  plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number): Promise<PlotPoint[]>;
-  /** a highlight cohort's points over the plot, with their case ids; null past the cap */
+  /** the values behind a box plot (every one, or those beyond `outside`'s whiskers), with their case ids; null past the cap */
+  plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number, outside?: Whiskers[]): Promise<PlotPoint[] | null>;
+  /** a scatter's cases (every one, or those in `sparse` cells), with their case ids; null past the cap */
+  plotScatterPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number, sparse?: SparseCells): Promise<PlotXYPoint[] | null>;
+  /** a ranked layer's points (the extremes on an axis, or the cases furthest from the fit), with their case ids */
+  plotRankedPoints(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind, rank: PointRank): Promise<HighlightPoint[]>;
+  /** a cohort layer's points over the plot, with their case ids; null past the cap */
   plotHighlightPoints(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     cap?: number): Promise<HighlightPoint[] | null>;
   readonly instance: Instance & { mode: "patient-level" };
@@ -1389,7 +1397,7 @@ export interface FederatedPlotCapable {
   plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]>;
   plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
-    Promise<{ total: number; nx: number; ny: number }>;
+    Promise<NonNullable<PlotData["coverage"]>>;
   /** a highlight's patients that are in the plotted cohort, here — a count */
   plotHighlightCount(def: CohortDef | null | undefined, highlight: CohortDef): Promise<number>;
   /** a highlight's cases as cells on the plotted scatter's own grid and extent */
@@ -1691,7 +1699,7 @@ abstract class BaseResolver implements AggregateCapable {
     const label = { x: { label: axisLabel(spec.x), kind: xk, ...logOf(spec.x) }, y: { label: axisLabel(spec.y), kind: yk, ...logOf(spec.y) } };
     // alongside the plot's own queries, never failing it: a missing coverage just means no note
     const coverage = this.runLogged<ChRow>("plot:coverage", plotCoverageSql(xSel, ySel, ctx), conn)
-      .then((r) => ({ total: Number(r.data[0]?.total || 0), nx: Number(r.data[0]?.nx || 0), ny: Number(r.data[0]?.ny || 0) }))
+      .then((r) => coverageOf(r.data[0] || {}))
       .catch(() => undefined);
     const done = async (d: PlotData): Promise<PlotData> => { const c = await coverage; return c ? { ...d, coverage: c } : d; };
 
@@ -1788,12 +1796,11 @@ abstract class BaseResolver implements AggregateCapable {
 
   /** This site's cases, and how many carry each axis — summed across sites by lib/views/plot.ts. */
   async plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
-    Promise<{ total: number; nx: number; ny: number }> {
+    Promise<NonNullable<PlotData["coverage"]>> {
     const ctx = this.plotCtx(def, spec);
     const r = await this.runLogged<ChRow>("plot:coverage",
       plotCoverageSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx), this.instance.conn);
-    const row = r.data[0] || {};
-    return { total: Number(row.total || 0), nx: Number(row.nx || 0), ny: Number(row.ny || 0) };
+    return coverageOf(r.data[0] || {});
   }
 
   /** Pass 1 of a federated numeric pair: this site's count and extent (plotBinsSql's `extent` arg). */
@@ -1938,15 +1945,16 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     this.instance = { ...instance, mode: "patient-level" };
   }
   /**
-   * The points behind a box plot, with their case ids, so a reader can find one on the figure.
+   * The points behind a box plot, with their case ids, so a reader can find one on the figure:
+   * every value, or with `outside` only the values beyond their group's whiskers (the outliers
+   * drawn over a violin once the cohort is past the cap).
    *
    * It lives here and nowhere else. `AggregateResolver` has no such method, and neither does a
    * remote peer, so a participant that may not disclose a case cannot be asked for one — the
    * same guarantee as `members()`, and for the same reason. The cap is what stops a quarter of
-   * a million dots being called a drawing; above it the caller falls back to the density every
-   * participant can compute.
+   * a million dots being called a drawing: past it this returns null, never the first `cap`.
    */
-  async plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP): Promise<PlotPoint[]> {
+  async plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP, outside?: Whiskers[]): Promise<PlotPoint[] | null> {
     const db = this.instance.conn.db, conn = this.instance.conn;
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
     const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
@@ -1958,16 +1966,50 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const catSel = axisSelect(numFirst ? spec.y : spec.x, ctx, "cat");
     const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
     const ringSel = spec.ringBy ? axisSelect(spec.ringBy, ctx, "cat") : undefined;
-    const r = await this.runLogged<ChRow>("plot:points",
-      plotPointsSql(numSel, catSel, ctx.cohortSql, cap, colorSel, ringSel), conn);
-    // one over the cap means there were more than a drawing can hold: the caller draws density
-    if (r.data.length > cap) return [];
+    const r = await this.runLogged<ChRow>(outside ? "plot:outliers" : "plot:points",
+      plotPointsSql(numSel, catSel, ctx.cohortSql, cap, colorSel, ringSel, outside), conn);
+    if (r.data.length > cap) return null;
     return r.data.map((x) => ({ id: String(x.id), g: String(x.g), v: Number(x.v),
       ...(colorSel ? { c: String(x.c ?? "") } : {}), ...(ringSel ? { r: String(x.r ?? "") } : {}) }));
   }
 
   /**
-   * A highlight's points: the plotted cohort's cases that are also in `highlight`, each with its
+   * A scatter's cases with their ids: every one, or with `sparse` only those in the density's
+   * sparse cells (binned against the plot's own grid and extent, so they are exactly the cells
+   * the figure leaves undrawn). Case-level, so here and nowhere else, for the reason plotPoints
+   * is; null past the cap.
+   */
+  async plotScatterPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP, sparse?: SparseCells): Promise<PlotXYPoint[] | null> {
+    const db = this.instance.conn.db, conn = this.instance.conn;
+    const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
+    const kinds = await this.clinicalKinds([spec.x, spec.y]);
+    const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
+    if (plotShape(xk, yk) !== "scatter") return [];
+    const r = await this.runLogged<ChRow>(sparse ? "plot:outliers" : "plot:points",
+      plotScatterPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, cap, sparse), conn);
+    if (r.data.length > cap) return null;
+    return r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y) }));
+  }
+
+  /**
+   * A ranked layer's points with their case ids: the highest and lowest values of one axis (per
+   * group on a box), or on a scatter the cases furthest from the fitted line. Case-level, so here
+   * and nowhere else, for the reason plotPoints is; bounded by the rank's `n`.
+   */
+  async plotRankedPoints(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind, rank: PointRank): Promise<HighlightPoint[]> {
+    const ctx = this.plotCtx(def, spec);
+    const shape = plotShape(xk, yk);
+    if (shape !== "scatter" && shape !== "box") return [];
+    const r = await this.runLogged<ChRow>("plot:layer:" + rank.by,
+      plotRankedPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, shape, xk === "num", rank), this.instance.conn);
+    return shape === "scatter"
+      ? r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y) }))
+      : r.data.map((p) => ({ id: String(p.id), g: String(p.g), v: Number(p.v) }));
+  }
+
+  /**
+   * A cohort layer's points: the plotted cohort's cases that are also in `highlight`, each with its
    * case id — (x, y) on a scatter, (group, value) on a box. Case-level, so here and nowhere else,
    * for the reason plotPoints is. null when there are more than `cap`: the caller draws the same
    * cases as an aggregate rather than the first `cap` of them.

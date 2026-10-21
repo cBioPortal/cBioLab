@@ -29,7 +29,7 @@ import {
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
-import { axisSelect, highlightCohortSql, plotPointsSql, plotScatterPointsSql } from "../lib/plot.ts";
+import { axisSelect, highlightCohortSql, plotPointsSql, plotScatterPointsSql, plotRankedPointsSql } from "../lib/plot.ts";
 import { clinicalRowSource } from "../lib/clinical-table.ts";
 import { mutationRowSource } from "../lib/mutation-table.ts";
 import { alterationPatientRowSource, alterationSource, patientSamplesSource } from "../lib/patient-alterations.ts";
@@ -221,6 +221,21 @@ describe("remote peers: nothing identifying leaves before the network is touched
       "AggregateResolver must not be able to return the points behind a box");
     assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>).plotPoints, "function",
       "the entitled participant is the one that answers with points");
+    // a scatter's own points (every case, or its sparse-cell outliers) are the same entitlement
+    for (const R of [AggregateResolver, RemoteAggregateResolver])
+      assert.equal(typeof (R.prototype as unknown as Record<string, unknown>).plotScatterPoints, "undefined",
+        R.name + " must not be able to return a scatter's points");
+    assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>).plotScatterPoints, "function");
+    assert.match(plotScatterPointsSql("SELECT 1 AS id, 1 AS v", "SELECT 1 AS id, 2 AS v", "SELECT '' AS pid", 10,
+      { grid: [4, 4], extent: { x0: 0, x1: 1, y0: 0, y1: 1 }, cellMax: 2 }), /xs\.id AS id/);
+    // a ranked layer (extremes, or furthest from the fit) names its cases: the same entitlement
+    for (const R of [AggregateResolver, RemoteAggregateResolver])
+      assert.equal(typeof (R.prototype as unknown as Record<string, unknown>).plotRankedPoints, "undefined",
+        R.name + " must not be able to return a ranked layer's points");
+    assert.equal(typeof (PatientLevelResolver.prototype as unknown as Record<string, unknown>).plotRankedPoints, "function");
+    assert.equal("plotRankedPointsSql" in (federation as Record<string, unknown>), false,
+      "plotRankedPointsSql returns case ids and must not sit among the aggregate builders");
+    assert.match(plotRankedPointsSql("SELECT 1 AS id, 1 AS v", "SELECT 1 AS id, 2 AS v", "SELECT '' AS pid", "scatter", true, { by: "y", n: 5 }), /xs\.id AS id/);
   });
 
   test("a highlight's points are the entitlement too; its aggregates are anyone's", () => {
@@ -562,7 +577,7 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     try { await fn(); } finally { for (const [k, v] of Object.entries(saved)) { if (v == null) delete process.env[k]; else process.env[k] = v; } }
   };
   const PEERS = "s1=http://peer.invalid/api/mcp,s2=http://peer.invalid/api/mcp";
-  const PATIENT_METHODS = ["members", "rowsPage", "rowsCounts", "rowsValues", "rowsRank", "plotPoints", "plotHighlightPoints", "coxRows", "logisticRows", "viewRows", "viewAggregate"];
+  const PATIENT_METHODS = ["members", "rowsPage", "rowsCounts", "rowsValues", "rowsRank", "plotPoints", "plotScatterPoints", "plotRankedPoints", "plotHighlightPoints", "coxRows", "logisticRows", "viewRows", "viewAggregate"];
 
   test("the rules: a study (or *) and the kinds allowed for it; a bare study is the timeline alone; an unknown kind is refused", () => {
     const r = parseRules("s1:timeline+alterations, s2 *:alterations", "X");

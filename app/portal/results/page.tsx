@@ -58,7 +58,7 @@ function resultsLayout(study: string, entries: string[], genes: string[], known:
     { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes, cohorts: both })] },
     { title: "Cancer Types Summary", views: [v("Cancer types summary", { kind: "cancertypes", genes, cohorts: ["Altered"] })] },
     ...(genes.length >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, cohorts: both })] }] : []),
-    ...(expr ? [{ title: "Plots", views: [v("Plot", { kind: "plot", x: { source: "alteration", gene: genes[0], by: "cna" }, y: { source: "molecular", profileType: expr, gene: genes[0] }, cohorts: ["All patients"], highlight: ["Altered"] })] }] : []),
+    ...(expr ? [{ title: "Plots", views: [v("Plot", { kind: "plot", x: { source: "alteration", gene: genes[0], by: "cna" }, y: { source: "molecular", profileType: expr, gene: genes[0] }, cohorts: ["All patients"], points: [{ cohort: "Altered" }] })] }] : []),
     // the portal's Mutations tab: one gene at a time, its lollipop over its mutation table
     { title: "Mutations", views: [v("Mutation diagram", { kind: "hotspots", genes: [genes[0]], cohorts: ["Altered"] }),
         v("Mutation table", { kind: "mutations", gene: genes[0], cohorts: ["Altered"] })],

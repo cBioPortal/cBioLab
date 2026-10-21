@@ -653,15 +653,16 @@ function PlotCard({ ctx, v, vi }: CardProps) {
   const { attrsLoading, busy, catalogAttrs, cohortChoice, docView, menuOpenRef, profileOptions, updateView } = ctx;
   // every cohort the document evaluates, but the plotted one and a split (which stands for several groups, not one set of cases)
   const ch = cohortChoice(vi, docView(vi), 1);
-  const highlightOptions = ch.nodes.filter((nd) => nd.kind !== "split" && nd.name !== ch.drawn[0])
+  const cohortOptions = ch.nodes.filter((nd) => nd.kind !== "split" && nd.name !== ch.drawn[0])
     .map((nd) => ({ name: nd.name, label: nd.label, depth: nd.depth }));
   return <>
     {v.kind === "plot" && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={ch} {...placement(ctx, vi)}
-        sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "patient")}s</> : "two axes over the same cases"} />
+        sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "sample")}s</> : "two axes over the same cases"} />
       <PlotControls spec={docView(vi)} plot={v.plot} attrs={catalogAttrs()} profiles={profileOptions()} loading={attrsLoading()} busy={busy}
-        highlightOptions={highlightOptions} update={(fn) => updateView(vi, fn)} />
-      <ViewFigure v={v} empty={v.plot?.note || "nothing to draw"} />
+        cohortOptions={cohortOptions} update={(fn) => updateView(vi, fn)}>
+        <ViewFigure v={v} empty={v.plot?.note || "nothing to draw"} />
+      </PlotControls>
     </>}
   </>;
 }

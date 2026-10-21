@@ -4,9 +4,10 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle, esc } from "../lib/view-svg.ts";
+import { PLOT_POINT_R } from "../lib/figures/plot.ts";
 import { buildLollipopGene } from "../lib/lollipop.ts";
 import type { ViewResult } from "../lib/types.ts";
-import { HIGHLIGHT_BASE, HIGHLIGHT_COLORS } from "../lib/plot-highlight.ts";
+import { LAYER_BASE, LAYER_COLORS } from "../lib/plot-layers.ts";
 
 const survival = (cohort: string): ViewResult => ({
   kind: "survival", cohorts: [cohort],
@@ -348,36 +349,38 @@ describe("sequence Sankey keeps everyone accounted for", () => {
 // grows (and the app's container scrolls), and past the colour key the rest is one disclosed
 // "other". Each is pinned here by counting what the SVG actually draws, so a fixed cap on
 // groups, categories or caption lines fails a test rather than hiding cases.
-describe("plot highlights: other cohorts drawn over the plotted one", () => {
-  const scatter = (highlights: any[]): ViewResult => ({ kind: "plot", note: "n", plot: {
+describe("plot point layers: subsets drawn over the plotted cohort", () => {
+  const scatter = (layers: any[]): ViewResult => ({ kind: "plot", note: "n", plot: {
     shape: "scatter", n: 100, x: { label: "AGE", kind: "num" }, y: { label: "TMB", kind: "num" },
     extent: { x0: 0, x1: 100, y0: 0, y1: 50 }, grid: [10, 10], bins: [{ bx: 1, by: 1, n: 100 }],
-    stats: { pearson: 0.1, spearman: null, slope: 0.1, intercept: 1, pPearson: 0.5, pSpearman: null }, highlights } as any });
-  const hl = (o: any) => ({ name: "R", color: HIGHLIGHT_COLORS[0], patients: 2, inPlot: 2, n: 2, shown: "points", ...o });
+    stats: { pearson: 0.1, spearman: null, slope: 0.1, intercept: 1, pPearson: 0.5, pSpearman: null }, layers } as any });
+  const hl = (o: any) => ({ kind: "cohort", name: "R", label: o.name || "R", color: LAYER_COLORS[0], patients: 2, inPlot: 2, n: 2, shown: "points", ...o });
 
-  test("the plotted cohort turns grey and each highlight's points draw in its colour, with a key", () => {
+  test("the plotted cohort turns grey and each layer's points draw in its colour, with a key", () => {
     const svg = viewToSvg(scatter([hl({ points: [{ id: "a", x: 10, y: 5 }, { id: "b", x: 90, y: 45 }] })]))!;
-    assert.match(svg, new RegExp('<rect [^>]*fill="' + HIGHLIGHT_BASE + '"'), "the base density is grey");
-    assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + HIGHLIGHT_COLORS[0] + '" fill-opacity', "g")) || []).length, 2);
-    assert.match(svg, />R \(2\)</, "the key names the highlight and how many it drew");
-    assert.doesNotMatch(svg, /stroke="#D55E00" stroke-width="1.5" stroke-dasharray/, "the fitted line leaves the first highlight colour to the highlight");
+    assert.match(svg, new RegExp('<rect [^>]*fill="' + LAYER_BASE + '"'), "the base density is grey");
+    assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + LAYER_COLORS[0] + '" fill-opacity', "g")) || []).length, 2);
+    assert.match(svg, />R \(2\)</, "the key names the layer and how many cases it holds");
+    assert.match(svg, />point layers</);
+    assert.doesNotMatch(svg, /stroke="#D55E00" stroke-width="1.5" stroke-dasharray/, "the fitted line leaves the first layer colour to the layer");
   });
 
-  test("without highlights the figure is as it was", () => {
+  test("without layers the figure is as it was", () => {
     const svg = viewToSvg(scatter([]))!;
-    assert.doesNotMatch(svg, new RegExp(HIGHLIGHT_BASE));
-    assert.doesNotMatch(svg, />highlighted</);
+    assert.doesNotMatch(svg, new RegExp(LAYER_BASE));
+    assert.doesNotMatch(svg, />point layers</);
   });
 
-  test("a highlight too large for points is cells on the same grid, in its colour", () => {
+  test("a cohort layer too large for points is cells on the same grid, in its colour", () => {
     const svg = viewToSvg(scatter([hl({ shown: "density", n: 9000, bins: [{ bx: 3, by: 4, n: 9000 }] })]))!;
-    assert.match(svg, new RegExp('<rect [^>]*fill="' + HIGHLIGHT_COLORS[0] + '"'));
-    assert.doesNotMatch(svg, new RegExp('<circle [^>]*fill="' + HIGHLIGHT_COLORS[0] + '" fill-opacity'));
+    assert.match(svg, new RegExp('<rect [^>]*fill="' + LAYER_COLORS[0] + '"'));
+    assert.doesNotMatch(svg, new RegExp('<circle [^>]*fill="' + LAYER_COLORS[0] + '" fill-opacity'));
   });
 
-  test("a highlight drawn as nothing gets no key entry", () => {
+  test("a layer drawn as nothing gets no key entry, and leaves the plotted cohort its colour", () => {
     const svg = viewToSvg(scatter([hl({ shown: "none", n: 0 })]))!;
-    assert.doesNotMatch(svg, />highlighted</);
+    assert.doesNotMatch(svg, />point layers</);
+    assert.doesNotMatch(svg, new RegExp(LAYER_BASE));
   });
 
   test("a cohort's name is escaped wherever the figure prints it", () => {
@@ -386,19 +389,86 @@ describe("plot highlights: other cohorts drawn over the plotted one", () => {
     assert.match(svg, /&lt;b&gt;&amp;evil/);
   });
 
-  test("on a box, a highlight's box sits in its group, and a value past the whiskers is pinned and counted", () => {
+  test("on a box, a cohort layer's box sits in its group, and a value past the axis is pinned and counted", () => {
     const v: ViewResult = { kind: "plot", plot: {
       shape: "box", n: 10, x: { label: "CANCER_TYPE", kind: "cat" }, y: { label: "TMB", kind: "num" },
       groups: [{ g: "A", n: 10, lo: 0, hi: 100, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 }], overlay: "none",
-      highlights: [
+      layers: [
         hl({ points: [{ id: "a", g: "A", v: 5 }, { id: "b", g: "A", v: 80 }] }),
-        hl({ name: "S", color: HIGHLIGHT_COLORS[1], shown: "boxes", n: 4, groups: [{ g: "A", n: 4, lo: 1, hi: 9, q1: 3, median: 5, q3: 7, loWhisker: 1, hiWhisker: 9 }] }),
+        hl({ name: "S", color: LAYER_COLORS[1], shown: "boxes", n: 4, groups: [{ g: "A", n: 4, lo: 1, hi: 9, q1: 3, median: 5, q3: 7, loWhisker: 1, hiWhisker: 9 }] }),
       ] } as any };
     const svg = viewToSvg(v)!;
-    assert.match(svg, new RegExp('<rect [^>]*fill="' + HIGHLIGHT_COLORS[1] + '" fill-opacity="0.85"'), "S is a box of its own");
-    assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + HIGHLIGHT_COLORS[0] + '" fill-opacity', "g")) || []).length, 1, "the value inside the whiskers is a dot");
-    assert.match(svg, new RegExp('<path d="M[^"]*Z" fill="' + HIGHLIGHT_COLORS[0] + '"'), "the value past them is a triangle at the edge");
-    assert.match(svg, /1 highlighted value lies beyond the axis/);
+    assert.match(svg, new RegExp('<rect [^>]*fill="' + LAYER_COLORS[1] + '" fill-opacity="0.85"'), "S is a box of its own");
+    assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + LAYER_COLORS[0] + '" fill-opacity', "g")) || []).length, 1, "the value inside the whiskers is a dot");
+    assert.match(svg, new RegExp('<path d="M[^"]*Z" fill="' + LAYER_COLORS[0] + '"'), "the value past them is a triangle at the edge");
+    assert.match(svg, /1 value of a point layer lies more than a whisker span past the/);
+  });
+
+  test("with the cases coloured by a category, a layer is a ring round the case, not a second fill", () => {
+    const v: ViewResult = { kind: "plot", plot: {
+      shape: "box", n: 3, x: { label: "G", kind: "cat" }, y: { label: "V", kind: "num" },
+      groups: [{ g: "A", n: 3, lo: 0, hi: 10, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 }], overlay: "points",
+      points: [{ id: "a", g: "A", v: 5, c: "X" }], legend: [{ label: "X", color: "#123456" }], colorLabel: "kind",
+      layers: [hl({ points: [{ id: "a", g: "A", v: 5 }] })] } as any };
+    const svg = viewToSvg(v)!;
+    assert.match(svg, new RegExp('<circle [^>]*fill="none" stroke="' + LAYER_COLORS[0] + '"'));
+    assert.doesNotMatch(svg, new RegExp('<circle [^>]*fill="' + LAYER_COLORS[0] + '" fill-opacity'));
+  });
+});
+
+describe("plot points: every case, or the outliers over the density", () => {
+  const base = { x: { label: "AGE", kind: "num" }, y: { label: "TMB", kind: "num" },
+    extent: { x0: 0, x1: 10, y0: 0, y1: 10 }, grid: [10, 10],
+    stats: { pearson: 0.1, spearman: 0.1, slope: 0, intercept: 0, pPearson: 0.5, pSpearman: 0.5 } };
+  const cells = (svg: string) => (svg.match(/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="[^"]*" fill="[^"]*" fill-opacity/g) || []).length;
+  const dots = (svg: string) => (svg.match(/<circle /g) || []).length;
+
+  test("every case a point: no cell is shaded, and the caption says a dot is a case", () => {
+    const svg = viewToSvg({ kind: "plot", plot: { ...base, shape: "scatter", n: 3, bins: [{ bx: 1, by: 1, n: 2 }, { bx: 5, by: 5, n: 1 }],
+      xyPoints: [{ id: "a", x: 1, y: 1 }, { id: "b", x: 1.2, y: 1.1 }, { id: "c", x: 5, y: 5 }], pointSet: { rule: "all", drawn: 3 } } as any })!;
+    assert.equal(cells(svg), 0);
+    assert.equal(dots(svg), 3);
+    assert.match(svg, /Each dot is one case\./);
+    assert.doesNotMatch(svg, /Darker is more/);
+  });
+
+  test("outliers: the sparse cells are left to their points, the dense ones stay shaded", () => {
+    const svg = viewToSvg({ kind: "plot", plot: { ...base, shape: "scatter", n: 105,
+      bins: [{ bx: 1, by: 1, n: 100 }, { bx: 2, by: 2, n: 3 }, { bx: 9, by: 9, n: 2 }], pointSet: { rule: "none", drawn: 0 },
+      layers: [{ kind: "outliers", label: "outliers", color: LAYER_COLORS[0], n: 5, drawn: 5, shown: "points", cellMax: 3,
+        points: [{ id: "a", x: 2.1, y: 2.1 }, { id: "b", x: 2.2, y: 2.3 }, { id: "c", x: 2.4, y: 2.2 }, { id: "d", x: 9.5, y: 9.5 }, { id: "e", x: 9.6, y: 9.1 }] }] } as any })!;
+    assert.equal(cells(svg), 1, "only the cell of 100 is shaded");
+    assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + LAYER_COLORS[0] + '" fill-opacity', "g")) || []).length, 5);
+    assert.match(svg, /Darker is more cases; the shade is logarithmic\./);
+  });
+
+  test("a point is the same size on every plot, whatever the count or shape", () => {
+    // a plotted case carries a fill-opacity; a legend swatch does not, and is not a case
+    const radii = (svg: string) => new Set([...svg.matchAll(/<circle [^>]*\br="([^"]+)"[^>]*fill-opacity/g)].map((m) => m[1]));
+    const few = viewToSvg({ kind: "plot", plot: { ...base, shape: "scatter", n: 2, bins: [{ bx: 1, by: 1, n: 2 }],
+      xyPoints: [{ id: "a", x: 1, y: 1 }, { id: "b", x: 2, y: 2 }], pointSet: { rule: "all", drawn: 2 } } as any })!;
+    const many = viewToSvg({ kind: "plot", plot: { ...base, shape: "scatter", n: 4000, bins: [{ bx: 1, by: 1, n: 4000 }],
+      xyPoints: Array.from({ length: 4000 }, (_, i) => ({ id: "p" + i, x: (i % 100) / 10, y: Math.floor(i / 100) / 4 })),
+      pointSet: { rule: "all", drawn: 4000 } } as any })!;
+    const boxed = viewToSvg({ kind: "plot", plot: { shape: "box", n: 3, x: { label: "G", kind: "cat" }, y: { label: "V", kind: "num" },
+      groups: [{ g: "A", n: 3, lo: 0, hi: 10, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 }], overlay: "points",
+      points: [{ id: "a", g: "A", v: 1 }, { id: "b", g: "A", v: 5, r: "Amplification" }, { id: "c", g: "A", v: 9 }],
+      legend: [{ label: "Amplification", color: "#f00", ring: true }], pointSet: { rule: "all", drawn: 3 } } as any })!;
+    for (const svg of [few, many, boxed]) assert.deepEqual([...radii(svg)], [String(PLOT_POINT_R)]);
+  });
+
+  test("a box's axis reaches its outliers, at most a whisker span past the whiskers; beyond that a counted triangle", () => {
+    const svg = viewToSvg({ kind: "plot", plot: { shape: "box", n: 1000, x: { label: "CANCER_TYPE", kind: "cat" }, y: { label: "TMB", kind: "num" },
+      groups: [{ g: "A", n: 1000, lo: 0, hi: 570, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 }],
+      overlay: "violin", violin: [{ g: "A", b: 0, n: 500 }, { g: "A", b: 15, n: 3 }], violinBins: 40, violinExtent: [0, 40], pointSet: { rule: "none", drawn: 0 },
+      layers: [{ kind: "outliers", label: "outliers", color: LAYER_COLORS[0], n: 2, drawn: 2, shown: "points",
+        points: [{ id: "a", g: "A", v: 15 }, { id: "b", g: "A", v: 570 }] }] } as any })!;
+    assert.match(svg, />20<\/text>/, "the axis tops out at whisker + one whisker span (10 + 10)");
+    assert.equal((svg.match(/<circle [^>]*fill-opacity/g) || []).length, 1, "the 15 is a dot on the axis");
+    assert.equal((svg.match(/<path d="M[^"]*Z"/g) || []).length, 1, "the 570 is a triangle at the edge");
+    assert.match(svg, /1 value of a point layer lies more than a whisker span past the whiskers and is drawn as a triangle/);
+    // the violin stops at the whiskers: its bin at 15..16 lies past them but inside the axis, where the points are
+    assert.equal((svg.match(/fill-opacity="0\.28"/g) || []).length, 1, "one violin bin drawn, the one inside the whiskers");
   });
 });
 

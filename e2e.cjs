@@ -545,6 +545,53 @@ async function main() {
       } catch (e) { geneEdit = String(e.message).split("\n")[0]; }
       ok("a view's genes can be changed without editing JSON", geneOk, geneEdit);
 
+      // A plot's axes are defined in a sidebar, as on cBioPortal's Plots tab: a horizontal block,
+      // Swap axes, a vertical block, each field named, the figure beside them. Swap rewrites the
+      // document's x and y; the fields stay on one control height, as a toolbar's do.
+      let sideWhat = "no plot rendered", sideOk = false;
+      try {
+        await page.goto(BASE + "/lab?tab=analysis&doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
+          study: "msk_chord_2024",
+          cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
+          views: [{ kind: "plot", cohorts: ["TP53 mut"], unit: "sample",
+            x: { source: "clinical", attribute: "MUTATION_COUNT" }, y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" } }]
+        })).toString("base64")));
+        await page.waitForSelector(".plot-side", { timeout: 300000 });
+        await page.waitForSelector(".figwidth svg", { timeout: 300000 });
+        const blocks = await page.locator(".plot-side .plot-axis h3").allInnerTexts();
+        const names = await page.locator(".plot-side .plot-axis").first().locator(".axfield-name").allInnerTexts();
+        const side = await page.locator(".plot-side").boundingBox(), fig = await page.locator(".figwidth").first().boundingBox();
+        const beside = side && fig && fig.x >= side.x + side.width - 1;
+        const heights = await page.locator(".plot-side [data-slot=select-trigger]").evaluateAll((els) => [...new Set(els.map((e) => Math.round(e.getBoundingClientRect().height)))]);
+        await page.locator(".plot-side .plot-swap").click();
+        await page.waitForFunction(() => {
+          try { const v = JSON.parse(document.querySelector("#docjson").value).views[0];
+            return v.x.attribute === "FRACTION_GENOME_ALTERED" && v.y.attribute === "MUTATION_COUNT"; } catch { return false; }
+        }, null, { timeout: 30000 });
+        sideOk = blocks.join(",") === "Horizontal axis,Vertical axis" && names.join(",") === "Data type,Clinical attribute" && !!beside && heights.length === 1;
+        sideWhat = "blocks " + blocks.join(",") + "; fields " + names.join(",") + "; figure beside: " + beside + "; select heights " + heights.join(",") + "; swap rewrote x/y";
+      } catch (e) { sideWhat = String(e.message).split("\n")[0]; }
+      ok("a plot's axes are defined in a sidebar beside the figure, and Swap axes swaps them", sideOk, sideWhat);
+
+      // Point layers: the sidebar lists the view's layers (the outliers by default) and adds one to
+      // the document; the figure's key then names it.
+      let layerWhat = "no plot rendered", layerOk = false;
+      try {
+        const chips = async () => page.locator(".plot-side .plot-layer").allInnerTexts();
+        const before = await chips();
+        await page.locator(".plot-side .plot-layers [role=combobox]").click();
+        await page.locator("[role=option]", { hasText: "furthest from the fit" }).click();
+        await page.waitForFunction(() => {
+          try { const v = JSON.parse(document.querySelector("#docjson").value).views[0];
+            return Array.isArray(v.points) && v.points.some((l) => l.rule === "trend"); } catch { return false; }
+        }, null, { timeout: 30000 });
+        await page.waitForFunction(() => /furthest from the fit \(/.test(document.querySelector(".figwidth svg")?.textContent || ""), null, { timeout: 300000 });
+        const after = await chips();
+        layerOk = before.length === 1 && /outliers/.test(before[0]) && after.length === 2;
+        layerWhat = "before " + JSON.stringify(before) + " -> after " + JSON.stringify(after) + "; the key names the new layer";
+      } catch (e) { layerWhat = String(e.message).split("\n")[0]; }
+      ok("a plot's point layers are listed in the sidebar, and adding one draws it with a key entry", layerOk, layerWhat);
+
       // The oncoprint's gear keeps ONLY the link out to cBioPortal; genes moved
       // to a named button and a modal, so the gear is not where editing hides.
       let gearSplit = "no oncoprint rendered", gearOk = false;
