@@ -103,8 +103,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   navigator (cohort, the patient list — a `<dialog>` holding the `DataTable` — and ‹ prev / next ›) steps by the result's `position` — the drawn patient's place
   in the list's order (`rankSql`) and its neighbours — setting `patient`. The chosen `patient`, folded `collapsed`
   tracks and `expandGaps` are in the spec; the last two are drawn in the browser (`dataPart`).
-  **Opt-in patient-level federation** serves this view and `alterations`, per study and kind of data:
-  rules (`lib/disclosure.ts`; `study:timeline+alterations`, `*` for every study) in the peer's
+  **Opt-in patient-level federation** serves this view, `alterations` and a plot's cases (`plot`;
+  a plot's aggregates cross for any peer through `federated_plot`), per study and kind of data:
+  rules (`lib/disclosure.ts`; `study:timeline+alterations+plot`, `*` for every study) in the peer's
   `MCP_DISCLOSE_PATIENTS` register and gate `federated_patient_rows`/`federated_patient_timeline`, and
   the same rules in the coordinator's `PEER_MCP_PATIENT_LEVEL` decide what it accepts — data crosses
   only where both allow it. The coordinator reaches the peer through `RemotePatientResolver` /

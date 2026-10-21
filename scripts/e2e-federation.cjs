@@ -1,7 +1,8 @@
 // Patient-level federation end to end, against a server whose second database is served to itself
 // as a simulated peer over MCP (lib/loopback-peer.ts): the timeline and alterations views list and
-// show a peer's patients beside this instance's own, every other view keeps the peer aggregate-only,
-// and nothing patient-level answers an outside MCP caller.
+// show a peer's patients beside this instance's own, a plot draws from the peer's counts (its cases
+// are not shared under these rules), every other view keeps the peer aggregate-only, and nothing
+// patient-level answers an outside MCP caller.
 //
 // Run by scripts/gate.sh when a second database is configured; on its own against a server started
 // with the simulated peer on:
@@ -12,7 +13,7 @@ const { launch } = require("../e2e-browser.cjs");
 
 const BASE = "http://127.0.0.1:" + (process.env.E2E_PORT || 3100);
 const LOCAL = "msk_chord_2024", PEER = "nsclc_public_genie_bpc", PEER_PATIENT = "GENIE-DFCI-109626";
-const COHORTS = { "KRAS mut": { studies: [LOCAL, PEER], all: [{ kind: "oql", q: "KRAS: MUT" }] } };
+const COHORTS = { "KRAS mut": { studies: [LOCAL, PEER], all: [{ kind: "oql", q: "KRAS: MUT" }] }, "peer's patients": { study: PEER, all: [] } };
 const doc = (views) => ({ dsl: "2.5", study: LOCAL, cohorts: COHORTS, views });
 
 async function post(path, body) {
@@ -75,6 +76,21 @@ async function main() {
     // every other view keeps the peer aggregate-only, and one that would leave its patients out is not drawn
     ok("the clinical table is not drawn without the peer's patients, and says why", !table.table && new RegExp("Cannot be drawn without leaving out the patients of " + PEER).test(table.error || ""), table.error);
     ok("an aggregate view reaches the peer over MCP", !compare.error && remoteQueries(compare) > 0 && compare.participation.studies.some((s) => s.study === PEER && s.remote), compare.error);
+
+    // a plot: its counts from the peer over MCP, pooled or alone; its cases only where the rules share
+    // them, and these do not (MCP_DISCLOSE_PATIENTS without "plot"), so the peer's study is density
+    const plots = await post("/api/analysis", doc([
+      { kind: "plot", unit: "sample", cohorts: ["KRAS mut"], x: { source: "clinical", attribute: "MUTATION_COUNT" }, y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" } },
+      { kind: "plot", unit: "sample", cohorts: ["peer's patients"], x: { source: "alteration", gene: "TP53", by: "mutated" }, y: { source: "clinical", attribute: "MUTATION_COUNT" } },
+    ]));
+    const [pooled, peerBox] = plots.views;
+    ok("a plot pooled with the peer's study draws, its counts from the peer over MCP", !pooled.error && pooled.plot?.n > 0 && remoteQueries(pooled) > 0,
+      pooled.error || pooled.plot?.n + " samples, " + remoteQueries(pooled) + " queries on the peer");
+    const pb = peerBox.plot;
+    ok("a plot of the peer's study alone draws its box and violin from the peer, and draws none of its cases, saying why",
+      !peerBox.error && pb?.shape === "box" && (pb.violin || []).length > 0 && remoteQueries(peerBox) > 0 && pb.pointSet?.rule === "none" &&
+      /may not show individual cases/.test(pb.pointSet?.why || "") && !(pb.points || []).length,
+      peerBox.error || JSON.stringify(pb?.pointSet) + "; " + (pb?.groups || []).map((g) => g.g + " " + g.n).join(", "));
 
     // an outside MCP caller: patient-level data of neither database
     const parts = [{ cohort: "c", cohortDef: { all: [] } }];

@@ -109,15 +109,16 @@ async function exploreFor(body: any) {
     return remoteFacets(s, peer.url, draft, peer.label, geneSearch);
   }));
   if (!local.length) {
-    return remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts);
+    const profileCatalog = [...new Map(studies.flatMap((st) => (profilesByStudy.get(st)?.catalog || []).map((p: ProfileInfo) => [p.profile, p] as const))).values()];
+    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog };
   }
   const { catalog: _c, ...oneProfiles } = profilesByStudy.get(local[0]) || {};
   const localResult = local.length === 1
     ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts, derived,
         ...oneProfiles, conn: connByStudy.get(local[0]) })
     : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived });
-  // every local study's profiles as it describes them, once per profile id, for a plot axis's Data picker
-  const profileCatalog = [...new Map(local.flatMap((st) => (profilesByStudy.get(st)?.catalog || []).map((p: ProfileInfo) => [p.profile, p] as const))).values()];
+  // every study's profiles as it describes them (a peer's from the peer), once per profile id, for a plot axis's Data picker
+  const profileCatalog = [...new Map(studies.flatMap((st) => (profilesByStudy.get(st)?.catalog || []).map((p: ProfileInfo) => [p.profile, p] as const))).values()];
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
   return { ...result, profileCatalog };
 }
