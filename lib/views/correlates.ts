@@ -5,8 +5,7 @@ import { benjaminiHochberg, pearsonFromMoments, pearsonR, fisherZMeta } from "..
 import { geneSymbols } from "../gene-tracks.ts";
 import { correlatesMethod } from "../method.ts";
 import type { ViewRun } from "./run.ts";
-import { PROFILE_NAME } from "./assays.ts";
-import { cytobands, answering, refuse } from "./shared.ts";
+import { cytobands, answering, refuse, PROFILE_NAME } from "./shared.ts";
 
 const CORR_SHOW_MAX = 250;
 

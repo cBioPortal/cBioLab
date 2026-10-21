@@ -8,6 +8,10 @@ export const CN_LOSS = STYLE.glyph.cna.options.find((o) => o.bit === "HOMDEL")!.
 
 export type Pal = ReturnType<typeof palette>;
 
+/** a time-axis plot's height for a figure `w` wide (survival, incidence, risk groups): a landscape
+ *  panel, neither a strip nor a square */
+export const plotHeight = (w: number) => Math.round(Math.max(200, Math.min(320, w * 0.32)));
+
 /** Greedy word wrap to at most `perLine` characters; a single over-long word is kept whole. */
 export function wrap(text: string, perLine: number): string[] {
   const lines: string[] = [];

@@ -7,7 +7,7 @@ import {
   seriesStyle, fmtInt, fmtNum, pDigits, esc, FS, SW, type SvgOpts, type LegendItem
 } from "../svg-kit.ts";
 import { AMP, DEL } from "./common.ts";
-import { volcano, volcanoPlotH } from "./enrichment.ts";
+import { volcano, volcanoPlotH } from "./volcano.ts";
 
 type Pal = ReturnType<typeof palette>;
 type AsResult = NonNullable<ViewResult["assays"]>;

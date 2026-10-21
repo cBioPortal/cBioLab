@@ -6,7 +6,7 @@ import {
   palette, frame, caption, label, textWidth, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight,
   legend, fmtInt, fmtNum, fmtQ, FS, SW, SERIES, OTHER, type SvgOpts
 } from "../svg-kit.ts";
-import { volcano, volcanoPlotH } from "./enrichment.ts";
+import { volcano, volcanoPlotH } from "./volcano.ts";
 
 type Pal = ReturnType<typeof palette>;
 type DeResult = NonNullable<ViewResult["diffexpr"]>;

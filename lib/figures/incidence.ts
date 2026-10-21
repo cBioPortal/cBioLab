@@ -7,7 +7,7 @@ import {
 import type { ViewResult } from "../types.ts";
 import { Z_975 } from "../stats.ts";
 import { stepPath } from "../chart/marks.ts";
-import { plotHeight } from "./survival.ts";
+import { plotHeight } from "./common.ts";
 import { timeScale, timeTitle } from "../chart/time.ts";
 import { paragraph } from "../chart/text.ts";
 import { lineSwatch } from "../chart/legend.ts";

@@ -4,7 +4,8 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
 import { wrap } from "../lib/figures/common.ts";
-import { niceCeil, defaultLog2 } from "../lib/views/diffexpr.ts";
+import { defaultLog2 } from "../lib/views/diffexpr.ts";
+import { niceCeil } from "../lib/views/shared.ts";
 import type { ViewResult, GenomeResult } from "../lib/types.ts";
 
 describe("wrap", () => {

@@ -2,7 +2,7 @@
 // a hazard ratio's direction depends entirely on it.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { buildCoxColumns } from "../lib/views/cox.ts";
+import { buildCoxColumns } from "../lib/views/covariates.ts";
 import type { CoxCovariate } from "../lib/types.ts";
 import type { AxisKind } from "../lib/plot.ts";
 

@@ -20,6 +20,16 @@ export function overLimit(what: string, max: number, given: number): string | nu
 
 /** a clinical attribute name as a view may name it */
 export const ATTR_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
+/** a molecular or generic-assay profile type, as a view names it */
+export const PROFILE_NAME = /^[A-Za-z0-9_.-]{1,96}$/;
+
+/** The smallest 1, 2 or 5 × 10^k at or above x — an axis end a reader can read off. */
+export function niceCeil(x: number): number {
+  if (!(x > 0)) return 1;
+  const k = Math.pow(10, Math.floor(Math.log10(x)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * k >= x - 1e-12) return m * k;
+  return 10 * k;
+}
 
 export type ViewResolver = Resolver & ViewAggregateCapable;
 

@@ -5,13 +5,13 @@ import {
 } from "../svg-kit.ts";
 import type { ViewResult, RiskTable1 } from "../types.ts";
 import { stepPath } from "../chart/marks.ts";
-import { plotHeight } from "./survival.ts";
+import { plotHeight } from "./common.ts";
 import { timeScale, timeTitle } from "../chart/time.ts";
 import { paragraph } from "../chart/text.ts";
 import { lineSwatch } from "../chart/legend.ts";
 import { r1 } from "../chart/marks.ts";
 import { placeLabels, type LabelWant } from "../chart/place.ts";
-import { unplacedNote } from "./enrichment.ts";
+import { unplacedNote } from "./volcano.ts";
 
 /** a hazard ratio below 1 and above it take the shared series' blue and vermillion */
 const FAVOURABLE = SERIES[0], ADVERSE = SERIES[4];

@@ -2,7 +2,7 @@
 // never on another label or a labelled point, and every label it cannot place reported.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { unplacedNote, volcano } from "../lib/figures/enrichment.ts";
+import { unplacedNote, volcano } from "../lib/figures/volcano.ts";
 import { placeLabels, crosses, type Box } from "../lib/chart/place.ts";
 import { palette } from "../lib/svg-kit.ts";
 

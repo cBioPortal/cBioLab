@@ -9,6 +9,37 @@ import nextPlugin from "@next/eslint-plugin-next";
 import sonarjs from "eslint-plugin-sonarjs";
 import jsxA11y from "eslint-plugin-jsx-a11y-x";
 import globals from "globals";
+import path from "node:path";
+
+// View kinds stay independent: a view's runner (lib/views/<kind>.ts), its figure
+// (lib/figures/<kind>.ts) and its own parts (<kind>-<part>.ts) may import each other and the
+// shared modules below, never another kind's modules, so a change to one view cannot break
+// another. What two kinds need goes into a shared module, added here.
+const SHARED_VIEW_MODULES = {
+  "lib/views": ["run", "shared", "rows", "covariates"],
+  "lib/figures": ["common", "volcano", "bars", "forest"],
+};
+const kindBoundary = {
+  meta: { type: "problem", schema: [] },
+  create(context) {
+    const rel = (f) => path.relative(context.cwd, f).split(path.sep).join("/");
+    const dirOf = (f) => Object.keys(SHARED_VIEW_MODULES).find((d) => path.posix.dirname(f) === d);
+    const from = rel(context.filename), fromDir = dirOf(from);
+    const base = (f) => path.posix.basename(f).replace(/\.tsx?$/, "");
+    if (!fromDir || base(from) === "index" || SHARED_VIEW_MODULES[fromDir].includes(base(from))) return {};
+    const kind = (f) => base(f).split("-")[0];
+    const check = (node) => {
+      const spec = node.source?.value;
+      if (typeof spec !== "string" || !spec.startsWith(".")) return;
+      const to = rel(path.resolve(path.dirname(context.filename), spec)), toDir = dirOf(to);
+      if (!toDir || SHARED_VIEW_MODULES[toDir].includes(base(to)) || kind(to) === kind(from)) return;
+      context.report({ node: node.source, message: from + " imports " + to + ", another view kind's module. Move what both " +
+        "need into a shared module (" + Object.entries(SHARED_VIEW_MODULES).map(([d, ms]) => d + ": " + ms.join(", ")).join("; ") +
+        ") so a change to one view cannot break the other." });
+    };
+    return { ImportDeclaration: check, ExportNamedDeclaration: check, ExportAllDeclaration: check, ImportExpression: check };
+  },
+};
 
 export default tseslint.config(
   {
@@ -91,6 +122,11 @@ export default tseslint.config(
       // AWS CDK rules: no infrastructure code here
       ...Object.fromEntries(Object.keys(sonarjs.rules).filter((r) => r.startsWith("aws-")).map((r) => [`sonarjs/${r}`, "off"])),
     },
+  },
+  {
+    files: ["lib/views/*.ts", "lib/figures/*.ts"],
+    plugins: { local: { rules: { "kind-boundary": kindBoundary } } },
+    rules: { "local/kind-boundary": "error" },
   },
   {
     files: ["**/*.{cjs,mjs,js}"],
