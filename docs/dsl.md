@@ -201,7 +201,9 @@ rel      := { "type": "NONE" }                                                 /
 - **Absence queries**: always set `"observed": true` on NOT_FOLLOWED_BY, restricting to patients
   whose follow-up actually covers the window — otherwise "no event" conflates with lost-to-follow-up.
 - **`priorGuard: true`** restricts to treatment-naive patients (required for honest "first-line"
-  claims; ~20% of MSK-CHORD patients had prior treatment elsewhere).
+  claims; ~20% of MSK-CHORD patients had prior treatment elsewhere). Naive means a "No prior
+  medications" record under `PRIOR_MED_TO_MSK`, which only MSK's own studies record; patients
+  with no record are left out, and a study that records the flag for no one is refused.
 - **"Treatment line (derived)"** is synthesized at query time and supports attrs `LINE_NO`,
   `COMPOSITION`, `GAP`. Lines have ONE definition, shared by this type, the `lines` derived
   metric and the `sequence` view: systemic-therapy `Treatment` records — the class is the event's

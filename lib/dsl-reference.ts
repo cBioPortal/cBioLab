@@ -1474,7 +1474,9 @@ rel      := { "type": "NONE" }                                                 /
 - **Absence queries**: always set \`"observed": true\` on NOT_FOLLOWED_BY, restricting to patients
   whose follow-up actually covers the window — otherwise "no event" conflates with lost-to-follow-up.
 - **\`priorGuard: true\`** restricts to treatment-naive patients (required for honest "first-line"
-  claims; ~20% of MSK-CHORD patients had prior treatment elsewhere).
+  claims; ~20% of MSK-CHORD patients had prior treatment elsewhere). Naive means a "No prior
+  medications" record under \`PRIOR_MED_TO_MSK\`, which only MSK's own studies record; patients
+  with no record are left out, and a study that records the flag for no one is refused.
 - **"Treatment line (derived)"** is synthesized at query time and supports attrs \`LINE_NO\`,
   \`COMPOSITION\`, \`GAP\`. Lines have ONE definition, shared by this type, the \`lines\` derived
   metric and the \`sequence\` view: systemic-therapy \`Treatment\` records — the class is the event's
@@ -2046,7 +2048,8 @@ Leaf kinds:
   {"type":"DURING"} | {"type":"NOT_FOLLOWED_BY","withinDays":N,"observed":true}.
   For absence queries ALWAYS set observed:true (else "no event" conflates with lost-to-follow-up).
   priorGuard:true restricts to treatment-naive patients — REQUIRED for honest "first-line" claims
-  (~20% of patients had prior treatment elsewhere, ~20% undetermined).
+  (~20% of patients had prior treatment elsewhere, ~20% undetermined and left out). Needs the
+  study's PRIOR_MED_TO_MSK flag (MSK studies); refused on a study without it.
 - {"kind":"sampleList"|"patientList","ids":["<study>:<id>",...]} — explicit, cross-study list; ids
   are "<study>:<bare-id>" (colon, matching the legacy portal's convention — not the database's
   internal underscore, since a bare id may contain one). A list the page saved on the server is
