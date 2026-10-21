@@ -12,7 +12,10 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable } from "./federation.ts";
+import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers } from "./plot.ts";
+import type { Moments } from "./stats.ts";
+import type { ProfileInfo } from "./profile-catalog.ts";
 import { carriesPatientIds, studyRouting } from "./federation.ts";
 import { loopbackConnId, loopbackHeaders, loopbackUrl, servingAsLoopbackPeer } from "./loopback-peer.ts";
 import { loopbackOnlyConn, noteFailedQuery } from "./ch.ts";
@@ -107,6 +110,13 @@ export async function remoteCatalog(study: string, url: string): Promise<StudyCa
   return cat;
 }
 
+/** A study's profiles as the peer that holds it describes them (federated_profiles): metadata only. */
+export async function remoteProfiles(study: string, url: string): Promise<{ profiles: string[]; gaProfiles: string[]; catalog: ProfileInfo[] }> {
+  const r = await mcpCall<{ study: string; profiles?: string[]; gaProfiles?: string[]; catalog?: ProfileInfo[] }>(url, "federated_profiles", { study });
+  if (r.study !== study) throw new Error("peer answered the profiles of '" + String(r.study).slice(0, 60) + "' for '" + study + "'");
+  return { profiles: r.profiles || [], gaProfiles: r.gaProfiles || [], catalog: r.catalog || [] };
+}
+
 /**
  * The opt-in patient-level federation mode, as THIS instance (the coordinator) configures it: the
  * kinds of patient-level data it accepts from the peer serving `study` — its PEER_MCP_PATIENT_LEVEL
@@ -190,7 +200,11 @@ export async function remoteFacets(study: string, url: string, draft: CohortDef 
   };
 }
 
-export class RemoteAggregateResolver implements AggregateCapable {
+/** a plot request as it travels to a peer: the axes, unit and grid, nothing else */
+const plotSpecOut = (spec: PlotRequest) => ({ x: spec.x, y: spec.y, unit: spec.unit,
+  ...(spec.colorBy ? { colorBy: spec.colorBy } : {}), ...(spec.ringBy ? { ringBy: spec.ringBy } : {}), ...(spec.bins ? { bins: spec.bins } : {}) });
+
+export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotCapable {
   readonly instance: Instance;
   readonly study: string;
   private readonly url: string;
@@ -300,14 +314,54 @@ export class RemoteAggregateResolver implements AggregateCapable {
     return r.eventCourse || [];
   }
   /**
-   * Plots are not federated yet. A peer's bins would be counted on its own scale, and pooling
-   * them with ours would draw a picture of neither cohort — so this refuses rather than
-   * returning something that looks like an answer.
+   * A plot, or one piece of a plot pooled across sites, answered by the peer in its own database
+   * (federated_plot): aggregates only, the cohort definitions refused here if they carry ids.
    */
-  async plot(def: CohortDef | null | undefined, _spec: PlotRequest): Promise<PlotData> {
+  protected async plotOp<T>(op: string, def: CohortDef | null | undefined, spec: PlotRequest | { x: PlotAxis; y: PlotAxis }, extra: Record<string, unknown> = {}): Promise<T> {
     this.guard(def);
-    throw new Error("the peer serving " + this.study + " does not answer plots yet: bins from two sites are counted " +
-      "on two scales, and pooling them needs a shared one");
+    if (extra.highlight !== undefined) this.guard(extra.highlight as CohortDef);
+    const r = await this.call<{ op: string; result: T; cohortSql?: string | null; queries?: QueryLogEntry[] | null }>("federated_plot",
+      { study: this.study, cohort: def || {}, op, spec: plotSpecOut(spec as PlotRequest), ...extra });
+    if (r.op !== op) throw new Error("the peer serving " + this.study + " answered '" + String(r.op).slice(0, 40) + "' when asked for '" + op + "'");
+    this.remember(r);
+    return r.result;
+  }
+  async plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData> {
+    return this.plotOp<PlotData>("plot", def, spec);
+  }
+  async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }> {
+    return this.plotOp("axisKinds", null, spec);
+  }
+  async plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }> {
+    return this.plotOp("extent", def, spec, { kinds: { xk, yk } });
+  }
+  async plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
+    return this.plotOp("bins", def, spec, { kinds: { xk, yk }, bins, extent });
+  }
+  async plotMoments(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<Moments> {
+    return this.plotOp("moments", def, spec, { kinds: { xk, yk } });
+  }
+  async plotTableCells(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<{ cx: string; cy: string; n: number }[]> {
+    return this.plotOp("table", def, spec, { kinds: { xk, yk } });
+  }
+  async plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
+    return this.plotOp("box", def, spec, { kinds: { xk, yk } });
+  }
+  async plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<NonNullable<PlotData["coverage"]>> {
+    return this.plotOp("coverage", def, spec, { kinds: { xk, yk } });
+  }
+  async plotHighlightCount(def: CohortDef | null | undefined, highlight: CohortDef): Promise<number> {
+    return this.plotOp("highlightCount", def, { x: { source: "none" }, y: { source: "none" } }, { highlight });
+  }
+  async plotHighlightBins(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
+    return this.plotOp("highlightBins", def, spec, { highlight, kinds: { xk, yk }, bins, extent });
+  }
+  async plotHighlightBoxRows(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+    Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
+    return this.plotOp("highlightBox", def, spec, { highlight, kinds: { xk, yk } });
   }
 
   async attributeQuantile(def: CohortDef | null | undefined, _attribute: string, _per: "patient" | "sample", _p: number): Promise<number | null> {
@@ -392,6 +446,20 @@ export class RemotePatientResolver extends RemoteAggregateResolver implements Re
     super(study, url, instance);
     this.peerUrl = url;
     this.patientKinds = new Set(kinds);
+    // A plot's cases, only where this instance accepts them from the peer (the `plot` kind): the
+    // methods are this object's own, never the class's, so a peer that does not share them has no
+    // way to be asked — the guarantee the boundary tests check.
+    if (this.patientKinds.has("plot")) Object.assign(this, plotCaseMethods(this));
+  }
+  /** a call for a plot's cases, its refusal said in terms of the rules that decide it */
+  async casesCall<T>(op: string, def: CohortDef | null | undefined, spec: PlotRequest, extra: Record<string, unknown>): Promise<T> {
+    this.refuseIds([def, extra.highlight as CohortDef | undefined]);
+    return this.disclosed(this.call<{ op: string; points: T; queries?: QueryLogEntry[] | null }>("federated_plot_cases",
+      { study: this.study, cohort: def || {}, op, spec: plotSpecOut(spec), ...extra }).then((r) => {
+      if (r.op !== op) throw new Error("the peer serving " + this.study + " answered '" + String(r.op).slice(0, 40) + "' when asked for '" + op + "'");
+      if (Array.isArray(r.queries)) for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, ms: q.ms, remote: true });
+      return r.points;
+    }), "plot");
   }
   protected refuseIds(defs: (CohortDef | null | undefined)[]): void {
     // the patient this view asks for is the entitlement; an explicit id LIST in a cohort is not part of it
@@ -437,6 +505,20 @@ export class RemotePatientResolver extends RemoteAggregateResolver implements Re
     return { rows, counts: own(r.counts as unknown as Record<string, unknown>[]) as unknown as PeerRowsAnswer["counts"], values: r.values || [], rank,
       oncokbPin: typeof r.oncokbPin === "string" ? r.oncokbPin.slice(0, 40) : null };
   }
+}
+
+/** The plot-case methods a peer that shares them answers, each a federated_plot_cases call. */
+function plotCaseMethods(r: RemotePatientResolver): PlotCasesCapable {
+  return {
+    plotPoints: (def, spec, cap?: number, outside?: Whiskers[]) =>
+      r.casesCall<PlotPoint[] | null>("points", def, spec, { ...(cap != null ? { cap } : {}), ...(outside ? { outside } : {}) }),
+    plotScatterPoints: (def, spec, cap?: number, sparse?: SparseCells) =>
+      r.casesCall<PlotXYPoint[] | null>("scatterPoints", def, spec, { ...(cap != null ? { cap } : {}), ...(sparse ? { sparse } : {}) }),
+    plotRankedPoints: (def, spec, xk, yk, rank: PointRank) =>
+      r.casesCall<HighlightPoint[]>("ranked", def, spec, { kinds: { xk, yk }, rank }),
+    plotHighlightPoints: (def, highlight, spec, xk, yk, cap?: number) =>
+      r.casesCall<HighlightPoint[] | null>("highlightPoints", def, spec, { highlight, kinds: { xk, yk }, ...(cap != null ? { cap } : {}) }),
+  };
 }
 
 /**

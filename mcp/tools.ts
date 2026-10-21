@@ -14,7 +14,7 @@ import {
 } from "../lib/campaign.ts";
 import { HYPOTHESIS_GRAMMAR } from "../lib/hypothesis.ts";
 import { runAnalysis, resolveStudy, studyProfiles } from "../lib/analysis.ts";
-import { resolverFor, carriesPatientIds, studyRouting, routeStudy, PatientLevelResolver, PEER_TABLES, type PeerTable, type CourseOpts, type SequenceOpts } from "../lib/federation.ts";
+import { resolverFor, carriesPatientIds, studyRouting, routeStudy, PatientLevelResolver, PEER_TABLES, hasFederatedPlot, type PeerTable, type CourseOpts, type SequenceOpts } from "../lib/federation.ts";
 import { timelinePatientRowSource, TIMELINE_COLUMNS, PATIENT_ID } from "../lib/patient-timeline.ts";
 import { ALTERATION_COLUMNS, ALTERATION_PATIENT_COLUMNS, PATIENT_SAMPLE_COLUMNS, alterationPatientRowSource, alterationSource, patientSamplesSource } from "../lib/patient-alterations.ts";
 import { loopbackConnId } from "../lib/loopback-peer.ts";
@@ -28,6 +28,8 @@ import { studiesFor } from "../lib/study-list.ts";
 import { catalogFor } from "../lib/study-catalog.ts";
 import type { AnalysisDoc, AnalysisResult, Contract } from "../lib/types.ts";
 import type { OncoprintSpec } from "../lib/views/oncoprint/types.ts";
+import { validateAxis, type PlotAxis, type PlotRequest, type AxisKind, type PointRank, type SparseCells, type Whiskers } from "../lib/plot.ts";
+import { resolveAxes } from "../lib/plot-profile.ts";
 
 // ---------- shared zod fragments (the tools' input schemas) ----------
 const zSelector = z.object({
@@ -102,6 +104,24 @@ async function ownStudy(study: string): Promise<string> {
   const { peerForStudy } = await import("../lib/federation-remote.ts");
   if (await peerForStudy(study)) throw new Error("study '" + study.slice(0, 60) + "' is not held by this instance");
   return resolveStudy(study);
+}
+
+/**
+ * A plot request as a caller sent it, made this instance's own: each axis resolved against this
+ * study's profiles (a profile axis) and checked as a local view's axes are. Only the fields a plot
+ * reads are kept.
+ */
+async function plotSpecHere(study: string, raw: any): Promise<PlotRequest> {
+  if (!raw || typeof raw !== "object") throw new Error("a plot needs its axes");
+  const { catalog } = await studyProfiles(study);
+  const axes = resolveAxes({ x: raw.x as PlotAxis, y: raw.y as PlotAxis, colorBy: raw.colorBy as PlotAxis | undefined, ringBy: raw.ringBy as PlotAxis | undefined },
+    [{ study, catalog }]);
+  validateAxis(axes.x, "x"); validateAxis(axes.y, "y");
+  if (axes.colorBy) validateAxis(axes.colorBy, "colorBy");
+  if (axes.ringBy) validateAxis(axes.ringBy, "ringBy");
+  const bins = Array.isArray(raw.bins) && raw.bins.length === 2 ? [Number(raw.bins[0]), Number(raw.bins[1])] as [number, number] : undefined;
+  return { x: axes.x, y: axes.y, unit: raw.unit === "patient" ? "patient" : "sample",
+    ...(axes.colorBy ? { colorBy: axes.colorBy } : {}), ...(axes.ringBy ? { ringBy: axes.ringBy } : {}), ...(bins ? { bins } : {}) };
 }
 
 export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
@@ -210,6 +230,85 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
             (attributeStats.length ? `, ${attributeStats.length} clinical attributes` : "") + " (no patient identifiers returned)" }],
           structuredContent: { ...payload, source: await peerSource(s) }
         };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
+      }
+    });
+
+  // A plot, or one of the per-site pieces a pooled plot is built from: counts, bins, sums,
+  // quartiles. Aggregates only, like federated_aggregates; the cases behind a plot are
+  // federated_plot_cases', under the disclosure rules. The axes come as the caller resolved them
+  // (or as profile axes, resolved here against this study's own profiles) and are checked here.
+  server.registerTool(
+    "federated_plot",
+    {
+      description:
+        "Federation endpoint for another cbio-lab instance's plot view: evaluates a cohort definition against a study THIS instance holds and returns a plot's aggregates — " +
+        "a whole plot (density grid, quartiles, violin, contingency, coefficients), or one piece of a plot pooled across sites: the axes' kinds, the extent, bin counts on a shared grid and extent, " +
+        "the six sums behind a correlation, box quartiles, contingency cells, coverage, or a second cohort's count, cells or quartiles within it. Never returns patient identifiers.",
+      inputSchema: {
+        study: z.string().max(120),
+        cohort: z.record(z.string(), z.any()),
+        op: z.enum(["plot", "axisKinds", "extent", "bins", "moments", "table", "box", "coverage", "highlightCount", "highlightBins", "highlightBox"]),
+        spec: z.record(z.string(), z.any()).describe("x, y, unit, and optionally colorBy, ringBy, bins: the plot as a view states it"),
+        kinds: z.object({ xk: z.enum(["num", "cat", "none"]), yk: z.enum(["num", "cat", "none"]) }).nullish(),
+        bins: z.tuple([z.number().int().min(1).max(1000), z.number().int().min(1).max(1000)]).nullish(),
+        extent: z.object({ x0: z.number(), x1: z.number(), y0: z.number(), y1: z.number() }).nullish(),
+        highlight: z.record(z.string(), z.any()).nullish().describe("for the highlight ops: the second cohort, whose cases within the first are counted"),
+      }
+    },
+    async (args: { study: string; cohort: any; op: string; spec: any; kinds?: { xk: AxisKind; yk: AxisKind } | null; bins?: [number, number] | null;
+      extent?: { x0: number; x1: number; y0: number; y1: number } | null; highlight?: any }) => {
+      try {
+        if (carriesPatientIds(args.cohort) || carriesPatientIds(args.highlight))
+          throw new Error("cohort contains an explicit sample or patient list; identifiers are not accepted across instances");
+        const s = await ownStudy(args.study);
+        const { profiles, gaProfiles } = await studyProfiles(s);
+        const res = await resolverFor(s, { oncokbPin: await oncokbPin(), profiles, gaProfiles });
+        if (!hasFederatedPlot(res)) throw new Error(s + " is not held by this instance's own database");
+        const spec = await plotSpecHere(s, args.spec);
+        const k = args.kinds, need = (x: unknown, what: string) => { if (x == null) throw new Error(args.op + " needs " + what); };
+        const hl = args.highlight as Parameters<typeof res.plotHighlightCount>[1];
+        let result: unknown;
+        switch (args.op) {
+          case "plot": result = await res.plot(args.cohort, spec); break;
+          case "axisKinds": result = await res.plotAxisKinds(spec); break; // no cohort: the axes alone decide
+          case "extent": need(k, "kinds"); result = await res.plotExtent(args.cohort, spec, k!.xk, k!.yk); break;
+          case "bins": need(k, "kinds"); need(args.bins, "bins"); need(args.extent, "extent"); result = await res.plotBinCounts(args.cohort, spec, k!.xk, k!.yk, args.bins!, args.extent!); break;
+          case "moments": need(k, "kinds"); result = await res.plotMoments(args.cohort, spec, k!.xk, k!.yk); break;
+          case "table": need(k, "kinds"); result = await res.plotTableCells(args.cohort, spec, k!.xk, k!.yk); break;
+          case "box": need(k, "kinds"); result = await res.plotBoxRows(args.cohort, spec, k!.xk, k!.yk); break;
+          case "coverage": need(k, "kinds"); result = await res.plotCoverage(args.cohort, spec, k!.xk, k!.yk); break;
+          case "highlightCount": need(hl, "highlight"); result = await res.plotHighlightCount(args.cohort, hl); break;
+          case "highlightBins": need(hl, "highlight"); need(k, "kinds"); need(args.bins, "bins"); need(args.extent, "extent");
+            result = await res.plotHighlightBins(args.cohort, hl, spec, k!.xk, k!.yk, args.bins!, args.extent!); break;
+          case "highlightBox": need(hl, "highlight"); need(k, "kinds"); result = await res.plotHighlightBoxRows(args.cohort, hl, spec, k!.xk, k!.yk); break;
+          default: throw new Error("unknown op");
+        }
+        const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
+        return {
+          content: [{ type: "text" as const, text: "plot " + args.op + " for " + s + " (aggregates; no patient identifiers returned)" }],
+          structuredContent: { study: s, op: args.op, result, cohortSql: hideSql || args.op === "axisKinds" ? null : res.cohortSql(args.cohort), queries: hideSql ? null : res.queries, source: await peerSource(s) }
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
+      }
+    });
+
+  // A study's molecular profiles as it describes them (genetic_profile: type, datatype, name), so a
+  // caller can read a profile axis as this study means it. Metadata only.
+  server.registerTool(
+    "federated_profiles",
+    {
+      description: "Federation endpoint: the molecular profiles of a study THIS instance holds, each with its alteration type, datatype and name. Metadata only; no data values.",
+      inputSchema: { study: z.string().max(120) }
+    },
+    async ({ study }: { study: string }) => {
+      try {
+        const s = await ownStudy(study);
+        const p = await studyProfiles(s);
+        return { content: [{ type: "text" as const, text: s + ": " + p.catalog.length + " profiles" }],
+          structuredContent: { study: s, profiles: p.profiles, gaProfiles: p.gaProfiles, catalog: p.catalog, source: await peerSource(s) } };
       } catch (e) {
         return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };
       }
@@ -334,6 +433,53 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           return {
             content: [{ type: "text" as const, text: `timeline of ${patient} (${s}): ${t.events.length} events, ${t.samples.length} samples — patient-level, disclosed under MCP_DISCLOSE_PATIENTS` }],
             structuredContent: { study: s, patient, events: t.events, samples: t.samples, queries: hideSql ? null : res.queries, source: await peerSource(s) }
+          };
+        } catch (e) { return rejected(e); }
+      });
+
+    server.registerTool(
+      "federated_plot_cases",
+      {
+        description:
+          "Patient-level federation endpoint (opt-in: MCP_DISCLOSE_PATIENTS rules, kind 'plot') for another cbio-lab instance's plot view: the cases a plot draws as points, with their case ids, " +
+          "for a study THIS instance holds — every case up to the cap, a box's values beyond given whiskers, a scatter's cases in sparse cells of a given grid, the extremes on an axis or the cases " +
+          "furthest from a fitted line, or a second cohort's cases within the first. Returns case identifiers.",
+        inputSchema: {
+          study: z.string().max(120),
+          cohort: z.record(z.string(), z.any()),
+          op: z.enum(["points", "scatterPoints", "ranked", "highlightPoints"]),
+          spec: z.record(z.string(), z.any()),
+          cap: z.number().int().min(1).max(50000).nullish(),
+          outside: z.array(z.object({ g: z.string().max(200), loWhisker: z.number(), hiWhisker: z.number() }).passthrough()).max(200).nullish(),
+          sparse: z.object({ grid: z.tuple([z.number().int(), z.number().int()]), extent: z.object({ x0: z.number(), x1: z.number(), y0: z.number(), y1: z.number() }), cellMax: z.number().int().min(1).max(100) }).nullish(),
+          rank: z.union([z.object({ by: z.enum(["x", "y"]), n: z.number().int().min(1).max(500) }),
+            z.object({ by: z.literal("residual"), n: z.number().int().min(1).max(500), slope: z.number(), intercept: z.number() })]).nullish(),
+          kinds: z.object({ xk: z.enum(["num", "cat", "none"]), yk: z.enum(["num", "cat", "none"]) }).nullish(),
+          highlight: z.record(z.string(), z.any()).nullish(),
+        }
+      },
+      async (args: { study: string; cohort: any; op: string; spec: any; cap?: number | null; outside?: Whiskers[] | null; sparse?: SparseCells | null;
+        rank?: PointRank | null; kinds?: { xk: AxisKind; yk: AxisKind } | null; highlight?: any }) => {
+        try {
+          if (carriesPatientIds(args.cohort) || carriesPatientIds(args.highlight))
+            throw new Error("a cohort contains an explicit sample or patient list; identifier lists are not accepted across instances");
+          const { s, res } = await held(args.study, "plot");
+          const spec = await plotSpecHere(s, args.spec);
+          const cap = args.cap ?? undefined;
+          let points: unknown;
+          if (args.op === "points") points = await res.plotPoints(args.cohort, spec, cap, args.outside ?? undefined);
+          else if (args.op === "scatterPoints") points = await res.plotScatterPoints(args.cohort, spec, cap, args.sparse ?? undefined);
+          else if (args.op === "ranked") {
+            if (!args.rank || !args.kinds) throw new Error("ranked needs rank and kinds");
+            points = await res.plotRankedPoints(args.cohort, spec, args.kinds.xk, args.kinds.yk, args.rank);
+          } else {
+            if (!args.highlight || !args.kinds) throw new Error("highlightPoints needs highlight and kinds");
+            points = await res.plotHighlightPoints(args.cohort, args.highlight, spec, args.kinds.xk, args.kinds.yk, cap);
+          }
+          const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
+          return {
+            content: [{ type: "text" as const, text: "plot " + args.op + " for " + s + " — patient-level, disclosed under MCP_DISCLOSE_PATIENTS (" + PATIENT_KIND_NAMES.plot + ")" }],
+            structuredContent: { study: s, op: args.op, points, queries: hideSql ? null : res.queries, source: await peerSource(s) }
           };
         } catch (e) { return rejected(e); }
       });

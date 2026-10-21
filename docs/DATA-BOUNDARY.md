@@ -113,10 +113,22 @@ The kinds (`lib/disclosure.ts`, `PATIENT_KINDS`), each one view's needs and noth
 |---|---|---|
 | `timeline` | `timeline` | the cohort's patient list with timeline counts; one patient's events and samples |
 | `alterations` | `alterations` | the cohort's patient list with alteration counts; one patient's samples, mutations, copy-number calls and structural variants |
+| `plot` | `plot` | the cases a plot draws as points, with their case ids: every case up to the points cap, the outliers past it, a ranked layer's extremes, a cohort layer's cases |
+
+A plot's **aggregates** cross for every peer, whatever its rules: `federated_plot` answers a whole
+plot (density grid, quartiles, violin, contingency, coefficients) or one piece of a plot pooled
+across sites (extent, bin counts on a shared grid and extent, the six sums behind a correlation,
+box quartiles, contingency cells, coverage, a cohort layer's count, cells or quartiles), counts
+only, so a plot is drawn over a peer's study like any other aggregate view. Its **cases** are the
+`plot` kind: `federated_plot_cases`, registered with the other patient-level tools, answers them
+only where the peer's rules disclose `plot` for the study, and the coordinator asks only where its
+rules accept it. Without both, the plot draws the peer's study as density and its caption says so;
+a peer that refuses mid-way leaves the density and names its reason, never failing the view.
 
 Each side writes **rules**: a study (or `*`) and the kinds allowed for it, e.g.
-`genie_public:timeline+alterations, *:timeline`. A bare study id allows the timeline alone; an
-unknown kind is refused naming the setting, never ignored.
+`genie_public:timeline+alterations, *:timeline`. A bare study id allows the timeline alone; `*` as
+a kind allows every kind (so `plot` too); an unknown kind is refused naming the setting, never
+ignored.
 
 | side | setting | effect |
 |---|---|---|
@@ -129,8 +141,10 @@ discloses a kind the coordinator does not accept is never asked, and the view is
 ("… is a remote peer, which does not share patient alterations with this instance").
 
 The same structural rule holds. A remote patient resolver adds exactly `patientRows()` (the row
-tables of its accepted kinds, refusing any other kind **before** the network is touched) and,
-with timelines, `patientTimeline()` — no `members()`, no plot points, no Cox/logistic rows, no
+tables of its accepted kinds, refusing any other kind **before** the network is touched), with
+timelines `patientTimeline()`, and with `plot` the four plot-case methods as the object's **own**
+properties (never the class's, so a peer that does not share them has no way to be asked;
+`plotCasesOf` in `lib/federation.ts`) — no `members()`, no Cox/logistic rows, no
 `rowsPage` — and its instance stays `aggregate-only`, so every view outside the kinds treats it as
 before (the clinical table and the oncoprint are not drawn over its studies). The coordinator never
 sends SQL: it names a table and the cohort *definitions*, and the peer builds and runs the query

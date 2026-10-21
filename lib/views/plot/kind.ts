@@ -42,5 +42,6 @@ export const plotKind: ViewKindDef<"plot"> = {
     title: "What is this?",
     text: "Plots two measurements against each other for the same patients or samples — for example, a gene's activity level against a patient's age — so you can see whether they tend to rise and fall together, split into distinct clusters, or show no relationship at all."
   },
-  need: "local",
+  // no need: counts from every participant, a peer included (federated_plot); its cases only from one
+  // that may show them, else its density alone, said in the caption (./run.ts)
 };

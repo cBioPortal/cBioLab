@@ -319,3 +319,52 @@ describe("the SQL a point layer adds", () => {
     assert.match(sql, /LIMIT 101$/);
   });
 });
+
+describe("a study served by a peer over MCP", () => {
+  /** a peer: its counts answered, its cases only if it shares them (and then possibly refused by it) */
+  const peer = (calls: Calls, cases: "none" | "shared" | "refused") => {
+    const r = fake("aggregate-only", calls) as Record<string, unknown>;
+    r.instance = { id: "peer", mode: "aggregate-only", conn: { db: "db" }, label: "GENIE (via MCP)" };
+    if (cases !== "none") {
+      const answer = (pts: unknown[]) => async () => {
+        calls.push("peer cases");
+        if (cases === "refused") throw new Error("the peer serving s does not share plot cases of s (its MCP_DISCLOSE_PATIENTS does not allow it)");
+        return pts;
+      };
+      Object.assign(r, { plotScatterPoints: answer([{ id: "P1", x: 10, y: 5 }]), plotPoints: answer([{ id: "P1", g: "A", v: 5 }]),
+        plotRankedPoints: answer([{ id: "P1", x: 10, y: 5 }]), plotHighlightPoints: answer([{ id: "P1", x: 10, y: 5 }, { id: "P2", x: 20, y: 8 }]) });
+    }
+    return r;
+  };
+
+  test("a peer that shares no cases: the plot draws from its counts, and no case is asked for", async () => {
+    const calls: Calls = [];
+    const r = await run({ s: peer(calls, "none") }, { points: [{ cohort: "R" }, { rule: "extremes", axis: "y" }] });
+    assert.equal(r.error, undefined);
+    assert.equal(r.plot!.pointSet!.rule, "none");
+    assert.match(r.plot!.pointSet!.why!, /s may not show individual cases/);
+    assert.equal(r.plot!.layers![0].shown, "density", "the cohort layer is its cells on the plot's grid");
+    assert.equal(r.plot!.layers![1].shown, "none");
+    assert.ok(!calls.includes("peer cases"));
+  });
+
+  test("a peer sharing the plot kind answers the cases like a local participant", async () => {
+    const calls: Calls = [];
+    const r = await run({ s: peer(calls, "shared") }, { points: [{ cohort: "R" }] });
+    assert.equal(r.plot!.pointSet!.rule, "all");
+    assert.equal(r.plot!.layers![0].shown, "points");
+    assert.ok(calls.includes("peer cases"));
+  });
+
+  test("a peer that refuses its cases: the density stays, each layer falls back, and the caption says the peer's reason", async () => {
+    const calls: Calls = [];
+    const r = await run({ s: peer(calls, "refused") }, { points: [{ cohort: "R" }, { rule: "extremes", axis: "y" }] });
+    assert.equal(r.error, undefined, "a refusal of cases does not fail the view");
+    assert.equal(r.plot!.pointSet!.rule, "none");
+    assert.match(r.plot!.pointSet!.why!, /does not share plot cases/);
+    assert.equal(r.plot!.layers![0].shown, "density");
+    assert.match(r.plot!.layers![0].why!, /does not share plot cases/);
+    assert.equal(r.plot!.layers![1].shown, "none");
+    assert.match(r.plot!.layers![1].why!, /does not share plot cases/);
+  });
+});
