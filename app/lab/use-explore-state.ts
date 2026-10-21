@@ -17,6 +17,10 @@ import type { CustomDataTab } from "./custom-data-panel.tsx";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useExplore, type ExploreAsk } from "./use-explore.ts";
 
+/** how many clinical charts Explore draws until the reader picks — cBioPortal's own default
+ *  (studyview_clinical_attribute_chart_count) */
+export const DEFAULT_CLINICAL_CHARTS = 20;
+
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort } from "./use-saved.ts";
 
@@ -111,10 +115,11 @@ export function useExploreState(page: ExplorePage) {
   const [studyChipsOpen, setStudyChipsOpen] = useState(false);
   const [geneFilter, setGeneFilter] = useState<Record<string, string>>({});   // per-table gene box, client-side
   const [clinFilter, setClinFilter] = useState("");                            // narrows the attribute checklist in "+ Add chart", not the grid itself
-  /** attributes unchecked in the "+ Add chart" > Clinical picker — keyed "per|attribute",
-   *  matching data-attr. Empty means every attribute shows, the same default as before
-   *  there was a picker at all. */
-  const [hiddenAttrs, setHiddenAttrs] = useState<Set<string>>(new Set());
+  /** the reader's own changes to the "+ Add chart" > Clinical checklist, keyed "per|attribute"
+   *  (matching data-attr), over the default charts (defaultCharts): checked beyond it, and
+   *  unchecked out of it. Kept as changes so the default can follow the studies explored. */
+  const [chartPicks, setChartPicks] = useState<{ added: Set<string>; removed: Set<string> }>(
+    () => ({ added: new Set(), removed: new Set() }));
   const [attrCoverage, setAttrCoverage] = useState(0);                       // clinical attributes shown
   /**
    * The "sequence / line filter" popover's draft — an A/[B] pair plus a
@@ -281,14 +286,49 @@ export function useExploreState(page: ExplorePage) {
    * "8 attributes" while all 20 were still drawn.
    *
    * Coverage (carried by enough of the selected studies) and the reader's own
-   * checklist (hiddenAttrs, set from "+ Add chart" > Clinical) are both "is this
-   * attribute allowed to show" concerns, so both live here; clinFilter is a
-   * different thing now — it narrows the CHECKLIST's own rows, not this.
+   * checklist ("+ Add chart" > Clinical) are both "is this attribute allowed to
+   * show" concerns, so both live here; clinFilter is a different thing now — it
+   * narrows the CHECKLIST's own rows, not this. An attribute the draft filters on
+   * always shows, so a filter in force is never hidden from the grid.
    */
+  const coverageOk = (c: { studyCount?: number }) =>
+    attrCoverage === 0 || (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length);
+  /**
+   * The charts checked until the reader changes them: cBioPortal's study-view default — the
+   * first DEFAULT_CLINICAL_CHARTS attributes with a priority above 0, in priority order
+   * (priority 0 is the portal's "available, hidden by default"). Read from the answer with no
+   * draft applied (use-explore.ts `vocab`), so a facet click never changes which charts show.
+   */
+  const defaultCharts = (): Set<string> => new Set(exploring.vocab.current
+    .filter((a) => a.priority > 0 && coverageOk(a)).slice(0, DEFAULT_CLINICAL_CHARTS).map((a) => a.key));
+  const draftedAttrs = (): Set<string> => {
+    const keys = new Set<string>();
+    const walk = (cs: any[]) => { for (const c of cs || []) {
+      if (c?.kind === "clinical") keys.add((c.per === "sample" ? "sample" : "patient") + "|" + c.attribute);
+      if (Array.isArray(c?.any)) walk(c.any);
+      if (c?.not) walk([c.not]);
+    } };
+    walk(parseDraft()?.all || []);
+    return keys;
+  };
+  /** whether the checklist has this attribute checked */
+  const chartChecked = (key: string, defaults = defaultCharts()) =>
+    chartPicks.added.has(key) || (defaults.has(key) && !chartPicks.removed.has(key));
+  /** check (or uncheck) every attribute in `keys` */
+  const setChartsChecked = (keys: string[], checked: boolean) => {
+    const defaults = defaultCharts();
+    setChartPicks((prev) => {
+      const added = new Set(prev.added), removed = new Set(prev.removed);
+      for (const k of keys) {
+        if (checked) { removed.delete(k); if (!defaults.has(k)) added.add(k); }
+        else { added.delete(k); if (defaults.has(k)) removed.add(k); }
+      }
+      return { added, removed };
+    });
+  };
   const visibleClinical = (list: { attribute: string; per: string; studyCount?: number }[]): typeof list => {
-    const coverageOk = (c: { studyCount?: number }) =>
-      attrCoverage === 0 || (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length);
-    return list.filter((c) => coverageOk(c) && !hiddenAttrs.has(attrKey(c)));
+    const defaults = defaultCharts(), drafted = draftedAttrs();
+    return list.filter((c) => coverageOk(c) && (chartChecked(attrKey(c), defaults) || drafted.has(attrKey(c))));
   };
 
   const attrsForBar = (bar: number, studiesOverride?: string[] | string): string[] => {
@@ -555,7 +595,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, hiddenAttrs, setHiddenAttrs, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

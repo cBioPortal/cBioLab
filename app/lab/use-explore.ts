@@ -76,13 +76,18 @@ export function useExplore(onError: (message: string) => void) {
    * answer shown changes, a cached one included.
    */
   const order = useRef<string[] | null>(null);
+  /** the same pinned answer's attributes in that order, with what choosing the default charts reads */
+  const vocab = useRef<{ key: string; priority: number; studyCount: number }[]>([]);
   /** facets from the last UNNARROWED answer — the coverage bar is always computed from these */
   const fullAttrs = useRef<{ attribute: string; studyCount: number }[]>([]);
   const arranged = useMemo(() => {
     if (!q.data || !req) return null;
     const j = { ...q.data };
     const noSelection = !req.draft || !Array.isArray(req.draft.all) || !req.draft.all.length;
-    if (noSelection) order.current = (j.clinical || []).map(facetKey);
+    if (noSelection) {
+      order.current = (j.clinical || []).map(facetKey);
+      vocab.current = (j.clinical || []).map((c) => ({ key: facetKey(c), priority: c.priority ?? 0, studyCount: c.studyCount ?? 1 }));
+    }
     else if (order.current && j.clinical) {
       const pinned = order.current;
       const rank = (c: FacetKey) => { const i = pinned.indexOf(facetKey(c)); return i === -1 ? pinned.length : i; };
@@ -110,5 +115,6 @@ export function useExplore(onError: (message: string) => void) {
     /** no studies selected: no facets, and any request in flight is dropped */
     clear: () => setAsk(null),
     fullAttrs,
+    vocab,
   };
 }

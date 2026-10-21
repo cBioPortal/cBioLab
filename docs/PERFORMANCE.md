@@ -505,6 +505,18 @@ Three conclusions:
   common attributes cuts the facet count 80x (1,634 → 20) and the latency only
   17%. 1,634 facets is unreadable, so the cap is worth having — but it does not
   address the ceiling.
+- **In the browser, though, the cap is the fix.** Measured 2026-10-21 over 32 studies with the
+  server's answer already cached (0.7s): drawing every attribute meant 486 facet cards, 7,521
+  value rows (5,935 of them inside lists' hidden scroll areas) and ~52,000 DOM nodes, built in
+  one 4.4s main-thread task; a facet click froze the page 2.9s before its request was even sent.
+  Explore now draws cBioPortal's default — the first 20 attributes with priority above 0,
+  plus any the draft filters on; the rest are one checkbox away in "+ Add chart" — and the same
+  selection is 20 cards and ~6,200 nodes, 1.0s to draw and 0.7s on a click (React dev build,
+  both sides). The server still computes every attribute, which keeps the checklist complete.
+- **`next dev` triples Explore's server time.** The same 32-study request with one filter took
+  ~27s through the dev server and ~7s calling `buildExploreFederated` directly; the difference
+  is React's development-only async debugging, which records a stack trace for every promise
+  created inside a `'use cache'` function. Measure server time on a production build.
 - **Production caps out well below the box.** `app/api/explore/route.ts` sets
   `maxDuration = 60`, so Vercel fails somewhere around 256 studies regardless.
 - **The default landing state is slow.** `DEFAULT_EXPLORE_STUDIES` is
