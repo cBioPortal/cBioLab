@@ -91,7 +91,7 @@ export const EXAMPLES: DslExample[] = [
         "CRC, KRAS wild-type": { all: [
           { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" },
           { not: { kind: "oql", q: "KRAS:" } },
-          { kind: "profiled", type: "MUTATION" }
+          { kind: "profiled", type: "MUTATION", gene: "KRAS" }
         ] }
       },
       views: [
@@ -113,7 +113,7 @@ export const EXAMPLES: DslExample[] = [
       cohorts: {
         "TP53 mut": { studies: ["msk_chord_2024", "msk_met_2021"], all: [{ kind: "oql", q: "TP53: MUT" }] },
         "TP53 wt": { studies: ["msk_chord_2024", "msk_met_2021"],
-          all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] }
+          all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION", gene: "TP53" }] }
       },
       views: [
         { kind: "compare", cohorts: ["TP53 mut", "TP53 wt"], genes: ["KRAS", "PIK3CA", "APC", "EGFR", "CDKN2A"] },
@@ -127,12 +127,12 @@ export const EXAMPLES: DslExample[] = [
     title: "Genomic status via OQL, compared",
     demonstrates: "The base case the others build on: two cohorts defined genomically, compared gene by gene with panel-aware denominators, then followed to death.",
     tags: ["OQL"],
-    note: "STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it includes not-profiled unless you add a profiled clause). Two views: co-alteration frequencies and overall survival.",
+    note: "STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration AND profiled for STK11 mutations; without the profiled clause it would include patients never sequenced for STK11). Two views: co-alteration frequencies and overall survival.",
     doc: {
       study: "msk_chord_2024",
       cohorts: {
         "STK11 driver": { all: [{ kind: "oql", q: "STK11: DRIVER" }] },
-        "STK11 wt": { all: [{ not: { kind: "oql", q: "STK11:" } }, { kind: "profiled", type: "MUTATION" }] }
+        "STK11 wt": { all: [{ not: { kind: "oql", q: "STK11:" } }, { kind: "profiled", type: "MUTATION", gene: "STK11" }] }
       },
       views: [{ kind: "compare", cohorts: ["STK11 driver", "STK11 wt"], genes: ["KEAP1", "KRAS", "TP53"] }, { kind: "survival", cohorts: ["STK11 driver", "STK11 wt"] }]
     }
@@ -545,7 +545,7 @@ export const EXAMPLES: DslExample[] = [
         "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] },
         // "wild-type" means PROFILED for mutation and not altered \u2014 without the
         // profiled guard, patients never tested land in the wild-type arm.
-        "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] }
+        "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION", gene: "TP53" }] }
       },
       views: [{
         kind: "course", cohorts: ["TP53 mut", "TP53 wt"], eventTypes: ["treatment", "surgery"],
@@ -583,7 +583,7 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] },
-        "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] }
+        "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION", gene: "TP53" }] }
       },
       views: [{
         kind: "sequence", cohorts: ["TP53 mut", "TP53 wt"], labelKey: "SUBTYPE",
@@ -625,7 +625,7 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] },
-        "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] }
+        "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION", gene: "TP53" }] }
       },
       views: [{ kind: "clinical", cohorts: ["TP53 mut", "TP53 wt"], attributes: ["CANCER_TYPE", "SMOKING_PREDICTIONS_3_CLASSES", "CURRENT_AGE_DEID", "TMB_NONSYNONYMOUS", "FRACTION_GENOME_ALTERED"] }]
     }
@@ -652,7 +652,7 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] },
-        "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] }
+        "TP53 wt": { all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION", gene: "TP53" }] }
       },
       views: [{ kind: "survival", cohorts: ["TP53 mut", "TP53 wt"],
         anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" } }]
@@ -668,7 +668,7 @@ export const EXAMPLES: DslExample[] = [
       cohorts: {
         "TP53 mut": { studies: ["msk_chord_2024", "msk_met_2021"], all: [{ kind: "oql", q: "TP53: MUT" }] },
         "TP53 wt": { studies: ["msk_chord_2024", "msk_met_2021"],
-          all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION" }] }
+          all: [{ not: { kind: "oql", q: "TP53:" } }, { kind: "profiled", type: "MUTATION", gene: "TP53" }] }
       },
       views: [{ kind: "survival", cohorts: ["TP53 mut", "TP53 wt"] }]
     }
@@ -2067,8 +2067,9 @@ Leaf kinds:
 - Attributes named "custom:<dataset>/<COLUMN>" are the user's own uploads (Explore → Custom data),
   usable anywhere a clinical attribute is. Use only ones explore_get_facets lists; they are stored on
   the server, so whoever opens a shared link must be logged in to run it.
-- {"kind":"profiled","type":"MUTATION"|"CNA"|"SV"} — patient was profiled for that data type
-  (use with {"not":...} to distinguish wild-type from not-profiled).
+- {"kind":"profiled","type":"MUTATION"|"CNA"|"SV","gene"?:"KRAS"|"genes"?:[...]} — patient was
+  profiled for that data type, on a panel covering the gene(s) if given. A wild-type cohort is
+  {"not": oql "GENE:"} AND profiled with that gene: "not" alone keeps patients never tested for it.
 - {"kind":"caseList","id":"sequenced"|"cna"|full stable id} — portal case lists.
 - {"kind":"genomicData","gene":"CDKN2A","profileType":"cna","range":{"lte":-2}} — continuous
   per-gene values; profile must exist in the study or it errors listing what does.

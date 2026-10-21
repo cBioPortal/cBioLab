@@ -747,7 +747,8 @@ Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "KRAS"
         }
       ]
     }
@@ -854,7 +855,8 @@ TP53-mutant versus wild-type across MSK-CHORD and MSK-MET. The log-rank is strat
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }
@@ -912,7 +914,7 @@ TP53-mutant versus wild-type across MSK-CHORD and MSK-MET. The log-rank is strat
 
 ### Example 4: Genomic status via OQL, compared
 
-STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it includes not-profiled unless you add a profiled clause). Two views: co-alteration frequencies and overall survival.
+STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration AND profiled for STK11 mutations; without the profiled clause it would include patients never sequenced for STK11). Two views: co-alteration frequencies and overall survival.
 
 ```json
 {
@@ -936,7 +938,8 @@ STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "STK11"
         }
       ]
     }
@@ -2462,7 +2465,8 @@ MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Trea
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }
@@ -2577,7 +2581,8 @@ MSK-CHORD therapy lines by TP53 status, 90-day gap, two panels on one scale. Rea
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }
@@ -2699,7 +2704,8 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }
@@ -2789,7 +2795,8 @@ TP53-mutant vs wild-type, overall survival measured from each patient's first ch
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }
@@ -2846,7 +2853,8 @@ TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers w
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }

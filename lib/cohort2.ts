@@ -77,6 +77,9 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
       }
     }
   }
+  // Every condition here reads a recorded value, so a patient with none matches neither `= X` nor
+  // `!= X`, while {not: {= X}} keeps them. At sample level a patient whose samples differ can
+  // match both `= X` and `!= X`.
   if (leaf.op != null) {
     const op = CLIN_OP[leaf.op];
     if (!op) throw new Error("invalid clinical op (use = != > >= < <=)");
@@ -524,6 +527,11 @@ function clauseSql(clause: any, ctx: Ctx): string {
     return clause.any.map((l: any) => "(" + leafSql(l, ctx) + ")").join("\nUNION DISTINCT\n");
   }
   if (clause.not) {
+    // `not` is the study's patients minus the matches, so it keeps every patient the leaf could
+    // not decide: {not: oql "STK11:"} includes patients never sequenced for STK11, and
+    // {not: clinical} those with no value recorded. A wild-type cohort pairs it with
+    // {kind: "profiled", type, gene} for the same gene; lib/cohort-partitions.ts sends the
+    // undecided to their own arm instead.
     // clauseSql, not leafSql: {not: {any: [...]}} needs the same any/leaf dispatch a bare
     // clause gets, not just a single leaf — De Morgan's otherwise forces two separate `not`s
     // to express "none of these" (e.g. "DDR intact" needed !A and !B and !C by hand).
