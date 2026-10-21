@@ -3,7 +3,7 @@
 
 /** categories that mean "this case has none of that", which draw as neutral and never as a ring */
 export function isAbsent(label: string): boolean {
-  return /^(not mutated|unaltered|neutral|no data|wild type|none|)$/i.test(String(label).trim());
+  return /^(not mutated|unaltered|neutral|diploid|no structural variant|not profiled|no data|wild type|none|)$/i.test(String(label).trim());
 }
 
 /**

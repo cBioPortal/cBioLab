@@ -5,7 +5,7 @@
 // picture draws for a hundred cases or four hundred thousand. The only cases drawn one by one are
 // the points the engine chose (every case under the cap, the outliers over it), at most POINTS_CAP.
 import type { ViewResult } from "../types.ts";
-import type { PlotData } from "../plot.ts";
+import type { HighlightPoint, PlotData, PlotLayer } from "../plot.ts";
 import { isAbsent, jitterFor } from "../plot-draw.ts";
 import { LAYER_BASE } from "../plot-layers.ts";
 import {
@@ -66,6 +66,19 @@ function layerItems(d: PlotData): LegendItem[] {
 }
 /** the layers drawn at all: with any, the plotted cohort steps back to a grey so their colours read */
 const drawnLayers = (d: PlotData) => (d.layers || []).filter((l) => l.shown !== "none");
+/**
+ * One layer's marks as a group tagged with its place in the view's list, so a page can hide it;
+ * `base` is the plotted cohort. A layer's cases an earlier layer drew are hidden groups, one per
+ * layer that drew them (`owner`), which the page shows when that owner is hidden.
+ */
+const layerGroup = (key: number | "base", marks: string[], owner?: number) =>
+  marks.length ? `<g data-layer="${key}"${owner != null ? ` data-shared="" data-owner="${owner}" display="none"` : ""}>${marks.join("")}</g>` : "";
+/** a layer's shared cases, grouped by the layer that drew each */
+function sharedGroups(h: PlotLayer, key: number, mark: (pt: HighlightPoint) => string[]): string {
+  const by = new Map<number, string[]>();
+  (h.shared || []).forEach((pt, i) => { const o = h.sharedOwners?.[i] ?? 0; (by.get(o) ?? by.set(o, []).get(o)!).push(...mark(pt)); });
+  return [...by.entries()].map(([o, marks]) => layerGroup(key, marks, o)).join("");
+}
 
 function scatter(v: ViewResult, d: PlotData, W: number, p: Pal): string {
   const { x0, x1, y0, y1 } = d.extent!, [gx, gy] = d.grid!;
@@ -100,17 +113,24 @@ function scatter(v: ViewResult, d: PlotData, W: number, p: Pal): string {
   const shaded = d.pointSet?.rule === "all" && d.xyPoints?.length ? []
     : cellMax ? d.bins!.filter((b) => b.n > cellMax) : d.bins!;
   // under point layers the plotted cohort is a floor-raised grey, so its faintest cells still read
-  for (const b of shaded) out.push(cell(b, base, hs.length ? 0.3 + 0.7 * shade(b.n) : shade(b.n)));
   const own = d.xyPoints || [];
-  for (const pt of own)
-    out.push(`<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${base}" fill-opacity="0.7"/>`);
-  // a cohort layer too large to draw as points is cells on the same grid, shaded by its own densest cell
-  for (const h of hs) if (h.shown === "density" && h.bins) {
-    const hMax = Math.max(1, ...h.bins.map((b) => b.n));
-    for (const b of h.bins) out.push(cell(b, h.color, 0.3 + 0.7 * Math.log1p(b.n) / Math.log1p(hMax)));
+  out.push(layerGroup("base", [
+    ...shaded.map((b) => cell(b, base, hs.length ? 0.3 + 0.7 * shade(b.n) : shade(b.n))),
+    ...own.map((pt) => `<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${base}" fill-opacity="0.7"/>`)]));
+  const dot = (pt: { x: number; y: number }, color: string) =>
+    `<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`;
+  for (const h of hs) {
+    const key = d.layers!.indexOf(h);
+    // a cohort layer too large to draw as points is cells on the same grid, shaded by its own densest cell
+    if (h.shown === "density" && h.bins) {
+      const hMax = Math.max(1, ...h.bins.map((b) => b.n));
+      out.push(layerGroup(key, h.bins.map((b) => cell(b, h.color, 0.3 + 0.7 * Math.log1p(b.n) / Math.log1p(hMax)))));
+    }
+    if (h.shown === "points") {
+      out.push(layerGroup(key, h.points!.flatMap((pt) => "x" in pt ? [dot(pt, h.color)] : [])));
+      out.push(sharedGroups(h, key, (pt) => "x" in pt ? [dot(pt, h.color)] : []));
+    }
   }
-  for (const h of hs) if (h.shown === "points") for (const pt of h.points!) if ("x" in pt)
-    out.push(`<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`);
   // the fitted line, over every case rather than over what is visible, clipped to the frame
   if (st && st.slope != null && st.intercept != null && x1 > x0) {
     const yAt = (xv: number) => st.intercept! + st.slope! * xv;
@@ -209,6 +229,8 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
 
   gs.forEach((g, i) => {
     const cx = L + bw * (i + 0.5), half = Math.min(24, bw * 0.32);
+    // the plotted cohort's violin and points, as one group a page can step back from
+    const baseMarks: string[] = [];
     if (d.overlay === "violin" && vio.has(g.g)) {
       const cells = vio.get(g.g)!;
       // a bin stands for a range of VALUES, mapped through the extent the bins were cut over
@@ -224,7 +246,7 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
         const yTop = ys(Math.min(cHi, vHi));
         const step = Math.max(1.2, ys(Math.max(cLo, vLo)) - yTop);
         if (!colorKey.length) {
-          out.push(`<rect x="${r1(cx - w)}" y="${r1(yTop)}" width="${r1(w * 2)}" height="${r1(step)}" fill="${base}" fill-opacity="0.28"/>`);
+          baseMarks.push(`<rect x="${r1(cx - w)}" y="${r1(yTop)}" width="${r1(w * 2)}" height="${r1(step)}" fill="${base}" fill-opacity="0.28"/>`);
           continue;
         }
         let x = cx - w;
@@ -233,7 +255,7 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
         for (const sg of segs) {
           if (!sg.n) continue;
           const seg = 2 * w * (sg.n / total);
-          out.push(`<rect x="${r1(x)}" y="${r1(yTop)}" width="${r1(seg)}" height="${r1(step)}" fill="${sg.color}" fill-opacity="0.75"/>`);
+          baseMarks.push(`<rect x="${r1(x)}" y="${r1(yTop)}" width="${r1(seg)}" height="${r1(step)}" fill="${sg.color}" fill-opacity="0.75"/>`);
           x += seg;
         }
       }
@@ -245,14 +267,15 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
         const ring = pt.r != null && !isAbsent(pt.r) ? ringOf(pt.r) : null;
         if (pt.v > vhi || pt.v < vlo) {
           ptOffScale++;
-          out.push(edgeMark(cx + jitterFor(pt.id) * half * 0.9, pt.v > vhi, rBase, fill));
+          baseMarks.push(edgeMark(cx + jitterFor(pt.id) * half * 0.9, pt.v > vhi, rBase, fill));
           continue;
         }
-        out.push(`<circle cx="${r1(cx + jitterFor(pt.id) * half * 0.9)}" cy="${r1(ys(pt.v))}" ` +
+        baseMarks.push(`<circle cx="${r1(cx + jitterFor(pt.id) * half * 0.9)}" cy="${r1(ys(pt.v))}" ` +
           `r="${rBase}" fill="${fill}" fill-opacity="0.85"` +
           (ring ? ` stroke="${ring}" stroke-width="${r1(rBase * 0.36)}"` : "") + `/>`);
       }
     }
+    out.push(layerGroup("base", baseMarks));
     out.push(`<line x1="${r1(cx)}" y1="${r1(ys(g.loWhisker))}" x2="${r1(cx)}" y2="${r1(ys(g.hiWhisker))}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
     out.push(`<rect x="${r1(cx - half)}" y="${r1(ys(g.q3))}" width="${r1(half * 2)}" height="${r1(Math.max(1, ys(g.q1) - ys(g.q3)))}" ` +
       `fill="${base}" fill-opacity="${d.overlay === "none" ? 0.25 : 0.1}" stroke="${base}"><title>${esc(g.g)}: median ${fmtNum(g.median)}, ` +
@@ -265,26 +288,29 @@ function box(v: ViewResult, d: PlotData, W0: number, p: Pal): string {
       const hg = h.groups!.find((x) => x.g === g.g);
       if (!hg) return;
       const hw = Math.max(1.5, half * 0.42), hx = cx + (j - (boxed.length - 1) / 2) * hw * 1.25;
-      out.push(`<line x1="${r1(hx)}" y1="${r1(ys(inAxis(hg.loWhisker)))}" x2="${r1(hx)}" y2="${r1(ys(inAxis(hg.hiWhisker)))}" stroke="${h.color}"/>` +
+      out.push(layerGroup(d.layers!.indexOf(h), [`<line x1="${r1(hx)}" y1="${r1(ys(inAxis(hg.loWhisker)))}" x2="${r1(hx)}" y2="${r1(ys(inAxis(hg.hiWhisker)))}" stroke="${h.color}"/>` +
         `<rect x="${r1(hx - hw / 2)}" y="${r1(ys(hg.q3))}" width="${r1(hw)}" height="${r1(Math.max(1, ys(hg.q1) - ys(hg.q3)))}" fill="${h.color}" fill-opacity="0.85"/>` +
-        `<line x1="${r1(hx - hw / 2 - 1)}" y1="${r1(ys(hg.median))}" x2="${r1(hx + hw / 2 + 1)}" y2="${r1(ys(hg.median))}" stroke="${p.ink}" stroke-width="1.5"/>`);
+        `<line x1="${r1(hx - hw / 2 - 1)}" y1="${r1(ys(hg.median))}" x2="${r1(hx + hw / 2 + 1)}" y2="${r1(ys(hg.median))}" stroke="${p.ink}" stroke-width="1.5"/>`]));
     });
     // A layer's value past the axis is pinned to the frame's edge as a triangle pointing off it, and
     // counted in the caption, rather than drawn outside the figure. With the cases coloured by a
     // category, a layer is a ring round the case, so fill and ring each keep one meaning.
     for (const h of hs) if (h.shown === "points") {
       const rH = PLOT_POINT_R;
-      for (const pt of h.points!) if ("g" in pt && pt.g === g.g) {
+      const marks = (pts: HighlightPoint[], counted: boolean) => pts.flatMap((pt) => {
+        if (!("g" in pt) || pt.g !== g.g) return [];
         const px = cx + jitterFor(pt.id) * half * 0.9;
         if (pt.v > vhi || pt.v < vlo) {
-          offScale++;
-          out.push(edgeMark(px, pt.v > vhi, rH, h.color));
-          continue;
+          if (counted) offScale++;
+          return [edgeMark(px, pt.v > vhi, rH, h.color)];
         }
-        out.push(categorised
+        return [categorised
           ? `<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${r1(rH + 1.4)}" fill="none" stroke="${h.color}" stroke-width="1.4"/>`
-          : `<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${rH}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`);
-      }
+          : `<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${rH}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`];
+      });
+      const key = d.layers!.indexOf(h);
+      out.push(layerGroup(key, marks(h.points!, true)));
+      out.push(sharedGroups(h, key, (pt) => marks([pt], false)));
     }
   });
   out.push(`<line x1="${L}" y1="${T + PLOT}" x2="${W - R}" y2="${T + PLOT}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);

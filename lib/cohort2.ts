@@ -232,6 +232,24 @@ function derivedLeafSql(leaf: any, ctx: Ctx): string {
     "  WHERE " + conds.join(" AND ");
 }
 
+/**
+ * The cases (samples, or patients with a profiled sample) profiled for `gene` in one alteration
+ * type, as bare ids in the column `profiled_id`: the same panel tables, and the same whole-exome rule, as the `profiled` clause
+ * and the gene-table denominator. What an OQL plot axis needs to tell "not altered" from "not
+ * profiled", per sample or per patient.
+ */
+export function profiledCasesSql(gene: string, type: "MUTATION" | "CNA" | "SV", o: { study: string; db: string; unit: "patient" | "sample" }): string {
+  const g = String(gene).toUpperCase().trim();
+  if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)) throw new Error("profiled: invalid gene symbol");
+  const col = o.unit === "sample" ? "sd.sample_unique_id" : "sd.patient_unique_id";
+  return "SELECT DISTINCT " + PID(col, o.study) + " AS profiled_id\n" +
+    "  FROM " + o.db + ".sample_to_gene_panel_derived sp\n" +
+    "  JOIN " + o.db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(o.study) + " AND sp.alteration_type = " + sq(PROFILED_TYPE[type]) +
+    "\n    AND (sp.gene_panel_id = 'WES' OR sp.gene_panel_id IN (\n" +
+    "      SELECT gene_panel_id FROM " + o.db + ".gene_panel_to_gene_derived WHERE gene = " + sq(g) + "))";
+}
+
 function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): string {
   const t = PROFILED_TYPE[String(leaf.type || "").toUpperCase()];
   if (!t) throw new Error("profiled clause: type must be MUTATION, CNA, or SV");

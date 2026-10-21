@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { CohortDef, View } from "../../../lib/types";
 import { PortalTabs } from "../PortalTabs";
-import { useStudyKnown, expressionProfile, type StudyKnown } from "../study-known";
+import { useStudyKnown, expressionProfile, discreteCnaProfile, type StudyKnown } from "../study-known";
 import { arrange, decodeDoc, usePageDoc, type PageLayout } from "../page-doc";
 import { ALTERATION_CELLS, cellLabel } from "../../../lib/lollipop";
 import { Button } from "../../_ui/button";
@@ -48,7 +48,7 @@ function resultsLayout(study: string, entries: string[], genes: string[], known:
     Altered: { all: [{ any: entries.map((q) => ({ kind: "oql", q })) }] } as CohortDef,
     Unaltered: { all: entries.map((q) => ({ not: { kind: "oql", q } })) } as CohortDef,
   };
-  const expr = expressionProfile(known.profiles);
+  const expr = expressionProfile(known.profileCatalog), cna = discreteCnaProfile(known.profileCatalog);
   // the portal plots and correlates over every queried sample, not one group
   if (expr) cohorts["All patients"] = { all: [] } as CohortDef;
   const both = ["Altered", "Unaltered"];
@@ -58,7 +58,8 @@ function resultsLayout(study: string, entries: string[], genes: string[], known:
     { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes, cohorts: both })] },
     { title: "Cancer Types Summary", views: [v("Cancer types summary", { kind: "cancertypes", genes, cohorts: ["Altered"] })] },
     ...(genes.length >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, cohorts: both })] }] : []),
-    ...(expr ? [{ title: "Plots", views: [v("Plot", { kind: "plot", x: { source: "alteration", gene: genes[0], by: "cna" }, y: { source: "molecular", profileType: expr, gene: genes[0] }, cohorts: ["All patients"], points: [{ cohort: "Altered" }] })] }] : []),
+    ...(expr ? [{ title: "Plots", views: [v("Plot", { kind: "plot", x: cna ? { source: "profile", profile: cna, gene: genes[0] } : { source: "alteration", gene: genes[0], by: "cna" },
+      y: { source: "profile", profile: expr, gene: genes[0] }, cohorts: ["All patients"], points: [{ cohort: "Altered" }] })] }] : []),
     // the portal's Mutations tab: one gene at a time, its lollipop over its mutation table
     { title: "Mutations", views: [v("Mutation diagram", { kind: "hotspots", genes: [genes[0]], cohorts: ["Altered"] }),
         v("Mutation table", { kind: "mutations", gene: genes[0], cohorts: ["Altered"] })],
@@ -119,7 +120,7 @@ export default function ResultsPage() {
     {!ready
       ? <><div className="skeleton mb-4 h-10" /><div className="card viewcard viewloading" aria-busy="true"><div className="skeleton skeleton-view" /></div></>
       : <PortalTabs doc={page.doc!} tabs={fresh!.tabs} titles={fresh!.titles} open={page.open} onOpen={page.openTab} onDoc={page.update}
-          catalog={{ attrs: known!.attrs, profiles: known!.profiles, loading: false }}
+          catalog={{ attrs: known!.attrs, profiles: known!.profiles, profileCatalog: known!.profileCatalog, loading: false }}
           onCounts={(c) => setCounts((o) => o || c)} />}
   </>);
 }

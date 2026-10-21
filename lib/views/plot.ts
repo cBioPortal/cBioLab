@@ -7,6 +7,7 @@ import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, tukey, covera
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank } from "../plot.ts";
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../plot-layers.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { resolveAxes } from "../plot-profile.ts";
 
 type BoxRow = { g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number };
 
@@ -31,6 +32,16 @@ function poolBoxRows(parts: BoxRow[][]): PlotGroup[] {
 }
 
 type Def = ViewRun["doc"]["cohorts"][string];
+
+/** copy-number levels in their own order, as the portal draws them; anything else keeps its place after them */
+const CNA_LEVELS = ["Deep deletion", "Shallow deletion", "Diploid", "Gain", "Amplification"];
+/** a box grouped by a discrete copy-number profile runs from deep deletion to amplification, not by size */
+function orderLevels(data: PlotData, spec: PlotRequest): void {
+  const cat = data.x.kind === "cat" ? spec.x : spec.y;
+  if (data.shape !== "box" || !data.groups || cat.source !== "molecular" || !cat.discrete) return;
+  const rank = (g: string) => { const i = CNA_LEVELS.indexOf(g); return i < 0 ? CNA_LEVELS.length : i; };
+  data.groups = [...data.groups].sort((a, b) => rank(a.g) - rank(b.g));
+}
 const TABLE_WHY = "a contingency table counts cases and has no points to mark";
 const fmt = (n: number) => n.toLocaleString("en-US");
 
@@ -121,7 +132,8 @@ async function pointLayers(pv: PlotView, data: PlotData, c: ViewRun, cn: string,
   const def = c.doc.cohorts[cn];
   const xk = data.x.kind, yk = data.y.kind;
   const closed = sites.filter((s) => !isPatientLevel(c.resolvers[s]));
-  const seen = new Set<string>();
+  // each drawn case, and the layer (its place in the list) that drew it
+  const seen = new Map<string, number>();
   let budget = POINTS_CAP;
   const out: PlotLayer[] = [];
   for (const [i, l] of specs.entries()) {
@@ -136,8 +148,12 @@ async function pointLayers(pv: PlotView, data: PlotData, c: ViewRun, cn: string,
     const { layer, keys } = picked;
     if (layer.shown === "points" && layer.points && keys) {
       const kept = layer.points.filter((_, j) => !seen.has(keys[j]));
-      for (const k of keys) seen.add(k);
-      layer.drawn = kept.length; layer.points = kept;
+      const sharedAt = keys.map((k, j) => seen.has(k) ? j : -1).filter((j) => j >= 0);
+      const owners = sharedAt.map((j) => seen.get(keys[j])!);
+      for (const k of keys) if (!seen.has(k)) seen.set(k, i);
+      layer.drawn = kept.length;
+      if (sharedAt.length) { layer.shared = sharedAt.map((j) => layer.points![j]); layer.sharedOwners = owners; }
+      layer.points = kept;
       budget -= kept.length;
     }
     out.push(layer);
@@ -296,8 +312,14 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
   const sites = cohorts[cn].studies;
   // a point is a sample unless the view asks for patients, as on cBioPortal's Plots tab
   const unit = pv.unit === "patient" ? "patient" as const : "sample" as const;
-  const spec = { x: pv.x, y: pv.y, unit,
-    ...(pv.colorBy ? { colorBy: pv.colorBy } : {}), ...(pv.ringBy ? { ringBy: pv.ringBy } : {}) };
+  // a profile axis is read as the studies describe the profile
+  let axes: { x: PlotView["x"]; y: PlotView["y"]; colorBy?: PlotView["x"]; ringBy?: PlotView["x"] };
+  try {
+    const catalogs = await Promise.all(sites.map(async (st) => ({ study: st, catalog: (await c.studyProfiles(st)).catalog || [] })));
+    axes = resolveAxes({ x: pv.x, y: pv.y, colorBy: pv.colorBy, ringBy: pv.ringBy }, catalogs);
+  } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
+  const spec = { x: axes.x, y: axes.y, unit,
+    ...(axes.colorBy ? { colorBy: axes.colorBy } : {}), ...(axes.ringBy ? { ringBy: axes.ringBy } : {}) };
   const bins: [number, number] = Array.isArray(pv.bins) && pv.bins.length === 2
     ? [Number(pv.bins[0]), Number(pv.bins[1])] : DEFAULT_BINS;
   const problem = layersProblem(pv, c, cn);
@@ -306,6 +328,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
     if (sites.length === 1) {
       const r0 = resolvers[sites[0]];
       const data = await r0.plot(doc.cohorts[cn], { ...spec, bins: pv.bins ? bins : undefined });
+      orderLevels(data, spec);
       await basePoints(pv, r0, doc.cohorts[cn], spec, data, sites[0]);
       const ls = await pointLayers(pv, data, c, cn, sites, spec);
       if (ls.length) data.layers = ls;
@@ -416,6 +439,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         }
       }
 
+      orderLevels(data, spec);
       // each site counts its own cases and their axes; the sums are exact. A failed count fails the
       // view: dropping the coverage note would hide how many cases the figure leaves out
       const covs = await Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk)));

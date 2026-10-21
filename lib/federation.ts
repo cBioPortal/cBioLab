@@ -27,7 +27,7 @@ import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql } f
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
-  highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql,
+  highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, OQL_NOT_PROFILED,
   type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape,
   type PlotXYPoint, type SparseCells, type Whiskers, type PointRank } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
@@ -807,6 +807,24 @@ export function anchoredSurvivalSql(
  * patient-level only (see PatientLevelResolver.coxRows) rather than something every
  * participant can answer.
  */
+/** an axis that can answer "Not profiled": a gene's alterations, or a discrete copy-number profile */
+function undecidable(a: PlotAxis): boolean {
+  return a.source === "alteration" || (a.source === "molecular" && !!a.discrete);
+}
+/** an axis's rows without its "Not profiled" cases */
+function decidedOnly(sel: string): string {
+  return "SELECT id, v FROM (\n" + sel + "\n) WHERE v != " + sq(OQL_NOT_PROFILED);
+}
+/**
+ * The SQL counting the rows of a model's query (before "Not profiled" is left out) that are not
+ * profiled on an undecidable axis: the patients a fit leaves out for that reason. null when no axis
+ * of the model can be undecided.
+ */
+function notProfiledCountSql(unfiltered: string, sels: { label: string }[], axes: PlotAxis[]): string | null {
+  const cols = sels.filter((_, i) => undecidable(axes[i])).map((s) => s.label + " = " + sq(OQL_NOT_PROFILED));
+  return cols.length ? "SELECT countIf(" + cols.join(" OR ") + ") AS n FROM (\n" + unfiltered + "\n)" : null;
+}
+
 export function coxRowsSql(
   cohortSql: string, study: string, db: string, endpoint: string, covariates: { label: string; sel: string }[],
   columns?: EndpointColumns
@@ -1289,10 +1307,10 @@ export interface PatientLevelCapable extends AggregateCapable {
   members(def: CohortDef | null | undefined): Promise<string[]>;
   /** per-patient rows for a Cox fit — see PatientLevelResolver.coxRows for why this is here and not on AggregateCapable */
   coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[], columns?: EndpointColumns):
-    Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[] }>;
+    Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[]; notProfiled: number }>;
   /** per-patient rows for a logistic fit — same reason as coxRows */
   logisticRows(def: CohortDef | null | undefined, outcome: PlotAxis, covariates: PlotAxis[]):
-    Promise<{ rows: { y: number | string; values: (number | string)[] }[]; outcomeKind: AxisKind; kinds: AxisKind[] }>;
+    Promise<{ rows: { y: number | string; values: (number | string)[] }[]; outcomeKind: AxisKind; kinds: AxisKind[]; notProfiled: number }>;
   /** one row per patient (never an identifier) for a view in lib/views/ (a lab waterfall) — see PatientLevelResolver.viewRows */
   viewRows(label: string, def: CohortDef | null | undefined, build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
   /** a table view's rows (lib/table-query.ts) in this instance, with their ids — see PatientLevelResolver.rowsPage */
@@ -2061,21 +2079,33 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * single row carries an identifier. `kinds` says which covariates came back numeric so the
    * caller (which dummy-codes categoricals) doesn't have to re-derive it.
    */
+  /** a count query's answer, or 0 when there is nothing to count */
+  private async countIfAny(label: string, sql: string | null, conn: ChConn): Promise<number> {
+    if (!sql) return 0;
+    const r = await this.runLogged<ChRow>(label, sql, conn);
+    return Number(r.data[0]?.n || 0);
+  }
+
   async coxRows(def: CohortDef | null | undefined, endpoint: string, covariates: PlotAxis[], columns?: EndpointColumns):
-    Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[] }> {
+    Promise<{ rows: { t: number; event: number; values: (number | string)[] }[]; kinds: AxisKind[]; notProfiled: number }> {
     covariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1)));
     const db = this.instance.conn.db, conn = this.instance.conn;
     const kindsMap = await this.clinicalKinds(covariates);
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
     const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
-    const sql = coxRowsSql(ctx.cohortSql, this.study, db, endpoint, sels, columns);
-    const r = await this.runLogged<ChRow>("coxRows:" + endpoint, sql, conn);
+    // a patient not profiled for a covariate's gene has no value to fit, so the fit leaves them
+    // out (in the query the method record re-runs) and counts them, rather than coding "unknown"
+    const decided = sels.map((s, i) => undecidable(covariates[i]) ? { ...s, sel: decidedOnly(s.sel) } : s);
+    const sql = coxRowsSql(ctx.cohortSql, this.study, db, endpoint, decided, columns);
+    const [r, np] = await Promise.all([
+      this.runLogged<ChRow>("coxRows:" + endpoint, sql, conn),
+      this.countIfAny("coxNotProfiled:" + endpoint, notProfiledCountSql(coxRowsSql(ctx.cohortSql, this.study, db, endpoint, sels, columns), sels, covariates), conn)]);
     const rows = r.data.map((row) => ({
       t: Number(row.m), event: Number(row.ev),
       values: covariates.map((_, i) => kinds[i] === "num" ? Number(row["c" + i]) : String(row["c" + i]))
     }));
-    return { rows, kinds };
+    return { rows, kinds, notProfiled: np };
   }
 
   /**
@@ -2145,7 +2175,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * level, or which already-0/1 numeric value, counts as the event.
    */
   async logisticRows(def: CohortDef | null | undefined, outcome: PlotAxis, covariates: PlotAxis[]):
-    Promise<{ rows: { y: number | string; values: (number | string)[] }[]; outcomeKind: AxisKind; kinds: AxisKind[] }> {
+    Promise<{ rows: { y: number | string; values: (number | string)[] }[]; outcomeKind: AxisKind; kinds: AxisKind[]; notProfiled: number }> {
     validateAxis(outcome, "outcome");
     covariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1)));
     const db = this.instance.conn.db, conn = this.instance.conn;
@@ -2155,13 +2185,19 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
     const outcomeSel = { label: "y0", sel: axisSelect(outcome, ctx, outcomeKind) };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
-    const sql = logisticRowsSql(ctx.cohortSql, outcomeSel, sels);
-    const r = await this.runLogged<ChRow>("logisticRows", sql, conn);
+    // as for Cox: not profiled for the outcome's or a covariate's gene is left out and counted
+    const all = [outcomeSel, ...sels], axes = [outcome, ...covariates];
+    const [dOut, ...dSels] = all.map((s, i) => undecidable(axes[i]) ? { ...s, sel: decidedOnly(s.sel) } : s);
+    const sql = logisticRowsSql(ctx.cohortSql, dOut, dSels);
+    const counted = all.map((s, i) => ({ ...s, label: i === 0 ? "y" : s.label }));
+    const [r, np] = await Promise.all([
+      this.runLogged<ChRow>("logisticRows", sql, conn),
+      this.countIfAny("logisticNotProfiled", notProfiledCountSql(logisticRowsSql(ctx.cohortSql, outcomeSel, sels), counted, axes), conn)]);
     const rows = r.data.map((row) => ({
       y: outcomeKind === "num" ? Number(row.y) : String(row.y),
       values: covariates.map((_, i) => kinds[i] === "num" ? Number(row["c" + i]) : String(row["c" + i]))
     }));
-    return { rows, outcomeKind, kinds };
+    return { rows, outcomeKind, kinds, notProfiled: np };
   }
 }
 

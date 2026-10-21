@@ -568,7 +568,7 @@ async function main() {
           try { const v = JSON.parse(document.querySelector("#docjson").value).views[0];
             return v.x.attribute === "FRACTION_GENOME_ALTERED" && v.y.attribute === "MUTATION_COUNT"; } catch { return false; }
         }, null, { timeout: 30000 });
-        sideOk = blocks.join(",") === "Horizontal axis,Vertical axis" && names.join(",") === "Data type,Clinical attribute" && !!beside && heights.length === 1;
+        sideOk = blocks.join(",") === "Horizontal axis,Vertical axis" && names.join(",") === "Data,Clinical attribute" && !!beside && heights.length === 1;
         sideWhat = "blocks " + blocks.join(",") + "; fields " + names.join(",") + "; figure beside: " + beside + "; select heights " + heights.join(",") + "; swap rewrote x/y";
       } catch (e) { sideWhat = String(e.message).split("\n")[0]; }
       ok("a plot's axes are defined in a sidebar beside the figure, and Swap axes swaps them", sideOk, sideWhat);
@@ -591,6 +591,57 @@ async function main() {
         layerWhat = "before " + JSON.stringify(before) + " -> after " + JSON.stringify(after) + "; the key names the new layer";
       } catch (e) { layerWhat = String(e.message).split("\n")[0]; }
       ok("a plot's point layers are listed in the sidebar, and adding one draws it with a key entry", layerOk, layerWhat);
+
+      // Hiding the plotted cases or a layer is instant and the browser's own: its group steps back,
+      // a case it drew reappears in the next layer holding it, Esc shows everything.
+      let soloWhat = "no layer buttons", soloOk = false;
+      try {
+        const groups = () => page.evaluate(() => [...document.querySelectorAll(".plot-figure g[data-layer]")]
+          .map((g) => [g.getAttribute("data-layer") + (g.hasAttribute("data-shared") ? "<" + g.getAttribute("data-owner") : ""), getComputedStyle(g).opacity, getComputedStyle(g).display]));
+        const docBefore = await page.locator("#docjson").inputValue();
+        const chips = page.locator(".plot-solo button");
+        const names = await chips.allInnerTexts();
+        await chips.nth(1).click();          // the first layer
+        const hid = await groups();
+        await chips.first().click();         // the plotted cases too
+        const both = await groups();
+        await page.keyboard.press("Escape");
+        const back = await groups();
+        const of = (gs, k) => gs.filter(([key]) => key === k);
+        soloOk = /^all samples/.test(names[0]) && names.length >= 2 &&
+          of(hid, "0").every(([, o]) => o !== "1") && of(hid, "base").every(([, o]) => o === "1") &&
+          hid.filter(([k]) => /<0$/.test(k)).every(([, o, d]) => o === "1" && d !== "none") &&
+          of(both, "base").every(([, o]) => o !== "1") &&
+          back.filter(([k]) => !k.includes("<")).every(([, o]) => o === "1") &&
+          (await page.locator("#docjson").inputValue()) === docBefore;
+        soloWhat = "chips " + JSON.stringify(names) + "; first layer hidden " + JSON.stringify(hid) + "; after Esc " + JSON.stringify(back) + "; document unchanged";
+      } catch (e) { soloWhat = String(e.message).split("\n")[0]; }
+      ok("the plotted cases and each layer can be hidden from their chips, shared cases follow, Esc shows everything, and the document is untouched", soloOk, soloWhat);
+
+      // An OQL axis is edited through the app's gene query dialog: it opens with one line per
+      // statement, and what it applies is the axis's query.
+      let oqlWhat = "no OQL axis", oqlOk = false;
+      try {
+        await page.goto(BASE + "/lab?tab=analysis&doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
+          study: "msk_chord_2024", cohorts: { All: { all: [] } },
+          views: [{ kind: "plot", cohorts: ["All"], x: { source: "alteration", oql: "KRAS: G12C, STK11: MUT", by: "statement" },
+            y: { source: "clinical", attribute: "TMB_NONSYNONYMOUS" } }]
+        })).toString("base64")));
+        await page.waitForSelector(".plot-side", { timeout: 300000 });
+        // genes and OQL are chosen in the dialog only: the axis holds no free-text field
+        const freeText = await page.locator(".plot-side .plot-axis input").count();
+        await page.getByRole("button", { name: "OQL for this axis" }).click();
+        const dlg = page.locator("[role=dialog]");
+        await dlg.waitFor({ timeout: 30000 });
+        const opened = await dlg.locator("textarea").inputValue();
+        await dlg.locator("textarea").fill("KRAS: G12C\nSTK11: MUT\nKEAP1: MUT");
+        await dlg.getByRole("button", { name: /^Apply/ }).click({ timeout: 30000 });
+        await page.waitForFunction(() => /KEAP1/.test(JSON.parse(document.querySelector("#docjson").value).views[0].x.oql), null, { timeout: 30000 });
+        const x = await page.evaluate(() => JSON.parse(document.querySelector("#docjson").value).views[0].x);
+        oqlOk = freeText === 0 && opened === "KRAS: G12C\nSTK11: MUT" && x.oql === "KRAS: G12C, STK11: MUT, KEAP1: MUT" && x.by === "statement";
+        oqlWhat = "free-text fields " + freeText + "; opened " + JSON.stringify(opened) + " -> axis " + JSON.stringify(x);
+      } catch (e) { oqlWhat = String(e.message).split("\n")[0]; }
+      ok("a plot's OQL axis is edited in the gene query dialog, and its lines become the axis's statements", oqlOk, oqlWhat);
 
       // The oncoprint's gear keeps ONLY the link out to cBioPortal; genes moved
       // to a named button and a modal, so the gear is not where editing hides.

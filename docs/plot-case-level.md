@@ -35,7 +35,7 @@ a hover lands on an arbitrary one. So:
   combines the patient's samples by a stated rule: a number is their mean, a category their common
   value or "Multiple" where they differ, an alteration counts if any sample has it, and the caption
   says how many patients had more than one sample.
-- **At or under `POINTS_CAP` (5,000), every case is a point** (`allPoints`, default true), on a
+- **At or under `POINTS_CAP` (10,000), every case is a point** (`allPoints`, default true), on a
   scatter as on a box — the portal's picture, and what most single studies get.
 - **Over the cap, the crowd is density, and point layers draw chosen subsets in colour over it.**
   `points` is an ordered list of at most four layers (`lib/plot-layers.ts`):
@@ -75,23 +75,43 @@ One commit per item; `npm test` and a focused check per item; the gate before ea
    the figure beside it (`PlotControls`, shared by the lab card and the Results page).
 3. **Done.** A point is a sample by default; patient mode combines samples by a stated rule.
 4. **Done.** Point layers (above), replacing `highlight`, with the sidebar's Points section.
-5. **Measure the cap.** SVG draw time and payload at 5k, 10k, 20k and 50k points on msk_chord;
-   set `POINTS_CAP` from it.
-6. **Multiple genes.** An alteration axis whose OQL has several statements gets one category per
-   statement (overlaps as their own category, never assigned arbitrarily), and commas separate
-   statements as well as `;` and newlines.
-7. **Colour by gene per case** (phase 2). `colorBy: { source: "gene", gene }`: fill from the case's
+5. **Done.** Show one layer alone: each layer is a group in the SVG tagged with its place in the
+   list (its cases an earlier layer drew are a hidden group of their own), and a row of buttons
+   above the figure steps the rest back with one CSS rule; Esc restores. Browser state only.
+6. **Done.** The cap, measured. The plot renderer drew a scatter and a box at n points
+   (synthetic values, real-shaped ids), and headless Chrome on the dev server (6 cores, no GPU)
+   inserted and painted each SVG, median of 3:
+
+   | points | paint, scatter / box | one hover hit-test | JSON (raw / gzip) |
+   |---|---|---|---|
+   | 5,000 | 84 / 117 ms | 0.4 ms | 220 / 35 KB |
+   | 10,000 | 180 / 190 ms | 1.7 ms | 440 / 70 KB |
+   | 20,000 | 352 / 337 ms | 3.2 ms | 880 / 140 KB |
+   | 50,000 | 904 / 752 ms | 7 ms | 2.2 MB / 350 KB |
+
+   Building the SVG string is 25–190 ms and not the limit; painting is, at about 18 ms per
+   thousand points, paid again on every redraw (a resize, a re-run). `POINTS_CAP` is 10,000, which
+   keeps a redraw near 200 ms on this machine (a laptop with a GPU is faster). Hover will go
+   through one overlay (item 9), so per-circle hit-testing does not set the cap.
+7. **Done.** Multiple genes. An OQL axis's statements are separated by ",", ";" or a new line
+   (everywhere OQL is read). `by: "statement"` gives each statement its own group, a case matching
+   two the pair, three or more "3 or more lines". Either way a case matching nothing is
+   "Unaltered" only when it is profiled for every statement's gene (panel-aware), otherwise "Not
+   profiled". On msk_chord, KRAS G12C and RRAGC (on 20,048 of 25,040 samples' panels): 1,111 /
+   61 / 3 both / 19,115 Unaltered / 4,750 Not profiled, equal to a direct query; the 4,750 were
+   counted as Unaltered before.
+8. **Colour by gene per case** (phase 2). `colorBy: { source: "gene", gene }`: fill from the case's
    highest-priority mutation (oncoprint priority, driver/VUS by the pinned OncoKB), ring from
    CNA/SV, "not profiled" its own class (panel coverage, reuse the oncoprint's). On scatters too;
    the rare classes become a point layer over the cap. Check per-class counts against the portal's
    Plots tab for one study and gene.
-8. **Interaction** (phase 3): one overlay over the SVG maps the cursor to the nearest point (a grid
+9. **Interaction** (phase 3): one overlay over the SVG maps the cursor to the nearest point (a grid
    index over the drawn points); hover tooltip (sample id linking to the patient view, values,
-   alterations), legend-click highlight, case-id / protein-change search whose matches come back
+   alterations), case-id / protein-change search whose matches come back
    from the server as a layer.
-9. **Brush and drill-down** (phase 4): a region or a cell returns its cases as a layer; "N cases →
+10. **Brush and drill-down** (phase 4): a region or a cell returns its cases as a layer; "N cases →
    study view" built from the full list on the server.
-10. **Sidebar parity** (phase 5): "same gene", Driver vs VUS and VAF axes, box category filter and
+11. **Sidebar parity** (phase 5): "same gene", Driver vs VUS and VAF axes, box category filter and
     sort-by-median, regression line toggle, R² and the equation, connect samples from the same
     patient.
 

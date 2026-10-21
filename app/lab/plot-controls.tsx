@@ -12,14 +12,17 @@ import { Checkbox } from "../_ui/checkbox";
 import { Choice, OptionSelect } from "../_ui/choice.tsx";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
-import { FIELD } from "../_ui/toolbar.ts";
-import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
+import { CHIP, FIELD } from "../_ui/toolbar.ts";
+import type { ProfileInfo } from "../../lib/profile-catalog.ts";
+import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_BASE, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
 
 type Update = (fn: (view: any) => any) => void;
+/** the points cap as the controls print it */
+const CAP = POINTS_CAP.toLocaleString("en-US");
 
 function LogToggle({ spec, side, numeric, busy, update }: { spec: any; side: "x" | "y"; numeric: boolean; busy: boolean; update: Update }) {
   const axis = spec[side];
-  if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular")) return null;
+  if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular" && axis.source !== "profile")) return null;
   return (
     <label className="chk text-md text-foreground" title="draw this axis on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out">
       <Checkbox checked={!!axis.log} disabled={busy}
@@ -71,7 +74,7 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
 }) {
   const has = (f: (l: PointLayerSpec) => boolean) => layers.some(f);
   const offers: [string, string, PointLayerSpec][] = [];
-  if (!has((l) => "rule" in l && l.rule === "outliers")) offers.push(["outliers", "outliers (past 5,000 cases)", { rule: "outliers" }]);
+  if (!has((l) => "rule" in l && l.rule === "outliers")) offers.push(["outliers", "outliers (past " + CAP + " cases)", { rule: "outliers" }]);
   for (const side of ["x", "y"] as const)
     if (plot?.[side].kind === "num" && !has((l) => "rule" in l && l.rule === "extremes" && l.axis === side))
       offers.push(["extremes:" + side, "top and bottom " + POINT_RULE_N + " by " + axisName(side), { rule: "extremes", axis: side }]);
@@ -110,12 +113,15 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
   );
 }
 
-export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohortOptions, update, children }: {
+export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohortOptions, update, children }: {
   /** the view as the document holds it */
   spec: any;
-  /** the last result's plot: which shape is on screen, each axis's name and kind, how many cases it shows */
-  plot?: { shape: string; n: number; x: { kind: string; label: string }; y: { kind: string; label: string }; coverage?: { total: number } };
-  attrs: { attribute: string; kind: string }[]; profiles: string[]; loading?: boolean; busy: boolean;
+  /** the last result's plot: which shape is on screen, each axis's name and kind, how many cases it shows, its layers */
+  plot?: { shape: string; n: number; x: { kind: string; label: string }; y: { kind: string; label: string }; coverage?: { total: number };
+    layers?: { label: string; color: string; n: number; shown: string }[] };
+  attrs: { attribute: string; kind: string }[];
+  /** the studies' profiles as they describe them, for each axis's Data picker */
+  catalog: ProfileInfo[]; loading?: boolean; busy: boolean;
   /** the cohorts a point layer may be: every one but the plotted one and a split */
   cohortOptions: { name: string; label: string; depth: number }[];
   update: Update;
@@ -123,6 +129,26 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohor
   children: React.ReactNode;
 }) {
   const layers: PointLayerSpec[] = Array.isArray(spec.points) ? spec.points : DEFAULT_POINT_LAYERS;
+  // Which of the plotted cohort and its layers are hidden: a reading gesture, kept in the browser
+  // like a hover (invariant 9), and dropped when the layers drawn change.
+  const drawn = (plot?.layers || []).map((l, i) => ({ ...l, i })).filter((l) => l.shown !== "none");
+  const drawnKey = drawn.map((l) => l.i + ":" + l.label).join("|");
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => setHidden([]), [drawnKey]);
+  useEffect(() => {
+    if (!hidden.length) return;
+    const off = (e: KeyboardEvent) => { if (e.key === "Escape") setHidden([]); };
+    window.addEventListener("keydown", off);
+    return () => window.removeEventListener("keydown", off);
+  }, [hidden]);
+  const toggle = (k: string) => setHidden((h) => h.includes(k) ? h.filter((x) => x !== k) : [...h, k]);
+  const chip = (k: string, color: string, text: string) => {
+    const shown = !hidden.includes(k);
+    return <Button key={k} type="button" variant="outline" size="xs" className={cn(CHIP, "h-ctl gap-1.5", !shown && "text-muted-foreground line-through")} aria-pressed={shown}
+      title={shown ? "hide " + text + " (Esc shows everything)" : "show " + text} onClick={() => toggle(k)}>
+      <span className="size-2.5 flex-none rounded-full" style={{ background: color, opacity: shown ? 1 : 0.35 }} />{text}
+    </Button>;
+  };
   const axisName = (side: "x" | "y") => plot?.[side].label || side;
   const unit = spec.unit || "sample";
   // A box is drawn with its categories across, whichever axis the document holds them on, so a
@@ -130,7 +156,7 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohor
   const boxTransposed = plot?.shape === "box" && plot.x.kind === "num";
   const boxDrawn = plot?.shape === "box" && !boxTransposed;
   const axisFields = (side: "x" | "y") => <>
-    <AxisPicker side={side} stacked axis={spec[side]} attrs={attrs} profiles={profiles} loading={loading} busy={busy}
+    <AxisPicker side={side} stacked axis={spec[side]} attrs={attrs} catalog={catalog} loading={loading} busy={busy}
       onChange={(a) => update((vv) => ({ ...vv, [side]: a }))} />
     <LogToggle spec={spec} side={side} numeric={plot?.[side].kind === "num"} busy={busy} update={update} />
   </>;
@@ -166,11 +192,11 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohor
                 <span className="axfield-name text-sm font-semibold text-foreground"
                   title="subsets of the plotted cases drawn in their own colour over it; the first layer draws a case two share">Points</span>
                 <label className="chk text-md text-foreground" title={overCap
-                  ? "this plot has " + plot!.n.toLocaleString() + " " + unit + "s, more than 5,000, so it is drawn as density whatever this says"
-                  : "every case as a point when there are at most 5,000 and the study may show cases; off draws the density alone"}>
+                  ? "this plot has " + plot!.n.toLocaleString() + " " + unit + "s, more than " + CAP + ", so it is drawn as density whatever this says"
+                  : "every case as a point when there are at most " + CAP + " and the study may show cases; off draws the density alone"}>
                   <Checkbox checked={spec.allPoints !== false} disabled={busy || overCap}
                     onCheckedChange={(c) => update((vv) => { const n = { ...vv }; if (c === true) delete n.allPoints; else n.allPoints = false; return n; })} />
-                  every {unit} (up to 5,000)
+                  every {unit} (up to {CAP})
                 </label>
                 <PointLayers layers={layers} plot={plot} cohortOptions={cohortOptions} axisName={axisName} busy={busy}
                   onChange={(next) => update((vv) => ({ ...vv, points: next }))} />
@@ -184,18 +210,23 @@ export function PlotControls({ spec, plot, attrs, profiles, loading, busy, cohor
           </p>}
           {/* colour and ring split a box's violin and points; a scatter's density and a contingency
               have no per-case colour, so the controls appear only with a box on screen */}
-          {plot?.shape === "box" && <div className="viewtb mt-0 mb-2.5">
-            <div className="tbz">
+          {(plot?.shape === "box" || drawn.length > 0) && <div className="viewtb mt-0 mb-2.5">
+            {plot?.shape === "box" && <><div className="tbz">
               <span className="tbl" title="colours each group's violin and points by a category">colour samples by</span>
-              <AxisPicker side="fill" axis={spec.colorBy} allowNone categorical attrs={attrs} profiles={profiles} loading={loading} busy={busy}
+              <AxisPicker side="fill" axis={spec.colorBy} allowNone categorical attrs={attrs} catalog={catalog} loading={loading} busy={busy}
                 onChange={(a) => update((vv) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
             </div>
             <div className="tbz">
-              <AxisPicker side="ring" axis={spec.ringBy} allowNone categorical attrs={attrs} profiles={profiles} loading={loading} busy={busy}
+              <AxisPicker side="ring" axis={spec.ringBy} allowNone categorical attrs={attrs} catalog={catalog} loading={loading} busy={busy}
                 onChange={(a) => update((vv) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
-            </div>
+            </div></>}
+            {drawn.length > 0 && <div className="tbz plot-solo">
+              <span className="tbl" title="this browser only: hide or show the plotted cases and each layer; Esc shows everything">show</span>
+              {chip("base", LAYER_BASE, "all " + unit + "s (" + plot!.n.toLocaleString() + ")")}
+              {drawn.map((l) => chip(String(l.i), l.color, l.label + " (" + l.n.toLocaleString() + ")"))}
+            </div>}
           </div>}
-          {children}
+          <div className="plot-figure" data-hide={hidden.length ? hidden.join(" ") : undefined}>{children}</div>
         </div>
       </div>
     </div>

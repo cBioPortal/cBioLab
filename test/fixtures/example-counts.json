@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-10-14",
+  "generated": "2026-10-20",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -80,6 +80,9 @@
     },
     "OQL on a plot axis: STK11 or KEAP1 mutant lung cancer": {
       "NSCLC": 7809
+    },
+    "Plot axes from the study's own profiles: ERBB2 copy number against expression": {
+      "all samples": 1084
     },
     "Merged gene rows: a pathway as one track": {
       "Pancreatic": 3109

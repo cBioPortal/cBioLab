@@ -9,6 +9,7 @@
 import { applyLocks, lockDate, lockSamples } from "./cohort-lock.ts";
 import { chQuery, STUDY, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
+import type { ProfileInfo } from "./profile-catalog.ts";
 import { describeCohortDef } from "./cohort2.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
@@ -34,11 +35,16 @@ async function oncokbPin(): Promise<string | null> {
   } catch { return null; }
 }
 
-const _profileCache = new Map<string, { profiles: string[]; gaProfiles: string[] }>(); // per-study
-export async function studyProfiles(study: string): Promise<{ profiles: string[]; gaProfiles: string[] }> {
+const _profileCache = new Map<string, StudyProfiles>(); // per-study
+export interface StudyProfiles {
+  profiles: string[]; gaProfiles: string[];
+  /** every profile as the study describes it (genetic_profile), for what a plot axis may read */
+  catalog: ProfileInfo[];
+}
+export async function studyProfiles(study: string): Promise<StudyProfiles> {
   if (_profileCache.has(study)) return _profileCache.get(study)!;
   const { peerForStudy } = await import("./federation-remote.ts");
-  if (await peerForStudy(study)) return { profiles: [], gaProfiles: [] }; // the peer owns its own profile inventory
+  if (await peerForStudy(study)) return { profiles: [], gaProfiles: [], catalog: [] }; // the peer owns its own profile inventory
   const conn = (await studyRouting()).get(study) || PRIMARY;
   const profiles = (await chQuery(
     "SELECT DISTINCT profile_type FROM " + conn.db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study), conn)).data.map((r) => r.profile_type);
@@ -47,7 +53,15 @@ export async function studyProfiles(study: string): Promise<{ profiles: string[]
     "SELECT DISTINCT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt FROM " + conn.db + ".genetic_profile gp\n" +
     "JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'GENERIC_ASSAY'", conn)).data.map((r) => r.pt);
-  const out = { profiles, gaProfiles };
+  const catalog = (await chQuery(
+    "SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS profile, gp.genetic_alteration_type AS type, gp.datatype AS datatype,\n" +
+    "       gp.name AS name, ifNull(toString(gp.generic_assay_type), '') AS assay, toInt32OrZero(ifNull(toString(gp.sort_order), '')) AS ord\n" +
+    "FROM " + conn.db + ".genetic_profile gp\n" +
+    "JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study), conn)).data.map((r): ProfileInfo => ({
+      profile: String(r.profile), type: String(r.type), datatype: String(r.datatype), name: String(r.name),
+      ...(r.assay ? { assayType: String(r.assay) } : {}), order: Number(r.ord) || 0 }));
+  const out = { profiles, gaProfiles, catalog };
   _profileCache.set(study, out);
   return out;
 }

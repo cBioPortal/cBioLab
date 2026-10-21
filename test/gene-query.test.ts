@@ -35,6 +35,9 @@ describe("gene query: OQL", () => {
   test("the browser-safe parser is the one the engine uses", () => {
     assert.equal(parseOql, parsePure);
   });
+  test("the engine reads a comma between statements as the dialog does: a cohort's or an axis's OQL alike", () => {
+    assert.deepEqual(parseOql("KRAS: G12C, STK11: MUT;EGFR: AMP\nTP53").map((e) => e.gene), ["KRAS", "STK11", "EGFR", "TP53"]);
+  });
 });
 
 describe("gene query: gene list", () => {

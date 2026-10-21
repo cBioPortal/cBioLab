@@ -6,7 +6,8 @@ import { isPatientLevel, type EndpointColumns } from "../federation.ts";
 import { axisLabel, validateAxis, OQL_UNALTERED, type AxisKind } from "../plot.ts";
 import { coxMethod, type CoxTrace } from "../method.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
-import { overLimit } from "./shared.ts";
+import { overLimit, studyCatalogs } from "./shared.ts";
+import { resolveProfileAxis } from "../plot-profile.ts";
 
 export interface CoxColumn { axisIndex: number; label: string; reference?: string; level?: string }
 /**
@@ -46,6 +47,12 @@ export function buildCoxColumns(covariates: CoxCovariate[], kindsFinal: AxisKind
   return columns;
 }
 
+/** what a model's caption says about the patients it left out as not profiled for a covariate's gene */
+export function notProfiledNote(n: number): string {
+  return n > 0 ? " " + n.toLocaleString("en-US") + " patient" + (n === 1 ? " was" : "s were") + " not profiled for the gene of a covariate and " +
+    (n === 1 ? "was" : "were") + " left out: an unknown alteration status is not wild type, and not a level to fit." : "";
+}
+
 export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;
   // Multivariate Cox: unlike survival/compare, this is fit from real per-patient rows
@@ -69,10 +76,15 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
     endpointColumns = { months: monthsAttr, status: statusAttr };
   }
   const endpointLabel = endpointColumns ? endpointColumns.months + "/" + endpointColumns.status : endpoint;
-  const covariates = Array.isArray(cx.covariates) ? cx.covariates : [];
+  let covariates = Array.isArray(cx.covariates) ? cx.covariates : [];
   if (!covariates.length) return untimed({ kind: "cox", endpoint, error: "a cox view needs at least one covariate" });
   { const e = overLimit("a cox view", 8, covariates.length); if (e) return untimed({ kind: "cox", endpoint, error: e.replace("at most 8", "at most 8 covariates") }); }
-  try { covariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1))); }
+  try {
+    // a profile covariate is read as the studies describe the profile; its reference level stays
+    const catalogs = await studyCatalogs(c, vStudies);
+    covariates = covariates.map((cv, i) => ({ ...resolveProfileAxis(cv, "covariate " + (i + 1), catalogs), ...(cv.reference != null ? { reference: cv.reference } : {}) }));
+    covariates.forEach((cv, i) => validateAxis(cv, "covariate " + (i + 1)));
+  }
   catch (e) { return untimed({ kind: "cox", endpoint, error: (e as Error).message }); }
   const rawCutoff = cx.cutoffMonths;
   let cutoffMonths: number | undefined;
@@ -88,7 +100,7 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
   type RawCoxRow = { t: number; event: number; values: (number | string)[]; study: string };
   type CoxFit = { error: string } | {
     coefficients: CoxCoefficient[]; n: number; events: number; termCount: number;
-    excludedRemote: { study: string; patients: number }[]; patientLevelTotal: number; trace: CoxTrace;
+    excludedRemote: { study: string; patients: number }[]; patientLevelTotal: number; notProfiled: number; trace: CoxTrace;
   };
   const fitCoxFor = async (names: string[]): Promise<CoxFit> => {
     const cohortTotal = names.reduce((n, cn) => n + cohorts[cn].count, 0);
@@ -98,7 +110,7 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
     const excludedRemote: { study: string; patients: number }[] = [];
     const rawRows: RawCoxRow[] = [];
     let kinds: AxisKind[] | null = null;
-    let patientLevelTotal = 0;
+    let patientLevelTotal = 0, notProfiled = 0;
     const perStudy: CoxTrace["perStudy"] = [];
     for (const n of names) {
       for (const st of cohorts[n].studies) {
@@ -108,10 +120,11 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
           continue;
         }
         patientLevelTotal += cohorts[n].perStudy[st]?.count || 0;
-        const { rows, kinds: k } = await res.coxRows(doc.cohorts[n], endpoint, covariates, endpointColumns);
+        const { rows, kinds: k, notProfiled: np } = await res.coxRows(doc.cohorts[n], endpoint, covariates, endpointColumns);
         if (!kinds) kinds = k;
+        notProfiled += np;
         for (const r of rows) rawRows.push({ ...r, study: st });
-        perStudy.push({ study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0, rows: rows.length });
+        perStudy.push({ study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0, rows: rows.length, ...(np ? { notProfiled: np } : {}) });
       }
     }
     if (!rawRows.length) {
@@ -157,7 +170,7 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
       censoredAtCutoff, droppedBadTime: rowsCut.length - coxInput.length,
       coefficients: columns.map((col, i) => ({ label: col.label, beta: fit.beta[i], se: fit.se[i], p: fit.p[i] })),
     };
-    return { coefficients, n: fit.n, events: fit.events, termCount: columns.length, excludedRemote, patientLevelTotal, trace };
+    return { coefficients, n: fit.n, events: fit.events, termCount: columns.length, excludedRemote, patientLevelTotal, notProfiled, trace };
   };
 
   const coxMethodOptions = {
@@ -199,7 +212,7 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
   } else {
     const fit0 = await fitCoxFor(vNames);
     if ("error" in fit0) return untimed({ kind: "cox", endpoint, cohorts: vNames, error: fit0.error });
-    const missing = fit0.patientLevelTotal - fit0.n;
+    const missing = fit0.patientLevelTotal - fit0.n - fit0.notProfiled;
     const coxResult: ViewResult = { kind: "cox", cohorts: vNames, endpoint,
       ...(cutoffMonths != null ? { cutoffMonths } : {}),
       cox: { coefficients: fit0.coefficients, n: fit0.n, events: fit0.events, ...(fit0.excludedRemote.length ? { excludedRemote: fit0.excludedRemote } : {}) },
@@ -207,6 +220,7 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
       caveat: "Cox proportional-hazards regression (Efron ties) on " + fit0.n + " patients, " + fit0.events + " events, " +
         fit0.termCount + " term" + (fit0.termCount === 1 ? "" : "s") + "." +
         (missing > 0 ? " " + missing + " patient" + (missing === 1 ? "" : "s") + " from patient-level participants lacked the endpoint or a covariate and were excluded." : "") +
+        notProfiledNote(fit0.notProfiled) +
         (cutoffMonths != null ? " Administratively censored at " + cutoffMonths + " months." : "") +
         (cx.stratifyByStudy
           ? " Stratified by study: each study fits its own baseline hazard, so a case-mix difference between studies cannot masquerade as a covariate effect."

@@ -16,7 +16,7 @@ const CLINICAL_SHOWN = 8;
 
 function comparisonLayout(linked: AnalysisDoc, study: string, known: StudyKnown): PageLayout {
   const names = Object.keys(linked.cohorts || {});
-  const expr = expressionProfile(known.profiles);
+  const expr = expressionProfile(known.profileCatalog);
   const ga = known.gaProfiles.find((p) => /signature/i.test(p) && /contribution/i.test(p)) || known.gaProfiles.find((p) => !/methylation/i.test(p)) || null;
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
   const left = [!known.clinical.length && "Clinical (no attributes)", !(expr && names.length === 2) && "mRNA (" + (expr ? "compares exactly two cohorts" : "no mRNA profile") + ")",
@@ -55,7 +55,7 @@ export default function ComparisonPage() {
     {!ready
       ? <><div className="skeleton mb-4 h-10" /><div className="card viewcard viewloading" aria-busy="true"><div className="skeleton skeleton-view" /></div></>
       : <PortalTabs doc={page.doc!} tabs={fresh!.tabs} titles={fresh!.titles} open={page.open} onOpen={page.openTab} onDoc={page.update}
-          catalog={{ attrs: known!.attrs, profiles: known!.profiles, loading: false }}
+          catalog={{ attrs: known!.attrs, profiles: known!.profiles, profileCatalog: known!.profileCatalog, loading: false }}
           onCounts={(c) => setCounts((o) => o || c)} />}
   </>);
 }

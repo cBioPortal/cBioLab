@@ -8,6 +8,7 @@ import { cacheLife } from "next/cache";
 import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
 import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
 import { chQuery } from "../../../lib/ch.ts";
+import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { assertCustomDataPresent } from "../../../lib/custom-data.ts";
 import { idSetRefsIn } from "../../../lib/id-sets.ts";
@@ -112,9 +113,13 @@ async function exploreFor(body: any) {
   if (!local.length) {
     return remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts);
   }
+  const { catalog: _c, ...oneProfiles } = profilesByStudy.get(local[0]) || {};
   const localResult = local.length === 1
     ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts, derived,
-        ...profilesByStudy.get(local[0]), conn: connByStudy.get(local[0]) })
+        ...oneProfiles, conn: connByStudy.get(local[0]) })
     : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived });
-  return remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
+  // every local study's profiles as it describes them, once per profile id, for a plot axis's Data picker
+  const profileCatalog = [...new Map(local.flatMap((st) => (profilesByStudy.get(st)?.catalog || []).map((p: ProfileInfo) => [p.profile, p] as const))).values()];
+  const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
+  return { ...result, profileCatalog };
 }

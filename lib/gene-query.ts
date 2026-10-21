@@ -2,7 +2,7 @@
 // (each line or ";"-separated entry a gene and what counts as altered in it) or a plain gene list
 // (cBioPortal's, where `[A B]` is one merged row). Pure and browser-safe; the symbols it finds are
 // checked against the warehouse's gene table separately (POST /api/genes).
-import { parseOql, type OqlSpec } from "./oql-parse.ts";
+import { parseOql, OQL_SEPARATOR, type OqlSpec } from "./oql-parse.ts";
 import { parseGeneList, geneSymbols, normalizeGeneTracks, MAX_GENE_TRACKS, type GeneTrackSpec } from "./gene-tracks.ts";
 
 export type GeneQueryMode = "oql" | "genes";
@@ -64,7 +64,7 @@ export function checkGeneQuery(text: string, mode: GeneQueryMode): QueryCheck {
       return { entries: [], genes: [], error: String((e as Error).message || e) };
     }
   }
-  const parts = text.split(/[;\n]/).flatMap(splitBareGenes);
+  const parts = text.split(OQL_SEPARATOR).flatMap(splitBareGenes);
   const entries: QueryEntry[] = parts.map((p) => {
     const head = (p.match(/^([A-Za-z0-9.-]+)/)?.[1] || "").toUpperCase();
     try {

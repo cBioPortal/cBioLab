@@ -6,6 +6,7 @@
 // document) and hands back the next view; whether that re-runs is the page's to decide, with
 // the rule from view-display.ts: the figure's own display options and sort never re-run.
 import React, { useState } from "react";
+import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 import OncoprintFigure, { type ColumnSelection } from "./OncoprintFigure.tsx";
 import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, sortKeyText } from "./view-display.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
@@ -199,7 +200,9 @@ export function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derive
 
 // ---- the card ----------------------------------------------------------------------------------
 
-export interface TrackCatalog { attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[]; loading: boolean }
+export interface TrackCatalog { attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[]; loading: boolean;
+  /** every profile as the studies describe them, for a plot axis's Data picker */
+  profileCatalog?: ProfileInfo[] }
 
 export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, onGenes, onCreateCohort, onSaveFeature, onContract, contract, note, studies, uploads, onUndo }: {
   /** the view as the document holds it */

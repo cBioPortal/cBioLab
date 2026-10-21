@@ -115,7 +115,8 @@ export interface FitTrace {
   /** the cohort this fit belongs to, when each cohort is fitted separately */
   scope?: string;
   /** per study: patients in the cohort there, and rows its query returned */
-  perStudy: { study: string; cohortPatients: number; rows: number }[];
+  /** each study's cohort patients, rows fetched, and patients left out as not profiled for an axis's gene */
+  perStudy: { study: string; cohortPatients: number; rows: number; notProfiled?: number }[];
   covariates: CoxCovariate[];
   kinds: AxisKind[];
   columns: MethodColumn[];
@@ -160,7 +161,9 @@ function fetchSteps(t: FitTrace, query: string, keep: string): MethodStep[] {
     kind: "fetch" as const,
     title: "Fetch one row per patient",
     detail: "The " + query + " query above. " + keep + " " +
-      (s.cohortPatients > s.rows ? plural(s.cohortPatients - s.rows, "cohort patient") + " had no row." : "Every cohort patient had a row."),
+      (s.cohortPatients > s.rows ? plural(s.cohortPatients - s.rows, "cohort patient") + " had no row" +
+        (s.notProfiled ? ", " + s.notProfiled.toLocaleString("en-US") + " of them because " + (s.notProfiled === 1 ? "it was" : "they were") +
+          " not profiled for the gene of an axis (a value of “Not profiled” is left out, never fitted as a level)" : "") + "." : "Every cohort patient had a row."),
     scope: s.study,
     rowsIn: s.cohortPatients,
     rowsOut: s.rows,

@@ -37,7 +37,7 @@ test("an axis that would read a whole profile is refused by name", () => {
     /needs one gene.*name the gene you mean/s);
   assert.throws(() => validateAxis({ source: "alteration" } as never, "y"), /needs a gene, a gene set, or an OQL query/);
   assert.throws(() => validateAxis({ source: "alateration", gene: "APC" } as never, "covariate 1"),
-    /unknown source 'alateration' — use one of clinical, molecular, alteration, none/);
+    /unknown source 'alateration' — use one of clinical, profile, molecular, alteration, none/);
   assert.throws(() => validateAxis({ source: "clinical", attribute: "not a name!" }, "x"), /not a clinical attribute name/);
   assert.throws(() => validateAxis({ source: "alteration", gene: "TP53", by: "driver" } as never, "x"), /not supported yet/);
   validateAxis(num, "x");   // the ordinary cases do not throw
@@ -212,7 +212,7 @@ test("log: true reads log10(v + 1), leaves out what has no such log, and says so
   assert.equal(axisLabel({ source: "molecular", profileType: "mrna", gene: "ESR1", log: true }), "log10(ESR1 mrna + 1)");
 });
 
-test("an OQL axis: each case is Altered when it matches any entry, Unaltered otherwise", () => {
+test("an OQL axis: Altered when a case matches any statement, Unaltered only when it is profiled for every one", () => {
   const oql = { source: "alteration" as const, oql: "KRAS: G12C; STK11: MUT" };
   validateAxis(oql, "x");
   assert.equal(axisKind(oql), "cat");
@@ -220,9 +220,26 @@ test("an OQL axis: each case is Altered when it matches any entry, Unaltered oth
   const sql = axisSelect(oql, ctx, "cat");
   // every case of the cohort is a row, so the unaltered are counted, not missing
   assert.match(sql, /FROM db\.sample_derived sd/);
-  assert.match(sql, /'Altered', 'Unaltered'\) AS v/);
+  assert.match(sql, /if\(length\(hit\) > 0, 'Altered', if\(/);
+  assert.match(sql, /, 'Unaltered', 'Not profiled'\)\) AS v/);
   assert.match(sql, /hugo_gene_symbol = 'KRAS'/);
   assert.match(sql, /hugo_gene_symbol = 'STK11'/);
+  // panel-aware: a sample whose panel omits the gene is not profiled for it, never wild type
+  assert.match(sql, /sample_to_gene_panel_derived sp[\s\S]*alteration_type = 'MUTATION_EXTENDED'[\s\S]*WHERE gene = 'KRAS'/);
+  assert.match(sql, /WHERE gene = 'STK11'/);
+});
+
+test("an OQL axis by statement: a group per line, a pair for two, '3 or more lines' past that; commas separate lines", () => {
+  const oql = { source: "alteration" as const, oql: "kras: G12C, STK11: MUT\nKEAP1", by: "statement" as const };
+  validateAxis(oql, "x");
+  assert.equal(axisLabel(oql), "kras: G12C; STK11: MUT; KEAP1 (OQL, by line)");
+  const sql = axisSelect(oql, ctx, "cat");
+  assert.match(sql, /\['KRAS: G12C', 'STK11: MUT', 'KEAP1'\]/, "each group is named by its statement, the gene in capitals");
+  assert.match(sql, /length\(hit\) = 2, concat\(hit\[1\], ' \+ ', hit\[2\]\), '3 or more lines'\)/);
+  // a bare gene is any alteration, so it must be profiled for all three kinds before "Unaltered"
+  assert.match(sql, /'COPY_NUMBER_ALTERATION'[\s\S]*WHERE gene = 'KEAP1'/);
+  assert.throws(() => validateAxis({ source: "alteration", oql: "A;B;C;D;E;F;G", by: "statement" }, "x"), /at most 6 lines; this query has 7/);
+  assert.throws(() => validateAxis({ source: "alteration", oql: "KRAS", by: "cna" } as never, "x"), /groups by "any" .* or "statement"/);
 });
 
 test("an OQL axis matches samples in sample mode and patients in patient mode", () => {

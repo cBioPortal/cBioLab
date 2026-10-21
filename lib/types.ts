@@ -549,7 +549,7 @@ export interface PlotView {
   /** the grid a scatter is binned onto (default 240 x 160) */
   bins?: [number, number];
   /**
-   * Every case is a point when there are at most 5,000 of them and the reader may see cases
+   * Every case is a point when there are at most POINTS_CAP (10,000) of them and the reader may see cases
    * (default true); false draws the density alone at any size.
    */
   allPoints?: boolean;
@@ -558,7 +558,7 @@ export interface PlotView {
    * outliers (past the cap: a box's values beyond its whiskers, a scatter's sparse cells), the
    * extremes on an axis, the cases furthest from the fitted line, or a cohort's cases. Default
    * [{rule:"outliers"}]; [] draws none. A case in two layers is drawn by the first. Every layer
-   * shares one 5,000-point budget; a cohort layer past it is drawn as density cells or boxes.
+   * shares one POINTS_CAP budget; a cohort layer past it is drawn as density cells or boxes.
    */
   points?: PointLayerSpec[];
   /**
@@ -1523,6 +1523,7 @@ export interface AlterationsResult extends TableRows<string | number | null> {
 }
 import type { PlotAxis, PlotData } from "./plot.ts";
 import type { PointLayerSpec } from "./plot-layers.ts";
+import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
@@ -2177,5 +2178,7 @@ export interface ExploreResult {
   totals?: { patients: number; samples: number };
   caseLists: { id: string; name: string; n: number }[];
   profiles: string[]; gaProfiles: string[];
+  /** every profile as the studies describe them (genetic_profile), for a plot axis's Data picker */
+  profileCatalog?: ProfileInfo[];
   stats: { ms: number; perStudy?: Record<string, number | null> };
 }

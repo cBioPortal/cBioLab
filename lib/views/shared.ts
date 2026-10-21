@@ -4,6 +4,7 @@ import type { ViewResult } from "../types.ts";
 import { hasViewAggregates, type Resolver, type ViewAggregateCapable } from "../federation.ts";
 import { geneCytobandsSql } from "../federation-views.ts";
 import type { ViewRun } from "./run.ts";
+import type { StudyCatalog } from "../plot-profile.ts";
 
 /** 12 genes = 66 pairs; beyond this the multiplicity correction eats the signal */
 export const COOCCUR_GENE_LIMIT = 12;
@@ -50,4 +51,9 @@ export async function cytobands(ok: Record<string, ViewResolver>, genes: string[
   if (!first || !genes.length) return new Map();
   const rows = await first.viewMeta("cytobands", (s, d) => geneCytobandsSql(genes, s, d)).catch(() => []);
   return new Map(rows.map((r) => [String(r.gene), String(r.cytoband || "")]));
+}
+
+/** each study's profiles as it describes them, for resolving a profile axis (lib/plot-profile.ts) */
+export async function studyCatalogs(c: ViewRun, studies: string[]): Promise<StudyCatalog[]> {
+  return Promise.all(studies.map(async (st) => ({ study: st, catalog: (await c.studyProfiles(st)).catalog || [] })));
 }
