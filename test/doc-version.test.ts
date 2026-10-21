@@ -130,6 +130,16 @@ describe("splits stored on cohorts", () => {
     assert.deepEqual(unflattenSplits(c, flattenSplits(c)), c);
   });
 
+  test("a split nested under an arm of a nested split writes back under its own parent", () => {
+    // found by test/properties.test.ts: the deepest split was attached to the outermost one
+    const c = { NSCLC: { all: [nsclc], splits: { "KRAS allele": { arms: [
+      { name: "G12C", where: g12c, splits: { sex: { arms: [
+        { name: "F", where: female, splits: { smoking: { arms: [{ name: "ever", where: mut }] } } }
+      ] } } }
+    ] } } } };
+    assert.deepEqual(unflattenSplits(c, flattenSplits(c)), c);
+  });
+
   test("the flat form knows each split's owner and name", () => {
     const flat = flattenSplits(cohorts());
     assert.equal(flat["NSCLC / KRAS allele / G12C / sex"].of, "NSCLC / KRAS allele / G12C");

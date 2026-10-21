@@ -1,5 +1,5 @@
 # Three jobs, run side by side: lint (ESLint, knip, ruff; no secrets), the gate below, and the
-# report-only duplication and security reports.
+# report-only duplication, coverage and security reports.
 #
 # The whole gate, on every pull request and every push to master: build, unit tests, the stores'
 # Postgres tests, the counts against cBioPortal, the cohort logic, the method scripts, the Python
@@ -124,8 +124,9 @@ jobs:
             /tmp/gate-server.log
           if-no-files-found: warn
 
-  # Report-only: copy-paste (jscpd) and security patterns (Semgrep's registry rule packs). Neither fails
-  # the run; the findings are kept as the quality-report artifact, Semgrep's as SARIF.
+  # Report-only: copy-paste (jscpd), unit-test coverage (node's, summarised on the job's page) and
+  # security patterns (Semgrep's registry rule packs). None fails the run; the findings are kept as
+  # the quality-report artifact, Semgrep's as SARIF.
   reports:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -145,6 +146,9 @@ jobs:
 
       - name: Duplication
         run: npm run report:dupes
+
+      - name: Unit-test coverage
+        run: npm run report:coverage
 
       - name: Security patterns
         run: npm run report:security
