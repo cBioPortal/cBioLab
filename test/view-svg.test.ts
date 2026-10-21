@@ -44,7 +44,7 @@ describe("renderers refuse rather than draw an empty frame", () => {
     assert.equal(viewToSvg({ kind: "hotspots", hotspots: [] }), null);
   });
   test("an unknown kind yields no figure", () => {
-    assert.equal(viewToSvg({ kind: "not-a-view" }), null);
+    assert.equal(viewToSvg({ kind: "not-a-view" as never }), null);
   });
 });
 

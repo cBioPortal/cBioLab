@@ -1,6 +1,6 @@
 // Helpers several view runners share: limits, which participants can answer a view aggregate,
 // refusals, and lookups more than one view makes.
-import type { ViewResult } from "../types.ts";
+import type { ViewResult, ViewKind } from "../types.ts";
 import { hasViewAggregates, type Resolver, type ViewAggregateCapable } from "../federation.ts";
 import { geneCytobandsSql } from "../federation-views.ts";
 import type { ViewRun } from "./run.ts";
@@ -52,7 +52,7 @@ export function answering(ctx: ViewRun): { ok: Record<string, ViewResolver>; exc
 export const plural = (n: number, one: string, many = one + "s") => n.toLocaleString("en-US") + " " + (n === 1 ? one : many);
 
 /** A view-level refusal: past a limit, or nothing that can answer. */
-export const refuse = (kind: string, ctx: ViewRun, error: string): ViewResult => ({ kind, cohorts: ctx.vNames, error });
+export const refuse = (kind: ViewKind, ctx: ViewRun, error: string): ViewResult => ({ kind, cohorts: ctx.vNames, error });
 
 /** Cytobands for the genes a table lists, from the first participant that can answer; a gene it
  *  does not know (or no answer at all) is left without one rather than failing the view. */

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   }
   const run = <T,>(fn: () => Promise<T>) => withRequestCustomData(body.customData, fn, { refs: body.customRefs, req, uses: body });
   const table = typeof body.table === "string" ? body.table : undefined;
-  const first = await run(() => runAnalysis(doc, { table })).catch((e) => ({ views: [{ kind: "", cohorts: [], error: String((e as Error)?.message || e) } as ViewResult] }));
+  const first = await run(() => runAnalysis(doc, { table })).catch((e) => ({ views: [{ kind: doc.views![0].kind, cohorts: [], error: String((e as Error)?.message || e) } as ViewResult] }));
   const v = first.views[0];
   const t = pagedTable(v, table);
   if (!t) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });

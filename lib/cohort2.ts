@@ -494,23 +494,35 @@ function splitLeafSql(leaf: SplitLeaf, ctx: Ctx): string {
     "    AND " + splitBucketSql(pid, ctx.study) + " = " + bucket;
 }
 
-function leafSql(leaf: any, ctx: Ctx): string {
-  if (leaf.kind === "oql") return oqlLeafSql(leaf.q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) });
-  if (leaf.kind === "alteration") return oqlLeafSql(alterationToOql(leaf), { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) }); // deprecated alias
-  if (leaf.kind === "clinical") return clinicalLeafSql(leaf, ctx);
-  if (leaf.kind === "profiled") return profiledLeafSql(leaf, ctx);
-  if (leaf.kind === "caseList") return caseListLeafSql(leaf, ctx);
-  if (leaf.kind === "genomicData") return genomicDataLeafSql(leaf, ctx);
-  if (leaf.kind === "genericAssay") return genericAssayLeafSql(leaf, ctx);
-  if (leaf.kind === "proteinPosition") return proteinPositionLeafSql(leaf, ctx);
-  if (leaf.kind === "event") return eventLeafSql(leaf, ctx);
-  if (leaf.kind === "derived") return derivedLeafSql(leaf, ctx);
-  if (leaf.kind === "sampleList") return sampleListLeafSql(leaf, ctx);
-  if (leaf.kind === "patientList") return patientListLeafSql(leaf, ctx);
-  if (leaf.kind === "split") return splitLeafSql(leaf, ctx);
+function leafSql(leaf: Leaf, ctx: Ctx): string {
+  const oqlCtx = () => ({ oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) });
   // v1 flat event shape without kind
-  if (leaf.a && leaf.rel) return eventLeafSql(leaf, ctx);
-  throw new Error("unknown clause kind: " + JSON.stringify(Object.keys(leaf)));
+  if (!("kind" in leaf)) {
+    if (leaf.a && leaf.rel) return eventLeafSql(leaf, ctx);
+    throw new Error("unknown clause kind: " + JSON.stringify(Object.keys(leaf)));
+  }
+  // one case per Leaf kind: a kind added to the Leaf union without a case here is a type error
+  switch (leaf.kind) {
+    case "oql": return oqlLeafSql(leaf.q, oqlCtx());
+    case "alteration": return oqlLeafSql(alterationToOql(leaf), oqlCtx()); // deprecated alias
+    case "clinical": return clinicalLeafSql(leaf, ctx);
+    case "profiled": return profiledLeafSql(leaf, ctx);
+    case "caseList": return caseListLeafSql(leaf, ctx);
+    case "genomicData": return genomicDataLeafSql(leaf, ctx);
+    case "genericAssay": return genericAssayLeafSql(leaf, ctx);
+    case "proteinPosition": return proteinPositionLeafSql(leaf, ctx);
+    case "event": return eventLeafSql(leaf, ctx);
+    case "derived": return derivedLeafSql(leaf, ctx);
+    case "sampleList": return sampleListLeafSql(leaf, ctx);
+    case "patientList": return patientListLeafSql(leaf, ctx);
+    case "split": return splitLeafSql(leaf, ctx);
+    default: return unknownLeaf(leaf);
+  }
+}
+
+/** Documents arrive as JSON, so a kind the types rule out can still reach here at run time. */
+function unknownLeaf(leaf: never): never {
+  throw new Error("unknown clause kind: " + JSON.stringify(Object.keys(leaf as object)));
 }
 
 function clauseSql(clause: any, ctx: Ctx): string {

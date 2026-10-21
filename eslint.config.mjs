@@ -72,6 +72,8 @@ export default tseslint.config(
       }],
       // an async onClick/onSubmit is fine in React; the check stays on everywhere else
       "@typescript-eslint/no-misused-promises": ["error", { checksVoidReturn: { attributes: false } }],
+      // a switch over a union without a default handles every member (a default routes the rest on purpose)
+      "@typescript-eslint/switch-exhaustiveness-check": ["error", { considerDefaultExhaustiveForUnions: true }],
       "no-useless-escape": "off",
       "no-empty": ["error", { allowEmptyCatch: true }],
 

@@ -37,7 +37,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   in `lib/views/index.ts`; each gets the run's context (`ViewRun` in `lib/views/run.ts`: the
   document, evaluated cohorts, resolvers, the view's cohorts and studies) and returns its result;
   `lib/views/shared.ts` holds what several runners use (`overLimit`, `answering`, `refuse`). A new
-  view kind is a new runner there, registered in `index.ts`. **Kinds never import each other:** a
+  view kind is a new runner there, registered in `index.ts` (`RUNNERS` is keyed by `ViewKind`, the
+  `View` union's kinds, so a kind without a runner does not compile). **Kinds never import each other:** a
   kind's runner, figure and `<kind>-<part>.ts` modules import only one another and the shared
   modules (`lib/views/`: run, shared, rows, covariates; `lib/figures/`: common, volcano, bars,
   forest) — `local/kind-boundary` in `eslint.config.mjs` enforces it; what two kinds need moves

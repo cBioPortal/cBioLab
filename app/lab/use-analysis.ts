@@ -14,7 +14,7 @@
 import { QueryClient, useQueries, useQuery, type QueryClient as QC } from "@tanstack/react-query";
 import { useRef } from "react";
 import { dataPart } from "../_oncoprint/view-display.ts";
-import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
+import type { AnalysisDoc, AnalysisResult, ViewKind } from "../../lib/types.ts";
 import { api } from "./api.ts";
 import type { AnalysisBody } from "../../lib/api-schemas.ts";
 import { viewIsEmpty } from "../../lib/partition-arms.ts";
@@ -113,7 +113,7 @@ export function useAnalysis(doc: AnalysisDoc, ids: number[], epoch: number, stud
   if (cohorts.data && !cohorts.isPlaceholderData) lastCohorts.current = { epoch, data: cohorts.data };
   const shown = viewQs.map((q, i): ViewResult => {
     const v = views[i];
-    if (viewIsEmpty(v)) return withNote({ kind: String(v.kind), empty: true }, v);
+    if (viewIsEmpty(v)) return withNote({ kind: v.kind as ViewKind, empty: true }, v);
     const r: ViewResult = q.data ?? (q.error ? { kind: v.kind, error: String((q.error as Error).message || q.error) } as ViewResult
       : { kind: v.kind, pending: true } as unknown as ViewResult);
     if (q.data && !q.isPlaceholderData) lastViews.current.set(ids[i], q.data);
