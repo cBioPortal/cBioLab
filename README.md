@@ -6,18 +6,21 @@ Users define cohorts by relationships between events — "progression within 180
 
 ## Architecture
 
-- `app/page.js` — query-builder UI (selectors, temporal relations, recipes, treatment-lines explorer)
+- `app/lab/` — the analysis app (Explore, cohorts, the analysis page, examples); `/` redirects there
 - `app/api/*` — API routes; the browser sends DSL JSON only, never SQL
-- `lib/compiler.js` — DSL → ClickHouse SQL compiler (selectors, BEFORE/DURING/NOT_FOLLOWED_BY relations,
-  occurrence pinning, observability guard, derived treatment-line events)
-- `lib/ch.js` — server-side ClickHouse HTTP client; credentials come from env and never reach the client
+- `lib/analysis.ts` — `runAnalysis(doc)`: evaluates the cohorts and hands each view to its runner (`lib/views/`)
+- `lib/cohort2.ts`, `lib/oql.ts`, `lib/compiler.ts` — the cohort DSL → ClickHouse SQL compilers (clauses,
+  OQL, and the timeline sub-DSL's BEFORE/DURING/NOT_FOLLOWED_BY relations, guards and treatment lines)
+- `lib/ch.ts` — server-side ClickHouse HTTP client; credentials come from env and never reach the client
+
+The full map, with the invariants, is in [`CLAUDE.md`](CLAUDE.md).
 
 ## The DSL
 
 The query language is documented in [`docs/dsl.md`](docs/dsl.md) — selectors, temporal
 relations, guards, derived treatment-line events, semantics, and worked examples with real
-msk_chord_2024 counts. A machine-readable contract is in
-[`docs/cohort-query.schema.json`](docs/cohort-query.schema.json) (JSON Schema 2020-12).
+msk_chord_2024 counts. It is generated from `lib/dsl-reference.ts`, which MCP clients also read
+through the `describe_dsl` tool.
 
 ## Environment variables
 
@@ -94,20 +97,19 @@ a query reached the simulated peer's database directly and was refused (`lib/ch.
 
 ## MCP server
 
-The MCP endpoint ships inside the Next.js app at **`/api/mcp`** (`app/api/[transport]/route.js`
+The MCP endpoint ships inside the Next.js app at **`/api/mcp`** (`app/api/[transport]/route.ts`
 via `mcp-handler`), so a Vercel deploy serves it automatically. `npm run mcp` runs the same tools
-as a standalone Streamable HTTP server (default `127.0.0.1:3201/mcp`). Both expose four
-tools to LLM clients: `describe_study`, `query_cohort` (the DSL), `derive_treatment_lines`, and
-`render_oncoprint` (returns a PNG image block rendered server-side from the OncoprintSpec
-contract via `lib/oncoprint-svg.js`). Tool schemas mirror `docs/cohort-query.schema.json`, and
+as a standalone Streamable HTTP server (default `127.0.0.1:3201/mcp`). Both serve the tools
+`mcp/tools.ts` registers: the analysis tools (`describe_dsl`, `run_analysis`, `describe_study`,
+`query_cohort`, `derive_treatment_lines`, and `render_oncoprint`, which returns a PNG rendered
+server-side from the OncoprintSpec contract via `lib/oncoprint-svg.ts`), the campaign tools
+(`campaign_*`), and the `federated_*` tools another instance calls (see Federation, above). Tool schemas are the zod fragments in `mcp/tools.ts`, and
 results carry the semantic caveats (observability guard, prior-medication guard, panel-aware
 denominators) for the model to surface. Register in Claude Code:
 
 ```bash
 claude mcp add --transport http cohort-lab https://<your-deployment>/api/mcp
 ```
-
-`mcp/test-client.mjs` exercises all four tools end to end.
 
 ## Run locally
 

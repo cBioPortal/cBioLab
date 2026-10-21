@@ -1,4 +1,4 @@
-// MCP endpoint on Vercel/Next: serves the same tools as mcp/server.js at /api/mcp.
+// MCP endpoint on Vercel/Next: serves the same tools as mcp/server.ts at /api/mcp.
 import { createMcpHandler } from "mcp-handler";
 import { registerTools } from "../../../mcp/tools.ts";
 import { cachedAnalysis, cachedContract } from "../../../lib/next-cache.ts";

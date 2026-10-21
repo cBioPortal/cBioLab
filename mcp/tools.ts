@@ -1,4 +1,4 @@
-// Shared MCP tool registry — consumed by mcp/server.js (standalone) and app/api/[transport]/route.js (Vercel).
+// Shared MCP tool registry — consumed by mcp/server.ts (standalone) and app/api/[transport]/route.ts (Vercel).
 import { z } from "zod";
 import { chQuery, DB, STUDY, PORTAL } from "../lib/ch.ts";
 import { compileCohort, compileLines, catalogSqls, lineCatalogSqls, LINE_TYPE } from "../lib/compiler.ts";
@@ -28,7 +28,7 @@ import { studiesFor } from "../lib/study-list.ts";
 import { catalogFor } from "../lib/study-catalog.ts";
 import type { AnalysisDoc, AnalysisResult, Contract, OncoprintSpec } from "../lib/types.ts";
 
-// ---------- shared zod fragments (mirrors docs/cohort-query.schema.json) ----------
+// ---------- shared zod fragments (the tools' input schemas) ----------
 const zSelector = z.object({
   eventType: z.string().max(200).describe("Event type from describe_study, or 'Treatment line (derived)'"),
   attrs: z.array(z.object({ key: z.string().max(200), value: z.string().max(500) })).max(3).optional()

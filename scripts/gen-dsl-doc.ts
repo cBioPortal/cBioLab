@@ -1,4 +1,4 @@
-// Regenerate docs/dsl.md from lib/dsl-reference.js (the single source of truth).
+// Regenerate docs/dsl.md from lib/dsl-reference.ts (the single source of truth).
 import { writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

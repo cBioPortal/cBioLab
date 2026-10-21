@@ -5,14 +5,14 @@
 //   - docs/dsl.md            (generated: npm run docs:gen — never edit by hand)
 //   - AGENT_GRAMMAR, the compact grammar the browser assistant reads (the analysis page's
 //     dsl_reference WebMCP tool, /api/campaign/format)
-//   - the MCP describe_dsl tool (mcp/tools.js serves renderDslMarkdown())
+//   - the MCP describe_dsl tool (mcp/tools.ts serves renderDslMarkdown())
 //
 // The EXAMPLES below are executed against the live compiler by
 // `npm run docs:check` (also run by e2e.cjs), and docs/dsl.md is diffed against
 // a regeneration — so a stale doc or a broken example fails the suite.
 //
 // When you change the DSL (lib/cohort2.ts, lib/oql.ts, lib/compiler.ts,
-// lib/analysis.ts views, lib/oncoprint.js), update this file in the same
+// lib/analysis.ts views, lib/oncoprint.ts), update this file in the same
 // commit and run `npm run docs:gen`.
 // ============================================================================
 

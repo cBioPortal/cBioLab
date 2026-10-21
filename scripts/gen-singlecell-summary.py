@@ -19,7 +19,7 @@ Two modes:
             and as one JSON array of datasets (the lab's inline customData).
 
   uv run scripts/gen-singlecell-summary.py propose <cell-explorer slug> <study> > config.json
-  uv run scripts/gen-singlecell-summary.py build config.json --out DIR [--ts lib/x.ts --export NAME]
+  uv run scripts/gen-singlecell-summary.py build config.json --out DIR [--ts lib/<name>.ts --export NAME]
 
 What it does not decide: anything a paper's design needs — a sorting correction, which sites to pool,
 cut-offs on a score. Those stay a dataset's own script (scripts/gen-spectrum-sc-demo.py).

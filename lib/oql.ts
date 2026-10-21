@@ -8,9 +8,11 @@
 //   DRIVER_ modifiers on any of the above | bare gene = any alteration |
 //   protein position range modifier on a mutation: (a-b) (a-) (-b), with * for fully contained,
 //   e.g. TRUNC_(1400-), MUT_(-500), (1-100*)_DRIVER, MUT=(712-979)_DRIVER.
+//   EXP/PROT with a threshold, e.g. EXP>2, PROT<=-1.5, on the study's mRNA / protein profile (its
+//   z-score profile where it has one).
 // Rejected with an explanation (not silently approximated): GAIN/HETLOSS (only high-level
-// CNA (+-2) is stored), EXP/PROT (no expression thresholds here), GERMLINE/SOMATIC
-// (public studies are germline-stripped).
+// CNA (+-2) is stored), EXP/PROT without a threshold, GERMLINE/SOMATIC (public studies are
+// germline-stripped).
 import { DB, STUDY } from "./ch.ts";
 import { sq } from "./compiler.ts";
 

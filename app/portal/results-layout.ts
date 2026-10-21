@@ -31,7 +31,7 @@ export interface ResultsData {
   clinical: string[];
   /** numeric clinical attributes, for a Plots tab without expression */
   numeric: string[];
-  /** whether expression may be compared across these studies (lib/cross-study-expression.ts); true for one study */
+  /** whether expression may be compared across these studies (crossStudyExpression in lib/results-settings.ts); true for one study */
   expressionAcross: boolean;
   /** the genomic data types every queried study holds, and those only some do */
   held: { every: ProfileType[]; some: ProfileType[] };

@@ -1,10 +1,10 @@
 // cbio-lab MCP server — standalone Streamable HTTP (stateless).
-// The same tools are served on Vercel via app/api/[transport]/route.js.
+// The same tools are served on Vercel via app/api/[transport]/route.ts.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-// load .env.local BEFORE importing tools (lib/ch.js reads process.env at import)
+// load .env.local BEFORE importing tools (lib/ch.ts reads process.env at import)
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 try {
   for (const line of readFileSync(join(root, ".env.local"), "utf8").split("\n")) {
