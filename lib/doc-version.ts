@@ -14,7 +14,7 @@
 
 import { flattenSplits, viewDrawProblem } from "./partition-arms.ts";
 
-export const DOC_VERSION = "2.8";
+export const DOC_VERSION = "2.9";
 
 /** what upgrading a document did, reported in the result so a reader is told, not left to notice */
 export interface DocUpgrade {
@@ -209,6 +209,13 @@ const idSetsNamed = (doc: AnyDoc): AnyDoc => doc;
  */
 const cohortsLockable = (doc: AnyDoc): AnyDoc => doc;
 
+/**
+ * 2.8 → 2.9: a `profiled` clause may name several genes (`genes`), profiled for every one. Nothing an
+ * older document says changes; the version exists so a 2.8 engine refuses a document using `genes`
+ * rather than ignoring it and reading the clause as "profiled for any gene".
+ */
+const profiledGeneLists = (doc: AnyDoc): AnyDoc => doc;
+
 /** each step upgrades from the version before `to`; unversioned documents start at the first */
 const STEPS: { to: string; run: (doc: AnyDoc, changes: string[]) => AnyDoc }[] = [
   { to: "2.3", run: partitionsToSplits },
@@ -216,7 +223,8 @@ const STEPS: { to: string; run: (doc: AnyDoc, changes: string[]) => AnyDoc }[] =
   { to: "2.5", run: viewsNameTheirCohorts },
   { to: "2.6", run: studyTrackRenamed },
   { to: "2.7", run: idSetsNamed },
-  { to: "2.8", run: cohortsLockable }
+  { to: "2.8", run: cohortsLockable },
+  { to: "2.9", run: profiledGeneLists }
 ];
 
 /**

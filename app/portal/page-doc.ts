@@ -36,14 +36,18 @@ export interface PageLayout {
   left: string[];
 }
 
-export function encodeDoc(d: AnalysisDoc): string {
-  return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+/** any JSON value as a URL parameter (base64url) */
+export function encodeParam(x: unknown): string {
+  return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(x)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
-export function decodeDoc(b64: string | null): AnalysisDoc | null {
+/** a URL parameter written by encodeParam; null when there is none or it does not decode */
+export function decodeParam<T>(b64: string | null): T | null {
   if (!b64) return null;
   try { return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)))); }
   catch { return null; }
 }
+export const encodeDoc = (d: AnalysisDoc): string => encodeParam(d);
+export const decodeDoc = (b64: string | null): AnalysisDoc | null => decodeParam<AnalysisDoc>(b64);
 
 /**
  * The document a link carries, if it is this page's: the same cohorts and the same kinds of view

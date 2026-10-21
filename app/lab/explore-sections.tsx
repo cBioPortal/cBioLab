@@ -2,6 +2,8 @@
 // Explore's sections: the study picker, the action bar, the add-chart dialog and the facet grid's
 // cards. The page owns Explore's state (app/lab/use-explore.ts and the draft) and hands every
 // section the same ExploreCtx — what it reads and the edits it can make.
+import { useState } from "react";
+import type { Clause } from "../../lib/types";
 import CohortPills from "./pills";
 import { ChartMenu } from "./partitions.tsx";
 import type { ChartKey } from "../../lib/partition-arms.ts";
@@ -15,7 +17,7 @@ import { naturalOrder } from "../../lib/ordinal.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import { SHOW_DERIVED_FACETS, type ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
-import { Save, Tag, X } from "lucide-react";
+import { Dna, Save, Tag, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { CHIP } from "../_ui/toolbar.ts";
 import { GearMenu } from "../_ui/gear-menu.tsx";
@@ -25,6 +27,10 @@ import { Choice } from "../_ui/choice.tsx";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { StudySearch, StudyRows, filterStudies } from "../_studies/study-list.tsx";
+import { QueryGenesDialog, studiesProblem } from "../portal/query-editor.tsx";
+import { resultsMaxStudies } from "../../lib/results-settings.ts";
+import { usePublicEnv } from "../_env/public-env-context.tsx";
+import { cn } from "../../lib/cn";
 
 /** The most studies "add all" stages at once (each adds dozens of queries to Explore's facets). */
 export const ADD_ALL_LIMIT = 30;
@@ -69,8 +75,15 @@ const ICON = "text-muted-foreground hover:text-accent-foreground [&_svg]:size-3.
 
 
 export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
-  const { addMode, analyzeDraft, exDraftStudies, exPanelOpen, exSel, exStudies, explore, exploreBusy, sCaps, sQuery, setExDraftStudies, setExPanelOpen, setExploreStudies, setSCaps, setSQuery, setStudyChipsOpen, studies, studyChipsOpen } = ctx;
+  const { addMode, analyzeDraft, exDraftStudies, exPanelOpen, exSel, exStudies, explore, exploreBusy, parseDraft, sCaps, sQuery, setExDraftStudies, setExPanelOpen, setExploreStudies, setSCaps, setSQuery, setStudyChipsOpen, studies, studyChipsOpen } = ctx;
+  // what a gene query is being written for: the selection (the header's button) or one study (a row's icon)
+  const [queryFor, setQueryFor] = useState<{ studies: string[]; filters: Clause[] } | null>(null);
+  const maxStudies = resultsMaxStudies(usePublicEnv());
+  const queryWhy = !exStudies.length ? "select a study first" : studiesProblem(exStudies.length, maxStudies);
+  const selectionFilters = (parseDraft()?.all || []) as Clause[];
+  const names = new Map(studies.map((s) => [s.id, s.name] as const));
   return <>
+    <QueryGenesDialog target={queryFor} names={names} onClose={() => setQueryFor(null)} />
     {(() => {
       const byId = new Map(studies.map((s) => [s.id, s] as const));
       const selPts = exStudies.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0);
@@ -145,6 +158,13 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
               Analyze
             </Button>}
+            {!addMode && <Button variant="outline" className="querygenes" disabled={!!queryWhy}
+              onClick={() => setQueryFor({ studies: exStudies, filters: selectionFilters })}
+              title={queryWhy || "query genes in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " studies") +
+                (selectionFilters.length ? ", within your " + selectionFilters.length + " filter" + (selectionFilters.length === 1 ? "" : "s") : "") +
+                ", and open the results — oncoprint, mutations, survival…"}>
+              <Dna />Query genes…
+            </Button>}
             {exStudies.length > 0 && <Button variant="outline" onClick={() => {
               if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
               else { setExDraftStudies(exStudies); setExPanelOpen(true); }           // open seeds
@@ -187,7 +207,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               </Button>
             </div>
             <StudyRows hits={hits} loading={!studies.length} pick="many" selected={staged} onToggle={toggleStaged}
-              actions={(id) => <StudyActions id={id} ctx={ctx} />} />
+              actions={(id) => <StudyActions id={id} ctx={ctx} onQuery={(one) => setQueryFor({ studies: [one], filters: [] })} />} />
           </>}
         </div>
       );
@@ -197,7 +217,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
 
 /** A study row's actions, like the portal home page's per-study icons. They act on this
  *  study alone, whatever is staged; a click on one does not tick the row. */
-function StudyActions({ id, ctx }: { id: string; ctx: ExploreCtx }) {
+function StudyActions({ id, ctx, onQuery }: { id: string; ctx: ExploreCtx; onQuery: (id: string) => void }) {
   const { addMode, exploreStudy, analyzeStudy, addDataToStudy } = ctx;
   const act = (f: (id: string) => void) => (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); f(id); };
   return (
@@ -207,6 +227,9 @@ function StudyActions({ id, ctx }: { id: string; ctx: ExploreCtx }) {
       </Button>
       {!addMode && <Button variant="ghost" size="icon-xs" className={ICON} onClick={act(analyzeStudy)} title={"start a fresh analysis of all of " + id + " (replaces the current document)"} aria-label={"analyze " + id}>
         <svg viewBox="0 0 16 16" aria-hidden><path d="M1.5 1v13.5H15V13H3V1Z" /><path d="M4.5 8h2v4h-2ZM8 5h2v7H8ZM11.5 2.5h2V12h-2Z" /></svg>
+      </Button>}
+      {!addMode && <Button variant="ghost" size="icon-xs" className={cn(ICON, "[&_svg]:fill-none")} onClick={act(onQuery)} title={"query genes in " + id + " and open its results"} aria-label={"query genes in " + id}>
+        <Dna />
       </Button>}
       <Button variant="ghost" size="icon-xs" className={ICON} onClick={act(addDataToStudy)} title={"explore " + id + " and add custom data to it"} aria-label={"add custom data to " + id}>
         <svg viewBox="0 0 16 16" aria-hidden><path d="M8 1c-3.6 0-6.5 1.1-6.5 2.5v9C1.5 13.9 4.4 15 8 15c.4 0 .8 0 1.2-.04a4.5 4.5 0 0 1-.9-1.48H8c-3.1 0-5-.9-5-1.48V9.9c1.2.65 3 1.03 5 1.08.05-.5.17-.98.36-1.43C5 9.5 3 8.6 3 8V5.4C4.2 6 6 6.5 8 6.5s3.8-.5 5-1.1V8a4.5 4.5 0 0 1 1.5.5v-5C14.5 2.1 11.6 1 8 1Zm0 4C5 5 3 4.1 3 3.5S5 2 8 2s5 .9 5 1.5S11 5 8 5Z" /><path d="M12 9.5a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0v-1.5h-1.5a.75.75 0 0 1 0-1.5h1.5v-1.5A.75.75 0 0 1 12 9.5Z" /></svg>

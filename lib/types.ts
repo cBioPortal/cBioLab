@@ -110,6 +110,12 @@ export interface ProfiledLeaf {
    * alteration facets always set it.
    */
   gene?: string;
+  /**
+   * Profiled for EVERY one of these genes: the same as one `gene` clause per gene, AND-ed, in a
+   * single clause, so "unaltered in a gene list" fits a cohort's clauses however long the list
+   * (the Results page's Unaltered group). Give `gene` or `genes`, not both.
+   */
+  genes?: string[];
 }
 export interface CaseListLeaf { kind: "caseList"; id: string }
 export interface GenomicDataLeaf {

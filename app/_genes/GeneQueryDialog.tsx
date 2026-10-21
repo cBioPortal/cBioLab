@@ -76,6 +76,8 @@ export interface GeneQueryDialogProps {
   max?: number;
   /** in "genes" mode, whether `[A B]` merged rows are taken (the oncoprint's) */
   groups?: boolean;
+  /** what the confirming button says, when it does more than apply the text ("Submit query") */
+  applyLabel?: string;
 }
 
 export function GeneQueryDialog(p: GeneQueryDialogProps) {
@@ -91,7 +93,7 @@ const PLACEHOLDER: Record<GeneQueryMode, string> = {
   genes: "TP53 KRAS PIK3CA",
 };
 
-function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply, min = 1, max = 30, groups = false }: GeneQueryDialogProps) {
+function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply, min = 1, max = 30, groups = false, applyLabel = "Apply" }: GeneQueryDialogProps) {
   const [text, setText] = useState(value);
   const [q, setQ] = useState("");
   const [setError, setSetError] = useState<string | null>(null);
@@ -138,7 +140,7 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
   const mine = (l: GeneList) => l.mode === mode;
 
   return (
-    <DialogContent data-tw className="gene-query-dialog gap-4 sm:max-w-4xl" onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !blocked) apply(); }}>
+    <DialogContent data-tw className="gene-query-dialog top-[6vh] max-h-[88vh] translate-y-0 gap-4 overflow-y-auto sm:max-w-4xl" onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !blocked) apply(); }}>
       <DialogHeader>
         <DialogTitle className="text-lg">{title}</DialogTitle>
         <DialogDescription className="text-md">
@@ -227,15 +229,15 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
             <TabsTrigger value="saved" className={SEG_TAB}><Star />Saved</TabsTrigger>
             <TabsTrigger value="help" className={SEG_TAB}>{mode === "oql" ? "OQL help" : "Syntax"}</TabsTrigger>
           </TabsList>
-          <TabsContent value="recent" className="m-0">
+          <TabsContent value="recent" className="m-0 max-h-[max(10rem,calc(88vh-15rem))] overflow-y-auto pr-1">
             <ListOf items={lists.recent.filter(mine)} empty="Queries you apply are kept here, in this browser." onUse={setText}
               onRemove={(l) => lists.forget(l.at)} />
           </TabsContent>
-          <TabsContent value="saved" className="m-0">
+          <TabsContent value="saved" className="m-0 max-h-[max(10rem,calc(88vh-15rem))] overflow-y-auto pr-1">
             <ListOf items={lists.saved.filter(mine)} empty="Save a query you will reuse — “Save list…” below. Saved in this browser." onUse={setText}
               onRemove={(l) => lists.unsave(l.name!)} />
           </TabsContent>
-          <TabsContent value="help" className="m-0">
+          <TabsContent value="help" className="m-0 max-h-[max(10rem,calc(88vh-15rem))] overflow-y-auto pr-1">
             {mode === "oql" ? (
               <div className="flex flex-col gap-1">
                 {OQL_HELP.map((h) => (
@@ -257,7 +259,7 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
           </TabsContent>
         </Tabs>
       </div>
-      <DialogFooter className="items-center gap-2 sm:justify-between">
+      <DialogFooter className="sticky -bottom-6 -mx-6 -mb-6 items-center gap-2 border-t bg-card px-6 py-3 sm:justify-between">
         {saving == null
           ? <Button variant="outline" size="sm" className={TB} disabled={!check.genes.length} onClick={() => setSaving("")}><BookmarkPlus />Save list…</Button>
           : <form className="flex items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); if (saving.trim()) { lists.save(saving, text, mode); setSaving(null); } }}>
@@ -270,7 +272,7 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
             {pending ? "checking symbols…" : problems.length ? problems.length + " to fix" : ""}
           </span>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={apply} disabled={blocked} title={blocked ? (pending ? "waiting for the symbols to be checked" : problems.join("\n")) : "apply (⌘/Ctrl+Enter)"}>Apply</Button>
+          <Button onClick={apply} disabled={blocked} title={blocked ? (pending ? "waiting for the symbols to be checked" : problems.join("\n")) : applyLabel.toLowerCase() + " (⌘/Ctrl+Enter)"}>{applyLabel}</Button>
         </div>
       </DialogFooter>
     </DialogContent>
@@ -280,7 +282,7 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
 function ListOf({ items, empty, onUse, onRemove }: { items: GeneList[]; empty: string; onUse: (text: string) => void; onRemove: (l: GeneList) => void }) {
   if (!items.length) return <p className="m-0 text-sm text-muted-foreground">{empty}</p>;
   return (
-    <ul className="m-0 flex max-h-80 list-none flex-col gap-1 overflow-y-auto p-0">
+    <ul className="m-0 flex list-none flex-col gap-1 p-0">
       {items.map((l) => (
         <li key={l.name ?? l.at} className="group flex items-start gap-1 rounded-sm hover:bg-accent">
           <button type="button" className="min-w-0 flex-1 border-0 bg-transparent px-1.5 py-1 text-left" onClick={() => onUse(l.text)} title={"use this query:\n" + l.text}>

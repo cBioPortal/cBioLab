@@ -97,6 +97,21 @@ async function oqlNesting(study: string, gene: string, allele: string) {
   record(study, "oql", `"${gene}: MUT AMP" is exactly mutated or amplified`, same(mutAmp, or(mut, amp)), diff("MUT AMP", mutAmp, or(mut, amp)));
 }
 
+/**
+ * A profiled clause naming several genes selects exactly the patients profiled for each of them —
+ * the intersection of the one-gene clauses — and "not altered, profiled for all" never reaches a
+ * patient some gene's panel did not cover.
+ */
+async function profiledGeneList(study: string, type: "MUTATION" | "CNA", genes: string[]) {
+  const [list, ...singles] = await Promise.all([
+    leaf(study, { kind: "profiled", type, genes } as Clause),
+    ...genes.map((gene) => leaf(study, { kind: "profiled", type, gene } as Clause)),
+  ]);
+  const expected = singles.slice(1).reduce((a, b) => and(a, b), singles[0]);
+  record(study, "profiled", `profiled for ${type} in every one of ${genes.join(", ")} is the intersection of each gene's profiled patients`,
+    list.size > 0 && same(list, expected), diff("gene list", list, expected) + " · each gene: " + singles.map(n).join(" / "));
+}
+
 /** A categorical attribute's values partition the patients who have one; a threshold splits a number. */
 async function clinicalPartition(study: string, attribute: string, values: string[], numeric: string, cut: number) {
   const recorded = await leaf(study, { kind: "clinical", attribute, op: "!=", value: "" } as Clause);
@@ -170,6 +185,8 @@ await splitByHand(CHORD, { all: [{ kind: "clinical", attribute: "CANCER_TYPE", v
   [{ name: "G12C", where: { kind: "oql", q: "KRAS: G12C" } }, { name: "other KRAS", where: { kind: "oql", q: "KRAS: MUT" } }], "KRAS wild-type");
 await splitByHand(CHORD, { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"], per: "sample" } as Clause] },
   [{ name: "PIK3CA", where: { kind: "oql", q: "PIK3CA: MUT" } }, { name: "TP53", where: { kind: "oql", q: "TP53: MUT" } }], "neither");
+await profiledGeneList(CHORD, "MUTATION", ["KRAS", "NRAS", "BRAF", "NTRK3", "SOX9"]);
+await profiledGeneList("brca_tcga", "CNA", ["KRAS", "TP53", "PIK3CA"]);
 await lineNesting(CHORD);
 await heldOutHalves(CHORD);
 
