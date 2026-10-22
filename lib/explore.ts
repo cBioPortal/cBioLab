@@ -500,7 +500,7 @@ export async function geneTables({ studies, db, conn, geneSearch, cond = "", pan
     const [altered, panelProfiled, wes, distinct] = await Promise.all([
       chQuery<ChRow>(
         "SELECT hugo_gene_symbol AS g," + (isCna ? " cna_alteration AS cna, any(cna_cytoband) AS cytoband," : "") + "\n" +
-        "       uniqExact(sample_unique_id) AS altered, count() AS events\n" +
+        "       uniqExact(sample_unique_id) AS altered, uniqExactIf(sample_unique_id, NOT off_panel) AS on_panel, count() AS events\n" +
         "FROM " + db + ".genomic_event_derived\n" + where + "\n" +
         "GROUP BY g" + (isCna ? ", cna" : "") + "\n" +
         "ORDER BY altered DESC, g ASC LIMIT " + GENE_TABLE_LIMIT, conn),
@@ -550,10 +550,10 @@ export async function geneTables({ studies, db, conn, geneSearch, cond = "", pan
     const wesN = Number(wes.data[0]?.n || 0);
     const rows = altered.data.map((r): GeneTableRow => {
       const profiled = (panelMap.get(r.g) || 0) + wesN;
-      const alt = Number(r.altered);
+      const alt = Number(r.altered), onPanel = Number(r.on_panel);
       return {
-        gene: r.g, altered: alt, events: Number(r.events), profiled,
-        freqPct: profiled ? Math.round(1000 * alt / profiled) / 10 : null,
+        gene: r.g, altered: alt, alteredOnPanel: onPanel, events: Number(r.events), profiled,
+        freqPct: profiled ? Math.round(1000 * onPanel / profiled) / 10 : null,
         ...(isCna ? { cna: Number(r.cna), cytoband: r.cytoband } : {})
       };
     });
@@ -1190,12 +1190,13 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     for (const p of parts) for (const r of pick(p) || []) {
       const k = r.gene + "|" + (r.cna ?? "");
       const cur = m.get(k);
-      if (!cur) { m.set(k, { ...r }); continue; }
+      if (!cur) { m.set(k, { ...r, alteredOnPanel: r.alteredOnPanel ?? r.altered }); continue; }
       cur.altered += r.altered; cur.events += r.events; cur.profiled += r.profiled;
+      cur.alteredOnPanel = (cur.alteredOnPanel ?? 0) + (r.alteredOnPanel ?? r.altered);
       cur.cytoband = cur.cytoband || r.cytoband;
     }
     return [...m.values()]
-      .map((r) => ({ ...r, freqPct: r.profiled ? Math.round(1000 * r.altered / r.profiled) / 10 : null }))
+      .map((r) => ({ ...r, freqPct: r.profiled ? Math.round(1000 * (r.alteredOnPanel ?? r.altered) / r.profiled) / 10 : null }))
       .sort((a, b) => b.altered - a.altered)
       .slice(0, GENE_TABLE_LIMIT);
   };

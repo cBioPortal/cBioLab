@@ -959,16 +959,19 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
                     of the cohort. Computed here from numbers already in the
                     payload; no extra query. */}
                 {(() => {
+                  // samples whose call is off-panel were not profiled for the gene: they sit in the
+                  // not-profiled share, as on the portal, where they count in "#" but not in Freq
                   const total = explore.totals?.samples ?? g.profiled;
-                  const wild = Math.max(0, g.profiled - g.altered);
+                  const onPanel = g.alteredOnPanel ?? g.altered;
+                  const wild = Math.max(0, g.profiled - onPanel);
                   const unprofiled = Math.max(0, total - g.profiled);
-                  const sum = g.altered + wild + unprofiled || 1;
+                  const sum = onPanel + wild + unprofiled || 1;
                   const w = (n: number) => (100 * n / sum) + "%";
                   return (
                     <span className="gsplit" aria-hidden="true"
-                      title={g.altered.toLocaleString() + " altered · " + wild.toLocaleString() +
+                      title={onPanel.toLocaleString() + " altered · " + wild.toLocaleString() +
                         " profiled and unaltered · " + unprofiled.toLocaleString() + " not profiled for " + g.gene}>
-                      <i className="s-alt" style={{ width: w(g.altered) }} />
+                      <i className="s-alt" style={{ width: w(onPanel) }} />
                       <i className="s-wt" style={{ width: w(wild) }} />
                       <i className="s-np" style={{ width: w(unprofiled) }} />
                     </span>
@@ -984,7 +987,17 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
                 {kind !== "cna" && <span className="gevents" title={g.events.toLocaleString() + " events across " + g.altered.toLocaleString() + " samples"}>{g.events.toLocaleString()}</span>}
                 <span className={g.cna != null ? "cnatag " + (g.cna === 2 ? "amp" : "del") : "cnatag none"}>{g.cna != null ? (g.cna === 2 ? "AMP" : "HOMDEL") : ""}</span>
                 <span className="gfreq">{g.freqPct != null ? fmtPct(g.freqPct) : "—"}</span>
-                <span className="gcount">{g.altered.toLocaleString()}<span className="meta">/{g.profiled.toLocaleString()}</span></span>
+                {(() => {
+                  const onPanel = g.alteredOnPanel ?? g.altered, off = g.altered - onPanel;
+                  return (
+                    <span className="gcount" title={off > 0 ? off.toLocaleString() + " more sample" + (off === 1 ? " has" : "s have") +
+                      " a call in " + g.gene + " that their panel does not cover (off-panel): counted among the " +
+                      g.altered.toLocaleString() + " altered, as cBioPortal's \"#\" does, but not in the frequency, since those samples were not profiled for it" : undefined}>
+                      {onPanel.toLocaleString()}<span className="meta">/{g.profiled.toLocaleString()}</span>
+                      {off > 0 && <span className="meta goff"> +{off.toLocaleString()} off-panel</span>}
+                    </span>
+                  );
+                })()}
               </button>
             ))}
           </div>

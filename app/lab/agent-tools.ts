@@ -107,9 +107,9 @@ function facetSummary(e: ExploreResult | null, section: string, limit: number) {
     ? { attribute: f.attribute, per: f.per, values: f.values.slice(0, 8) }
     : { attribute: f.attribute, per: f.per, numeric: { min: f.min, median: f.median, max: f.max } });
   if (want("genes")) out.genes = {
-    note: "samples altered / samples profiled for THAT gene (panel-aware)",
-    mutated: (e.mutatedGenes || []).slice(0, limit).map((g) => ({ gene: g.gene, altered: g.altered, profiled: g.profiled, pct: g.freqPct })),
-    cna: (e.cnaGenes || []).slice(0, Math.min(limit, 10)).map((g) => ({ gene: g.gene, type: g.cna === 2 ? "amplification" : g.cna === -2 ? "deep deletion" : g.cna, altered: g.altered, profiled: g.profiled, pct: g.freqPct }))
+    note: "pct = samples altered on a panel covering the gene / samples profiled for THAT gene (panel-aware), as cBioPortal's study view; altered also counts off-panel calls (the portal's \"#\"), which the frequency leaves out",
+    mutated: (e.mutatedGenes || []).slice(0, limit).map((g) => ({ gene: g.gene, altered: g.altered, alteredOnPanel: g.alteredOnPanel ?? g.altered, profiled: g.profiled, pct: g.freqPct })),
+    cna: (e.cnaGenes || []).slice(0, Math.min(limit, 10)).map((g) => ({ gene: g.gene, type: g.cna === 2 ? "amplification" : g.cna === -2 ? "deep deletion" : g.cna, altered: g.altered, alteredOnPanel: g.alteredOnPanel ?? g.altered, profiled: g.profiled, pct: g.freqPct }))
   };
   if (want("events")) out.timelineEvents = e.events.slice(0, limit);
   if (want("derived")) out.derived = (e.derived || []).map((d) => ({ metric: d.metric, label: d.label, buckets: d.buckets }));

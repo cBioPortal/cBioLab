@@ -8,7 +8,9 @@
  *
  *   1. Cohort size — patients and samples.
  *   2. The gene tables — for the top genes by alteration frequency (mutations, copy-number,
- *      structural variants): samples altered AND samples profiled, the panel-aware denominator.
+ *      structural variants): samples altered (the portal's "#"), samples altered on a panel that
+ *      covers the gene (the frequency's numerator: an off-panel call is left out of it), and samples
+ *      profiled, the panel-aware denominator.
  *   3. Clinical counts — every value of the leading categorical attributes.
  *   4. Filtered cohorts — patients with a mutation in the study's most-mutated gene, with its
  *      most-altered copy-number gene amplified or deleted, and with one clinical value, compiled by
@@ -19,6 +21,10 @@
  *   6. OQL mutation classes (TRUNC, MISSENSE, NONSENSE, FRAMESHIFT, INFRAME, SPLICE, NONSTART,
  *      NONSTOP, PROMOTER) on that gene and on TERT (promoter mutations), the same way: the
  *      portal's mutations, its own classes.
+ *   7. A selection of several studies profiled differently — panel (IMPACT341), several panels in
+ *      one study (IMPACT341/410/468) and whole-exome — through the multi-study path: every row of
+ *      the three gene tables, which is where per-study denominators, pooling and off-panel calls
+ *      meet.
  *
  * Every comparison must agree EXACTLY; a count is a count. Differences are reported, never
  * tolerated, so a disagreement caused by the two databases holding different releases of a
@@ -31,7 +37,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { buildExplore } from "../lib/explore.ts";
+import { buildExplore, buildExploreFederated } from "../lib/explore.ts";
 import { studyProfiles } from "../lib/analysis.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
@@ -72,7 +78,10 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
   }
 }
 
-interface PortalGene { hugoGeneSymbol: string; numberOfAlteredCases: number; numberOfProfiledCases: number; alteration?: number }
+interface PortalGene { hugoGeneSymbol: string; numberOfAlteredCases: number; numberOfAlteredCasesOnPanel: number; numberOfProfiledCases: number; alteration?: number }
+/** altered / altered on a covering panel / profiled, as both sides are compared */
+const oursGene = (r: GeneTableRow) => `${r.altered}/${r.alteredOnPanel ?? r.altered}/${r.profiled}`;
+const portalGene = (p: PortalGene) => `${p.numberOfAlteredCases}/${p.numberOfAlteredCasesOnPanel}/${p.numberOfProfiledCases}`;
 interface PortalCount { attributeId: string; counts: { value: string; count: number }[] }
 interface PortalSample { sampleId: string; patientId: string }
 
@@ -106,9 +115,8 @@ for (const study of STUDIES) {
     for (const r of rows.slice(0, TOP_GENES)) {
       const p = byKey.get(r.gene + "|" + (r.cna ?? ""));
       const what = r.gene + (r.cna === 2 ? " amplified" : r.cna === -2 ? " deleted" : "");
-      record({ study, group: label, what, ours: `${r.altered}/${r.profiled}`,
-        portal: p ? `${p.numberOfAlteredCases}/${p.numberOfProfiledCases}` : "absent",
-        agree: !!p && p.numberOfAlteredCases === r.altered && p.numberOfProfiledCases === r.profiled });
+      record({ study, group: label, what, ours: oursGene(r), portal: p ? portalGene(p) : "absent",
+        agree: !!p && oursGene(r) === portalGene(p) });
     }
   }
 
@@ -249,13 +257,46 @@ function inPortalRange(m: PortalMutation, r: { lo?: number; hi?: number; contain
   return r.contained ? lo <= p[0] && hi >= p[1] : lo <= p[1] && p[0] <= hi;
 }
 
+// 7. studies profiled differently, together
+const MIXED = ["utuc_mskcc_2015", "msk_impact_2017", "blca_tcga_pan_can_atlas_2018"];
+{
+  const study = MIXED.join(" + ");
+  const profilesByStudy = new Map();
+  for (const s of MIXED) profilesByStudy.set(s, await studyProfiles(s));
+  const ex = await buildExploreFederated({ studies: MIXED, profilesByStudy });
+  const tables: [string, GeneTableRow[] | undefined, string][] = [
+    ["mutations", ex.mutatedGenes, "/mutated-genes/fetch"],
+    ["copy number", ex.cnaGenes, "/cna-genes/fetch"],
+    ["structural variants", ex.svGenes, "/structuralvariant-genes/fetch"],
+  ];
+  for (const [label, rows, path] of tables) {
+    const portal = await api<PortalGene[]>(path, { studyIds: MIXED });
+    const byKey = new Map(portal.map((g) => [g.hugoGeneSymbol + "|" + (g.alteration ?? ""), g]));
+    const what = (r: GeneTableRow) => r.gene + (r.cna === 2 ? " amplified" : r.cna === -2 ? " deleted" : "");
+    const agrees = (r: GeneTableRow) => { const p = byKey.get(r.gene + "|" + (r.cna ?? "")); return !!p && oursGene(r) === portalGene(p); };
+    // named: the leading genes, and the rows where off-panel calls separate "#" from the frequency
+    const offPanel = (rows || []).filter((r) => (r.alteredOnPanel ?? r.altered) !== r.altered);
+    for (const r of [...(rows || []).slice(0, TOP_GENES), ...offPanel.slice(0, 10)]) {
+      const p = byKey.get(r.gene + "|" + (r.cna ?? ""));
+      record({ study, group: label, what: what(r) + ((r.alteredOnPanel ?? r.altered) !== r.altered ? " (off-panel calls)" : ""),
+        ours: oursGene(r), portal: p ? portalGene(p) : "absent", agree: agrees(r) });
+    }
+    // and every row the table holds
+    const wrong = (rows || []).filter((r) => !agrees(r));
+    record({ study, group: label, what: `every row of the table (${(rows || []).length}, ${offPanel.length} with off-panel calls)`,
+      ours: wrong.length ? wrong.length + " differ: " + wrong.slice(0, 5).map((r) => what(r) + " " + oursGene(r)).join(", ") : "all agree",
+      portal: wrong.length ? wrong.slice(0, 5).map((r) => { const p = byKey.get(r.gene + "|" + (r.cna ?? "")); return p ? portalGene(p) : "absent"; }).join(", ") : "all agree",
+      agree: !!rows?.length && !wrong.length });
+  }
+}
+
 const failed = checks.filter((c) => !c.agree).length;
 if (process.env.RECORD) mkdirSync(new URL(".", OUT), { recursive: true });
 if (process.env.RECORD) writeFileSync(OUT, JSON.stringify({
   ranAt: new Date().toISOString(),
   commit: (() => { try { return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch { return null; } })(),
   reference: "https://www.cbioportal.org (public API)",
-  studies: STUDIES,
+  studies: [...STUDIES, MIXED.join(" + ")],
   total: checks.length, agree: checks.length - failed,
   checks,
 }, null, 1) + "\n");

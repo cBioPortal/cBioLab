@@ -467,6 +467,8 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .generow .gbar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .generow .gfreq { text-align: right; font-variant-numeric: tabular-nums; }
 .generow .gcount { text-align: right; font-variant-numeric: tabular-nums; font-size: var(--t-sm); }
+/* off-panel calls: counted in "#", not in the frequency — said under the fraction they are not part of */
+.generow .gcount .goff { display: block; font-size: var(--t-xs); line-height: 1.1; }
 
 /* Explore: numeric clinical histograms (cBioPortal study-view bins) */
 .histo { display: flex; align-items: flex-end; gap: 2px; height: 62px; }

@@ -2099,13 +2099,21 @@ export interface NumericBin {
  */
 export interface GeneTableRow {
   gene: string;
-  /** distinct samples with such an alteration in this gene */
+  /** distinct samples with such an alteration in this gene — the portal's "#", off-panel calls included */
   altered: number;
+  /**
+   * those of them whose call is ON a panel covering the gene (genomic_event_derived.off_panel is
+   * false; a whole-exome call always is) — the frequency's numerator, as on cBioPortal's study view.
+   * An off-panel call is a gene its sample's panel does not cover, so that sample is not in
+   * `profiled`; counting it would set a numerator against a denominator it is not part of.
+   * Absent from a peer that predates it, which then reads as `altered`.
+   */
+  alteredOnPanel?: number;
   /** number of alteration events (a sample may carry several) */
   events: number;
   /** samples profiled for this gene = panel-profiled + whole-exome */
   profiled: number;
-  /** altered / profiled, as a percentage */
+  /** alteredOnPanel / profiled, as a percentage */
   freqPct: number | null;
   /** CNA only: 2 = amplification, -2 = deep deletion, plus its cytoband */
   cna?: number;
