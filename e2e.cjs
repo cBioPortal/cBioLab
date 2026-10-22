@@ -159,12 +159,13 @@ async function main() {
     page.on("requestfailed", r => ((r.failure() || {}).errorText === "net::ERR_ABORTED") || errors.push("requestfailed " + r.method() + " " + r.url() +
       " (" + ((r.failure() || {}).errorText || "?") + ")"));
 
-    // "/" no longer serves the standalone query-builder UI — it redirects into
-    // the Analysis app, which subsumes it. Verify the redirect itself once
-    // (scheme-independent) and use /lab as the base for both passes below.
+    // "/" is the homepage (choose studies, then explore or query them); the app's
+    // shell is /lab, the base for both passes below.
     const rootResp = await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
-    ok(scheme + ": / redirects into the app", /\/lab(\?|$)/.test(page.url()) && rootResp.ok(),
+    ok(scheme + ": / is the homepage", new URL(page.url()).pathname === "/" && rootResp.ok() &&
+      (await page.locator("section[aria-label='choose studies']").count()) === 1,
       page.url() + " status " + rootResp.status());
+    await page.goto(BASE + "/lab", { waitUntil: "domcontentloaded" });
     await page.waitForSelector("[aria-label='lab sections'] [role=tab]", { timeout: 90000 });
     ok(scheme + ": app shell loads", (await page.getByRole("tab").count()) >= 4);
 
@@ -1510,6 +1511,69 @@ async function main() {
     await ctx.close();
   }
 
+  // The homepage, as cBioPortal's: choose studies (cancer types, filters, select all), then explore
+  // them or query them by gene in a modal whose Submit opens the Results page; a row's icons act on
+  // that study alone, and the Results page's "Modify query" reopens the modal on its own genes.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const name = "the homepage: choose studies, then explore them or query them by gene";
+    try {
+      const res = await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+      const landed = new URL(page.url()).pathname;     // the homepage itself, no longer a redirect to /lab
+      await page.locator(".study-row:not(.study-head)").first().waitFor({ timeout: 120000 });
+      const query = page.locator("button.querybygene");
+      const empty = { disabled: await query.isDisabled(), why: await query.getAttribute("title") };
+      // the list's own count of matches ("84 of 565"): it draws at most 200 rows, so counting rows would cap there
+      const rows = async () => Number((/([\d,]+) of [\d,]+/.exec(await page.locator("section[aria-label='choose studies']").innerText()) || [])[1]?.replace(/,/g, ""));
+      const all = await rows();
+      await page.locator("nav[aria-label='cancer types'] button").nth(1).click();
+      const byType = await rows();
+      await page.locator("nav[aria-label='cancer types'] button").first().click();
+      await page.getByRole("button", { name: /^Filters/ }).click();
+      await page.getByRole("menuitemcheckbox", { name: "mRNA" }).click();
+      await page.keyboard.press("Escape");
+      const byData = await rows();
+      await page.getByRole("button", { name: /^Filters/ }).click();
+      await page.getByRole("menuitemcheckbox", { name: "mRNA" }).click();
+      await page.keyboard.press("Escape");
+      await page.getByLabel("search studies").fill("coadread_tcga_pub");
+      await page.getByRole("checkbox", { name: /^Select all/ }).click();
+      const picked = await page.locator("label.study-row.sel").count();
+      const explore = await page.locator("a", { hasText: "Explore selected studies" }).getAttribute("href");
+      // a row's icon asks for that study alone, and does not tick it
+      await page.getByLabel("search studies").fill("brca_tcga");
+      await page.getByRole("button", { name: "query genes in brca_tcga", exact: true }).click();
+      const dlg = page.locator("[role=dialog].gene-query-dialog");
+      const rowTitle = await dlg.getByRole("heading").first().innerText();
+      const rowTicked = await page.locator("label.study-row.sel", { hasText: "Firehose Legacy" }).count();
+      await page.keyboard.press("Escape");
+      await dlg.waitFor({ state: "detached" });
+      await query.click();
+      const title = await dlg.getByRole("heading").first().innerText();
+      await dlg.locator("textarea").fill("KRAS: MUT\nBRAF");
+      await page.waitForFunction(() => { const b = [...document.querySelectorAll("[role=dialog].gene-query-dialog button")].find((x) => x.textContent === "Submit query"); return b && !b.disabled; }, null, { timeout: 60000 });
+      await dlg.getByRole("button", { name: "Submit query" }).click();
+      await page.waitForURL(/\/portal\/results\?/, { timeout: 60000 });
+      const q = new URL(page.url()).searchParams;
+      await page.waitForFunction(() => /profiled patients altered/.test(document.body.innerText), null, { timeout: 240000 });
+      await page.getByRole("button", { name: "Modify query" }).click();
+      await page.locator("button.querybygene").click();
+      const again = await dlg.locator("textarea").inputValue();
+      ok(name, res.status() === 200 && landed === "/" &&
+        empty.disabled && /select at least one study/.test(empty.why || "") && byType < all && byData < all && picked >= 1 &&
+        /^\/lab\?tab=explore&study=/.test(explore || "") && /^Query genes in /.test(rowTitle) && rowTicked === 0 &&
+        title === "Select genes to query:" && q.get("study") === "coadread_tcga_pub" && q.get("genes") === "KRAS: MUT\nBRAF" && again === "KRAS: MUT\nBRAF",
+        JSON.stringify({ status: res.status(), landed, empty, rows: [all, byType, byData], picked, explore, rowTitle, rowTicked, title, results: [q.get("study"), q.get("genes")], again }));
+    } catch (e) {
+      ok(name, false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("homepage: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+
   // From the study list to a gene query's results: a study row's query icon opens the gene query
   // dialog for that study, and its Submit opens the Results page with the study and the query.
   {
@@ -1916,13 +1980,13 @@ async function main() {
       sp.on("request", (r) => { if (/\/api\/(explore|cohort)/.test(r.url())) apiCalls++; });
       await sp.getByRole("button", { name: "Add / change studies" }).click();
       await sp.waitForSelector(".applybar", { timeout: 60000 });
-      // "add all" over every study is refused, naming the limit: each study adds dozens of
+      // "select all" over every study is refused, naming the limit: each study adds dozens of
       // facet queries, and nothing here needs more than a handful
-      const addAll = sp.getByRole("button", { name: /^add all/ });
+      const addAll = sp.getByRole("checkbox", { name: /^Select all/ });
       const refused = await addAll.isDisabled();
       const refusedWhy = (await addAll.getAttribute("title")) || "";
-      ok("add all is refused past 30 studies, saying so", refused && /at most 30 studies/.test(refusedWhy), refusedWhy.slice(0, 90));
-      // a narrow search: two ticks, then add all picks up the rest of it
+      ok("select all is refused past 30 studies, saying so", refused && /at most 30 studies/.test(refusedWhy), refusedWhy.slice(0, 90));
+      // a narrow search: two ticks, then select all picks up the rest of it
       await sp.locator('input[placeholder^="search name"]').fill("thymoma");
       await sp.waitForTimeout(300);
       const boxes = sp.locator('.study-row [role=checkbox]');
@@ -1930,7 +1994,7 @@ async function main() {
       await addAll.click();
       await sp.waitForTimeout(2500);                  // well past the 350ms fetch debounce
       ok("staging studies queries nothing", apiCalls === 0,
-        apiCalls === 0 ? "0 requests over 2 ticks + add-all" : apiCalls + " request(s) fired before submit");
+        apiCalls === 0 ? "0 requests over 2 ticks + select all" : apiCalls + " request(s) fired before submit");
       const bar = (await sp.locator(".applybar").innerText()).replace(/\s+/g, " ");
       ok("the staged bar distinguishes staged from applied", /not queried yet/.test(bar), bar.slice(0, 80));
       // and submit must actually apply it

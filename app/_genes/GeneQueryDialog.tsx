@@ -1,6 +1,6 @@
 "use client";
-// THE way a reader enters genes: one dialog for every place a page asks for a gene list or an OQL
-// query. Search (genes, their aliases, gene sets), the query as text, a check of every entry as it
+// THE way a reader enters genes: one editor, in a dialog or in place, for every place a page asks
+// for a gene list or an OQL query. Search (genes, their aliases, gene sets), the query as text, a check of every entry as it
 // is typed (does it parse, is each symbol a gene, an alias of one, or neither), and the lists this
 // browser has used or saved. `mode` decides what the text is: "oql" — each entry a gene and what
 // counts as altered in it — or "genes", cBioPortal's gene list, where `[A B]` is one merged row.
@@ -64,7 +64,7 @@ export interface GeneQueryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  /** what the query is for, under the title */
+  /** what the query is for, under the title; "" for none */
   description?: string;
   mode: GeneQueryMode;
   /** the query as the page holds it */
@@ -93,7 +93,32 @@ const PLACEHOLDER: Record<GeneQueryMode, string> = {
   genes: "TP53 KRAS PIK3CA",
 };
 
-function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply, min = 1, max = 30, groups = false, applyLabel = "Apply" }: GeneQueryDialogProps) {
+/** what the editor's text says, and what stands between it and being used */
+export interface GeneEditorStatus {
+  text: string; check: QueryCheck;
+  /** each problem in words; empty when the text can be used */
+  problems: string[];
+  /** symbols are still being checked */
+  pending: boolean;
+  blocked: boolean;
+}
+
+/**
+ * The gene query editor itself — search, the text, the check of every line, the lists and the help —
+ * for a dialog (GeneQueryDialog) or a page that asks for genes in place (the homepage's query step).
+ * It keeps the text being typed to itself and reports it, with what it says, through `onChange`.
+ */
+export function GeneQueryEditor({ mode, value, onChange, onSubmit, min = 1, max = 30, groups = false, sideClass }: {
+  mode: GeneQueryMode;
+  /** the text it starts from */
+  value: string;
+  onChange?: (status: GeneEditorStatus) => void;
+  /** ⌘/Ctrl+Enter, when the text can be used */
+  onSubmit?: () => void;
+  min?: number; max?: number; groups?: boolean;
+  /** the side panel's height limit (a dialog caps it to the window) */
+  sideClass?: string;
+}) {
   const [text, setText] = useState(value);
   const [q, setQ] = useState("");
   const [setError, setSetError] = useState<string | null>(null);
@@ -136,144 +161,158 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
   const blocked = problems.length > 0 || pending;
   const fixAll = () => setText((t) => aliases.reduce((acc, c) => c.hugo!.length === 1 ? replaceSymbol(acc, c.symbol, c.hugo![0]) : acc, t));
 
-  const apply = () => { lists.remember(text, mode); onApply(text.trim(), check); onOpenChange(false); };
   const mine = (l: GeneList) => l.mode === mode;
 
+  useEffect(() => { onChange?.({ text, check, problems, pending, blocked }); }, [text, check, problems.join("\n"), pending]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <DialogContent data-tw className="gene-query-dialog top-[6vh] max-h-[88vh] translate-y-0 gap-4 overflow-y-auto sm:max-w-4xl" onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !blocked) apply(); }}>
-      <DialogHeader>
-        <DialogTitle className="text-lg">{title}</DialogTitle>
-        <DialogDescription className="text-md">
-          {description || (mode === "oql" ? "One gene per line, optionally with what counts as altered in it (OQL)." : "Gene symbols separated by spaces" + (groups ? "; [A B] draws A and B as one row." : "."))}
-        </DialogDescription>
-      </DialogHeader>
+    <div className="flex min-w-0 flex-col gap-4">
       <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1fr)_17rem]">
-        {/* ---- the query ---- */}
-        <div className="flex min-w-0 flex-col gap-2.5">
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search genes, aliases or gene sets…" aria-label="search genes"
-              className={cn(FIELD, "h-9 pl-8")}
-              onKeyDown={(e) => { if (e.key === "Enter" && found.genes[0]) { e.preventDefault(); append([found.genes[0].symbol]); } }} />
-            {q.trim() && (
-              <div role="listbox" aria-label="matching genes" className="absolute inset-x-0 top-full z-10 mt-1 max-h-72 overflow-y-auto rounded-md border bg-popover p-1 shadow-md">
-                {found.loading && <div className="waiting px-2 py-1.5"><span className="spinner" /> searching…</div>}
-                {!found.loading && !found.genes.length && !found.sets.length && <div className="px-2 py-1.5 text-sm text-muted-foreground">no gene or gene set matches “{q}”</div>}
-                {found.genes.map((g) => (
-                  <button key={g.symbol} type="button" role="option" aria-selected={false} onClick={() => append([g.symbol])}
-                    className="flex w-full items-baseline gap-2 rounded-sm border-0 bg-transparent px-2 py-1 text-left hover:bg-accent">
-                    <span className="font-mono text-md font-medium">{g.symbol}</span>
-                    <span className="text-sm text-muted-foreground">{g.aliasOf ? "for “" + g.aliasOf + "” (alias)" : g.type}</span>
-                    {check.genes.includes(g.symbol.toUpperCase()) && <Check className="ml-auto size-3.5 text-primary" aria-label="already in the query" />}
-                  </button>
-                ))}
-                {found.sets.length > 0 && <div className="mt-1 border-t px-2 pt-1.5 pb-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Gene sets</div>}
-                {found.sets.map((s) => (
-                  <button key={s.name} type="button" role="option" aria-selected={false} disabled={s.size > 30} onClick={() => addSet(s.name)}
-                    title={s.size > 30 ? "has " + s.size + " genes; a query takes at most 30" : "add its " + s.size + " genes"}
-                    className="flex w-full items-baseline gap-2 rounded-sm border-0 bg-transparent px-2 py-1 text-left hover:bg-accent disabled:opacity-50 disabled:hover:bg-transparent">
-                    <span className="min-w-0 truncate font-mono text-sm">{s.name}</span>
-                    <span className="ml-auto shrink-0 text-sm text-muted-foreground tabular-nums">{s.size} genes</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {setError && <p className="m-0 text-sm text-destructive">{setError}</p>}
-          <Textarea ref={area} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} rows={6}
-            aria-label={mode === "oql" ? "OQL query" : "gene list"} placeholder={PLACEHOLDER[mode] + (groups ? " [\"RTK\" EGFR ERBB2 MET]" : "")}
-            className="min-h-36 bg-paper font-mono text-md md:text-md" />
-          {/* every entry as it reads */}
-          <div className="rounded-md border" aria-live="polite">
-            <div className="flex items-center gap-2 border-b px-2.5 py-1.5 text-sm text-muted-foreground">
-              <span className="font-semibold tracking-wide uppercase">Check</span>
-              <span className="tabular-nums">{check.genes.length} gene{check.genes.length === 1 ? "" : "s"}</span>
-              {pending && <span className="waiting"><span className="spinner" /> checking symbols…</span>}
-              {checkError && <span className="text-destructive">could not check symbols: {checkError}</span>}
-              {aliases.some((c) => c.hugo!.length === 1) && (
-                <Button variant="link" size="inline" className="ml-auto" onClick={fixAll}>use the official symbols</Button>
+          {/* ---- the query ---- */}
+          <div className="flex min-w-0 flex-col gap-2.5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="search genes, aliases or gene sets…" aria-label="search genes"
+                className={cn(FIELD, "h-9 pl-8")}
+                onKeyDown={(e) => { if (e.key === "Enter" && found.genes[0]) { e.preventDefault(); append([found.genes[0].symbol]); } }} />
+              {q.trim() && (
+                <div role="listbox" aria-label="matching genes" className="absolute inset-x-0 top-full z-10 mt-1 max-h-72 overflow-y-auto rounded-md border bg-popover p-1 shadow-md">
+                  {found.loading && <div className="waiting px-2 py-1.5"><span className="spinner" /> searching…</div>}
+                  {!found.loading && !found.genes.length && !found.sets.length && <div className="px-2 py-1.5 text-sm text-muted-foreground">no gene or gene set matches “{q}”</div>}
+                  {found.genes.map((g) => (
+                    <button key={g.symbol} type="button" role="option" aria-selected={false} onClick={() => append([g.symbol])}
+                      className="flex w-full items-baseline gap-2 rounded-sm border-0 bg-transparent px-2 py-1 text-left hover:bg-accent">
+                      <span className="font-mono text-md font-medium">{g.symbol}</span>
+                      <span className="text-sm text-muted-foreground">{g.aliasOf ? "for “" + g.aliasOf + "” (alias)" : g.type}</span>
+                      {check.genes.includes(g.symbol.toUpperCase()) && <Check className="ml-auto size-3.5 text-primary" aria-label="already in the query" />}
+                    </button>
+                  ))}
+                  {found.sets.length > 0 && <div className="mt-1 border-t px-2 pt-1.5 pb-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Gene sets</div>}
+                  {found.sets.map((s) => (
+                    <button key={s.name} type="button" role="option" aria-selected={false} disabled={s.size > 30} onClick={() => addSet(s.name)}
+                      title={s.size > 30 ? "has " + s.size + " genes; a query takes at most 30" : "add its " + s.size + " genes"}
+                      className="flex w-full items-baseline gap-2 rounded-sm border-0 bg-transparent px-2 py-1 text-left hover:bg-accent disabled:opacity-50 disabled:hover:bg-transparent">
+                      <span className="min-w-0 truncate font-mono text-sm">{s.name}</span>
+                      <span className="ml-auto shrink-0 text-sm text-muted-foreground tabular-nums">{s.size} genes</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-            <ul className="m-0 max-h-48 list-none overflow-y-auto p-0">
-              {check.error && <li className="flex gap-2 px-2.5 py-1 text-sm text-destructive"><CircleAlert className="mt-0.5 size-3.5 shrink-0" />{check.error}</li>}
-              {!check.entries.length && !check.error && <li className="px-2.5 py-1.5 text-sm text-muted-foreground">nothing entered yet</li>}
-              {check.entries.map((e, i) => {
-                const cs = e.genes.map((g) => checks.get(g));
-                const bad = e.error || cs.some((c) => c?.status === "unknown");
-                const alias = cs.find((c) => c?.status === "alias");
-                const wait = cs.some((c) => !c);
-                return (
-                  <li key={i} className="flex items-baseline gap-2 border-b px-2.5 py-1 text-sm last:border-b-0">
-                    {bad ? <CircleAlert className="size-3.5 shrink-0 translate-y-0.5 text-destructive" aria-label="problem" />
-                      : alias ? <TriangleAlert className="size-3.5 shrink-0 translate-y-0.5 text-mark" aria-label="alias" />
-                      : wait ? <span className="spinner shrink-0" />
-                      : <Check className="size-3.5 shrink-0 translate-y-0.5 text-primary" aria-label="ok" />}
-                    <code className="shrink-0 font-mono text-md">{e.text}</code>
-                    <span className={cn("min-w-0", bad ? "text-destructive" : "text-muted-foreground")}>
-                      {e.error ? e.error
-                        : cs.filter((c) => c?.status === "unknown").length ? cs.filter((c) => c?.status === "unknown").map((c) => c!.symbol).join(", ") + " is not a gene symbol"
-                        : alias ? <>alias of {alias.hugo!.map((h, k) => <span key={h}>{k ? " / " : ""}
-                            <Button variant="link" size="inline" className="font-mono" onClick={() => setText((t) => replaceSymbol(t, alias.symbol, h))}>{h}</Button></span>)} — click to use it</>
-                        : e.meaning}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+            {setError && <p className="m-0 text-sm text-destructive">{setError}</p>}
+            <Textarea ref={area} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} rows={6}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !blocked) onSubmit?.(); }}
+              aria-label={mode === "oql" ? "OQL query" : "gene list"} placeholder={PLACEHOLDER[mode] + (groups ? " [\"RTK\" EGFR ERBB2 MET]" : "")}
+              className="min-h-36 bg-paper font-mono text-md md:text-md" />
+            {/* every entry as it reads */}
+            <div className="rounded-md border" aria-live="polite">
+              <div className="flex items-center gap-2 border-b px-2.5 py-1.5 text-sm text-muted-foreground">
+                <span className="font-semibold tracking-wide uppercase">Check</span>
+                <span className="tabular-nums">{check.genes.length} gene{check.genes.length === 1 ? "" : "s"}</span>
+                {pending && <span className="waiting"><span className="spinner" /> checking symbols…</span>}
+                {checkError && <span className="text-destructive">could not check symbols: {checkError}</span>}
+                {aliases.some((c) => c.hugo!.length === 1) && (
+                  <Button variant="link" size="inline" className="ml-auto" onClick={fixAll}>use the official symbols</Button>
+                )}
+              </div>
+              <ul className="m-0 max-h-48 list-none overflow-y-auto p-0">
+                {check.error && <li className="flex gap-2 px-2.5 py-1 text-sm text-destructive"><CircleAlert className="mt-0.5 size-3.5 shrink-0" />{check.error}</li>}
+                {!check.entries.length && !check.error && <li className="px-2.5 py-1.5 text-sm text-muted-foreground">nothing entered yet</li>}
+                {check.entries.map((e, i) => {
+                  const cs = e.genes.map((g) => checks.get(g));
+                  const bad = e.error || cs.some((c) => c?.status === "unknown");
+                  const alias = cs.find((c) => c?.status === "alias");
+                  const wait = cs.some((c) => !c);
+                  return (
+                    <li key={i} className="flex items-baseline gap-2 border-b px-2.5 py-1 text-sm last:border-b-0">
+                      {bad ? <CircleAlert className="size-3.5 shrink-0 translate-y-0.5 text-destructive" aria-label="problem" />
+                        : alias ? <TriangleAlert className="size-3.5 shrink-0 translate-y-0.5 text-mark" aria-label="alias" />
+                        : wait ? <span className="spinner shrink-0" />
+                        : <Check className="size-3.5 shrink-0 translate-y-0.5 text-primary" aria-label="ok" />}
+                      <code className="shrink-0 font-mono text-md">{e.text}</code>
+                      <span className={cn("min-w-0", bad ? "text-destructive" : "text-muted-foreground")}>
+                        {e.error ? e.error
+                          : cs.filter((c) => c?.status === "unknown").length ? cs.filter((c) => c?.status === "unknown").map((c) => c!.symbol).join(", ") + " is not a gene symbol"
+                          : alias ? <>alias of {alias.hugo!.map((h, k) => <span key={h}>{k ? " / " : ""}
+                              <Button variant="link" size="inline" className="font-mono" onClick={() => setText((t) => replaceSymbol(t, alias.symbol, h))}>{h}</Button></span>)} — click to use it</>
+                          : e.meaning}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+            <div className="flex items-center gap-2">
+          {saving == null
+                ? <Button variant="outline" size="sm" className={TB} disabled={!check.genes.length} onClick={() => setSaving("")}><BookmarkPlus />Save list…</Button>
+                : <form className="flex items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); if (saving.trim()) { lists.save(saving, text, mode); setSaving(null); } }}>
+                    <Input autoFocus value={saving} onChange={(e) => setSaving(e.target.value)} placeholder="name this list" aria-label="list name" className={cn(FIELD, "w-48")} />
+                    <Button size="sm" className={cn(TB, "font-medium")} type="submit" disabled={!saving.trim()}>Save</Button>
+                    <Button variant="ghost" size="icon-xs" type="button" aria-label="cancel saving" onClick={() => setSaving(null)}><X /></Button>
+                  </form>}
+            </div>
           </div>
+          {/* ---- lists and help ---- */}
+          <Tabs defaultValue={lists.recent.some(mine) || lists.saved.some(mine) ? "recent" : "help"} className="min-w-0 gap-2.5">
+            <TabsList className={SEG_TABS} aria-label="gene lists and help">
+              <TabsTrigger value="recent" className={SEG_TAB}><History />Recent</TabsTrigger>
+              <TabsTrigger value="saved" className={SEG_TAB}><Star />Saved</TabsTrigger>
+              <TabsTrigger value="help" className={SEG_TAB}>{mode === "oql" ? "OQL help" : "Syntax"}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="recent" className={cn("m-0 overflow-y-auto pr-1", sideClass)}>
+              <ListOf items={lists.recent.filter(mine)} empty="Queries you apply are kept here, in this browser." onUse={setText}
+                onRemove={(l) => lists.forget(l.at)} />
+            </TabsContent>
+            <TabsContent value="saved" className={cn("m-0 overflow-y-auto pr-1", sideClass)}>
+              <ListOf items={lists.saved.filter(mine)} empty="Save a query you will reuse — “Save list…” below. Saved in this browser." onUse={setText}
+                onRemove={(l) => lists.unsave(l.name!)} />
+            </TabsContent>
+            <TabsContent value="help" className={cn("m-0 overflow-y-auto pr-1", sideClass)}>
+              {mode === "oql" ? (
+                <div className="flex flex-col gap-1">
+                  {OQL_HELP.map((h) => (
+                    <button key={h.q} type="button" onClick={() => setText((t) => (t.trim() ? t.replace(/\s+$/, "") + "\n" : "") + h.q)}
+                      title="add this line to the query" className="rounded-sm border-0 bg-transparent px-1.5 py-1 text-left hover:bg-accent">
+                      <code className="block font-mono text-sm font-medium">{h.q}</code>
+                      <span className="block text-xs text-muted-foreground">{h.means}</span>
+                    </button>
+                  ))}
+                  <p className="mt-1.5 mb-0 text-xs text-muted-foreground">Entries on separate lines (or split by “;” or “,”) are alternatives: a patient is altered if any of them matches. {OQL_REFUSED}</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+                  <p className="m-0">Symbols separated by spaces, commas or new lines: <code className="font-mono">TP53 KRAS PIK3CA</code>.</p>
+                  {groups && <p className="m-0"><code className="font-mono">[EGFR ERBB2]</code> draws both as one merged row; a label goes first in quotes: <code className="font-mono">[&quot;RTK&quot; EGFR ERBB2 MET]</code>.</p>}
+                  <p className="m-0">Per-gene OQL (<code className="font-mono">TP53: MUT</code>) is not taken here — a row draws every alteration type its gene has. To restrict the patients, give the view a cohort with an OQL clause.</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
-        {/* ---- lists and help ---- */}
-        <Tabs defaultValue={lists.recent.some(mine) || lists.saved.some(mine) ? "recent" : "help"} className="min-w-0 gap-2.5">
-          <TabsList className={SEG_TABS} aria-label="gene lists and help">
-            <TabsTrigger value="recent" className={SEG_TAB}><History />Recent</TabsTrigger>
-            <TabsTrigger value="saved" className={SEG_TAB}><Star />Saved</TabsTrigger>
-            <TabsTrigger value="help" className={SEG_TAB}>{mode === "oql" ? "OQL help" : "Syntax"}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="recent" className="m-0 max-h-[max(10rem,calc(88vh-15rem))] overflow-y-auto pr-1">
-            <ListOf items={lists.recent.filter(mine)} empty="Queries you apply are kept here, in this browser." onUse={setText}
-              onRemove={(l) => lists.forget(l.at)} />
-          </TabsContent>
-          <TabsContent value="saved" className="m-0 max-h-[max(10rem,calc(88vh-15rem))] overflow-y-auto pr-1">
-            <ListOf items={lists.saved.filter(mine)} empty="Save a query you will reuse — “Save list…” below. Saved in this browser." onUse={setText}
-              onRemove={(l) => lists.unsave(l.name!)} />
-          </TabsContent>
-          <TabsContent value="help" className="m-0 max-h-[max(10rem,calc(88vh-15rem))] overflow-y-auto pr-1">
-            {mode === "oql" ? (
-              <div className="flex flex-col gap-1">
-                {OQL_HELP.map((h) => (
-                  <button key={h.q} type="button" onClick={() => setText((t) => (t.trim() ? t.replace(/\s+$/, "") + "\n" : "") + h.q)}
-                    title="add this line to the query" className="rounded-sm border-0 bg-transparent px-1.5 py-1 text-left hover:bg-accent">
-                    <code className="block font-mono text-sm font-medium">{h.q}</code>
-                    <span className="block text-xs text-muted-foreground">{h.means}</span>
-                  </button>
-                ))}
-                <p className="mt-1.5 mb-0 text-xs text-muted-foreground">Entries on separate lines (or split by “;” or “,”) are alternatives: a patient is altered if any of them matches. {OQL_REFUSED}</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-                <p className="m-0">Symbols separated by spaces, commas or new lines: <code className="font-mono">TP53 KRAS PIK3CA</code>.</p>
-                {groups && <p className="m-0"><code className="font-mono">[EGFR ERBB2]</code> draws both as one merged row; a label goes first in quotes: <code className="font-mono">[&quot;RTK&quot; EGFR ERBB2 MET]</code>.</p>}
-                <p className="m-0">Per-gene OQL (<code className="font-mono">TP53: MUT</code>) is not taken here — a row draws every alteration type its gene has. To restrict the patients, give the view a cohort with an OQL clause.</p>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
-      <DialogFooter className="sticky -bottom-6 -mx-6 -mb-6 items-center gap-2 border-t bg-card px-6 py-3 sm:justify-between">
-        {saving == null
-          ? <Button variant="outline" size="sm" className={TB} disabled={!check.genes.length} onClick={() => setSaving("")}><BookmarkPlus />Save list…</Button>
-          : <form className="flex items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); if (saving.trim()) { lists.save(saving, text, mode); setSaving(null); } }}>
-              <Input autoFocus value={saving} onChange={(e) => setSaving(e.target.value)} placeholder="name this list" aria-label="list name" className={cn(FIELD, "w-48")} />
-              <Button size="sm" className={cn(TB, "font-medium")} type="submit" disabled={!saving.trim()}>Save</Button>
-              <Button variant="ghost" size="icon-xs" type="button" aria-label="cancel saving" onClick={() => setSaving(null)}><X /></Button>
-            </form>}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground" title={problems.join("\n")}>
-            {pending ? "checking symbols…" : problems.length ? problems.length + " to fix" : ""}
-          </span>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={apply} disabled={blocked} title={blocked ? (pending ? "waiting for the symbols to be checked" : problems.join("\n")) : applyLabel.toLowerCase() + " (⌘/Ctrl+Enter)"}>{applyLabel}</Button>
-        </div>
+    </div>
+  );
+}
+
+function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply, min = 1, max = 30, groups = false, applyLabel = "Apply" }: GeneQueryDialogProps) {
+  const lists = useGeneLists();
+  const [status, setStatus] = useState<GeneEditorStatus | null>(null);
+  const blocked = !status || status.blocked;
+  const about = description ?? (mode === "oql" ? "One gene per line, optionally with what counts as altered in it (OQL)." : "Gene symbols separated by spaces" + (groups ? "; [A B] draws A and B as one row." : "."));
+  const apply = () => { if (!status || status.blocked) return; lists.remember(status.text, mode); onApply(status.text.trim(), status.check); onOpenChange(false); };
+  return (
+    <DialogContent data-tw className="gene-query-dialog top-[6vh] max-h-[88vh] translate-y-0 gap-4 overflow-y-auto sm:max-w-4xl" {...(about ? {} : { "aria-describedby": undefined })}>
+      <DialogHeader>
+        <DialogTitle className="text-lg">{title}</DialogTitle>
+        {about && <DialogDescription className="text-md">{about}</DialogDescription>}
+      </DialogHeader>
+      <GeneQueryEditor mode={mode} value={value} min={min} max={max} groups={groups} onChange={setStatus} onSubmit={apply}
+        sideClass="max-h-[max(10rem,calc(88vh-15rem))]" />
+      <DialogFooter className="sticky -bottom-6 -mx-6 -mb-6 items-center gap-2 border-t bg-card px-6 py-3">
+        <span className="text-sm text-muted-foreground" title={status?.problems.join("\n")}>
+          {status?.pending ? "checking symbols…" : status?.problems.length ? status.problems.length + " to fix" : ""}
+        </span>
+        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        <Button onClick={apply} disabled={blocked} title={blocked ? (status?.pending ? "waiting for the symbols to be checked" : status?.problems.join("\n")) : applyLabel.toLowerCase() + " (⌘/Ctrl+Enter)"}>{applyLabel}</Button>
       </DialogFooter>
     </DialogContent>
   );

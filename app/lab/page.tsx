@@ -290,6 +290,8 @@ export default function AnalysisPage() {
         const only = (new URLSearchParams(window.location.search).get("study") || "")
           .split(",").map((x) => x.trim().replace(/[^A-Za-z0-9._-]/g, "")).filter(Boolean);
         if (only.length) { setStudy(only[0]); setExStudies(only); exSel.current = only; }
+        // &custom=add opens Custom data → Add data on them (the homepage's "add custom data to" icon)
+        if (only.length && new URLSearchParams(window.location.search).get("custom") === "add") exploreState.setCustomTab("add");
         if (tabRef.current === "explore") fetchExplore();
       }
     } catch (e) { setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
@@ -384,7 +386,7 @@ export default function AnalysisPage() {
   return (
     <>
       <header>
-        <h1>cbio-lab</h1>
+        <h1><a href="/" className="text-foreground no-underline" title="choose studies, then explore or query them">cbio-lab</a></h1>
         <span className="sub">analysis documents — cohorts and views over one declarative object</span>
         <span className="spacer" />
         <a className="toplink" href="/reproductions">paper reproductions</a>

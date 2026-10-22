@@ -279,7 +279,14 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   (`use-analysis.ts`): saved cohorts and analyses are `use-saved.ts`, Explore's facets
   `use-explore.ts` (keyed by everything that decides the answer, so a superseded request is
   cancelled and can never land; `e2e-lab-races.cjs` holds requests to prove it). The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
-  demo pages were retired once the Analysis app subsumed them; `/` now redirects to `/lab`.
+  demo pages were retired once the Analysis app subsumed them.
+- **The homepage (`/`, `app/_home/`)** — cBioPortal's: choose studies, then **Explore selected
+  studies** (the lab's Explore, `/lab?tab=explore&study=a,b`) or **Query by gene** (the gene query
+  dialog, whose Submit opens the Results page). One study chooser serves it, Explore's picker and
+  the Results page's "Modify query" (`app/_studies/study-chooser.tsx`: cancer types, search, the
+  data Filters, quick select, select all, rows with their quick-jump icons in `study-actions.tsx`),
+  and one gene editor serves every gene entry (`app/_genes/GeneQueryDialog.tsx`: `GeneQueryEditor`,
+  in the dialog or in place).
 - **WebMCP (`lib/webmcp.ts`)** — every page's tools for the researcher's assistant in the
   browser (Claude in the Chrome sidebar): registered with `document.modelContext` and published
   as `window.cohortLab`. The analysis page's (`app/lab/agent-tools.ts`) read and edit the

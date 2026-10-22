@@ -26,11 +26,11 @@ import { Input } from "../_ui/input";
 import { Choice } from "../_ui/choice.tsx";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
-import { StudySearch, StudyRows, filterStudies } from "../_studies/study-list.tsx";
+import { StudyChooser } from "../_studies/study-chooser.tsx";
+import { StudyRowActions } from "../_studies/study-actions.tsx";
 import { QueryGenesDialog, studiesProblem } from "../portal/query-editor.tsx";
 import { resultsMaxStudies } from "../../lib/results-settings.ts";
 import { usePublicEnv } from "../_env/public-env-context.tsx";
-import { cn } from "../../lib/cn";
 
 /** The most studies "add all" stages at once (each adds dozens of queries to Explore's facets). */
 export const ADD_ALL_LIMIT = 30;
@@ -71,7 +71,6 @@ const SEARCH = "h-8 w-44 text-md md:text-md";
 /** the × that removes a chip */
 const CHIP_X = "ml-1 size-4 rounded-sm text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-3";
 /** a study row's action icon */
-const ICON = "text-muted-foreground hover:text-accent-foreground [&_svg]:size-3.5 [&_svg]:fill-current";
 
 
 export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
@@ -96,8 +95,6 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
         setExploreStudies(cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
       };
       const staged = exDraftStudies ?? exStudies;
-      const toggleStaged = (id: string) =>
-        setExDraftStudies(staged.includes(id) ? staged.filter(x => x !== id) : [...staged, id]);
       const dirty = exDraftStudies != null &&
         (staged.length !== exStudies.length || staged.some(x => !exStudies.includes(x)));
       const applyStaged = () => {
@@ -105,7 +102,6 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
         setExPanelOpen(false);
         setExploreStudies(staged);
       };
-      const hits = filterStudies(studies, sQuery, sCaps);
       return (
         <div className="card">
           <div className="row center g5">
@@ -172,27 +168,6 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
           </div>
           {/* with nothing selected the picker is simply open: there is nothing else to do here */}
           {(exPanelOpen || exStudies.length === 0) && <>
-            <StudySearch query={sQuery} onQuery={setSQuery} caps={sCaps} onCaps={setSCaps} matches={hits.length} total={studies.length}>
-              {/* "all matches", not "all 200 drawn": the list renders the 200 largest, and a button
-                  that selected only those would disagree with the count beside it. Refused, with the
-                  limit named, when it would stage more than ADD_ALL_LIMIT studies: every study adds
-                  dozens of queries to the facets, and a narrower search is the way through. */}
-              {(() => {
-                const after = new Set([...staged, ...hits.map(h => h.id)]).size;
-                const over = after > ADD_ALL_LIMIT;
-                return (
-                  <Button variant="outline" size="xs" className={CHIP} disabled={!hits.length || over}
-                    title={over
-                      ? "add all stages at most " + ADD_ALL_LIMIT + " studies; this would make " + after.toLocaleString() + " — narrow the search, or tick studies one by one"
-                      : "adds the " + hits.length + " studies matching the current search to the staged set, keeping what is already staged — use clear first to replace"}
-                    onClick={() => setExDraftStudies([...new Set([...staged, ...hits.map(h => h.id)])])}>
-                    add all {hits.length.toLocaleString()} match{hits.length === 1 ? "" : "es"}
-                  </Button>
-                );
-              })()}
-              <Button variant="ghost" size="xs" className={CHIP} disabled={!staged.length}
-                onClick={() => setExDraftStudies([])}>clear</Button>
-            </StudySearch>
             <div className="row applybar center g5">
               <strong>{staged.length.toLocaleString()}</strong>
               <span className="meta">
@@ -206,7 +181,9 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
                 Submit
               </Button>
             </div>
-            <StudyRows hits={hits} loading={!studies.length} pick="many" selected={staged} onToggle={toggleStaged}
+            {/* the homepage's chooser: cancer types, search, filters, quick select; "add all" capped, since every study adds facet queries */}
+            <StudyChooser className="mt-2.5" studies={studies} loading={!studies.length} selected={staged} onChange={setExDraftStudies}
+              query={sQuery} onQuery={setSQuery} caps={sCaps} onCaps={setSCaps} addAllLimit={ADD_ALL_LIMIT}
               actions={(id) => <StudyActions id={id} ctx={ctx} onQuery={(one) => setQueryFor({ studies: [one], filters: [] })} />} />
           </>}
         </div>
@@ -219,23 +196,14 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
  *  study alone, whatever is staged; a click on one does not tick the row. */
 function StudyActions({ id, ctx, onQuery }: { id: string; ctx: ExploreCtx; onQuery: (id: string) => void }) {
   const { addMode, exploreStudy, analyzeStudy, addDataToStudy } = ctx;
-  const act = (f: (id: string) => void) => (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); f(id); };
-  return (
-    <span className="studyacts">
-      <Button variant="ghost" size="icon-xs" className={ICON} onClick={act(exploreStudy)} title={"explore " + id + " now (replaces the current selection)"} aria-label={"explore " + id}>
-        <svg viewBox="0 0 16 16" aria-hidden><path d="M7.25 1.54A6.5 6.5 0 1 0 14.46 8.75H7.25Z" /><path d="M8.75.04v6.71h6.71A6.5 6.5 0 0 0 8.75.04Z" /></svg>
-      </Button>
-      {!addMode && <Button variant="ghost" size="icon-xs" className={ICON} onClick={act(analyzeStudy)} title={"start a fresh analysis of all of " + id + " (replaces the current document)"} aria-label={"analyze " + id}>
-        <svg viewBox="0 0 16 16" aria-hidden><path d="M1.5 1v13.5H15V13H3V1Z" /><path d="M4.5 8h2v4h-2ZM8 5h2v7H8ZM11.5 2.5h2V12h-2Z" /></svg>
-      </Button>}
-      {!addMode && <Button variant="ghost" size="icon-xs" className={cn(ICON, "[&_svg]:fill-none")} onClick={act(onQuery)} title={"query genes in " + id + " and open its results"} aria-label={"query genes in " + id}>
-        <Dna />
-      </Button>}
-      <Button variant="ghost" size="icon-xs" className={ICON} onClick={act(addDataToStudy)} title={"explore " + id + " and add custom data to it"} aria-label={"add custom data to " + id}>
-        <svg viewBox="0 0 16 16" aria-hidden><path d="M8 1c-3.6 0-6.5 1.1-6.5 2.5v9C1.5 13.9 4.4 15 8 15c.4 0 .8 0 1.2-.04a4.5 4.5 0 0 1-.9-1.48H8c-3.1 0-5-.9-5-1.48V9.9c1.2.65 3 1.03 5 1.08.05-.5.17-.98.36-1.43C5 9.5 3 8.6 3 8V5.4C4.2 6 6 6.5 8 6.5s3.8-.5 5-1.1V8a4.5 4.5 0 0 1 1.5.5v-5C14.5 2.1 11.6 1 8 1Zm0 4C5 5 3 4.1 3 3.5S5 2 8 2s5 .9 5 1.5S11 5 8 5Z" /><path d="M12 9.5a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0v-1.5h-1.5a.75.75 0 0 1 0-1.5h1.5v-1.5A.75.75 0 0 1 12 9.5Z" /></svg>
-      </Button>
-    </span>
-  );
+  return <StudyRowActions id={id} acts={{
+    explore: { title: "explore " + id + " now (replaces the current selection)", onClick: () => exploreStudy(id) },
+    ...(addMode ? {} : {
+      analyze: { title: "start a fresh analysis of all of " + id + " (replaces the current document)", onClick: () => analyzeStudy(id) },
+      query: { title: "query genes in " + id + " and open its results", onClick: () => onQuery(id) },
+    }),
+    addData: { title: "explore " + id + " and add custom data to it", onClick: () => addDataToStudy(id) },
+  }} />;
 }
 
 export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
