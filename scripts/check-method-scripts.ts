@@ -1,4 +1,5 @@
-// Method-record gate, run by `npm run check:methods` and by scripts/gate.sh:
+// Method-record gate, run by `npm run check:methods` and, sharing one run of the examples with
+// docs:check, by `npm run check:examples` (scripts/gate.sh):
 //   1. Every view in every documented example carries a method record (lib/method.ts), unless
 //      its kind is on EXEMPT below with the reason — a new view cannot ship without one.
 //   2. Every record's Python script is run, with the library versions our statistics are tested
@@ -14,12 +15,11 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { spawn, execSync } from "child_process";
 import { EXAMPLES } from "../lib/dsl-reference.ts";
-import { runAnalysis } from "../lib/analysis.ts";
 import { methodFiles } from "../lib/method-data.ts";
 import { PYTHON_PINS } from "../lib/method-notebook.ts";
 import type { ViewResult } from "../lib/types.ts";
 import { RESULT_MARKER, type MethodRecord } from "../lib/method.ts";
-import { withRequestCustomData } from "../lib/custom-data-server.ts";
+import { runExamples, isMain, type ExampleRun } from "./examples-run.ts";
 
 /** View kinds without a method record yet, and why. Shrink this list; never grow it quietly. */
 const EXEMPT: Record<string, string> = {
@@ -37,9 +37,6 @@ const report = (ok: boolean, label: string, extra = "") => {
   if (!ok) failed++;
   console.log((ok ? "PASS" : "FAIL") + " " + label + (extra ? "  [" + extra + "]" : ""));
 };
-
-try { execSync("uv --version", { stdio: "ignore" }); }
-catch { console.log("FAIL uv is not on the PATH — the method scripts cannot be run"); process.exit(1); }
 
 type View = { kind: string; error?: string; method?: MethodRecord; queries?: { study: string; label: string; sql: string }[]; cohorts?: string[] };
 
@@ -80,48 +77,54 @@ function compare(check: MethodRecord["check"], result: Record<string, number | n
 }
 
 interface Job { label: string; view: View }
-const jobs: Job[] = [];
+
+/** Reports every check above for these runs of the examples; answers how many failed. */
+export async function checkMethods(runs: ExampleRun[]): Promise<number> {
+  failed = 0;
+  try { execSync("uv --version", { stdio: "ignore" }); }
+  catch { report(false, "uv is not on the PATH — the method scripts cannot be run"); return failed; }
+  const jobs: Job[] = [];
+  for (const { ex, result, error } of runs) {
+    if (!result) { report(false, "example “" + ex.title + "” runs", String(error).slice(0, 200)); continue; }
+    (result.views as View[]).forEach((v, i) => {
+      const label = "“" + ex.title + "” view " + (i + 1) + " (" + v.kind + ")";
+      if (v.error) return;   // an errored view has nothing to record; the docs gate owns errors
+      if (!v.method) {
+        if (EXEMPT[v.kind]) return;
+        report(false, label + " has a method record", "no record, and " + v.kind + " is not on the exempt list");
+        return;
+      }
+      if (!v.method.python) return;   // the queries' counts are the numbers
+      if (!v.method.check || !Object.keys(v.method.check).length) { report(false, label + " says what its script must reproduce", "no check values"); return; }
+      jobs.push({ label, view: v });
+    });
+  }
+
+  let next = 0;
+  async function worker() {
+    while (next < jobs.length) {
+      const { label, view } = jobs[next++];
+      const dir = mkdtempSync(join(tmpdir(), "method-check-"));
+      try {
+        writeFileSync(join(dir, "script.py"), view.method!.python!);
+        const why = await materialize(view, dir);
+        if (why) { report(false, label + " script runs", why); continue; }
+        const r = await runPython(dir);
+        const line = r.out.split("\n").reverse().find((l) => l.startsWith(RESULT_MARKER));
+        if (r.code !== 0 || !line) { report(false, label + " script runs", "exit " + r.code + ": " + r.err.trim().split("\n").slice(-3).join(" | ").slice(0, 300)); continue; }
+        const bad = compare(view.method!.check, JSON.parse(line.slice(RESULT_MARKER.length)));
+        report(!bad.length, label + " script reproduces the view",
+          bad.length ? bad.slice(0, 3).join("; ") + (bad.length > 3 ? " … and " + (bad.length - 3) + " more" : "")
+            : Object.keys(view.method!.check!).length + " numbers · " + Math.round(r.ms / 1000) + "s");
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    }
+  }
+  await Promise.all(Array.from({ length: PARALLEL }, worker));
+
+  console.log(failed ? "\n" + failed + " method check(s) FAILED" : "\nall method records present and every script reproduces its view");
+  return failed;
+}
+
 // METHOD_CHECK_ONLY=<text> runs just the examples whose title contains it, while iterating
 const only = process.env.METHOD_CHECK_ONLY;
-for (const ex of EXAMPLES.filter((e) => !only || e.title.includes(only))) {
-  let result;
-  // an example's bundled demo data travels with it, exactly as the page sends it
-  try { result = await withRequestCustomData(ex.customData, () => runAnalysis(ex.doc)); }
-  catch (e) { report(false, "example “" + ex.title + "” runs", String((e as Error).message).slice(0, 200)); continue; }
-  (result.views as View[]).forEach((v, i) => {
-    const label = "“" + ex.title + "” view " + (i + 1) + " (" + v.kind + ")";
-    if (v.error) return;   // an errored view has nothing to record; the docs gate owns errors
-    if (!v.method) {
-      if (EXEMPT[v.kind]) return;
-      report(false, label + " has a method record", "no record, and " + v.kind + " is not on the exempt list");
-      return;
-    }
-    if (!v.method.python) return;   // the queries' counts are the numbers
-    if (!v.method.check || !Object.keys(v.method.check).length) { report(false, label + " says what its script must reproduce", "no check values"); return; }
-    jobs.push({ label, view: v });
-  });
-}
-
-let next = 0;
-async function worker() {
-  while (next < jobs.length) {
-    const { label, view } = jobs[next++];
-    const dir = mkdtempSync(join(tmpdir(), "method-check-"));
-    try {
-      writeFileSync(join(dir, "script.py"), view.method!.python!);
-      const why = await materialize(view, dir);
-      if (why) { report(false, label + " script runs", why); continue; }
-      const r = await runPython(dir);
-      const line = r.out.split("\n").reverse().find((l) => l.startsWith(RESULT_MARKER));
-      if (r.code !== 0 || !line) { report(false, label + " script runs", "exit " + r.code + ": " + r.err.trim().split("\n").slice(-3).join(" | ").slice(0, 300)); continue; }
-      const bad = compare(view.method!.check, JSON.parse(line.slice(RESULT_MARKER.length)));
-      report(!bad.length, label + " script reproduces the view",
-        bad.length ? bad.slice(0, 3).join("; ") + (bad.length > 3 ? " … and " + (bad.length - 3) + " more" : "")
-          : Object.keys(view.method!.check!).length + " numbers · " + Math.round(r.ms / 1000) + "s");
-    } finally { rmSync(dir, { recursive: true, force: true }); }
-  }
-}
-await Promise.all(Array.from({ length: PARALLEL }, worker));
-
-console.log(failed ? "\n" + failed + " method check(s) FAILED" : "\nall method records present and every script reproduces its view");
-process.exit(failed ? 1 : 0);
+if (isMain(import.meta.url)) process.exit(await checkMethods(await runExamples(EXAMPLES.filter((e) => !only || e.title.includes(only)))) ? 1 : 0);

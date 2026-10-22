@@ -8,7 +8,7 @@
 //   - the MCP describe_dsl tool (mcp/tools.ts serves renderDslMarkdown())
 //
 // The EXAMPLES below are executed against the live compiler by
-// `npm run docs:check` (also run by e2e.cjs), and docs/dsl.md is diffed against
+// `npm run docs:check` (in scripts/gate.sh as `check:examples`), and docs/dsl.md is diffed against
 // a regeneration — so a stale doc or a broken example fails the suite.
 //
 // When you change the DSL (lib/cohort2.ts, lib/oql.ts, lib/compiler.ts,

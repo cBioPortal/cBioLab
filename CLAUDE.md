@@ -330,7 +330,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   calls a covering panel made: an off-panel call (`off_panel`) is in neither side, as on
   cBioPortal (§1 there). Both halves are additive
   over samples, which is what makes pooling safe; averaging per-study percentages is never safe.
-  Guarded by `test/denominator.test.ts` and `npm run check:denominators` (in the e2e gate); over
+  Guarded by `test/denominator.test.ts` and `npm run check:denominators` (a stage of `scripts/gate.sh`); over
   studies profiled differently (panel, several panels, whole-exome), `npm run check:pooled`
   (histograms, the OncoPrint) and `check:portal`'s mixed selection, filtered and not, are gate stages.
   Read before claiming this project is "fast": on a cached single chart the portal is ~20x
@@ -357,7 +357,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
 4. **Docs are generated.** Never hand-edit `docs/dsl.md`. Change `lib/dsl-reference.ts`, run
    `npm run docs:gen`, commit both. `EXAMPLES` there is also what the app's **Examples tab**
    renders, so one edit updates the doc, the MCP `describe_dsl` tool, and the gallery at once —
-   and the docs gate already proves every gallery entry runs. `npm run docs:check` (part of e2e) fails on drift and
+   and the docs gate already proves every gallery entry runs. `npm run docs:check` (a stage of `scripts/gate.sh`) fails on drift and
    EXECUTES every documented example against the live compiler. The agent grammar (`AGENT_GRAMMAR`,
    served by the WebMCP `dsl_reference` tool) and the MCP `describe_dsl` tool render from the same module.
    **Every example's cohort counts are pinned** in `test/fixtures/example-counts.json` and asserted
@@ -423,7 +423,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
    built from the values that computation used, plus a Python script that recomputes the numbers
    with standard libraries. **A change to how a view computes must update its method builder in the
    same commit** — the steps, the script and the `check` values the script must reproduce.
-   `npm run check:methods` (a stage of `scripts/gate.sh`) runs every gallery example's script and
+   `npm run check:methods` (a stage of `scripts/gate.sh`, which runs it with `docs:check` off one run
+   of the examples: `npm run check:examples`) runs every gallery example's script and
    fails on any number the script does not reproduce, and on any view without a record that is not on
    its named exempt list; it was mutation-checked to catch a real drift. Numbers and settings in a
    record's text come from variables or named constants, never typed in. The statistics themselves
@@ -442,9 +443,10 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
    (unit tests, `check:methods`, then the three below with `RECORD=1`), fails on any failing check,
    and writes `docs/verification/*.json` — the report the page reads, committed from a passing run.
    The saved copy is updated by hand; the page links to the latest CI runs on master. CI
-   (`.github/workflows/verify.yml`) runs `scripts/gate.sh` plus `check:mutants` with `RECORD=1` and
+   (`.github/workflows/verify.yml`) runs `scripts/gate.sh` as parallel jobs, one lane each (`local`,
+   `warehouse`, `e2e`), plus `check:mutants` after the warehouse lane, with `RECORD=1` and
    `REPORT_DIR` (a folder that starts empty, so a stage that never ran leaves no stale file) on every
-   PR and push to master, and uploads that folder as the `verification-report` artifact. The planted-bug
+   PR and push to master, and merges the jobs' folders into the `verification-report` artifact. The planted-bug
    check strips `RECORD`/`REPORT_DIR` from its guard runs, so a run against a planted bug never writes
    a report. The page is written for
    bench scientists and PIs and opens by saying what the suite is and what it depends on (the public
@@ -675,7 +677,10 @@ they can't tell you:
   Postgres SQL, `db/migrations`, their runner and their triggers on an in-process Postgres (PGlite,
   `test/postgres.db-test.ts`). A store promise belongs in `test/support/store-contracts.ts`, which
   runs there and on `lib/db.ts`'s own fallback.
-  `node e2e.cjs` — Playwright + docs gate + the boundary suite + the denominator gate.
+  `node e2e.cjs` — the browser checks (Playwright) against a running server. The checks that need
+  no server (`check:examples`, `check:denominators`, `check:genefacets`, `check:values`,
+  `check:splitby-perf`) are stages of `scripts/gate.sh` of their own, and the boundary suite is in
+  `npm test`.
   `npm run report:coverage` — the unit suites' coverage (CI shows it on the reports job).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Lint: `npm run lint` (~2 min, the gate's first stage) — see "Code standards" above for what it

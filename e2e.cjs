@@ -1590,31 +1590,6 @@ async function main() {
     await ctx.close();
   }
 
-  // Patient-data boundary gate: aggregate-only participants must never emit or
-  // receive patient identifiers. See docs/DATA-BOUNDARY.md.
-  try {
-    const { execSync } = require("child_process");
-    const out = execSync("node --test test/boundary.test.ts", { cwd: __dirname, encoding: "utf8", timeout: 120000 });
-    const pass = /^# pass (\d+)/m.exec(out), fail = /^# fail (\d+)/m.exec(out);
-    ok("patient-data boundary (" + (pass ? pass[1] : "?") + " checks)", !!fail && fail[1] === "0",
-      fail && fail[1] !== "0" ? "BOUNDARY VIOLATION — see npm run test:boundary" : "");
-  } catch (e) {
-    ok("patient-data boundary", false, "boundary suite failed: " + String(e.message).slice(0, 160));
-  }
-
-  // DSL doc sync gate: docs/dsl.md must match lib/dsl-reference.js, and every
-  // documented example must run against the live compiler.
-  try {
-    const { execSync } = require("child_process");
-    // Runs every gallery example against the live database, ~210s for 58 examples on a loaded
-    // box; the limit bounds a hang, not the check.
-    const out = execSync("npm run --silent docs:check", { cwd: __dirname, encoding: "utf8", timeout: 420000 });
-    for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
-  } catch (e) {
-    const out = String((e.stdout || "") + (e.stderr || "")).trim();
-    for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
-    if (!/^FAIL /m.test(out)) results.push("FAIL docs:check crashed: " + String(e.message).slice(0, 120));
-  }
   // A saved cohort added to a view is a COPY that remembers its source: the saved cohort's id and
   // the hash of what was copied. Editing the saved cohort changes nothing in the analysis until the
   // reader asks; the summary says the saved version changed and "Update" brings it in.
@@ -1981,63 +1956,6 @@ async function main() {
   if (LOGIN) await require("./e2e-saved.cjs").savedLists(browser, ok, BASE, LOGIN);
 
   await browser.close();
-
-  // Panel-aware denominator gate. A gene's frequency is altered / profiled-for-
-  // that-gene, resolved through the panel tables — and the wrong version, a
-  // study-or-cohort total, produces plausible percentages rather than an error.
-  // Runs against the live database over studies whose panels genuinely differ.
-  try {
-    const { execSync } = require("child_process");
-    const out = execSync("npm run --silent check:denominators", { cwd: __dirname, encoding: "utf8", timeout: 300000 });
-    for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
-  } catch (e) {
-    const out = String((e.stdout || "") + (e.stderr || "")).trim();
-    for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
-    if (!/^FAIL /m.test(out)) results.push("FAIL check:denominators crashed: " + String(e.message).slice(0, 120));
-  }
-
-  // Gene-status facet gate. A filterable facet's count comes from one query and
-  // its cohort from a compiled clause; nothing forces them to agree, and both
-  // ways this broke during development were invisible in the output's shape.
-  try {
-    const { execSync } = require("child_process");
-    const out = execSync("npm run --silent check:genefacets", { cwd: __dirname, encoding: "utf8", timeout: 300000 });
-    for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
-  } catch (e) {
-    const out = String((e.stdout || "") + (e.stderr || "")).trim();
-    for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
-    if (!/^FAIL /m.test(out)) results.push("FAIL check:genefacets crashed: " + String(e.message).slice(0, 120));
-  }
-
-  // Value-folding gate. A facet click compiles to an equality on the value, so
-  // while `Female` and `FEMALE` were separate literals the click selected one of
-  // them and the cohort was silently short — 35.6% short in breast_msk_2025.
-  // The source tripwire can only see that both sides share one fold expression;
-  // this confirms the resulting cohort is actually the whole group.
-  try {
-    const { execSync } = require("child_process");
-    const out = execSync("npm run --silent check:values", { cwd: __dirname, encoding: "utf8", timeout: 300000 });
-    for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
-  } catch (e) {
-    const out = String((e.stdout || "") + (e.stderr || "")).trim();
-    for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
-    if (!/^FAIL /m.test(out)) results.push("FAIL check:values crashed: " + String(e.message).slice(0, 120));
-  }
-
-  // splitBy performance gate — the first of its kind (see docs/PERFORMANCE.md: everything
-  // else there is a manual snapshot, not a gate). splitBy can turn one cohort into up to
-  // SPLIT_BY_MAX_ARMS_CEILING of them for a single view with one click; this asserts query
-  // count scales with arm count, not worse, and that a near-ceiling split stays well under a
-  // generous wall-clock budget.
-  try {
-    const { execSync } = require("child_process");
-    const out = execSync("npm run --silent check:splitby-perf", { cwd: __dirname, encoding: "utf8", timeout: 300000 });
-    for (const line of out.trim().split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
-  } catch (e) {
-    const out = String((e.stdout || "") + (e.stderr || "")).trim();
-    for (const line of out.split("\n")) if (/^(PASS|FAIL) /.test(line)) results.push(line);
-    if (!/^FAIL /m.test(out)) results.push("FAIL check:splitby-perf crashed: " + String(e.message).slice(0, 120));
-  }
 
   console.log(results.join("\n"));
   process.exit(results.some(r => r.startsWith("FAIL")) ? 1 : 0);

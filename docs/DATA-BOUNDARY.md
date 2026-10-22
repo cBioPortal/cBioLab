@@ -186,7 +186,7 @@ Known gaps, in the order they matter:
 ## What the tests cover
 
 `test/boundary.test.ts` (26 checks, no database required, wired into
-`npm test` and into `e2e.cjs` so the standard gate catches a breach):
+`npm test`, so the standard gate catches a breach):
 
 - `carriesPatientIds` finds a `patients` leaf at top level, in `all`, nested in
   `any`, nested in `not`, and at any depth below those (`{not:{not:…}}`,

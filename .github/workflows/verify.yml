@@ -1,10 +1,15 @@
-# Three jobs, run side by side: lint (ESLint, knip, ruff; no secrets), the gate below, and the
-# report-only duplication, coverage and security reports.
+# Jobs run side by side: lint (ESLint, knip, ruff; no secrets), the gate as three lanes, the
+# planted-bug check, and the report-only duplication, coverage and security reports.
 #
-# The whole gate, on every pull request and every push to master: build, unit tests, the stores'
-# Postgres tests, the counts against cBioPortal, the cohort logic, the method scripts, the Python
-# port's conformance and the e2e suite (scripts/gate.sh), then the planted-bug check. The report
-# /verification displays (docs/verification/*.json) is kept as this run's artifact.
+# The whole gate, on every pull request and every push to master, is scripts/gate.sh, split into the
+# lanes it names: `local` (unit tests, the stores' Postgres tests, the planted sharing bugs, the
+# Python port's conformance; no secrets), `warehouse` (the counts against cBioPortal, the cohort
+# logic, the pooled paths, the gallery examples and their method scripts, the denominator, facet,
+# value-folding and splitBy checks) and `e2e` (the build, then the browser suite and federation
+# against it). The planted-bug check follows the warehouse lane rather than running beside it, so
+# no more than two jobs query the warehouse at once, each with its ClickHouse concurrency halved.
+# The report /verification displays (docs/verification/*.json) is kept as this run's
+# verification-report artifact, merged from the jobs that write it.
 #
 # Needs these repository secrets: the warehouse's read-only login (CLICKHOUSE_URL, CLICKHOUSE_USER,
 # CLICKHOUSE_PASSWORD, CLICKHOUSE_DB) and, for the federation checks, the second instance's
@@ -50,17 +55,11 @@ jobs:
       - name: ESLint, knip, ruff
         run: npm run lint
 
-  verify:
+  gate-local:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     permissions:
       contents: read
-    env:
-      # each check writes its part of the report to a folder that starts empty, so the artifact holds
-      # only what this run wrote (docs/verification/ keeps the copy saved with the code, which the
-      # build reads); a stage that never ran leaves no file
-      RECORD: "1"
-      REPORT_DIR: ${{ github.workspace }}/verification-report
     steps:
       - uses: actions/checkout@v5
 
@@ -73,16 +72,47 @@ jobs:
         with:
           python-version: "3.12"
 
-      # the method scripts and the golden fixtures run their Python through uv
+      - run: npm ci
+
+      - name: Gate, local lane (unit, Postgres, planted sharing bugs, Python port)
+        run: scripts/gate.sh local
+
+  gate-warehouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # each check writes its part of the report to a folder that starts empty, so the artifact holds
+      # only what this run wrote (docs/verification/ keeps the copy saved with the code, which the
+      # build reads); a stage that never ran leaves no file
+      RECORD: "1"
+      REPORT_DIR: ${{ github.workspace }}/verification-report
+      CLICKHOUSE_MAX_INFLIGHT: "4"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # the method scripts run their Python through uv, with the versions lib/method-notebook.ts pins;
+      # unpruned, the cache keeps the wheels they install
       - uses: astral-sh/setup-uv@v6
+        with:
+          cache-dependency-glob: lib/method-notebook.ts
+          prune-cache: false
 
       - run: npm ci
 
-      - name: Install Chromium for the e2e suite
-        run: npx playwright install --with-deps chromium
-
       # every script reads its credentials with `node --env-file=.env.local`
-      - name: Write .env.local from secrets
+      - &env-local
+        name: Write .env.local from secrets
         env:
           CLICKHOUSE_URL: ${{ secrets.CLICKHOUSE_URL }}
           CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
@@ -105,24 +135,102 @@ jobs:
           done
           true
 
-      - name: Gate (build, unit, db, cBioPortal, cohort logic, method scripts, Python, e2e)
-        # the lint job above covers lint
-        env:
-          GATE_SKIP_LINT: "1"
-        run: scripts/gate.sh
+      - name: Gate, warehouse lane (cBioPortal, cohort logic, pooled paths, examples, method scripts, Explore checks)
+        run: scripts/gate.sh warehouse
+
+      - name: Keep this lane's part of the verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-report-warehouse
+          path: verification-report/
+          if-no-files-found: warn
+
+  gate-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: npm ci
+
+      - name: Install Chromium for the e2e suite
+        run: npx playwright install --with-deps chromium
+
+      - *env-local
+
+      - name: Gate, e2e lane (build, browser suite, federation)
+        run: scripts/gate.sh e2e
+
+      - name: Keep the e2e servers' logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-server-logs
+          path: /tmp/gate-server-*.log
+          if-no-files-found: warn
+
+  # After the warehouse lane, not beside it: its guards query the warehouse too. It runs whether
+  # or not that lane passed.
+  planted-bugs:
+    needs: gate-warehouse
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      RECORD: "1"
+      REPORT_DIR: ${{ github.workspace }}/verification-report
+      CLICKHOUSE_MAX_INFLIGHT: "4"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - *env-local
 
       - name: Planted bugs
         run: npm run check:mutants
 
-      - name: Keep the verification report
+      - name: Keep this job's part of the verification report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: verification-report
-          path: |
-            verification-report/
-            /tmp/gate-server.log
+          name: verification-report-mutants
+          path: verification-report/
           if-no-files-found: warn
+
+  # One verification-report artifact, as /verification describes it, from the jobs' parts.
+  verification-report:
+    needs: [gate-warehouse, planted-bugs]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/upload-artifact/merge@v4
+        with:
+          name: verification-report
+          pattern: verification-report-*
+          delete-merged: true
 
   # Report-only: copy-paste (jscpd), unit-test coverage (node's, summarised on the job's page) and
   # security patterns (Semgrep's registry rule packs). None fails the run; the findings are kept as
