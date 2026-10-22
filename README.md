@@ -55,10 +55,10 @@ in [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md#federation).
 Every view either draws over every patient of its cohorts or is not drawn and says why
 (`lib/view-coverage.ts`); the add-view buttons and cohort pickers are disabled with the reason.
 
-| | over MCP, aggregates | over MCP, patient-level (`timeline`, `alterations` shared) |
+| | over MCP, aggregates | over MCP, patient-level (`timeline`, `alterations`, `plot` shared) |
 |---|---|---|
-| drawn | compare, survival, cooccurrence, coexpression, clinical, hotspots, attrition, course, sequence; Explore, study list, catalog | the same, plus timeline and alterations |
-| not drawn over the peer's studies | oncoprint, clinical data table, mutation table, cox, logistic, risk model, plot, genome, pathways, enrichment, overlap, incidence, cancer types, clonality, paired, diffexpr, correlates, assays, labs, composition | the same |
+| drawn | compare, survival, cooccurrence, coexpression, clinical, hotspots, attrition, course, sequence, plot (as density, no cases); Explore, study list, catalog | the same, plus timeline and alterations, and a plot's cases as points (`plot`) |
+| not drawn over the peer's studies | oncoprint, clinical data table, mutation table, cox, logistic, risk model, genome, pathways, enrichment, overlap, incidence, cancer types, clonality, paired, diffexpr, correlates, assays, labs, composition | the same |
 
 Measured cost (`docs/DATA-BOUNDARY.md`, "Federation: where it stands"): about +0.3–0.4 s per
 analysis for aggregate views on a small study, about +2 s for the patient-level views; on a large

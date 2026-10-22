@@ -27,7 +27,9 @@ const NEEDS: Record<string, Need> = {
   // aggregates every local participant computes and a remote peer does not serve yet
   genome: "local", pathways: "local", enrichment: "local", diffexpr: "local", paired: "local", clonality: "local",
   incidence: "local", labs: "local", cancertypes: "local", overlap: "local", assays: "local", composition: "local",
-  correlates: "local", plot: "local"
+  correlates: "local"
+  // plot: counts from every participant, a peer included (federated_plot); its cases only from one
+  // that may show them, else its density alone, said in the caption (lib/views/plot.ts)
 };
 
 /** What `kind` needs of every study it draws (null: only counts, which every participant gives). */

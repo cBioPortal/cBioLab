@@ -42,7 +42,7 @@ Federation section for what each supports, and `docs/DATA-BOUNDARY.md` for the r
 | `LOOPBACK_PEER_LABEL` | same | optional: how the peer's studies are labelled, e.g. `GENIE (via MCP)` (default `<CLICKHOUSE2_LABEL> (simulated peer)`) |
 | `PEER_MCP` | a coordinator using a separate peer | which studies a peer serves: `study=url` pairs, comma-separated, e.g. `genie_public=http://peer:3000/api/mcp,nsclc_public_genie_bpc=http://peer:3000/api/mcp`. Only the studies listed are taken from that peer |
 | `PEER_LABEL` | same | optional: how those studies are labelled (default `peer via MCP`) |
-| `MCP_DISCLOSE_PATIENTS` | the peer (for a simulated peer: the deployment) | opt-in patient-level federation, what the peer sends: rules `study:kind+kind`, comma-separated, `*` for every study. Kinds: `timeline`, `alterations` (a bare study means `timeline`). Unset, the peer sends aggregates only |
+| `MCP_DISCLOSE_PATIENTS` | the peer (for a simulated peer: the deployment) | opt-in patient-level federation, what the peer sends: rules `study:kind+kind`, comma-separated, `*` for every study. Kinds: `timeline`, `alterations`, `plot` (a plot's cases; its aggregates cross without a rule) (a bare study means `timeline`). Unset, the peer sends aggregates only |
 | `PEER_MCP_PATIENT_LEVEL` | the coordinator (for a simulated peer: the deployment) | the same rules, for what this app accepts. Patient-level data crosses only where both sides allow the study and kind |
 | `FEDERATION_HIDE_SQL` | the peer | `1`: do not send the SQL it ran back with its answers (provenance then stops at the peer) |
 
@@ -59,6 +59,10 @@ LOOPBACK_PEER_LABEL=GENIE (via MCP)
 MCP_DISCLOSE_PATIENTS=*:timeline+alterations
 PEER_MCP_PATIENT_LEVEL=*:timeline+alterations
 ```
+
+To let plots draw the peer's cases as points as well as its density, add `+plot` to both of the
+last two lines (`*:timeline+alterations+plot`); without it a plot over a peer's study is its
+density, and the caption says the peer shares no cases.
 
 Then redeploy. The study picker labels the second database's studies `GENIE (via MCP)`, and a
 view's "how these numbers were computed" marks the queries that ran on the peer. Without the last
