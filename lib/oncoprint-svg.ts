@@ -131,6 +131,8 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   const hidden = contract.stats.hiddenVus;
   const caption = "gene %: driver / any" +
     (hidden != null ? "; " + hidden.toLocaleString("en-US") + " alterations of unknown significance are hidden and are not in the %" : "") +
+    (contract.stats.offPanel ? "; " + contract.stats.offPanel.toLocaleString("en-US") + " " + (contract.stats.offPanel === 1 ? "call" : "calls") +
+      " in a gene no panel of the " + (contract.unit === "sample" ? "sample" : "patient") + " covers (off-panel) are not drawn in that gene's row and are not in its %" : "") +
     (contract.display?.annotate === "none" ? "; no driver calls were made" : "") + (partial ? "; " + PARTIAL_PROFILE_NOTE : "") +
     " — annotation: " + (contract.conventions ? contract.conventions.annotation || "none" : "none");
   // wrap rather than run off the edge: annotation notes name every unsynced study and get long

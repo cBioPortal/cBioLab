@@ -102,8 +102,13 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                     cells[i] = 0
     # Hiding unknown significance drops the ALTERATION as the event is read, so a driver in one
     # gene cannot smuggle another gene's passenger onto a merged row. The column stays profiled.
+    # A call on a cell no panel covers (off-panel) is not drawn: the cell stays NOT_PROFILED and the
+    # gene's % does not count it, as cBioPortal's results view does. A merged row is profiled where any
+    # member is, so it can still draw a call its gene's own row leaves out. Every call left out of a
+    # row is counted, so the caption says so.
     hide_vus = bool((display or {}).get("hideVUS"))
     hidden_vus = 0
+    off_panel = 0
     vus_mut: dict[int, tuple[np.ndarray, np.ndarray]] = {}
     for r in events:
         i = pid_index.get(r["pid"])
@@ -122,26 +127,26 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             bit = BITS["AMP"] if cna >= 2 else (BITS["HOMDEL"] if cna <= -2 else 0)
         if not bit:
             continue
+        covered = [cells for cells in rows if cells[i] != NOT_PROFILED]
+        if len(covered) < len(rows):
+            off_panel += 1
+        if not covered:
+            continue
         driver = is_driver(r)
         if hide_vus and not driver:
             hidden_vus += 1
-            for cells in rows:
-                if cells[i] == NOT_PROFILED:
-                    cells[i] = 0
             continue
         mut = r["vt"] == "mutation"
         if mut and not driver:
             # a VUS mutation's class joins the cell only where no driver mutation does (the portal's precedence)
-            for cells in rows:
+            for cells in covered:
                 held = vus_mut.setdefault(id(cells), (cells, np.zeros(len(cells), dtype=np.uint16)))[1]
                 held[i] |= bit
-                if cells[i] == NOT_PROFILED:
-                    cells[i] = 0
             continue
         if driver:
             bit |= BITS["DRIVER"] | (BITS["MUT_DRIVER"] if mut else BITS["SV_DRIVER"] if bit == BITS["SV"] else 0)
-        for cells in rows:
-            cells[i] = (0 if cells[i] == NOT_PROFILED else int(cells[i])) | bit
+        for cells in covered:
+            cells[i] = int(cells[i]) | bit
     for cells, held in vus_mut.values():
         free = (held > 0) & ((cells & BITS["MUT_DRIVER"]) == 0)
         cells[free] |= held[free].astype(cells.dtype)
@@ -354,7 +359,8 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                      "annotation": annotation_source, "lineGap": line_gap,
                      "sort": [("-" if s.get("dir") == "desc" else "") + s["track"] for s in sort]},
         display=dict(display) if display else dict(DEFAULT_DISPLAY),
-        stats={"nColumns": len(columns), "ms": 0, **({"hiddenVus": hidden_vus} if hide_vus else {})})
+        stats={"nColumns": len(columns), "ms": 0, **({"hiddenVus": hidden_vus} if hide_vus else {}),
+               **({"offPanel": off_panel} if off_panel else {})})
 
 
 def _num(x: float) -> int | float:

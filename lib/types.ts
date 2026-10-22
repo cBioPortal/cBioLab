@@ -2023,7 +2023,9 @@ export interface Contract {
   /** ms: total; queryMs: fetching rows; assembleMs: turning them into this contract */
   stats: { nColumns: number; ms: number; queryMs?: number; assembleMs?: number;
     /** cells whose only alterations were of unknown significance, dropped by display.hideVUS */
-    hiddenVus?: number };
+    hiddenVus?: number;
+    /** calls on a cell no panel covers (off-panel), not drawn: the cell stays not profiled; absent when none */
+    offPanel?: number };
   /** the SQL this contract was built from, when the caller asked for provenance */
   queries?: { label: string; sql: string; ms?: number; study?: string }[];
   /** set by the MCP app's display-resolution downsampler */

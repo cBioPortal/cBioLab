@@ -1037,6 +1037,7 @@ function Legend({ data, display, colors }: { data: UnpackedContract; display: Fi
       <span>% = driver / any</span>
       {white && <span className="mark">white background: unaltered and not-profiled differ only by the stripe</span>}
       {data.stats.hiddenVus != null && <span className="mark">{data.stats.hiddenVus.toLocaleString()} alterations of unknown significance hidden — the percentages are over drivers alone</span>}
+      {!!data.stats.offPanel && <span className="mark" title="the gene is not on any panel that column was sequenced with, so the column is not profiled for it — as on cBioPortal, the call is not drawn and the % leaves it out">{data.stats.offPanel.toLocaleString()} off-panel {data.stats.offPanel === 1 ? "call" : "calls"} not drawn — those cells are not profiled</span>}
       {data.display?.annotate === "none" && <span className="mark">driver annotation off: nothing is called a driver</span>}
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
         <span key={t.label}>{t.label}: {t.bar

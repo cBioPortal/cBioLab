@@ -121,6 +121,37 @@ class Conformance(unittest.TestCase):
                 py.pop("stats", None)
                 self.assertEqual(json.dumps(py, sort_keys=True), json.dumps(ts, sort_keys=True))
 
+    def test_off_panel_calls_match_typescript(self):
+        """A call in a gene the column's panels do not cover is not drawn, in both implementations."""
+        self.assertTrue(shutil.which("node"), "node is required to check conformance against the TypeScript implementation")
+        # P05's panel omits EGFR and P10's covers TP53 only: each of these calls is off-panel
+        extra = "P05\tEGFR\tL858R\tMISSENSE_DRIVER\nP10\tKRAS\tG12C\tMISSENSE\nP10\tEGFR\tAMP\tAMP_DRIVER\n"
+        cases = [dict(), dict(genes="[TP53 KRAS] KRAS EGFR"), dict(display='{"hideVUS": true}')]
+        with tempfile.TemporaryDirectory() as d:
+            events = os.path.join(d, "events.tsv")
+            with open(os.path.join(FIX, "events.tsv"), encoding="utf-8") as f, open(events, "w", encoding="utf-8") as g:
+                g.write(f.read() + extra)
+            for case in cases:
+                with self.subTest(case=case):
+                    out = os.path.join(d, "ts.json")
+                    cmd = ["node", os.path.join(ROOT, "scripts", "oncoprint-cli.ts"), "--events", events,
+                           "--clinical", os.path.join(FIX, "clinical.tsv"), "--coverage", os.path.join(FIX, "coverage.tsv"), "--out", out, "--quiet"]
+                    for k, v in case.items():
+                        cmd.append("--" + k + "=" + v)
+                    subprocess.run(cmd, check=True, cwd=ROOT)
+                    with open(out, encoding="utf-8") as f:
+                        ts = json.load(f)
+                    py = Oncoprint.from_tables(events, os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"),
+                                               genes=case.get("genes") or None,
+                                               display=json.loads(case["display"]) if case.get("display") else None).to_json()
+                    self.assertEqual(py["stats"].get("offPanel"), ts["stats"].get("offPanel"))
+                    self.assertEqual(py["stats"].get("offPanel"), 3, "every off-panel call is counted")
+                    egfr = next(t for t in py["tracks"] if t["label"] == "EGFR")
+                    self.assertEqual(egfr["cells"][py["columns"].index("P05")], -1, "an off-panel call leaves the cell not profiled")
+                    for c in (py, ts):
+                        c.pop("stats", None)
+                    self.assertEqual(json.dumps(py, sort_keys=True), json.dumps(ts, sort_keys=True))
+
 
 class LevelOfDetailConformance(unittest.TestCase):
     """Bucket codes must match lib/oncoprint-lod.ts at several widths, including the 400k-style case."""

@@ -18,7 +18,7 @@ const input = (): AssembleInput => ({
     ev("P5", "TP53", "structural_variant", undefined, undefined, true),
     ev("P9", "TP53", "mutation", "Missense_Mutation")    // not a column: ignored
   ],
-  coverage: [{ pid: "P1", genes: ["TP53", "KRAS"] }, { pid: "P2", genes: ["TP53", "KRAS"] }, { pid: "P3", genes: ["TP53", "KRAS"] }, { pid: "P4", genes: ["TP53"] }],
+  coverage: [{ pid: "P1", genes: ["TP53", "KRAS"] }, { pid: "P2", genes: ["TP53", "KRAS"] }, { pid: "P3", genes: ["TP53", "KRAS"] }, { pid: "P4", genes: ["TP53"] }, { pid: "P5", genes: ["TP53"] }],
   isDriver: (r: EventRow & { driver?: boolean }) => !!r.driver,
   annotationSource: "fixture",
   clinical: [
@@ -30,7 +30,7 @@ const input = (): AssembleInput => ({
   sort: [{ track: "genomic", dir: "asc" }], lineGap: 90
 });
 
-test("cells: bitmask, driver bit, NOT_PROFILED from coverage, event implies profiled", () => {
+test("cells: bitmask, driver bit, NOT_PROFILED from coverage", () => {
   const c = assembleContract(input());
   const byLabel = Object.fromEntries(c.tracks.map((t) => [t.label, t]));
   const col = (p: string) => c.columns.indexOf(p);
@@ -39,8 +39,41 @@ test("cells: bitmask, driver bit, NOT_PROFILED from coverage, event implies prof
   assert.equal(byLabel.KRAS.cells[col("P2")], BITS.AMP | BITS.DRIVER);
   assert.equal(byLabel.KRAS.cells[col("P3")], 0, "gain is below the high-level threshold");
   assert.equal(byLabel.KRAS.cells[col("P4")], NOT_PROFILED, "P4's panel does not cover KRAS");
-  assert.equal(byLabel.TP53.cells[col("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER, "an event on an uncovered patient still draws");
+  assert.equal(byLabel.TP53.cells[col("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER);
   assert.equal(byLabel.KRAS.cells[col("P5")], NOT_PROFILED);
+  assert.equal(c.stats.offPanel, undefined, "no call here falls outside its column's panels");
+});
+
+test("a call on a cell no panel covers is not drawn, and not in the %, as cBioPortal's results view", () => {
+  // P6's panel covers TP53 only; P7 is in no coverage row at all. Their KRAS and TP53 calls are
+  // off-panel: the portal counts a column altered only where it was also sequenced for the gene.
+  const i = input();
+  i.groups = [{ name: "A", pids: ["P1", "P2", "P3", "P6", "P7"] }];
+  i.coverage = [...i.coverage, { pid: "P6", genes: ["TP53"] }];
+  i.events = [...i.events,
+    ev("P6", "KRAS", "cna", undefined, 2, true),                     // driver, off-panel
+    ev("P7", "TP53", "structural_variant", undefined, undefined, true),
+    ev("P7", "KRAS", "mutation", "Missense_Mutation", undefined, false)];  // VUS, off-panel
+  const c = assembleContract(i);
+  const byLabel = Object.fromEntries(c.tracks.map((t) => [t.label, t]));
+  const col = (p: string) => c.columns.indexOf(p);
+  assert.equal(byLabel.KRAS.cells[col("P6")], NOT_PROFILED, "an off-panel driver does not make the cell profiled");
+  assert.equal(byLabel.TP53.cells[col("P6")], 0, "the covered gene stays profiled and unaltered");
+  assert.equal(byLabel.TP53.cells[col("P7")], NOT_PROFILED, "nor does a call on a column with no panel at all");
+  assert.equal(byLabel.KRAS.cells[col("P7")], NOT_PROFILED, "nor an off-panel VUS");
+  assert.equal(byLabel.TP53.profiled, 4); assert.equal(byLabel.TP53.altered, 2, "P1 and P2; P7's SV is not counted");
+  assert.equal(byLabel.KRAS.profiled, 3); assert.equal(byLabel.KRAS.altered, 1, "P2's amp; P6's is not counted");
+  assert.equal(c.stats.offPanel, 3, "every call left out is counted, so the caption can say so");
+  // hiding unknown significance does not turn an off-panel VUS into evidence of profiling either
+  const h = assembleContract({ ...i, display: { ...i.display, hideVUS: true } as AssembleInput["display"] });
+  assert.equal(h.tracks.find((t) => t.label === "KRAS")!.cells[h.columns.indexOf("P7")], NOT_PROFILED);
+  assert.equal(h.stats.offPanel, 3);
+  // a merged row is profiled where ANY member is, so P6's KRAS amp draws there (TP53 covers the
+  // column), while KRAS's own row leaves it out — the call is still counted as left out of a row
+  const m = assembleContract({ ...i, genes: [{ label: "either", genes: ["TP53", "KRAS"] }, "KRAS"] });
+  assert.equal(m.tracks.find((t) => t.label === "either")!.cells[m.columns.indexOf("P6")], BITS.AMP | BITS.DRIVER);
+  assert.equal(m.tracks.find((t) => t.label === "KRAS")!.cells[m.columns.indexOf("P6")], NOT_PROFILED);
+  assert.equal(m.stats.offPanel, 3);
 });
 
 test("frequencies use profiled columns as the denominator", () => {
@@ -56,8 +89,8 @@ test("byGroup: the same pooled formula, sliced to each group's own columns", () 
   const c = assembleContract(input());
   const tp53 = c.tracks.find((t) => t.label === "TP53")!;
   // group A = P1 (altered), P2 (altered), P3 (profiled, not altered) -> 2 of 3
-  // group B = P4 (profiled, not altered), P5 (altered via an event on an uncovered
-  // patient) -> 1 of 2 -- and 2+1 = 3, 3+2 = 5, matching the pooled numbers above exactly
+  // group B = P4 (profiled, not altered), P5 (altered) -> 1 of 2 -- and 2+1 = 3, 3+2 = 5,
+  // matching the pooled numbers above exactly
   assert.deepEqual(tp53.byGroup, [
     { group: "A", altered: 2, profiled: 3, freqPct: 66.7, driverPct: 33.3 },
     { group: "B", altered: 1, profiled: 2, freqPct: 50, driverPct: 50 }
@@ -277,14 +310,13 @@ test("hiding unknown significance drops the alteration, not the whole cell", () 
   assert.equal(c.stats.hiddenVus, 1);
 });
 
-test("hiding unknown significance leaves the cell profiled where the alteration was found", () => {
+test("hiding unknown significance leaves a covered cell profiled", () => {
   const i = input();
   i.display = { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true,
     hideVUS: true, annotate: "oncokb", whiteBackground: false };
   const c = assembleContract(i);
   const tp53 = c.tracks.find((t) => t.label === "TP53")!;
   const col = (p: string) => c.columns.indexOf(p);
-  // P5 is in no coverage row: its only evidence of being assayed is the (driver) SV
   assert.equal(tp53.cells[col("P2")], 0, "the passenger truncation is gone, the column stays profiled");
   assert.equal(tp53.profiled, 5);
   assert.equal(tp53.altered, 2, "P1 and P5, both drivers");
