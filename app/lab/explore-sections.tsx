@@ -1020,17 +1020,6 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
   const { addClause, parseDraft } = ctx;
   const explore = ctx.explore!;
   return <>
-    <div className="card" style={{ display: "none" }}>
-      <h2>Genes <span className="plain">— most-altered (click = OQL clause)</span></h2>
-      <div className="flex flex-wrap gap-1">
-        {explore.genes.map(g => (
-          <Button key={g.gene} variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "oql", q: g.gene + ":" })}>
-            {g.gene} <span className="meta">{g.n.toLocaleString()}</span>
-          </Button>
-        ))}
-      </div>
-      <p className="note">Bare gene = any alteration; edit the OQL pill afterwards for MUT/AMP/DRIVER specifics.</p>
-    </div>
     <div className="card">
       <h2>Timeline events</h2>
       {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}

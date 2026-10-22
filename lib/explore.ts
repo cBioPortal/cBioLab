@@ -226,12 +226,17 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     disjValues.set(key, v.data.map(x => ({ v: x.v, n: Number(x.n) })));
   }
 
+  // each attribute's values, grouped once ("type|attribute"), in the order the query returned them
+  const valuesOf = new Map<string, { v: string; n: number }[]>();
+  for (const x of catValues) {
+    const k = x.type + "|" + x.a, l = valuesOf.get(k), row = { v: x.v, n: Number(x.n) };
+    if (l) l.push(row); else valuesOf.set(k, [row]);
+  }
   const clinical: ClinicalFacet[] = [
     ...catAttrs.map((r): ClinicalFacet => ({
       attribute: r.a, per: r.type as "patient" | "sample", kind: "cat", patients: Number(r.np),
       distinct: Number(r.nv),
-      values: disjValues.get(r.type + "|" + r.a) ||
-        catValues.filter((x) => x.a === r.a && x.type === r.type).map((x) => ({ v: x.v, n: Number(x.n) })),
+      values: disjValues.get(r.type + "|" + r.a) || valuesOf.get(r.type + "|" + r.a) || [],
       disjunctive: disjValues.has(r.type + "|" + r.a) || undefined
     })),
     ...numAttrs.map((r): ClinicalFacet => ({
@@ -271,8 +276,8 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // The federated path calls the same builder once for every study on a
   // connection instead of once per study; `skipGenes` is how it tells this
   // pass not to duplicate that work. See geneTables() below.
-  const { mutatedGenes, cnaGenes, svGenes, geneTotals, genes } = skipGenes
-    ? { mutatedGenes: [], cnaGenes: [], svGenes: [], genes: [],
+  const { mutatedGenes, cnaGenes, svGenes, geneTotals } = skipGenes
+    ? { mutatedGenes: [], cnaGenes: [], svGenes: [],
         geneTotals: { mutated: 0, cna: 0, sv: 0 } }
     : await geneTables({ studies: [study], db, conn, geneSearch, cond, panelSampleCond });
 
@@ -305,7 +310,6 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     study, draftCount, studyBreakdown,
     clinical, derived,
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
-    genes,
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
     mutatedGenes, cnaGenes, svGenes, geneTotals, geneFacets, totals, dataTypes,
     numStats: numAttrs.map((r) => ({ attribute: r.a, per: r.type as "patient" | "sample", min: Number(r.mn), max: Number(r.mx), q1: Number(r.q1), q3: Number(r.q3), allInts: String(r.allints) === "1", n: Number(r.np) })),
@@ -471,7 +475,7 @@ async function buildDerivedFacets(
 export async function geneTables({ studies, db, conn, geneSearch, cond = "", panelSampleCond = "" }: {
   studies: string[]; db: string; conn: ChConn; geneSearch?: string;
   cond?: string; panelSampleCond?: string;
-}): Promise<Pick<ExploreResult, "mutatedGenes" | "cnaGenes" | "svGenes" | "geneTotals" | "genes">> {
+}): Promise<Pick<ExploreResult, "mutatedGenes" | "cnaGenes" | "svGenes" | "geneTotals">> {
   /** one study keeps the equality the pinned denominators were measured against */
   const studyIn = (ss: string[]) => ss.length === 1
     ? "cancer_study_identifier = " + sq(ss[0])
@@ -568,18 +572,7 @@ const [mut, cna, sv] = await Promise.all([
 const mutatedGenes = mut.rows, cnaGenes = cna.rows, svGenes = sv.rows;
 const geneTotals = { mutated: mut.total, cna: cna.total, sv: sv.total };
 
-// legacy combined list (patients), retained for existing consumers
-const genes = await chQuery(
-  "SELECT hugo_gene_symbol AS g, uniqExact(patient_unique_id) AS n\n" +
-  "FROM " + db + ".genomic_event_derived\n" +
-  "WHERE " + studyIn(studies) + "\n" +
-  "  AND (variant_type != 'cna' OR abs(cna_alteration) >= 2)" + cond + "\n" +
-  "GROUP BY g ORDER BY n DESC LIMIT 15", conn);
-
-  return {
-    mutatedGenes, cnaGenes, svGenes, geneTotals,
-    genes: genes.data.map((r) => ({ gene: r.g, n: Number(r.n) }))
-  };
+  return { mutatedGenes, cnaGenes, svGenes, geneTotals };
 }
 
 // ---- per-gene alteration facets ------------------------------------------
@@ -985,8 +978,14 @@ async function prefetchFacets(opts: {
       (set ? "\n  AND concat(cs.cancer_study_identifier, '_', p.stable_id) IN " + set : "") + "\n" +
       "GROUP BY s, id ORDER BY n DESC LIMIT 10 BY s", conn),
   ]);
-  const of = (rows: ChRow[], st: string) => rows.filter((r) => r.s === st);
-  const metaOf = new Map(studies.map((st) => [st, new Map(of(meta.data, st).map((r) => [r.a, r]))]));
+  // each result split by study once, in its row order: one pass per table, not one per study
+  const byStudy = (rows: ChRow[]): Map<string, ChRow[]> => {
+    const m = new Map<string, ChRow[]>();
+    for (const r of rows) { const k = String(r.s); const l = m.get(k); if (l) l.push(r); else m.set(k, [r]); }
+    return m;
+  };
+  const metaRows = byStudy(meta.data);
+  const metaOf = new Map(studies.map((st) => [st, new Map((metaRows.get(st) || []).map((r) => [r.a, r]))]));
   // the value lists read each study's categorical attributes, so they wait for the classification
   const catKeys = new Set<string>();
   for (const r of cls.data) if (!isNumericAttr(r, metaOf.get(String(r.s))!)) catKeys.add(r.s + "|" + r.type + "|" + r.a);
@@ -1001,10 +1000,11 @@ async function prefetchFacets(opts: {
     "  AND attribute_name IN (" + catNames.map(sq).join(",") + ")" + cond + "\n" +
     "GROUP BY s, type, a, vkey ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT + " BY s, type, a", conn)).data
     .filter((r) => catKeys.has(r.s + "|" + r.type + "|" + r.a)) : [];
+  const [tot, cl, vals, ev, dt, li] = [totals.data, cls.data, values, events.data, dataTypes.data, lists.data].map(byStudy);
   return new Map(studies.map((st) => [st, {
-    totals: of(totals.data, st)[0] || { pts: 0, smp: 0 },
-    meta: of(meta.data, st), cls: of(cls.data, st), catValues: of(values, st),
-    events: of(events.data, st), dataTypes: of(dataTypes.data, st), lists: of(lists.data, st),
+    totals: tot.get(st)?.[0] || { pts: "0", smp: "0" },
+    meta: metaRows.get(st) || [], cls: cl.get(st) || [], catValues: vals.get(st) || [],
+    events: ev.get(st) || [], dataTypes: dt.get(st) || [], lists: li.get(st) || [],
   }]));
 }
 
@@ -1183,7 +1183,6 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
   }
 
   const evm = sumBy(parts.map(p => p.events), "type");
-  const gm = sumBy(parts.map(p => p.genes), "gene");
   // gene tables: sum altered/events/profiled per (gene, cna) across participants
   const mergeGeneTable = (pick: (p: ExploreResult) => GeneTableRow[] | undefined): GeneTableRow[] => {
     const m = new Map<string, GeneTableRow>();
@@ -1230,7 +1229,6 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     clinical,
     ...(derivedMerged.length ? { derived: derivedMerged } : {}),
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
-    genes: [...gm.entries()].map(([gene, n]) => ({ gene, n })).sort((x, y) => y.n - x.n).slice(0, 15),
     caseLists: [...lm.values()].sort((x, y) => y.n - x.n).slice(0, 10),
     geneFacets: [...gfMap.values()],
     mutatedGenes: mergeGeneTable((p) => p.mutatedGenes),

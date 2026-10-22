@@ -2168,8 +2168,6 @@ export interface ExploreResult {
   clinical: ClinicalFacet[];
   events: { type: string; n: number }[];
   derived?: DerivedFacet[];
-  /** legacy combined list — kept so existing consumers keep working */
-  genes: { gene: string; n: number }[];
   /**
    * Per-gene alteration facets — the portal's "EGFR: Somatic mutations" and
    * "EGFR: Copy-number alterations" charts. Counted in PATIENTS, because that is

@@ -365,8 +365,9 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
         });
         return {
           content: [{ type: "text" as const, text: `facets for ${s}: ${facets.clinical.length} clinical attributes, ` +
-            `${facets.genes.length} genes, ${facets.events.length} event types (aggregates only)` }],
-          structuredContent: { ...facets, source: await peerSource(s) } as unknown as Record<string, unknown>
+            `${facets.mutatedGenes?.length ?? 0} mutated genes, ${facets.events.length} event types (aggregates only)` }],
+          // `genes` (the retired combined list) stays empty for coordinators whose merge still sums it
+          structuredContent: { ...facets, genes: [], source: await peerSource(s) } as unknown as Record<string, unknown>
         };
       } catch (e) {
         return { content: [{ type: "text" as const, text: "REJECTED: " + String((e as Error)?.message || e) }], isError: true };

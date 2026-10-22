@@ -27,6 +27,18 @@ export interface ViewOptionsPage {
   studies: StudyInfo[];
 }
 
+/**
+ * The exploration's most-altered genes, from its mutation, CNA and SV tables: each gene ranked by
+ * its largest on-panel altered count in any of them — samples whose call a covering panel made, as
+ * the tables' frequencies count — which never counts a sample twice for carrying two kinds of call.
+ */
+function mostAlteredGenes(explore: ExploreResult | null | undefined): string[] {
+  const best = new Map<string, number>();
+  for (const rows of [explore?.mutatedGenes, explore?.cnaGenes, explore?.svGenes])
+    for (const r of rows || []) best.set(r.gene, Math.max(best.get(r.gene) ?? 0, r.alteredOnPanel ?? r.altered));
+  return [...best].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([g]) => g);
+}
+
 export function useViewOptions(page: ViewOptionsPage) {
   const { cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading, studies } = page;
 
@@ -51,7 +63,8 @@ export function useViewOptions(page: ViewOptionsPage) {
   const viewGenes = (): string[] => {
     const inDoc = (doc.views || []).flatMap((v: any) => v.genes || []).map(String);
     if (inDoc.length) return [...new Set(inDoc)].slice(0, 6);
-    if (explore && explore.genes && explore.genes.length) return explore.genes.slice(0, 6).map((g: any) => g.gene);
+    const top = mostAlteredGenes(explore);
+    if (top.length) return top.slice(0, 6);
     return ["TP53", "KRAS", "EGFR", "PIK3CA"];
   };
   const viewAttrs = (): string[] => {
@@ -174,9 +187,7 @@ export function useViewOptions(page: ViewOptionsPage) {
   const GENE_VIEWS = ["compare", "oncoprint", "cooccurrence", "coexpression", "hotspots"];
   /** the most-altered genes this exploration found, for the suggestion list */
   const geneChoices = (): string[] => {
-    const fromExplore = (explore?.mutatedGenes || []).map((g: any) => String(g.gene));
-    const legacy = (explore?.genes || []).map((g: any) => String(g.gene));
-    return [...new Set([...fromExplore, ...legacy])].slice(0, 60);
+    return mostAlteredGenes(explore).slice(0, 60);
   };
 
   return { viewGenes, viewAttrs, viewEvents, catalogAttrs, numericAttrs, attrsLoading, profileOptions, profileCatalog, assayOptions, contProfile, noSurvivalWhy, VIEW_KINDS, drawsOwnHead, GENE_VIEWS, geneChoices, cantDrawCohort };

@@ -769,7 +769,7 @@ path (7.2s engine against 7.3-8.0s for 32 studies with a filter before the chang
 | 32 | 3.1s → 0.46s (1,165 → 34) | 6.4s → 0.88s (1,594 → 98) |
 | 64 | 6.5s → 1.0s | 13.3s → 1.7s |
 | 128 | 13.3s → 1.9s (4,621 → 34) | 23.5s → 3.4s (6,374 → 290) |
-| 551 | 48.7s → 11.2s (19,849 → 34) | — |
+| 551 | 48.7s → 4.7s (19,849 → 33) | — |
 
 Two wrong answers it removed, both live for multi-study Explore before it:
 
@@ -786,9 +786,12 @@ Two wrong answers it removed, both live for multi-study Explore before it:
 
 What is left, measured at 128-551 studies:
 
-- **The legacy combined `genes` list** (patients per gene over every event, top 15) is one scan
-  of the whole event table: 8.0s of the 11.2s at 551 studies. Explore draws it and the view
-  builder suggests genes from it, so it stays until those read the gene tables instead.
+- **Removed since: the legacy combined `genes` list** (patients per gene over every event, top
+  15), one scan of the whole event table and 8.0s of 11.2s at 551 studies. Its card was hidden;
+  the view builder's suggestions and default genes now rank the three gene tables' rows instead.
+  Taking it away exposed ~8s of JavaScript it had been running beside: the pooled answer was
+  split back into studies by filtering every row once per study (O(studies × rows)). Grouping
+  each result once took 551 studies from 11.6s to 4.7s.
 - **A draft is still resolved, and disjunctive values counted, per study**: 256 of the 290
   queries at 128 studies with a draft.
 - **A cohort past `EXPLORE_COHORT_EXTERNAL_LIMIT`** (50,000 patients) is inlined as its compiled
