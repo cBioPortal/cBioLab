@@ -1,5 +1,5 @@
 // Every view kind's runner, by kind.
-import type { ViewResult, ViewKind } from "../types.ts";
+import { plainResult, type ViewResult, type ViewKind } from "../types.ts";
 import type { DocView, ViewRun, ViewRunner } from "./run.ts";
 import { runCompare } from "./compare.ts";
 import { runSurvival } from "./survival.ts";
@@ -41,7 +41,7 @@ function drawn<V>(run: (view: V, c: ViewRun) => Promise<ViewResult>): ViewRunner
   return async (view: DocView, c: ViewRun) => {
     let r: ViewResult;
     try { r = await run(view as V, c); }
-    catch (e) { r = { kind: view.kind, cohorts: c.vNames, error: (e as Error).message }; }
+    catch (e) { r = plainResult(view.kind, { cohorts: c.vNames, error: (e as Error).message }); }
     return r;
   };
 }

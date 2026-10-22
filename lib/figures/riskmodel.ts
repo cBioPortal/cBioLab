@@ -3,7 +3,7 @@ import {
   palette, frame, caption, linear, log, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, label, textWidth,
   seriesStyle, SERIES, esc, fmtInt, fmtNum, fmtPct, fmtShare, fmtRatio, fmtP, fmtQ, fmtMonths, FS, SW, type SvgOpts
 } from "../svg-kit.ts";
-import type { ViewResult, RiskTable1 } from "../types.ts";
+import type { RiskTable1, ViewResultOf } from "../types.ts";
 import { stepPath } from "../chart/marks.ts";
 import { plotHeight } from "./common.ts";
 import { timeScale, timeTitle } from "../chart/time.ts";
@@ -25,7 +25,7 @@ export const RISK_FIGURE_GENES = 15;
 /** the gene chart reads as one unit: past this its bars would sit far from their names */
 const GENE_BARS_MAX = 420;
 
-type Risk = NonNullable<ViewResult["riskmodel"]>;
+type Risk = NonNullable<ViewResultOf<"riskmodel">["riskmodel"]>;
 
 /** A raw score on OncoCast's 0–10 scale: 0 and 10 are the lowest and highest held-out scores the cuts are placed on. */
 export function riskScaled(m: Pick<Risk, "scale">, raw: number): number {
@@ -198,7 +198,7 @@ export function table1Words(t: RiskTable1): string {
     (set.length ? "Set aside: " + set.map((r) => r.name + " (" + (r as { skipped: string }).skipped + ")").join("; ") + ". " : "");
 }
 
-export function riskmodelSvg(v: ViewResult, o: SvgOpts): string {
+export function riskmodelSvg(v: ViewResultOf<"riskmodel">, o: SvgOpts): string {
   const m = v.riskmodel!;
   const p = palette(o.theme);
   let W = Math.max(480, o.width || 720), grown = false;

@@ -22,7 +22,7 @@
 import { filterHotspotGene } from "./lollipop.ts";
 import { lollipopPanelsSvg, lollipopSummaryText } from "./lollipop-svg.ts";
 export { lollipopSummaryText };
-import type { ViewResult, HotspotGene } from "./types.ts";
+import type { ViewResult, ViewResultOf, HotspotGene } from "./types.ts";
 import { kindFigure, kindTitle } from "./figures/index.ts";
 import { survivalSvg } from "./figures/survival.ts";
 import { coxSvg, logisticSvg } from "./figures/forest.ts";
@@ -35,7 +35,7 @@ import { esc, SERIES, type SvgOpts } from "./svg-kit.ts";
 export { esc, SERIES, type SvgOpts };
 
 /** The lollipop standing alone (an MCP client's image): the selection applied, the app's controls in words in the caption. */
-function hotspotsSvg(v: ViewResult, o: SvgOpts): string {
+function hotspotsSvg(v: ViewResultOf<"hotspots">, o: SvgOpts): string {
   const hide = (v.hide || []) as string[];
   const all = (v.hotspots || []) as HotspotGene[];
   return lollipopPanelsSvg(all.map((g) => filterHotspotGene(g, hide).gene), o,

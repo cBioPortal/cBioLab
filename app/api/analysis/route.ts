@@ -1,5 +1,5 @@
 import { parseBody, AnalysisRequest } from "../../../lib/api-schemas.ts";
-import type { AnalysisDoc } from "../../../lib/types.ts";
+import type { AnalysisDoc, ViewResult } from "../../../lib/types.ts";
 import { cachedAnalysis } from "../../../lib/next-cache.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { viewToSvg } from "../../../lib/view-svg.ts";
@@ -17,14 +17,21 @@ export async function POST(req: Request) {
     const result = await withRequestCustomData(customData, () => cachedAnalysis(doc as unknown as AnalysisDoc, { oncoprint: mode }), { refs: customRefs, req, uses: doc });
     // ?figures=svg: every view drawn by the shared server renderer, for a client that cannot draw
     if (url.searchParams.get("figures") === "svg")
-      return Response.json({ ...result, views: result.views.map((v) => v.svg || v.error ? v : { ...v, svg: viewToSvg(v) || undefined }) });
+      return Response.json({ ...result, views: result.views.map((v) => (v.kind === "oncoprint" && v.svg) || v.error ? v : { ...v, svg: viewToSvg(v) || undefined }) });
     // the web app draws every other figure itself, at its card's width (app/lab/figure.tsx): a
     // figure drawn here as well would travel unused. A method's Python script, read only when the
     // reader opens it, comes from /api/analysis/method then.
-    if (mode === "spec") return Response.json({ ...result, views: result.views.map(({ svg: _svg, ...v }) =>
+    if (mode === "spec") return Response.json({ ...result, views: result.views.map((r) => withoutSvg(r)).map((v) =>
       v.method?.python ? { ...v, method: { ...v.method, python: undefined, pythonDeferred: true as const } } : v) });
     return Response.json(result);
   } catch (e) {
     return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
   }
+}
+
+/** a result without the oncoprint's server-drawn SVG, which the web app draws itself */
+function withoutSvg(v: ViewResult): ViewResult {
+  if (v.kind !== "oncoprint") return v;
+  const { svg: _svg, ...rest } = v;
+  return rest;
 }

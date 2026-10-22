@@ -3,10 +3,10 @@ import {
   esc, palette, frame, caption, linear, axisLeft, leftAxisWidth, bandLabels, legend, label, textWidth,
   fmtInt, fmtNum, fmtPct, FS, SW, type SvgOpts, type LegendItem
 } from "../svg-kit.ts";
-import type { ViewResult, CancertypesGroup } from "../types.ts";
+import type { CancertypesGroup, ViewResultOf } from "../types.ts";
 import { AMP, DEL, MULTI, MUT, SV } from "./common.ts";
 
-type CtResult = NonNullable<ViewResult["cancertypes"]>;
+type CtResult = NonNullable<ViewResultOf<"cancertypes">["cancertypes"]>;
 const CT_KINDS: [keyof CancertypesGroup, string, string][] = [["mutation", "Mutation", MUT], ["amp", "Amplification", AMP],
   ["homdel", "Deep Deletion", DEL], ["sv", "Structural Variant", SV], ["multiple", "Multiple Alterations", MULTI]];
 const PROFILES: [keyof NonNullable<CancertypesGroup["profiledFor"]>, string, string][] = [["mutation", "Mutation data", "mutation"], ["cna", "CNA data", "CNA"], ["sv", "Structural variant data", "structural variant"]];
@@ -108,7 +108,7 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
 const andList = (xs: string[]) => xs.length > 1 ? xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1] : xs.join("");
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
-export function cancertypesSvg(v: ViewResult, o: SvgOpts): string {
+export function cancertypesSvg(v: ViewResultOf<"cancertypes">, o: SvgOpts): string {
   const p = palette(o.theme), r = v.cancertypes!;
   let y = 0, W = Math.max(360, o.width || 860), grown = false;
   const parts: string[] = [];

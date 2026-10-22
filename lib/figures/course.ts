@@ -1,5 +1,5 @@
 // The clinical course: small multiples, one panel per event type, one line per cohort.
-import type { ViewResult, CourseSeries } from "../types.ts";
+import type { CourseSeries, ViewResultOf } from "../types.ts";
 import {
   palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, legend, label, textWidth,
   seriesStyle, fmtInt, FS, SW, type SvgOpts
@@ -22,7 +22,7 @@ import { r1 } from "../chart/marks.ts";
  * simply gets noisy.
  */
 export const RISK_FLOOR = 10;
-export function courseSvg(v: ViewResult, o: SvgOpts): string {
+export function courseSvg(v: ViewResultOf<"course">, o: SvgOpts): string {
   const p = palette(o.theme), W = Math.max(420, o.width || 720);
   const series = (v.course || []) as CourseSeries[];
   const axis = v.courseAxis || { binMonths: 3, from: -12, to: 60 };

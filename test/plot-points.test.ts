@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runPlot } from "../lib/views/plot.ts";
 import { POINTS_CAP, OUTLIER_CELL_MAX, sparseCellMax } from "../lib/plot.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
-import type { PlotData, ViewResult } from "../lib/types.ts";
+import type { PlotData, ViewResultOf } from "../lib/types.ts";
 
 const CAP = POINTS_CAP.toLocaleString("en-US");
 const EXTENT = { x0: 0, x1: 100, y0: 0, y1: 50 };
@@ -44,7 +44,7 @@ function fake(mode: "patient-level" | "aggregate-only", calls: Call[], data: () 
 const evaluated = (studies: string[], count: number): EvaluatedCohort =>
   ({ studies, perStudy: Object.fromEntries(studies.map((s) => [s, { sql: "", count, mode: "patient-level" }])), count, text: "" });
 
-async function run(resolver: Record<string, unknown>, view: Record<string, unknown> = {}): Promise<ViewResult> {
+async function run(resolver: Record<string, unknown>, view: Record<string, unknown> = {}): Promise<ViewResultOf<"plot">> {
   const c = {
     doc: { cohorts: { All: { all: [] } } },
     cohorts: { All: evaluated(["s"], 1000) }, resolvers: { s: resolver }, vNames: ["All"], vStudies: ["s"],
@@ -53,7 +53,7 @@ async function run(resolver: Record<string, unknown>, view: Record<string, unkno
   } as unknown as ViewRun;
   const v = { kind: "plot", cohorts: ["All"], x: { source: "clinical", attribute: "AGE" }, y: { source: "clinical", attribute: "TMB" }, ...view };
   const r = await runPlot(v as never, c);
-  return "result" in (r as object) ? (r as { result: ViewResult }).result : r as ViewResult;
+  return "result" in (r as object) ? (r as { result: ViewResultOf<"plot"> }).result : r as ViewResultOf<"plot">;
 }
 
 describe("sparseCellMax: the cell threshold for a scatter's outlier points", () => {

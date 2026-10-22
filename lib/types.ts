@@ -1799,9 +1799,9 @@ export interface LogRankK {
   groups: number;
   strata: number;
 }
-export interface ViewResult {
-  /** the one value outside ViewKind: runAnalysis echoes a kind it does not know, with error "unknown view kind" */
-  kind: ViewKind; error?: string; note?: string; studies?: string[];
+/** What every view's result carries, whatever its kind. */
+export interface ViewResultCommon {
+  error?: string; note?: string; studies?: string[];
   /** a view that names no cohorts yet: the page draws it waiting for one, and nothing ran for it */
   empty?: true;
   /** the analyst's own annotation, carried through from the view spec */
@@ -1811,11 +1811,6 @@ export interface ViewResult {
   ms?: number;
   /** of that, time spent rendering on the SERVER (the oncoprint's SVG) */
   renderMs?: number;
-  /**
-   * Oncoprint only, and only for `runAnalysis(doc, {oncoprint:"spec"})`: what to POST to
-   * /api/oncoprint to get the figure. Carries cohort DEFINITIONS, never compiled SQL.
-   */
-  spec?: OncoprintSpec;
   /** the aggregate queries that produced THIS view's numbers, in order */
   queries?: { study: string; label: string; sql: string; ms?: number; remote?: boolean }[];
   /** what was computed from those queries' rows, built from the values the computation used (lib/method.ts) */
@@ -1842,62 +1837,163 @@ export interface ViewResult {
      *  counts not summing to the base cohort. 0/undefined when there's no overlap to report. */
     overlapCount?: number;
   };
-  rows?: CompareRow[];                      // compare
-  curves?: KmCurve[]; caveat?: string;      // survival
-  endpoint?: string;                        // survival: which endpoint was used
-  anchoredTo?: string;                      // survival: the event the clock was reset to
-  truncated?: boolean;                      // survival: delayed entry was applied
-  /** survival: how long after the anchor patients became observable */
-  entryMonths?: { median: number; p90: number; max: number };
-  cutoffMonths?: number;                    // survival: administrative censoring applied, echoed for the renderers
-  tickMonths?: number;                      // survival: requested x-axis tick spacing, echoed for the renderers
-  display?: "survival" | "incidence";       // survival: which curve was drawn
-  logrank?: LogRank; logrankPooled?: LogRank;
-  /** survival, 3+ cohorts: the k-group generalization (tests whether the groups differ AT ALL) */
-  logrankK?: LogRankK; logrankKPooled?: LogRankK;
-  pairs?: CooccurRow[];                     // cooccurrence
-  clinical?: ClinicalRow[];                 // clinical comparison
-  coexpression?: CoexprRow[];
-  /** a plot's aggregated contract: bins, groups or cells — never points */
-  plot?: PlotData;               // co-expression
-  hotspots?: HotspotGene[];                 // hotspots / lollipop
-  /** hotspots: the cells the view hides, as applied to its figure (`hotspots` itself stays whole, so the app can re-filter it) */
-  hide?: string[];
-  course?: CourseSeries[];                  // clinical course
-  sequence?: SequenceResult;                // treatment sequences
-  /** course: bin width and window actually used, in months */
-  courseAxis?: { binMonths: number; from: number; to: number };
-  /**
-   * course: every event type this cohort's timeline actually holds, so the UI
-   * can offer the choice without a round trip. `perPatient` and `hasDurations`
-   * are what separate a clinical event from an administrative marker — a type
-   * with exactly one event per patient and no duration (Sequencing, Sample
-   * acquisition) is a filing record, not a course.
-   */
-  eventOptions?: { canonical: string; label: string; patients: number; perPatient: number; hasDurations: boolean }[];
-  svg?: string; nColumns?: number;          // oncoprint
-  genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
-  cox?: CoxResult;                          // multivariate Cox
-  logistic?: LogisticResult;                // multivariate logistic regression
-  attrition?: AttritionPanel[];             // cohort attrition
-  genome?: GenomeResult;                    // genome-wide copy-number frequency
-  pathways?: PathwaysResult;                // oncogenic signalling pathways
-  diffexpr?: DiffexprResult;                // differential expression + GSEA
-  paired?: PairedResult;                    // paired-sample concordance
-  clonality?: ClonalityResult;              // FACETS clonality, WGD, purity/ploidy
-  incidence?: IncidenceResult;              // competing-risks cumulative incidence
-  labs?: LabsResult;                        // lab-value course and response
-  riskmodel?: RiskmodelResult;              // elastic-net Cox ensemble and its risk groups
-  cancertypes?: CancertypesResult;          // alteration frequency per cancer type
-  overlap?: OverlapResult;                  // how cohorts intersect (UpSet)
-  enrichment?: EnrichmentResult;            // genome-wide alteration enrichment
-  assays?: AssaysResult;                    // generic-assay comparison
-  composition?: CompositionResult;          // parts of a whole per case, compared between cohorts
-  correlates?: CorrelatesResult;            // genome-wide co-expression with one gene
-  table?: TableResult;                      // the clinical data table
-  timeline?: TimelineResult;                // one patient's timeline, and the patients to choose from
-  mutations?: MutationsResult;              // one gene's mutation table
-  alterations?: AlterationsResult;          // one patient's mutation, copy-number and SV tables, and the patients to choose from
+  /** what a reader must know to read the numbers right */
+  caveat?: string;
+}
+/**
+ * Each view kind's own result fields, beside the common ones. A result of one kind has only its
+ * kind's fields: code that reads another kind's does not compile. They are optional because a
+ * refused, failed or waiting view carries none of them.
+ */
+export interface ViewResultFields {
+  compare: {
+    rows?: CompareRow[];
+  };
+  survival: {
+    curves?: KmCurve[];
+    /** which endpoint was used */
+    endpoint?: string;
+    /** the event the clock was reset to */
+    anchoredTo?: string;
+    /** delayed entry was applied */
+    truncated?: boolean;
+    /** how long after the anchor patients became observable */
+    entryMonths?: { median: number; p90: number; max: number };
+    /** administrative censoring applied, echoed for the renderers */
+    cutoffMonths?: number;
+    /** requested x-axis tick spacing, echoed for the renderers */
+    tickMonths?: number;
+    /** which curve was drawn */
+    display?: "survival" | "incidence";
+    logrank?: LogRank; logrankPooled?: LogRank;
+    /** 3+ cohorts: the k-group generalization (tests whether the groups differ AT ALL) */
+    logrankK?: LogRankK; logrankKPooled?: LogRankK;
+  };
+  cox: {
+    cox?: CoxResult;
+    /** which endpoint was fitted */
+    endpoint?: string;
+  };
+  logistic: {
+    logistic?: LogisticResult;
+  };
+  course: {
+    course?: CourseSeries[];
+    /** bin width and window actually used, in months */
+    courseAxis?: { binMonths: number; from: number; to: number };
+    /**
+     * every event type this cohort's timeline actually holds, so the UI
+     * can offer the choice without a round trip. `perPatient` and `hasDurations`
+     * are what separate a clinical event from an administrative marker — a type
+     * with exactly one event per patient and no duration (Sequencing, Sample
+     * acquisition) is a filing record, not a course.
+     */
+    eventOptions?: { canonical: string; label: string; patients: number; perPatient: number; hasDurations: boolean }[];
+  };
+  sequence: {
+    sequence?: SequenceResult;
+  };
+  hotspots: {
+    hotspots?: HotspotGene[];
+    /** the cells the view hides, as applied to its figure (`hotspots` itself stays whole, so the app can re-filter it) */
+    hide?: string[];
+  };
+  plot: {
+    /** a plot's aggregated contract: bins, groups or cells — never points */
+    plot?: PlotData;
+  };
+  coexpression: {
+    coexpression?: CoexprRow[];
+    /** a plot's aggregated contract: bins, groups or cells — never points */
+    plot?: PlotData;
+  };
+  clinical: {
+    clinical?: ClinicalRow[];
+  };
+  cooccurrence: {
+    pairs?: CooccurRow[];
+  };
+  oncoprint: {
+    /**
+     * only for `runAnalysis(doc, {oncoprint:"spec"})`: what to POST to
+     * /api/oncoprint to get the figure. Carries cohort DEFINITIONS, never compiled SQL.
+     */
+    spec?: OncoprintSpec;
+    svg?: string; nColumns?: number;
+    genes?: { gene: string; driverPct: number | null; anyPct: number | null }[];
+  };
+  attrition: {
+    attrition?: AttritionPanel[];
+  };
+  genome: {
+    genome?: GenomeResult;
+  };
+  pathways: {
+    pathways?: PathwaysResult;
+  };
+  diffexpr: {
+    diffexpr?: DiffexprResult;
+  };
+  paired: {
+    paired?: PairedResult;
+  };
+  clonality: {
+    clonality?: ClonalityResult;
+  };
+  incidence: {
+    incidence?: IncidenceResult;
+  };
+  labs: {
+    labs?: LabsResult;
+  };
+  riskmodel: {
+    riskmodel?: RiskmodelResult;
+  };
+  cancertypes: {
+    cancertypes?: CancertypesResult;
+  };
+  overlap: {
+    overlap?: OverlapResult;
+  };
+  enrichment: {
+    enrichment?: EnrichmentResult;
+  };
+  assays: {
+    assays?: AssaysResult;
+  };
+  composition: {
+    composition?: CompositionResult;
+  };
+  correlates: {
+    correlates?: CorrelatesResult;
+  };
+  table: {
+    table?: TableResult;
+  };
+  timeline: {
+    timeline?: TimelineResult;
+  };
+  mutations: {
+    mutations?: MutationsResult;
+  };
+  alterations: {
+    alterations?: AlterationsResult;
+  };
+}
+/** A view's result: the common fields, its kind's own (ViewResultFields), and `kind` to tell which. */
+export type ViewResultOf<K extends ViewKind> = ViewResultCommon & { kind: K } & ViewResultFields[K];
+/**
+ * Any view's result. Checking `kind` narrows it to that kind's ViewResultOf. The one value outside
+ * ViewKind: runAnalysis echoes a kind it does not know, with error "unknown view kind".
+ */
+export type ViewResult = { [K in ViewKind]: ViewResultOf<K> }[ViewKind];
+/**
+ * A result carrying only common fields (a refusal, an error, a view waiting for cohorts), for a kind
+ * known only at run time. Valid for every kind, but TypeScript cannot check an object against all
+ * of them at once, so this is the one place that says so.
+ */
+export function plainResult(kind: ViewKind, fields: ViewResultCommon = {}): ViewResult {
+  return { ...fields, kind } as ViewResult;
 }
 /**
  * Therapy transitions, ready to draw: nodes in columns, flows between them.

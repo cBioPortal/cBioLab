@@ -148,7 +148,7 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
             <ViewHead menuStore={menus.current} v={v && !v.error ? v : { kind: spec.kind }} title={titles[vi]}
               sub={drawn.length ? drawn.join(drawn.length === 2 ? " vs " : ", ") : undefined} />
             {hasKindCard(spec.kind as string) && <KindCardControls c={mc} />}
-            {spec.kind === "plot" && <PlotControls spec={spec} plot={v && !v.error ? v.plot : undefined} attrs={catalog.attrs} catalog={catalog.profileCatalog || []}
+            {spec.kind === "plot" && <PlotControls spec={spec} plot={v && !v.error && v.kind === "plot" ? v.plot : undefined} attrs={catalog.attrs} catalog={catalog.profileCatalog || []}
               loading={catalog.loading} busy={busy} update={(fn) => edit(vi, fn(spec))}
               cohortOptions={Object.keys(doc.cohorts || {}).filter((n) => n !== drawn[0]).map((n) => ({ name: n, label: n, depth: 0 }))}>
               {figureArea}

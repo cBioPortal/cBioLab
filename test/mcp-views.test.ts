@@ -98,7 +98,7 @@ describe("MCP run_analysis attaches the figures themselves", () => {
     // Not a second drawing path: lib/view-svg.ts is the one renderer, so a
     // figure in a chat transcript and a figure in the app cannot diverge.
     assert.match(tools, /import \{ viewToSvg, viewTitle \} from "\.\.\/lib\/view-svg\.ts"/);
-    assert.match(tools, /v\.svg \|\| viewToSvg\(v, \{ theme: "light" \}\)/,
+    assert.match(tools, /\(v\.kind === "oncoprint" \? v\.svg : undefined\) \|\| viewToSvg\(v, \{ theme: "light" \}\)/,
       "the oncoprint carries its own svg; every other kind is rendered on demand");
   });
 

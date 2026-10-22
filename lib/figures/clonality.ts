@@ -3,7 +3,7 @@ import {
   palette, frame, caption, linear, axisBottom, axisLeft, leftAxisWidth, bottomAxisHeight, legend, label, textWidth,
   fmtInt, fmtPct, fmtP, pDigits, seriesStyle, FS, SW, OTHER, type SvgOpts, type LegendItem
 } from "../svg-kit.ts";
-import type { ViewResult, ClonalityPanel } from "../types.ts";
+import type { ClonalityPanel, ViewResultOf } from "../types.ts";
 
 type Pal = ReturnType<typeof palette>;
 const PAD = 8, GUT = 12, SUB = 15, BAR = 10, GROUP_GAP = 8, MIN_BAR_W = 140;
@@ -45,7 +45,7 @@ function sidePanel(pn: ClonalityPanel, ci: number, qc: boolean, x: number, y0: n
   return { svg: out.join(""), height: y - y0 };
 }
 
-export function clonalitySvg(v: ViewResult, o: SvgOpts): string {
+export function clonalitySvg(v: ViewResultOf<"clonality">, o: SvgOpts): string {
   const p = palette(o.theme), r = v.clonality!;
   let W = Math.max(480, o.width || 960);
   const k = r.panels.length;

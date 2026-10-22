@@ -12,6 +12,7 @@ import { sq } from "./compiler.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 import { describeCohortDef } from "./cohort2.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, ViewKind, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
+import { plainResult } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
 import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, type Resolver } from "./federation.ts";
 import { cantDraw } from "./view-coverage.ts";
@@ -435,7 +436,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     if (sb) {
       const baseName = sb.cohort;
       if (!cohorts[baseName]) {
-        views.push({ kind: view.kind, error: "splitBy names cohort “" + baseName + "”, which doesn't exist" });
+        views.push(plainResult(view.kind, { error: "splitBy names cohort “" + baseName + "”, which doesn't exist" }));
         continue;
       }
       const baseDef = doc.cohorts[baseName];
@@ -483,7 +484,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           ...(overlapCount ? { overlapCount } : {})
         };
       } catch (e) {
-        views.push({ kind: view.kind, error: (e as Error).message });
+        views.push(plainResult(view.kind, { error: (e as Error).message }));
         continue;
       }
     } else {
@@ -491,25 +492,25 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // (expandSplits). One that names none is empty, which is a refusal, not "all of them".
       const listed = Array.isArray(view.cohorts) ? view.cohorts : [];
       if (!listed.length) {
-        views.push({ kind: view.kind, error: "this view names no cohorts — list the ones it draws in its `cohorts` (this document has " +
-          names.filter((n) => !generatedNames.has(n)).map((n) => "“" + n + "”").join(", ") + ")" });
+        views.push(plainResult(view.kind, { error: "this view names no cohorts — list the ones it draws in its `cohorts` (this document has " +
+          names.filter((n) => !generatedNames.has(n)).map((n) => "“" + n + "”").join(", ") + ")" }));
         continue;
       }
       const unknown = listed.filter((n) => !cohorts[n] && !partitionShapes.some((p) => p.name === n));
       if (unknown.length) {
-        views.push({ kind: view.kind, error: "this view names " + unknown.map((n) => "“" + n + "”").join(", ") +
-          ", which " + (unknown.length === 1 ? "is not a cohort" : "are not cohorts") + " in this document" });
+        views.push(plainResult(view.kind, { error: "this view names " + unknown.map((n) => "“" + n + "”").join(", ") +
+          ", which " + (unknown.length === 1 ? "is not a cohort" : "are not cohorts") + " in this document" }));
         continue;
       }
       const problem = viewDrawProblem(listed, partitionShapes);
-      if (problem) { views.push({ kind: view.kind, error: problem }); continue; }
+      if (problem) { views.push(plainResult(view.kind, { error: problem })); continue; }
       vNames = expandSplits(listed, partitionShapes).filter((n) => cohorts[n]);
     }
     const vStudies = [...new Set(vNames.flatMap((n) => cohorts[n].studies))];
     // A view is drawn over every patient of its cohorts or not at all (lib/view-coverage.ts).
     const uncovered = cantDraw(view.kind, vStudies, (st) => resolvers[st] && studyAccess(resolvers[st]));
     if (uncovered) {
-      views.push({ kind: view.kind, cohorts: vNames, error: uncovered, participation: participationFor(vStudies, false) });
+      views.push(plainResult(view.kind, { cohorts: vNames, error: uncovered, participation: participationFor(vStudies, false) }));
       continue;
     }
     const mark = queryMark(), pushedBefore = views.length, viewT0 = Date.now();
@@ -525,7 +526,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     } else {
       // unreachable for well-typed documents, but documents arrive as untrusted
       // JSON from clients/chat/MCP, so an unknown kind must still be reported, under its own name
-      views.push({ kind: String((view as { kind?: unknown }).kind ?? "unknown") as ViewKind, error: "unknown view kind" });
+      views.push(plainResult(String((view as { kind?: unknown }).kind ?? "unknown") as ViewKind, { error: "unknown view kind" }));
     }
     // Wall-clock for the view, not the sum of its queries — they run
     // concurrently across cohorts and studies, so summing would overstate it.

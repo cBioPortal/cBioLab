@@ -6,10 +6,10 @@ import assert from "node:assert/strict";
 import { viewToSvg, viewTitle, esc } from "../lib/view-svg.ts";
 import { PLOT_POINT_R } from "../lib/figures/plot.ts";
 import { buildLollipopGene } from "../lib/lollipop.ts";
-import type { ViewResult } from "../lib/types.ts";
+import type { ViewResultOf } from "../lib/types.ts";
 import { LAYER_BASE, LAYER_COLORS } from "../lib/plot-layers.ts";
 
-const survival = (cohort: string): ViewResult => ({
+const survival = (cohort: string): ViewResultOf<"survival"> => ({
   kind: "survival", cohorts: [cohort],
   curves: [{ cohort, points: [{ t: 0, s: 1 }, { t: 5, s: 0.5 }], median: 5, n: 10, events: 5 }],
   caveat: "a caveat that must travel with the figure"
@@ -51,13 +51,13 @@ describe("renderers refuse rather than draw an empty frame", () => {
 describe("cox: pooled vs stratified-by-cohort forest plots", () => {
   const coef = (label: string, hr: number) => ({ label, reference: "Not mutated", level: "Mutated", axisIndex: 0, beta: Math.log(hr), se: 0.1, hr, ciLow: hr * 0.7, ciHigh: hr * 1.3, p: 0.02 });
   test("a pooled fit draws one panel, one HR=1 reference line", () => {
-    const v: ViewResult = { kind: "cox", cohorts: ["all"], cox: { coefficients: [coef("TP53", 1.2)], n: 100, events: 40 }, caveat: "pooled" };
+    const v: ViewResultOf<"cox"> = { kind: "cox", cohorts: ["all"], cox: { coefficients: [coef("TP53", 1.2)], n: 100, events: 40 }, caveat: "pooled" };
     const svg = viewToSvg(v)!;
     assert.equal((svg.match(/HR = 1/g) || []).length, 1);
     assert.ok(svg.includes("TP53"));
   });
   test("stratifyByCohort draws one panel per cohort that fit, each headed by its own name and n", () => {
-    const v: ViewResult = { kind: "cox", cohorts: ["NSCLC", "CRC"],
+    const v: ViewResultOf<"cox"> = { kind: "cox", cohorts: ["NSCLC", "CRC"],
       cox: { coefficients: [], n: 150, events: 55, byCohort: [
         { cohort: "NSCLC", coefficients: [coef("TP53", 1.5)], n: 100, events: 40 },
         { cohort: "CRC", coefficients: [coef("TP53", 0.6)], n: 50, events: 15 },
@@ -70,7 +70,7 @@ describe("cox: pooled vs stratified-by-cohort forest plots", () => {
     assert.equal((svg.match(/HR = 1/g) || []).length, 1);
   });
   test("a cohort that failed to fit is simply not drawn, not a blank panel", () => {
-    const v: ViewResult = { kind: "cox", cohorts: ["NSCLC", "Empty"],
+    const v: ViewResultOf<"cox"> = { kind: "cox", cohorts: ["NSCLC", "Empty"],
       cox: { coefficients: [], n: 100, events: 40, byCohort: [
         { cohort: "NSCLC", coefficients: [coef("TP53", 1.5)], n: 100, events: 40 },
         { cohort: "Empty", coefficients: [], n: 0, events: 0, error: "nothing to fit: cohort “Empty” is empty." },
@@ -88,7 +88,7 @@ describe("cox: pooled vs stratified-by-cohort forest plots", () => {
 describe("logistic: forest plot of odds ratios", () => {
   const coef = (label: string, or: number) => ({ label, reference: "Not mutated", level: "Mutated", axisIndex: 0, beta: Math.log(or), se: 0.1, or, ciLow: or * 0.7, ciHigh: or * 1.3, p: 0.02 });
   test("draws one panel, one OR=1 reference line — same shape as cox's forest plot, an odds ratio instead of a hazard ratio", () => {
-    const v: ViewResult = { kind: "logistic", cohorts: ["all"], logistic: { coefficients: [coef("APC", 0.3)], n: 471, events: 27 }, caveat: "logistic" };
+    const v: ViewResultOf<"logistic"> = { kind: "logistic", cohorts: ["all"], logistic: { coefficients: [coef("APC", 0.3)], n: 471, events: 27 }, caveat: "logistic" };
     const svg = viewToSvg(v)!;
     assert.equal((svg.match(/OR = 1/g) || []).length, 1);
     assert.equal((svg.match(/HR = 1/g) || []).length, 0);
@@ -124,7 +124,7 @@ describe("survival: tick interval and cutoff controls reach the SVG", () => {
 });
 
 describe("survival: the number at risk under each tick", () => {
-  const withRisk = (): ViewResult => ({ kind: "survival", cohorts: ["A", "B"], curves: [
+  const withRisk = (): ViewResultOf<"survival"> => ({ kind: "survival", cohorts: ["A", "B"], curves: [
     { cohort: "A", points: [{ t: 0, s: 1 }, { t: 6, s: 0.5 }, { t: 25, s: 0.3 }], median: 6, n: 1200, events: 600, atRisk: Array.from({ length: 30 }, (_, m) => 1200 - m * 40) },
     { cohort: "B", points: [{ t: 0, s: 1 }, { t: 10, s: 0.7 }], median: null, n: 80, events: 20, atRisk: Array.from({ length: 13 }, (_, m) => 80 - m * 5) },
   ] } as any);
@@ -350,7 +350,7 @@ describe("sequence Sankey keeps everyone accounted for", () => {
 // "other". Each is pinned here by counting what the SVG actually draws, so a fixed cap on
 // groups, categories or caption lines fails a test rather than hiding cases.
 describe("plot point layers: subsets drawn over the plotted cohort", () => {
-  const scatter = (layers: any[]): ViewResult => ({ kind: "plot", note: "n", plot: {
+  const scatter = (layers: any[]): ViewResultOf<"plot"> => ({ kind: "plot", note: "n", plot: {
     shape: "scatter", n: 100, x: { label: "AGE", kind: "num" }, y: { label: "TMB", kind: "num" },
     extent: { x0: 0, x1: 100, y0: 0, y1: 50 }, grid: [10, 10], bins: [{ bx: 1, by: 1, n: 100 }],
     stats: { pearson: 0.1, spearman: null, slope: 0.1, intercept: 1, pPearson: 0.5, pSpearman: null }, layers } as any });
@@ -390,7 +390,7 @@ describe("plot point layers: subsets drawn over the plotted cohort", () => {
   });
 
   test("on a box, a cohort layer's box sits in its group, and a value past the axis is pinned and counted", () => {
-    const v: ViewResult = { kind: "plot", plot: {
+    const v: ViewResultOf<"plot"> = { kind: "plot", plot: {
       shape: "box", n: 10, x: { label: "CANCER_TYPE", kind: "cat" }, y: { label: "TMB", kind: "num" },
       groups: [{ g: "A", n: 10, lo: 0, hi: 100, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 }], overlay: "none",
       layers: [
@@ -417,7 +417,7 @@ describe("plot point layers: subsets drawn over the plotted cohort", () => {
   });
 
   test("with the cases coloured by a category, a layer is a ring round the case, not a second fill", () => {
-    const v: ViewResult = { kind: "plot", plot: {
+    const v: ViewResultOf<"plot"> = { kind: "plot", plot: {
       shape: "box", n: 3, x: { label: "G", kind: "cat" }, y: { label: "V", kind: "num" },
       groups: [{ g: "A", n: 3, lo: 0, hi: 10, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 }], overlay: "points",
       points: [{ id: "a", g: "A", v: 5, c: "X" }], legend: [{ label: "X", color: "#123456" }], colorLabel: "kind",
@@ -485,7 +485,7 @@ describe("plot points: every case, or the outliers over the density", () => {
 });
 
 describe("plot figures draw every group and category they are given", () => {
-  const box = (nGroups: number, extra: Partial<any> = {}): ViewResult => ({
+  const box = (nGroups: number, extra: Partial<any> = {}): ViewResultOf<"plot"> => ({
     kind: "plot", plot: {
       shape: "box", n: nGroups * 10,
       x: { label: "CANCER_TYPE", kind: "cat" }, y: { label: "FRACTION_GENOME_ALTERED", kind: "num" },

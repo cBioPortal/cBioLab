@@ -6,7 +6,7 @@
 // The figure itself (lib/view-svg.ts) is the plot alone; a figure that travels without the app
 // carries the summary and the selection in its caption instead.
 import React, { useMemo } from "react";
-import type { HotspotGene, ViewResult } from "../../lib/types.ts";
+import type { HotspotGene, ViewResultOf } from "../../lib/types.ts";
 import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellOf, type AlterationCell, type ImpactType } from "../../lib/lollipop.ts";
 import { lollipopPanelsSvg } from "../../lib/lollipop-svg.ts";
 import { DrawAtWidth } from "../lab/figure.tsx";
@@ -109,7 +109,7 @@ function GeneSummary({ g }: { g: HotspotGene }) {
   );
 }
 
-export function HotspotsBody({ v, hide: hideList, onHide }: { v: ViewResult; hide?: string[]; onHide: (next: string[] | undefined) => void }) {
+export function HotspotsBody({ v, hide: hideList, onHide }: { v: ViewResultOf<"hotspots">; hide?: string[]; onHide: (next: string[] | undefined) => void }) {
   const genes = useMemo(() => (v.hotspots || []) as HotspotGene[], [v.hotspots]);
   const hide = useMemo(() => new Set(hideList || []), [hideList]);
   const classes = classesOf(genes);

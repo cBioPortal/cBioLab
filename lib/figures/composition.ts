@@ -4,14 +4,14 @@
 //
 // Bars at least MIN_BAR wide are drawn one per case; narrower ones as stacked areas over the
 // sorted cases, so a cohort of 2,000 is still every case rather than a sample of them.
-import type { ViewResult } from "../types.ts";
+import type { ViewResultOf } from "../types.ts";
 import {
   palette, frame, caption, label, legend, linear, axisLeft, leftAxisWidth, textWidth,
   fmtInt, fmtNum, fmtShare, fmtP, esc, num, FS, SW, type SvgOpts, type LegendItem
 } from "../svg-kit.ts";
 import { categoryColor, numericColor, STYLE } from "../oncoprint-style.ts";
 
-type CResult = NonNullable<ViewResult["composition"]>;
+type CResult = NonNullable<ViewResultOf<"composition">["composition"]>;
 
 const PAD = 8, BAR_H = 180, HEAD_H = 2 * (FS.body + 4) + 4, MEAN_W = 26, MEAN_GAP = 5, BLOCK_GAP = 18, MIN_BLOCK = 64;
 const MIN_BAR = 2, ROW_H = 18, LOG2_CLAMP = 2;
@@ -53,7 +53,7 @@ function blockWidths(counts: number[], room: number): number[] {
   return counts.map((c, i) => pinned.has(i) ? MIN_BLOCK : c * unit + fixed);
 }
 
-export function compositionSvg(v: ViewResult, o: SvgOpts): string {
+export function compositionSvg(v: ViewResultOf<"composition">, o: SvgOpts): string {
   const r = v.composition as CResult;
   const p = palette(o.theme);
   const W0 = o.width || 760;

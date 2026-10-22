@@ -161,8 +161,10 @@ export function extractPrimary(h: Hypothesis, r: AnalysisResult): Outcome {
   const n = Object.fromEntries(names.map((c) => [c, r.cohorts[c]?.count ?? 0]));
   if (!v) return { ok: false, reason: "the view did not run", n };
   if (v.error) return { ok: false, reason: v.error, n };
+  // each statistic is read from a view of its own kind
+  if (v.kind !== p.stat) return { ok: false, reason: `view ${p.view + 1} is a ${v.kind} view, not the ${p.stat} view this statistic reads`, n };
   if (p.stat === "compare") {
-    const row = (v.rows || []).find((x) => x.gene.toUpperCase() === p.gene.toUpperCase());
+    const row = ((v.kind === "compare" && v.rows) || []).find((x) => x.gene.toUpperCase() === p.gene.toUpperCase());
     if (!row) return { ok: false, reason: `no row for ${p.gene} in the compare view`, n };
     const driver = p.measure === "driver";
     const pv = driver ? row.pDriver : row.pAny;
@@ -173,16 +175,16 @@ export function extractPrimary(h: Hypothesis, r: AnalysisResult): Outcome {
       effect: `${p.gene} ${driver ? "driver-altered" : "altered"} in ${pct(pa)} vs ${pct(pb)} (${driver ? a.driver : a.any}/${a.profiled} vs ${driver ? b.driver : b.any}/${b.profiled} profiled)` });
   }
   if (p.stat === "survival") {
-    const lr = v.logrank;
+    const lr = v.kind === "survival" ? v.logrank : undefined;
     if (!lr) return { ok: false, reason: "no log-rank test (an arm below the minimum size, or not two cohorts)", n };
-    const [c0, c1] = v.curves || [];
+    const [c0, c1] = (v.kind === "survival" && v.curves) || [];
     const med = (c?: { median: number | null }) => c?.median == null ? "not reached" : c.median.toFixed(1) + " mo";
     // more events than expected in the first arm = higher hazard in the first arm
     return judge(h, { p: lr.p, observed: sign(lr.observed[0] - lr.expected[0]), n,
       effect: `median ${med(c0)} vs ${med(c1)} (${lr.observed[0]}/${lr.observed[1]} events; ${lr.observed[0] > lr.expected[0] ? "more" : "fewer"} than expected in the first arm)` });
   }
   if (p.stat === "clinical") {
-    const row = (v.clinical || []).find((x) => x.attribute === p.attribute);
+    const row = ((v.kind === "clinical" && v.clinical) || []).find((x) => x.attribute === p.attribute);
     if (!row) return { ok: false, reason: `no row for ${p.attribute} in the clinical view`, n };
     if (row.skipped || row.p == null) return { ok: false, reason: row.skipped || `no test for ${p.attribute}`, n };
     const [a, b] = names.map((c) => row.cells.find((x) => x.cohort === c));
@@ -192,7 +194,7 @@ export function extractPrimary(h: Hypothesis, r: AnalysisResult): Outcome {
         effect: `mean ${a.mean?.toFixed(2)} vs ${b.mean?.toFixed(2)} (${row.test})` });
     return judge(h, { p: row.p, observed: null, n, effect: categoricalEffect(a, b, row.test) });
   }
-  const cox = v.cox;
+  const cox = v.kind === "cox" ? v.cox : undefined;
   const coef = cox?.coefficients.find((c) => c.label === p.term) ||
     cox?.coefficients.find((c) => c.label.toUpperCase().startsWith(p.term.toUpperCase()));
   if (!coef) return { ok: false, reason: `no cox coefficient "${p.term}"${cox ? " (have: " + cox.coefficients.map((c) => c.label).join(", ") + ")" : ""}`, n };
