@@ -1,7 +1,7 @@
 // Figures for the view kinds drawn outside lib/view-svg.ts, one module each, by kind. Same contract
 // and the same two rules as lib/view-svg.ts (every label escaped, uniform scaling), drawn through the
 // same frame, palette and caption (lib/svg-kit.ts), so a figure here cannot drift from the others.
-import type { ViewResult, ViewResultOf, ViewKind } from "../types.ts";
+import { isDrawn, type ViewResult, type ViewResultOf, type DrawnResultOf, type ViewKind } from "../types.ts";
 import type { SvgOpts } from "../svg-kit.ts";
 import { attritionSvg } from "./attrition.ts";
 import { genomeSvg } from "./genome.ts";
@@ -20,7 +20,7 @@ import { compositionSvg } from "./composition.ts";
 import { correlatesSvg } from "./correlates.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
-interface Figure<K extends ViewKind> { draw(v: ViewResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
+interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
 
 /** each entry is given only its own kind's result */
 const FIGURES: { [K in ViewKind]?: Figure<K> } = {
@@ -88,7 +88,7 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
 
 /** the figure for a view of one of these kinds, or null (another kind, or nothing to draw) */
 export function kindFigure(v: ViewResult, o: SvgOpts): string | null {
-  return figureOf(v)?.draw(v, o) ?? null;
+  return isDrawn(v) ? figureOf(v)?.draw(v, o) ?? null : null;
 }
 
 /** the one-line title for a view of one of these kinds, or null */
@@ -97,6 +97,6 @@ export function kindTitle(v: ViewResult): string | null {
 }
 
 /** FIGURES' entry for v's kind: keyed by that kind, so it takes v (TypeScript cannot follow the key) */
-function figureOf(v: ViewResult): Figure<ViewKind> | undefined {
-  return Object.hasOwn(FIGURES, v.kind) ? FIGURES[v.kind] as Figure<ViewKind> | undefined : undefined;
+function figureOf(v: ViewResult): { draw(v: ViewResult, o: SvgOpts): string | null; title(v: ViewResult): string } | undefined {
+  return Object.hasOwn(FIGURES, v.kind) ? FIGURES[v.kind] as unknown as ReturnType<typeof figureOf> : undefined;
 }

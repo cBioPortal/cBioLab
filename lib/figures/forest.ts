@@ -5,7 +5,7 @@
 // glance. The scale is set by the estimates, not by the widest interval: a covariate that barely
 // converged can have an upper bound in the millions, which would otherwise squash every other row
 // to a dot. An interval running past the scale ends in an arrow, and the caption says so.
-import type { ViewResultOf } from "../types.ts";
+import type { DrawnResultOf } from "../types.ts";
 import {
   palette, frame, caption, log, axisBottom, bottomAxisHeight, label, textWidth,
   fmtRatio, pDigits, FS, SW, SERIES, type SvgOpts
@@ -80,7 +80,7 @@ function forestSvg(panels: Panel[], W: number, theme: SvgOpts["theme"], ratioNam
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /** Cox: hazard ratios; with stratifyByCohort, one panel per cohort that fit */
-export function coxSvg(v: ViewResultOf<"cox">, o: SvgOpts): string {
+export function coxSvg(v: DrawnResultOf<"cox">, o: SvgOpts): string {
   const byCohort = v.cox?.byCohort;
   const panels: Panel[] = byCohort
     ? byCohort.filter((c) => c.coefficients.length).map((c) => ({
@@ -91,7 +91,7 @@ export function coxSvg(v: ViewResultOf<"cox">, o: SvgOpts): string {
 }
 
 /** logistic: odds ratios, one panel */
-export function logisticSvg(v: ViewResultOf<"logistic">, o: SvgOpts): string {
+export function logisticSvg(v: DrawnResultOf<"logistic">, o: SvgOpts): string {
   const panels: Panel[] = [{ heading: null, coefs: (v.logistic?.coefficients || []).map((cf) => ({ ...cf, ratio: cf.or })) }];
   return forestSvg(panels, Math.max(520, o.width || 760), o.theme, "OR", v.caveat || "", "Logistic regression — odds ratios");
 }

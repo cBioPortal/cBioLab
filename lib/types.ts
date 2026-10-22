@@ -1980,8 +1980,26 @@ export interface ViewResultFields {
     alterations?: AlterationsResult;
   };
 }
+/**
+ * Each kind's main field: what every DRAWN result of that kind carries (one that neither failed
+ * nor waits for cohorts). The oncoprint has none: it carries its figure or its spec, by request.
+ */
+export interface ViewResultMain {
+  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; course: "course"; sequence: "sequence";
+  hotspots: "hotspots"; plot: "plot"; coexpression: "coexpression"; clinical: "clinical"; cooccurrence: "pairs";
+  oncoprint: never; attrition: "attrition"; genome: "genome"; pathways: "pathways"; diffexpr: "diffexpr";
+  paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
+  cancertypes: "cancertypes"; overlap: "overlap"; enrichment: "enrichment"; assays: "assays";
+  composition: "composition"; correlates: "correlates"; table: "table"; timeline: "timeline";
+  mutations: "mutations"; alterations: "alterations";
+}
+/** a result that was drawn: no error, not waiting, and its main field present */
+type Drawn<K extends ViewKind> = { error?: undefined; empty?: undefined } & ViewResultFields[K]
+  & { [F in ViewResultMain[K]]-?: NonNullable<ViewResultFields[K][F & keyof ViewResultFields[K]]> };
+/** a result that was not: refused or failed (`error`), or waiting for cohorts (`empty`) */
+type NotDrawn<K extends ViewKind> = ({ error: string } | { empty: true }) & ViewResultFields[K];
 /** A view's result: the common fields, its kind's own (ViewResultFields), and `kind` to tell which. */
-export type ViewResultOf<K extends ViewKind> = ViewResultCommon & { kind: K } & ViewResultFields[K];
+export type ViewResultOf<K extends ViewKind> = ViewResultCommon & { kind: K } & (Drawn<K> | NotDrawn<K>);
 /**
  * Any view's result. Checking `kind` narrows it to that kind's ViewResultOf. The one value outside
  * ViewKind: runAnalysis echoes a kind it does not know, with error "unknown view kind".
@@ -1992,6 +2010,12 @@ export type ViewResult = { [K in ViewKind]: ViewResultOf<K> }[ViewKind];
  * known only at run time. Valid for every kind, but TypeScript cannot check an object against all
  * of them at once, so this is the one place that says so.
  */
+/** a result of kind K that was drawn: its main field present (ViewResultMain) */
+export type DrawnResultOf<K extends ViewKind> = Extract<ViewResultOf<K>, { error?: undefined; empty?: undefined }>;
+/** v was drawn: after this, its kind's main field (ViewResultMain) is known to be present. */
+export function isDrawn<R extends ViewResult>(v: R): v is Extract<R, { error?: undefined; empty?: undefined }> {
+  return !v.error && !v.empty;
+}
 export function plainResult(kind: ViewKind, fields: ViewResultCommon = {}): ViewResult {
   return { ...fields, kind } as ViewResult;
 }

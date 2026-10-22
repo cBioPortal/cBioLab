@@ -1,6 +1,6 @@
 // Correlates figure: one gene's expression against every gene's — every ρ as a histogram, and the
 // most positive and most negative genes listed with their ρ as a bar.
-import type { ViewResultOf } from "../types.ts";
+import type { ViewResultOf, DrawnResultOf } from "../types.ts";
 import {
   palette, frame, caption, label, textWidth, wrapWidth, linear, axisLeft, axisBottom, leftAxisWidth,
   bottomAxisHeight, fmtInt, pDigits, tickFormat, esc, FS, SW, SERIES, type SvgOpts
@@ -17,8 +17,8 @@ const MIN_LIST = 250;
 const MAX_ROWS = 25;
 const f2 = tickFormat(0.01);
 
-export function correlatesSvg(v: ViewResultOf<"correlates">, o: SvgOpts): string {
-  const p = palette(o.theme), r = v.correlates!;
+export function correlatesSvg(v: DrawnResultOf<"correlates">, o: SvgOpts): string {
+  const p = palette(o.theme), r = v.correlates;
   const want = o.width || 960, W = Math.max(MIN_LIST + 16, want);
   const out: string[] = [];
   const head = fmtInt(r.tested) + " genes against " + r.gene + " · " + fmtInt(r.significant) + " at q < 0.05 · Spearman ρ" + (r.rhoFrom === "meta" ? " (Fisher-z across studies)" : "");

@@ -1,7 +1,7 @@
 // Assays figure: one generic-assay profile's entities compared between cohorts — the shared volcano
 // (two cohorts, numeric), a row per entity with each cohort's mean or mix of values, and the picked
 // entity per cohort (assayEntitySvg, the page's plot beside its table).
-import type { ViewResultOf } from "../types.ts";
+import type { ViewResultOf, DrawnResultOf } from "../types.ts";
 import {
   palette, frame, caption, label, textWidth, wrapWidth, linear, axisBottom, bottomAxisHeight, legend,
   seriesStyle, fmtInt, fmtNum, pDigits, esc, FS, SW, type SvgOpts, type LegendItem
@@ -44,8 +44,8 @@ const MIN_W = 360;
 /** rows of the entity table drawn; the rest are counted */
 const ROWS_NUM = 18, ROWS_CAT = 24;
 
-export function assaysSvg(v: ViewResultOf<"assays">, o: SvgOpts): string {
-  const p = palette(o.theme), r = v.assays!;
+export function assaysSvg(v: DrawnResultOf<"assays">, o: SvgOpts): string {
+  const p = palette(o.theme), r = v.assays;
   const want = o.width || 960;
   const cat = r.datatype === "categorical";
   const two = r.groups.length === 2 && !!r.grid;

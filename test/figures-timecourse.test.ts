@@ -11,7 +11,7 @@ import { labsSvg } from "../lib/figures/labs.ts";
 import { courseSvg } from "../lib/figures/course.ts";
 import { timelineSvg } from "../lib/timeline-svg.ts";
 import { textWidth } from "../lib/svg-kit.ts";
-import type { ViewResultOf } from "../lib/types.ts";
+import type { DrawnResultOf } from "../lib/types.ts";
 
 const unesc = (s: string) => s.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#39;/g, "'").replace(/&amp;/g, "&");
 
@@ -66,7 +66,7 @@ describe("incidence: many long-named cohorts and horizons stay inside the frame"
     points: [{ t: 3, f1: 0.1, f2: 0.05, se1: 0.02, atRisk: 9000 }, { t: 3.01, f1: 0.11, f2: 0.05, se1: 0.02, atRisk: 8990 }, { t: 30, f1: 0.2, f2: 0.3, se1: 0.03, atRisk: 5000 }],
     excluded: { prior: 1234, unobserved: 12, noFollowup: 3, noAnchor: 4 }, late: 0 });
   const curves = Array.from({ length: 8 }, (_, i) => curve(i));
-  const v: ViewResultOf<"incidence"> = { kind: "incidence", cohorts: curves.map((c) => c.cohort), caveat: "not 1-KM",
+  const v: DrawnResultOf<"incidence"> = { kind: "incidence", cohorts: curves.map((c) => c.cohort), caveat: "not 1-KM",
     incidence: { eventLabel: "brain metastasis", curves,
       horizons: [6, 12, 24, 36, 60].map((months) => ({ months, cells: curves.map((c) => ({ cohort: c.cohort, f1: 0.123, lo: 0.1, hi: 0.15, naive: 0.2, atRisk: 50 })) })),
       gray: { statistic: 3.2, p: 0.04, permutations: 2000, groups: 8 } } };
@@ -84,7 +84,7 @@ describe("incidence: many long-named cohorts and horizons stay inside the frame"
 
 describe("risk model, labs, course and timeline stay inside the frame", () => {
   const km = (n: number) => ({ points: [{ t: 0.5, s: 0.99 }, { t: 0.6, s: 0.98 }, { t: 40, s: 0.6 }, { t: 108, s: 0.3 }], median: 70.123, n, events: Math.round(n / 3) });
-  const rm: ViewResultOf<"riskmodel"> = { kind: "riskmodel", cohorts: ["A"], caveat: "association, not cause",
+  const rm: DrawnResultOf<"riskmodel"> = { kind: "riskmodel", cohorts: ["A"], caveat: "association, not cause",
     riskmodel: { study: "s", n: 12000, events: 4000, notProfiled: 3, noStratum: 0, neverHeldOut: 1030, noCovariate: 0, noAnchor: 0, anchorAfterStart: 0, noFollowUp: 0,
       anchoredTo: null, covariates: [{ name: "AGE_AT_DIAGNOSIS", meanCoef: 0.1, hr: 1.1 }], validation: null, reportedOn: "held-out scores",
       genesCovered: 341, candidates: 302, minMutated: 30, strata: "CANCER_TYPE", strataLevels: 12, alpha: 0.5, runs: 5, seed: 1, measure: "any",
@@ -101,10 +101,10 @@ describe("risk model, labs, course and timeline stay inside the frame", () => {
   const labPanel = (i: number, waterfall?: number[]) => ({ cohort: LONG(i), anchored: 12345, baseline: 9876, positiveBaseline: 9000, evaluable: 8765,
     course: [-12, -8, -4, 0, 4, 8, 12].map((week) => ({ week, n: 80, q1: -80, median: -40, q3: 250 })),
     best: new Array(201).fill(0).map((_, k) => k % 7), responders: 4321, ...(waterfall ? { waterfall } : { waterfallWithheld: 8 }) });
-  const labs: ViewResultOf<"labs"> = { kind: "labs", cohorts: [], caveat: "measured, not everyone",
+  const labs: DrawnResultOf<"labs"> = { kind: "labs", cohorts: [], caveat: "measured, not everyone",
     labs: { test: "PSA", anchoredTo: "Treatment [SUBTYPE=Hormone]", responseDrop: 50, fromWeeks: -12, toWeeks: 52, binWeeks: 4, baselineDays: 90,
       panels: [0, 1, 2, 3, 4, 5, 6].map((i) => labPanel(i, i % 2 ? undefined : [-99, -60, 10, 300])), responseP: 1.4e-6 } } as any;
-  const course: ViewResultOf<"course"> = { kind: "course", cohorts: [], caveat: "Aligned on first Treatment.", courseAxis: { binMonths: 3, from: -12, to: 60 },
+  const course: DrawnResultOf<"course"> = { kind: "course", cohorts: [], caveat: "Aligned on first Treatment.", courseAxis: { binMonths: 3, from: -12, to: 60 },
     course: [0, 1, 2, 3, 4, 5, 6].flatMap((i) => ["A very long event type name that goes on", "Surgery"].map((eventType) => ({ cohort: LONG(i), eventType, variants: [eventType], isInterval: i % 2 === 0,
       points: Array.from({ length: 25 }, (_, k) => ({ t: -12 + 3 * k, atRisk: 12345 - k * 300, n: 100, pct: 40 })) }))) } as any;
   for (const width of [480, 760, 1400]) {

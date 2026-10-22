@@ -4,7 +4,7 @@
 // The cells, the quartiles and the coefficients arrive already computed, which is why the same
 // picture draws for a hundred cases or four hundred thousand. The only cases drawn one by one are
 // the points the engine chose (every case under the cap, the outliers over it), at most POINTS_CAP.
-import type { ViewResultOf } from "../types.ts";
+import type { DrawnResultOf } from "../types.ts";
 import type { HighlightPoint, PlotData, PlotLayer } from "../plot.ts";
 import { isAbsent, jitterFor } from "../plot-draw.ts";
 import { LAYER_BASE } from "../plot-layers.ts";
@@ -49,7 +49,7 @@ function numScale(lo: number, hi: number, r0: number, r1: number, isLog: boolean
   return s;
 }
 
-export function plotSvg(v: ViewResultOf<"plot" | "coexpression">, o: SvgOpts): string {
+export function plotSvg(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, o: SvgOpts): string {
   const d = v.plot as PlotData | undefined;
   if (!d) return "";
   const p = palette(o.theme), W = Math.max(480, o.width || 960);
@@ -80,7 +80,7 @@ function sharedGroups(h: PlotLayer, key: number, mark: (pt: HighlightPoint) => s
   return [...by.entries()].map(([o, marks]) => layerGroup(key, marks, o)).join("");
 }
 
-function scatter(v: ViewResultOf<"plot" | "coexpression">, d: PlotData, W: number, p: Pal): string {
+function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotData, W: number, p: Pal): string {
   const { x0, x1, y0, y1 } = d.extent!, [gx, gy] = d.grid!;
   const hs = drawnLayers(d);
   const base = hs.length ? LAYER_BASE : SERIES[0];
@@ -150,7 +150,7 @@ function scatter(v: ViewResultOf<"plot" | "coexpression">, d: PlotData, W: numbe
   return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, false, "Plot — " + yTitle + " against " + xTitle);
 }
 
-function box(v: ViewResultOf<"plot" | "coexpression">, d: PlotData, W0: number, p: Pal): string {
+function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotData, W0: number, p: Pal): string {
   // Every group is drawn. Past what fits at the requested width the figure widens (and the page
   // scrolls) rather than dropping the smaller groups, whose cases would otherwise be missing from
   // a figure that still claims the full count.
@@ -351,7 +351,7 @@ function box(v: ViewResultOf<"plot" | "coexpression">, d: PlotData, W0: number, 
   return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, W > W0, "Plot — " + numTitle + " by " + catTitle);
 }
 
-function table(v: ViewResultOf<"plot" | "coexpression">, d: PlotData, W0: number, p: Pal): string {
+function table(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotData, W0: number, p: Pal): string {
   // Every category on both axes — the engine refuses a pair past CATEGORY_CAP, so what arrives is
   // already the whole table, and a table missing rows or columns is a wrong one. Ordered by
   // marginal total so the big categories read first.

@@ -3,7 +3,7 @@ import {
   esc, palette, frame, caption, linear, axisLeft, leftAxisWidth, bandLabels, legend, label, textWidth,
   fmtInt, fmtNum, fmtPct, FS, SW, type SvgOpts, type LegendItem
 } from "../svg-kit.ts";
-import type { CancertypesGroup, ViewResultOf } from "../types.ts";
+import type { CancertypesGroup, ViewResultOf, DrawnResultOf } from "../types.ts";
 import { AMP, DEL, MULTI, MUT, SV } from "./common.ts";
 
 type CtResult = NonNullable<ViewResultOf<"cancertypes">["cancertypes"]>;
@@ -108,8 +108,8 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
 const andList = (xs: string[]) => xs.length > 1 ? xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1] : xs.join("");
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
-export function cancertypesSvg(v: ViewResultOf<"cancertypes">, o: SvgOpts): string {
-  const p = palette(o.theme), r = v.cancertypes!;
+export function cancertypesSvg(v: DrawnResultOf<"cancertypes">, o: SvgOpts): string {
+  const p = palette(o.theme), r = v.cancertypes;
   let y = 0, W = Math.max(360, o.width || 860), grown = false;
   const parts: string[] = [];
   r.panels.forEach((_, i) => {

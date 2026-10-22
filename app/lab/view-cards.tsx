@@ -8,7 +8,7 @@ import { KIND_CARDS, hasKindCard, kindSub, KindCardControls, KindCardBody, draws
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
 import { OncoprintCard, Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import type { AnalysisDoc, AnalysisResult, OncoprintView, ExploreResult } from "../../lib/types.ts";
+import { isDrawn, type AnalysisDoc, type AnalysisResult, type OncoprintView, type ExploreResult } from "../../lib/types.ts";
 import { pDigits } from "../../lib/chart/format.ts";
 import { MethodPanel } from "./method-panel.tsx";
 import { viewRequest } from "./use-analysis.ts";
@@ -233,8 +233,8 @@ function CompareCard({ ctx, v, vi }: CardProps) {
           <thead><tr>
             <th className="l">gene</th>
             {v.cohorts!.map((n, i: number) => <th key={n} className="r"><SeriesSwatch i={i} /> {n}<br /><span className="thsub">driver / any</span></th>)}
-            {v.rows![0] && v.rows![0].pAny != null && <th className="r">p (any)</th>}
-            {v.rows![0] && v.rows![0].qAny != null && <th className="r">q (any)</th>}
+            {v.rows[0] && v.rows[0].pAny != null && <th className="r">p (any)</th>}
+            {v.rows[0] && v.rows[0].qAny != null && <th className="r">q (any)</th>}
           </tr></thead>
           <tbody>{v.rows.map(r => (
             <tr key={r.gene} className="ruled">
@@ -282,7 +282,7 @@ function HotspotsCard({ ctx, v, vi }: CardProps) {
 function CoexpressionCard({ ctx, v, vi }: CardProps) {
   const { busy, cohortChoice, docView, explore, menuOpenRef, openGenes, updateView } = ctx;
   return <>
-    {v.kind === "coexpression" && v.coexpression && <>
+    {v.kind === "coexpression" && isDrawn(v) && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi), 1)} sub="Pearson correlation from per-site sums" {...placement(ctx, vi)}
         actions={<>
           <label className="tbfield" title="the molecular profile the correlation is computed over">profile <Choice size="ctl"
@@ -315,7 +315,7 @@ function CoexpressionCard({ ctx, v, vi }: CardProps) {
                   background: r.r < 0 ? "#D55E00" : "#0072B2" }} /></span>}
               </td>
               <td className={"r tnum" + (Math.abs(r.r ?? 0) > 0.5 ? " bold" : "")}>{r.r ?? "—"}</td>
-              {v.coexpression!.some(x => x.rMeta != null) && <td className="r tnum">{r.rMeta ?? "—"}</td>}
+              {v.coexpression.some(x => x.rMeta != null) && <td className="r tnum">{r.rMeta ?? "—"}</td>}
               <td className="r tnum">{pCell(r.pMeta ?? r.p)}</td>
               <td className="r tnum muted">{pCell(r.q)}</td>
             </tr>))}

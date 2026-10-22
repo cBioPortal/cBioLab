@@ -3,7 +3,7 @@ import {
   palette, frame, caption, label, legend, textWidth, packLines, linear, axisLeft, leftAxisWidth, seriesStyle,
   fmtInt, esc, num, FS, SW, OTHER, type SvgOpts
 } from "../svg-kit.ts";
-import type { ViewResultOf } from "../types.ts";
+import type { ViewResultOf, DrawnResultOf } from "../types.ts";
 
 type OvResult = NonNullable<ViewResultOf<"overlap">["overlap"]>;
 type Pal = ReturnType<typeof palette>;
@@ -135,8 +135,8 @@ export function upsetColumns(n: number, room: number): { shown: number; pooled: 
   return { shown, pooled, cols, pitch: Math.min(UPSET_MAX_COL, room / Math.max(1, cols)) };
 }
 
-function upsetSvg(v: ViewResultOf<"overlap">, o: SvgOpts): string {
-  const p = palette(o.theme), r = v.overlap!;
+function upsetSvg(v: DrawnResultOf<"overlap">, o: SvgOpts): string {
+  const p = palette(o.theme), r = v.overlap;
   const sets = r.sets, inter = r.intersections;
   const W = Math.max(480, o.width || 860);
 
@@ -220,8 +220,8 @@ function overlapKey(r: OvResult, p: Pal, x: number, y: number, w: number): { svg
   })), x, y, w, p);
 }
 
-export function overlapSvg(v: ViewResultOf<"overlap">, o: SvgOpts): string {
-  const r = v.overlap!;
+export function overlapSvg(v: DrawnResultOf<"overlap">, o: SvgOpts): string {
+  const r = v.overlap;
   if (r.sets.length > 3 || r.sets.some((s) => s.samples == null)) return upsetSvg(v, o);
   // two or three groups: samples and patients side by side, as the portal's Overlap tab shows them
   const p = palette(o.theme);
