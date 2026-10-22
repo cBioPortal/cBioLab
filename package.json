@@ -29,6 +29,7 @@
     "check:splitby-perf": "node --env-file=.env.local scripts/check-splitby-perf.ts",
     "check:portal": "node --env-file=.env.local scripts/check-portal-parity.ts",
     "check:cohorts": "node --env-file=.env.local scripts/check-cohort-logic.ts",
+    "check:pooled": "node --env-file=.env.local scripts/check-pooled.ts",
     "check:access-mutants": "node scripts/check-access-mutants.ts",
     "check:mutants": "node --env-file=.env.local scripts/check-mutants.ts",
     "verify": "npm test && npm run check:methods && RECORD=1 npm run check:portal && RECORD=1 npm run check:cohorts && RECORD=1 npm run check:mutants",

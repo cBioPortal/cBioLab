@@ -24,7 +24,9 @@
  *   7. A selection of several studies profiled differently — panel (IMPACT341), several panels in
  *      one study (IMPACT341/410/468) and whole-exome — through the multi-study path: every row of
  *      the three gene tables, which is where per-study denominators, pooling and off-panel calls
- *      meet.
+ *      meet. Once as it is, and once filtered (SEX = Female, the portal's clinical filter): under a
+ *      draft the gene tables once fell back to per-study tables, losing from the denominator every
+ *      study that profiled a gene outside its own top 500 (SV NFIB read 32/47 for 32/440).
  *
  * Every comparison must agree EXACTLY; a count is a count. Differences are reported, never
  * tolerated, so a disagreement caused by the two databases holding different releases of a
@@ -257,20 +259,31 @@ function inPortalRange(m: PortalMutation, r: { lo?: number; hi?: number; contain
   return r.contained ? lo <= p[0] && hi >= p[1] : lo <= p[1] && p[0] <= hi;
 }
 
-// 7. studies profiled differently, together
+// 7. studies profiled differently, together — as they are, and filtered
 const MIXED = ["utuc_mskcc_2015", "msk_impact_2017", "blca_tcga_pan_can_atlas_2018"];
-{
-  const study = MIXED.join(" + ");
-  const profilesByStudy = new Map();
-  for (const s of MIXED) profilesByStudy.set(s, await studyProfiles(s));
-  const ex = await buildExploreFederated({ studies: MIXED, profilesByStudy });
+const MIXED_SELECTIONS: { label: string; draft: CohortDef | null; filter: Record<string, unknown> }[] = [
+  { label: "", draft: null, filter: { studyIds: MIXED } },
+  { label: " · SEX = Female",
+    draft: { all: [{ kind: "clinical", attribute: "SEX", per: "patient", op: "=", value: "Female" }] },
+    filter: { studyIds: MIXED, clinicalDataFilters: [{ attributeId: "SEX", values: [{ value: "Female" }] }] } },
+];
+const mixedProfiles = new Map();
+for (const s of MIXED) mixedProfiles.set(s, await studyProfiles(s));
+for (const { label: filterLabel, draft, filter } of MIXED_SELECTIONS) {
+  const study = MIXED.join(" + ") + filterLabel;
+  const ex = await buildExploreFederated({ studies: MIXED, profilesByStudy: mixedProfiles, draft });
+  // the selection itself, before its gene tables
+  const portalSamples = await api<(PortalSample & { uniquePatientKey: string })[]>("/filtered-samples/fetch", filter);
+  const portalPatients = new Set(portalSamples.map((x) => x.uniquePatientKey)).size;
+  record({ study, group: "size", what: "patients", ours: String(ex.totals?.patients), portal: String(portalPatients), agree: ex.totals?.patients === portalPatients });
+  record({ study, group: "size", what: "samples", ours: String(ex.totals?.samples), portal: String(portalSamples.length), agree: ex.totals?.samples === portalSamples.length });
   const tables: [string, GeneTableRow[] | undefined, string][] = [
     ["mutations", ex.mutatedGenes, "/mutated-genes/fetch"],
     ["copy number", ex.cnaGenes, "/cna-genes/fetch"],
     ["structural variants", ex.svGenes, "/structuralvariant-genes/fetch"],
   ];
   for (const [label, rows, path] of tables) {
-    const portal = await api<PortalGene[]>(path, { studyIds: MIXED });
+    const portal = await api<PortalGene[]>(path, filter);
     const byKey = new Map(portal.map((g) => [g.hugoGeneSymbol + "|" + (g.alteration ?? ""), g]));
     const what = (r: GeneTableRow) => r.gene + (r.cna === 2 ? " amplified" : r.cna === -2 ? " deleted" : "");
     const agrees = (r: GeneTableRow) => { const p = byKey.get(r.gene + "|" + (r.cna ?? "")); return !!p && oursGene(r) === portalGene(p); };
