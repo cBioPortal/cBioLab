@@ -42,7 +42,8 @@ export interface StudyProfiles {
   catalog: ProfileInfo[];
 }
 /**
- * studyProfiles for many studies at once, rather than three queries per study one after another —
+ * Each study's profiles, many studies at once (studyProfiles is the list of one), rather than three
+ * queries per study one after another —
  * Explore over all 551 studies spent ~30s on that before its first query; this takes ~6s. The two
  * genetic_profile queries run once per connection over every study not yet cached (30-60ms). The
  * profile types stay one query per study, in parallel: genetic_alteration_derived is read by its
@@ -90,28 +91,7 @@ export async function studyProfilesMany(studies: string[]): Promise<Map<string, 
 }
 
 export async function studyProfiles(study: string): Promise<StudyProfiles> {
-  if (_profileCache.has(study)) return _profileCache.get(study)!;
-  const { peerForStudy } = await import("./federation-remote.ts");
-  if (await peerForStudy(study)) return { profiles: [], gaProfiles: [], catalog: [] }; // the peer owns its own profile inventory
-  const conn = (await studyRouting()).get(study) || PRIMARY;
-  const profiles = (await chQuery(
-    "SELECT DISTINCT profile_type FROM " + conn.db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study), conn)).data.map((r) => r.profile_type);
-  // by the study's own id, not a prefix of the profile id, which also matches sibling studies
-  const gaProfiles = (await chQuery(
-    "SELECT DISTINCT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt FROM " + conn.db + ".genetic_profile gp\n" +
-    "JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'GENERIC_ASSAY'", conn)).data.map((r) => r.pt);
-  const catalog = (await chQuery(
-    "SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS profile, gp.genetic_alteration_type AS type, gp.datatype AS datatype,\n" +
-    "       gp.name AS name, ifNull(toString(gp.generic_assay_type), '') AS assay, toInt32OrZero(ifNull(toString(gp.sort_order), '')) AS ord\n" +
-    "FROM " + conn.db + ".genetic_profile gp\n" +
-    "JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study), conn)).data.map((r): ProfileInfo => ({
-      profile: String(r.profile), type: String(r.type), datatype: String(r.datatype), name: String(r.name),
-      ...(r.assay ? { assayType: String(r.assay) } : {}), order: Number(r.ord) || 0 }));
-  const out = { profiles, gaProfiles, catalog };
-  _profileCache.set(study, out);
-  return out;
+  return (await studyProfilesMany([study])).get(study)!;
 }
 
 /**
