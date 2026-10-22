@@ -18,7 +18,8 @@ import CohortPills from "../../lab/pills.tsx";
 import { usePublicEnv } from "../../_env/public-env-context.tsx";
 import { fmtInt } from "../../../lib/chart/format.ts";
 import { PortalHeader, PortalSummary } from "../portal-chrome.tsx";
-import { QueryEditor, RESULTS_MAX_GENES, readResultsTarget, studiesProblem } from "../query-editor.tsx";
+import { RESULTS_MAX_GENES, readResultsTarget, studiesProblem } from "../query-editor.tsx";
+import { QueryFlow } from "../../_home/query-flow.tsx";
 import { checkGeneQuery } from "../../../lib/gene-query.ts";
 import { resultsMaxStudies, crossStudyExpression, expressionAcross, isExpressionProfile, isExpressionType } from "../../../lib/results-settings.ts";
 
@@ -47,15 +48,14 @@ export default function ResultsPage() {
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [editing, setEditing] = useState(false);
   const shell = (body: React.ReactNode) => <><PortalHeader page="query results" /><main className="analysis-main">{body}</main></>;
-  if (target.error || !studies.length || !genes.length) return shell(
-    <section data-tw className="mb-4 rounded-lg border bg-card px-4.5 py-4">
-      <div className="text-sm font-semibold tracking-[0.12em] text-muted-foreground uppercase">Query</div>
-      {target.error && <div className="error">{target.error}</div>}
-      <p className="mt-1 mb-4 text-md text-muted-foreground">One or more studies and up to {RESULTS_MAX_GENES} genes: the page shows the patients altered in any of them against the profiled rest, tab by tab, as cBioPortal&apos;s Results page does.</p>
-      <QueryEditor target={target} />
-    </section>);
-  if (queryError) return shell(<><div className="error">this query cannot be read — {queryError}</div><QueryEditor target={target} /></>);
-  if (tooMany) return shell(<><div className="error">{tooMany}</div><QueryEditor target={target} /></>);
+  // a query that is not one yet, or cannot be read, opens the homepage's flow at the step it needs
+  const flow = (note?: string | null) => shell(<>
+    {note && <div className="error">{note}</div>}
+    <QueryFlow initial={target} />
+  </>);
+  if (target.error || !studies.length || !genes.length) return flow(target.error);
+  if (queryError) return flow("this query cannot be read — " + queryError);
+  if (tooMany) return flow(tooMany);
   if (genes.length > RESULTS_MAX_GENES) return shell(<p className="note">a results page takes at most {RESULTS_MAX_GENES} genes, the oncoprint&apos;s rows; this asks for {genes.length}</p>);
   if (error) return shell(<div className="error">{error}</div>);
   const ready = !!(fresh && page.doc);
@@ -85,8 +85,8 @@ export default function ResultsPage() {
           {oqlNarrows ? "The query's OQL decides who is Altered; the oncoprint and the gene tabs draw every alteration of " + (genes.length === 1 ? "its gene." : "its genes.") : ""}
         </p>
       ) : null}
-      {editing && <QueryEditor target={target} className="mt-4 border-t pt-4" />}
     </PortalSummary>
+    {editing && <QueryFlow initial={target} className="mb-4" />}
     {page.note && <p className="note">{page.note}</p>}
     {!ready
       ? <><div className="skeleton mb-4 h-10" /><div className="card viewcard viewloading" aria-busy="true"><div className="skeleton skeleton-view" /></div></>

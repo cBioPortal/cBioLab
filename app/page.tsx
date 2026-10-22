@@ -1,12 +1,11 @@
-// The root route. The standalone "query builder" UI that used to live here
-// (v1 recipes, treatment-line explorer) has been retired in favour of the
-// Analysis app, which subsumes it — Explore/Cohorts/Saved/Analysis/Examples
-// are all reachable from there. Redirect rather than 404 so old links and
-// bookmarks still land somewhere useful.
-import { redirect } from "next/navigation";
-
-export const instant = false;
+// The homepage: cBioPortal's, choose studies and then explore or query them (app/_home). It reads
+// its state from the URL, which under Cache Components streams inside a Suspense boundary; the
+// lab's query cache serves its study list, and the public environment its Results settings.
+import { Suspense } from "react";
+import { LabProviders } from "./lab/providers.tsx";
+import { PublicEnv } from "./_env/public-env.tsx";
+import { HomePage } from "./_home/HomePage.tsx";
 
 export default function RootPage() {
-  redirect("/lab");
+  return <LabProviders><Suspense><PublicEnv><HomePage /></PublicEnv></Suspense></LabProviders>;
 }

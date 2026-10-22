@@ -5,14 +5,14 @@ import { SeriesSwatch } from "../lab/view-chrome.tsx";
 import { Badge } from "../_ui/badge";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
 
-/** the app's header, as the lab draws it, naming which portal page this is */
+/** the app's header, as the lab draws it, naming which page this is; the name goes home */
 export function PortalHeader({ page }: { page: string }) {
   return (
     <header>
-      <h1><a href="/lab" className="text-foreground no-underline">cbio-lab</a></h1>
+      <h1><a href="/" className="text-foreground no-underline">cbio-lab</a></h1>
       <span className="sub">{page}</span>
       <span className="spacer" />
-      <a className="toplink" href="/lab?tab=explore">explore studies</a>
+      <a className="toplink" href="/">studies</a>
       <a className="toplink" href="/lab?tab=analysis">analysis</a>
       <a className="toplink" href="/verification">how we verify</a>
     </header>
