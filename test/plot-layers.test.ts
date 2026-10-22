@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runPlot } from "../lib/views/plot.ts";
 import { highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, axisSelect, POINTS_CAP, LAYER_COLORS } from "../lib/plot.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
-import type { PlotData, ViewResult } from "../lib/types.ts";
+import type { PlotData, ViewResultOf } from "../lib/types.ts";
 
 type Calls = string[];
 const CAP = POINTS_CAP.toLocaleString("en-US");
@@ -55,7 +55,7 @@ const evaluated = (studies: string[], count: number): EvaluatedCohort =>
 
 function run(resolvers: Record<string, unknown>, opts: {
   points?: unknown; plotStudies?: string[]; hl?: Record<string, EvaluatedCohort>; extra?: Record<string, unknown>;
-} = {}): Promise<ViewResult> {
+} = {}): Promise<ViewResultOf<"plot">> {
   const plotStudies = opts.plotStudies || Object.keys(resolvers);
   const cohorts: Record<string, EvaluatedCohort> = { All: evaluated(plotStudies, 1000), ...(opts.hl || { R: evaluated(plotStudies, 10) }) };
   const c = {
@@ -66,7 +66,7 @@ function run(resolvers: Record<string, unknown>, opts: {
   } as unknown as ViewRun;
   const view = { kind: "plot", unit: "patient", cohorts: ["All"], x: { source: "clinical", attribute: "AGE" }, y: { source: "clinical", attribute: "TMB" },
     points: opts.points !== undefined ? opts.points : [{ cohort: "R" }], ...opts.extra };
-  return runPlot(view as never, c).then((r) => ("result" in (r as object) ? (r as { result: ViewResult }).result : r as ViewResult));
+  return runPlot(view as never, c).then((r) => ("result" in (r as object) ? (r as { result: ViewResultOf<"plot"> }).result : r as ViewResultOf<"plot">));
 }
 
 describe("a highlight on one study", () => {

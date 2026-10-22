@@ -329,8 +329,8 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         ` most positively correlated:\n` + co.positive.map(line).join("\n") +
         `\n most negatively correlated:\n` + co.negative.map(line).join("\n") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "mutations" || v.kind === "table") {
-      const t = (v.mutations || v.table)!;
-      const title = v.mutations ? `${v.mutations.gene} mutations` : `Clinical data table (one row per ${v.table!.unit})`;
+      const t = (v.kind === "mutations" ? v.mutations : v.table)!;
+      const title = v.kind === "mutations" ? `${v.mutations!.gene} mutations` : `Clinical data table (one row per ${v.table!.unit})`;
       out.push(`${title}: ${t.total < t.all ? `${t.total.toLocaleString()} of ${t.all.toLocaleString()} rows kept by the query` : `${t.total.toLocaleString()} rows`}; ` +
         tableText(t) + caveatOf(v) + noteOf(v));
     } else if (v.kind === "timeline" && v.timeline) {

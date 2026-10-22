@@ -2,7 +2,7 @@
 // clinical): what MCP and `?figures=svg` get for them. Compare is grouped bars, one group per gene
 // and one bar per cohort; the other three are one horizontal bar per row on a labelled value axis,
 // signed about a zero line where the value has a direction.
-import type { ViewResult, CooccurRow, CompareRow, ClinicalRow, CoexprRow } from "../types.ts";
+import type { CooccurRow, CompareRow, ClinicalRow, CoexprRow, ViewResultOf } from "../types.ts";
 import {
   esc, palette, frame, caption, linear, axisBottom, bottomAxisHeight, legend, label, textWidth,
   seriesStyle, fmtNum, fmtPct, fmtQ, fmtInt, FS, SW, OTHER, SERIES, type SvgOpts, type LegendItem, type Scale
@@ -121,7 +121,7 @@ function hbars(title: string, rows: HRow[], o: SvgOpts, a: {
 const sentence = (s: string) => s.trim() && !/[.!?)]$/.test(s.trim()) ? s.trim() + "." : s.trim();
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
-export function cooccurrenceSvg(v: ViewResult, o: SvgOpts): string {
+export function cooccurrenceSvg(v: ViewResultOf<"cooccurrence">, o: SvgOpts): string {
   const pairs = (v.pairs || []) as CooccurRow[];
   let anyInf = false;
   const rows = pairs.map((r): HRow => {
@@ -143,7 +143,7 @@ export function cooccurrenceSvg(v: ViewResult, o: SvgOpts): string {
   });
 }
 
-export function coexpressionSvg(v: ViewResult, o: SvgOpts): string {
+export function coexpressionSvg(v: ViewResultOf<"coexpression">, o: SvgOpts): string {
   const rows = (v.coexpression || []) as CoexprRow[];
   return hbars("Co-expression — Pearson r", rows.map((r): HRow => {
     const rr = r.rMeta ?? r.r;
@@ -164,7 +164,7 @@ export function coexpressionSvg(v: ViewResult, o: SvgOpts): string {
 /** −log₁₀ q past this runs off the axis as an arrow: q < 1e-50 is beyond any reading difference */
 const Q_CAP = 50;
 
-export function clinicalSvg(v: ViewResult, o: SvgOpts): string {
+export function clinicalSvg(v: ViewResultOf<"clinical">, o: SvgOpts): string {
   const all = (v.clinical || []) as ClinicalRow[];
   const rows = all.map((r): HRow => {
     if (r.skipped) return { label: r.attribute, v: null, fill: OTHER, text: "not tested: " + r.skipped, muted: true };
@@ -190,7 +190,7 @@ const COL_MIN = 340;
  * Altered %, grouped by gene: one bar per cohort in each gene's group, the cohorts keyed once in
  * a legend. Genes flow down columns as the width allows, every column on one shared scale.
  */
-export function compareSvg(v: ViewResult, o: SvgOpts): string {
+export function compareSvg(v: ViewResultOf<"compare">, o: SvgOpts): string {
   const p = palette(o.theme);
   const rows = (v.rows || []) as CompareRow[];
   const names = v.cohorts && v.cohorts.length ? v.cohorts : (rows[0]?.cells || []).map((c) => c.cohort);

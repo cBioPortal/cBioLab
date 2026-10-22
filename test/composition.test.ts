@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { partNames, validateSource, compositionCasesSql, partsSql, COMPOSITION_MAX_PARTS } from "../lib/composition.ts";
 import { compositionSvg } from "../lib/figures/composition.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
-import type { ViewResult } from "../lib/types.ts";
+import type { ViewResultOf } from "../lib/types.ts";
 
 test("attribute parts lose the prefix they share, at a word boundary", () => {
   assert.deepEqual(partNames(["custom:sc-tnk/TNK_CD8_T_ISG", "custom:sc-tnk/TNK_CD4_T_naive"]), ["CD8 T ISG", "CD4 T naive"]);
@@ -38,7 +38,7 @@ test("the SQL keeps cases with every part, normalises only when asked, and never
   assert.match(clin, /WHERE isFinite\(ifNull\(av, nan\)\)/);
 });
 
-function result(groups: { cohort: string; n: number; cases?: number[][] }[]): ViewResult {
+function result(groups: { cohort: string; n: number; cases?: number[][] }[]): ViewResultOf<"composition"> {
   const parts = [{ id: "A", name: "A" }, { id: "B", name: "B" }, { id: "C", name: "C" }];
   return {
     kind: "composition", cohorts: groups.map((g) => g.cohort), caveat: "test caveat",
@@ -50,7 +50,7 @@ function result(groups: { cohort: string; n: number; cases?: number[][] }[]): Vi
         ...(groups.length > 1 ? { log2: 0.4, p: 0.01, q: 0.03 } : {}) }))),
       tested: groups.length > 1 ? groups.length * 3 : 0, significant: groups.length > 1 ? groups.length * 3 : 0
     }
-  } as ViewResult;
+  } as ViewResultOf<"composition">;
 }
 
 test("the figure draws bars, areas and mean-only cohorts without a lint issue at any card width", () => {

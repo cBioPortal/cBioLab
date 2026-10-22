@@ -4,7 +4,7 @@ import {
   palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, legend, label, textWidth,
   seriesStyle, fmtInt, fmtNum, fmtPct, fmtCI, fmtP, pDigits, FS, SW, type SvgOpts
 } from "../svg-kit.ts";
-import type { ViewResult } from "../types.ts";
+import type { ViewResultOf } from "../types.ts";
 import { Z_975 } from "../stats.ts";
 import { stepPath } from "../chart/marks.ts";
 import { plotHeight } from "./common.ts";
@@ -17,7 +17,7 @@ import { r1 } from "../chart/marks.ts";
 const COMPETING_DASH = "2 2.5";
 const SWATCH = 18, GAP = 16;
 
-export function incidenceSvg(v: ViewResult, o: SvgOpts): string {
+export function incidenceSvg(v: ViewResultOf<"incidence">, o: SvgOpts): string {
   const p = palette(o.theme), r = v.incidence!;
   // every cohort keeps its series index (and so the colour its page swatch has); one no patient could
   // be at risk in is not drawn, and its counts line says so

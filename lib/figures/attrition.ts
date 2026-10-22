@@ -3,7 +3,7 @@
 // Columns share the figure's width; past as many as fit at a readable width they wrap onto a
 // further row of columns rather than run off the edge. Every box is as wide as its column and its
 // clause wraps to that width, so a long clause takes more lines, never more than the box.
-import type { ViewResult, AttritionPanel } from "../types.ts";
+import type { AttritionPanel, ViewResultOf } from "../types.ts";
 import {
   palette, frame, caption, label, wrapWidth, ellipsize, seriesStyle, fmtInt, fmtPct, esc, FS, SW, type SvgOpts
 } from "../svg-kit.ts";
@@ -27,7 +27,7 @@ export function clauseLines(text: string, w: number): { lines: string[]; cut: bo
   return { lines: [...lines.slice(0, MAX_LINES - 1), ellipsize(lines.slice(MAX_LINES - 1).join(" "), w, FS.body)], cut: true };
 }
 
-export function attritionSvg(v: ViewResult, o: SvgOpts): string {
+export function attritionSvg(v: ViewResultOf<"attrition">, o: SvgOpts): string {
   const p = palette(o.theme);
   const panels = v.attrition || [];
   const W0 = o.width || 760;

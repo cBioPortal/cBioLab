@@ -1,5 +1,5 @@
 // Enrichment view: every gene's alteration frequency, compared between cohorts
-import type { ViewResult, EnrichmentView, EnrichmentGene } from "../types.ts";
+import type { ViewResult, EnrichmentView, EnrichmentGene, ViewResultOf } from "../types.ts";
 import { enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql, type EnrichAlteration } from "../federation-views.ts";
 import { fisherExact, chiSquareTest, benjaminiHochberg } from "../stats.ts";
 import { enrichmentMethod } from "../method.ts";
@@ -72,7 +72,7 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   const bands = await cytobands(ok, rows.map((g) => g.gene));
   for (const g of rows) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
   const labels = rows.slice(0, label).map((g) => g.gene);
-  let grid: NonNullable<ViewResult["enrichment"]>["grid"];
+  let grid: NonNullable<ViewResultOf<"enrichment">["enrichment"]>["grid"];
   if (two) {
     const lp = (p: number) => -Math.log10(Math.max(1e-300, p));
     const finite = tested.map((g) => g.log2Ratio).filter((x): x is number => x != null);

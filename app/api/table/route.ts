@@ -46,7 +46,9 @@ export async function POST(req: Request) {
   const filtered = !!describeQuery(t.query, t.columns);
   const studies = [...new Set(t.lists.map((l) => l.study))];
   const name = "cohort-lab_" + (studies.length === 1 ? studies[0] : studies.length + "-studies") + "_" +
-    (v.table ? "clinical_" + v.table.unit + "s" : v.timeline ? "timeline_patients" : v.alterations ? (table && v.alterations.patient ? v.alterations.patient.id + "_" + table : "alterations_patients") : v.mutations!.gene + "_mutations") + (filtered ? "_filtered" : "") + ".csv";
+    (v.kind === "table" ? "clinical_" + v.table!.unit + "s" : v.kind === "timeline" ? "timeline_patients"
+      : v.kind === "alterations" ? (table && v.alterations?.patient ? v.alterations.patient.id + "_" + table : "alterations_patients")
+      : v.kind === "mutations" ? v.mutations!.gene + "_mutations" : v.kind) + (filtered ? "_filtered" : "") + ".csv";
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {

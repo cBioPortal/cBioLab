@@ -3,7 +3,7 @@ import {
   palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, label, textWidth,
   seriesStyle, fmtInt, fmtPct, fmtP, FS, SW, type SvgOpts
 } from "../svg-kit.ts";
-import type { ViewResult } from "../types.ts";
+import type { ViewResultOf } from "../types.ts";
 import { timeScale, timeTitle } from "../chart/time.ts";
 import { paragraph } from "../chart/text.ts";
 import { r1 } from "../chart/marks.ts";
@@ -15,7 +15,7 @@ export const LAB_MIN_POINT_N = 5;
 const SIDE_BY_SIDE = 860;
 const WATERFALL_H = 96;
 
-export function labsSvg(v: ViewResult, o: SvgOpts): string {
+export function labsSvg(v: ViewResultOf<"labs">, o: SvgOpts): string {
   const p = palette(o.theme), r = v.labs!;
   const W = Math.max(420, o.width || 960);
   const side = W >= SIDE_BY_SIDE;

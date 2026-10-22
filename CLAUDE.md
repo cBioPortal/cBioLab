@@ -38,7 +38,11 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   document, evaluated cohorts, resolvers, the view's cohorts and studies) and returns its result;
   `lib/views/shared.ts` holds what several runners use (`overLimit`, `answering`, `refuse`). A new
   view kind is a new runner there, registered in `index.ts` (`RUNNERS` is keyed by `ViewKind`, the
-  `View` union's kinds, so a kind without a runner does not compile). **Kinds never import each other:** a
+  `View` union's kinds, so a kind without a runner does not compile). A result is a `ViewResult`, a
+  union over kinds: the common fields (`ViewResultCommon`) plus its kind's own (`ViewResultFields` in
+  `lib/types.ts`, where a new kind declares its fields), so checking `kind` narrows it and reading
+  another kind's field does not compile; a figure takes `ViewResultOf<"<kind>">`. A refusal or error
+  for a kind known only at run time is `plainResult(kind, {…})`. **Kinds never import each other:** a
   kind's runner, figure and `<kind>-<part>.ts` modules import only one another and the shared
   modules (`lib/views/`: run, shared, rows, covariates; `lib/figures/`: common, volcano, bars,
   forest) — `local/kind-boundary` in `eslint.config.mjs` enforces it; what two kinds need moves

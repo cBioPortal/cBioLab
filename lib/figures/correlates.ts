@@ -1,13 +1,13 @@
 // Correlates figure: one gene's expression against every gene's — every ρ as a histogram, and the
 // most positive and most negative genes listed with their ρ as a bar.
-import type { ViewResult } from "../types.ts";
+import type { ViewResultOf } from "../types.ts";
 import {
   palette, frame, caption, label, textWidth, wrapWidth, linear, axisLeft, axisBottom, leftAxisWidth,
   bottomAxisHeight, fmtInt, pDigits, tickFormat, esc, FS, SW, SERIES, type SvgOpts
 } from "../svg-kit.ts";
 
 type Pal = ReturnType<typeof palette>;
-type CoResult = NonNullable<ViewResult["correlates"]>;
+type CoResult = NonNullable<ViewResultOf<"correlates">["correlates"]>;
 type CoGene = CoResult["positive"][number];
 
 const GAP = 28;
@@ -17,7 +17,7 @@ const MIN_LIST = 250;
 const MAX_ROWS = 25;
 const f2 = tickFormat(0.01);
 
-export function correlatesSvg(v: ViewResult, o: SvgOpts): string {
+export function correlatesSvg(v: ViewResultOf<"correlates">, o: SvgOpts): string {
   const p = palette(o.theme), r = v.correlates!;
   const want = o.width || 960, W = Math.max(MIN_LIST + 16, want);
   const out: string[] = [];

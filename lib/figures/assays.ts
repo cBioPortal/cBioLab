@@ -1,7 +1,7 @@
 // Assays figure: one generic-assay profile's entities compared between cohorts — the shared volcano
 // (two cohorts, numeric), a row per entity with each cohort's mean or mix of values, and the picked
 // entity per cohort (assayEntitySvg, the page's plot beside its table).
-import type { ViewResult } from "../types.ts";
+import type { ViewResultOf } from "../types.ts";
 import {
   palette, frame, caption, label, textWidth, wrapWidth, linear, axisBottom, bottomAxisHeight, legend,
   seriesStyle, fmtInt, fmtNum, pDigits, esc, FS, SW, type SvgOpts, type LegendItem
@@ -10,7 +10,7 @@ import { AMP, DEL } from "./common.ts";
 import { volcano, volcanoPlotH } from "./volcano.ts";
 
 type Pal = ReturnType<typeof palette>;
-type AsResult = NonNullable<ViewResult["assays"]>;
+type AsResult = NonNullable<ViewResultOf<"assays">["assays"]>;
 type AsRow = AsResult["rows"][number];
 interface Fill { color: string; opacity: number }
 
@@ -44,7 +44,7 @@ const MIN_W = 360;
 /** rows of the entity table drawn; the rest are counted */
 const ROWS_NUM = 18, ROWS_CAT = 24;
 
-export function assaysSvg(v: ViewResult, o: SvgOpts): string {
+export function assaysSvg(v: ViewResultOf<"assays">, o: SvgOpts): string {
   const p = palette(o.theme), r = v.assays!;
   const want = o.width || 960;
   const cat = r.datatype === "categorical";

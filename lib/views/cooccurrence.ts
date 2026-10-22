@@ -58,7 +58,7 @@ export async function runCooccurrence(view: DocView, c: ViewRun): Promise<ViewRe
   benjaminiHochberg(primary).forEach((q, i) => { assessable[i].q = q; });
   assessable.sort((x, y) => (x.pStratified ?? x.p) - (y.pStratified ?? y.p));
   rows.length = 0; rows.push(...assessable);
-  return { kind: "cooccurrence", cohorts: [cn], rows: undefined, pairs: rows,
+  return { kind: "cooccurrence", cohorts: [cn], pairs: rows,
     studies: cohorts[cn].studies,
     method: cooccurrenceMethod({
       cohort: cn, pairs: pairs.length, assessable: assessable.length,

@@ -1,6 +1,6 @@
 // Enrichment figure: every gene's alteration frequency compared between cohorts — the portal's
 // three charts (volcano, frequency scatter, most-altered genes) and its table.
-import type { ViewResult } from "../types.ts";
+import type { ViewResultOf } from "../types.ts";
 import { volcano, volcanoPlotH } from "./volcano.ts";
 import {
   palette, frame, caption, label, textWidth, wrapWidth, linear, axisLeft, axisBottom, leftAxisWidth,
@@ -15,7 +15,7 @@ const EDGE = 6;
 
 // ---- the portal's three charts -----------------------------------------------------------------
 
-type EnResult = NonNullable<ViewResult["enrichment"]>;
+type EnResult = NonNullable<ViewResultOf<"enrichment">["enrichment"]>;
 type EnRow = EnResult["rows"][number];
 type Panel = { svg: string; height: number; unplaced?: string[] };
 
@@ -134,7 +134,7 @@ const enrichTitle = (r: EnResult) => "Alteration enrichment — " + r.alteration
 
 // ---- the server figure: the charts, then the table ---------------------------------------------
 
-export function enrichmentSvg(v: ViewResult, o: SvgOpts): string {
+export function enrichmentSvg(v: ViewResultOf<"enrichment">, o: SvgOpts): string {
   const p = palette(o.theme), r = v.enrichment!;
   const want = o.width || 960;
   const two = r.groups.length === 2;

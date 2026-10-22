@@ -5,7 +5,7 @@
 // their pathway's row; inside a tile each cohort has a line of its own (a mini bar on the
 // pathway bars' scale, and its percentage), so the numbers never run together however many
 // cohorts there are.
-import type { ViewResult, PathwayRow, PathwayCell } from "../types.ts";
+import type { PathwayRow, PathwayCell, ViewResultOf } from "../types.ts";
 import {
   palette, frame, caption, label, legend, textWidth, linear, seriesStyle, fmtPct, fmtQ, fmtInt, esc, num,
   FS, SW, type SvgOpts
@@ -37,7 +37,7 @@ export function tileLines(widths: number[], room: number): number[] {
   return line;
 }
 
-export function pathwaysSvg(v: ViewResult, o: SvgOpts): string {
+export function pathwaysSvg(v: ViewResultOf<"pathways">, o: SvgOpts): string {
   const p = palette(o.theme), res = v.pathways!;
   const rows = res.rows, k = rows[0]?.cells.length || 1;
   const cohorts = rows[0]?.cells.map((c) => c.cohort) || [];

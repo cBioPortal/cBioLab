@@ -455,7 +455,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       let skipped = 0;
       for (const v of r.views) {
         if (v.error) continue;
-        const svg = v.svg || viewToSvg(v, { theme: "light" });
+        const svg = (v.kind === "oncoprint" ? v.svg : undefined) || viewToSvg(v, { theme: "light" });
         if (!svg) continue;
         if (drawn.length >= MAX_FIGURES) { skipped++; continue; }
         ensureFonts();

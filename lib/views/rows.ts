@@ -184,6 +184,11 @@ export const PAGED_KINDS = ["table", "mutations", "timeline", "alterations"];
 
 /** A table view's rows in its result: its one table — or, for the alterations view, the patient list or the `table` named. */
 export function pagedTable(v: ViewResult, table?: string): TableRows<unknown> | undefined {
-  if (v.alterations) return table ? (v.alterations.tables as Record<string, TableRows<unknown> | undefined>)[table] : v.alterations;
-  return v.table || v.mutations || v.timeline;
+  switch (v.kind) {
+    case "alterations": return v.alterations && table ? (v.alterations.tables as Record<string, TableRows<unknown> | undefined>)[table] : v.alterations;
+    case "table": return v.table;
+    case "mutations": return v.mutations;
+    case "timeline": return v.timeline;
+    default: return undefined;
+  }
 }

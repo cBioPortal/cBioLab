@@ -3,7 +3,7 @@ import {
   palette, frame, caption, linear, axisLeft, leftAxisWidth, legend, label, textWidth,
   fmtInt, fmtNum, FS, SW, SERIES, type SvgOpts, type LegendItem
 } from "../svg-kit.ts";
-import type { ViewResult } from "../types.ts";
+import type { ViewResultOf } from "../types.ts";
 import { CN_GAIN, CN_LOSS } from "./common.ts";
 
 const PAD = 8, R = 10, HEAD = 18, GAP = 14, STRIP = 10;
@@ -33,7 +33,7 @@ export function chromLabels(chrom: { c: string; mid: number }[], y: number, fill
   return { svg: out.join(""), height: rows * (FS.small + 3) + 2 };
 }
 
-export function genomeSvg(v: ViewResult, o: SvgOpts): string {
+export function genomeSvg(v: ViewResultOf<"genome">, o: SvgOpts): string {
   const p = palette(o.theme), g = v.genome!;
   const W = Math.max(480, o.width || 960);
   const PH = Math.round(Math.max(96, Math.min(150, W * 0.12)));

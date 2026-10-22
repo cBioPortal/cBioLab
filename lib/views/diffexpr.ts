@@ -1,5 +1,5 @@
 // Differential expression view: a volcano of every gene, and preranked GSEA of the same ranking
-import type { ViewResult, DiffexprView, DiffexprGene } from "../types.ts";
+import type { ViewResult, DiffexprView, DiffexprGene, ViewResultOf } from "../types.ts";
 import { profileMomentsAllSql, genesetMembersSql } from "../federation-views.ts";
 import { benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea } from "../stats.ts";
 import { diffexprMethod } from "../method.ts";
@@ -111,7 +111,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
   });
 
   // enrichment: rank by t, best (higher in the first cohort) first
-  let gsea: NonNullable<ViewResult["diffexpr"]>["gsea"];
+  let gsea: NonNullable<ViewResultOf<"diffexpr">["diffexpr"]>["gsea"];
   let gseaSets: { name: string; genes: string[] }[] | undefined;
   if (!setNames || setNames.length) {
     const meta = ok[Object.keys(ok)[0]];

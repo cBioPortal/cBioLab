@@ -3,11 +3,11 @@ import {
   esc, palette, frame, caption, linear, axisBottom, bottomAxisHeight, legend, label, textWidth, wrapWidth,
   fmtInt, fmtPct, pDigits, textOn, FS, SW, OTHER, SERIES, type SvgOpts
 } from "../svg-kit.ts";
-import type { ViewResult } from "../types.ts";
+import type { ViewResultOf } from "../types.ts";
 
 const PAD = 8, GUT = 14, ROW = 20, BAR = 14, MIN_BAR_W = 200;
 
-export function pairedSvg(v: ViewResult, o: SvgOpts): string {
+export function pairedSvg(v: ViewResultOf<"paired">, o: SvgOpts): string {
   const p = palette(o.theme), r = v.paired!;
   let W = Math.max(480, o.width || 960);
   const aL = r.labels.a, bL = r.labels.b;

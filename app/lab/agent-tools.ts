@@ -131,7 +131,7 @@ function warnings(r: AnalysisResult): string {
   const empty = Object.entries(r.cohorts).filter(([n, c]) => c.count === 0 && !childRole.has(n)).map(([n]) => n);
   if (empty.length)
     out.push(`WARNING: ${empty.map((n) => `"${n}"`).join(", ")} match${empty.length === 1 ? "es" : ""} 0 patients — check its attributes, values and event names against study_vocabulary before drawing any conclusion.`);
-  const unprofiled = [...new Set(r.views.flatMap((v) => (v.rows || []).filter((row) => row.cells.every((c) => !c.profiled)).map((row) => row.gene)))];
+  const unprofiled = [...new Set(r.views.flatMap((v) => ((v.kind === "compare" && v.rows) || []).filter((row) => row.cells.every((c) => !c.profiled)).map((row) => row.gene)))];
   if (unprofiled.length)
     out.push(`WARNING: ${unprofiled.join(", ")} ${unprofiled.length === 1 ? "is" : "are"} profiled in 0 patients of every cohort — an unknown gene symbol, or one no panel here covers.`);
   return out.length ? out.join("\n") + "\n\n" : "";
