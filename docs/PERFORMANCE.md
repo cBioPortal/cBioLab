@@ -476,9 +476,24 @@ gate). Both were mutation-verified against the shortcut above. Note that the
 additivity half of the check stayed GREEN under that mutation — only the pinned
 absolute values caught it, because two compensating errors agree with each other.
 
-## 2. How Explore scales today
+**Off-panel calls belong to neither side of the frequency.** A sample can carry a call in a gene
+its panel does not cover (`genomic_event_derived.off_panel`) — 0.37% of mutation calls on
+panel-sequenced samples, 1.3% of CNA calls and 37% of SV calls (a fusion is recorded under both
+partners, and the partner is often not on the panel). That sample is not in `profiled`, so the
+numerator must not count it either: cBioPortal's study view shows it in "#"
+(`numberOfAlteredCases`) and leaves it out of Freq (`numberOfAlteredCasesOnPanel / numberOfProfiledCases`),
+and its results view counts a sample altered only where it was also sequenced. Ours does both
+(`GeneTableRow.alteredOnPanel`; the OncoPrint leaves the cell not profiled and counts the calls
+in `stats.offPanel`). Counting them read SV EWSR1 at 72/407 = 17.7% where the portal shows 0/407.
+`check:portal` compares all three numbers for every row of a selection mixing panel and
+whole-exome studies.
 
-`buildExploreFederated` calls `buildExplore` once **per study**, and each call
+## 2. How Explore scaled per study
+
+**Superseded by §3d:** every Explore query now runs once per connection. This section records
+the per-study design it replaced, and the measurements that motivated the change.
+
+`buildExploreFederated` called `buildExplore` once **per study**, and each call
 makes 41 ClickHouse round trips (measured; an earlier draft of this section said
 ~17). At 560 studies that is ~23,000 queries for one page load. Cost is
 therefore linear in study *count*, not in patients. §3b records what pooling the
@@ -513,10 +528,13 @@ Three conclusions:
   plus any the draft filters on; the rest are one checkbox away in "+ Add chart" — and the same
   selection is 20 cards and ~6,200 nodes, 1.0s to draw and 0.7s on a click (React dev build,
   both sides). The server still computes every attribute, which keeps the checklist complete.
-- **`next dev` triples Explore's server time.** The same 32-study request with one filter took
-  ~27s through the dev server and ~7s calling `buildExploreFederated` directly; the difference
-  is React's development-only async debugging, which records a stack trace for every promise
-  created inside a `'use cache'` function. Measure server time on a production build.
+- **`next dev` is about 4× slower than a production build for Explore.** The same 32-study
+  request with one filter, sent with an unseen filter value so neither server's result cache
+  answered it: 29.8s and 30.4s through the dev server, 7.3s and 8.0s through a production build
+  of the same tree (and ~7s calling `buildExploreFederated` directly). Profiling the dev server
+  put ~60% of its CPU in React's development-only async debugging, which records a stack trace
+  for every promise created inside a `'use cache'` function; the rest is unoptimised dev code.
+  Measure server time on a production build. (Measured before §3d; the ratio is what carries.)
 - **Production caps out well below the box.** `app/api/explore/route.ts` sets
   `maxDuration = 60`, so Vercel fails somewhere around 256 studies regardless.
 - **The default landing state is slow.** `DEFAULT_EXPLORE_STUDIES` is
@@ -722,6 +740,60 @@ parallel**. What would change that, and should be measured before acting on it:
 The paged row views (`table`, `mutations`) are the exception, for a reason of correctness rather
 than speed: a page of one global order can only be cut from all the rows sorted together, so they
 combine every (cohort, study) part in one statement per connection.
+
+## 3d. Explore pooled by connection: measured, and shipped (October 2026)
+
+§3c's finding — parallel per-study queries beat one pooled statement — was measured on the
+analysis views, whose queries are large. Explore's are small: averaging 26-35 ms, dominated by
+the round trip, and `MAX_INFLIGHT = 8` (`lib/ch.ts`) runs them eight at a time, so its wall time
+was summed query time ÷ 8, and every query removed was time saved. Of 1,165 queries for 32
+studies, 896 were histograms (14 numeric facets × 32 studies × bins and outliers), 13 the
+already-pooled gene tables, the rest ~8 facet queries per study; a draft added a per-study
+fallback for the gene tables (416 queries).
+
+Every Explore query now runs once per connection over all its studies, the study in its
+`GROUP BY` and `LIMIT … BY study` where it had a per-study limit, and each study's rows are
+handed back to it (`prefetchFacets`), so classification, disjunctive values and `mergeExplore`
+are unchanged. Histograms bin every study at once against the shared edges, outlier bars in the
+same scan (`pooledHistograms`). Under a draft each study's cohort is resolved once up front and
+the pooled queries read them as one set of study-qualified ids (`pooledPatientSet`). One study is
+the list of length one: single-study output is identical to the per-study code's.
+
+Engine time, best of two alternating runs, the production build matching the engine for this
+path (7.2s engine against 7.3-8.0s for 32 studies with a filter before the change):
+
+| studies | no draft: per study → pooled | with a draft |
+|---|---|---|
+| 2 | 334ms → 154ms (57 → 27 queries) | 503ms → 190ms |
+| 8 | 875ms → 296ms | 1.5s → 0.32s |
+| 32 | 3.1s → 0.46s (1,165 → 34) | 6.4s → 0.88s (1,594 → 98) |
+| 64 | 6.5s → 1.0s | 13.3s → 1.7s |
+| 128 | 13.3s → 1.9s (4,621 → 34) | 23.5s → 3.4s (6,374 → 290) |
+| 551 | 48.7s → 11.2s (19,849 → 34) | — |
+
+Two wrong answers it removed, both live for multi-study Explore before it:
+
+- **Histograms were summed across studies by bar position**, while a study carries the "<=" /
+  ">" bars only when it has values there: bars shifted into their neighbours and outlier bars
+  vanished. 14 of 14 numeric facets were wrong over 32 studies, with and without a draft; pooled,
+  14/14 equal an independently shaped per-(study, bin) count.
+- **Under a draft the gene tables fell back to per-study tables merged by gene**, so a study
+  that profiled a gene without it reaching its own top 500 dropped out of the denominator — §3b's
+  second error, still live on that path: SV NFIB in female patients read 32/47 = 68% for 32/440 =
+  7.3%. Pooled: 30/30 rows equal an independent per-study count; and for utuc_mskcc_2015 +
+  msk_impact_2017 (three IMPACT panels) + blca_tcga_pan_can_atlas_2018 (whole-exome), 1,500 of
+  1,500 mutation, CNA and SV rows equal cbioportal.org's API — now a `check:portal` stage.
+
+What is left, measured at 128-551 studies:
+
+- **The legacy combined `genes` list** (patients per gene over every event, top 15) is one scan
+  of the whole event table: 8.0s of the 11.2s at 551 studies. Explore draws it and the view
+  builder suggests genes from it, so it stays until those read the gene tables instead.
+- **A draft is still resolved, and disjunctive values counted, per study**: 256 of the 290
+  queries at 128 studies with a draft.
+- **A cohort past `EXPLORE_COHORT_EXTERNAL_LIMIT`** (50,000 patients) is inlined as its compiled
+  definition, which every pooled query then evaluates: 0.9s → 3.0s at 32 studies with an OQL
+  draft when forced. No study on the primary connection is that large; the answers are the same.
 
 ## 4. Time to display vs cbioportal.org
 
