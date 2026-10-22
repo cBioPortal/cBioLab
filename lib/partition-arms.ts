@@ -334,7 +334,9 @@ export function unflattenSplits(cohorts: Cohorts, flat: Record<string, Partition
     if (out[of]) {
       out[of] = { ...out[of], splits: { ...(out[of].splits || {}), [split]: def } };
     } else {
-      const parent = entries.find((e) => of.startsWith(e.key + " / "));
+      // the nearest enclosing split: every split above it is a prefix of `of` too
+      const parent = entries.filter((e) => of.startsWith(e.key + " / ")).reduce<typeof entries[number] | undefined>(
+        (best, e) => !best || e.key.length > best.key.length ? e : best, undefined);
       if (!parent) throw new Error("split “" + split + "” is of “" + of + "”, which is not a cohort or an arm of a split");
       attach(parent.key, parent.p, [...chain, key]);
       const pd = built.get(parent.key)!;

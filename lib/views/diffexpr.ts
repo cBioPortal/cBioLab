@@ -4,18 +4,10 @@ import { profileMomentsAllSql, genesetMembersSql } from "../federation-views.ts"
 import { benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea } from "../stats.ts";
 import { diffexprMethod } from "../method.ts";
 import type { ViewRun } from "./run.ts";
-import { overLimit, answering, refuse } from "./shared.ts";
+import { overLimit, answering, refuse, niceCeil } from "./shared.ts";
 
 const DE_MIN_N = 3, DE_POINT_CAP = 1500, DE_PERMUTATIONS = 1000;
 const SET_NAME = /^[A-Z0-9_]{3,120}$/;
-
-/** The smallest 1, 2 or 5 × 10^k at or above x — an axis end a reader can read off. */
-export function niceCeil(x: number): number {
-  if (!(x > 0)) return 1;
-  const k = Math.pow(10, Math.floor(Math.log10(x)));
-  for (const m of [1, 2, 2.5, 5, 10]) if (m * k >= x - 1e-12) return m * k;
-  return 10 * k;
-}
 
 /** RNA-seq counts/RSEM/TPM are compared on log2(v + 1); z-scores, protein and methylation as stored. */
 export function defaultLog2(profileType: string): boolean {

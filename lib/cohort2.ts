@@ -77,6 +77,9 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
       }
     }
   }
+  // Every condition here reads a recorded value, so a patient with none matches neither `= X` nor
+  // `!= X`, while {not: {= X}} keeps them. At sample level a patient whose samples differ can
+  // match both `= X` and `!= X`.
   if (leaf.op != null) {
     const op = CLIN_OP[leaf.op];
     if (!op) throw new Error("invalid clinical op (use = != > >= < <=)");
@@ -491,23 +494,35 @@ function splitLeafSql(leaf: SplitLeaf, ctx: Ctx): string {
     "    AND " + splitBucketSql(pid, ctx.study) + " = " + bucket;
 }
 
-function leafSql(leaf: any, ctx: Ctx): string {
-  if (leaf.kind === "oql") return oqlLeafSql(leaf.q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) });
-  if (leaf.kind === "alteration") return oqlLeafSql(alterationToOql(leaf), { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) }); // deprecated alias
-  if (leaf.kind === "clinical") return clinicalLeafSql(leaf, ctx);
-  if (leaf.kind === "profiled") return profiledLeafSql(leaf, ctx);
-  if (leaf.kind === "caseList") return caseListLeafSql(leaf, ctx);
-  if (leaf.kind === "genomicData") return genomicDataLeafSql(leaf, ctx);
-  if (leaf.kind === "genericAssay") return genericAssayLeafSql(leaf, ctx);
-  if (leaf.kind === "proteinPosition") return proteinPositionLeafSql(leaf, ctx);
-  if (leaf.kind === "event") return eventLeafSql(leaf, ctx);
-  if (leaf.kind === "derived") return derivedLeafSql(leaf, ctx);
-  if (leaf.kind === "sampleList") return sampleListLeafSql(leaf, ctx);
-  if (leaf.kind === "patientList") return patientListLeafSql(leaf, ctx);
-  if (leaf.kind === "split") return splitLeafSql(leaf, ctx);
+function leafSql(leaf: Leaf, ctx: Ctx): string {
+  const oqlCtx = () => ({ oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) });
   // v1 flat event shape without kind
-  if (leaf.a && leaf.rel) return eventLeafSql(leaf, ctx);
-  throw new Error("unknown clause kind: " + JSON.stringify(Object.keys(leaf)));
+  if (!("kind" in leaf)) {
+    if (leaf.a && leaf.rel) return eventLeafSql(leaf, ctx);
+    throw new Error("unknown clause kind: " + JSON.stringify(Object.keys(leaf)));
+  }
+  // one case per Leaf kind: a kind added to the Leaf union without a case here is a type error
+  switch (leaf.kind) {
+    case "oql": return oqlLeafSql(leaf.q, oqlCtx());
+    case "alteration": return oqlLeafSql(alterationToOql(leaf), oqlCtx()); // deprecated alias
+    case "clinical": return clinicalLeafSql(leaf, ctx);
+    case "profiled": return profiledLeafSql(leaf, ctx);
+    case "caseList": return caseListLeafSql(leaf, ctx);
+    case "genomicData": return genomicDataLeafSql(leaf, ctx);
+    case "genericAssay": return genericAssayLeafSql(leaf, ctx);
+    case "proteinPosition": return proteinPositionLeafSql(leaf, ctx);
+    case "event": return eventLeafSql(leaf, ctx);
+    case "derived": return derivedLeafSql(leaf, ctx);
+    case "sampleList": return sampleListLeafSql(leaf, ctx);
+    case "patientList": return patientListLeafSql(leaf, ctx);
+    case "split": return splitLeafSql(leaf, ctx);
+    default: return unknownLeaf(leaf);
+  }
+}
+
+/** Documents arrive as JSON, so a kind the types rule out can still reach here at run time. */
+function unknownLeaf(leaf: never): never {
+  throw new Error("unknown clause kind: " + JSON.stringify(Object.keys(leaf as object)));
 }
 
 function clauseSql(clause: any, ctx: Ctx): string {
@@ -524,6 +539,11 @@ function clauseSql(clause: any, ctx: Ctx): string {
     return clause.any.map((l: any) => "(" + leafSql(l, ctx) + ")").join("\nUNION DISTINCT\n");
   }
   if (clause.not) {
+    // `not` is the study's patients minus the matches, so it keeps every patient the leaf could
+    // not decide: {not: oql "STK11:"} includes patients never sequenced for STK11, and
+    // {not: clinical} those with no value recorded. A wild-type cohort pairs it with
+    // {kind: "profiled", type, gene} for the same gene; lib/cohort-partitions.ts sends the
+    // undecided to their own arm instead.
     // clauseSql, not leafSql: {not: {any: [...]}} needs the same any/leaf dispatch a bare
     // clause gets, not just a single leaf — De Morgan's otherwise forces two separate `not`s
     // to express "none of these" (e.g. "DDR intact" needed !A and !B and !C by hand).

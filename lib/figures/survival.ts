@@ -4,13 +4,12 @@
 import type { ViewResult, KmCurve } from "../types.ts";
 import { survivalAxis } from "../stats.ts";
 import { stepPath } from "../chart/marks.ts";
+import { plotHeight } from "./common.ts";
 import {
   palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, legend,
   seriesStyle, fmtInt, fmtMonths, fmtP, fmtNum, label, textWidth, esc, FS, SW, type SvgOpts
 } from "../svg-kit.ts";
 
-/** the plot's height for a figure `w` wide: a landscape panel, neither a strip nor a square */
-export const plotHeight = (w: number) => Math.round(Math.max(200, Math.min(320, w * 0.32)));
 
 export function survivalSvg(v: ViewResult, o: SvgOpts): string {
   const p = palette(o.theme), W = Math.max(360, o.width || 720);

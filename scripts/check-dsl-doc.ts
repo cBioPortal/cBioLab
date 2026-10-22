@@ -1,5 +1,5 @@
 // Doc-sync gate, run by `npm run docs:check` and by e2e.cjs:
-//   1. docs/dsl.md must equal a fresh regeneration from lib/dsl-reference.js
+//   1. docs/dsl.md must equal a fresh regeneration from lib/dsl-reference.ts
 //      (fail => someone edited the doc by hand, or changed the reference
 //      without running `npm run docs:gen`).
 //   2. Every example in the reference is executed against the live compiler
@@ -23,7 +23,7 @@ const n = (x: number) => x.toLocaleString("en-US");
 // 1. committed doc matches the reference
 const committed = readFileSync(join(root, "docs", "dsl.md"), "utf8");
 const fresh = renderDslMarkdown();
-if (committed === fresh) report(true, "docs/dsl.md matches lib/dsl-reference.js");
+if (committed === fresh) report(true, "docs/dsl.md matches lib/dsl-reference.ts");
 else { failed++; report(false, "docs/dsl.md is stale — run `npm run docs:gen` and commit the result"); }
 
 // ---- pinned cohort counts -------------------------------------------------

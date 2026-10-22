@@ -465,7 +465,7 @@ async function buildDerivedFacets(
  * a gene ranking outside some study's top-N lost that study's PROFILED samples
  * along with its (small) altered count, and the frequency came out biased high.
  * Pooled, every selected study contributes to the denominator whether or not the
- * gene ranks in it. See test/pooled-genes.test.ts.
+ * gene ranks in it. Pinned by test/denominator.test.ts and npm run check:denominators.
  *
  * Safe because `sample_unique_id` is unique across studies — measured 408,055
  * rows and 408,055 distinct values in sample_derived — so `uniqExact` over a

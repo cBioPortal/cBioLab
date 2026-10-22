@@ -4,14 +4,12 @@ import { assayProfileSql, assayMomentsSql, assayValueCountsSql, assayEntityNames
 import { chiSquareTest, benjaminiHochberg, welchT, welchAnovaTest, varianceFromMoments } from "../stats.ts";
 import { assaysMethod } from "../method.ts";
 import type { ViewRun } from "./run.ts";
-import { overLimit, answering, refuse } from "./shared.ts";
-import { niceCeil } from "./diffexpr.ts";
+import { overLimit, answering, refuse, niceCeil, PROFILE_NAME } from "./shared.ts";
 
 const ASSAY_ROWS = 300;
 /** past this many entities a profile is refused rather than compared: the per-cohort answer
  *  carries a row per entity, and a probe-level profile has hundreds of thousands */
 const ASSAY_MAX_ENTITIES = 20000;
-export const PROFILE_NAME = /^[A-Za-z0-9_.-]{1,96}$/;
 /** values a categorical assay uses for "not called"; counted apart, never a category */
 const MISSING_VALUES = new Set(["", "NA", "N/A", "NaN", "nan", "null", "NULL"]);
 

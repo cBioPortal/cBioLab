@@ -331,7 +331,8 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     // every case in the cohort appears, because "no alteration" is an answer and not a missing value
     const events = "SELECT sample_unique_id, mutation_type, variant_type, cna_alteration\n" +
       "     FROM " + db + ".genomic_event_derived\n" +
-      "     WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")";
+      "     WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
+      "       AND mutation_status != 'UNCALLED'"; // read support, not a call (lib/oql.ts specCond)
     const hit = by === "cna" ? "abs(g.cna_alteration) >= 2" : by === "sv" ? "g.variant_type = 'structural_variant'" : "g.variant_type = 'mutation'";
     const value = by === "cna"
       ? "if(countIf(g.cna_alteration >= 2) > 0, 'Amplification', if(countIf(g.cna_alteration <= -2) > 0, 'Deep deletion', 'Neutral'))"

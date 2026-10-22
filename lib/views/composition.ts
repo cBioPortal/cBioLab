@@ -9,8 +9,7 @@ import {
   COMPOSITION_MAX_PARTS, COMPOSITION_CASES_CAP, COMPOSITION_EPS, compositionCasesSql, partNames, validateSource, type CompositionSource
 } from "../composition.ts";
 import type { ViewRun } from "./run.ts";
-import { overLimit, answering, refuse } from "./shared.ts";
-import { PROFILE_NAME } from "./assays.ts";
+import { overLimit, answering, refuse, PROFILE_NAME } from "./shared.ts";
 
 const MAX_COHORTS = 8;
 

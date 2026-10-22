@@ -4,8 +4,7 @@ import { enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql, type EnrichAlte
 import { fisherExact, chiSquareTest, benjaminiHochberg } from "../stats.ts";
 import { enrichmentMethod } from "../method.ts";
 import type { ViewRun } from "./run.ts";
-import { overLimit, cytobands, answering, refuse } from "./shared.ts";
-import { niceCeil } from "./diffexpr.ts";
+import { overLimit, cytobands, answering, refuse, niceCeil } from "./shared.ts";
 
 const ENRICH_ROWS = 300;
 const ALTERATION_WORD: Record<EnrichAlteration, string> = {

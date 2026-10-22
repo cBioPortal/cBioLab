@@ -107,10 +107,10 @@ flowchart TB
     MCP <--> DOC
 
     subgraph ENGINE["Server engine — clients never send SQL"]
-        RA["runAnalysis — lib/analysis.js<br/>per-study evaluation · federation by SUMMING aggregates<br/>(ids cross an instance boundary only for the oncoprint's own columns; no dedup, labeled)"]
-        COMP["Cohort compilers<br/>lib/cohort2.js · lib/oql.js · lib/compiler.js<br/><i>loud rejection of anything unanswerable</i>"]
+        RA["runAnalysis — lib/analysis.ts<br/>per-study evaluation · federation by SUMMING aggregates<br/>(ids cross an instance boundary only for the oncoprint's own columns; no dedup, labeled)"]
+        COMP["Cohort compilers<br/>lib/cohort2.ts · lib/oql.ts · lib/compiler.ts<br/><i>loud rejection of anything unanswerable</i>"]
         VIEWS["Views<br/>compare (Fisher, panel-aware denominators)<br/>survival (KM + left-truncation caveat)<br/>oncoprint"]
-        CONTRACT["Render contract — lib/oncoprint.js<br/>bitmask cells · NOT_PROFILED first-class<br/>declarative sort · clinical + heatmap tracks"]
+        CONTRACT["Render contract — lib/oncoprint.ts<br/>bitmask cells · NOT_PROFILED first-class<br/>declarative sort · clinical + heatmap tracks"]
     end
 
     DOC --> RA
@@ -137,7 +137,7 @@ flowchart TB
     RA --> PROV
     PROV -. "one click back to" .-> UI
 
-    REF["lib/dsl-reference.js<br/><b>single source of DSL truth</b>"]
+    REF["lib/dsl-reference.ts<br/><b>single source of DSL truth</b>"]
     REF -- "generates docs/dsl.md<br/>(examples CI-executed)" --> DOCS["docs/dsl.md"]
     REF -- "grammar" --> CHAT
     REF -- "describe_dsl" --> MCP
@@ -197,8 +197,8 @@ a "corrected" count resting on a linkage the data can't support.
 
 ---
 
-*The common thread: every one of these is enforced in the engine (`lib/analysis.js`,
-`lib/oncoprint.js`, `lib/compiler.js`), surfaces in results as machine-attached captions, and
+*The common thread: every one of these is enforced in the engine (`lib/analysis.ts`,
+`lib/oncoprint.ts`, `lib/compiler.ts`), surfaces in results as machine-attached captions, and
 is documented in the generated DSL reference (`docs/dsl.md`) whose examples are executed
 against the live compiler on every test run.*
 

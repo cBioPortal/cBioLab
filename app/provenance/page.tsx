@@ -60,7 +60,7 @@ export default async function ProvenancePage({ searchParams }: { searchParams: P
                 <pre>{q.sql}</pre>
               </div>
             ))}
-            <p className="note">Contract assembly (bitmask cells, NOT_PROFILED marking, staircase sort, panel-aware frequencies) happens in application code over these result sets — see <code>lib/oncoprint.js</code>.</p>
+            <p className="note">Contract assembly (bitmask cells, NOT_PROFILED marking, staircase sort, panel-aware frequencies) happens in application code over these result sets — see <code>lib/oncoprint.ts</code>.</p>
           </div>
         )}
       </main>

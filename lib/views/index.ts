@@ -1,5 +1,5 @@
 // Every view kind's runner, by kind.
-import type { ViewResult } from "../types.ts";
+import type { ViewResult, ViewKind } from "../types.ts";
 import type { DocView, ViewRun, ViewRunner } from "./run.ts";
 import { runCompare } from "./compare.ts";
 import { runSurvival } from "./survival.ts";
@@ -46,7 +46,8 @@ function drawn<V>(run: (view: V, c: ViewRun) => Promise<ViewResult>): ViewRunner
   };
 }
 
-const RUNNERS: Record<string, ViewRunner> = {
+/** one runner per kind: a kind added to the View union without a runner is a type error here */
+const RUNNERS: Record<ViewKind, ViewRunner> = {
   compare: runCompare,
   survival: runSurvival,
   cox: runCox,
@@ -83,5 +84,5 @@ const RUNNERS: Record<string, ViewRunner> = {
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */
 export function viewRunner(kind: unknown): ViewRunner | undefined {
   const k = String(kind);
-  return Object.hasOwn(RUNNERS, k) ? RUNNERS[k] : undefined;
+  return Object.hasOwn(RUNNERS, k) ? RUNNERS[k as ViewKind] : undefined;
 }

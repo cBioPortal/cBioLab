@@ -177,6 +177,9 @@ A patient matches if **any** entry matches (portal "altered in query" semantics)
 - Protein position range, on a mutation (cBioPortal's `(a-b)` modifier): `TRUNC_(1400-)`, `MUT_(-500)`, `MUT_(12-13)`, `MUT=(712-979)_DRIVER`, or a range alone (`(1400-)`, any mutation there). By default a mutation matches when its protein range (start-end) **overlaps** the range; with `*` (`(1-100*)`) it must lie entirely inside it. A mutation with no usable position (missing, -1, or start after end) never matches, as in the portal. The range and the class are tested on the **same** mutation, so `APC: TRUNC_(1400-)` is a truncation at or after codon 1400 — unlike ANDing an `APC: TRUNC` leaf with a `proteinPosition` leaf, which can be satisfied by two different mutations. On anything but a mutation (`AMP_(1-100)`) it is refused.
 - Expression: `EXP>z EXP<z PROT>z` — only in studies with mRNA/protein profiles (errors otherwise, listing available profiles).
 - **Rejected loudly** (never silently approximated): `GAIN HETLOSS GERMLINE SOMATIC`.
+- **Uncalled mutations are not alterations**, as on the portal: a variant called in one of a patient's
+  samples and looked up in the others, where reads support it below the caller's thresholds
+  (`mutation_status` UNCALLED), matches no OQL, oncoprint cell or plot axis.
 
 ### Event sub-DSL (timeline)
 
@@ -201,7 +204,9 @@ rel      := { "type": "NONE" }                                                 /
 - **Absence queries**: always set `"observed": true` on NOT_FOLLOWED_BY, restricting to patients
   whose follow-up actually covers the window — otherwise "no event" conflates with lost-to-follow-up.
 - **`priorGuard: true`** restricts to treatment-naive patients (required for honest "first-line"
-  claims; ~20% of MSK-CHORD patients had prior treatment elsewhere).
+  claims; ~20% of MSK-CHORD patients had prior treatment elsewhere). Naive means a "No prior
+  medications" record under `PRIOR_MED_TO_MSK`, which only MSK's own studies record; patients
+  with no record are left out, and a study that records the flag for no one is refused.
 - **"Treatment line (derived)"** is synthesized at query time and supports attrs `LINE_NO`,
   `COMPOSITION`, `GAP`. Lines have ONE definition, shared by this type, the `lines` derived
   metric and the `sequence` view: systemic-therapy `Treatment` records — the class is the event's
@@ -745,7 +750,8 @@ Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "KRAS"
         }
       ]
     }
@@ -852,7 +858,8 @@ TP53-mutant versus wild-type across MSK-CHORD and MSK-MET. The log-rank is strat
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }
@@ -910,7 +917,7 @@ TP53-mutant versus wild-type across MSK-CHORD and MSK-MET. The log-rank is strat
 
 ### Example 4: Genomic status via OQL, compared
 
-STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it includes not-profiled unless you add a profiled clause). Two views: co-alteration frequencies and overall survival.
+STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration AND profiled for STK11 mutations; without the profiled clause it would include patients never sequenced for STK11). Two views: co-alteration frequencies and overall survival.
 
 ```json
 {
@@ -934,7 +941,8 @@ STK11 putative drivers vs wild-type (wild-type = NOT any STK11 alteration, so it
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "STK11"
         }
       ]
     }
@@ -2460,7 +2468,8 @@ MSK-CHORD, aligned on each patient's FIRST treatment, split by TP53 status. Trea
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }
@@ -2575,7 +2584,8 @@ MSK-CHORD therapy lines by TP53 status, 90-day gap, two panels on one scale. Rea
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }
@@ -2697,7 +2707,8 @@ How TP53-mutant and wild-type tumors differ clinically. Categorical attributes a
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }
@@ -2787,7 +2798,8 @@ TP53-mutant vs wild-type, overall survival measured from each patient's first ch
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }
@@ -2844,7 +2856,8 @@ TP53-mutant vs wild-type, each cohort spanning two studies. Every site answers w
         },
         {
           "kind": "profiled",
-          "type": "MUTATION"
+          "type": "MUTATION",
+          "gene": "TP53"
         }
       ]
     }

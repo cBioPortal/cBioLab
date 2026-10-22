@@ -5,7 +5,7 @@ import type { ViewResult, LogisticView, LogisticCoefficient } from "../types.ts"
 import { isPatientLevel } from "../federation.ts";
 import { axisLabel, validateAxis, type AxisKind } from "../plot.ts";
 import { logisticMethod, type CoxTrace } from "../method.ts";
-import { buildCoxColumns, notProfiledNote } from "./cox.ts";
+import { buildCoxColumns, notProfiledNote } from "./covariates.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
 import { overLimit, studyCatalogs } from "./shared.ts";
 import { resolveProfileAxis } from "../plot-profile.ts";

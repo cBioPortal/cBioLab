@@ -1,6 +1,6 @@
 // Helpers several view runners share: limits, which participants can answer a view aggregate,
 // refusals, and lookups more than one view makes.
-import type { ViewResult } from "../types.ts";
+import type { ViewResult, ViewKind } from "../types.ts";
 import { hasViewAggregates, type Resolver, type ViewAggregateCapable } from "../federation.ts";
 import { geneCytobandsSql } from "../federation-views.ts";
 import type { ViewRun } from "./run.ts";
@@ -20,6 +20,16 @@ export function overLimit(what: string, max: number, given: number): string | nu
 
 /** a clinical attribute name as a view may name it */
 export const ATTR_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
+/** a molecular or generic-assay profile type, as a view names it */
+export const PROFILE_NAME = /^[A-Za-z0-9_.-]{1,96}$/;
+
+/** The smallest 1, 2 or 5 × 10^k at or above x — an axis end a reader can read off. */
+export function niceCeil(x: number): number {
+  if (!(x > 0)) return 1;
+  const k = Math.pow(10, Math.floor(Math.log10(x)));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * k >= x - 1e-12) return m * k;
+  return 10 * k;
+}
 
 export type ViewResolver = Resolver & ViewAggregateCapable;
 
@@ -42,7 +52,7 @@ export function answering(ctx: ViewRun): { ok: Record<string, ViewResolver>; exc
 export const plural = (n: number, one: string, many = one + "s") => n.toLocaleString("en-US") + " " + (n === 1 ? one : many);
 
 /** A view-level refusal: past a limit, or nothing that can answer. */
-export const refuse = (kind: string, ctx: ViewRun, error: string): ViewResult => ({ kind, cohorts: ctx.vNames, error });
+export const refuse = (kind: ViewKind, ctx: ViewRun, error: string): ViewResult => ({ kind, cohorts: ctx.vNames, error });
 
 /** Cytobands for the genes a table lists, from the first participant that can answer; a gene it
  *  does not know (or no answer at all) is left without one rather than failing the view. */

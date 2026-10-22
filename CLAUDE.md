@@ -37,7 +37,12 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   in `lib/views/index.ts`; each gets the run's context (`ViewRun` in `lib/views/run.ts`: the
   document, evaluated cohorts, resolvers, the view's cohorts and studies) and returns its result;
   `lib/views/shared.ts` holds what several runners use (`overLimit`, `answering`, `refuse`). A new
-  view kind is a new runner there, registered in `index.ts`. Kinds registered through `drawn()`
+  view kind is a new runner there, registered in `index.ts` (`RUNNERS` is keyed by `ViewKind`, the
+  `View` union's kinds, so a kind without a runner does not compile). **Kinds never import each other:** a
+  kind's runner, figure and `<kind>-<part>.ts` modules import only one another and the shared
+  modules (`lib/views/`: run, shared, rows, covariates; `lib/figures/`: common, volcano, bars,
+  forest) — `local/kind-boundary` in `eslint.config.mjs` enforces it; what two kinds need moves
+  into a shared module, listed there. Kinds registered through `drawn()`
   have their figure drawn from the result and a throw reported as the view's error.
 - **`lib/oncoprint.ts`** — spec → rows (ClickHouse fetch); **`lib/oncoprint-assemble.ts`** — rows →
   render contract, pure (bitmask cells, NOT_PROFILED=-1, panel-aware denominators, staircase +
@@ -306,7 +311,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   (feasibility from cohort sizes only → lock → discovery half → one correction → survivors on the
   validation half). **The campaign engine never calls a model**: hypotheses are written by the
   researcher's AI assistant through the campaign page's tools — WebMCP plus `window.cohortLab`
-  (`app/campaign/[id]/agent-tools.ts`), whether that assistant is Claude in Chrome or the app's own
+  (`app/campaign/agent-tools.ts`), whether that assistant is Claude in Chrome or the app's own
   chat sidebar, which drives the same tools — or by any MCP client. Do not add a model call to
   the campaign code. The held-out half is the
   engine's `split` leaf (`lib/cohort2.ts`): a salted hash of the patient id inside ClickHouse,
@@ -665,13 +670,13 @@ they can't tell you:
   commit (a hand-run `docker build` without `--build-arg GIT_COMMIT=…`) reads "unknown", never blank.
 - Test: `npm test` — unit suites, no database needed (the patient-data boundary, the stats used by
   federated views, cohort-definition semantics, clinical-course semantics, and the SVG figure
-  renderers, plots, gene tracks, template parameters and the panel-aware denominator;
-  252 checks across 40 suites). `npm run test:db` (~15 s, in `scripts/gate.sh`) runs the stores'
+  renderers, plots, gene tracks, template parameters, the panel-aware denominator, and the
+  property tests of `test/properties.test.ts`). `npm run test:db` (~15 s, in `scripts/gate.sh`) runs the stores'
   Postgres SQL, `db/migrations`, their runner and their triggers on an in-process Postgres (PGlite,
   `test/postgres.db-test.ts`). A store promise belongs in `test/support/store-contracts.ts`, which
   runs there and on `lib/db.ts`'s own fallback.
-  `node e2e.cjs` — 81 checks (Playwright + docs gate + the boundary suite + the
-  denominator gate).
+  `node e2e.cjs` — Playwright + docs gate + the boundary suite + the denominator gate.
+  `npm run report:coverage` — the unit suites' coverage (CI shows it on the reports job).
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Lint: `npm run lint` (~2 min, the gate's first stage) — see "Code standards" above for what it
   holds code to. While iterating, `npx eslint <files you touched>` is enough.

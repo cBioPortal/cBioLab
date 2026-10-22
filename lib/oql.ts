@@ -8,9 +8,11 @@
 //   DRIVER_ modifiers on any of the above | bare gene = any alteration |
 //   protein position range modifier on a mutation: (a-b) (a-) (-b), with * for fully contained,
 //   e.g. TRUNC_(1400-), MUT_(-500), (1-100*)_DRIVER, MUT=(712-979)_DRIVER.
+//   EXP/PROT with a threshold, e.g. EXP>2, PROT<=-1.5, on the study's mRNA / protein profile (its
+//   z-score profile where it has one).
 // Rejected with an explanation (not silently approximated): GAIN/HETLOSS (only high-level
-// CNA (+-2) is stored), EXP/PROT (no expression thresholds here), GERMLINE/SOMATIC
-// (public studies are germline-stripped).
+// CNA (+-2) is stored), EXP/PROT without a threshold, GERMLINE/SOMATIC (public studies are
+// germline-stripped).
 import { DB, STUDY } from "./ch.ts";
 import { sq } from "./compiler.ts";
 
@@ -42,8 +44,14 @@ const mutClassSql = (type: string, change: string): string =>
   "multiIf(lower(" + type + ") = 'fusion', 'none', lower(" + change + ") = 'promoter', 'promoter', " +
   PORTAL_TYPE_CLASS.map(([cls, types]) => "lower(" + type + ") IN (" + types.map(sq).join(", ") + "), " + sq(cls)).join(", ") +
   ", 'other')";
+/** not an uncalled mutation (see specCond); true of every copy-number and structural-variant row */
+const CALLED = "g.mutation_status != 'UNCALLED'";
+
 function specCond(spec: OqlSpec): string {
-  const conds: string[] = [];
+  // An uncalled mutation is a called variant's read support looked up in the patient's other
+  // samples, below the caller's thresholds there; the portal shows it greyed out and never counts
+  // it as an alteration, and neither does any query here. Other rows carry SOMATIC, NA, … .
+  const conds: string[] = [CALLED];
   if (spec.type === "MUT") {
     conds.push("g.variant_type = 'mutation'");
     // The portal's TRUNC is every class but missense and in-frame (oqlfilter.ts), not a list of types.
@@ -83,13 +91,13 @@ function rangeCond(r: OqlRange): string {
 /**
  * Mutations with their protein positions, under genomic_event_derived's column names so specCond
  * and DRIVER_JOIN read them unchanged. genomic_event_derived stores no positions; this table holds
- * the same mutation rows (same profiles, uncalled included, same protein change and type).
+ * the same mutation rows (same profiles, same protein change and type, the same mutation status).
  */
 const mutationsWithPositions = (db: string, study: string, gene: string): string =>
   "(SELECT concat(studyId, '_', sampleId) AS sample_unique_id, concat(studyId, '_', patientId) AS patient_unique_id,\n" +
   "          studyId AS cancer_study_identifier, `GENE.hugoGeneSymbol` AS hugo_gene_symbol, 'mutation' AS variant_type,\n" +
   "          proteinChange AS mutation_variant, mutationType AS mutation_type, proteinPosStart AS pos_start, proteinPosEnd AS pos_end,\n" +
-  "          CAST(NULL AS Nullable(Int8)) AS cna_alteration\n" +
+  "          CAST(NULL AS Nullable(Int8)) AS cna_alteration, ifNull(mutationStatus, '') AS mutation_status\n" +
   "     FROM " + db + ".mutation_derived WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + ") g\n";
 
 const DRIVER_JOIN = (pin: string): string =>

@@ -1534,6 +1534,8 @@ export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
+/** every view kind the document language has; a comparison against anything else is a type error */
+export type ViewKind = View["kind"];
 
 /**
  * A document AS AUTHORED, before parameters are resolved. Any value in it may be
@@ -1798,7 +1800,8 @@ export interface LogRankK {
   strata: number;
 }
 export interface ViewResult {
-  kind: string; error?: string; note?: string; studies?: string[];
+  /** the one value outside ViewKind: runAnalysis echoes a kind it does not know, with error "unknown view kind" */
+  kind: ViewKind; error?: string; note?: string; studies?: string[];
   /** a view that names no cohorts yet: the page draws it waiting for one, and nothing ran for it */
   empty?: true;
   /** the analyst's own annotation, carried through from the view spec */

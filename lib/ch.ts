@@ -169,6 +169,17 @@ function release(): void { inflight--; const next = waiting.shift(); if (next) n
 
 const RETRYABLE = /socket|ECONNRESET|ETIMEDOUT|EPIPE|other side closed|fetch failed|terminated/i;
 
+/** A JSON-format error body's own message, so a refusal raised in SQL (throwIf) reads as itself. */
+export function chException(body: string): string {
+  const m = /"exception":\s*("(?:[^"\\]|\\.)*")/.exec(body);
+  if (!m) return body;
+  let msg: string;
+  try { msg = String(JSON.parse(m[1])); } catch { return body; }
+  // 395 is throwIf's code: the message is ours, without the server's account of where it ran
+  const own = /^Code: 395\. DB::Exception: ([\s\S]*?): while executing/.exec(msg);
+  return own ? own[1] : msg;
+}
+
 /** External tables this statement actually names — an unreferenced cohort is not uploaded. */
 function externalsFor(query: string): ChExternalEnc[] {
   const s = ctxStore.getStore();
@@ -250,7 +261,7 @@ async function post(sql: string, conn: ChConn, format: string): Promise<string> 
     const res = await fetch(url, { ...init, cache: "no-store", signal: ctx?.signal });
     const text = await res.text();
     // never echo the query (it can embed patient ids) or anything credential-shaped
-    if (!res.ok) throw new Error("ClickHouse error [" + conn.id + "]: " + text.slice(0, 500));
+    if (!res.ok) throw new Error("ClickHouse error [" + conn.id + "]: " + chException(text).slice(0, 500));
     return text;
   };
   await acquire();

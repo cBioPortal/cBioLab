@@ -11,7 +11,7 @@ import { chQuery, STUDY, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 import { describeCohortDef } from "./cohort2.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, ViewKind, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
 import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, type Resolver } from "./federation.ts";
 import { cantDraw } from "./view-coverage.ts";
@@ -524,8 +524,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       views.push(out);
     } else {
       // unreachable for well-typed documents, but documents arrive as untrusted
-      // JSON from clients/chat/MCP, so an unknown kind must still be reported
-      views.push({ kind: String((view as { kind?: unknown }).kind ?? "unknown"), error: "unknown view kind" });
+      // JSON from clients/chat/MCP, so an unknown kind must still be reported, under its own name
+      views.push({ kind: String((view as { kind?: unknown }).kind ?? "unknown") as ViewKind, error: "unknown view kind" });
     }
     // Wall-clock for the view, not the sum of its queries — they run
     // concurrently across cohorts and studies, so summing would overstate it.
