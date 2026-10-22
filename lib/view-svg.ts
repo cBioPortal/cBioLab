@@ -22,7 +22,7 @@
 import { filterHotspotGene } from "./lollipop.ts";
 import { lollipopPanelsSvg, lollipopSummaryText } from "./lollipop-svg.ts";
 export { lollipopSummaryText };
-import type { ViewResult, ViewResultOf, HotspotGene } from "./types.ts";
+import { isDrawn, type ViewResult, type HotspotGene, type DrawnResultOf } from "./types.ts";
 import { kindFigure, kindTitle } from "./figures/index.ts";
 import { survivalSvg } from "./figures/survival.ts";
 import { coxSvg, logisticSvg } from "./figures/forest.ts";
@@ -35,7 +35,7 @@ import { esc, SERIES, type SvgOpts } from "./svg-kit.ts";
 export { esc, SERIES, type SvgOpts };
 
 /** The lollipop standing alone (an MCP client's image): the selection applied, the app's controls in words in the caption. */
-function hotspotsSvg(v: ViewResultOf<"hotspots">, o: SvgOpts): string {
+function hotspotsSvg(v: DrawnResultOf<"hotspots">, o: SvgOpts): string {
   const hide = (v.hide || []) as string[];
   const all = (v.hotspots || []) as HotspotGene[];
   return lollipopPanelsSvg(all.map((g) => filterHotspotGene(g, hide).gene), o,
@@ -43,7 +43,7 @@ function hotspotsSvg(v: ViewResultOf<"hotspots">, o: SvgOpts): string {
 }
 
 export function viewToSvg(v: ViewResult, o: SvgOpts = {}): string | null {
-  if (!v || v.error) return null;
+  if (!v || !isDrawn(v)) return null;
   if (v.kind === "oncoprint") return v.svg || null;   // already rendered by the contract
   if (v.kind === "plot" && v.plot) return plotSvg(v, o) || null;
   if (v.kind === "course" && v.course && v.course.length) return courseSvg(v, o);

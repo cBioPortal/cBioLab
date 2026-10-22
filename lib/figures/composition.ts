@@ -4,7 +4,7 @@
 //
 // Bars at least MIN_BAR wide are drawn one per case; narrower ones as stacked areas over the
 // sorted cases, so a cohort of 2,000 is still every case rather than a sample of them.
-import type { ViewResultOf } from "../types.ts";
+import type { ViewResultOf, DrawnResultOf } from "../types.ts";
 import {
   palette, frame, caption, label, legend, linear, axisLeft, leftAxisWidth, textWidth,
   fmtInt, fmtNum, fmtShare, fmtP, esc, num, FS, SW, type SvgOpts, type LegendItem
@@ -53,7 +53,7 @@ function blockWidths(counts: number[], room: number): number[] {
   return counts.map((c, i) => pinned.has(i) ? MIN_BLOCK : c * unit + fixed);
 }
 
-export function compositionSvg(v: ViewResultOf<"composition">, o: SvgOpts): string {
+export function compositionSvg(v: DrawnResultOf<"composition">, o: SvgOpts): string {
   const r = v.composition as CResult;
   const p = palette(o.theme);
   const W0 = o.width || 760;

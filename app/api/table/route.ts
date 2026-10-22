@@ -3,7 +3,7 @@ import { runAnalysis } from "../../../lib/analysis.ts";
 import { PAGED_KINDS, TABLE_CHUNK, pagedTable } from "../../../lib/views/rows.ts";
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
-import type { AnalysisDoc, ViewResult } from "../../../lib/types.ts";
+import { isDrawn, type AnalysisDoc, type ViewResult } from "../../../lib/types.ts";
 
 export const maxDuration = 300;
 
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   const first = await run(() => runAnalysis(doc, { table })).catch((e) => ({ views: [{ kind: doc.views![0].kind, cohorts: [], error: String((e as Error)?.message || e) } as ViewResult] }));
   const v = first.views[0];
   const t = pagedTable(v, table);
-  if (!t) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
+  if (!t || !isDrawn(v)) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
   const line = (xs: unknown[]) => xs.map(csvField).join(",") + "\r\n";
   const enc = new TextEncoder();
   // the header row comes first, so the file opens as a table anywhere; what the query kept and who
@@ -46,9 +46,9 @@ export async function POST(req: Request) {
   const filtered = !!describeQuery(t.query, t.columns);
   const studies = [...new Set(t.lists.map((l) => l.study))];
   const name = "cohort-lab_" + (studies.length === 1 ? studies[0] : studies.length + "-studies") + "_" +
-    (v.kind === "table" ? "clinical_" + v.table!.unit + "s" : v.kind === "timeline" ? "timeline_patients"
+    (v.kind === "table" ? "clinical_" + v.table.unit + "s" : v.kind === "timeline" ? "timeline_patients"
       : v.kind === "alterations" ? (table && v.alterations?.patient ? v.alterations.patient.id + "_" + table : "alterations_patients")
-      : v.kind === "mutations" ? v.mutations!.gene + "_mutations" : v.kind) + (filtered ? "_filtered" : "") + ".csv";
+      : v.kind === "mutations" ? v.mutations.gene + "_mutations" : v.kind) + (filtered ? "_filtered" : "") + ".csv";
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {

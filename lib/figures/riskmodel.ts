@@ -3,7 +3,7 @@ import {
   palette, frame, caption, linear, log, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, label, textWidth,
   seriesStyle, SERIES, esc, fmtInt, fmtNum, fmtPct, fmtShare, fmtRatio, fmtP, fmtQ, fmtMonths, FS, SW, type SvgOpts
 } from "../svg-kit.ts";
-import type { RiskTable1, ViewResultOf } from "../types.ts";
+import type { RiskTable1, ViewResultOf, DrawnResultOf } from "../types.ts";
 import { stepPath } from "../chart/marks.ts";
 import { plotHeight } from "./common.ts";
 import { timeScale, timeTitle } from "../chart/time.ts";
@@ -198,8 +198,8 @@ export function table1Words(t: RiskTable1): string {
     (set.length ? "Set aside: " + set.map((r) => r.name + " (" + (r as { skipped: string }).skipped + ")").join("; ") + ". " : "");
 }
 
-export function riskmodelSvg(v: ViewResultOf<"riskmodel">, o: SvgOpts): string {
-  const m = v.riskmodel!;
+export function riskmodelSvg(v: DrawnResultOf<"riskmodel">, o: SvgOpts): string {
+  const m = v.riskmodel;
   const p = palette(o.theme);
   let W = Math.max(480, o.width || 720), grown = false;
 

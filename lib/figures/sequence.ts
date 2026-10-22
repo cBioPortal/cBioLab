@@ -1,5 +1,5 @@
 // Treatment sequences as a Sankey.
-import type { SequencePanel, SequenceNodeKind, ViewResultOf } from "../types.ts";
+import type { SequencePanel, SequenceNodeKind, DrawnResultOf } from "../types.ts";
 import {
   palette, frame, caption, label, legend, textWidth, seriesStyle, fmtInt, fmtShare, esc, num,
   FS, OTHER, type SvgOpts, type LegendItem
@@ -56,9 +56,9 @@ export function placeLabels(nodes: { y: number; h: number }[], height = LABEL_H)
   return at;
 }
 
-export function sequenceSvg(v: ViewResultOf<"sequence">, o: SvgOpts): string {
+export function sequenceSvg(v: DrawnResultOf<"sequence">, o: SvgOpts): string {
   const p = palette(o.theme), W0 = o.width || 720;
-  const sq = v.sequence!;
+  const sq = v.sequence;
   const panels = sq.panels;
   const cols = [...new Set(panels.flatMap((pn) => pn.nodes.map((n) => n.column)))].sort((a, b) => a - b);
   const lastCol = cols[cols.length - 1];

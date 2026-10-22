@@ -1,7 +1,7 @@
 // Kaplan–Meier (or 1 − KM, "cumulative incidence") curves, one per cohort, with the number still
 // at risk under each tick (a curve over 40 remaining patients must not look like one over 4,000),
 // each cohort's median, size and events in the legend, and the log-rank test under it.
-import type { KmCurve, ViewResultOf } from "../types.ts";
+import type { KmCurve, DrawnResultOf } from "../types.ts";
 import { survivalAxis } from "../stats.ts";
 import { stepPath } from "../chart/marks.ts";
 import { plotHeight } from "./common.ts";
@@ -11,7 +11,7 @@ import {
 } from "../svg-kit.ts";
 
 
-export function survivalSvg(v: ViewResultOf<"survival">, o: SvgOpts): string {
+export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts): string {
   const p = palette(o.theme), W = Math.max(360, o.width || 720);
   const curves = (v.curves || []) as KmCurve[];
   const incidence = v.display === "incidence";
@@ -64,7 +64,7 @@ export function survivalSvg(v: ViewResultOf<"survival">, o: SvgOpts): string {
 }
 
 /** the tests, in words: the one the reader asked for and, where studies were pooled, the other */
-function statLines(v: ViewResultOf<"survival">): string[] {
+function statLines(v: DrawnResultOf<"survival">): string[] {
   const lines: string[] = [];
   const strat = (s: number) => s > 1 ? " · stratified by study, " + s + " strata" : "";
   const disagree = (a: number, b: number) => (a < 0.05) !== (b < 0.05) ? " — the two disagree at p = 0.05" : "";

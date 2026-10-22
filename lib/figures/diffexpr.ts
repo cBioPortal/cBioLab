@@ -1,7 +1,7 @@
 // Differential expression figure: a volcano of every gene (the shared one, lib/figures/enrichment.ts),
 // and the GSEA gene sets — their normalised scores as bars, the strongest set each way as a
 // running-sum curve over the ranking.
-import type { ViewResultOf } from "../types.ts";
+import type { ViewResultOf, DrawnResultOf } from "../types.ts";
 import {
   palette, frame, caption, label, textWidth, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight,
   legend, fmtInt, fmtNum, fmtQ, FS, SW, SERIES, OTHER, type SvgOpts
@@ -20,8 +20,8 @@ const SHOWN_SETS = 12;
 
 const setName = (name: string) => name.replace(/^HALLMARK_/, "").replace(/_/g, " ").toLowerCase();
 
-export function diffexprSvg(v: ViewResultOf<"diffexpr">, o: SvgOpts): string {
-  const p = palette(o.theme), d = v.diffexpr!;
+export function diffexprSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): string {
+  const p = palette(o.theme), d = v.diffexpr;
   const want = o.width || 960, W = Math.max(MIN_PANEL, want);
   const [A, B] = d.groups;
   const hasGsea = !!(d.gsea && d.gsea.sets.length);

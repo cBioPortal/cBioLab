@@ -5,7 +5,7 @@
 // and MCP — so the two cannot drift; only the arrangement and the interaction live here. Which
 // sub-tab or row is open is this browser's (invariant 9), never the document's.
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { ViewResult, ViewResultOf, TableQuery, CohortDef, View } from "../../lib/types";
+import type { ViewResult, ViewResultOf, DrawnResultOf, TableQuery, CohortDef, View } from "../../lib/types";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 export { usePages, Pager } from "../_table/DataTable.tsx";
 import { cancertypesPanelSvg } from "../../lib/figures/cancertypes";
@@ -40,8 +40,8 @@ function Pills({ items, on, set }: { items: string[]; on: string; set: (x: strin
 
 // ---- Cancer Types Summary: "All Queried Genes" and one tab per gene, a bar chart per cohort ----
 
-export function CancertypesBody({ v }: { v: ViewResultOf<"cancertypes"> }) {
-  const r = v.cancertypes!;
+export function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
+  const r = v.cancertypes;
   const ALL = "All Queried Genes";
   const [gene, setGene] = useState(ALL);
   // each cohort's chart laid out for the card's width; one with more groups than fit grows and scrolls
@@ -127,8 +127,8 @@ export const AnnotationBadge = ({ text }: { text: string }) => text
 
 type EnRow = NonNullable<ViewResultOf<"enrichment">["enrichment"]>["rows"][number];
 
-export function EnrichmentBody({ v }: { v: ViewResultOf<"enrichment"> }) {
-  const r = v.enrichment!;
+export function EnrichmentBody({ v }: { v: DrawnResultOf<"enrichment"> }) {
+  const r = v.enrichment;
   const two = r.groups.length === 2;
   const color = (g: string) => seriesStyle(Math.max(0, r.groups.indexOf(g))).color;
   const cols: Col<EnRow>[] = [
@@ -180,8 +180,8 @@ function usePairPlot(docJson: (() => string) | undefined, cohort: string, view: 
   return state && state.key === key ? state : null;
 }
 
-export function CorrelatesBody({ v, docJson }: { v: ViewResultOf<"correlates">; docJson?: () => string }) {
-  const r = v.correlates!;
+export function CorrelatesBody({ v, docJson }: { v: DrawnResultOf<"correlates">; docJson?: () => string }) {
+  const r = v.correlates;
   const [which, setWhich] = useState<"any" | "positive" | "negative">("any");
   const rows = useMemo(() => which === "positive" ? r.positive : which === "negative" ? r.negative : [...r.positive, ...r.negative], [r, which]);
   const [sel, setSel] = useState<CoRow | null>(null);
@@ -222,8 +222,8 @@ export function CorrelatesBody({ v, docJson }: { v: ViewResultOf<"correlates">; 
 
 type AsRow = NonNullable<ViewResultOf<"assays">["assays"]>["rows"][number];
 
-export function AssaysBody({ v }: { v: ViewResultOf<"assays"> }) {
-  const r = v.assays!;
+export function AssaysBody({ v }: { v: DrawnResultOf<"assays"> }) {
+  const r = v.assays;
   const [sel, setSel] = useState<AsRow | null>(null);
   const picked = sel && r.rows.includes(sel) ? sel : r.rows[0] || null;
   const color = (g: string) => seriesStyle(Math.max(0, r.groups.indexOf(g))).color;
@@ -255,9 +255,9 @@ export function AssaysBody({ v }: { v: ViewResultOf<"assays"> }) {
 
 // ---- Mutations: one gene's mutation table, on the shared table (app/_table/DataTable.tsx) ---------
 
-export function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: ViewResultOf<"mutations">; spec: Record<string, unknown>; vi: number; updating: boolean; docJson?: () => string;
+export function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnResultOf<"mutations">; spec: Record<string, unknown>; vi: number; updating: boolean; docJson?: () => string;
   onQuery: (q: TableQuery) => void }) {
-  const t = v.mutations!;
+  const t = v.mutations;
   return (
     <div className="pb">
       <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} onQuery={onQuery}
