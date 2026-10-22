@@ -471,8 +471,8 @@ at 0.46s. Correctness here does not cost performance, and nothing needs to be
 traded against it.
 
 Guarded by `test/denominator.test.ts` (source tripwire, no database) and
-`npm run check:denominators` (live differential with pinned values, in the e2e
-gate). Both were mutation-verified against the shortcut above. Note that the
+`npm run check:denominators` (live differential with pinned values, a stage of
+`scripts/gate.sh`). Both were mutation-verified against the shortcut above. Note that the
 additivity half of the check stayed GREEN under that mutation — only the pinned
 absolute values caught it, because two compensating errors agree with each other.
 

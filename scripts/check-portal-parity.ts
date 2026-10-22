@@ -39,8 +39,10 @@
  * With RECORD=1 (npm run verify) it writes docs/verification/portal-parity.json, which /verification reads
  * (or REPORT_DIR/portal-parity.json when REPORT_DIR is set, as in CI).
  */
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildExplore, buildExploreFederated } from "../lib/explore.ts";
 import { studyProfiles } from "../lib/analysis.ts";
@@ -73,7 +75,22 @@ const record = (c: Check) => {
   console.log(`${c.agree ? "PASS" : "FAIL"} ${c.study} ${c.group}: ${c.what}  ours ${c.ours} / cBioPortal ${c.portal}`);
 };
 
+/**
+ * PORTAL_CACHE=<dir> keeps each cBioPortal answer there, keyed by its request, and answers a repeat
+ * from it. check:mutants sets it: a planted bug changes only this engine's side, so the portal's
+ * answers are the same on every run against one, and a request that does change is a new key.
+ */
+const CACHE = process.env.PORTAL_CACHE;
+
 async function api<T>(path: string, body?: unknown): Promise<T> {
+  const cached = CACHE && join(CACHE, createHash("sha256").update(path + "\n" + JSON.stringify(body ?? null)).digest("hex") + ".json");
+  if (cached && existsSync(cached)) return JSON.parse(readFileSync(cached, "utf8")) as T;
+  const answer = await fetchApi<T>(path, body);
+  if (cached) { mkdirSync(CACHE, { recursive: true }); writeFileSync(cached, JSON.stringify(answer)); }
+  return answer;
+}
+
+async function fetchApi<T>(path: string, body?: unknown): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     const r = await fetch(API + path, body === undefined ? {} : {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),

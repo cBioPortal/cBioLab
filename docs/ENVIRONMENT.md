@@ -147,6 +147,7 @@ see the security notes below.
 |---|---|---|
 | `GATE_PORT` | `scripts/gate.sh` | the port its e2e server uses (default `3100`); give concurrent sessions their own |
 | `GATE_SKIP_LINT` | `scripts/gate.sh` | skip the lint stage (CI runs it as a job of its own) |
+| `GATE_SERIAL` | `scripts/gate.sh` | run the warehouse checks one at a time before e2e, instead of beside it (less memory at peak, several minutes slower) |
 | `E2E_PORT` | the e2e scripts | the server they drive (default `3100`) |
 | `E2E_LOGIN_EMAIL` | the e2e scripts | the email the development sign-in uses |
 | `CHROME_PATH` | `e2e-browser.cjs` | the Chromium Playwright launches |
@@ -156,6 +157,7 @@ see the security notes below.
 | `UPDATE_GOLDEN` | the oncoprint golden tests (TypeScript and Python) | accept an intentional change to the golden SVG and raster |
 | `VISUAL_BASE` / `VISUAL_CONCURRENCY` / `VISUAL_NOISE_PX` | `npm run visual` | the server it screenshots (default `http://127.0.0.1:3109`), pages at once (`2`), and the pixel difference below which a change is noise (`50`) |
 | `FIGURE_CHECK_ONLY` / `FIGURE_CHECK_VERBOSE` | `check:figures` | lint only figures whose name contains this; list every issue, not the first five per figure |
+| `PORTAL_CACHE` | `check:portal` | keep cBioPortal's answers in this folder and reuse them for repeated requests (`check:mutants` sets it for its runs) |
 | `METHOD_CHECK_ONLY` | `check:methods` | run only the examples whose name contains this |
 | `MUTANT_ONLY` | `check:mutants` | plant only the bug with this id |
 

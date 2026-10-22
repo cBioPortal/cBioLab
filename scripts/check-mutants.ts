@@ -14,7 +14,7 @@
  * With RECORD=1 (npm run verify) it writes docs/verification/mutants.json, which /verification reads
  * (or REPORT_DIR/mutants.json when REPORT_DIR is set, as in CI).
  */
-import { cpSync, mkdtempSync, readFileSync, writeFileSync, symlinkSync, rmSync, mkdirSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, writeFileSync, symlinkSync, rmSync, mkdirSync, readdirSync } from "node:fs";
 import { execSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -122,10 +122,26 @@ const MUTANTS: Mutant[] = [
     replace: "r.role !== \"outcome\"" },
 ];
 
-function run(dir: string, guard: Guard): { ok: boolean; failures: number; firstFailure: string } {
-  const [cmd, ...args] = GUARD_CMD[guard];
-  // a guard run against a planted bug must never write a report
-  const { RECORD, REPORT_DIR, ...env } = process.env;
+/**
+ * The unit suites that import `file` themselves: what a planted bug there runs against, rather than
+ * all of `npm test` (the baseline runs all of it). A bug only a suite further away would catch
+ * shows as SURVIVED, a failure, never as a pass.
+ */
+function suitesImporting(dir: string, file: string): string[] {
+  const imports = new RegExp("from \"(\\.\\./)+" + file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\"");
+  const suites = readdirSync(join(dir, "test")).filter((f) => f.endsWith(".test.ts"))
+    .filter((f) => imports.test(readFileSync(join(dir, "test", f), "utf8"))).map((f) => "test/" + f);
+  // `node --test` given no files runs every suite, which would hide that none guards this one
+  if (!suites.length) throw new Error("no unit suite imports " + file + "; give its planted bugs another guard");
+  return suites;
+}
+
+function run(dir: string, guard: Guard, file?: string): { ok: boolean; failures: number; firstFailure: string } {
+  const [cmd, ...args] = guard === "unit" && file ? ["node", "--test", ...suitesImporting(dir, file)] : GUARD_CMD[guard];
+  // a guard run against a planted bug must never write a report; the portal's answers are kept
+  // between runs (PORTAL_CACHE in check-portal-parity.ts), since a planted bug cannot change them
+  const { RECORD, REPORT_DIR, ...rest } = process.env;
+  const env = { ...rest, PORTAL_CACHE: join(dir, ".portal-cache") };
   const r = spawnSync(cmd, args, { cwd: dir, env, encoding: "utf8", maxBuffer: 64 << 20, timeout: 600_000 });
   const out = (r.stdout || "") + (r.stderr || "");
   const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -159,7 +175,7 @@ try {
     if (hits !== 1) throw new Error(`${m.id}: expected the bug's site exactly once in ${m.file}, found ${hits}`);
     writeFileSync(path, original.replace(m.find, m.replace));
     const t0 = Date.now();
-    const r = run(dir, m.guard);
+    const r = run(dir, m.guard, m.file);
     writeFileSync(path, original);
     const caught = !r.ok;
     console.log(`${caught ? "CAUGHT  " : "SURVIVED"} ${m.id} (${m.guard}, ${r.failures} failing, ${((Date.now() - t0) / 1000).toFixed(0)}s)${caught ? "  " + r.firstFailure : ""}`);
