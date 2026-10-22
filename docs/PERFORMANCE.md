@@ -792,8 +792,22 @@ What is left, measured at 128-551 studies:
   Taking it away exposed ~8s of JavaScript it had been running beside: the pooled answer was
   split back into studies by filtering every row once per study (O(studies × rows)). Grouping
   each result once took 551 studies from 11.6s to 4.7s.
-- **A draft is still resolved, and disjunctive values counted, per study**: 256 of the 290
-  queries at 128 studies with a draft.
+- **Drafts over many studies**, measured at 551 studies against the code before, alternating, a
+  fresh filter value each run (the shared database moved both columns between runs):
+  `SEX = Female` 13.0-17.9s → 10.8-12.8s, `SEX` + `TP53: MUT` 24.8-25.2s → 17.5-20.1s. Three
+  changes: the pooled queries read the draft as ONE uploaded table of study-qualified ids per
+  connection rather than a UNION over 551 per-study tables (each pooled query ran 2-5x slower
+  with that union); a drafted attribute's values without its own clauses are counted in one
+  pooled query when the rest of the draft is empty, the common case of one clicked attribute
+  (551 queries → 1); and the histograms run beside the gene tables instead of after them.
+  Pooling the disjunctive count when the rest is NOT empty was built and measured slower (one
+  statement evaluating 551 compiled definitions, 24.8s → 26-33s), so that case stays per study,
+  as does resolving each study's cohort: 551 small queries each, the remaining cost of a draft.
+- **The first request after a restart** loaded each study's profiles with three queries per
+  study, one after another: ~30s at 565 studies before any facet query. `studyProfilesMany` runs
+  the two `genetic_profile` queries once per connection (30-60ms) and the profile types one query
+  per study in parallel: 5.1s. Pooling the profile types too was measured at 72s — one DISTINCT
+  over `genetic_alteration_derived` across 551 studies, against its study key used per query.
 - **A cohort past `EXPLORE_COHORT_EXTERNAL_LIMIT`** (50,000 patients) is inlined as its compiled
   definition, which every pooled query then evaluates: 0.9s → 3.0s at 32 studies with an OQL
   draft when forced. No study on the primary connection is that large; the answers are the same.

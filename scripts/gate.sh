@@ -47,6 +47,7 @@ echo "== postgres (stores, migrations, triggers) ==" && npm run test:db 2>&1 | s
 echo "== access (planted sharing bugs) ==" && npm run check:access-mutants 2>&1 | summary grep -E "SURVIVED|planted access bugs"
 echo "== counts against cBioPortal ==" && npm run check:portal 2>&1 | summary grep -E "^FAIL|comparisons"
 echo "== cohort logic =="              && npm run check:cohorts 2>&1 | summary grep -E "^FAIL|cohort-logic checks"
+echo "== pooled paths, independent counts ==" && npm run check:pooled 2>&1 | summary grep -E "^FAIL|pooled checks"
 echo "== method scripts =="            && npm run check:methods 2>&1 | summary grep -E "^FAIL|method records present|FAILED"
 echo "== python conformance (lib/oncoprint-*.ts vs python/cohortlab) =="
 python/.venv/bin/python -m unittest discover -s python/tests -v 2>&1 | summary tail -20

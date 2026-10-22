@@ -325,7 +325,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   calls a covering panel made: an off-panel call (`off_panel`) is in neither side, as on
   cBioPortal (§1 there). Both halves are additive
   over samples, which is what makes pooling safe; averaging per-study percentages is never safe.
-  Guarded by `test/denominator.test.ts` and `npm run check:denominators` (in the e2e gate).
+  Guarded by `test/denominator.test.ts` and `npm run check:denominators` (in the e2e gate); over
+  studies profiled differently (panel, several panels, whole-exome), `npm run check:pooled`
+  (histograms, the OncoPrint) and `check:portal`'s mixed selection, filtered and not, are gate stages.
   Read before claiming this project is "fast": on a cached single chart the portal is ~20x
   quicker (those measurements predate the result cache of invariant 11, which answers only
   exact repeats), and our advantage is data movement (36x less to the

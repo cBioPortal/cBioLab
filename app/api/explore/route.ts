@@ -6,7 +6,7 @@ import { mergeExplore } from "../../../lib/explore.ts";
 import { PRIMARY, withChContext, ensureChContext, withoutFailedQueries } from "../../../lib/ch.ts";
 import { cacheLife } from "next/cache";
 import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
-import { studyProfiles, resolveStudy } from "../../../lib/analysis.ts";
+import { studyProfilesMany, resolveStudy } from "../../../lib/analysis.ts";
 import { chQuery } from "../../../lib/ch.ts";
 import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
@@ -57,11 +57,9 @@ async function exploreEntry(body: any, _version: string): Promise<string> {
 async function exploreFor(body: any) {
   const requested = Array.isArray(body.studies) && body.studies.length
     ? body.studies : [body.study];
-  const studies = [];
-  for (const s of requested) studies.push(await resolveStudy(s));
+  const studies = await Promise.all(requested.map((s: string) => resolveStudy(s)));
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
-  const profilesByStudy = new Map();
-  for (const s of studies) profilesByStudy.set(s, await studyProfiles(s));
+  const profilesByStudy = await studyProfilesMany(studies);
   const routing = await studyRouting();
   // Studies held by a remote peer are faceted over MCP; the rest locally.
   const peers = new Map((await Promise.all(studies.map(async (s) => [s, await peerForStudy(s)] as const))).filter(([, p]) => p) as [string, { url: string; label: string }][]);
