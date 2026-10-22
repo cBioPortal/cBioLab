@@ -98,7 +98,8 @@ export function genomicEventsSql(genes: string[], study: string = STUDY, db: str
     "       hugo_gene_symbol AS gene, variant_type AS vt, mutation_type AS mt,\n" +
     "       mutation_variant AS mv, cna_alteration AS cna\n" +
     "FROM " + db + ".genomic_event_derived\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")";
+    "WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
+    "  AND mutation_status != 'UNCALLED'"; // read support, not a call (lib/oql.ts specCond)
 }
 
 /**
@@ -190,7 +191,7 @@ export function vafSql(genes: string[], study: string = STUDY, db: string = DB, 
     "       max(tumorAltCount / (tumorAltCount + tumorRefCount)) AS v\n" +
     "FROM " + db + ".mutation_derived\n" +
     "WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
-    "  AND tumorAltCount > 0 AND tumorRefCount >= 0\n" +
+    "  AND tumorAltCount > 0 AND tumorRefCount >= 0 AND molecularProfileId NOT LIKE '%uncalled%'\n" +
     "GROUP BY pid, gene";
 }
 

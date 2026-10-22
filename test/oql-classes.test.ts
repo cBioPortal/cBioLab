@@ -3,6 +3,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { parseOql, oqlLeafSql } from "../lib/oql.ts";
+import { genomicEventsSql, vafSql } from "../lib/oncoprint.ts";
+import { axisSelect } from "../lib/plot.ts";
 
 const spec = (q: string) => parseOql(q)[0].specs[0];
 const sql = (q: string) => oqlLeafSql(q, { study: "s1", db: "db", oncokbPin: "v1" });
@@ -43,5 +45,23 @@ describe("OQL mutation classes: SQL", () => {
     assert.match(s, /mutation_derived/);
     assert.match(s, /NOT IN \('missense', 'inframe'\)/);
     assert.match(s, /g\.pos_end >= 1400/);
+  });
+});
+
+describe("uncalled mutations are read support, not alterations", () => {
+  // a variant called in one of a patient's samples, looked up in the others below the caller's
+  // thresholds (mutation_status UNCALLED); the portal never counts one
+  const leaf = (q: string) => oqlLeafSql(q, { study: "s1", db: "db", oncokbPin: "v1" });
+  for (const q of ["TP53: MUT", "TP53", "TP53: DRIVER", "TP53: MISSENSE", "APC: TRUNC_(1400-)", "KRAS: G12C"]) {
+    test(q + " leaves them out", () => assert.match(leaf(q), /g\.mutation_status != 'UNCALLED'/));
+  }
+  test("the position table carries the same status, so a range query leaves them out too", () => {
+    assert.match(leaf("APC: TRUNC_(1400-)"), /ifNull\(mutationStatus, ''\) AS mutation_status/);
+  });
+  test("the oncoprint's cells and VAF, and a plot's alteration axis, leave them out", () => {
+    assert.match(genomicEventsSql(["TP53"], "s1", "db"), /AND mutation_status != 'UNCALLED'/);
+    assert.match(vafSql(["TP53"], "s1", "db"), /molecularProfileId NOT LIKE '%uncalled%'/);
+    assert.match(axisSelect({ source: "alteration", genes: ["TP53"] }, { study: "s1", db: "db", unit: "sample", cohortSql: "SELECT 1" }, "cat"),
+      /AND mutation_status != 'UNCALLED'/);
   });
 });

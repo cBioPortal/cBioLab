@@ -27,6 +27,9 @@
  *      meet. Once as it is, and once filtered (SEX = Female, the portal's clinical filter): under a
  *      draft the gene tables once fell back to per-study tables, losing from the denominator every
  *      study that profiled a gene outside its own top 500 (SV NFIB read 32/47 for 32/440).
+ *   8. Uncalled mutations: glioma_msk_2018, the study that holds them (read support for a
+ *      patient's other samples, below the caller's thresholds), against the portal's mutation
+ *      profile, which leaves them out. Counted in samples, where they would differ.
  *
  * Every comparison must agree EXACTLY; a count is a count. Differences are reported, never
  * tolerated, so a disagreement caused by the two databases holding different releases of a
@@ -42,6 +45,7 @@ import { pathToFileURL } from "node:url";
 import { buildExplore, buildExploreFederated } from "../lib/explore.ts";
 import { studyProfiles } from "../lib/analysis.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
+import { oqlCasesSql } from "../lib/oql.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
 import { oncokbPin } from "../lib/annotation.ts";
 import type { CohortDef, GeneTableRow, ClinicalFacet } from "../lib/types.ts";
@@ -224,7 +228,7 @@ async function portalMutations(profile: string, study: string, symbol: string): 
   return api<PortalMutation[]>(`/molecular-profiles/${profile}/mutations/fetch`, { sampleListId: study + "_all", entrezGeneIds: [gene.entrezGeneId] });
 }
 
-interface PortalMutation { patientId: string; proteinPosStart?: number; proteinPosEnd?: number; mutationType?: string; proteinChange?: string }
+interface PortalMutation { patientId: string; sampleId: string; proteinPosStart?: number; proteinPosEnd?: number; mutationType?: string; proteinChange?: string }
 
 /** cbioportal-frontend AccessorsForOqlFilter getMutationSubType + getSimplifiedMutationType; null (Fusion) as "none". */
 function portalClass(m: PortalMutation): string {
@@ -300,6 +304,18 @@ for (const { label: filterLabel, draft, filter } of MIXED_SELECTIONS) {
       ours: wrong.length ? wrong.length + " differ: " + wrong.slice(0, 5).map((r) => what(r) + " " + oursGene(r)).join(", ") : "all agree",
       portal: wrong.length ? wrong.slice(0, 5).map((r) => { const p = byKey.get(r.gene + "|" + (r.cna ?? "")); return p ? portalGene(p) : "absent"; }).join(", ") : "all agree",
       agree: !!rows?.length && !wrong.length });
+  }
+}
+
+// 8. uncalled mutations are not alterations
+{
+  const study = "glioma_msk_2018", { profiles } = await studyProfiles(study);
+  for (const g of ["IDH1", "TP53", "PDGFRB"]) {
+    const pn = new Set((await portalMutations(study + "_mutations", study, g)).map((m) => m.sampleId)).size;
+    const sql = oqlCasesSql(g + ": MUT", { study, db: DB, profiles, unit: "sample" });
+    const ours = Number((await chQuery<{ n: string }>("SELECT count() AS n FROM (" + sql + ")", PRIMARY)).data[0].n);
+    record({ study, group: "cohort", what: `samples matching OQL "${g}: MUT" (the study's uncalled mutations left out, as the portal does)`,
+      ours: String(ours), portal: String(pn), agree: ours === pn });
   }
 }
 

@@ -1450,6 +1450,9 @@ A patient matches if **any** entry matches (portal "altered in query" semantics)
 - Protein position range, on a mutation (cBioPortal's \`(a-b)\` modifier): \`TRUNC_(1400-)\`, \`MUT_(-500)\`, \`MUT_(12-13)\`, \`MUT=(712-979)_DRIVER\`, or a range alone (\`(1400-)\`, any mutation there). By default a mutation matches when its protein range (start-end) **overlaps** the range; with \`*\` (\`(1-100*)\`) it must lie entirely inside it. A mutation with no usable position (missing, -1, or start after end) never matches, as in the portal. The range and the class are tested on the **same** mutation, so \`APC: TRUNC_(1400-)\` is a truncation at or after codon 1400 — unlike ANDing an \`APC: TRUNC\` leaf with a \`proteinPosition\` leaf, which can be satisfied by two different mutations. On anything but a mutation (\`AMP_(1-100)\`) it is refused.
 - Expression: \`EXP>z EXP<z PROT>z\` — only in studies with mRNA/protein profiles (errors otherwise, listing available profiles).
 - **Rejected loudly** (never silently approximated): \`GAIN HETLOSS GERMLINE SOMATIC\`.
+- **Uncalled mutations are not alterations**, as on the portal: a variant called in one of a patient's
+  samples and looked up in the others, where reads support it below the caller's thresholds
+  (\`mutation_status\` UNCALLED), matches no OQL, oncoprint cell or plot axis.
 
 ### Event sub-DSL (timeline)
 
