@@ -41,6 +41,54 @@ export interface StudyProfiles {
   /** every profile as the study describes it (genetic_profile), for what a plot axis may read */
   catalog: ProfileInfo[];
 }
+/**
+ * studyProfiles for many studies at once, rather than three queries per study one after another —
+ * Explore over all 551 studies spent ~30s on that before its first query; this takes ~6s. The two
+ * genetic_profile queries run once per connection over every study not yet cached (30-60ms). The
+ * profile types stay one query per study, in parallel: genetic_alteration_derived is read by its
+ * study key that way, and one pooled DISTINCT over it measured 72s at 551 studies against 5.6s.
+ * Fills the same cache studyProfiles reads.
+ */
+export async function studyProfilesMany(studies: string[]): Promise<Map<string, StudyProfiles>> {
+  const { peerForStudy } = await import("./federation-remote.ts");
+  const routing = await studyRouting();
+  const todo = studies.filter((s) => !_profileCache.has(s));
+  const peers = await Promise.all(todo.map((s) => peerForStudy(s)));
+  const groups = new Map<string, { conn: ChConn; studies: string[] }>();
+  todo.forEach((s, i) => {
+    if (peers[i]) { _profileCache.set(s, { profiles: [], gaProfiles: [], catalog: [] }); return; } // the peer owns its own profile inventory
+    const conn = routing.get(s) || PRIMARY;
+    const k = conn.id + "|" + conn.db;
+    if (!groups.has(k)) groups.set(k, { conn, studies: [] });
+    groups.get(k)!.studies.push(s);
+  });
+  await Promise.all([...groups.values()].map(async ({ conn, studies: ss }) => {
+    const IN = "(" + ss.map(sq).join(",") + ")";
+    const [types, ga, cat] = await Promise.all([
+      Promise.all(ss.map(async (s) => (await chQuery(
+        "SELECT DISTINCT profile_type FROM " + conn.db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(s), conn))
+        .data.map((r) => ({ s, profile_type: r.profile_type })))).then((rows) => ({ data: rows.flat() })),
+      // by the study's own id, not a prefix of the profile id, which also matches sibling studies
+      chQuery("SELECT DISTINCT cs.cancer_study_identifier AS s, replaceOne(gp.stable_id, concat(cs.cancer_study_identifier, '_'), '') AS pt FROM " + conn.db + ".genetic_profile gp\n" +
+        "JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+        "WHERE cs.cancer_study_identifier IN " + IN + " AND gp.genetic_alteration_type = 'GENERIC_ASSAY'", conn),
+      chQuery("SELECT cs.cancer_study_identifier AS s, replaceOne(gp.stable_id, concat(cs.cancer_study_identifier, '_'), '') AS profile, gp.genetic_alteration_type AS type, gp.datatype AS datatype,\n" +
+        "       gp.name AS name, ifNull(toString(gp.generic_assay_type), '') AS assay, toInt32OrZero(ifNull(toString(gp.sort_order), '')) AS ord\n" +
+        "FROM " + conn.db + ".genetic_profile gp\n" +
+        "JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+        "WHERE cs.cancer_study_identifier IN " + IN, conn),
+    ]);
+    const out = new Map<string, StudyProfiles>(ss.map((s) => [s, { profiles: [], gaProfiles: [], catalog: [] }]));
+    for (const r of types.data) out.get(String(r.s))?.profiles.push(r.profile_type);
+    for (const r of ga.data) out.get(String(r.s))?.gaProfiles.push(r.pt);
+    for (const r of cat.data) out.get(String(r.s))?.catalog.push({
+      profile: String(r.profile), type: String(r.type), datatype: String(r.datatype), name: String(r.name),
+      ...(r.assay ? { assayType: String(r.assay) } : {}), order: Number(r.ord) || 0 });
+    for (const [s, p] of out) _profileCache.set(s, p);
+  }));
+  return new Map(studies.map((s) => [s, _profileCache.get(s)!]));
+}
+
 export async function studyProfiles(study: string): Promise<StudyProfiles> {
   if (_profileCache.has(study)) return _profileCache.get(study)!;
   const { peerForStudy } = await import("./federation-remote.ts");
