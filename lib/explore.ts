@@ -61,7 +61,7 @@ const cohortTable = (study: string) => "_cohort_" + study.replace(/[^A-Za-z0-9_]
  */
 async function resolveCohort(
   study: string, db: string, dsql: string, conn: ChConn
-): Promise<{ cond: string; sampleCond: string; panelSampleCond: string; count: number }> {
+): Promise<{ cond: string; panelSampleCond: string; count: number }> {
   const pidExpr = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   const inlineCond = "\n  AND " + pidExpr + " IN (SELECT pid FROM (" + dsql + "))";
   const inlinePanel = "\n  AND sample_unique_id IN (SELECT sample_unique_id FROM " + db + ".sample_derived" +
@@ -80,12 +80,12 @@ async function resolveCohort(
     // Too large to ship, or no request context to hold it (MCP, scripts, tests): inline the
     // predicate exactly as before, and pay one counting query for the size we did not learn.
     const c = await chQuery<ChRow>("SELECT uniqExact(pid) AS n FROM (" + dsql + ")", conn);
-    return { cond: inlineCond, sampleCond: inlineCond, panelSampleCond: inlinePanel, count: Number(c.data[0].n) };
+    return { cond: inlineCond, panelSampleCond: inlinePanel, count: Number(c.data[0].n) };
   }
 
   const cond = "\n  AND " + pidExpr + " IN (SELECT pid FROM " + table + ")";
   return {
-    cond, sampleCond: cond,
+    cond,
     // sample_to_gene_panel_derived has no patient column, so map through sample_derived
     panelSampleCond: "\n  AND sample_unique_id IN (SELECT sample_unique_id FROM " + db + ".sample_derived" +
       " WHERE cancer_study_identifier = " + sq(study) + cond + ")",
@@ -127,69 +127,16 @@ const GENE_FACET_LIMIT = 6;
 import { isClinicalLeaf } from "./types.ts";
 
 
-/** Stats row from the classification query, for one numeric attribute. */
-interface NumStats { a: string; mn: string; mx: string; q1: string; q3: string; allints: unknown }
-
-/**
- * Attach histograms to numeric facets. Edges are either computed per attribute
- * (single study) or supplied by the caller (federated, so every participant
- * bins identically and the counts can simply be summed).
- */
-async function attachHistograms(opts: {
-  facets: Extract<ClinicalFacet, { kind: "num" }>[];
-  stats: ChRow[];
-  db: string; conn: ChConn; study: string; cond: string;
-  cohort: { patients: number; samples: number };
-  edgesByAttr?: Record<string, { edges: number[]; interval: number }>;
-}): Promise<void> {
-  const { facets, stats, db, conn, study, cond, cohort, edgesByAttr } = opts;
-  await Promise.all(facets.map(async (f) => {
-    let spec = edgesByAttr?.[f.attribute];
-    if (!spec) {
-      const src = stats.find((r) => r.a === f.attribute) as unknown as NumStats | undefined;
-      if (!src) return;
-      spec = numericBinEdges(Number(src.mn), Number(src.mx), Number(src.q1), Number(src.q3),
-        String(src.allints) === "1");
-    }
-    const { edges, interval } = spec;
-    if (edges.length < 2) return;
-    const lastEdge = edges[edges.length - 1] + interval;
-    const unit = f.per === "sample" ? "sample_unique_id" : "patient_unique_id";
-    const source =
-      "(SELECT toFloat64OrNull(attribute_value) AS v, " + unit + " AS id\n" +
-      " FROM " + clinicalTable(db, [f.attribute]) + "\n" +
-      " WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(f.attribute) +
-      "   AND type = " + sq(f.per) + " AND attribute_value != ''" + cond + ")";
-    // portal bins are (start, end]: a value on an edge belongs to the lower bar
-    const [rows, outliers] = await Promise.all([
-      chQuery<ChRow>(
-        "SELECT toInt32(ceil((v - " + edges[0] + ") / " + interval + ")) - 1 AS b, uniqExact(id) AS n\n" +
-        "FROM " + source + "\n" +
-        "WHERE v IS NOT NULL AND v > " + edges[0] + " AND v <= " + lastEdge + "\n" +
-        "GROUP BY b ORDER BY b", conn),
-      chQuery<ChRow>(
-        "SELECT uniqExactIf(id, v <= " + edges[0] + ") AS lo, uniqExactIf(id, v > " + lastEdge + ") AS hi\n" +
-        "FROM " + source, conn)
-    ]);
-    const byBin = new Map<number, number>(rows.data.map((x) => [Number(x.b), Number(x.n)]));
-    const counted = rows.data.reduce((n, x) => n + Number(x.n), 0);
-    const lo = Number(outliers.data[0]?.lo || 0), hi = Number(outliers.data[0]?.hi || 0);
-    const bins: NumericBin[] = [];
-    if (lo) bins.push({ special: "<=", end: edges[0], count: lo });
-    edges.forEach((e, i) => bins.push({ start: e, end: Math.round((e + interval) * 1e6) / 1e6, count: byBin.get(i) || 0 }));
-    if (hi) bins.push({ special: ">", start: lastEdge, count: hi });
-    const cohortSize = f.per === "sample" ? cohort.samples : cohort.patients;
-    f.naCount = Math.max(0, cohortSize - (counted + lo + hi));
-    f.bins = bins;
-  }));
-}
-
 export interface ExploreArgs {
   study: string; draft?: CohortDef | null; oncokbPin?: string | null; profiles?: string[];
   gaProfiles?: string[]; conn?: ChConn; geneSearch?: string; skipBins?: boolean; skipGenes?: boolean;
-  binEdges?: Record<string, { edges: number[]; interval: number }>; attributes?: string[]; geneCharts?: string[];
+  attributes?: string[]; geneCharts?: string[];
   /** the derived facets to compute; none when omitted */
   derived?: DerivedRequest[];
+  /** the draft's cohort, already resolved by a caller that needed it first (the pooled gene pass) */
+  resolved?: Awaited<ReturnType<typeof resolveCohort>>;
+  /** this study's rows of the facet queries, fetched for every study on its connection at once */
+  prefetched?: Prefetched;
 }
 
 /**
@@ -201,24 +148,16 @@ export function buildExplore(args: ExploreArgs): Promise<ExploreResult> {
   return ensureChContext(() => buildExploreOne(args));
 }
 
-async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, binEdges, attributes, geneCharts, derived: derivedReq }: ExploreArgs): Promise<ExploreResult> {
+async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, attributes, geneCharts, derived: derivedReq, resolved, prefetched }: ExploreArgs): Promise<ExploreResult> {
   const db = conn.db;
   const t0 = Date.now();
-  // An optional allow-list of attribute names. Exploring hundreds of studies at
-  // once, a reader wants the handful of attributes those studies SHARE, not the
-  // union of every study's own vocabulary — which reached 1,634 facets across 64
-  // studies. Empty means "everything", so nothing changes by default.
-  const attrAllow = [...new Set((attributes || []).map(String).filter((a) => ATTR_NAME_RE.test(a)))].slice(0, 60);
-  // the reader's own uploads are always faceted, whatever the allow-list narrows to
-  if (attrAllow.length) for (const c of customAttributesFor(study)) if (!attrAllow.includes(c.attribute)) attrAllow.push(c.attribute);
-  let cond = "", sampleCond = "", panelSampleCond = "", draftCount = null, dsql = null;
+  let cond = "", panelSampleCond = "", draftCount = null;
   if (draft && Array.isArray(draft.all) && draft.all.length) {
-    dsql = compileCohortDef(draft, { oncokbPin, profiles, gaProfiles, study, db });
+    const dsql = compileCohortDef(draft, { oncokbPin, profiles, gaProfiles, study, db });
     // Resolved once here; every facet query below then reads the cohort rather than
     // recomputing it. `count` is the same number the old uniqExact query returned.
-    const c = await resolveCohort(study, db, dsql, conn);
+    const c = resolved ?? await resolveCohort(study, db, dsql, conn);
     cond = c.cond;
-    sampleCond = c.sampleCond; // sample_derived / genomic_event_derived both carry patient_unique_id
     panelSampleCond = c.panelSampleCond;
     draftCount = c.count;
   }
@@ -227,20 +166,19 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // they cost almost nothing.
   const derivedP = buildDerivedFacets(db, study, conn, cond, draft,
     { oncokbPin, profiles, gaProfiles }, derivedReq);
+  // The facet queries, shared with the federated path, which fetches them for every study on a
+  // connection at once and hands each study its rows; a study alone is the list of length one.
+  const pre = prefetched ?? (await prefetchFacets({ studies: [study], db, conn, attributes,
+    set: pooledPatientSet([study], db, draft, { oncokbPin, profilesByStudy: new Map([[study, { profiles, gaProfiles }]]) }) })).get(study)!;
 
   // how many patients this study contributes under the current draft (or in total)
-  const studyN = draftCount ?? Number((await chQuery<ChRow>(
-    "SELECT uniqExact(patient_unique_id) AS n FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study), conn
-  )).data[0].n);
+  const studyN = draftCount ?? Number(pre.totals.pts);
   const studyBreakdown: StudyBreakdownRow[] = [
     { study, n: studyN, instance: conn.id, instanceLabel: conn.label }
   ];
   // both units, as the portal's study-view header reports them: facets are
   // counted in their natural unit, so the header anchors what each one means
-  const totalsRow = (await chQuery<ChRow>(
-    "SELECT uniqExact(patient_unique_id) AS pts, uniqExact(sample_unique_id) AS smp\n" +
-    "FROM " + db + ".sample_derived\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + sampleCond, conn)).data[0];
+  const totalsRow = pre.totals;
   const totals = { patients: Number(totalsRow.pts), samples: Number(totalsRow.smp) };
 
   // ---- attribute metadata: the portal's own declarations -----------------
@@ -248,57 +186,18 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // view uses to decide pie-vs-histogram. priority drives chart ordering, and
 
   // priority 0 means "available but hidden by default" in the portal.
-  const metaRows = await chQuery<ChRow>(
-    "SELECT cam.attr_id AS a, cam.datatype AS datatype, cam.display_name AS display_name,\n" +
-    "       cam.description AS description, cam.priority AS priority, cam.patient_attribute AS patient_attribute\n" +
-    "FROM " + clinicalMetaTable(db) + " cam\n" +
-    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study), conn).catch(() => ({ data: [] as ChRow[] }));
+  const metaRows = { data: pre.meta };
   const meta = new Map(metaRows.data.map((r) => [r.a, r]));
 
   // ---- clinical attributes: classify categorical vs numeric --------------
-  const cls = await chQuery(
-    "SELECT type, attribute_name AS a, uniqExact(" + clinicalValueFoldSql("attribute_value") + ") AS nv,\n" +
-    "  countIf(toFloat64OrNull(attribute_value) IS NOT NULL) / count() AS numratio,\n" +
-    "  uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS np,\n" +
-    "  min(toFloat64OrNull(attribute_value)) AS mn, max(toFloat64OrNull(attribute_value)) AS mx,\n" +
-    "  quantileExact(0.5)(toFloat64OrNull(attribute_value)) AS md,\n" +
-    "  quantileExact(0.25)(toFloat64OrNull(attribute_value)) AS q1,\n" +
-    "  quantileExact(0.75)(toFloat64OrNull(attribute_value)) AS q3,\n" +
-    "  countIf(toFloat64OrNull(attribute_value) IS NULL) AS na,\n" +
-    "  countIf(toFloat64OrNull(attribute_value) = round(toFloat64OrNull(attribute_value))) = countIf(toFloat64OrNull(attribute_value) IS NOT NULL) AS allints\n" +
-    "FROM " + clinicalTable(db, attrAllow.length ? attrAllow : "all") + "\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''" + cond +
-    (attrAllow.length ? "\n  AND attribute_name IN (" + attrAllow.map(sq).join(",") + ")" : "") + "\n" +
-    "GROUP BY type, a ORDER BY np DESC LIMIT 250", conn);
+  const cls = { data: pre.cls };
   // Declared datatype wins; the old value-sniffing survives only as a fallback
   // for attributes with no metadata row, so nothing is silently discarded.
-  const declaredNumeric = (r: ChRow): boolean => {
-    const m = meta.get(r.a);
-    if (m) return String(m.datatype).toUpperCase() === "NUMBER";
-    return Number(r.numratio) >= 0.9 && Number(r.nv) > 10;
-  };
+  const declaredNumeric = (r: ChRow): boolean => isNumericAttr(r, meta);
   const numAttrs = cls.data.filter(declaredNumeric);
   const catAttrs = cls.data.filter((r) => !declaredNumeric(r));
 
-  let catValues: ChRow[] = [];
-  if (catAttrs.length) {
-    const v = await chQuery(
-      // Grouped by the FOLDED value, so `Female` and `FEMALE` are one row —
-      // and counted with uniqExact at the folded level rather than by summing
-      // the variants, because a patient with one sample spelled each way would
-      // otherwise be counted twice. The label shown is the most frequent
-      // original spelling, so the reader sees `Female`, not `female`.
-      "SELECT type, attribute_name AS a,\n" +
-      "       topK(1)(attribute_value)[1] AS v,\n" +
-      "       " + clinicalValueFoldSql("attribute_value") + " AS vkey,\n" +
-      "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
-      "FROM " + clinicalTable(db, catAttrs.map((r) => String(r.a))) + "\n" +
-      "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_value != ''\n" +
-      "  AND attribute_name IN (" + catAttrs.map(r => sq(r.a)).join(",") + ")" + cond + "\n" +
-      "GROUP BY type, a, vkey ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT + " BY type, a", conn);
-    catValues = v.data;
-  }
+  const catValues = pre.catValues;
   // Disjunctive faceting: attributes already constrained in the draft get their value
   // lists conditioned on the draft MINUS their own clauses — otherwise a selected
   // attribute collapses to its chosen value and can never be OR-extended.
@@ -327,12 +226,17 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     disjValues.set(key, v.data.map(x => ({ v: x.v, n: Number(x.n) })));
   }
 
+  // each attribute's values, grouped once ("type|attribute"), in the order the query returned them
+  const valuesOf = new Map<string, { v: string; n: number }[]>();
+  for (const x of catValues) {
+    const k = x.type + "|" + x.a, l = valuesOf.get(k), row = { v: x.v, n: Number(x.n) };
+    if (l) l.push(row); else valuesOf.set(k, [row]);
+  }
   const clinical: ClinicalFacet[] = [
     ...catAttrs.map((r): ClinicalFacet => ({
       attribute: r.a, per: r.type as "patient" | "sample", kind: "cat", patients: Number(r.np),
       distinct: Number(r.nv),
-      values: disjValues.get(r.type + "|" + r.a) ||
-        catValues.filter((x) => x.a === r.a && x.type === r.type).map((x) => ({ v: x.v, n: Number(x.n) })),
+      values: disjValues.get(r.type + "|" + r.a) || valuesOf.get(r.type + "|" + r.a) || [],
       disjunctive: disjValues.has(r.type + "|" + r.a) || undefined
     })),
     ...numAttrs.map((r): ClinicalFacet => ({
@@ -356,58 +260,37 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // ---- numeric histograms (cBioPortal study-view bins) --------------------
   if (!skipBins) {
     const numFacets = clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num").slice(0, NUM_HISTOGRAM_LIMIT);
-    await attachHistograms({
-      facets: numFacets, stats: numAttrs, db, conn, study, cond,
-      cohort: totals, edgesByAttr: binEdges
-    });
+    const edgesByAttr: Record<string, { edges: number[]; interval: number }> = {};
+    for (const f of numFacets) {
+      const src = numAttrs.find((r) => r.a === f.attribute);
+      if (src) edgesByAttr[f.attribute] = numericBinEdges(Number(src.mn), Number(src.mx), Number(src.q1), Number(src.q3), String(src.allints) === "1");
+    }
+    await fillHistograms({ facets: numFacets.filter((f) => edgesByAttr[f.attribute]), edgesByAttr,
+      groups: [{ conn, studies: [study], cond }], cohort: totals });
   }
 
   // ---- timeline event types ----------------------------------------------
-  const ev = await chQuery(
-    "SELECT ce.event_type AS t, uniqExact(ce.patient_id) AS n\n" +
-    "FROM " + db + ".clinical_event ce\n" +
-    "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
-    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study) +
-    (dsql ? "\n  AND p.stable_id IN (SELECT pid FROM (" + dsql + "))" : "") + "\n" +
-    "GROUP BY t ORDER BY n DESC", conn);
+  const ev = { data: pre.events };
 
   // ---- gene tables: built for this ONE study by the shared builder ---------
   // The federated path calls the same builder once for every study on a
   // connection instead of once per study; `skipGenes` is how it tells this
   // pass not to duplicate that work. See geneTables() below.
-  const { mutatedGenes, cnaGenes, svGenes, geneTotals, genes } = skipGenes
-    ? { mutatedGenes: [], cnaGenes: [], svGenes: [], genes: [],
+  const { mutatedGenes, cnaGenes, svGenes, geneTotals } = skipGenes
+    ? { mutatedGenes: [], cnaGenes: [], svGenes: [],
         geneTotals: { mutated: 0, cna: 0, sv: 0 } }
     : await geneTables({ studies: [study], db, conn, geneSearch, cond, panelSampleCond });
 
   // ---- molecular data types (portal: molecular-profile sample counts) -----
   // Samples with data of each type. The three that our DSL can filter on
   // (mutation / CNA / SV) become `profiled` clauses when clicked.
-  const dt = await chQuery<ChRow>(
-    "SELECT replaceOne(gp.stable_id, concat(sd.cancer_study_identifier, '_'), '') AS profile,\n" +
-    "       any(gp.name) AS label, gp.genetic_alteration_type AS atype, uniqExact(sp.sample_id) AS n\n" +
-    "FROM " + db + ".sample_profile sp\n" +
-    "JOIN " + db + ".sample_derived sd ON sp.sample_id = sd.internal_id\n" +
-    "JOIN " + db + ".genetic_profile gp ON sp.genetic_profile_id = gp.genetic_profile_id\n" +
-    "WHERE sd.cancer_study_identifier = " + sq(study) +
-    (dsql ? "\n  AND replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (" + dsql + "))" : "") + "\n" +
-    "GROUP BY gp.stable_id, sd.cancer_study_identifier, atype ORDER BY n DESC", conn);
+  const dt = { data: pre.dataTypes };
   const dataTypes = dt.data.map((r) => ({
     profile: r.profile, label: r.label, alterationType: r.atype, n: Number(r.n)
   }));
 
   // ---- case lists (draft-conditioned, like every other facet) ------------
-  const lists = await chQuery(
-    "SELECT sl.stable_id AS id, any(sl.name) AS name, uniqExact(p.stable_id) AS n\n" +
-    "FROM " + db + ".sample_list sl\n" +
-    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = sl.cancer_study_id\n" +
-    "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
-    "JOIN " + db + ".sample s ON s.internal_id = sll.sample_id\n" +
-    "JOIN " + db + ".patient p ON p.internal_id = s.patient_id\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study) +
-    (dsql ? "\n  AND p.stable_id IN (SELECT pid FROM (" + dsql + "))" : "") + "\n" +
-    "GROUP BY id ORDER BY n DESC LIMIT 10", conn);
+  const lists = { data: pre.lists };
 
   // ---- derived facets ------------------------------------------------------
   // Only the ones the caller asked for. Computed from dates and gene symbols, never from a study's event-type names
@@ -427,7 +310,6 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     study, draftCount, studyBreakdown,
     clinical, derived,
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
-    genes,
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
     mutatedGenes, cnaGenes, svGenes, geneTotals, geneFacets, totals, dataTypes,
     numStats: numAttrs.map((r) => ({ attribute: r.a, per: r.type as "patient" | "sample", min: Number(r.mn), max: Number(r.mx), q1: Number(r.q1), q3: Number(r.q3), allInts: String(r.allints) === "1", n: Number(r.np) })),
@@ -593,7 +475,7 @@ async function buildDerivedFacets(
 export async function geneTables({ studies, db, conn, geneSearch, cond = "", panelSampleCond = "" }: {
   studies: string[]; db: string; conn: ChConn; geneSearch?: string;
   cond?: string; panelSampleCond?: string;
-}): Promise<Pick<ExploreResult, "mutatedGenes" | "cnaGenes" | "svGenes" | "geneTotals" | "genes">> {
+}): Promise<Pick<ExploreResult, "mutatedGenes" | "cnaGenes" | "svGenes" | "geneTotals">> {
   /** one study keeps the equality the pinned denominators were measured against */
   const studyIn = (ss: string[]) => ss.length === 1
     ? "cancer_study_identifier = " + sq(ss[0])
@@ -622,7 +504,7 @@ export async function geneTables({ studies, db, conn, geneSearch, cond = "", pan
     const [altered, panelProfiled, wes, distinct] = await Promise.all([
       chQuery<ChRow>(
         "SELECT hugo_gene_symbol AS g," + (isCna ? " cna_alteration AS cna, any(cna_cytoband) AS cytoband," : "") + "\n" +
-        "       uniqExact(sample_unique_id) AS altered, count() AS events\n" +
+        "       uniqExact(sample_unique_id) AS altered, uniqExactIf(sample_unique_id, NOT off_panel) AS on_panel, count() AS events\n" +
         "FROM " + db + ".genomic_event_derived\n" + where + "\n" +
         "GROUP BY g" + (isCna ? ", cna" : "") + "\n" +
         "ORDER BY altered DESC, g ASC LIMIT " + GENE_TABLE_LIMIT, conn),
@@ -672,10 +554,10 @@ export async function geneTables({ studies, db, conn, geneSearch, cond = "", pan
     const wesN = Number(wes.data[0]?.n || 0);
     const rows = altered.data.map((r): GeneTableRow => {
       const profiled = (panelMap.get(r.g) || 0) + wesN;
-      const alt = Number(r.altered);
+      const alt = Number(r.altered), onPanel = Number(r.on_panel);
       return {
-        gene: r.g, altered: alt, events: Number(r.events), profiled,
-        freqPct: profiled ? Math.round(1000 * alt / profiled) / 10 : null,
+        gene: r.g, altered: alt, alteredOnPanel: onPanel, events: Number(r.events), profiled,
+        freqPct: profiled ? Math.round(1000 * onPanel / profiled) / 10 : null,
         ...(isCna ? { cna: Number(r.cna), cytoband: r.cytoband } : {})
       };
     });
@@ -690,18 +572,7 @@ const [mut, cna, sv] = await Promise.all([
 const mutatedGenes = mut.rows, cnaGenes = cna.rows, svGenes = sv.rows;
 const geneTotals = { mutated: mut.total, cna: cna.total, sv: sv.total };
 
-// legacy combined list (patients), retained for existing consumers
-const genes = await chQuery(
-  "SELECT hugo_gene_symbol AS g, uniqExact(patient_unique_id) AS n\n" +
-  "FROM " + db + ".genomic_event_derived\n" +
-  "WHERE " + studyIn(studies) + "\n" +
-  "  AND (variant_type != 'cna' OR abs(cna_alteration) >= 2)" + cond + "\n" +
-  "GROUP BY g ORDER BY n DESC LIMIT 15", conn);
-
-  return {
-    mutatedGenes, cnaGenes, svGenes, geneTotals,
-    genes: genes.data.map((r) => ({ gene: r.g, n: Number(r.n) }))
-  };
+  return { mutatedGenes, cnaGenes, svGenes, geneTotals };
 }
 
 // ---- per-gene alteration facets ------------------------------------------
@@ -926,33 +797,42 @@ export function buildExploreFederated(args: ExploreFederatedArgs): Promise<Explo
 }
 
 async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived }: ExploreFederatedArgs): Promise<ExploreResult> {
-  // Pass 1: facets per study, WITHOUT histograms — each study's own quartiles
-  // would give it different bin edges, and bars over different ranges cannot be
-  // summed. Skip the work rather than compute bins we would throw away.
-  // The gene tables are 13 of each study's ~17 round trips. They also POOL:
-  // altered and profiled are both additive over samples, so one query per
-  // connection with the studies in an IN list is the same arithmetic that
-  // merging per-study tables performs — and a better denominator, because no
-  // study's contribution is lost to its own top-N cut (see geneTables).
-  //
-  // Two cases keep the per-study path. A draft filter compiles per study, so
-  // pooling it would need a cohort compiler that spans studies; and a lone
-  // study has nothing to pool with, so it stays byte-identical to before.
-  const poolGenes = !draft && studies.length > 1;
-  const connGroups = new Map<string, { conn: ChConn; studies: string[] }>();
-  if (poolGenes) for (const s of studies) {
+  // Every query below runs once per CONNECTION over all its studies, not once per study
+  // (docs/PERFORMANCE.md §3b): the counts are additive over study-qualified ids, so a pooled count
+  // is the per-study sum — and, for the gene tables, a better one, since no study's denominator is
+  // lost to its own top-N cut. Studies on another instance get their own pass; a remote peer is
+  // asked separately by the route.
+  const groups = byConnection(studies, connByStudy);
+  // A draft is resolved once per study up front: the pooled passes read every study's cohort, and
+  // each study's own pass (disjunctive values, derived facets) reuses it.
+  const resolvedByStudy = new Map<string, Awaited<ReturnType<typeof resolveCohort>>>();
+  if (draft && Array.isArray(draft.all) && draft.all.length) await Promise.all(studies.map(async (s) => {
     const conn = connByStudy?.get(s) || PRIMARY;
-    const k = conn.id + "|" + conn.db;
-    if (!connGroups.has(k)) connGroups.set(k, { conn, studies: [] });
-    connGroups.get(k)!.studies.push(s);
-  }
+    const dsql = compileCohortDef(draft, { oncokbPin, ...(profilesByStudy.get(s) || {}), study: s, db: conn.db });
+    resolvedByStudy.set(s, await resolveCohort(s, conn.db, dsql, conn));
+  }));
+  const condOf = (g: ConnGroup) => pooledPatientCond(g.studies, g.conn.db, draft, { oncokbPin, profilesByStudy });
 
+  // Pass 1: each study's facets from the pooled facet queries, WITHOUT histograms — each study's
+  // own quartiles would give it different bin edges, and bars over different ranges cannot be
+  // summed — beside the pooled gene tables.
+  const prefetched = new Map<string, Prefetched>();
+  const prefetchP = Promise.all(groups.map(async (g) => {
+    const m = await prefetchFacets({ studies: g.studies, db: g.conn.db, conn: g.conn, attributes,
+      set: pooledPatientSet(g.studies, g.conn.db, draft, { oncokbPin, profilesByStudy }) });
+    for (const [st, p] of m) prefetched.set(st, p);
+  }));
   const [parts, geneParts] = await Promise.all([
-    Promise.all(studies.map(s =>
-      buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: poolGenes, attributes, geneCharts, derived,
-        conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}) }))),
-    Promise.all([...connGroups.values()].map(async ({ conn, studies: ss }) => {
-      const g = await geneTables({ studies: ss, db: conn.db, conn, geneSearch });
+    prefetchP.then(() => Promise.all(studies.map(s =>
+      buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: true, attributes, geneCharts, derived,
+        conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}), resolved: resolvedByStudy.get(s), prefetched: prefetched.get(s) })))),
+    Promise.all(groups.map(async (grp) => {
+      const { conn, studies: ss } = grp;
+      const cond = condOf(grp);
+      const g = await geneTables({ studies: ss, db: conn.db, conn, geneSearch, cond,
+        // sample_to_gene_panel_derived has no patient column, so map through sample_derived
+        panelSampleCond: cond && "\n  AND sample_unique_id IN (SELECT sample_unique_id FROM " + conn.db + ".sample_derived" +
+          " WHERE cancer_study_identifier IN (" + ss.map(sq).join(",") + ")" + cond + ")" });
       // A gene-only participant. It names no study and holds no patients or
       // facets, so every other field merges as a zero and it adds nothing to
       // the study breakdown. Feeding it through the SAME mergeExplore as the
@@ -964,47 +844,225 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
     }))
   ]);
 
-  // Pass 2: derive ONE set of edges per attribute from the pooled statistics,
-  // then have every study bin against those, so the bars line up and add.
+  // Pass 2: ONE set of edges per attribute from the pooled statistics, binned over every study at
+  // once, so the bars line up and add.
   const merged = mergeExplore([...parts, ...geneParts], !!draft);
   const edgesByAttr = sharedBinEdges(parts);
-  if (Object.keys(edgesByAttr).length) {
-    const numFacets = merged.clinical.filter(
-      (c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num" && !!edgesByAttr[c.attribute]).slice(0, NUM_HISTOGRAM_LIMIT);
-    // one per-study histogram set, summed into the merged facets
-    const perStudy = await Promise.all(studies.map(async (st) => {
-      const conn = connByStudy?.get(st) || PRIMARY;
-      const facets = numFacets.map((f) => ({ ...f, bins: undefined, naCount: 0 })) as typeof numFacets;
-      const part = parts[studies.indexOf(st)];
-      await attachHistograms({
-        facets, stats: [], db: conn.db, conn, study: st,
-        cond: draft ? draftCondFor(st, conn.db, draft, { oncokbPin, ...(profilesByStudy.get(st) || {}) }) : "",
-        cohort: part.totals || { patients: 0, samples: 0 }, edgesByAttr
-      });
-      return facets;
-    }));
-    for (const f of numFacets) {
-      const contributions = perStudy.map((set) => set.find((x) => x.attribute === f.attribute)).filter(Boolean) as typeof numFacets;
-      const withBins = contributions.filter((c) => c.bins && c.bins.length);
-      if (!withBins.length) continue;
-      const template = withBins[0].bins!;
-      f.bins = template.map((b, i) => ({ ...b, count: withBins.reduce((n, c) => n + (c.bins![i]?.count || 0), 0) }));
-      f.naCount = withBins.reduce((n, c) => n + (c.naCount || 0), 0);
-    }
-  }
+  const numFacets = merged.clinical.filter(
+    (c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num" && !!edgesByAttr[c.attribute]).slice(0, NUM_HISTOGRAM_LIMIT);
+  await fillHistograms({ facets: numFacets, edgesByAttr, cohort: merged.totals || { patients: 0, samples: 0 },
+    groups: groups.map((g) => ({ ...g, cond: condOf(g) })) });
   return merged;
 }
 
-/** The draft predicate a given study would apply — needed for pass-2 binning. */
-function draftCondFor(study: string, db: string, draft: CohortDef, ctx: { oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[] }): string {
-  const pidExpr = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  // Pass 1 already resolved this study's cohort; read it rather than compiling and
-  // re-evaluating the same definition for every histogram.
-  const table = cohortTable(study);
-  if (chExternalRegistered(table)) return "\n  AND " + pidExpr + " IN (SELECT pid FROM " + table + ")";
-  const dsql = compileCohortDef(draft, { ...ctx, study, db });
-  return "\n  AND " + pidExpr + " IN (SELECT pid FROM (" + dsql + "))";
+type ConnGroup = { conn: ChConn; studies: string[] };
+/** The studies grouped by the connection (and database) that holds them, in first-seen order. */
+function byConnection(studies: string[], connByStudy?: Map<string, ChConn>): ConnGroup[] {
+  const groups = new Map<string, ConnGroup>();
+  for (const s of studies) {
+    const conn = connByStudy?.get(s) || PRIMARY;
+    const k = conn.id + "|" + conn.db;
+    if (!groups.has(k)) groups.set(k, { conn, studies: [] });
+    groups.get(k)!.studies.push(s);
+  }
+  return [...groups.values()];
 }
+
+/**
+ * Histograms for `facets` against the given edges, counted over every group's studies (one query
+ * per facet per connection, pooledHistograms) and summed by bin. `cohort` is everyone the counts
+ * are drawn from, so a facet's NA bar is the rest of it.
+ */
+async function fillHistograms(opts: {
+  facets: Extract<ClinicalFacet, { kind: "num" }>[];
+  edgesByAttr: Record<string, { edges: number[]; interval: number }>;
+  groups: (ConnGroup & { cond: string })[];
+  cohort: { patients: number; samples: number };
+}): Promise<void> {
+  const { facets, edgesByAttr, groups, cohort } = opts;
+  if (!facets.length) return;
+  const pooled = await Promise.all(groups.map((g) => pooledHistograms({
+    facets, studies: g.studies, db: g.conn.db, conn: g.conn, edgesByAttr, cond: g.cond })));
+  for (const f of facets) {
+    const { edges, interval } = edgesByAttr[f.attribute];
+    if (edges.length < 2) continue;
+    const key = f.per + "|" + f.attribute;
+    const count = (b: number) => pooled.reduce((n, g) => n + (g.get(key)?.bins.get(b) || 0), 0);
+    const lastEdge = edges[edges.length - 1] + interval;
+    // portal bins are (start, end]: a value on an edge belongs to the lower bar
+    const bins: NumericBin[] = [];
+    if (count(-1)) bins.push({ special: "<=", end: edges[0], count: count(-1) });
+    edges.forEach((e, i) => bins.push({ start: e, end: Math.round((e + interval) * 1e6) / 1e6, count: count(i) }));
+    if (count(-2)) bins.push({ special: ">", start: lastEdge, count: count(-2) });
+    f.bins = bins;
+    const counted = pooled.reduce((n, g) => n + (g.get(key)?.counted || 0), 0);
+    f.naCount = Math.max(0, (f.per === "sample" ? cohort.samples : cohort.patients) - counted);
+  }
+}
+
+/** Declared datatype wins; value-sniffing is the fallback for an attribute with no metadata row. */
+function isNumericAttr(r: ChRow, meta: Map<unknown, ChRow>): boolean {
+  const m = meta.get(r.a);
+  if (m) return String(m.datatype).toUpperCase() === "NUMBER";
+  return Number(r.numratio) >= 0.9 && Number(r.nv) > 10;
+}
+
+/** One study's rows of Explore's facet queries, as buildExploreOne would have fetched them. */
+interface Prefetched { totals: ChRow; meta: ChRow[]; cls: ChRow[]; catValues: ChRow[]; events: ChRow[]; dataTypes: ChRow[]; lists: ChRow[] }
+
+/**
+ * Explore's per-study facet queries for every study on one connection at once: each the same
+ * statement as buildExploreOne's, with the study added to its GROUP BY and its per-study LIMIT
+ * written as LIMIT … BY study, then split back into one Prefetched per study so every later step
+ * (classification, disjunctive values, the merge) is unchanged.
+ */
+async function prefetchFacets(opts: {
+  studies: string[]; db: string; conn: ChConn; attributes?: string[];
+  /** the draft's patients as study-qualified ids (pooledPatientSet), or "" */
+  set: string;
+}): Promise<Map<string, Prefetched>> {
+  const { studies, db, conn, set } = opts;
+  const IN = "(" + studies.map(sq).join(",") + ")";
+  const cond = set ? "\n  AND patient_unique_id IN " + set : "";
+  const attrAllow = [...new Set((opts.attributes || []).map(String).filter((a) => ATTR_NAME_RE.test(a)))].slice(0, 60);
+  if (attrAllow.length) for (const s of studies) for (const c of customAttributesFor(s)) if (!attrAllow.includes(c.attribute)) attrAllow.push(c.attribute);
+  const [totals, meta, cls, events, dataTypes, lists] = await Promise.all([
+    chQuery<ChRow>(
+      "SELECT cancer_study_identifier AS s, uniqExact(patient_unique_id) AS pts, uniqExact(sample_unique_id) AS smp\n" +
+      "FROM " + db + ".sample_derived\nWHERE cancer_study_identifier IN " + IN + cond + "\nGROUP BY s", conn),
+    chQuery<ChRow>(
+      "SELECT cs.cancer_study_identifier AS s, cam.attr_id AS a, cam.datatype AS datatype, cam.display_name AS display_name,\n" +
+      "       cam.description AS description, cam.priority AS priority, cam.patient_attribute AS patient_attribute\n" +
+      "FROM " + clinicalMetaTable(db) + " cam\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+      "WHERE cs.cancer_study_identifier IN " + IN, conn).catch(() => ({ data: [] as ChRow[] })),
+    chQuery<ChRow>(
+      "SELECT cancer_study_identifier AS s, type, attribute_name AS a, uniqExact(" + clinicalValueFoldSql("attribute_value") + ") AS nv,\n" +
+      "  countIf(toFloat64OrNull(attribute_value) IS NOT NULL) / count() AS numratio,\n" +
+      "  uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS np,\n" +
+      "  min(toFloat64OrNull(attribute_value)) AS mn, max(toFloat64OrNull(attribute_value)) AS mx,\n" +
+      "  quantileExact(0.5)(toFloat64OrNull(attribute_value)) AS md,\n" +
+      "  quantileExact(0.25)(toFloat64OrNull(attribute_value)) AS q1,\n" +
+      "  quantileExact(0.75)(toFloat64OrNull(attribute_value)) AS q3,\n" +
+      "  countIf(toFloat64OrNull(attribute_value) IS NULL) AS na,\n" +
+      "  countIf(toFloat64OrNull(attribute_value) = round(toFloat64OrNull(attribute_value))) = countIf(toFloat64OrNull(attribute_value) IS NOT NULL) AS allints\n" +
+      "FROM " + clinicalTable(db, attrAllow.length ? attrAllow : "all") + "\n" +
+      "WHERE cancer_study_identifier IN " + IN + " AND attribute_value != ''" + cond +
+      (attrAllow.length ? "\n  AND attribute_name IN (" + attrAllow.map(sq).join(",") + ")" : "") + "\n" +
+      "GROUP BY s, type, a ORDER BY np DESC LIMIT 250 BY s", conn),
+    chQuery<ChRow>(
+      "SELECT cs.cancer_study_identifier AS s, ce.event_type AS t, uniqExact(ce.patient_id) AS n\n" +
+      "FROM " + db + ".clinical_event ce\n" +
+      "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+      "WHERE cs.cancer_study_identifier IN " + IN +
+      (set ? "\n  AND concat(cs.cancer_study_identifier, '_', p.stable_id) IN " + set : "") + "\n" +
+      "GROUP BY s, t ORDER BY n DESC", conn),
+    chQuery<ChRow>(
+      "SELECT sd.cancer_study_identifier AS s, replaceOne(gp.stable_id, concat(sd.cancer_study_identifier, '_'), '') AS profile,\n" +
+      "       any(gp.name) AS label, gp.genetic_alteration_type AS atype, uniqExact(sp.sample_id) AS n\n" +
+      "FROM " + db + ".sample_profile sp\n" +
+      "JOIN " + db + ".sample_derived sd ON sp.sample_id = sd.internal_id\n" +
+      "JOIN " + db + ".genetic_profile gp ON sp.genetic_profile_id = gp.genetic_profile_id\n" +
+      "WHERE sd.cancer_study_identifier IN " + IN +
+      (set ? "\n  AND sd.patient_unique_id IN " + set : "") + "\n" +
+      "GROUP BY gp.stable_id, sd.cancer_study_identifier, atype ORDER BY n DESC", conn),
+    chQuery<ChRow>(
+      "SELECT cs.cancer_study_identifier AS s, sl.stable_id AS id, any(sl.name) AS name, uniqExact(p.stable_id) AS n\n" +
+      "FROM " + db + ".sample_list sl\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = sl.cancer_study_id\n" +
+      "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
+      "JOIN " + db + ".sample s ON s.internal_id = sll.sample_id\n" +
+      "JOIN " + db + ".patient p ON p.internal_id = s.patient_id\n" +
+      "WHERE cs.cancer_study_identifier IN " + IN +
+      (set ? "\n  AND concat(cs.cancer_study_identifier, '_', p.stable_id) IN " + set : "") + "\n" +
+      "GROUP BY s, id ORDER BY n DESC LIMIT 10 BY s", conn),
+  ]);
+  // each result split by study once, in its row order: one pass per table, not one per study
+  const byStudy = (rows: ChRow[]): Map<string, ChRow[]> => {
+    const m = new Map<string, ChRow[]>();
+    for (const r of rows) { const k = String(r.s); const l = m.get(k); if (l) l.push(r); else m.set(k, [r]); }
+    return m;
+  };
+  const metaRows = byStudy(meta.data);
+  const metaOf = new Map(studies.map((st) => [st, new Map((metaRows.get(st) || []).map((r) => [r.a, r]))]));
+  // the value lists read each study's categorical attributes, so they wait for the classification
+  const catKeys = new Set<string>();
+  for (const r of cls.data) if (!isNumericAttr(r, metaOf.get(String(r.s))!)) catKeys.add(r.s + "|" + r.type + "|" + r.a);
+  const catNames = [...new Set(cls.data.filter((r) => catKeys.has(r.s + "|" + r.type + "|" + r.a)).map((r) => String(r.a)))];
+  const values = catNames.length ? (await chQuery<ChRow>(
+    "SELECT cancer_study_identifier AS s, type, attribute_name AS a,\n" +
+    "       topK(1)(attribute_value)[1] AS v,\n" +
+    "       " + clinicalValueFoldSql("attribute_value") + " AS vkey,\n" +
+    "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
+    "FROM " + clinicalTable(db, catNames) + "\n" +
+    "WHERE cancer_study_identifier IN " + IN + " AND attribute_value != ''\n" +
+    "  AND attribute_name IN (" + catNames.map(sq).join(",") + ")" + cond + "\n" +
+    "GROUP BY s, type, a, vkey ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT + " BY s, type, a", conn)).data
+    .filter((r) => catKeys.has(r.s + "|" + r.type + "|" + r.a)) : [];
+  const [tot, cl, vals, ev, dt, li] = [totals.data, cls.data, values, events.data, dataTypes.data, lists.data].map(byStudy);
+  return new Map(studies.map((st) => [st, {
+    totals: tot.get(st)?.[0] || { pts: "0", smp: "0" },
+    meta: metaRows.get(st) || [], cls: cl.get(st) || [], catValues: vals.get(st) || [],
+    events: ev.get(st) || [], dataTypes: dt.get(st) || [], lists: li.get(st) || [],
+  }]));
+}
+
+
+/**
+ * The draft over several studies at once, as one condition on `patient_unique_id`: each study's
+ * resolved cohort (or, past the external-table bound, its compiled definition) with the study's
+ * prefix put back, so one pooled scan keeps exactly the patients each per-study scan would.
+ */
+function pooledPatientCond(studies: string[], db: string, draft: CohortDef | null | undefined,
+  ctx: { oncokbPin?: string | null; profilesByStudy?: Map<string, { profiles?: string[]; gaProfiles?: string[] }> }): string {
+  const set = pooledPatientSet(studies, db, draft, ctx);
+  return set && "\n  AND patient_unique_id IN " + set;
+}
+
+/** The same patients as a parenthesised subquery of study-qualified ids, or "" with no draft. */
+function pooledPatientSet(studies: string[], db: string, draft: CohortDef | null | undefined,
+  ctx: { oncokbPin?: string | null; profilesByStudy?: Map<string, { profiles?: string[]; gaProfiles?: string[] }> }): string {
+  if (!draft || !Array.isArray(draft.all) || !draft.all.length) return "";
+  const parts = studies.map((s) => {
+    const table = cohortTable(s);
+    const src = chExternalRegistered(table) ? table
+      : "(" + compileCohortDef(draft, { oncokbPin: ctx.oncokbPin, ...(ctx.profilesByStudy?.get(s) || {}), study: s, db }) + ")";
+    return "SELECT concat(" + sq(s + "_") + ", pid) FROM " + src;
+  });
+  return "(" + parts.join("\n    UNION ALL ") + ")";
+}
+
+/**
+ * Pass-2 histograms for every study on one connection in one query per facet: the edges are
+ * shared (that is what pass 2 is for) and ids are study-qualified, so a pooled count per bin is
+ * exactly the sum of the per-study counts. The outlier bars ride in the same scan as bins -1/-2.
+ */
+async function pooledHistograms(opts: {
+  facets: Extract<ClinicalFacet, { kind: "num" }>[]; studies: string[]; db: string; conn: ChConn; cond: string;
+  edgesByAttr: Record<string, { edges: number[]; interval: number }>;
+}): Promise<Map<string, { bins: Map<number, number>; counted: number }>> {
+  const { facets, studies, db, conn, cond, edgesByAttr } = opts;
+  const out = new Map<string, { bins: Map<number, number>; counted: number }>();
+  await Promise.all(facets.map(async (f) => {
+    const { edges, interval } = edgesByAttr[f.attribute];
+    if (edges.length < 2) return;
+    const lastEdge = edges[edges.length - 1] + interval;
+    const unit = f.per === "sample" ? "sample_unique_id" : "patient_unique_id";
+    const r = await chQuery<ChRow>(
+      "SELECT multiIf(v <= " + edges[0] + ", -1, v > " + lastEdge + ", -2, toInt32(ceil((v - " + edges[0] + ") / " + interval + ")) - 1) AS b,\n" +
+      "       uniqExact(id) AS n\n" +
+      "FROM (SELECT toFloat64OrNull(attribute_value) AS v, " + unit + " AS id\n" +
+      "      FROM " + clinicalTable(db, [f.attribute]) + "\n" +
+      "      WHERE cancer_study_identifier IN (" + studies.map(sq).join(",") + ") AND attribute_name = " + sq(f.attribute) +
+      "        AND type = " + sq(f.per) + " AND attribute_value != ''" + cond + ")\n" +
+      "WHERE v IS NOT NULL\nGROUP BY b", conn);
+    const bins = new Map<number, number>(r.data.map((x) => [Number(x.b), Number(x.n)]));
+    out.set(f.per + "|" + f.attribute, { bins, counted: r.data.reduce((n, x) => n + Number(x.n), 0) });
+  }));
+  return out;
+}
+
 
 /**
  * One set of bin edges per numeric attribute, from the pooled statistics.
@@ -1125,19 +1183,19 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
   }
 
   const evm = sumBy(parts.map(p => p.events), "type");
-  const gm = sumBy(parts.map(p => p.genes), "gene");
   // gene tables: sum altered/events/profiled per (gene, cna) across participants
   const mergeGeneTable = (pick: (p: ExploreResult) => GeneTableRow[] | undefined): GeneTableRow[] => {
     const m = new Map<string, GeneTableRow>();
     for (const p of parts) for (const r of pick(p) || []) {
       const k = r.gene + "|" + (r.cna ?? "");
       const cur = m.get(k);
-      if (!cur) { m.set(k, { ...r }); continue; }
+      if (!cur) { m.set(k, { ...r, alteredOnPanel: r.alteredOnPanel ?? r.altered }); continue; }
       cur.altered += r.altered; cur.events += r.events; cur.profiled += r.profiled;
+      cur.alteredOnPanel = (cur.alteredOnPanel ?? 0) + (r.alteredOnPanel ?? r.altered);
       cur.cytoband = cur.cytoband || r.cytoband;
     }
     return [...m.values()]
-      .map((r) => ({ ...r, freqPct: r.profiled ? Math.round(1000 * r.altered / r.profiled) / 10 : null }))
+      .map((r) => ({ ...r, freqPct: r.profiled ? Math.round(1000 * (r.alteredOnPanel ?? r.altered) / r.profiled) / 10 : null }))
       .sort((a, b) => b.altered - a.altered)
       .slice(0, GENE_TABLE_LIMIT);
   };
@@ -1171,7 +1229,6 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     clinical,
     ...(derivedMerged.length ? { derived: derivedMerged } : {}),
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
-    genes: [...gm.entries()].map(([gene, n]) => ({ gene, n })).sort((x, y) => y.n - x.n).slice(0, 15),
     caseLists: [...lm.values()].sort((x, y) => y.n - x.n).slice(0, 10),
     geneFacets: [...gfMap.values()],
     mutatedGenes: mergeGeneTable((p) => p.mutatedGenes),

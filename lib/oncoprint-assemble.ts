@@ -200,8 +200,14 @@ export function assembleContract(input: AssembleInput): Contract {
   // driver %, the sort). The portal ranks every driver mutation above every VUS one whatever
   // the class, so a VUS mutation's class is held aside and joins the cell only where no driver
   // mutation does — a VUS truncation beside a driver missense shows as the driver missense.
+  //
+  // A call on a cell no panel covers — a gene its column's panels do not include (off-panel) —
+  // is not drawn: the cell stays NOT_PROFILED, and the gene's % does not count it, as cBioPortal's
+  // results view does (altered AND sequenced over sequenced). A merged row is profiled where any
+  // member is, so it can still draw a call its gene's own row leaves out. Every call left out of
+  // a row is counted, so the caption says so.
   const hideVus = !!input.display?.hideVUS;
-  let hiddenVus = 0;
+  let hiddenVus = 0, offPanel = 0;
   const vusMut = new Map<Int32Array, Uint16Array>();   // mutation class bits all sit below 1024
   for (const r of events) {
     const i = pidIndex.get(r.pid);
@@ -214,23 +220,21 @@ export function assembleContract(input: AssembleInput): Contract {
     else if (r.vt === "structural_variant") bit = BITS.SV;
     else if (r.vt === "cna") bit = Number(r.cna) >= 2 ? BITS.AMP : (Number(r.cna) <= -2 ? BITS.HOMDEL : 0);
     if (!bit) continue;
+    const covered = rows.filter((cells) => cells[i] !== NOT_PROFILED);
+    if (covered.length < rows.length) offPanel++;
+    if (!covered.length) continue;
     const driver = isDriver(r);
-    if (hideVus && !driver) {
-      hiddenVus++;
-      for (const cells of rows) if (cells[i] === NOT_PROFILED) cells[i] = 0;   // it was still assayed
-      continue;
-    }
+    if (hideVus && !driver) { hiddenVus++; continue; }
     if (mut && !driver) {
-      for (const cells of rows) {
+      for (const cells of covered) {
         let held = vusMut.get(cells);
         if (!held) { held = new Uint16Array(cells.length); vusMut.set(cells, held); }
         held[i] |= bit;
-        if (cells[i] === NOT_PROFILED) cells[i] = 0;
       }
       continue;
     }
     if (driver) bit |= BITS.DRIVER | (mut ? BITS.MUT_DRIVER : bit === BITS.SV ? BITS.SV_DRIVER : 0);
-    for (const cells of rows) cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | bit; // an observed event implies profiled
+    for (const cells of covered) cells[i] |= bit;
   }
   for (const [cells, held] of vusMut)
     for (let i = 0; i < cells.length; i++) if (held[i] && !(cells[i] & BITS.MUT_DRIVER)) cells[i] |= held[i];
@@ -539,6 +543,6 @@ export function assembleContract(input: AssembleInput): Contract {
       annotation: input.annotationSource, lineGap,
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track) },
     display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false },
-    stats: { nColumns: columns.length, ms: Date.now() - t0, ...(input.display?.hideVUS ? { hiddenVus } : {}) }
+    stats: { nColumns: columns.length, ms: Date.now() - t0, ...(input.display?.hideVUS ? { hiddenVus } : {}), ...(offPanel ? { offPanel } : {}) }
   };
 }

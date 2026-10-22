@@ -15,7 +15,7 @@ import { textWidth } from "../../lib/chart/text.ts";
 import { fmtInt, fmtNum, fmtPct } from "../../lib/chart/format.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
-import { SHOW_DERIVED_FACETS, type ExploreState } from "./use-explore-state.ts";
+import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { Dna, Save, Tag, X } from "lucide-react";
 import { Button } from "../_ui/button";
@@ -285,7 +285,7 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
 }
 
 export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
-  const { addChartOpen, setAddChartOpen, addSeqFilter, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, openCustomManager, geneCharts, hiddenAttrs, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setHiddenAttrs, setSeq, treatmentEventType, unchartGene, visibleClinical } = ctx;
+  const { addChartOpen, setAddChartOpen, addSeqFilter, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, openCustomManager, geneCharts, chartChecked, setChartsChecked, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setSeq, treatmentEventType, unchartGene } = ctx;
   const explore = ctx.explore!;
   return <>
     {explore && (
@@ -304,12 +304,8 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
           const builtin = explore.clinical.filter((c) => !isCustomAttr(c.attribute));
           const keysOf = (list: typeof explore.clinical) => list.map(attrKey);
           /** check every attribute of `list` (shown) or none of it (hidden), leaving the other tab's alone */
-          const setAll = (list: typeof explore.clinical, shown: boolean) => setHiddenAttrs(prev => {
-            const next = new Set(prev);
-            for (const k of keysOf(list)) { if (shown) next.delete(k); else next.add(k); }
-            return next;
-          });
-          const checkedOf = (list: typeof explore.clinical) => visibleClinical(list as never).length;
+          const setAll = (list: typeof explore.clinical, shown: boolean) => setChartsChecked(keysOf(list), shown);
+          const checkedOf = (list: typeof explore.clinical) => list.filter((c) => chartChecked(attrKey(c))).length;
           const table = (rows: typeof explore.clinical, showDataset: boolean) => (
             <div className="attrtablewrap">
               <table className="attrtable">
@@ -318,11 +314,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                 </thead>
                 <tbody>
                   {rows.map((c) => {
-                    const toggle = () => setHiddenAttrs(prev => {
-                      const next = new Set(prev);
-                      if (next.has(attrKey(c))) next.delete(attrKey(c)); else next.add(attrKey(c));
-                      return next;
-                    });
+                    const toggle = () => setChartsChecked([attrKey(c)], !chartChecked(attrKey(c)));
                     // Shown regardless — the checklist is the union across the
                     // selection (see visibleClinical's own comment) — but an
                     // attribute only SOME of the selected studies actually carry
@@ -331,7 +323,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                     const partial = exStudies.length > 1 && (c.studyCount ?? 1) < exStudies.length;
                     return (
                       <tr key={attrKey(c)} onClick={(e) => { if (!(e.target as HTMLElement).closest("[role=checkbox]")) toggle(); }}>
-                        <td><Checkbox checked={!hiddenAttrs.has(attrKey(c))} onCheckedChange={toggle} aria-label={"chart " + (c.displayName || c.attribute)} /></td>
+                        <td><Checkbox checked={chartChecked(attrKey(c))} onCheckedChange={toggle} aria-label={"chart " + (c.displayName || c.attribute)} /></td>
                         <td>
                           {c.displayName || c.attribute}
                           {partial && (
@@ -376,7 +368,9 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
             <div>
               <p className="note mt-0 mb-3">
                 Check an attribute to draw it as a tile in the facet grid below; uncheck to hide
-                it. The search here only narrows this list — it doesn't touch the grid itself.
+                it. Until you change it, the first {DEFAULT_CLINICAL_CHARTS} by the portal's own priority are
+                checked, as on cBioPortal's study view; an attribute you filter on is drawn either way.
+                The search here only narrows this list — it doesn't touch the grid itself.
                 {exStudies.length > 1 && <> An attribute marked <b>*</b> isn't carried by every
                 selected study — hover it for which share of the {exStudies.length} do.</>}
               </p>
@@ -965,16 +959,19 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
                     of the cohort. Computed here from numbers already in the
                     payload; no extra query. */}
                 {(() => {
+                  // samples whose call is off-panel were not profiled for the gene: they sit in the
+                  // not-profiled share, as on the portal, where they count in "#" but not in Freq
                   const total = explore.totals?.samples ?? g.profiled;
-                  const wild = Math.max(0, g.profiled - g.altered);
+                  const onPanel = g.alteredOnPanel ?? g.altered;
+                  const wild = Math.max(0, g.profiled - onPanel);
                   const unprofiled = Math.max(0, total - g.profiled);
-                  const sum = g.altered + wild + unprofiled || 1;
+                  const sum = onPanel + wild + unprofiled || 1;
                   const w = (n: number) => (100 * n / sum) + "%";
                   return (
                     <span className="gsplit" aria-hidden="true"
-                      title={g.altered.toLocaleString() + " altered · " + wild.toLocaleString() +
+                      title={onPanel.toLocaleString() + " altered · " + wild.toLocaleString() +
                         " profiled and unaltered · " + unprofiled.toLocaleString() + " not profiled for " + g.gene}>
-                      <i className="s-alt" style={{ width: w(g.altered) }} />
+                      <i className="s-alt" style={{ width: w(onPanel) }} />
                       <i className="s-wt" style={{ width: w(wild) }} />
                       <i className="s-np" style={{ width: w(unprofiled) }} />
                     </span>
@@ -990,7 +987,17 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
                 {kind !== "cna" && <span className="gevents" title={g.events.toLocaleString() + " events across " + g.altered.toLocaleString() + " samples"}>{g.events.toLocaleString()}</span>}
                 <span className={g.cna != null ? "cnatag " + (g.cna === 2 ? "amp" : "del") : "cnatag none"}>{g.cna != null ? (g.cna === 2 ? "AMP" : "HOMDEL") : ""}</span>
                 <span className="gfreq">{g.freqPct != null ? fmtPct(g.freqPct) : "—"}</span>
-                <span className="gcount">{g.altered.toLocaleString()}<span className="meta">/{g.profiled.toLocaleString()}</span></span>
+                {(() => {
+                  const onPanel = g.alteredOnPanel ?? g.altered, off = g.altered - onPanel;
+                  return (
+                    <span className="gcount" title={off > 0 ? off.toLocaleString() + " more sample" + (off === 1 ? " has" : "s have") +
+                      " a call in " + g.gene + " that their panel does not cover (off-panel): counted among the " +
+                      g.altered.toLocaleString() + " altered, as cBioPortal's \"#\" does, but not in the frequency, since those samples were not profiled for it" : undefined}>
+                      {onPanel.toLocaleString()}<span className="meta">/{g.profiled.toLocaleString()}</span>
+                      {off > 0 && <span className="meta goff"> +{off.toLocaleString()} off-panel</span>}
+                    </span>
+                  );
+                })()}
               </button>
             ))}
           </div>
@@ -1013,17 +1020,6 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
   const { addClause, parseDraft } = ctx;
   const explore = ctx.explore!;
   return <>
-    <div className="card" style={{ display: "none" }}>
-      <h2>Genes <span className="plain">— most-altered (click = OQL clause)</span></h2>
-      <div className="flex flex-wrap gap-1">
-        {explore.genes.map(g => (
-          <Button key={g.gene} variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "oql", q: g.gene + ":" })}>
-            {g.gene} <span className="meta">{g.n.toLocaleString()}</span>
-          </Button>
-        ))}
-      </div>
-      <p className="note">Bare gene = any alteration; edit the OQL pill afterwards for MUT/AMP/DRIVER specifics.</p>
-    </div>
     <div className="card">
       <h2>Timeline events</h2>
       {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}

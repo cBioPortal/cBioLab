@@ -321,7 +321,9 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   Explore scales with study count, and **the panel-aware denominator rule that outranks all of
   it**: a sample whose gene panel omits a gene is NOT PROFILED for it, never wild-type, so a
   frequency is `altered ÷ samples profiled for THAT gene`. Dividing by a study or selection total
-  does not error — it silently reports every gene as rarer than it is. Both halves are additive
+  does not error — it silently reports every gene as rarer than it is. The numerator counts only
+  calls a covering panel made: an off-panel call (`off_panel`) is in neither side, as on
+  cBioPortal (§1 there). Both halves are additive
   over samples, which is what makes pooling safe; averaging per-study percentages is never safe.
   Guarded by `test/denominator.test.ts` and `npm run check:denominators` (in the e2e gate).
   Read before claiming this project is "fast": on a cached single chart the portal is ~20x

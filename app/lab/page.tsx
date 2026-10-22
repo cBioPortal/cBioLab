@@ -350,7 +350,7 @@ export default function AnalysisPage() {
   const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, storeLists, study });
   const { lockCohorts, unlockCohort, unlockAll, analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells } = cohortEdits;
   const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
-  const { setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies } = exploreState;
+  const { setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
   const openTab = (t: typeof TABS[number]) => { goTab(t); if (t === "explore" && !explore) fetchExplore(); };
   const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading, studies });
   const { VIEW_KINDS, assayOptions, attrsLoading, cantDrawCohort, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, profileCatalog, viewAttrs, viewEvents, viewGenes } = viewOptions;
@@ -454,6 +454,12 @@ export default function AnalysisPage() {
               <Button variant="outline" size="sm" title="upload your own annotations and chart, filter and analyse them like clinical attributes"
                 onClick={() => openCustomManager(customState.unlocked && customState.datasets.length ? "manage" : "add")}>
                 <Upload />Custom data{customState.datasets.length ? " (" + customState.datasets.length + ")" : ""}</Button>
+              {(() => {
+                // the grid draws the checked charts only, so say how many of the attributes that is
+                const shown = visibleClinical(explore.clinical || []).length, all = (explore.clinical || []).length;
+                return shown < all && <span className="meta" data-charted={shown + "/" + all}>
+                  {shown} of {all.toLocaleString()} clinical attributes charted — the rest are in Add chart</span>;
+              })()}
               {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
             </div>
           )}

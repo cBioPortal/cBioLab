@@ -290,12 +290,15 @@ async function main() {
       ok("value bars stay small", !!vals.bars && !!barBox && barBox.h <= 10 && barBox.w <= 80,
         barBox ? vals.bars + " bars, " + barBox.w + "x" + barBox.h + "px" : "no bars found");
 
-      // Every clinical attribute shows by default now (checked/unchecked from
-      // "+ Add chart" > Clinical, not a positional "show N more" cutoff) — this
-      // selection carries 66 attributes, well past the old default cap of 20.
+      // The grid draws the checked attributes of "+ Add chart" > Clinical, and until the
+      // reader changes them those are cBioPortal's default: the first 20 with a priority
+      // above 0 — this selection carries 66, and drawing every one is what froze the page
+      // across many studies. The rest are said to be there, never silently missing.
       const attrTileCount = await page.locator("[data-attr]").count();
-      ok("every clinical attribute shows by default, no positional cutoff",
-        attrTileCount > 20, attrTileCount + " attribute tiles");
+      const charted = (await page.locator("[data-charted]").getAttribute("data-charted").catch(() => null)) || "";
+      ok("Explore charts the portal's default 20 attributes and says how many it leaves out",
+        attrTileCount === 20 && charted === "20/" + charted.split("/")[1] && Number(charted.split("/")[1]) > 20,
+        attrTileCount + " attribute tiles, charted " + (charted || "(no note)"));
 
       ok("derived facets appear and filter", derivedFacetsHidden || (der.facets >= 2 && der.filtered),
         derivedFacetsHidden ? "skipped — Derived facets card is currently hidden (SHOW_DERIVED_FACETS=false)" :

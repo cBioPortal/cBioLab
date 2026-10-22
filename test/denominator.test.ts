@@ -96,7 +96,21 @@ describe("gene frequencies keep a panel-aware denominator", () => {
     const merge = explore.slice(explore.indexOf("const mergeGeneTable"), explore.indexOf("const mergeGeneTable") + 900);
     assert.match(merge, /cur\.altered \+= r\.altered/);
     assert.match(merge, /cur\.profiled \+= r\.profiled/);
-    assert.match(merge, /freqPct:.*altered\s*\/\s*r?\.?profiled/s,
+    assert.match(merge, /cur\.alteredOnPanel = \(cur\.alteredOnPanel \?\? 0\) \+ \(r\.alteredOnPanel \?\? r\.altered\)/,
+      "the frequency's numerator must be summed across participants like the other two");
+    assert.match(merge, /freqPct:.*\(r\.alteredOnPanel \?\? r\.altered\)\s*\/\s*r\.profiled/s,
       "the percentage must be derived from the summed totals, not averaged");
+  });
+
+  test("an off-panel call counts in altered but not in the frequency", () => {
+    // A call in a gene its sample's panel does not cover: that sample is not in `profiled`, so
+    // counting it in the numerator sets a numerator against a denominator it is not part of —
+    // SV EWSR1 read 72/407 = 17.7% where cBioPortal's study view shows 0/407. The portal counts
+    // such a sample in "#" (numberOfAlteredCases) and leaves it out of Freq
+    // (numberOfAlteredCasesOnPanel); check:portal compares all three numbers.
+    assert.match(src, /uniqExactIf\(sample_unique_id, NOT off_panel\) AS on_panel/,
+      "the on-panel count must come from the event's off_panel flag");
+    assert.match(src, /freqPct: profiled \? Math\.round\(1000 \* onPanel \/ profiled\)/,
+      "the frequency's numerator is the on-panel count");
   });
 });
