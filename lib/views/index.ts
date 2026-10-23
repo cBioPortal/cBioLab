@@ -40,6 +40,7 @@ import { runMultistate } from "./multistate.ts";
 import { runRmst } from "./rmst.ts";
 import { runPredictive } from "./predictive.ts";
 import { runCutpoint } from "./cutpoint.ts";
+import { runHla } from "./hla.ts";
 import { runForest } from "./forest.ts";
 import { runAdjusted } from "./adjusted.ts";
 import { runInstability } from "./instability.ts";
@@ -100,6 +101,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   rmst: drawn(runRmst),
   predictive: drawn(runPredictive),
   cutpoint: drawn(runCutpoint),
+  hla: drawn(runHla),
   forest: drawn(runForest),
   adjusted: drawn(runAdjusted),
   instability: drawn(runInstability),

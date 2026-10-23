@@ -1694,6 +1694,57 @@ export interface CutpointResult extends CutpointScan {
   };
 }
 
+/**
+ * HLA class I genotype and HLA loss of heterozygosity against outcome (Chowell et al. 2018;
+ * McGranahan et al. 2017): per cohort, the share of fully typed patients homozygous at 0, 1 or
+ * 2+ of HLA-A, -B and -C, the share with HLA LOH in a tumour sample, and overall survival by
+ * homozygous-at-any-locus against fully heterozygous and by HLA LOH against none.
+ */
+export interface HlaView {
+  note?: string;
+  kind: "hla"; cohorts?: string[];
+  /** fields of the allele name compared: 1 (allele group, A*02), 2 (protein, A*02:01; default) or "full" */
+  resolution?: 1 | 2 | "full";
+  /** per locus, the attributes holding its two alleles ([first, second]) or one holding both ("A*02:01/A*24:02"); default: the layouts MSK-IMPACT and the melanoma/NSCLC immunotherapy studies use */
+  alleles?: { A?: string[]; B?: string[]; C?: string[] };
+  /** sample attributes calling HLA LOH (default HLA_A1_LOH … HLA_C2_LOH, HLA_LOH) and the values that mean loss (default Loss, Yes, LOH, True) */
+  lohAttributes?: string[]; lohValues?: string[];
+  endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
+  /** clinical attributes the adjusted Cox fit adds (at most 4; numbers as they are, categories against the commonest) */
+  covariates?: string[];
+}
+export interface HlaHr { hr: number; ciLow: number; ciHigh: number; p: number; n: number; events: number }
+export interface HlaSplit {
+  /** the two groups' OS curves (exposed first), the log-rank test (stratified by study when pooled) and Cox HRs of exposed against not */
+  curves: (Omit<KmCurve, "cohort"> & { label: string })[];
+  logrank: LogRank | null;
+  hr: HlaHr | null;
+  /** with covariates: the HR adjusted for them, on the patients with every covariate */
+  adjusted: HlaHr | null;
+}
+export interface HlaPanel {
+  cohort: string;
+  /** cohort patients, patients with any class I allele recorded, and those typed at all three loci */
+  patients: number; anyTyped: number; typed: number;
+  /** fully typed patients homozygous at 0, 1, 2 and 3 loci */
+  homozygous: [number, number, number, number];
+  /** per locus (A, B, C): patients typed there and homozygous there */
+  loci: { locus: "A" | "B" | "C"; typed: number; homozygous: number }[];
+  /** typed at fewer allele-name fields than the resolution asks (compared at what they have) */
+  coarser: number;
+  /** patients with an HLA LOH call in some sample, and those with a loss */
+  lohEvaluated: number; loh: number;
+  /** OS by homozygous at ≥ 1 locus vs none, and by HLA LOH vs none; null with why when not drawn */
+  byHomozygosity: HlaSplit | null; byHomozygosityWhy?: string;
+  byLoh: HlaSplit | null; byLohWhy?: string;
+  /** patients without the endpoint, and (with covariates) without a covariate, left out of the fits */
+  noOutcome: number; noCovariate: number;
+}
+export interface HlaResult {
+  resolution: 1 | 2 | "full"; endpoint: string; covariates: string[];
+  panels: HlaPanel[];
+}
+
 export interface LabsView {
   note?: string;
   kind: "labs"; cohorts?: string[];
@@ -2119,7 +2170,7 @@ import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView | ActionabilityView | DrivernegativeView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | MultistateView | RmstView | PredictiveView | CutpointView | InstabilityView
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | MultistateView | RmstView | PredictiveView | CutpointView | HlaView | InstabilityView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
 export type ViewKind = View["kind"];
@@ -2569,6 +2620,9 @@ export interface ViewResultFields {
   predictive: {
     predictive?: PredictiveResult;
   };
+  hla: {
+    hla?: HlaResult;
+  };
   cutpoint: {
     cutpoint?: CutpointResult;
   };
@@ -2617,7 +2671,7 @@ export interface ViewResultMain {
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
   cancertypes: "cancertypes"; overlap: "overlap"; enrichment: "enrichment"; assays: "assays";
   composition: "composition"; correlates: "correlates"; table: "table"; timeline: "timeline";
-  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity"; txendpoints: "txendpoints"; multistate: "multistate"; rmst: "rmst"; predictive: "predictive"; cutpoint: "cutpoint"; instability: "instability";
+  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity"; txendpoints: "txendpoints"; multistate: "multistate"; rmst: "rmst"; predictive: "predictive"; cutpoint: "cutpoint"; hla: "hla"; instability: "instability";
 }
 /** a result that was drawn: no error, not waiting, and its main field present */
 type Drawn<K extends ViewKind> = { error?: undefined; empty?: undefined } & ViewResultFields[K]

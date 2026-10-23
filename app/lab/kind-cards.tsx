@@ -80,6 +80,8 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
     why: (k) => k.events.some((e) => /lab/i.test(e.canonical)) ? null : "this study records no lab-test timeline events" },
   incidence: { label: "Cumulative incidence (competing risks)", title: "Cumulative incidence", maxCohorts: 6,
     why: (k) => k.events.length ? null : "this study records no timeline events to estimate the incidence of" },
+  hla: { label: "HLA class I genotype (homozygosity, HLA LOH and OS)", title: "HLA class I genotype", maxCohorts: 3,
+    why: (k) => k.attrs.some((a) => /^hla[-_]?[abc]/i.test(a.attribute)) ? null : "this study records no HLA class I alleles" },
   cutpoint: { label: "Biomarker cut-point (best split of a number for OS)", title: "Cut-point", maxCohorts: 1,
     why: (k) => k.attrs.some((a) => a.kind === "num") ? null : "this study has no numeric clinical attribute to find a cut-point of" },
   predictive: { label: "Predictive biomarkers (gene × treatment interaction)", title: "Predictive biomarkers", genes: true, maxCohorts: 2,
@@ -236,6 +238,8 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     return (e.label || e.eventType || "no event chosen") +
       (an && an.eventType ? " from first " + an.eventType + (an.key ? " [" + an.key + "=" + an.value + "]" : "") : " from day 0") + ", death competing";
   }
+  if (kind === "hla") return "alleles at " + (spec.resolution === 1 ? "1 field" : spec.resolution === "full" ? "full resolution" : "2 fields") + " · " + (spec.endpoint || "OS") +
+    " by homozygosity and by HLA LOH" + (spec.covariates && spec.covariates.length ? " · adjusted for " + spec.covariates.join(", ") : "");
   if (kind === "cutpoint") return (spec.attribute || "TMB_NONSYNONYMOUS") + " on " + (spec.endpoint || "OS") + " · best log-rank cut, " + (spec.permutations ?? 1000) + " permutations" +
     (spec.stratifyBy ? " · per " + spec.stratifyBy : "");
   if (kind === "predictive") {
@@ -725,6 +729,28 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       </div>
     );
   }
+  if (spec.kind === "hla") {
+    const nums = c.attrs.filter((a) => a.kind === "num").map((a) => a.attribute);
+    const cov = (spec.covariates || [])[0] || "";
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="how many fields of the allele name must match for a locus to count as homozygous">
+            resolution <OptionSelect value={String(spec.resolution ?? 2)} disabled={busy} onValueChange={(v) => patch({ resolution: v === "full" ? "full" : v === "1" ? 1 : undefined })}>
+              <option value="1">1 field (A*02)</option><option value="2">2 fields (A*02:01)</option><option value="full">full</option>
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="a numeric attribute the adjusted hazard ratio adds (e.g. tumour mutational burden)">
+            adjust for <OptionSelect value={cov} disabled={busy} onValueChange={(v) => patch({ covariates: v ? [v] : undefined })}>
+              <option value="">(unadjusted)</option>
+              {cov && !nums.includes(cov) && <option value={cov}>{cov}</option>}
+              {nums.map((a) => <option key={a} value={a}>{a}</option>)}
+            </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "cutpoint") {
     const nums = c.attrs.filter((a) => a.kind === "num").map((a) => a.attribute);
     const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
@@ -1104,6 +1130,10 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
     return { kind, test: "PSA", anchor: { eventType: tx ? tx.label : "Treatment" } };
+  }
+  if (kind === "hla") {
+    const tmb = known.attrs.find((a) => a.attribute === "TMB_NONSYNONYMOUS" || a.attribute === "TMB_SCORE");
+    return tmb ? { kind, covariates: [tmb.attribute] } : { kind };
   }
   if (kind === "cutpoint") {
     const num = known.attrs.find((a) => a.attribute === "TMB_NONSYNONYMOUS") || known.attrs.find((a) => a.kind === "num");

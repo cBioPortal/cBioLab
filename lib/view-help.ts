@@ -135,6 +135,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "Asks, for each pair of genes, whether tumours carry changes in both more or less often than chance — \"mutually exclusive\" genes are rarely changed together, which can mean either change alone is enough to drive the cancer. Its sense of \"chance\" accounts for how many changes each tumour has overall: a tumour with hundreds of changes is expected to share genes with many others, so it does not make two genes look linked just because they both turn up in heavily altered tumours. Beside it is the simpler test that ignores this, to show the difference."
   },
+  hla: {
+    title: "What is this?",
+    text: "HLA class I molecules (HLA-A, -B and -C) show pieces of a tumour's proteins to the immune system. Everyone inherits two copies of each; a person who inherited two identical copies at a gene (homozygous) shows a narrower range of pieces, and a tumour can also lose one copy (HLA loss of heterozygosity) to hide. This shows how common each is in a cohort, and whether patients homozygous at any of the three genes, or whose tumour lost a copy, lived shorter or longer. In patients treated with immunotherapy, homozygosity has been linked to worse survival; in a cohort not limited to them the comparison describes prognosis, not response to treatment."
+  },
   cutpoint: {
     title: "What is this?",
     text: "Looks for the value of a measurement — such as tumour mutational burden — that best splits patients into a group that did better and a group that did worse. It tries every reasonable dividing line (from the lowest tenth of patients to the highest) and draws how strongly each one separates survival; the dot marks the best. Because trying many lines and keeping the best always finds something, the view also reshuffles the measurement among the patients a thousand times to see how good a 'best line' chance alone produces, and reports how surprising the real best line is once that search is accounted for. A line found this way needs checking in other patients before anyone relies on it."

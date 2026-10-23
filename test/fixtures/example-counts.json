@@ -258,6 +258,12 @@
     "A tumour mutational burden cut-point for survival on immunotherapy": {
       "all patients": 1661
     },
+    "HLA class I homozygosity and HLA loss in lung cancer, and survival": {
+      "NSCLC": 6633
+    },
+    "HLA class I homozygosity and survival on checkpoint blockade in melanoma": {
+      "melanoma on checkpoint blockade": 212
+    },
     "PSA response to hormone therapy, by TP53 status": {
       "Prostate, TP53 mutant": 849,
       "Prostate, TP53 wild-type": 2284

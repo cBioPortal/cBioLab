@@ -440,6 +440,10 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),
     // run only by PatientLevelResolver.viewRows: one row of values per patient, no identifier
     "cutpointRowsSql": () => federation.cutpointRowsSql(cohortSql, "x", "db", { attribute: "TMB_NONSYNONYMOUS", months: "OS_MONTHS", status: "OS_STATUS" }),
+    // run only by PatientLevelResolver.viewRows: one row of genotype, LOH, endpoint and covariate values per patient, no identifier
+    "hlaRowsSql": () => federation.hlaRowsSql(cohortSql, "x", "db", { loci: ["A", "B", "C"].map((l) => ({ first: ["HLA-" + l + "1"], second: ["HLA-" + l + "2"], pair: ["HLA_" + l] })),
+      fields: 2, lohAttributes: ["HLA_A1_LOH"], lohValues: ["Loss"], months: "OS_MONTHS", status: "OS_STATUS", covariates: ["TMB_SCORE", "CANCER_TYPE"] }),
+    "hlaAttributesSql": () => federation.hlaAttributesSql(cohortSql, "x", "db"),
     "cutpointRowsSql:stratified": () => federation.cutpointRowsSql(cohortSql, "x", "db", { attribute: "TMB_NONSYNONYMOUS", months: "OS_MONTHS", status: "OS_STATUS", stratum: "CANCER_TYPE" }),
     "labTestsSql": () => federation.labTestsSql(cohortSql, "x", "db", "Lab_Test", "TEST"),
     // cancertypes: `alt`/`per`/`covered` hold samples; the outer SELECT counts them per group

@@ -26,6 +26,7 @@ import { multistateSvg } from "./multistate.ts";
 import { rmstSvg } from "./rmst.ts";
 import { predictiveSvg } from "./predictive.ts";
 import { cutpointSvg } from "./cutpoint.ts";
+import { hlaSvg } from "./hla.ts";
 import { metaForestSvg } from "./forest.ts";
 import { adjustedSvg } from "./adjusted.ts";
 import { instabilitySvg } from "./instability.ts";
@@ -124,6 +125,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   exclusivity: {
     draw: (v, o) => v.exclusivity && v.exclusivity.pairs.length ? exclusivitySvg(v, o) : null,
     title: (v) => "Mutual exclusivity (DISCOVER)" + (v.exclusivity ? " — " + v.exclusivity.cohort : "")
+  },
+  hla: {
+    draw: (v, o) => v.hla.panels.some((pn) => pn.typed || pn.lohEvaluated) ? hlaSvg(v, o) : null,
+    title: (v) => "HLA class I genotype and " + (v.hla ? v.hla.endpoint : "OS")
   },
   cutpoint: {
     draw: (v, o) => v.cutpoint.candidates.length ? cutpointSvg(v, o) : null,
