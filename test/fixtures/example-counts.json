@@ -226,6 +226,9 @@
       "NSCLC, KRAS mutant": 2194,
       "NSCLC, KRAS wild-type": 5540
     },
+    "Which mutations change survival on immunotherapy in lung cancer?": {
+      "NSCLC": 7809
+    },
     "PSA response to hormone therapy, by TP53 status": {
       "Prostate, TP53 mutant": 849,
       "Prostate, TP53 wild-type": 2284

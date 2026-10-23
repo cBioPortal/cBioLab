@@ -1287,6 +1287,45 @@ export interface TxendpointsResult {
   excludedStudies?: { study: string; reason: string }[];
 }
 
+export interface PredictiveView {
+  note?: string;
+  kind: "predictive"; cohorts?: string[];
+  /** the exposure: patients with a timeline event of this type (and key = value) are exposed, the rest unexposed */
+  exposure: { eventType: string; key?: string; value?: string };
+  /** the candidate biomarkers (at most 20); each is fitted alone, over the patients profiled for it */
+  genes: string[];
+  endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
+  /** "any" mutation (default) or OncoKB drivers only */
+  measure?: "any" | "driver";
+  /** clinical attributes adjusted for (at most 6): numbers as they are, categories as indicators against the commonest level */
+  covariates?: string[];
+  /** a gene is fitted only with at least this many mutated patients in each exposure group (default 5) */
+  minMutated?: number;
+}
+export interface PredictiveEffect { hr: number; ciLow: number; ciHigh: number; p: number }
+export interface PredictiveGene {
+  gene: string;
+  /** patients profiled for the gene (and with every covariate), by exposure, and those of them mutated */
+  exposed: number; unexposed: number; mutatedExposed: number; mutatedUnexposed: number; events: number;
+  /** the gene's hazard ratio among the exposed and among the unexposed, and their ratio (the interaction); null when not fitted */
+  inExposed: PredictiveEffect | null; inUnexposed: PredictiveEffect | null; interaction: PredictiveEffect | null;
+  /** Benjamini–Hochberg over the fitted genes' interaction p */
+  q: number | null;
+  /** why the gene was not fitted */
+  skipped?: string;
+}
+export interface PredictiveResult {
+  exposure: string; endpoint: string; measure: "any" | "driver";
+  /** patients with a survival time and every covariate, and how many of them are exposed */
+  n: number; exposed: number; events: number;
+  /** patients left out: no mutation panel on record, a covariate missing */
+  notProfiled: number; noCovariate: number;
+  covariates: string[]; minMutated: number;
+  /** the fits' baseline hazard is stratified by these (cohort and study, when several) */
+  strata: number;
+  genes: PredictiveGene[];
+}
+
 export interface LabsView {
   note?: string;
   kind: "labs"; cohorts?: string[];
@@ -1712,7 +1751,7 @@ import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | PredictiveView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
 export type ViewKind = View["kind"];
@@ -2138,6 +2177,9 @@ export interface ViewResultFields {
   txendpoints: {
     txendpoints?: TxendpointsResult;
   };
+  predictive: {
+    predictive?: PredictiveResult;
+  };
   riskmodel: {
     riskmodel?: RiskmodelResult;
   };
@@ -2183,7 +2225,7 @@ export interface ViewResultMain {
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
   cancertypes: "cancertypes"; overlap: "overlap"; enrichment: "enrichment"; assays: "assays";
   composition: "composition"; correlates: "correlates"; table: "table"; timeline: "timeline";
-  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity"; txendpoints: "txendpoints";
+  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity"; txendpoints: "txendpoints"; predictive: "predictive";
 }
 /** a result that was drawn: no error, not waiting, and its main field present */
 type Drawn<K extends ViewKind> = { error?: undefined; empty?: undefined } & ViewResultFields[K]

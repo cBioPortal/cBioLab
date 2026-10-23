@@ -95,3 +95,77 @@ export function logisticSvg(v: DrawnResultOf<"logistic">, o: SvgOpts): string {
   const panels: Panel[] = [{ heading: null, coefs: (v.logistic?.coefficients || []).map((cf) => ({ ...cf, ratio: cf.or })) }];
   return forestSvg(panels, Math.max(520, o.width || 760), o.theme, "OR", v.caveat || "", "Logistic regression — odds ratios");
 }
+
+/** One row of a two-marker forest: a label, two ratios with their intervals (either may be missing), and a test's p (and q). */
+export interface DualForestRow {
+  label: string; detail?: string;
+  a: { ratio: number; ciLow: number; ciHigh: number } | null;
+  b: { ratio: number; ciLow: number; ciHigh: number } | null;
+  p: number | null; q?: number | null;
+  /** why the row has no estimates */
+  note?: string;
+}
+
+/**
+ * A forest with two markers per row — the same effect in two groups (a above b, each its own
+ * series colour) on one log axis — and a test column on the right (p, and q where given), e.g. a
+ * gene's hazard ratio among the treated and the untreated with the p of their interaction.
+ */
+export function dualForestSvg(rows: DualForestRow[], o: { width?: number; theme?: SvgOpts["theme"]; ratioName: string; names: [string, string];
+  testName: string; note: string; title: string }): string {
+  const W = Math.max(520, o.width || 760), p = palette(o.theme);
+  const RR = 30, val = (e: DualForestRow["a"]) => e ? fmtRatio(e.ratio) + " [" + fmtRatio(e.ciLow) + "–" + fmtRatio(e.ciHigh) + "]" : "—";
+  const pText = (r: DualForestRow) => r.p == null ? (r.note ? "" : "—") : pDigits(r.p) + (r.q != null ? " · q " + pDigits(r.q) : "");
+  const labW = Math.min(W * 0.26, Math.max(textWidth(o.ratioName, FS.small), ...rows.map((r) => Math.max(textWidth(r.label, FS.body, 600), r.detail ? textWidth(r.detail, FS.small) : 0))));
+  const valW = Math.max(...o.names.map((n) => textWidth(n, FS.small)), ...rows.flatMap((r) => [textWidth(val(r.a), FS.small), textWidth(val(r.b), FS.small)]));
+  const pW = Math.max(textWidth(o.testName, FS.small), ...rows.map((r) => textWidth(pText(r), FS.body)));
+  const L = 8 + labW + 14, R = W - 8 - pW - 14 - valW - 14;
+  const ests = rows.flatMap((r) => [r.a, r.b]).filter((e): e is NonNullable<DualForestRow["a"]> => !!e && Number.isFinite(e.ratio) && e.ratio > 0);
+  const eLo = Math.min(1, ...ests.map((e) => e.ratio)), eHi = Math.max(1, ...ests.map((e) => e.ratio));
+  const lims = [eLo / 4, eHi * 4];
+  const ci = ests.flatMap((e) => [e.ciLow, e.ciHigh]).filter((x) => Number.isFinite(x) && x > 0).map((x) => Math.min(lims[1], Math.max(lims[0], x)));
+  const xs = log(Math.min(eLo, ...ci) * 0.9, Math.max(eHi, ...ci) * 1.1, L, R, { nice: false });
+  const [d0, d1] = xs.domain;
+  const out: string[] = [];
+  // the two groups' key, then the column heads
+  let kx = L;
+  o.names.forEach((n, k) => {
+    out.push(`<rect x="${r1(kx)}" y="5" width="8" height="8" fill="${SERIES[k === 0 ? 0 : 4]}"/>`);
+    out.push(label(kx + 12, 13, n, { size: FS.small, fill: p.ink }));
+    kx += 12 + textWidth(n, FS.small) + 24;
+  });
+  const HEAD = 34;
+  out.push(label(R + 14, HEAD - 6, o.ratioName + " [95% CI]", { size: FS.small, fill: p.muted }));
+  out.push(label(W - 8, HEAD - 6, o.testName, { size: FS.small, fill: p.muted, anchor: "end" }));
+  let y = HEAD, offScale = 0;
+  rows.forEach((r, i) => {
+    if (i % 2 === 0) out.push(`<rect x="4" y="${y}" width="${W - 8}" height="${RR}" fill="${p.line}" opacity="0.35"/>`);
+    out.push(label(8, y + 13, r.label, { size: FS.body, fill: p.ink, weight: 600, maxW: labW }));
+    if (r.detail) out.push(label(8, y + 25, r.detail, { size: FS.small, fill: p.muted, maxW: labW }));
+    if (r.note && !r.a && !r.b) out.push(label(L, y + RR / 2 + FS.small * 0.35, r.note, { size: FS.small, fill: p.muted, maxW: W - 8 - L }));
+    ([r.a, r.b] as const).forEach((e, k) => {
+      const cy = y + (k === 0 ? 10 : 21), col = SERIES[k === 0 ? 0 : 4];
+      if (!e) return;
+      const lo = Math.max(e.ciLow, d0), hi = Math.min(e.ciHigh, d1);
+      if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo)
+        out.push(`<line x1="${r1(xs(lo))}" y1="${cy}" x2="${r1(xs(hi))}" y2="${cy}" stroke="${col}" stroke-width="${SW.series}"/>`);
+      for (const [past, at, dir] of [[e.ciLow < d0, xs(d0), -1], [e.ciHigh > d1, xs(d1), 1]] as [boolean, number, number][]) {
+        if (!past) continue;
+        offScale++;
+        out.push(`<path d="M${r1(at)} ${cy} l${-dir * 6} -3.5 v7 Z" fill="${col}"/>`);
+      }
+      if (e.ratio > 0 && Number.isFinite(e.ratio)) out.push(`<rect x="${r1(xs(Math.min(d1, Math.max(d0, e.ratio))) - 3.5)}" y="${cy - 3.5}" width="7" height="7" fill="${col}"/>`);
+      out.push(label(R + 14, cy + FS.small * 0.35, val(e), { size: FS.small, fill: p.ink }));
+    });
+    const sig = r.p != null && r.p < 0.05;
+    out.push(label(W - 8, y + RR / 2 + FS.body * 0.35, pText(r), { size: FS.body, fill: sig ? p.ink : p.muted, anchor: "end", weight: sig ? 600 : 400 }));
+    y += RR;
+  });
+  out.push(`<line x1="${r1(xs(1))}" y1="${HEAD - 2}" x2="${r1(xs(1))}" y2="${y}" stroke="${p.muted}" stroke-width="${SW.line}" stroke-dasharray="3 3"/>`);
+  const axTitle = o.ratioName + " (log scale) — left of 1 is lower, right is higher";
+  out.push(axisBottom(xs, y + 4, p, { title: axTitle, minX: L - 20, maxX: R + 20 }));
+  y += 4 + bottomAxisHeight(axTitle) + 6;
+  const cap = caption(o.note + (offScale ? " " + offScale + " interval end" + (offScale === 1 ? " runs" : "s run") +
+    " past the axis and " + (offScale === 1 ? "is" : "are") + " drawn as an arrow; the numbers beside it are exact." : ""), W, y, p.muted);
+  return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, false, o.title);
+}

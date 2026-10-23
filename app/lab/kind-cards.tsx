@@ -80,6 +80,8 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
     why: (k) => k.events.some((e) => /lab/i.test(e.canonical)) ? null : "this study records no lab-test timeline events" },
   incidence: { label: "Cumulative incidence (competing risks)", title: "Cumulative incidence", maxCohorts: 6,
     why: (k) => k.events.length ? null : "this study records no timeline events to estimate the incidence of" },
+  predictive: { label: "Predictive biomarkers (gene × treatment interaction)", title: "Predictive biomarkers", genes: true, maxCohorts: 2,
+    why: (k) => k.events.some((e) => /treat|therap|drug|medicat/i.test(e.canonical)) ? null : "this study records no treatment timeline events to define an exposure" },
   txendpoints: { label: "Treatment endpoints (TTNT, time on treatment, real-world PFS)", title: "Treatment endpoints", maxCohorts: 6,
     why: (k) => k.events.some((e) => /treat|therap|drug|medicat/i.test(e.canonical)) ? null : "this study records no treatment timeline events" },
   clonality: { label: "Clonality (FACETS)", title: "Clonality", genes: true, maxCohorts: 3 },
@@ -206,6 +208,11 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     const an = spec.anchor;
     return (e.label || e.eventType || "no event chosen") +
       (an && an.eventType ? " from first " + an.eventType + (an.key ? " [" + an.key + "=" + an.value + "]" : "") : " from day 0") + ", death competing";
+  }
+  if (kind === "predictive") {
+    const ex = spec.exposure || {};
+    return "gene × " + (ex.eventType || "?") + (ex.key ? " [" + ex.key + "=" + ex.value + "]" : "") + " on " + (spec.endpoint || "OS") +
+      (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") + " · Cox per gene";
   }
   if (kind === "txendpoints") {
     const an = spec.anchor || {};
@@ -553,6 +560,30 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       </div>
     );
   }
+  if (spec.kind === "predictive") {
+    const ex = spec.exposure || { eventType: "Treatment" };
+    const types = c.events.map((x) => x.label);
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">exposure</span>
+          <label className="tbfield" title="patients with an event of this type are exposed, the rest unexposed">
+            had <OptionSelect value={ex.eventType || ""} disabled={busy} onValueChange={(v) => patch({ exposure: { ...ex, eventType: v } })}>
+              {!types.includes(ex.eventType) && <option value={ex.eventType || ""}>{ex.eventType || "choose…"}</option>}
+              {types.map((t) => <option key={t} value={t}>{t}</option>)}
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="only events with this attribute (e.g. SUBTYPE, AGENT); empty for any">
+            where <DraftInput value={ex.key || ""} disabled={busy} width="6rem" placeholder="attribute"
+              onCommit={(t) => patch({ exposure: { eventType: ex.eventType, ...(t.trim() ? { key: t.trim(), value: ex.value || "" } : {}) } })} />
+          </label>
+          <label className="tbfield" title="the value that attribute must take (e.g. Immuno)">
+            = <DraftInput value={ex.value || ""} disabled={busy} width="7rem" placeholder="value"
+              onCommit={(t) => patch({ exposure: { ...ex, value: t } })} />
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "txendpoints") {
     const an = spec.anchor || { eventType: "Treatment" };
     const types = c.events.map((x) => x.label);
@@ -810,6 +841,10 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
     return { kind, test: "PSA", anchor: { eventType: tx ? tx.label : "Treatment" } };
+  }
+  if (kind === "predictive") {
+    const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
+    return { kind, exposure: { eventType: tx ? tx.label : "Treatment", key: "SUBTYPE", value: "Immuno" }, genes: known.genes.length ? known.genes.slice(0, 8) : ["STK11", "KEAP1", "KRAS", "TP53", "EGFR"] };
   }
   if (kind === "txendpoints") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));

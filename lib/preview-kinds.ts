@@ -6,6 +6,7 @@ export const PREVIEW_KINDS: Record<string, string> = {
   acquired: "no method record or golden test of the before/after pairing and McNemar counts yet",
   ctdna: "no method record or golden test of the agreement counts, Wilson intervals and survival split yet",
   exclusivity: "no method record or golden test of the DISCOVER background fit against the R package yet",
+  predictive: "no method record or golden test of the per-gene interaction fits yet",
   txendpoints: "no method record or golden test of the endpoint derivation (lines, stops, progression) or the median intervals yet",
 };
 

@@ -320,6 +320,14 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         "\n  genes kept most often: " + m.features.slice(0, 15).map((f) => `${f.gene} ${Math.round(f.selected * 100)}% HR ${f.hr.toFixed(2)}`).join(", ") +
         (m.neverHeldOut ? `\n  ${m.neverHeldOut} patients were never held out, so have no score` : "") +
         caveatOf(v) + methodOf(v) + noteOf(v));
+    } else if (v.kind === "predictive") {
+      const m = v.predictive;
+      const eff = (e: { hr: number; ciLow: number; ciHigh: number; p: number } | null) => e ? `HR ${e.hr.toFixed(2)} (95% CI ${e.ciLow.toFixed(2)}-${e.ciHigh.toFixed(2)}, ${pFmt(e.p)})` : "n/a";
+      out.push(`Predictive biomarkers: gene x ${m.exposure} on ${m.endpoint} (Cox per gene; ${m.n.toLocaleString()} patients, ${m.exposed.toLocaleString()} exposed, ${m.events.toLocaleString()} events` +
+        (m.covariates.length ? `; adjusted for ${m.covariates.join(", ")}` : "") + `):\n` +
+        m.genes.map((g) => `  ${g.gene}: mutated ${g.mutatedExposed}/${g.exposed} exposed, ${g.mutatedUnexposed}/${g.unexposed} unexposed; ` +
+          (g.interaction ? `among exposed ${eff(g.inExposed)}; among unexposed ${eff(g.inUnexposed)}; interaction ${eff(g.interaction)}, q=${pFmt(g.q!)}` : `not fitted: ${g.skipped}`)).join("\n") +
+        caveatOf(v) + noteOf(v));
     } else if (v.kind === "txendpoints") {
       const t = v.txendpoints;
       out.push(`Treatment endpoint: ${t.endpointLabel} from ${t.anchoredTo} (Kaplan-Meier):\n` +
