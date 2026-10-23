@@ -1,0 +1,143 @@
+{
+  "study": "sarcoma_msk_2022",
+  "cohorts": {
+    "Well-diff liposarcoma": {
+      "count": 444,
+      "text": "CANCER_TYPE_DETAILED in [Well-Differentiated Liposarcoma] (any sample)",
+      "studies": [
+        "sarcoma_msk_2022"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "cohorts": [
+        "Well-diff liposarcoma"
+      ],
+      "annotation": "OncoKB v7.5 (pinned)",
+      "rows": [
+        {
+          "gene": "MDM2",
+          "cells": [
+            {
+              "cohort": "Well-diff liposarcoma",
+              "profiled": 444,
+              "any": 0,
+              "driver": 0,
+              "anyPct": 0,
+              "driverPct": 0,
+              "byType": {
+                "mutation": {
+                  "profiled": 444,
+                  "altered": 0
+                },
+                "cna": {
+                  "profiled": 0,
+                  "altered": 0
+                },
+                "structuralVariant": {
+                  "profiled": 444,
+                  "altered": 0
+                }
+              }
+            }
+          ]
+        },
+        {
+          "gene": "TP53",
+          "cells": [
+            {
+              "cohort": "Well-diff liposarcoma",
+              "profiled": 444,
+              "any": 17,
+              "driver": 7,
+              "anyPct": 3.8,
+              "driverPct": 1.6,
+              "byType": {
+                "mutation": {
+                  "profiled": 444,
+                  "altered": 11
+                },
+                "cna": {
+                  "profiled": 0,
+                  "altered": 0
+                },
+                "structuralVariant": {
+                  "profiled": 444,
+                  "altered": 6
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "sarcoma_msk_2022",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "no copy-number data exists for sarcoma_msk_2022 — altered% reflects only mutation/structural-variant status, not a real negative for the missing type(s)",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count profiled and altered patients per gene",
+            "detail": "The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.",
+            "scope": "Well-diff liposarcoma · sarcoma_msk_2022",
+            "rowsIn": 444,
+            "params": [
+              [
+                "genes",
+                "2"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "No test",
+            "detail": "One cohort: frequencies only, nothing to compare against."
+          }
+        ],
+        "implementation": {
+          "functions": [],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "check": {
+          "compare:MDM2:Well-diff liposarcoma:profiled": {
+            "v": 444,
+            "abs": 0
+          },
+          "compare:MDM2:Well-diff liposarcoma:altered": {
+            "v": 0,
+            "abs": 0
+          },
+          "compare:MDM2:Well-diff liposarcoma:driver": {
+            "v": 0,
+            "abs": 0
+          },
+          "compare:TP53:Well-diff liposarcoma:profiled": {
+            "v": 444,
+            "abs": 0
+          },
+          "compare:TP53:Well-diff liposarcoma:altered": {
+            "v": 17,
+            "abs": 0
+          },
+          "compare:TP53:Well-diff liposarcoma:driver": {
+            "v": 7,
+            "abs": 0
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,399 @@
+{
+  "study": "ucec_msk_2018",
+  "cohorts": {
+    "MSI-H": {
+      "count": 28,
+      "text": "MSI_STATUS in [MSI-H] (any sample)",
+      "studies": [
+        "ucec_msk_2018"
+      ]
+    },
+    "MSS": {
+      "count": 148,
+      "text": "MSI_STATUS in [MSS] (any sample)",
+      "studies": [
+        "ucec_msk_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "survival",
+      "cohorts": [
+        "MSI-H",
+        "MSS"
+      ],
+      "curves": [
+        {
+          "cohort": "MSI-H",
+          "points": [
+            {
+              "t": 0,
+              "s": 1
+            },
+            {
+              "t": 1.67,
+              "s": 0.9643
+            },
+            {
+              "t": 3.3,
+              "s": 0.9286
+            },
+            {
+              "t": 5.5,
+              "s": 0.8929
+            },
+            {
+              "t": 5.63,
+              "s": 0.8571
+            },
+            {
+              "t": 8.8,
+              "s": 0.8182
+            },
+            {
+              "t": 9.77,
+              "s": 0.7773
+            },
+            {
+              "t": 10.57,
+              "s": 0.7364
+            },
+            {
+              "t": 12.47,
+              "s": 0.693
+            },
+            {
+              "t": 13.37,
+              "s": 0.6497
+            },
+            {
+              "t": 13.77,
+              "s": 0.6064
+            },
+            {
+              "t": 15.03,
+              "s": 0.5631
+            },
+            {
+              "t": 18.3,
+              "s": 0.5162
+            },
+            {
+              "t": 18.37,
+              "s": 0.4693
+            },
+            {
+              "t": 20.9,
+              "s": 0.4223
+            },
+            {
+              "t": 21.63,
+              "s": 0.3754
+            },
+            {
+              "t": 24.9,
+              "s": 0.3285
+            },
+            {
+              "t": 29.6,
+              "s": 0.2816
+            },
+            {
+              "t": 30.5,
+              "s": 0.2346
+            },
+            {
+              "t": 32.57,
+              "s": 0.1877
+            },
+            {
+              "…": "4 more",
+              "sha256": "ae4e15c7574d45c3"
+            }
+          ],
+          "median": 18.37,
+          "n": 28,
+          "events": 23,
+          "atRisk": [
+            28,
+            28,
+            27,
+            27,
+            26,
+            26,
+            24,
+            23,
+            22,
+            20,
+            19,
+            18,
+            17,
+            16,
+            14,
+            14,
+            13,
+            13,
+            12,
+            10,
+            {
+              "…": "107 more",
+              "sha256": "ce019366da5426a4"
+            }
+          ],
+          "missing": 0
+        },
+        {
+          "cohort": "MSS",
+          "points": [
+            {
+              "t": 0,
+              "s": 1
+            },
+            {
+              "t": 1.9,
+              "s": 0.9932
+            },
+            {
+              "t": 2.57,
+              "s": 0.9865
+            },
+            {
+              "t": 2.6,
+              "s": 0.9797
+            },
+            {
+              "t": 2.9,
+              "s": 0.973
+            },
+            {
+              "t": 3.5,
+              "s": 0.9662
+            },
+            {
+              "t": 3.83,
+              "s": 0.9595
+            },
+            {
+              "t": 4.4,
+              "s": 0.9527
+            },
+            {
+              "t": 4.43,
+              "s": 0.9459
+            },
+            {
+              "t": 4.47,
+              "s": 0.9392
+            },
+            {
+              "t": 4.8,
+              "s": 0.9324
+            },
+            {
+              "t": 5.03,
+              "s": 0.9257
+            },
+            {
+              "t": 5.1,
+              "s": 0.9189
+            },
+            {
+              "t": 5.27,
+              "s": 0.9122
+            },
+            {
+              "t": 5.37,
+              "s": 0.9054
+            },
+            {
+              "t": 5.4,
+              "s": 0.8986
+            },
+            {
+              "t": 5.57,
+              "s": 0.8919
+            },
+            {
+              "t": 5.6,
+              "s": 0.8851
+            },
+            {
+              "t": 6.03,
+              "s": 0.8784
+            },
+            {
+              "t": 6.73,
+              "s": 0.8716
+            },
+            {
+              "…": "113 more",
+              "sha256": "d929e8ddbccaad19"
+            }
+          ],
+          "median": 15.3,
+          "n": 148,
+          "events": 142,
+          "atRisk": [
+            148,
+            148,
+            147,
+            144,
+            142,
+            138,
+            131,
+            128,
+            122,
+            115,
+            106,
+            96,
+            91,
+            83,
+            76,
+            75,
+            69,
+            66,
+            60,
+            57,
+            {
+              "…": "167 more",
+              "sha256": "348a13dfb556251a"
+            }
+          ],
+          "missing": 0
+        }
+      ],
+      "endpoint": "PFS_1L",
+      "participation": {
+        "studies": [
+          {
+            "study": "ucec_msk_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "logrank": {
+        "chi2": 0.3942,
+        "p": 0.5301191634922409,
+        "df": 1,
+        "observed": [
+          23,
+          141
+        ],
+        "expected": [
+          25.9,
+          138.1
+        ],
+        "variance": 21.5713,
+        "strata": 1
+      },
+      "caveat": "PFS_1L from each study's own baseline (left truncation applies) Status '0:...' treated as censored. Log-rank on a single study, so no stratification applies.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count patients by time and status",
+            "detail": "The survivalCounts:PFS_1L query above: patients grouped by identical PFS_MONTHS_FIRST_LINE_TX, event, returned as counts — no patient identifier leaves the database. Event: PROGRESSION_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.",
+            "scope": "MSI-H · ucec_msk_2018",
+            "rowsIn": 28,
+            "rowsOut": 28,
+            "params": [
+              [
+                "count rows",
+                "28"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count patients by time and status",
+            "detail": "The survivalCounts:PFS_1L query above: patients grouped by identical PFS_MONTHS_FIRST_LINE_TX, event, returned as counts — no patient identifier leaves the database. Event: PROGRESSION_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.",
+            "scope": "MSS · ucec_msk_2018",
+            "rowsIn": 148,
+            "rowsOut": 148,
+            "params": [
+              [
+                "count rows",
+                "138"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Estimate survival by Kaplan–Meier",
+            "detail": "The product-limit estimator, one curve per cohort, pooled over its studies. The median is the first time the curve is at or below 0.5.",
+            "params": [
+              [
+                "MSI-H",
+                "28 patients, 23 events, median 18.4 months"
+              ],
+              [
+                "MSS",
+                "148 patients, 142 events, median 15.3 months"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Two-group log-rank test",
+            "detail": "At each event time, every cohort's observed events against its share of the risk set, with the hypergeometric variance; χ² on 1 df.",
+            "params": [
+              [
+                "χ² / df / p",
+                "0.3942 / 1 / 0.530"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "kaplanMeier",
+            "logRank"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).",
+        "check": {
+          "km:MSI-H:n": {
+            "v": 28,
+            "abs": 0
+          },
+          "km:MSI-H:events": {
+            "v": 23,
+            "abs": 0
+          },
+          "km:MSI-H:median": {
+            "v": 18.37,
+            "abs": 1e-9
+          },
+          "km:MSS:n": {
+            "v": 148,
+            "abs": 0
+          },
+          "km:MSS:events": {
+            "v": 142,
+            "abs": 0
+          },
+          "km:MSS:median": {
+            "v": 15.3,
+            "abs": 1e-9
+          },
+          "logrank:chi2": {
+            "v": 0.3942,
+            "abs": 0.00005
+          },
+          "logrank:p": {
+            "v": 0.5301191634922409,
+            "rel": 0.00001,
+            "abs": 1e-300
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1562 @@
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "all patients": {
+      "count": 48179,
+      "text": "all patients in the study",
+      "studies": [
+        "msk_impact_50k_2026"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "cancertypes",
+      "cohorts": [
+        "all patients"
+      ],
+      "cancertypes": {
+        "groupBy": "CANCER_TYPE",
+        "measure": "any",
+        "genes": [
+          "KRAS",
+          "NRAS",
+          "HRAS"
+        ],
+        "minSamples": 200,
+        "show": "frequency",
+        "unit": "patient",
+        "panels": [
+          {
+            "cohort": "all patients",
+            "samples": 48179,
+            "profiled": 48179,
+            "altered": 10796,
+            "groups": [
+              {
+                "key": "pancreatic cancer",
+                "label": "Pancreatic Cancer",
+                "samples": 2729,
+                "profiled": 2729,
+                "altered": 2263,
+                "mutation": 2211,
+                "amp": 3,
+                "homdel": 0,
+                "sv": 0,
+                "multiple": 49,
+                "profiledFor": {
+                  "mutation": 2729,
+                  "cna": 2729,
+                  "sv": 2729
+                }
+              },
+              {
+                "key": "appendiceal cancer",
+                "label": "Appendiceal Cancer",
+                "samples": 269,
+                "profiled": 269,
+                "altered": 163,
+                "mutation": 163,
+                "amp": 0,
+                "homdel": 0,
+                "sv": 0,
+                "multiple": 0,
+                "profiledFor": {
+                  "mutation": 269,
+                  "cna": 269,
+                  "sv": 269
+                }
+              },
+              {
+                "key": "colorectal cancer",
+                "label": "Colorectal Cancer",
+                "samples": 4993,
+                "profiled": 4993,
+                "altered": 2450,
+                "mutation": 2383,
+                "amp": 48,
+                "homdel": 4,
+                "sv": 1,
+                "multiple": 14,
+                "profiledFor": {
+                  "mutation": 4993,
+                  "cna": 4993,
+                  "sv": 4993
+                }
+              },
+              {
+                "key": "non-small cell lung cancer",
+                "label": "Non-Small Cell Lung Cancer",
+                "samples": 6633,
+                "profiled": 6633,
+                "altered": 2103,
+                "mutation": 1943,
+                "amp": 71,
+                "homdel": 20,
+                "sv": 1,
+                "multiple": 68,
+                "profiledFor": {
+                  "mutation": 6633,
+                  "cna": 6633,
+                  "sv": 6633
+                }
+              },
+              {
+                "key": "germ cell tumor",
+                "label": "Germ Cell Tumor",
+                "samples": 663,
+                "profiled": 663,
+                "altered": 208,
+                "mutation": 78,
+                "amp": 114,
+                "homdel": 0,
+                "sv": 0,
+                "multiple": 16,
+                "profiledFor": {
+                  "mutation": 663,
+                  "cna": 663,
+                  "sv": 663
+                }
+              },
+              {
+                "key": "melanoma",
+                "label": "Melanoma",
+                "samples": 1706,
+                "profiled": 1706,
+                "altered": 506,
+                "mutation": 452,
+                "amp": 17,
+                "homdel": 4,
+                "sv": 0,
+                "multiple": 33,
+                "profiledFor": {
+                  "mutation": 1706,
+                  "cna": 1706,
+                  "sv": 1706
+                }
+              },
+              {
+                "key": "cancer of unknown primary",
+                "label": "Cancer of Unknown Primary",
+                "samples": 1535,
+                "profiled": 1535,
+                "altered": 395,
+                "mutation": 348,
+                "amp": 25,
+                "homdel": 7,
+                "sv": 1,
+                "multiple": 14,
+                "profiledFor": {
+                  "mutation": 1535,
+                  "cna": 1535,
+                  "sv": 1535
+                }
+              },
+              {
+                "key": "endometrial cancer",
+                "label": "Endometrial Cancer",
+                "samples": 2373,
+                "profiled": 2373,
+                "altered": 570,
+                "mutation": 541,
+                "amp": 19,
+                "homdel": 6,
+                "sv": 0,
+                "multiple": 4,
+                "profiledFor": {
+                  "mutation": 2373,
+                  "cna": 2373,
+                  "sv": 2373
+                }
+              },
+              {
+                "key": "thyroid cancer",
+                "label": "Thyroid Cancer",
+                "samples": 803,
+                "profiled": 803,
+                "altered": 172,
+                "mutation": 164,
+                "amp": 2,
+                "homdel": 1,
+                "sv": 0,
+                "multiple": 5,
+                "profiledFor": {
+                  "mutation": 803,
+                  "cna": 803,
+                  "sv": 803
+                }
+              },
+              {
+                "key": "esophagogastric cancer",
+                "label": "Esophagogastric Cancer",
+                "samples": 1671,
+                "profiled": 1671,
+                "altered": 311,
+                "mutation": 134,
+                "amp": 169,
+                "homdel": 3,
+                "sv": 0,
+                "multiple": 5,
+                "profiledFor": {
+                  "mutation": 1671,
+                  "cna": 1671,
+                  "sv": 1671
+                }
+              },
+              {
+                "key": "ovarian cancer",
+                "label": "Ovarian Cancer",
+                "samples": 2075,
+                "profiled": 2075,
+                "altered": 297,
+                "mutation": 199,
+                "amp": 75,
+                "homdel": 13,
+                "sv": 1,
+                "multiple": 9,
+                "profiledFor": {
+                  "mutation": 2075,
+                  "cna": 2075,
+                  "sv": 2075
+                }
+              },
+              {
+                "key": "hepatobiliary cancer",
+                "label": "Hepatobiliary Cancer",
+                "samples": 1353,
+                "profiled": 1353,
+                "altered": 191,
+                "mutation": 173,
+                "amp": 16,
+                "homdel": 0,
+                "sv": 0,
+                "multiple": 2,
+                "profiledFor": {
+                  "mutation": 1353,
+                  "cna": 1353,
+                  "sv": 1353
+                }
+              },
+              {
+                "key": "cervical cancer",
+                "label": "Cervical Cancer",
+                "samples": 326,
+                "profiled": 326,
+                "altered": 44,
+                "mutation": 40,
+                "amp": 0,
+                "homdel": 2,
+                "sv": 0,
+                "multiple": 2,
+                "profiledFor": {
+                  "mutation": 326,
+                  "cna": 326,
+                  "sv": 326
+                }
+              },
+              {
+                "key": "bladder cancer",
+                "label": "Bladder Cancer",
+                "samples": 2046,
+                "profiled": 2046,
+                "altered": 259,
+                "mutation": 215,
+                "amp": 27,
+                "homdel": 13,
+                "sv": 1,
+                "multiple": 3,
+                "profiledFor": {
+                  "mutation": 2046,
+                  "cna": 2046,
+                  "sv": 2046
+                }
+              },
+              {
+                "key": "skin cancer, non-melanoma",
+                "label": "Skin Cancer, Non-Melanoma",
+                "samples": 429,
+                "profiled": 429,
+                "altered": 40,
+                "mutation": 38,
+                "amp": 0,
+                "homdel": 2,
+                "sv": 0,
+                "multiple": 0,
+                "profiledFor": {
+                  "mutation": 429,
+                  "cna": 429,
+                  "sv": 429
+                }
+              },
+              {
+                "key": "salivary gland cancer",
+                "label": "Salivary Gland Cancer",
+                "samples": 352,
+                "profiled": 352,
+                "altered": 29,
+                "mutation": 24,
+                "amp": 3,
+                "homdel": 0,
+                "sv": 0,
+                "multiple": 2,
+                "profiledFor": {
+                  "mutation": 352,
+                  "cna": 352,
+                  "sv": 352
+                }
+              },
+              {
+                "key": "head and neck cancer",
+                "label": "Head and Neck Cancer",
+                "samples": 610,
+                "profiled": 610,
+                "altered": 47,
+                "mutation": 39,
+                "amp": 8,
+                "homdel": 0,
+                "sv": 0,
+                "multiple": 0,
+                "profiledFor": {
+                  "mutation": 610,
+                  "cna": 610,
+                  "sv": 610
+                }
+              },
+              {
+                "key": "small cell lung cancer",
+                "label": "Small Cell Lung Cancer",
+                "samples": 442,
+                "profiled": 442,
+                "altered": 27,
+                "mutation": 17,
+                "amp": 4,
+                "homdel": 6,
+                "sv": 0,
+                "multiple": 0,
+                "profiledFor": {
+                  "mutation": 442,
+                  "cna": 442,
+                  "sv": 442
+                }
+              },
+              {
+                "key": "soft tissue sarcoma",
+                "label": "Soft Tissue Sarcoma",
+                "samples": 2128,
+                "profiled": 2128,
+                "altered": 103,
+                "mutation": 63,
+                "amp": 17,
+                "homdel": 15,
+                "sv": 1,
+                "multiple": 7,
+                "profiledFor": {
+                  "mutation": 2128,
+                  "cna": 2128,
+                  "sv": 2128
+                }
+              },
+              {
+                "key": "uterine sarcoma",
+                "label": "Uterine Sarcoma",
+                "samples": 337,
+                "profiled": 337,
+                "altered": 15,
+                "mutation": 7,
+                "amp": 4,
+                "homdel": 3,
+                "sv": 0,
+                "multiple": 1,
+                "profiledFor": {
+                  "mutation": 337,
+                  "cna": 337,
+                  "sv": 337
+                }
+              },
+              {
+                "…": "8 more",
+                "sha256": "a8285816abe66c3d"
+              }
+            ],
+            "pooled": {
+              "key": "__pooled__",
+              "label": "38 smaller groups",
+              "samples": 1842,
+              "profiled": 1842,
+              "altered": 250,
+              "mutation": 231,
+              "amp": 8,
+              "homdel": 8,
+              "sv": 0,
+              "multiple": 3,
+              "profiledFor": {
+                "mutation": 1842,
+                "cna": 1842,
+                "sv": 1842
+              },
+              "count": 38
+            },
+            "perGene": [
+              {
+                "gene": "KRAS",
+                "groups": [
+                  {
+                    "key": "pancreatic cancer",
+                    "label": "Pancreatic Cancer",
+                    "samples": 2729,
+                    "profiled": 2729,
+                    "altered": 2249,
+                    "mutation": 2199,
+                    "amp": 2,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 48,
+                    "profiledFor": {
+                      "mutation": 2729,
+                      "cna": 2729,
+                      "sv": 2729
+                    }
+                  },
+                  {
+                    "key": "appendiceal cancer",
+                    "label": "Appendiceal Cancer",
+                    "samples": 269,
+                    "profiled": 269,
+                    "altered": 157,
+                    "mutation": 157,
+                    "amp": 0,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 269,
+                      "cna": 269,
+                      "sv": 269
+                    }
+                  },
+                  {
+                    "key": "colorectal cancer",
+                    "label": "Colorectal Cancer",
+                    "samples": 4993,
+                    "profiled": 4993,
+                    "altered": 2233,
+                    "mutation": 2181,
+                    "amp": 41,
+                    "homdel": 0,
+                    "sv": 1,
+                    "multiple": 10,
+                    "profiledFor": {
+                      "mutation": 4993,
+                      "cna": 4993,
+                      "sv": 4993
+                    }
+                  },
+                  {
+                    "key": "non-small cell lung cancer",
+                    "label": "Non-Small Cell Lung Cancer",
+                    "samples": 6633,
+                    "profiled": 6633,
+                    "altered": 2004,
+                    "mutation": 1872,
+                    "amp": 65,
+                    "homdel": 6,
+                    "sv": 0,
+                    "multiple": 61,
+                    "profiledFor": {
+                      "mutation": 6633,
+                      "cna": 6633,
+                      "sv": 6633
+                    }
+                  },
+                  {
+                    "key": "germ cell tumor",
+                    "label": "Germ Cell Tumor",
+                    "samples": 663,
+                    "profiled": 663,
+                    "altered": 189,
+                    "mutation": 60,
+                    "amp": 113,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 16,
+                    "profiledFor": {
+                      "mutation": 663,
+                      "cna": 663,
+                      "sv": 663
+                    }
+                  },
+                  {
+                    "key": "cancer of unknown primary",
+                    "label": "Cancer of Unknown Primary",
+                    "samples": 1535,
+                    "profiled": 1535,
+                    "altered": 336,
+                    "mutation": 306,
+                    "amp": 19,
+                    "homdel": 0,
+                    "sv": 1,
+                    "multiple": 10,
+                    "profiledFor": {
+                      "mutation": 1535,
+                      "cna": 1535,
+                      "sv": 1535
+                    }
+                  },
+                  {
+                    "key": "endometrial cancer",
+                    "label": "Endometrial Cancer",
+                    "samples": 2373,
+                    "profiled": 2373,
+                    "altered": 484,
+                    "mutation": 466,
+                    "amp": 16,
+                    "homdel": 1,
+                    "sv": 0,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 2373,
+                      "cna": 2373,
+                      "sv": 2373
+                    }
+                  },
+                  {
+                    "key": "esophagogastric cancer",
+                    "label": "Esophagogastric Cancer",
+                    "samples": 1671,
+                    "profiled": 1671,
+                    "altered": 283,
+                    "mutation": 122,
+                    "amp": 158,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 3,
+                    "profiledFor": {
+                      "mutation": 1671,
+                      "cna": 1671,
+                      "sv": 1671
+                    }
+                  },
+                  {
+                    "key": "hepatobiliary cancer",
+                    "label": "Hepatobiliary Cancer",
+                    "samples": 1353,
+                    "profiled": 1353,
+                    "altered": 160,
+                    "mutation": 144,
+                    "amp": 15,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 1353,
+                      "cna": 1353,
+                      "sv": 1353
+                    }
+                  },
+                  {
+                    "key": "ovarian cancer",
+                    "label": "Ovarian Cancer",
+                    "samples": 2075,
+                    "profiled": 2075,
+                    "altered": 243,
+                    "mutation": 166,
+                    "amp": 70,
+                    "homdel": 0,
+                    "sv": 1,
+                    "multiple": 6,
+                    "profiledFor": {
+                      "mutation": 2075,
+                      "cna": 2075,
+                      "sv": 2075
+                    }
+                  },
+                  {
+                    "key": "cervical cancer",
+                    "label": "Cervical Cancer",
+                    "samples": 326,
+                    "profiled": 326,
+                    "altered": 38,
+                    "mutation": 35,
+                    "amp": 1,
+                    "homdel": 1,
+                    "sv": 0,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 326,
+                      "cna": 326,
+                      "sv": 326
+                    }
+                  },
+                  {
+                    "key": "bladder cancer",
+                    "label": "Bladder Cancer",
+                    "samples": 2046,
+                    "profiled": 2046,
+                    "altered": 134,
+                    "mutation": 113,
+                    "amp": 18,
+                    "homdel": 1,
+                    "sv": 0,
+                    "multiple": 2,
+                    "profiledFor": {
+                      "mutation": 2046,
+                      "cna": 2046,
+                      "sv": 2046
+                    }
+                  },
+                  {
+                    "key": "head and neck cancer",
+                    "label": "Head and Neck Cancer",
+                    "samples": 610,
+                    "profiled": 610,
+                    "altered": 18,
+                    "mutation": 11,
+                    "amp": 7,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 610,
+                      "cna": 610,
+                      "sv": 610
+                    }
+                  },
+                  {
+                    "key": "small cell lung cancer",
+                    "label": "Small Cell Lung Cancer",
+                    "samples": 442,
+                    "profiled": 442,
+                    "altered": 13,
+                    "mutation": 10,
+                    "amp": 3,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 442,
+                      "cna": 442,
+                      "sv": 442
+                    }
+                  },
+                  {
+                    "key": "melanoma",
+                    "label": "Melanoma",
+                    "samples": 1706,
+                    "profiled": 1706,
+                    "altered": 49,
+                    "mutation": 29,
+                    "amp": 14,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 6,
+                    "profiledFor": {
+                      "mutation": 1706,
+                      "cna": 1706,
+                      "sv": 1706
+                    }
+                  },
+                  {
+                    "key": "bone cancer",
+                    "label": "Bone Cancer",
+                    "samples": 506,
+                    "profiled": 506,
+                    "altered": 14,
+                    "mutation": 6,
+                    "amp": 7,
+                    "homdel": 1,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 506,
+                      "cna": 506,
+                      "sv": 506
+                    }
+                  },
+                  {
+                    "key": "thyroid cancer",
+                    "label": "Thyroid Cancer",
+                    "samples": 803,
+                    "profiled": 803,
+                    "altered": 20,
+                    "mutation": 20,
+                    "amp": 0,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 803,
+                      "cna": 803,
+                      "sv": 803
+                    }
+                  },
+                  {
+                    "key": "peripheral nervous system",
+                    "label": "Peripheral Nervous System",
+                    "samples": 324,
+                    "profiled": 324,
+                    "altered": 7,
+                    "mutation": 5,
+                    "amp": 2,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 324,
+                      "cna": 324,
+                      "sv": 324
+                    }
+                  },
+                  {
+                    "key": "skin cancer, non-melanoma",
+                    "label": "Skin Cancer, Non-Melanoma",
+                    "samples": 429,
+                    "profiled": 429,
+                    "altered": 9,
+                    "mutation": 9,
+                    "amp": 0,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 429,
+                      "cna": 429,
+                      "sv": 429
+                    }
+                  },
+                  {
+                    "key": "breast cancer",
+                    "label": "Breast Cancer",
+                    "samples": 5803,
+                    "profiled": 5803,
+                    "altered": 120,
+                    "mutation": 53,
+                    "amp": 61,
+                    "homdel": 4,
+                    "sv": 1,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 5803,
+                      "cna": 5803,
+                      "sv": 5803
+                    }
+                  },
+                  {
+                    "…": "8 more",
+                    "sha256": "67690ccb247396a1"
+                  }
+                ],
+                "pooled": {
+                  "key": "__pooled__",
+                  "label": "38 smaller groups",
+                  "samples": 1842,
+                  "profiled": 1842,
+                  "altered": 213,
+                  "mutation": 203,
+                  "amp": 8,
+                  "homdel": 0,
+                  "sv": 0,
+                  "multiple": 2,
+                  "profiledFor": {
+                    "mutation": 1842,
+                    "cna": 1842,
+                    "sv": 1842
+                  },
+                  "count": 38
+                }
+              },
+              {
+                "gene": "NRAS",
+                "groups": [
+                  {
+                    "key": "melanoma",
+                    "label": "Melanoma",
+                    "samples": 1706,
+                    "profiled": 1706,
+                    "altered": 416,
+                    "mutation": 388,
+                    "amp": 3,
+                    "homdel": 2,
+                    "sv": 0,
+                    "multiple": 23,
+                    "profiledFor": {
+                      "mutation": 1706,
+                      "cna": 1706,
+                      "sv": 1706
+                    }
+                  },
+                  {
+                    "key": "thyroid cancer",
+                    "label": "Thyroid Cancer",
+                    "samples": 803,
+                    "profiled": 803,
+                    "altered": 119,
+                    "mutation": 117,
+                    "amp": 0,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 2,
+                    "profiledFor": {
+                      "mutation": 803,
+                      "cna": 803,
+                      "sv": 803
+                    }
+                  },
+                  {
+                    "key": "colorectal cancer",
+                    "label": "Colorectal Cancer",
+                    "samples": 4993,
+                    "profiled": 4993,
+                    "altered": 218,
+                    "mutation": 206,
+                    "amp": 6,
+                    "homdel": 6,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 4993,
+                      "cna": 4993,
+                      "sv": 4993
+                    }
+                  },
+                  {
+                    "key": "germ cell tumor",
+                    "label": "Germ Cell Tumor",
+                    "samples": 663,
+                    "profiled": 663,
+                    "altered": 21,
+                    "mutation": 20,
+                    "amp": 1,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 663,
+                      "cna": 663,
+                      "sv": 663
+                    }
+                  },
+                  {
+                    "key": "endometrial cancer",
+                    "label": "Endometrial Cancer",
+                    "samples": 2373,
+                    "profiled": 2373,
+                    "altered": 71,
+                    "mutation": 70,
+                    "amp": 0,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 2373,
+                      "cna": 2373,
+                      "sv": 2373
+                    }
+                  },
+                  {
+                    "key": "cancer of unknown primary",
+                    "label": "Cancer of Unknown Primary",
+                    "samples": 1535,
+                    "profiled": 1535,
+                    "altered": 44,
+                    "mutation": 34,
+                    "amp": 6,
+                    "homdel": 3,
+                    "sv": 0,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 1535,
+                      "cna": 1535,
+                      "sv": 1535
+                    }
+                  },
+                  {
+                    "key": "appendiceal cancer",
+                    "label": "Appendiceal Cancer",
+                    "samples": 269,
+                    "profiled": 269,
+                    "altered": 6,
+                    "mutation": 6,
+                    "amp": 0,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 269,
+                      "cna": 269,
+                      "sv": 269
+                    }
+                  },
+                  {
+                    "key": "hepatobiliary cancer",
+                    "label": "Hepatobiliary Cancer",
+                    "samples": 1353,
+                    "profiled": 1353,
+                    "altered": 30,
+                    "mutation": 29,
+                    "amp": 1,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 1353,
+                      "cna": 1353,
+                      "sv": 1353
+                    }
+                  },
+                  {
+                    "key": "skin cancer, non-melanoma",
+                    "label": "Skin Cancer, Non-Melanoma",
+                    "samples": 429,
+                    "profiled": 429,
+                    "altered": 9,
+                    "mutation": 7,
+                    "amp": 0,
+                    "homdel": 2,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 429,
+                      "cna": 429,
+                      "sv": 429
+                    }
+                  },
+                  {
+                    "key": "bladder cancer",
+                    "label": "Bladder Cancer",
+                    "samples": 2046,
+                    "profiled": 2046,
+                    "altered": 39,
+                    "mutation": 27,
+                    "amp": 10,
+                    "homdel": 1,
+                    "sv": 1,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 2046,
+                      "cna": 2046,
+                      "sv": 2046
+                    }
+                  },
+                  {
+                    "key": "ovarian cancer",
+                    "label": "Ovarian Cancer",
+                    "samples": 2075,
+                    "profiled": 2075,
+                    "altered": 39,
+                    "mutation": 32,
+                    "amp": 6,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 2075,
+                      "cna": 2075,
+                      "sv": 2075
+                    }
+                  },
+                  {
+                    "key": "mesothelioma",
+                    "label": "Mesothelioma",
+                    "samples": 382,
+                    "profiled": 382,
+                    "altered": 6,
+                    "mutation": 5,
+                    "amp": 0,
+                    "homdel": 1,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 382,
+                      "cna": 382,
+                      "sv": 382
+                    }
+                  },
+                  {
+                    "key": "soft tissue sarcoma",
+                    "label": "Soft Tissue Sarcoma",
+                    "samples": 2128,
+                    "profiled": 2128,
+                    "altered": 33,
+                    "mutation": 28,
+                    "amp": 3,
+                    "homdel": 1,
+                    "sv": 0,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 2128,
+                      "cna": 2128,
+                      "sv": 2128
+                    }
+                  },
+                  {
+                    "key": "cervical cancer",
+                    "label": "Cervical Cancer",
+                    "samples": 326,
+                    "profiled": 326,
+                    "altered": 5,
+                    "mutation": 5,
+                    "amp": 0,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 326,
+                      "cna": 326,
+                      "sv": 326
+                    }
+                  },
+                  {
+                    "key": "uterine sarcoma",
+                    "label": "Uterine Sarcoma",
+                    "samples": 337,
+                    "profiled": 337,
+                    "altered": 5,
+                    "mutation": 3,
+                    "amp": 2,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 337,
+                      "cna": 337,
+                      "sv": 337
+                    }
+                  },
+                  {
+                    "key": "esophagogastric cancer",
+                    "label": "Esophagogastric Cancer",
+                    "samples": 1671,
+                    "profiled": 1671,
+                    "altered": 24,
+                    "mutation": 10,
+                    "amp": 10,
+                    "homdel": 3,
+                    "sv": 0,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 1671,
+                      "cna": 1671,
+                      "sv": 1671
+                    }
+                  },
+                  {
+                    "key": "peripheral nervous system",
+                    "label": "Peripheral Nervous System",
+                    "samples": 324,
+                    "profiled": 324,
+                    "altered": 4,
+                    "mutation": 3,
+                    "amp": 1,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 324,
+                      "cna": 324,
+                      "sv": 324
+                    }
+                  },
+                  {
+                    "key": "non-small cell lung cancer",
+                    "label": "Non-Small Cell Lung Cancer",
+                    "samples": 6633,
+                    "profiled": 6633,
+                    "altered": 80,
+                    "mutation": 67,
+                    "amp": 5,
+                    "homdel": 6,
+                    "sv": 1,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 6633,
+                      "cna": 6633,
+                      "sv": 6633
+                    }
+                  },
+                  {
+                    "key": "head and neck cancer",
+                    "label": "Head and Neck Cancer",
+                    "samples": 610,
+                    "profiled": 610,
+                    "altered": 6,
+                    "mutation": 6,
+                    "amp": 0,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 610,
+                      "cna": 610,
+                      "sv": 610
+                    }
+                  },
+                  {
+                    "key": "small cell lung cancer",
+                    "label": "Small Cell Lung Cancer",
+                    "samples": 442,
+                    "profiled": 442,
+                    "altered": 4,
+                    "mutation": 3,
+                    "amp": 0,
+                    "homdel": 1,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 442,
+                      "cna": 442,
+                      "sv": 442
+                    }
+                  },
+                  {
+                    "…": "8 more",
+                    "sha256": "98fc00fd9877bd84"
+                  }
+                ],
+                "pooled": {
+                  "key": "__pooled__",
+                  "label": "38 smaller groups",
+                  "samples": 1842,
+                  "profiled": 1842,
+                  "altered": 17,
+                  "mutation": 16,
+                  "amp": 0,
+                  "homdel": 1,
+                  "sv": 0,
+                  "multiple": 0,
+                  "profiledFor": {
+                    "mutation": 1842,
+                    "cna": 1842,
+                    "sv": 1842
+                  },
+                  "count": 38
+                }
+              },
+              {
+                "gene": "HRAS",
+                "groups": [
+                  {
+                    "key": "salivary gland cancer",
+                    "label": "Salivary Gland Cancer",
+                    "samples": 352,
+                    "profiled": 352,
+                    "altered": 24,
+                    "mutation": 22,
+                    "amp": 1,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 1,
+                    "profiledFor": {
+                      "mutation": 352,
+                      "cna": 352,
+                      "sv": 352
+                    }
+                  },
+                  {
+                    "key": "skin cancer, non-melanoma",
+                    "label": "Skin Cancer, Non-Melanoma",
+                    "samples": 429,
+                    "profiled": 429,
+                    "altered": 23,
+                    "mutation": 23,
+                    "amp": 0,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 429,
+                      "cna": 429,
+                      "sv": 429
+                    }
+                  },
+                  {
+                    "key": "bladder cancer",
+                    "label": "Bladder Cancer",
+                    "samples": 2046,
+                    "profiled": 2046,
+                    "altered": 99,
+                    "mutation": 88,
+                    "amp": 0,
+                    "homdel": 11,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 2046,
+                      "cna": 2046,
+                      "sv": 2046
+                    }
+                  },
+                  {
+                    "key": "thyroid cancer",
+                    "label": "Thyroid Cancer",
+                    "samples": 803,
+                    "profiled": 803,
+                    "altered": 34,
+                    "mutation": 28,
+                    "amp": 2,
+                    "homdel": 1,
+                    "sv": 0,
+                    "multiple": 3,
+                    "profiledFor": {
+                      "mutation": 803,
+                      "cna": 803,
+                      "sv": 803
+                    }
+                  },
+                  {
+                    "key": "head and neck cancer",
+                    "label": "Head and Neck Cancer",
+                    "samples": 610,
+                    "profiled": 610,
+                    "altered": 23,
+                    "mutation": 22,
+                    "amp": 1,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 610,
+                      "cna": 610,
+                      "sv": 610
+                    }
+                  },
+                  {
+                    "key": "melanoma",
+                    "label": "Melanoma",
+                    "samples": 1706,
+                    "profiled": 1706,
+                    "altered": 48,
+                    "mutation": 42,
+                    "amp": 1,
+                    "homdel": 2,
+                    "sv": 0,
+                    "multiple": 3,
+                    "profiledFor": {
+                      "mutation": 1706,
+                      "cna": 1706,
+                      "sv": 1706
+                    }
+                  },
+                  {
+                    "key": "small cell lung cancer",
+                    "label": "Small Cell Lung Cancer",
+                    "samples": 442,
+                    "profiled": 442,
+                    "altered": 10,
+                    "mutation": 4,
+                    "amp": 1,
+                    "homdel": 5,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 442,
+                      "cna": 442,
+                      "sv": 442
+                    }
+                  },
+                  {
+                    "key": "soft tissue sarcoma",
+                    "label": "Soft Tissue Sarcoma",
+                    "samples": 2128,
+                    "profiled": 2128,
+                    "altered": 33,
+                    "mutation": 11,
+                    "amp": 9,
+                    "homdel": 13,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 2128,
+                      "cna": 2128,
+                      "sv": 2128
+                    }
+                  },
+                  {
+                    "key": "prostate cancer",
+                    "label": "Prostate Cancer",
+                    "samples": 2893,
+                    "profiled": 2893,
+                    "altered": 44,
+                    "mutation": 35,
+                    "amp": 1,
+                    "homdel": 7,
+                    "sv": 1,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 2893,
+                      "cna": 2893,
+                      "sv": 2893
+                    }
+                  },
+                  {
+                    "key": "uterine sarcoma",
+                    "label": "Uterine Sarcoma",
+                    "samples": 337,
+                    "profiled": 337,
+                    "altered": 5,
+                    "mutation": 0,
+                    "amp": 2,
+                    "homdel": 3,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 337,
+                      "cna": 337,
+                      "sv": 337
+                    }
+                  },
+                  {
+                    "key": "cancer of unknown primary",
+                    "label": "Cancer of Unknown Primary",
+                    "samples": 1535,
+                    "profiled": 1535,
+                    "altered": 19,
+                    "mutation": 12,
+                    "amp": 2,
+                    "homdel": 5,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 1535,
+                      "cna": 1535,
+                      "sv": 1535
+                    }
+                  },
+                  {
+                    "key": "cervical cancer",
+                    "label": "Cervical Cancer",
+                    "samples": 326,
+                    "profiled": 326,
+                    "altered": 4,
+                    "mutation": 3,
+                    "amp": 0,
+                    "homdel": 1,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 326,
+                      "cna": 326,
+                      "sv": 326
+                    }
+                  },
+                  {
+                    "key": "endometrial cancer",
+                    "label": "Endometrial Cancer",
+                    "samples": 2373,
+                    "profiled": 2373,
+                    "altered": 29,
+                    "mutation": 19,
+                    "amp": 4,
+                    "homdel": 6,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 2373,
+                      "cna": 2373,
+                      "sv": 2373
+                    }
+                  },
+                  {
+                    "key": "glioma",
+                    "label": "Glioma",
+                    "samples": 2042,
+                    "profiled": 2042,
+                    "altered": 20,
+                    "mutation": 7,
+                    "amp": 2,
+                    "homdel": 11,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 2042,
+                      "cna": 2042,
+                      "sv": 2042
+                    }
+                  },
+                  {
+                    "key": "ovarian cancer",
+                    "label": "Ovarian Cancer",
+                    "samples": 2075,
+                    "profiled": 2075,
+                    "altered": 20,
+                    "mutation": 5,
+                    "amp": 2,
+                    "homdel": 13,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 2075,
+                      "cna": 2075,
+                      "sv": 2075
+                    }
+                  },
+                  {
+                    "key": "peripheral nervous system",
+                    "label": "Peripheral Nervous System",
+                    "samples": 324,
+                    "profiled": 324,
+                    "altered": 3,
+                    "mutation": 2,
+                    "amp": 0,
+                    "homdel": 1,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 324,
+                      "cna": 324,
+                      "sv": 324
+                    }
+                  },
+                  {
+                    "key": "breast cancer",
+                    "label": "Breast Cancer",
+                    "samples": 5803,
+                    "profiled": 5803,
+                    "altered": 49,
+                    "mutation": 20,
+                    "amp": 2,
+                    "homdel": 27,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 5803,
+                      "cna": 5803,
+                      "sv": 5803
+                    }
+                  },
+                  {
+                    "key": "gastrointestinal stromal tumor",
+                    "label": "Gastrointestinal Stromal Tumor",
+                    "samples": 520,
+                    "profiled": 520,
+                    "altered": 4,
+                    "mutation": 0,
+                    "amp": 0,
+                    "homdel": 4,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 520,
+                      "cna": 520,
+                      "sv": 520
+                    }
+                  },
+                  {
+                    "key": "colorectal cancer",
+                    "label": "Colorectal Cancer",
+                    "samples": 4993,
+                    "profiled": 4993,
+                    "altered": 37,
+                    "mutation": 33,
+                    "amp": 4,
+                    "homdel": 0,
+                    "sv": 0,
+                    "multiple": 0,
+                    "profiledFor": {
+                      "mutation": 4993,
+                      "cna": 4993,
+                      "sv": 4993
+                    }
+                  },
+                  {
+                    "key": "non-small cell lung cancer",
+                    "label": "Non-Small Cell Lung Cancer",
+                    "samples": 6633,
+                    "profiled": 6633,
+                    "altered": 39,
+                    "mutation": 24,
+                    "amp": 3,
+                    "homdel": 10,
+                    "sv": 0,
+                    "multiple": 2,
+                    "profiledFor": {
+                      "mutation": 6633,
+                      "cna": 6633,
+                      "sv": 6633
+                    }
+                  },
+                  {
+                    "…": "8 more",
+                    "sha256": "2397ab07fdd60ed9"
+                  }
+                ],
+                "pooled": {
+                  "key": "__pooled__",
+                  "label": "38 smaller groups",
+                  "samples": 1842,
+                  "profiled": 1842,
+                  "altered": 21,
+                  "mutation": 12,
+                  "amp": 1,
+                  "homdel": 8,
+                  "sv": 0,
+                  "multiple": 0,
+                  "profiledFor": {
+                    "mutation": 1842,
+                    "cna": 1842,
+                    "sv": 1842
+                  },
+                  "count": 38
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_impact_50k_2026",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Patients altered in at least one of 3 genes per CANCER_TYPE group, over the patients profiled for at least one of them (the union of their panels, as an oncoprint's merged row counts it). Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. A patient with more than one kind of alteration across the genes counts once, under \"multiple\". A patient counts in every group one of their samples falls in, profiled if any of those samples is, altered if any is. CANCER_TYPE is read per sample and folded on case and whitespace; samples with no value form their own group. Groups with fewer than 200 profiled patients are pooled into one bar rather than dropped. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count patients per CANCER_TYPE group",
+            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only, or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.",
+            "scope": "all patients · msk_impact_50k_2026",
+            "rowsOut": 67,
+            "params": [
+              [
+                "genes",
+                "KRAS, NRAS, HRAS"
+              ],
+              [
+                "profiled patients",
+                "48,892"
+              ]
+            ]
+          },
+          {
+            "kind": "transform",
+            "title": "Pool the small groups",
+            "scope": "all patients",
+            "detail": "38 groups with fewer than 200 profiled patients drawn as one pooled bar; 28 drawn on their own.",
+            "params": [
+              [
+                "profiled",
+                "48,179"
+              ],
+              [
+                "altered",
+                "10,796"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [],
+          "file": "lib/views/cancertypes.ts",
+          "commit": null
+        }
+      }
+    }
+  ]
+}

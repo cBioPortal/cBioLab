@@ -1,0 +1,22 @@
+Analysis over ucec_msk_2018 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- MSI-H: 28 patients — MSI_STATUS in [MSI-H] (any sample)
+- MSS: 148 patients — MSI_STATUS in [MSS] (any sample)
+
+Survival (KM, PFS_1L):
+  MSI-H: median 18.4mo (n=28, 23 events)
+  MSS: median 15.3mo (n=148, 142 events)
+  log-rank p=0.5301
+CAVEAT (tell the user): PFS_1L from each study's own baseline (left truncation applies) Status '0:...' treated as censored. Log-rank on a single study, so no stratification applies.
+  METHOD:
+    - Count patients by time and status [MSI-H · ucec_msk_2018] (28 → 28 rows): The survivalCounts:PFS_1L query above: patients grouped by identical PFS_MONTHS_FIRST_LINE_TX, event, returned as counts — no patient identifier leaves the database. Event: PROGRESSION_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.
+        count rows: 28
+    - Count patients by time and status [MSS · ucec_msk_2018] (148 → 148 rows): The survivalCounts:PFS_1L query above: patients grouped by identical PFS_MONTHS_FIRST_LINE_TX, event, returned as counts — no patient identifier leaves the database. Event: PROGRESSION_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.
+        count rows: 138
+    - Estimate survival by Kaplan–Meier: The product-limit estimator, one curve per cohort, pooled over its studies. The median is the first time the curve is at or below 0.5.
+        MSI-H: 28 patients, 23 events, median 18.4 months
+        MSS: 148 patients, 142 events, median 15.3 months
+    - Two-group log-rank test: At each event time, every cohort's observed events against its share of the risk set, with the hypergeometric variance; χ² on 1 df.
+        χ² / df / p: 0.3942 / 1 / 0.530
+    Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).

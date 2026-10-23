@@ -1,0 +1,233 @@
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "all patients": {
+      "count": 48179,
+      "text": "all patients in the study",
+      "studies": [
+        "msk_impact_50k_2026"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "paired",
+      "cohorts": [
+        "all patients"
+      ],
+      "paired": {
+        "pairBy": {
+          "attribute": "SAMPLE_TYPE",
+          "a": [
+            "Primary"
+          ],
+          "b": [
+            "Metastasis"
+          ]
+        },
+        "labels": {
+          "a": "Primary",
+          "b": "Metastasis"
+        },
+        "measure": "driver",
+        "panels": [
+          {
+            "cohort": "all patients",
+            "patients": 2278,
+            "aSamples": 2558,
+            "bSamples": 2674,
+            "genes": [
+              {
+                "gene": "TP53",
+                "pairs": 2278,
+                "both": 930,
+                "aOnly": 108,
+                "bOnly": 161,
+                "neither": 1079,
+                "concordance": 0.776,
+                "p": 0.0014752559593677614,
+                "q": 0.002360409534988418
+              },
+              {
+                "gene": "KRAS",
+                "pairs": 2278,
+                "both": 235,
+                "aOnly": 58,
+                "bOnly": 75,
+                "neither": 1910,
+                "concordance": 0.639,
+                "p": 0.16508338915579682,
+                "q": 0.18866673046376778
+              },
+              {
+                "gene": "PIK3CA",
+                "pairs": 2278,
+                "both": 199,
+                "aOnly": 87,
+                "bOnly": 64,
+                "neither": 1928,
+                "concordance": 0.569,
+                "p": 0.07304915944162735,
+                "q": 0.09739887925550313
+              },
+              {
+                "gene": "ESR1",
+                "pairs": 2278,
+                "both": 4,
+                "aOnly": 7,
+                "bOnly": 49,
+                "neither": 2218,
+                "concordance": 0.067,
+                "p": 7.455210310203303e-9,
+                "q": 2.982084124081321e-8
+              },
+              {
+                "gene": "AR",
+                "pairs": 2278,
+                "both": 9,
+                "aOnly": 1,
+                "bOnly": 71,
+                "neither": 2197,
+                "concordance": 0.111,
+                "p": 3.091670257478201e-20,
+                "q": 2.473336205982561e-19
+              },
+              {
+                "gene": "CDKN2A",
+                "pairs": 2278,
+                "both": 222,
+                "aOnly": 123,
+                "bOnly": 180,
+                "neither": 1753,
+                "concordance": 0.423,
+                "p": 0.0012575668195445922,
+                "q": 0.002360409534988418
+              },
+              {
+                "gene": "MYC",
+                "pairs": 2278,
+                "both": 65,
+                "aOnly": 47,
+                "bOnly": 113,
+                "neither": 2053,
+                "concordance": 0.289,
+                "p": 1.876911518039637e-7,
+                "q": 5.005097381439033e-7
+              },
+              {
+                "gene": "TERT",
+                "pairs": 2278,
+                "both": 298,
+                "aOnly": 72,
+                "bOnly": 75,
+                "neither": 1833,
+                "concordance": 0.67,
+                "p": 0.8690499708342935,
+                "q": 0.8690499708342935
+              }
+            ]
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_impact_50k_2026",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Within patients with samples on both sides, Primary and Metastasis (SAMPLE_TYPE = Primary vs Metastasis; all patients: 2,278 patients), per gene, among those profiled for it on BOTH sides by each side's own panels: an OncoKB driver (v7.5) on both sides, on the Primary side only, or the Metastasis side only; a patient with several samples on a side counts as altered there if any is. Concordance is both ÷ altered anywhere. The exact McNemar test asks whether discordance runs one way; q is Benjamini–Hochberg across the genes of each cohort. A sample's SAMPLE_TYPE records where the tissue came from, not when it was taken, so Metastasis-only is not the same as \"acquired later\"; and patients sampled twice are a selected group, typically with longer or harder disease courses.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count each gene's state in paired samples",
+            "detail": "The paired:patients and paired:genes queries above. Patients with both a SAMPLE_TYPE = Primary sample (Primary) and a SAMPLE_TYPE = Metastasis sample (Metastasis); per gene, among those profiled for it on both sides by each side's own panels: altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) on both sides, on the Primary side only, or the Metastasis side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
+            "scope": "all patients · msk_impact_50k_2026",
+            "rowsIn": 48179
+          },
+          {
+            "kind": "statistic",
+            "title": "Exact McNemar test per gene",
+            "detail": "Only the discordant patients carry information about direction: of the Primary-only and Metastasis-only patients, each is a fair coin under the null, so p is twice the smaller binomial tail (capped at 1). Concordance is both ÷ altered anywhere.",
+            "params": [
+              [
+                "all patients",
+                "2,278 patients with both kinds of sample"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across genes, per cohort",
+            "detail": "q-values over the genes with at least one discordant patient, separately for each cohort."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "mcnemarExact",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "The exact McNemar test matches statsmodels 0.15.0 mcnemar(exact=True) and Benjamini–Hochberg multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
+        "check": {
+          "paired:all patients:TP53:p": {
+            "v": 0.0014752559593677614
+          },
+          "paired:all patients:TP53:q": {
+            "v": 0.002360409534988418
+          },
+          "paired:all patients:KRAS:p": {
+            "v": 0.16508338915579682
+          },
+          "paired:all patients:KRAS:q": {
+            "v": 0.18866673046376778
+          },
+          "paired:all patients:PIK3CA:p": {
+            "v": 0.07304915944162735
+          },
+          "paired:all patients:PIK3CA:q": {
+            "v": 0.09739887925550313
+          },
+          "paired:all patients:ESR1:p": {
+            "v": 7.455210310203303e-9
+          },
+          "paired:all patients:ESR1:q": {
+            "v": 2.982084124081321e-8
+          },
+          "paired:all patients:AR:p": {
+            "v": 3.091670257478201e-20
+          },
+          "paired:all patients:AR:q": {
+            "v": 2.473336205982561e-19
+          },
+          "paired:all patients:CDKN2A:p": {
+            "v": 0.0012575668195445922
+          },
+          "paired:all patients:CDKN2A:q": {
+            "v": 0.002360409534988418
+          },
+          "paired:all patients:MYC:p": {
+            "v": 1.876911518039637e-7
+          },
+          "paired:all patients:MYC:q": {
+            "v": 5.005097381439033e-7
+          },
+          "paired:all patients:TERT:p": {
+            "v": 0.8690499708342935
+          },
+          "paired:all patients:TERT:q": {
+            "v": 0.8690499708342935
+          }
+        }
+      }
+    }
+  ]
+}

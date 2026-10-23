@@ -1,0 +1,679 @@
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "all patients": {
+      "count": 1084,
+      "text": "all patients in the study",
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "correlates",
+      "cohorts": [
+        "all patients"
+      ],
+      "correlates": {
+        "gene": "ESR1",
+        "profileType": "rna_seq_v2_mrna",
+        "otherProfile": "rna_seq_v2_mrna",
+        "cohort": "all patients",
+        "tested": 20057,
+        "untested": 280,
+        "significant": 15572,
+        "minN": 10,
+        "rhoFrom": "rank",
+        "positive": [
+          {
+            "gene": "CCDC170",
+            "n": 1082,
+            "rho": 0.7917,
+            "rhoP": 2.2249983400385912e-233,
+            "q": 4.4626791706154024e-229,
+            "r": 0.6675,
+            "p": 1.86618036574955e-140,
+            "cytoband": "6q25.1"
+          },
+          {
+            "gene": "DCPH1",
+            "n": 1082,
+            "rho": 0.7841,
+            "rhoP": 5.089149809464745e-226,
+            "q": 5.103653886421719e-222,
+            "r": 0.5652,
+            "p": 2.3489389556771624e-92,
+            "cytoband": "6q25.1"
+          },
+          {
+            "gene": "THSD4",
+            "n": 1082,
+            "rho": 0.7776,
+            "rhoP": 6.808597091162043e-220,
+            "q": 4.55200106191457e-216,
+            "r": 0.6439,
+            "p": 1.0524911370004154e-127,
+            "cytoband": "15q23"
+          },
+          {
+            "gene": "FOXA1",
+            "n": 1082,
+            "rho": 0.7478,
+            "rhoP": 2.5074740593460398e-194,
+            "q": 1.257310180207588e-190,
+            "r": 0.686,
+            "p": 2.481862600299769e-151,
+            "cytoband": "14q21.1"
+          },
+          {
+            "gene": "TBC1D9",
+            "n": 1082,
+            "rho": 0.746,
+            "rhoP": 6.233807186705536e-193,
+            "q": 2.500629414875059e-189,
+            "r": 0.5514,
+            "p": 4.160301459187909e-87,
+            "cytoband": "4q31.21"
+          },
+          {
+            "gene": "RABEP1",
+            "n": 1082,
+            "rho": 0.7283,
+            "rhoP": 1.7768277814040784e-179,
+            "q": 5.9396391352702666e-176,
+            "r": 0.6183,
+            "p": 3.9827630128370835e-115,
+            "cytoband": "17p13.2"
+          },
+          {
+            "gene": "SLC39A6",
+            "n": 1082,
+            "rho": 0.7217,
+            "rhoP": 9.308705660658694e-175,
+            "q": 2.667210134797592e-171,
+            "r": 0.45,
+            "p": 4.487562761959699e-55,
+            "cytoband": "18q12.2"
+          },
+          {
+            "gene": "GATA3",
+            "n": 1082,
+            "rho": 0.7201,
+            "rhoP": 1.3729095344785626e-173,
+            "q": 3.442055816629566e-170,
+            "r": 0.5603,
+            "p": 1.9260821179739106e-90,
+            "cytoband": "10p14"
+          },
+          {
+            "gene": "CA12",
+            "n": 1082,
+            "rho": 0.6942,
+            "rhoP": 2.226749523984242e-156,
+            "q": 4.962435022505771e-153,
+            "r": 0.516,
+            "p": 1.2021766685492872e-74,
+            "cytoband": "15q22.2"
+          },
+          {
+            "gene": "CT62",
+            "n": 1082,
+            "rho": 0.6938,
+            "rhoP": 3.645402252874833e-156,
+            "q": 7.311583298591052e-153,
+            "r": 0.43,
+            "p": 6.425429292514996e-50,
+            "cytoband": "15q23"
+          },
+          {
+            "gene": "MYB",
+            "n": 1082,
+            "rho": 0.6935,
+            "rhoP": 5.955304524673328e-156,
+            "q": 1.0858685713761177e-152,
+            "r": 0.5738,
+            "p": 9.00390029063427e-96,
+            "cytoband": "6q23.3"
+          },
+          {
+            "gene": "PARD6B",
+            "n": 1082,
+            "rho": 0.6921,
+            "rhoP": 4.213572617077861e-155,
+            "q": 7.042635498394222e-152,
+            "r": 0.4221,
+            "p": 5.4130701455257253e-48,
+            "cytoband": "20q13.13"
+          },
+          {
+            "gene": "AGR3",
+            "n": 1082,
+            "rho": 0.6917,
+            "rhoP": 7.300702914027078e-155,
+            "q": 1.1263861411280085e-151,
+            "r": 0.4529,
+            "p": 7.611917342990354e-56,
+            "cytoband": "7p21.1"
+          },
+          {
+            "gene": "RERG",
+            "n": 1082,
+            "rho": 0.6865,
+            "rhoP": 1.1766729896737167e-151,
+            "q": 1.685752153848981e-148,
+            "r": 0.4489,
+            "p": 9.237499849486198e-55,
+            "cytoband": "12p12.3"
+          },
+          {
+            "gene": "RUNDC1",
+            "n": 1082,
+            "rho": 0.6862,
+            "rhoP": 1.9659693783158502e-151,
+            "q": 2.628763188058734e-148,
+            "r": 0.5386,
+            "p": 2.0039803628690585e-82,
+            "cytoband": "17q21.31"
+          },
+          {
+            "gene": "ARSG",
+            "n": 1082,
+            "rho": 0.6832,
+            "rhoP": 1.2219847393427153e-149,
+            "q": 1.5318342448123024e-146,
+            "r": 0.4884,
+            "p": 6.0880783498218e-66,
+            "cytoband": "17q24.2"
+          },
+          {
+            "gene": "XBP1",
+            "n": 1082,
+            "rho": 0.6777,
+            "rhoP": 2.1462031656658728e-146,
+            "q": 2.2655998365137056e-143,
+            "r": 0.5701,
+            "p": 2.7960784409340003e-94,
+            "cytoband": "22q12.1"
+          },
+          {
+            "gene": "C5AR2",
+            "n": 1082,
+            "rho": 0.6746,
+            "rhoP": 1.4869993093025757e-144,
+            "q": 1.4202259593657982e-141,
+            "r": 0.4487,
+            "p": 9.969062428953839e-55,
+            "cytoband": "19q13.32"
+          },
+          {
+            "gene": "ACADSB",
+            "n": 1082,
+            "rho": 0.6692,
+            "rhoP": 1.8245900918985383e-141,
+            "q": 1.591121890139521e-138,
+            "r": 0.4641,
+            "p": 6.801311968497827e-59,
+            "cytoband": "10q26.13"
+          },
+          {
+            "gene": "AFF3",
+            "n": 1082,
+            "rho": 0.6632,
+            "rhoP": 4.3889664583171614e-138,
+            "q": 3.6678958439361377e-135,
+            "r": 0.508,
+            "p": 4.629622349829199e-72,
+            "cytoband": "2q11.2"
+          },
+          {
+            "…": "80 more",
+            "sha256": "17a1ad5b7d8a703b"
+          }
+        ],
+        "negative": [
+          {
+            "gene": "HAPLN3",
+            "n": 1082,
+            "rho": -0.6795,
+            "rhoP": 1.9286476519055978e-147,
+            "q": 2.275463879662975e-144,
+            "r": -0.3676,
+            "p": 6.0141506017266405e-36,
+            "cytoband": "15q26.1"
+          },
+          {
+            "gene": "YBX1",
+            "n": 1082,
+            "rho": -0.6785,
+            "rhoP": 7.249101982610627e-147,
+            "q": 8.077513248067853e-144,
+            "r": -0.4242,
+            "p": 1.6918694343193526e-48,
+            "cytoband": "1p34.2"
+          },
+          {
+            "gene": "SMCO4",
+            "n": 1082,
+            "rho": -0.6755,
+            "rhoP": 4.707889999738897e-145,
+            "q": 4.721307486238153e-142,
+            "r": -0.4643,
+            "p": 5.852839975162891e-59,
+            "cytoband": "11q21"
+          },
+          {
+            "gene": "PSAT1",
+            "n": 1082,
+            "rho": -0.6732,
+            "rhoP": 9.879824634187141e-144,
+            "q": 9.007256485813249e-141,
+            "r": -0.3561,
+            "p": 1.0668131141943748e-33,
+            "cytoband": "9q21.2"
+          },
+          {
+            "gene": "ACOT9",
+            "n": 1082,
+            "rho": -0.6513,
+            "rhoP": 1.3528541471059772e-131,
+            "q": 9.044731876168195e-129,
+            "r": -0.4689,
+            "p": 3.0756367010551174e-60,
+            "cytoband": "Xp22.11"
+          },
+          {
+            "gene": "PPP1R14C",
+            "n": 1082,
+            "rho": -0.6399,
+            "rhoP": 1.0858639930576848e-125,
+            "q": 5.925766056574825e-123,
+            "r": -0.301,
+            "p": 4.21053493663196e-24,
+            "cytoband": "6q25.1"
+          },
+          {
+            "gene": "PADI2",
+            "n": 1082,
+            "rho": -0.6378,
+            "rhoP": 1.3108638940870085e-124,
+            "q": 6.572999280925782e-122,
+            "r": -0.3904,
+            "p": 1.049149496850871e-40,
+            "cytoband": "1p36.13"
+          },
+          {
+            "gene": "NCK2",
+            "n": 1082,
+            "rho": -0.6349,
+            "rhoP": 3.795969997926965e-123,
+            "q": 1.7971046075302762e-120,
+            "r": -0.4534,
+            "p": 5.539379416243532e-56,
+            "cytoband": "2q12.2"
+          },
+          {
+            "gene": "UBE2E3",
+            "n": 1082,
+            "rho": -0.6301,
+            "rhoP": 8.703162966833193e-121,
+            "q": 3.6366529088702784e-118,
+            "r": -0.5035,
+            "p": 1.2643614072929785e-70,
+            "cytoband": "2q31.3"
+          },
+          {
+            "gene": "BCL11A",
+            "n": 1082,
+            "rho": -0.6297,
+            "rhoP": 1.4616886426408042e-120,
+            "q": 5.983079409274818e-118,
+            "r": -0.3608,
+            "p": 1.3078776903970973e-34,
+            "cytoband": "2p16.1"
+          },
+          {
+            "gene": "CCDC71L",
+            "n": 1082,
+            "rho": -0.6296,
+            "rhoP": 1.5073665335434951e-120,
+            "q": 6.046650112656376e-118,
+            "r": -0.4197,
+            "p": 2.0824439735859627e-47,
+            "cytoband": "7q22.3"
+          },
+          {
+            "gene": "MSANTD3",
+            "n": 1082,
+            "rho": -0.6261,
+            "rhoP": 8.199876471874299e-119,
+            "q": 3.162786969161208e-116,
+            "r": -0.4676,
+            "p": 7.098801694277027e-60,
+            "cytoband": "9q31.1"
+          },
+          {
+            "gene": "NXN",
+            "n": 1082,
+            "rho": -0.6239,
+            "rhoP": 9.456765471161885e-118,
+            "q": 3.448624455547162e-115,
+            "r": -0.4446,
+            "p": 1.2405501727205802e-53,
+            "cytoband": "17p13.3"
+          },
+          {
+            "gene": "GLIPR2",
+            "n": 1082,
+            "rho": -0.6231,
+            "rhoP": 2.1299986841621278e-117,
+            "q": 7.628818501471392e-115,
+            "r": -0.387,
+            "p": 5.444979798636671e-40,
+            "cytoband": "9p13.3"
+          },
+          {
+            "gene": "MTHFD1L",
+            "n": 1082,
+            "rho": -0.6194,
+            "rhoP": 1.2583543296204185e-115,
+            "q": 4.2777648795248705e-113,
+            "r": -0.404,
+            "p": 9.667661724659982e-44,
+            "cytoband": "6q25.1"
+          },
+          {
+            "gene": "USB1",
+            "n": 1082,
+            "rho": -0.619,
+            "rhoP": 2.014366286114203e-115,
+            "q": 6.733690766765428e-113,
+            "r": -0.4453,
+            "p": 7.932625194451654e-54,
+            "cytoband": "16q21"
+          },
+          {
+            "gene": "MSL3",
+            "n": 1082,
+            "rho": -0.6177,
+            "rhoP": 8.090272347188528e-115,
+            "q": 2.6172031043154886e-112,
+            "r": -0.4725,
+            "p": 2.957035824955362e-61,
+            "cytoband": "Xp22.2"
+          },
+          {
+            "gene": "VGLL1",
+            "n": 1082,
+            "rho": -0.6137,
+            "rhoP": 6.022559869204369e-113,
+            "q": 1.7013307506567892e-110,
+            "r": -0.2137,
+            "p": 1.219860470145793e-12,
+            "cytoband": "Xq26.3"
+          },
+          {
+            "gene": "CSRP2",
+            "n": 1082,
+            "rho": -0.609,
+            "rhoP": 8.507424395223815e-111,
+            "q": 2.245176461776369e-108,
+            "r": -0.3422,
+            "p": 4.421146331412537e-31,
+            "cytoband": "12q21.2"
+          },
+          {
+            "gene": "KCNN4",
+            "n": 1082,
+            "rho": -0.6088,
+            "rhoP": 1.061542169475088e-110,
+            "q": 2.729660422200236e-108,
+            "r": -0.3303,
+            "p": 5.937877932918649e-29,
+            "cytoband": "19q13.31"
+          },
+          {
+            "…": "80 more",
+            "sha256": "a9c884cfa869dfcb"
+          }
+        ],
+        "histogram": [
+          [
+            -1,
+            0
+          ],
+          [
+            -0.95,
+            0
+          ],
+          [
+            -0.9,
+            0
+          ],
+          [
+            -0.85,
+            0
+          ],
+          [
+            -0.8,
+            0
+          ],
+          [
+            -0.75,
+            0
+          ],
+          [
+            -0.7,
+            5
+          ],
+          [
+            -0.65,
+            23
+          ],
+          [
+            -0.6,
+            66
+          ],
+          [
+            -0.55,
+            147
+          ],
+          [
+            -0.5,
+            281
+          ],
+          [
+            -0.45,
+            427
+          ],
+          [
+            -0.4,
+            638
+          ],
+          [
+            -0.35,
+            786
+          ],
+          [
+            -0.3,
+            1094
+          ],
+          [
+            -0.25,
+            1253
+          ],
+          [
+            -0.2,
+            1401
+          ],
+          [
+            -0.15,
+            1448
+          ],
+          [
+            -0.1,
+            1762
+          ],
+          [
+            -0.05,
+            1943
+          ],
+          {
+            "…": "20 more",
+            "sha256": "ddc5ef42075ece16"
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "ESR1 on “rna_seq_v2_mrna” against every gene on “rna_seq_v2_mrna”, over the patients in “all patients” with both values (a patient's samples averaged, as the heatmap takes them). Ranked by Spearman's ρ, as the portal ranks, with Pearson's r beside it; q is Benjamini–Hochberg over ρ's p across all 20,057 genes tested. A correlation is not a regulatory link: genes that rise together across a cohort often both track a third thing — a subtype, the tumour's purity, proliferation. 280 genes were not tested: fewer than 10 patients with both values, or no spread.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Sum every gene's values and ranks against ESR1's",
+            "detail": "The correlates:moments query above. Per patient, ESR1 on “rna_seq_v2_mrna” and every gene on “rna_seq_v2_mrna” (a patient's samples averaged); per gene, over the patients with both: n, Σx, Σy, Σxy, Σx², Σy², and the same six over each value's average rank among those patients (ties share the mean of their ranks). Sums only.",
+            "scope": "all patients · brca_tcga_pan_can_atlas_2018",
+            "rowsIn": 1084,
+            "rowsOut": 20338
+          },
+          {
+            "kind": "statistic",
+            "title": "Pearson's r and Spearman's ρ per gene",
+            "detail": "r from the sums: (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); ρ is the same formula on the rank sums. Each p from t = r√((n − 2)/(1 − r²)) on n − 2 df, as scipy's pearsonr and spearmanr compute it. ESR1 against itself is left out. A gene with fewer than 10 patients, or no spread, is not tested.",
+            "params": [
+              [
+                "tested",
+                "20,057"
+              ],
+              [
+                "not tested",
+                "280"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg over ρ",
+            "detail": "q-values over every gene tested, from ρ's p."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "pearsonFromMoments",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Pearson's r from sums matches scipy 1.18.1 pearsonr (test/moments-golden.test.ts); ρ is the same formula on average ranks, which is how scipy's spearmanr defines it — checked against spearmanr on raw values for TCGA breast cancer ESR1 (FOXA1 ρ 0.7478, PSAT1 −0.6732). Benjamini–Hochberg matches statsmodels multipletests (test/tables-golden.test.ts).",
+        "check": {
+          "correlates:tested": {
+            "v": 20057
+          },
+          "correlates:CCDC170:rho": {
+            "v": 0.7917,
+            "abs": 0.000050000001000000005
+          },
+          "correlates:CCDC170:rho_p": {
+            "v": 2.2249983400385912e-233,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:CCDC170:q": {
+            "v": 4.4626791706154024e-229,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:CCDC170:r": {
+            "v": 0.6675,
+            "abs": 0.000050000001000000005
+          },
+          "correlates:CCDC170:p": {
+            "v": 1.86618036574955e-140,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:DCPH1:rho": {
+            "v": 0.7841,
+            "abs": 0.000050000001000000005
+          },
+          "correlates:DCPH1:rho_p": {
+            "v": 5.089149809464745e-226,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:DCPH1:q": {
+            "v": 5.103653886421719e-222,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:DCPH1:r": {
+            "v": 0.5652,
+            "abs": 0.000050000001000000005
+          },
+          "correlates:DCPH1:p": {
+            "v": 2.3489389556771624e-92,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:THSD4:rho": {
+            "v": 0.7776,
+            "abs": 0.000050000001000000005
+          },
+          "correlates:THSD4:rho_p": {
+            "v": 6.808597091162043e-220,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:THSD4:q": {
+            "v": 4.55200106191457e-216,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:THSD4:r": {
+            "v": 0.6439,
+            "abs": 0.000050000001000000005
+          },
+          "correlates:THSD4:p": {
+            "v": 1.0524911370004154e-127,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:FOXA1:rho": {
+            "v": 0.7478,
+            "abs": 0.000050000001000000005
+          },
+          "correlates:FOXA1:rho_p": {
+            "v": 2.5074740593460398e-194,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:FOXA1:q": {
+            "v": 1.257310180207588e-190,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "correlates:FOXA1:r": {
+            "v": 0.686,
+            "abs": 0.000050000001000000005
+          },
+          "…": {
+            "more": 381,
+            "sha256": "af5ded2c86034ab3"
+          }
+        }
+      }
+    }
+  ]
+}

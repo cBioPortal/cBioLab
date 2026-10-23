@@ -1,0 +1,568 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Prostate, TP53 mutant": {
+      "count": 849,
+      "text": "CANCER_TYPE in [Prostate Cancer] (any sample) AND OQL[TP53: MUT]",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    },
+    "Prostate, TP53 wild-type": {
+      "count": 2284,
+      "text": "CANCER_TYPE in [Prostate Cancer] (any sample) AND NOT OQL[TP53]",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "labs",
+      "cohorts": [
+        "Prostate, TP53 mutant",
+        "Prostate, TP53 wild-type"
+      ],
+      "labs": {
+        "test": "PSA",
+        "anchoredTo": "Treatment [SUBTYPE=Hormone]",
+        "responseDrop": 50,
+        "fromWeeks": -12,
+        "toWeeks": 52,
+        "binWeeks": 4,
+        "baselineDays": 90,
+        "panels": [
+          {
+            "cohort": "Prostate, TP53 mutant",
+            "anchored": 792,
+            "baseline": 649,
+            "positiveBaseline": 631,
+            "evaluable": 586,
+            "course": [
+              {
+                "week": -12,
+                "n": 84,
+                "q1": -36.5,
+                "median": -13,
+                "q3": 32
+              },
+              {
+                "week": -8,
+                "n": 119,
+                "q1": -32,
+                "median": -12,
+                "q3": 4
+              },
+              {
+                "week": -4,
+                "n": 149,
+                "q1": -18,
+                "median": -6,
+                "q3": 8
+              },
+              {
+                "week": 0,
+                "n": 208,
+                "q1": -84,
+                "median": -56,
+                "q3": -6
+              },
+              {
+                "week": 4,
+                "n": 407,
+                "q1": -96,
+                "median": -86,
+                "q3": -48
+              },
+              {
+                "week": 8,
+                "n": 319,
+                "q1": -98,
+                "median": -94,
+                "q3": -66
+              },
+              {
+                "week": 12,
+                "n": 327,
+                "q1": -100,
+                "median": -96,
+                "q3": -63
+              },
+              {
+                "week": 16,
+                "n": 350,
+                "q1": -100,
+                "median": -98,
+                "q3": -82
+              },
+              {
+                "week": 20,
+                "n": 245,
+                "q1": -100,
+                "median": -98,
+                "q3": -64
+              },
+              {
+                "week": 24,
+                "n": 269,
+                "q1": -100,
+                "median": -96,
+                "q3": -62
+              },
+              {
+                "week": 28,
+                "n": 310,
+                "q1": -100,
+                "median": -98,
+                "q3": -74.5
+              },
+              {
+                "week": 32,
+                "n": 234,
+                "q1": -100,
+                "median": -96,
+                "q3": -72
+              },
+              {
+                "week": 36,
+                "n": 217,
+                "q1": -100,
+                "median": -96,
+                "q3": -42
+              },
+              {
+                "week": 40,
+                "n": 273,
+                "q1": -100,
+                "median": -98,
+                "q3": -54
+              },
+              {
+                "week": 44,
+                "n": 238,
+                "q1": -100,
+                "median": -95,
+                "q3": -44.5
+              },
+              {
+                "week": 48,
+                "n": 213,
+                "q1": -100,
+                "median": -94,
+                "q3": -22
+              },
+              {
+                "week": 52,
+                "n": 23,
+                "q1": -100,
+                "median": -82,
+                "q3": 31
+              }
+            ],
+            "best": [
+              311,
+              69,
+              29,
+              12,
+              10,
+              12,
+              6,
+              6,
+              9,
+              7,
+              5,
+              3,
+              1,
+              3,
+              3,
+              1,
+              3,
+              2,
+              1,
+              2,
+              {
+                "…": "181 more",
+                "sha256": "33dc4736a2e19428"
+              }
+            ],
+            "responders": 503,
+            "waterfall": [
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              {
+                "…": "566 more",
+                "sha256": "f1b10b1b2f434557"
+              }
+            ]
+          },
+          {
+            "cohort": "Prostate, TP53 wild-type",
+            "anchored": 1888,
+            "baseline": 1568,
+            "positiveBaseline": 1543,
+            "evaluable": 1449,
+            "course": [
+              {
+                "week": -12,
+                "n": 255,
+                "q1": -41,
+                "median": -22,
+                "q3": -4
+              },
+              {
+                "week": -8,
+                "n": 356,
+                "q1": -30,
+                "median": -14,
+                "q3": 2
+              },
+              {
+                "week": -4,
+                "n": 328,
+                "q1": -14,
+                "median": -6,
+                "q3": 6
+              },
+              {
+                "week": 0,
+                "n": 495,
+                "q1": -84,
+                "median": -64,
+                "q3": -19
+              },
+              {
+                "week": 4,
+                "n": 947,
+                "q1": -96,
+                "median": -90,
+                "q3": -72
+              },
+              {
+                "week": 8,
+                "n": 722,
+                "q1": -100,
+                "median": -98,
+                "q3": -84.5
+              },
+              {
+                "week": 12,
+                "n": 772,
+                "q1": -100,
+                "median": -98,
+                "q3": -88
+              },
+              {
+                "week": 16,
+                "n": 799,
+                "q1": -100,
+                "median": -100,
+                "q3": -94
+              },
+              {
+                "week": 20,
+                "n": 563,
+                "q1": -100,
+                "median": -100,
+                "q3": -92
+              },
+              {
+                "week": 24,
+                "n": 582,
+                "q1": -100,
+                "median": -100,
+                "q3": -92
+              },
+              {
+                "week": 28,
+                "n": 733,
+                "q1": -100,
+                "median": -100,
+                "q3": -94
+              },
+              {
+                "week": 32,
+                "n": 464,
+                "q1": -100,
+                "median": -100,
+                "q3": -88
+              },
+              {
+                "week": 36,
+                "n": 488,
+                "q1": -100,
+                "median": -100,
+                "q3": -77.5
+              },
+              {
+                "week": 40,
+                "n": 615,
+                "q1": -100,
+                "median": -100,
+                "q3": -90
+              },
+              {
+                "week": 44,
+                "n": 508,
+                "q1": -100,
+                "median": -100,
+                "q3": -78
+              },
+              {
+                "week": 48,
+                "n": 480,
+                "q1": -100,
+                "median": -100,
+                "q3": -69.5
+              },
+              {
+                "week": 52,
+                "n": 56,
+                "q1": -100,
+                "median": -98,
+                "q3": -21.5
+              }
+            ],
+            "best": [
+              966,
+              121,
+              49,
+              43,
+              32,
+              15,
+              17,
+              13,
+              8,
+              4,
+              8,
+              11,
+              7,
+              3,
+              9,
+              8,
+              3,
+              3,
+              3,
+              5,
+              {
+                "…": "181 more",
+                "sha256": "c24b835620b51a4f"
+              }
+            ],
+            "responders": 1347,
+            "waterfall": [
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              -100,
+              {
+                "…": "1429 more",
+                "sha256": "96ae3b8f4f34c36f"
+              }
+            ]
+          }
+        ],
+        "responseP": 0.0000014345634433689822
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "PSA as % change from each patient's baseline — the mean of their readings on the last day with any, in the 90 days up to and including the first Treatment [SUBTYPE=Hormone] — over -12 to 52 weeks around it, in 4-week bins; a patient tested several times in a bin counts once, at their mean, and no reading from the baseline day is drawn. Median and interquartile band are read from 2-point histograms, so they are exact to within a point, and the figure draws only bins with at least 5 patients; values above +300% share the top bin. Best response is each patient's lowest value after the anchor within the window; a responder fell by at least 50% (PCWG3's PSA50), counted exactly. Denominators: Prostate, TP53 mutant — 792 anchored, 649 with a baseline (18 of them left out: a baseline of 0 or below has no % change), 586 with a value after; Prostate, TP53 wild-type — 1,888 anchored, 1,568 with a baseline (25 of them left out: a baseline of 0 or below has no % change), 1,449 with a value after. Patients tested more often are over-represented in any bin they appear in, and testing itself is more frequent when a value is moving; the course is of those measured, not of everyone. Response rates compared with a two-sided Fisher test. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count patients' % change from baseline",
+            "detail": "The labs:course and labs:best queries above (and labs:waterfall, one bar per patient, from a patient-level participant). Counts per bin and per rule, no individual value except the waterfall's bars.",
+            "scope": "Prostate, TP53 mutant · msk_chord_2024",
+            "rowsIn": 849
+          },
+          {
+            "kind": "fetch",
+            "title": "Count patients' % change from baseline",
+            "detail": "The labs:course and labs:best queries above (and labs:waterfall, one bar per patient, from a patient-level participant). Counts per bin and per rule, no individual value except the waterfall's bars.",
+            "scope": "Prostate, TP53 wild-type · msk_chord_2024",
+            "rowsIn": 2284
+          },
+          {
+            "kind": "transform",
+            "title": "Anchor, baseline and change",
+            "detail": "Day 0 is each patient's first Treatment [SUBTYPE=Hormone] (event type, key and value matched ignoring case); a patient without one is not anchored. PSA readings are those whose result parses as a number. The baseline is the mean of a patient's readings on the last day with any in the 90 days up to and including day 0; a patient without one has no baseline, and one whose baseline is 0 or below is left out, since a % change from it means nothing. Every later reading becomes 100·(value − baseline)/baseline; readings on the baseline day itself are not used.",
+            "params": [
+              [
+                "Prostate, TP53 mutant",
+                "792 anchored → 649 with a baseline → 631 with a positive one → 586 with a reading after day 0"
+              ],
+              [
+                "Prostate, TP53 wild-type",
+                "1,888 anchored → 1,568 with a baseline → 1,543 with a positive one → 1,449 with a reading after day 0"
+              ]
+            ]
+          },
+          {
+            "kind": "transform",
+            "title": "Bin the course",
+            "detail": "Weeks -12 to 52 around day 0 in 4-week bins; a patient tested several times in a bin counts once, at their mean. % change in 2-point bins from -100 to 300, values beyond either end in the end bin. The figure draws a bin only from 5 patients."
+          },
+          {
+            "kind": "statistic",
+            "title": "Median and interquartile range per week",
+            "detail": "From each bin's histogram, with the bin midpoints as values and linear interpolation between ranks — exact to within a 2-point bin."
+          },
+          {
+            "kind": "statistic",
+            "title": "Best response",
+            "detail": "Each patient's lowest % change after day 0 within the window; a responder fell by at least 50%, counted from the unbinned values. The two cohorts' response rates are compared with a two-sided Fisher's exact test.",
+            "params": [
+              [
+                "Prostate, TP53 mutant",
+                "503 responders of 586"
+              ],
+              [
+                "Prostate, TP53 wild-type",
+                "1,347 responders of 1,449"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "quantilesFromHistogram",
+            "fisherExact"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Quantiles from histograms match numpy percentile on the expanded values, and Fisher's exact test scipy 1.18.1 fisher_exact, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts).",
+        "check": {
+          "labs:Prostate, TP53 mutant:-12:q1": {
+            "v": -36.5,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:-12:median": {
+            "v": -13,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:-12:q3": {
+            "v": 32,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:-8:q1": {
+            "v": -32,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:-8:median": {
+            "v": -12,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:-8:q3": {
+            "v": 4,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:-4:q1": {
+            "v": -18,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:-4:median": {
+            "v": -6,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:-4:q3": {
+            "v": 8,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:0:q1": {
+            "v": -84,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:0:median": {
+            "v": -56,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:0:q3": {
+            "v": -6,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:4:q1": {
+            "v": -96,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:4:median": {
+            "v": -86,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:4:q3": {
+            "v": -48,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:8:q1": {
+            "v": -98,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:8:median": {
+            "v": -94,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:8:q3": {
+            "v": -66,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:12:q1": {
+            "v": -100,
+            "abs": 0.000500001
+          },
+          "labs:Prostate, TP53 mutant:12:median": {
+            "v": -96,
+            "abs": 0.000500001
+          },
+          "…": {
+            "more": 83,
+            "sha256": "c0351cf9c722cb35"
+          }
+        }
+      }
+    }
+  ]
+}

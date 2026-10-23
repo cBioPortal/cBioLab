@@ -1,0 +1,367 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "NSCLC": {
+      "count": 7809,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "cooccurrence",
+      "cohorts": [
+        "NSCLC"
+      ],
+      "pairs": [
+        {
+          "a": "STK11",
+          "b": "KEAP1",
+          "both": 572,
+          "onlyA": 537,
+          "onlyB": 512,
+          "neither": 6188,
+          "profiled": 7809,
+          "log2Odds": 3.686,
+          "p": 3.396549365554813e-249,
+          "q": 5.094824048332219e-248,
+          "tendency": "co-occurrence"
+        },
+        {
+          "a": "EGFR",
+          "b": "KRAS",
+          "both": 75,
+          "onlyA": 1947,
+          "onlyB": 2194,
+          "neither": 3593,
+          "profiled": 7809,
+          "log2Odds": -3.987,
+          "p": 1.5080466769626828e-238,
+          "q": 1.1310350077220122e-237,
+          "tendency": "mutual exclusivity"
+        },
+        {
+          "a": "EGFR",
+          "b": "STK11",
+          "both": 52,
+          "onlyA": 1970,
+          "onlyB": 1057,
+          "neither": 4730,
+          "profiled": 7809,
+          "log2Odds": -3.082,
+          "p": 8.910206347433695e-88,
+          "q": 4.4551031737168476e-87,
+          "tendency": "mutual exclusivity"
+        },
+        {
+          "a": "KRAS",
+          "b": "STK11",
+          "both": 598,
+          "onlyA": 1671,
+          "onlyB": 511,
+          "neither": 5029,
+          "profiled": 7809,
+          "log2Odds": 1.816,
+          "p": 4.9400796448155687e-79,
+          "q": 1.8525298668058381e-78,
+          "tendency": "co-occurrence"
+        },
+        {
+          "a": "EGFR",
+          "b": "KEAP1",
+          "both": 66,
+          "onlyA": 1956,
+          "onlyB": 1018,
+          "neither": 4769,
+          "profiled": 7809,
+          "log2Odds": -2.661,
+          "p": 1.503888597094316e-72,
+          "q": 4.511665791282948e-72,
+          "tendency": "mutual exclusivity"
+        },
+        {
+          "a": "KRAS",
+          "b": "TP53",
+          "both": 873,
+          "onlyA": 1396,
+          "onlyB": 3215,
+          "neither": 2325,
+          "profiled": 7809,
+          "log2Odds": -1.145,
+          "p": 1.0558783450158271e-55,
+          "q": 2.6396958625395677e-55,
+          "tendency": "mutual exclusivity"
+        },
+        {
+          "a": "EGFR",
+          "b": "ALK",
+          "both": 49,
+          "onlyA": 1973,
+          "onlyB": 503,
+          "neither": 5284,
+          "profiled": 7809,
+          "log2Odds": -1.938,
+          "p": 3.1984865484044725e-25,
+          "q": 6.853899746581012e-25,
+          "tendency": "mutual exclusivity"
+        },
+        {
+          "a": "KRAS",
+          "b": "KEAP1",
+          "both": 456,
+          "onlyA": 1813,
+          "onlyB": 628,
+          "neither": 4912,
+          "profiled": 7809,
+          "log2Odds": 0.976,
+          "p": 5.47635802660293e-23,
+          "q": 1.0268171299880494e-22,
+          "tendency": "co-occurrence"
+        },
+        {
+          "a": "TP53",
+          "b": "STK11",
+          "both": 453,
+          "onlyA": 3635,
+          "onlyB": 656,
+          "neither": 3065,
+          "profiled": 7809,
+          "log2Odds": -0.78,
+          "p": 1.3052910427261104e-16,
+          "q": 2.175485071210184e-16,
+          "tendency": "mutual exclusivity"
+        },
+        {
+          "a": "EGFR",
+          "b": "TP53",
+          "both": 1174,
+          "onlyA": 848,
+          "onlyB": 2914,
+          "neither": 2873,
+          "profiled": 7809,
+          "log2Odds": 0.449,
+          "p": 2.2614400356737777e-9,
+          "q": 3.3921600535106666e-9,
+          "tendency": "co-occurrence"
+        },
+        {
+          "a": "KRAS",
+          "b": "ALK",
+          "both": 118,
+          "onlyA": 2151,
+          "onlyB": 434,
+          "neither": 5106,
+          "profiled": 7809,
+          "log2Odds": -0.632,
+          "p": 0.000027654786501243727,
+          "q": 0.00003771107250169599,
+          "tendency": "mutual exclusivity"
+        },
+        {
+          "a": "STK11",
+          "b": "ALK",
+          "both": 66,
+          "onlyA": 1043,
+          "onlyB": 486,
+          "neither": 6214,
+          "profiled": 7809,
+          "log2Odds": -0.306,
+          "p": 0.12879997517049538,
+          "q": 0.16099996896311922,
+          "tendency": "mutual exclusivity"
+        },
+        {
+          "a": "TP53",
+          "b": "ALK",
+          "both": 303,
+          "onlyA": 3785,
+          "onlyB": 249,
+          "neither": 3472,
+          "profiled": 7809,
+          "log2Odds": 0.159,
+          "p": 0.21623930193910998,
+          "q": 0.24172078956410842,
+          "tendency": "co-occurrence"
+        },
+        {
+          "a": "TP53",
+          "b": "KEAP1",
+          "both": 586,
+          "onlyA": 3502,
+          "onlyB": 498,
+          "neither": 3223,
+          "profiled": 7809,
+          "log2Odds": 0.115,
+          "p": 0.2256060702598345,
+          "q": 0.24172078956410842,
+          "tendency": "co-occurrence"
+        },
+        {
+          "a": "KEAP1",
+          "b": "ALK",
+          "both": 72,
+          "onlyA": 1012,
+          "onlyB": 480,
+          "neither": 6245,
+          "profiled": 7809,
+          "log2Odds": -0.111,
+          "p": 0.6094218694938038,
+          "q": 0.6094218694938038,
+          "tendency": "mutual exclusivity"
+        }
+      ],
+      "studies": [
+        "msk_chord_2024"
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "Pairwise co-occurrence within “NSCLC”. Denominators are the patients profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on patients whose panel could not have detected it. Two-sided Fisher exact test. q-values are Benjamini–Hochberg across the 15 assessable pairs. Every site returns four counts per pair and nothing else.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count each gene pair's 2×2 table",
+            "detail": "The pairCounts query above. Of the patients with a sample on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.",
+            "scope": "NSCLC · msk_chord_2024",
+            "rowsIn": 7809,
+            "params": [
+              [
+                "pairs",
+                "15"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Log₂ odds ratio per pair",
+            "detail": "log₂((both · neither) / (only first · only second)) on the counts summed across studies, with 0.5 added to every cell when any cell is 0."
+          },
+          {
+            "kind": "statistic",
+            "title": "Fisher's exact test per pair",
+            "detail": "Two-sided, on the pair's 2×2 table."
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across pairs",
+            "detail": "q-values over the 15 assessable pairs, from the Fisher p-values."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "fisherExact",
+            "log2OddsRatio",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels 0.15.0 multipletests(method=\"fdr_bh\"), to a relative 1e-6 (test/tables-golden.test.ts).",
+        "check": {
+          "cooccurrence:STK11/KEAP1:p": {
+            "v": 3.396549365554813e-249
+          },
+          "cooccurrence:STK11/KEAP1:q": {
+            "v": 5.094824048332219e-248
+          },
+          "cooccurrence:EGFR/KRAS:p": {
+            "v": 1.5080466769626828e-238
+          },
+          "cooccurrence:EGFR/KRAS:q": {
+            "v": 1.1310350077220122e-237
+          },
+          "cooccurrence:EGFR/STK11:p": {
+            "v": 8.910206347433695e-88
+          },
+          "cooccurrence:EGFR/STK11:q": {
+            "v": 4.4551031737168476e-87
+          },
+          "cooccurrence:KRAS/STK11:p": {
+            "v": 4.9400796448155687e-79
+          },
+          "cooccurrence:KRAS/STK11:q": {
+            "v": 1.8525298668058381e-78
+          },
+          "cooccurrence:EGFR/KEAP1:p": {
+            "v": 1.503888597094316e-72
+          },
+          "cooccurrence:EGFR/KEAP1:q": {
+            "v": 4.511665791282948e-72
+          },
+          "cooccurrence:KRAS/TP53:p": {
+            "v": 1.0558783450158271e-55
+          },
+          "cooccurrence:KRAS/TP53:q": {
+            "v": 2.6396958625395677e-55
+          },
+          "cooccurrence:EGFR/ALK:p": {
+            "v": 3.1984865484044725e-25
+          },
+          "cooccurrence:EGFR/ALK:q": {
+            "v": 6.853899746581012e-25
+          },
+          "cooccurrence:KRAS/KEAP1:p": {
+            "v": 5.47635802660293e-23
+          },
+          "cooccurrence:KRAS/KEAP1:q": {
+            "v": 1.0268171299880494e-22
+          },
+          "cooccurrence:TP53/STK11:p": {
+            "v": 1.3052910427261104e-16
+          },
+          "cooccurrence:TP53/STK11:q": {
+            "v": 2.175485071210184e-16
+          },
+          "cooccurrence:EGFR/TP53:p": {
+            "v": 2.2614400356737777e-9
+          },
+          "cooccurrence:EGFR/TP53:q": {
+            "v": 3.3921600535106666e-9
+          },
+          "cooccurrence:KRAS/ALK:p": {
+            "v": 0.000027654786501243727
+          },
+          "cooccurrence:KRAS/ALK:q": {
+            "v": 0.00003771107250169599
+          },
+          "cooccurrence:STK11/ALK:p": {
+            "v": 0.12879997517049538
+          },
+          "cooccurrence:STK11/ALK:q": {
+            "v": 0.16099996896311922
+          },
+          "cooccurrence:TP53/ALK:p": {
+            "v": 0.21623930193910998
+          },
+          "cooccurrence:TP53/ALK:q": {
+            "v": 0.24172078956410842
+          },
+          "cooccurrence:TP53/KEAP1:p": {
+            "v": 0.2256060702598345
+          },
+          "cooccurrence:TP53/KEAP1:q": {
+            "v": 0.24172078956410842
+          },
+          "cooccurrence:KEAP1/ALK:p": {
+            "v": 0.6094218694938038
+          },
+          "cooccurrence:KEAP1/ALK:q": {
+            "v": 0.6094218694938038
+          }
+        }
+      }
+    }
+  ]
+}

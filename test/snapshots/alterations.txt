@@ -1,0 +1,59 @@
+Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- Prostate: 3,211 patients — CANCER_TYPE in [Prostate Cancer] (any sample)
+
+Patient alterations — patients to choose from: 3,211; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	patient	source	samples	mutations	cna	sv
+  Prostate	P-0030872	this portal (primary)	1	4	0	5
+  Prostate	P-0000631	this portal (primary)	1	3	4	4
+  Prostate	P-0013729	this portal (primary)	1	0	7	4
+  Prostate	P-0017262	this portal (primary)	1	2	1	4
+  Prostate	P-0020078	this portal (primary)	1	5	7	4
+  Prostate	P-0025988	this portal (primary)	1	5	0	4
+  Prostate	P-0030109	this portal (primary)	1	2	0	4
+  Prostate	P-0037022	this portal (primary)	1	3	0	4
+  Prostate	P-0038349	this portal (primary)	1	3	0	4
+  Prostate	P-0043336	this portal (primary)	1	26	0	4
+  Prostate	P-0046943	this portal (primary)	1	2	0	4
+  Prostate	P-0049524	this portal (primary)	1	2	0	4
+  Prostate	P-0069200	this portal (primary)	1	9	0	4
+  Prostate	P-0081157	this portal (primary)	1	3	4	4
+  Prostate	P-0003511	this portal (primary)	1	3	4	3
+  Prostate	P-0004946	this portal (primary)	2	7	0	3
+  Prostate	P-0006689	this portal (primary)	1	0	0	3
+  Prostate	P-0008960	this portal (primary)	1	0	3	3
+  Prostate	P-0012605	this portal (primary)	1	2	0	3
+  Prostate	P-0017882	this portal (primary)	1	3	9	3
+  Prostate	P-0019663	this portal (primary)	1	0	0	3
+  Prostate	P-0024249	this portal (primary)	2	7	3	3
+  Prostate	P-0024679	this portal (primary)	1	1	0	3
+  Prostate	P-0025139	this portal (primary)	1	3	4	3
+  Prostate	P-0025823	this portal (primary)	1	2	17	3
+  … 3,186 more rows
+P-0024249 (msk_chord_2024); samples: P-0024249-T01-IM6 (Primary), P-0024249-T02-IM7 (Primary)
+Mutations: 3 of 7 rows kept by the query; the first 3, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	samples	gene	proteinChange	annotation	mutationType	copy	freq	vaf
+  Prostate	P-0024249-T02-IM7	KRAS	G12V	Oncogenic · Level 1	Missense_Mutation		28.5	0.076
+  Prostate	P-0024249-T01-IM6	PTEN	G127V	Likely Oncogenic · Level 1	Missense_Mutation		4.8	0.619
+  Prostate	P-0024249-T01-IM6	TP53	P151R	Likely Oncogenic	Missense_Mutation		52.4	0.761
+Copy Number Alterations: 3 rows; the first 3, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	samples	gene	cna	annotation	cytoband	freq
+  Prostate	P-0024249-T01-IM6	MAP3K1	HOMDEL	Likely Oncogenic	5q11.2	0.3
+  Prostate	P-0024249-T01-IM6	RAD51B	HOMDEL	Likely Oncogenic · Level 1	14q24.1	0.1
+  Prostate	P-0024249-T01-IM6	PLK2	HOMDEL	Unknown	5q11.2	0.2
+Structural Variants: 3 rows; the first 3, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	samples	gene1	gene2	class	eventInfo	breakpointType	connectionType
+  Prostate	P-0024249-T01-IM6	IRS2	CHMP1A	TRANSLOCATION	Protein Fusion: mid-exon  {IRS2:CHMP1A}	IMPPRECISE	3to5
+  Prostate	P-0024249-T01-IM6	TCF7L2		DELETION	TCF7L2-intragenic	PRECISE	3to5
+  Prostate	P-0024249-T01-IM6	TMPRSS2	ERG	DELETION	Protein Fusion: out of frame  {TMPRSS2:ERG}	IMPPRECISE	3to5
+  CAVEAT (tell the user): P-0024249 — Mutations: 3 of 7 rows (rows Annotation (OncoKB) contains “Oncogenic”); Copy Number Alterations: 3 rows; Structural Variants: 3 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 3,211 patients. Sorted by Structural Variants (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
+  METHOD:
+    - Count the patients per cohort and study: The alterations:counts query above: every patient of each cohort, with their sample count and how many rows each of the three tables lists for them (a mutation, a gene's deep copy-number call, a structural variant — each counted once however many samples carry it).
+        Prostate · msk_chord_2024: 3,211
+    - Sort them together and take one page: The alterations:rows query above: the patients of every cohort and study combined in one query, sorted by Structural Variants descending with missing values last, then patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset.
+    - Read P-0024249's three tables: The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Mutations: every called mutation of the patient's samples (uncalled calls left out), one row per variant with the samples carrying it, the highest allele frequency among them (variant / (variant + reference) reads) with that sample's reads, and the gene's deep copy-number calls in the patient (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event (both genes and breakpoints, class, event info), the highest read counts among its samples. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.
+        Mutations: 3 of 7 rows (kept: rows Annotation (OncoKB) contains “Oncogenic”)
+        Copy Number Alterations: 3 rows
+        Structural Variants: 3 rows
+    A listing: no statistic is computed, so there is no script — the queries are the numbers.

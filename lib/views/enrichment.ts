@@ -4,7 +4,7 @@ import { enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql, type EnrichAlte
 import { fisherExact, chiSquareTest, benjaminiHochberg } from "../stats.ts";
 import { enrichmentMethod } from "../method.ts";
 import type { ViewRun } from "./run.ts";
-import { overLimit, cytobands, answering, refuse, niceCeil } from "./shared.ts";
+import { overLimit, cytobands, answering, refuse, niceCeil, askEachSite } from "./shared.ts";
 
 const ENRICH_ROWS = 300;
 const ALTERATION_WORD: Record<EnrichAlteration, string> = {
@@ -32,19 +32,18 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   const altered = new Map<string, number>(), panel = new Map<string, number>(), wes = new Map<string, number>();
   const genes = new Set<string>();
   const perSite: { cohort: string; study: string; genes: number; wes: number }[] = [];
-  await Promise.all(vNames.flatMap((n) => cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
-    const def = doc.cohorts[n];
-    const [a, pr, w] = await Promise.all([
-      ok[st].viewAggregate("enrichment:altered:" + n, def, (c, s, d) => enrichAlteredSql(c, s, d, alteration, pin, measure === "driver")),
-      ok[st].viewAggregate("enrichment:panels:" + n, def, (c, s, d) => enrichPanelProfiledSql(c, s, d, alteration)),
-      ok[st].viewAggregate("enrichment:wes:" + n, def, (c, s, d) => enrichWesSql(c, s, d, alteration))
-    ]);
+  const answers = await askEachSite(ctx, ok, (n, st, r) => Promise.all([
+    r.viewAggregate("enrichment:altered:" + n, doc.cohorts[n], (c, s, d) => enrichAlteredSql(c, s, d, alteration, pin, measure === "driver")),
+    r.viewAggregate("enrichment:panels:" + n, doc.cohorts[n], (c, s, d) => enrichPanelProfiledSql(c, s, d, alteration)),
+    r.viewAggregate("enrichment:wes:" + n, doc.cohorts[n], (c, s, d) => enrichWesSql(c, s, d, alteration))
+  ]));
+  for (const { cohort: n, study: st, answer: [a, pr, w] } of answers) {
     for (const r of a) { const k = n + "\t" + r.gene; altered.set(k, (altered.get(k) || 0) + Number(r.altered)); genes.add(String(r.gene)); }
     for (const r of pr) { const k = n + "\t" + r.gene; panel.set(k, (panel.get(k) || 0) + Number(r.profiled)); }
     const wn = Number(w[0]?.n || 0);
     wes.set(n, (wes.get(n) || 0) + wn);
     perSite.push({ cohort: n, study: st, genes: a.length, wes: wn });
-  })));
+  }
   const two = vNames.length === 2;
   const tested: EnrichmentGene[] = [];
   let untested = 0;

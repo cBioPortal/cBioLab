@@ -1,0 +1,2243 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Breast": {
+      "count": 5368,
+      "text": "CANCER_TYPE in [Breast Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "timeline",
+      "cohorts": [
+        "Breast"
+      ],
+      "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1000 522\" width=\"100%\" role=\"img\" aria-label=\"Timeline of P-0000012\" style=\"max-width:1000px;height:auto;display:block;font-family:'IBM Plex Sans',system-ui,sans-serif\"><title>Timeline of P-0000012</title><rect width=\"1000\" height=\"522\" fill=\"var(--bg, #ffffff)\"/><line x1=\"164\" y1=\"25.5\" x2=\"986\" y2=\"25.5\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"1\"/><line x1=\"178.2\" x2=\"178.2\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"178.2\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-26y</text><g transform=\"translate(213.5 0)\"><title>9 years with no events, cut</title><path d=\"M-6 17 q3 -6 6 0 t6 0\" fill=\"none\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"1.2\"/><line x1=\"0\" x2=\"0\" y1=\"26\" y2=\"468\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"0.75\" stroke-dasharray=\"2 3\"/></g><line x1=\"218.5\" x2=\"218.5\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><line x1=\"248.8\" x2=\"248.8\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"248.8\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-15y</text><line x1=\"279.1\" x2=\"279.1\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"279.1\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-14y</text><line x1=\"309.5\" x2=\"309.5\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"309.5\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-13y</text><line x1=\"339.8\" x2=\"339.8\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"339.8\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-12y</text><line x1=\"370.1\" x2=\"370.1\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"370.1\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-11y</text><line x1=\"400.4\" x2=\"400.4\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"400.4\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-10y</text><line x1=\"430.8\" x2=\"430.8\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"430.8\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-9y</text><line x1=\"461.1\" x2=\"461.1\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"461.1\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-8y</text><line x1=\"491.4\" x2=\"491.4\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"491.4\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-7y</text><line x1=\"521.7\" x2=\"521.7\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"521.7\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-6y</text><line x1=\"552.1\" x2=\"552.1\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"552.1\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-5y</text><line x1=\"582.4\" x2=\"582.4\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"582.4\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-4y</text><line x1=\"612.7\" x2=\"612.7\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"612.7\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-3y</text><line x1=\"643.0\" x2=\"643.0\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"643\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-2y</text><line x1=\"673.4\" x2=\"673.4\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"673.4\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">-1y</text><line x1=\"703.7\" x2=\"703.7\" y1=\"22\" y2=\"468\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"0.75\"/><text x=\"703.7\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">0</text><line x1=\"734.0\" x2=\"734.0\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"734\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">1y</text><line x1=\"764.3\" x2=\"764.3\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"764.3\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">2y</text><line x1=\"794.7\" x2=\"794.7\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"794.7\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">3y</text><line x1=\"825.0\" x2=\"825.0\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"825\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">4y</text><line x1=\"855.3\" x2=\"855.3\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"855.3\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">5y</text><line x1=\"885.6\" x2=\"885.6\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"885.6\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">6y</text><line x1=\"916.0\" x2=\"916.0\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"916\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">7y</text><line x1=\"946.3\" x2=\"946.3\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"946.3\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">8y</text><line x1=\"976.6\" x2=\"976.6\" y1=\"22\" y2=\"468\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\"/><text x=\"976.6\" y=\"18\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"middle\">9y</text><g><title>Sample acquisition</title><text x=\"5\" y=\"39.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\" font-weight=\"600\">Sample acquisition</text></g><line x1=\"0\" x2=\"1000\" y1=\"45.5\" y2=\"45.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(250.7 0)\"><circle cx=\"0\" cy=\"36\" r=\"7\" fill=\"black\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"0.75\"/><text x=\"0\" y=\"39.5\" font-size=\"10\" fill=\"#ffffff\" text-anchor=\"middle\">1</text></g><g transform=\"translate(703.7 0)\"><circle cx=\"0\" cy=\"36\" r=\"7\" fill=\"red\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"0.75\"/><text x=\"0\" y=\"39.5\" font-size=\"10\" fill=\"#ffffff\" text-anchor=\"middle\">2</text></g><g><title>Sequencing</title><text x=\"5\" y=\"59.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\" font-weight=\"600\">Sequencing</text></g><line x1=\"0\" x2=\"1000\" y1=\"65.5\" y2=\"65.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(703.7 0)\"><circle cx=\"0\" cy=\"56\" r=\"7\" fill=\"red\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"0.75\"/><text x=\"0\" y=\"59.5\" font-size=\"10\" fill=\"#ffffff\" text-anchor=\"middle\">2</text></g><g transform=\"translate(707.7 0)\"><circle cx=\"0\" cy=\"56\" r=\"7\" fill=\"black\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"0.75\"/><text x=\"0\" y=\"59.5\" font-size=\"10\" fill=\"#ffffff\" text-anchor=\"middle\">1</text></g><g><title>Surgery</title><text x=\"5\" y=\"79.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\" font-weight=\"600\">Surgery</text></g><line x1=\"0\" x2=\"1000\" y1=\"85.5\" y2=\"85.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(484.9 0)\"><circle cx=\"0\" cy=\"76\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(646.0 0)\"><circle cx=\"0\" cy=\"76\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(703.7 0)\"><circle cx=\"0\" cy=\"76\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(727.7 0)\"><circle cx=\"0\" cy=\"76\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(843.9 0)\"><circle cx=\"0\" cy=\"76\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(970.9 0)\"><circle cx=\"0\" cy=\"76\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g><title>Treatment</title><text x=\"5\" y=\"99.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\" font-weight=\"600\">▾ Treatment</text></g><line x1=\"0\" x2=\"1000\" y1=\"105.5\" y2=\"105.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g><title>Chemo</title><text x=\"19\" y=\"119.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">▸ Chemo</text></g><line x1=\"0\" x2=\"1000\" y1=\"125.5\" y2=\"125.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(252.0 0)\"><rect x=\"0\" y=\"113.5\" width=\"8.0\" height=\"5\" rx=\"2\" ry=\"2\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(252.0 0)\"><rect x=\"0\" y=\"113.5\" width=\"9.2\" height=\"5\" rx=\"2\" ry=\"2\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(252.0 0)\"><rect x=\"0\" y=\"113.5\" width=\"9.1\" height=\"5\" rx=\"2\" ry=\"2\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(706.4 0)\"><rect x=\"0\" y=\"113.5\" width=\"8.0\" height=\"5\" rx=\"2\" ry=\"2\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(706.4 0)\"><rect x=\"0\" y=\"113.5\" width=\"8.0\" height=\"5\" rx=\"2\" ry=\"2\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(708.8 0)\"><rect x=\"0\" y=\"113.5\" width=\"8.0\" height=\"5\" rx=\"2\" ry=\"2\" fill=\"rgb(31, 119, 180)\"/></g><g><title>Radiation Therapy</title><text x=\"19\" y=\"139.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">Radiation Therapy</text></g><line x1=\"0\" x2=\"1000\" y1=\"145.5\" y2=\"145.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(706.4 0)\"><circle cx=\"0\" cy=\"136\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(846.7 0)\"><circle cx=\"0\" cy=\"136\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g><title>Investigational</title><text x=\"19\" y=\"159.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">▾ Investigational</text></g><line x1=\"0\" x2=\"1000\" y1=\"165.5\" y2=\"165.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g><title>INVESTIGATIONAL</title><text x=\"33\" y=\"179.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">INVESTIGATIONAL</text></g><line x1=\"0\" x2=\"1000\" y1=\"185.5\" y2=\"185.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(730.3 0)\"><ellipse cx=\"0\" cy=\"177.125\" rx=\"4.5\" ry=\"2.34\" fill=\"rgb(31, 119, 180)\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"176.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"174.875\" rx=\"4.5\" ry=\"2.34\" fill=\"rgb(31, 119, 180)\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><text x=\"6.5\" y=\"179.5\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\">2</text></g><g><title>Immuno</title><text x=\"19\" y=\"199.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">▾ Immuno</text></g><line x1=\"0\" x2=\"1000\" y1=\"205.5\" y2=\"205.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g><title>NIVOLUMAB</title><text x=\"33\" y=\"219.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">NIVOLUMAB</text></g><line x1=\"0\" x2=\"1000\" y1=\"225.5\" y2=\"225.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(847.8 0)\"><rect x=\"0\" y=\"213.5\" width=\"8.0\" height=\"5\" rx=\"2\" ry=\"2\" fill=\"rgb(31, 119, 180)\"/></g><g><title>Diagnosis</title><text x=\"5\" y=\"239.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\" font-weight=\"600\">▾ Diagnosis</text></g><line x1=\"0\" x2=\"1000\" y1=\"245.5\" y2=\"245.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g><title>Primary</title><text x=\"19\" y=\"259.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">Primary</text></g><line x1=\"0\" x2=\"1000\" y1=\"265.5\" y2=\"265.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(165.7 0)\"><circle cx=\"0\" cy=\"256\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(700.2 0)\"><circle cx=\"0\" cy=\"256\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g><title>HasCancer</title><text x=\"19\" y=\"279.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">HasCancer</text></g><line x1=\"0\" x2=\"1000\" y1=\"285.5\" y2=\"285.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(682.5 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(682.7 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(698.0 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(704.5 0)\"><ellipse cx=\"0\" cy=\"278.25\" rx=\"4.5\" ry=\"2.34\" fill=\"#D62727\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"277.25\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"276\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"275\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"273.75\" rx=\"4.5\" ry=\"2.34\" fill=\"#D62727\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(716.1 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#C0C0C0\"/></g><g transform=\"translate(724.5 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(727.0 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(727.7 0)\"><ellipse cx=\"0\" cy=\"277.125\" rx=\"4.5\" ry=\"2.34\" fill=\"#C0C0C0\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"276.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"274.875\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(728.4 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(729.1 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(731.4 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(731.5 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(734.2 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(737.7 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(745.1 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(745.4 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(752.5 0)\"><ellipse cx=\"0\" cy=\"277.125\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"276.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"274.875\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(761.1 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(770.4 0)\"><ellipse cx=\"0\" cy=\"277.125\" rx=\"4.5\" ry=\"2.34\" fill=\"#D62727\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"276.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"274.875\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(785.1 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#C0C0C0\"/></g><g transform=\"translate(798.1 0)\"><ellipse cx=\"0\" cy=\"277.125\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"276.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"274.875\" rx=\"4.5\" ry=\"2.34\" fill=\"#C0C0C0\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(813.1 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(828.1 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(843.4 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(844.9 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(845.1 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(858.4 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(867.7 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(877.0 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(892.2 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(906.7 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(906.8 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(921.9 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#C0C0C0\"/></g><g transform=\"translate(937.1 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(952.8 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(983.3 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(983.4 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(984.3 0)\"><circle cx=\"0\" cy=\"276\" r=\"4\" fill=\"#C0C0C0\"/></g><g><title>Progression</title><text x=\"19\" y=\"299.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">Progression</text></g><line x1=\"0\" x2=\"1000\" y1=\"305.5\" y2=\"305.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(682.5 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(682.7 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#C0C0C0\"/></g><g transform=\"translate(698.0 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#C0C0C0\"/></g><g transform=\"translate(704.5 0)\"><ellipse cx=\"0\" cy=\"298.25\" rx=\"4.5\" ry=\"2.34\" fill=\"#C0C0C0\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"297.25\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"296\" rx=\"4.5\" ry=\"2.34\" fill=\"#D62727\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"295\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"293.75\" rx=\"4.5\" ry=\"2.34\" fill=\"#D62727\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(716.1 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(724.5 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(727.0 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#D62727\"/></g><g transform=\"translate(727.7 0)\"><ellipse cx=\"0\" cy=\"297.125\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"296.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"294.875\" rx=\"4.5\" ry=\"2.34\" fill=\"#C0C0C0\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(728.4 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(729.1 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(731.4 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(731.5 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(734.2 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(737.7 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#C0C0C0\"/></g><g transform=\"translate(745.1 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(745.4 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(752.5 0)\"><ellipse cx=\"0\" cy=\"297.125\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"296.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"294.875\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(761.1 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(770.4 0)\"><ellipse cx=\"0\" cy=\"297.125\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"296.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"294.875\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(785.1 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(798.1 0)\"><ellipse cx=\"0\" cy=\"297.125\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"296.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"294.875\" rx=\"4.5\" ry=\"2.34\" fill=\"#2AA02B\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(813.1 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(828.1 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(843.4 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(844.9 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#C0C0C0\"/></g><g transform=\"translate(845.1 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(858.4 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(867.7 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(877.0 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(892.2 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(906.7 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(906.8 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(921.9 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(937.1 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(952.8 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(983.3 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(983.4 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g transform=\"translate(984.3 0)\"><circle cx=\"0\" cy=\"296\" r=\"4\" fill=\"#2AA02B\"/></g><g><title>Tumor Sites</title><text x=\"19\" y=\"319.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">Tumor Sites</text></g><line x1=\"0\" x2=\"1000\" y1=\"325.5\" y2=\"325.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(698.0 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(704.5 0)\"><ellipse cx=\"0\" cy=\"318.25\" rx=\"4.5\" ry=\"2.34\" fill=\"rgb(31, 119, 180)\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"317.25\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"316\" rx=\"4.5\" ry=\"2.34\" fill=\"rgb(31, 119, 180)\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"315\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"313.75\" rx=\"4.5\" ry=\"2.34\" fill=\"rgb(31, 119, 180)\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(716.1 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(727.0 0)\"><ellipse cx=\"0\" cy=\"317.125\" rx=\"4.5\" ry=\"2.34\" fill=\"rgb(31, 119, 180)\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"316.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"314.875\" rx=\"4.5\" ry=\"2.34\" fill=\"rgb(31, 119, 180)\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(727.7 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(729.1 0)\"><ellipse cx=\"0\" cy=\"317.125\" rx=\"4.5\" ry=\"2.34\" fill=\"rgb(31, 119, 180)\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/><ellipse cx=\"0\" cy=\"316.125\" rx=\"4.5\" ry=\"2.34\" fill=\"var(--bg, #ffffff)\"/><ellipse cx=\"0\" cy=\"314.875\" rx=\"4.5\" ry=\"2.34\" fill=\"rgb(31, 119, 180)\" stroke=\"var(--ink, #16232b)\" stroke-width=\"0.2\"/></g><g transform=\"translate(734.2 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(737.7 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(745.4 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(843.4 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(845.1 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(867.7 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(892.2 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(937.1 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(984.3 0)\"><circle cx=\"0\" cy=\"316\" r=\"4\" fill=\"rgb(31, 119, 180)\"/></g><g><title>Performance Status</title><text x=\"19\" y=\"339.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">Performance Status</text></g><line x1=\"0\" x2=\"1000\" y1=\"345.5\" y2=\"345.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g transform=\"translate(716.9 0)\"><circle cx=\"0\" cy=\"336\" r=\"4\" fill=\"#fae9e9\"/></g><g><title>Lab_Test</title><text x=\"5\" y=\"359.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\" font-weight=\"600\">▾ Lab_Test</text></g><line x1=\"0\" x2=\"1000\" y1=\"365.5\" y2=\"365.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><g><title>CEA</title><text x=\"19\" y=\"379.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">CEA</text></g><line x1=\"0\" x2=\"1000\" y1=\"415.5\" y2=\"415.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><text x=\"156\" y=\"376.5\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"end\">4.6</text><line x1=\"159\" x2=\"164\" y1=\"373\" y2=\"373\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"1\"/><text x=\"156\" y=\"412.5\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"end\">1.2</text><line x1=\"159\" x2=\"164\" y1=\"409\" y2=\"409\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"1\"/><polyline fill=\"none\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"1\" points=\"252.0,402.6 262.8,401.6 273.5,406.9 288.4,405.8 300.8,406.9 314.5,403.7 327.3,409.0 341.3,407.9 375.9,402.6 404.4,398.4 422.7,401.6 440.7,398.4 455.3,401.6 478.0,399.5 495.4,400.5 519.2,402.6 546.6,396.3 586.7,398.4 646.8,391.0 676.9,387.8 696.8,373.0\"/><g transform=\"translate(252.0 0)\"><circle cx=\"0\" cy=\"402.6470588235294\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(262.8 0)\"><circle cx=\"0\" cy=\"401.5882352941176\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(273.5 0)\"><circle cx=\"0\" cy=\"406.88235294117646\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(288.4 0)\"><circle cx=\"0\" cy=\"405.8235294117647\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(300.8 0)\"><circle cx=\"0\" cy=\"406.88235294117646\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(314.5 0)\"><circle cx=\"0\" cy=\"403.70588235294116\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(327.3 0)\"><circle cx=\"0\" cy=\"409\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(341.3 0)\"><circle cx=\"0\" cy=\"407.94117647058823\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(375.9 0)\"><circle cx=\"0\" cy=\"402.6470588235294\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(404.4 0)\"><circle cx=\"0\" cy=\"398.4117647058823\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(422.7 0)\"><circle cx=\"0\" cy=\"401.5882352941176\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(440.7 0)\"><circle cx=\"0\" cy=\"398.4117647058823\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(455.3 0)\"><circle cx=\"0\" cy=\"401.5882352941176\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(478.0 0)\"><circle cx=\"0\" cy=\"399.47058823529414\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(495.4 0)\"><circle cx=\"0\" cy=\"400.52941176470586\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(519.2 0)\"><circle cx=\"0\" cy=\"402.6470588235294\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(546.6 0)\"><circle cx=\"0\" cy=\"396.29411764705884\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(586.7 0)\"><circle cx=\"0\" cy=\"398.4117647058823\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(646.8 0)\"><circle cx=\"0\" cy=\"391\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(676.9 0)\"><circle cx=\"0\" cy=\"387.8235294117647\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(696.8 0)\"><circle cx=\"0\" cy=\"373\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g><title>CA_15-3</title><text x=\"19\" y=\"429.9\" font-size=\"11\" fill=\"var(--ink, #16232b)\">CA_15-3</text></g><line x1=\"0\" x2=\"1000\" y1=\"465.5\" y2=\"465.5\" stroke=\"var(--line, #dde4e8)\" stroke-width=\"0.75\" opacity=\"0.6\"/><text x=\"156\" y=\"426.5\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"end\">21</text><line x1=\"159\" x2=\"164\" y1=\"423\" y2=\"423\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"1\"/><text x=\"156\" y=\"462.5\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\" text-anchor=\"end\">8</text><line x1=\"159\" x2=\"164\" y1=\"459\" y2=\"459\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"1\"/><polyline fill=\"none\" stroke=\"var(--muted, #5b6b76)\" stroke-width=\"1\" points=\"262.8,423.0 273.5,436.8 288.4,434.1 300.8,442.4 314.5,442.4 327.3,434.1 341.3,445.2 375.9,442.4 404.4,439.6 422.7,442.4 440.7,447.9 455.3,447.9 478.0,445.2 495.4,456.2 519.2,459.0 546.6,456.2 586.7,450.7 646.8,453.5 676.9,439.6 696.8,445.2\"/><g transform=\"translate(262.8 0)\"><circle cx=\"0\" cy=\"423\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(273.5 0)\"><circle cx=\"0\" cy=\"436.84615384615387\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(288.4 0)\"><circle cx=\"0\" cy=\"434.0769230769231\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(300.8 0)\"><circle cx=\"0\" cy=\"442.38461538461536\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(314.5 0)\"><circle cx=\"0\" cy=\"442.38461538461536\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(327.3 0)\"><circle cx=\"0\" cy=\"434.0769230769231\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(341.3 0)\"><circle cx=\"0\" cy=\"445.15384615384613\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(375.9 0)\"><circle cx=\"0\" cy=\"442.38461538461536\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(404.4 0)\"><circle cx=\"0\" cy=\"439.61538461538464\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(422.7 0)\"><circle cx=\"0\" cy=\"442.38461538461536\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(440.7 0)\"><circle cx=\"0\" cy=\"447.9230769230769\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(455.3 0)\"><circle cx=\"0\" cy=\"447.9230769230769\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(478.0 0)\"><circle cx=\"0\" cy=\"445.15384615384613\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(495.4 0)\"><circle cx=\"0\" cy=\"456.2307692307692\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(519.2 0)\"><circle cx=\"0\" cy=\"459\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(546.6 0)\"><circle cx=\"0\" cy=\"456.2307692307692\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(586.7 0)\"><circle cx=\"0\" cy=\"450.6923076923077\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(646.8 0)\"><circle cx=\"0\" cy=\"453.46153846153845\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(676.9 0)\"><circle cx=\"0\" cy=\"439.61538461538464\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><g transform=\"translate(696.8 0)\"><circle cx=\"0\" cy=\"445.15384615384613\" r=\"3\" fill=\"rgb(31, 119, 180)\"/></g><text x=\"8\" y=\"484\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\">P-0000012 (msk_chord_2024): 172 events in 6 event types, from -26 years, 5 months, 1 day to 9 years, 3 months, 2 days relative to diagnosis (day 0). Samples,</text><text x=\"8\" y=\"498\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\">numbered in collection order: 1 P-0000012-T02-IM3 (Primary), 2 P-0000012-T03-IM3 (Metastasis). 9 years with no events are cut from the axis (dashed line);</text><text x=\"8\" y=\"512\" font-size=\"10\" fill=\"var(--muted, #5b6b76)\">expandGaps draws every year. Events of one type nest by attribute as on cBioPortal (treatment by subtype and agent, lab tests by test); vocabularies are the study's own.</text></svg>",
+      "timeline": {
+        "columns": [
+          {
+            "id": "patient",
+            "name": "Patient ID",
+            "numeric": false
+          },
+          {
+            "id": "source",
+            "name": "Source",
+            "numeric": false
+          },
+          {
+            "id": "samples",
+            "name": "Samples",
+            "numeric": true
+          },
+          {
+            "id": "events",
+            "name": "Events",
+            "numeric": true
+          },
+          {
+            "id": "first",
+            "name": "First event (day)",
+            "numeric": true
+          },
+          {
+            "id": "last",
+            "name": "Last event (day)",
+            "numeric": true
+          },
+          {
+            "id": "span",
+            "name": "Span (days)",
+            "numeric": true
+          },
+          {
+            "id": "types",
+            "name": "Event types",
+            "numeric": false
+          }
+        ],
+        "shown": [
+          "patient",
+          "source",
+          "samples",
+          "events",
+          "span",
+          "types"
+        ],
+        "defaults": [
+          "patient",
+          "source",
+          "samples",
+          "events",
+          "span",
+          "types"
+        ],
+        "query": {
+          "sort": {
+            "column": "events",
+            "desc": true
+          }
+        },
+        "rows": [
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0014149",
+            "sample": "",
+            "values": [
+              "P-0014149",
+              "this portal (primary)",
+              1,
+              925,
+              -3547,
+              2590,
+              6137,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0007146",
+            "sample": "",
+            "values": [
+              "P-0007146",
+              "this portal (primary)",
+              1,
+              800,
+              -2420,
+              2791,
+              5211,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0015681",
+            "sample": "",
+            "values": [
+              "P-0015681",
+              "this portal (primary)",
+              1,
+              717,
+              -6020,
+              475,
+              6495,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0041672",
+            "sample": "",
+            "values": [
+              "P-0041672",
+              "this portal (primary)",
+              1,
+              708,
+              -3542,
+              1133,
+              4675,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0047755",
+            "sample": "",
+            "values": [
+              "P-0047755",
+              "this portal (primary)",
+              1,
+              694,
+              -5120,
+              182,
+              5302,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0016734",
+            "sample": "",
+            "values": [
+              "P-0016734",
+              "this portal (primary)",
+              1,
+              677,
+              -6200,
+              565,
+              6765,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0057382",
+            "sample": "",
+            "values": [
+              "P-0057382",
+              "this portal (primary)",
+              1,
+              663,
+              -6967,
+              926,
+              7893,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0003958",
+            "sample": "",
+            "values": [
+              "P-0003958",
+              "this portal (primary)",
+              1,
+              655,
+              -3390,
+              3493,
+              6883,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0010993",
+            "sample": "",
+            "values": [
+              "P-0010993",
+              "this portal (primary)",
+              1,
+              652,
+              -4350,
+              2142,
+              6492,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0011420",
+            "sample": "",
+            "values": [
+              "P-0011420",
+              "this portal (primary)",
+              1,
+              646,
+              -5572,
+              2183,
+              7755,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0015568",
+            "sample": "",
+            "values": [
+              "P-0015568",
+              "this portal (primary)",
+              1,
+              642,
+              -8203,
+              1526,
+              9729,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0018146",
+            "sample": "",
+            "values": [
+              "P-0018146",
+              "this portal (primary)",
+              1,
+              638,
+              -7821,
+              1762,
+              9583,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0008398",
+            "sample": "",
+            "values": [
+              "P-0008398",
+              "this portal (primary)",
+              1,
+              635,
+              -847,
+              2605,
+              3452,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0029771",
+            "sample": "",
+            "values": [
+              "P-0029771",
+              "this portal (primary)",
+              1,
+              632,
+              -2639,
+              1995,
+              4634,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0001990",
+            "sample": "",
+            "values": [
+              "P-0001990",
+              "this portal (primary)",
+              1,
+              621,
+              -3820,
+              1008,
+              4828,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0007045",
+            "sample": "",
+            "values": [
+              "P-0007045",
+              "this portal (primary)",
+              1,
+              612,
+              -3459,
+              464,
+              3923,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0013915",
+            "sample": "",
+            "values": [
+              "P-0013915",
+              "this portal (primary)",
+              1,
+              609,
+              -4836,
+              2168,
+              7004,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0001939",
+            "sample": "",
+            "values": [
+              "P-0001939",
+              "this portal (primary)",
+              1,
+              574,
+              -3575,
+              2723,
+              6298,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0025567",
+            "sample": "",
+            "values": [
+              "P-0025567",
+              "this portal (primary)",
+              1,
+              573,
+              -3303,
+              2061,
+              5364,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0002531",
+            "sample": "",
+            "values": [
+              "P-0002531",
+              "this portal (primary)",
+              1,
+              571,
+              -4323,
+              2181,
+              6504,
+              "Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment"
+            ]
+          },
+          {
+            "…": "5 more",
+            "sha256": "43eea4588ff30354"
+          }
+        ],
+        "offset": 0,
+        "pageSize": 25,
+        "lists": [
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "total": 5368,
+            "all": 5368
+          }
+        ],
+        "total": 5368,
+        "all": 5368,
+        "patient": {
+          "study": "msk_chord_2024",
+          "patient": "P-0000012",
+          "events": [
+            {
+              "type": "Diagnosis",
+              "start": -9641,
+              "end": null,
+              "attrs": [
+                [
+                  "SUBTYPE",
+                  "Primary"
+                ],
+                [
+                  "CLINICAL_GROUP",
+                  "99"
+                ],
+                [
+                  "SUMMARY",
+                  "N/A"
+                ],
+                [
+                  "PATH_GROUP",
+                  "99"
+                ],
+                [
+                  "SOURCE",
+                  "Tumor Registry"
+                ],
+                [
+                  "DX_DESCRIPTION",
+                  "INFILTRATING DUCT CARCINOMA | BREAST, NOS (M8500/3 | C509)"
+                ],
+                [
+                  "STAGE_CDM_DERIVED",
+                  "Stage 1-3"
+                ]
+              ]
+            },
+            {
+              "type": "Sample acquisition",
+              "start": -5453,
+              "end": null,
+              "attrs": [
+                [
+                  "SEQ_DATE",
+                  "48"
+                ],
+                [
+                  "SAMPLE_ID",
+                  "P-0000012-T02-IM3"
+                ]
+              ]
+            },
+            {
+              "type": "Treatment",
+              "start": -5437,
+              "end": -5369,
+              "attrs": [
+                [
+                  "SUBTYPE",
+                  "Chemo"
+                ],
+                [
+                  "AGENT",
+                  "CYCLOPHOSPHAMIDE"
+                ],
+                [
+                  "RX_INVESTIGATIVE",
+                  "N"
+                ],
+                [
+                  "FLAG_OROTOPICAL",
+                  "0"
+                ]
+              ]
+            },
+            {
+              "type": "Treatment",
+              "start": -5437,
+              "end": -5326,
+              "attrs": [
+                [
+                  "SUBTYPE",
+                  "Chemo"
+                ],
+                [
+                  "AGENT",
+                  "FLUOROURACIL"
+                ],
+                [
+                  "RX_INVESTIGATIVE",
+                  "N"
+                ],
+                [
+                  "FLAG_OROTOPICAL",
+                  "0"
+                ]
+              ]
+            },
+            {
+              "type": "Treatment",
+              "start": -5437,
+              "end": -5327,
+              "attrs": [
+                [
+                  "SUBTYPE",
+                  "Chemo"
+                ],
+                [
+                  "AGENT",
+                  "METHOTREXATE"
+                ],
+                [
+                  "RX_INVESTIGATIVE",
+                  "N"
+                ],
+                [
+                  "FLAG_OROTOPICAL",
+                  "0"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -5437,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CEA"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "ng/ml"
+                ],
+                [
+                  "RESULT",
+                  "1.8"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -5307,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CA_15-3"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "Units/ml"
+                ],
+                [
+                  "RESULT",
+                  "21"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -5307,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CEA"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "ng/ml"
+                ],
+                [
+                  "RESULT",
+                  "1.9"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -5178,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CA_15-3"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "Units/ml"
+                ],
+                [
+                  "RESULT",
+                  "16"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -5178,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CEA"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "ng/ml"
+                ],
+                [
+                  "RESULT",
+                  "1.4"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -4999,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CA_15-3"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "Units/ml"
+                ],
+                [
+                  "RESULT",
+                  "17"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -4999,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CEA"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "ng/ml"
+                ],
+                [
+                  "RESULT",
+                  "1.5"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -4849,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CA_15-3"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "Units/ml"
+                ],
+                [
+                  "RESULT",
+                  "14"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -4849,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CEA"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "ng/ml"
+                ],
+                [
+                  "RESULT",
+                  "1.4"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -4684,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CA_15-3"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "Units/ml"
+                ],
+                [
+                  "RESULT",
+                  "14"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -4684,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CEA"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "ng/ml"
+                ],
+                [
+                  "RESULT",
+                  "1.7"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -4530,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CA_15-3"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "Units/ml"
+                ],
+                [
+                  "RESULT",
+                  "17"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -4530,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CEA"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "ng/ml"
+                ],
+                [
+                  "RESULT",
+                  "1.2"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -4362,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CA_15-3"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "Units/ml"
+                ],
+                [
+                  "RESULT",
+                  "13"
+                ]
+              ]
+            },
+            {
+              "type": "Lab_Test",
+              "start": -4362,
+              "end": null,
+              "attrs": [
+                [
+                  "TEST",
+                  "CEA"
+                ],
+                [
+                  "LR_UNIT_MEASURE",
+                  "ng/ml"
+                ],
+                [
+                  "RESULT",
+                  "1.3"
+                ]
+              ]
+            },
+            {
+              "…": "152 more",
+              "sha256": "5d06e726a3a25f5f"
+            }
+          ],
+          "samples": [
+            {
+              "id": "P-0000012-T02-IM3",
+              "type": "Primary"
+            },
+            {
+              "id": "P-0000012-T03-IM3",
+              "type": "Metastasis"
+            }
+          ],
+          "source": {
+            "label": "primary"
+          }
+        },
+        "position": {
+          "index": 1251,
+          "prev": {
+            "study": "msk_chord_2024",
+            "id": "P-0082770"
+          },
+          "next": {
+            "study": "msk_chord_2024",
+            "id": "P-0000478"
+          }
+        }
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "The list is one row per patient of each cohort; event counts and days come from the study's timeline, in days from diagnosis as the study records them. 5,368 patients. Sorted by Events (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the patients per cohort and study",
+            "detail": "The timeline:counts query above: every patient of each cohort, with their sample count and, from the study's timeline, the number of events, the first and last event day (a range counted to its stop) and the event types — a patient with no timeline is listed with none.",
+            "params": [
+              [
+                "Breast · msk_chord_2024",
+                "5,368"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Sort them together and take one page",
+            "detail": "The timeline:rows query above: the patients of every cohort and study combined in one query, sorted by Events descending with missing values last, then patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset."
+          },
+          {
+            "kind": "fetch",
+            "title": "Read P-0000012's timeline",
+            "detail": "The timeline:events and timeline:samples queries above: every clinical event recorded for P-0000012 in msk_chord_2024 with all its attributes, and the patient's samples with their SAMPLE_TYPE. Events are drawn as stored, in days from diagnosis; tracks group them by event type (case-folded) and nest them by attribute as cBioPortal's patient view does.",
+            "params": [
+              [
+                "events",
+                "172"
+              ],
+              [
+                "samples",
+                "2"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "runTimeline",
+            "timelinePatientRowSource",
+            "patientEventsSql",
+            "buildTracks",
+            "pageSql",
+            "countsSql",
+            "rankSql"
+          ],
+          "file": "lib/views/timeline.ts, lib/patient-timeline.ts, lib/timeline-tracks.ts, lib/table-query.ts",
+          "commit": null
+        },
+        "verification": "A listing and one patient's record: no statistic is computed, so there is no script — the queries are the numbers."
+      }
+    },
+    {
+      "kind": "alterations",
+      "cohorts": [
+        "Breast"
+      ],
+      "alterations": {
+        "columns": [
+          {
+            "id": "patient",
+            "name": "Patient ID",
+            "numeric": false
+          },
+          {
+            "id": "source",
+            "name": "Source",
+            "numeric": false
+          },
+          {
+            "id": "samples",
+            "name": "Samples",
+            "numeric": true
+          },
+          {
+            "id": "mutations",
+            "name": "Mutations",
+            "numeric": true
+          },
+          {
+            "id": "cna",
+            "name": "CNAs",
+            "numeric": true
+          },
+          {
+            "id": "sv",
+            "name": "Structural Variants",
+            "numeric": true
+          }
+        ],
+        "shown": [
+          "patient",
+          "source",
+          "samples",
+          "mutations",
+          "cna",
+          "sv"
+        ],
+        "defaults": [
+          "patient",
+          "source",
+          "samples",
+          "mutations",
+          "cna",
+          "sv"
+        ],
+        "query": {},
+        "rows": [
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000012",
+            "sample": "",
+            "values": [
+              "P-0000012",
+              "this portal (primary)",
+              2,
+              31,
+              3,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000015",
+            "sample": "",
+            "values": [
+              "P-0000015",
+              "this portal (primary)",
+              1,
+              7,
+              11,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000041",
+            "sample": "",
+            "values": [
+              "P-0000041",
+              "this portal (primary)",
+              1,
+              10,
+              0,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000057",
+            "sample": "",
+            "values": [
+              "P-0000057",
+              "this portal (primary)",
+              1,
+              5,
+              0,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000058",
+            "sample": "",
+            "values": [
+              "P-0000058",
+              "this portal (primary)",
+              1,
+              1,
+              7,
+              1
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000066",
+            "sample": "",
+            "values": [
+              "P-0000066",
+              "this portal (primary)",
+              1,
+              4,
+              5,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000077",
+            "sample": "",
+            "values": [
+              "P-0000077",
+              "this portal (primary)",
+              1,
+              2,
+              8,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000081",
+            "sample": "",
+            "values": [
+              "P-0000081",
+              "this portal (primary)",
+              1,
+              6,
+              0,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000093",
+            "sample": "",
+            "values": [
+              "P-0000093",
+              "this portal (primary)",
+              1,
+              2,
+              8,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000098",
+            "sample": "",
+            "values": [
+              "P-0000098",
+              "this portal (primary)",
+              1,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000102",
+            "sample": "",
+            "values": [
+              "P-0000102",
+              "this portal (primary)",
+              1,
+              4,
+              2,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000104",
+            "sample": "",
+            "values": [
+              "P-0000104",
+              "this portal (primary)",
+              1,
+              5,
+              5,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000106",
+            "sample": "",
+            "values": [
+              "P-0000106",
+              "this portal (primary)",
+              1,
+              4,
+              7,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000107",
+            "sample": "",
+            "values": [
+              "P-0000107",
+              "this portal (primary)",
+              1,
+              4,
+              0,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000120",
+            "sample": "",
+            "values": [
+              "P-0000120",
+              "this portal (primary)",
+              1,
+              6,
+              2,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000125",
+            "sample": "",
+            "values": [
+              "P-0000125",
+              "this portal (primary)",
+              1,
+              4,
+              0,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000126",
+            "sample": "",
+            "values": [
+              "P-0000126",
+              "this portal (primary)",
+              1,
+              5,
+              7,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000129",
+            "sample": "",
+            "values": [
+              "P-0000129",
+              "this portal (primary)",
+              1,
+              1,
+              6,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000131",
+            "sample": "",
+            "values": [
+              "P-0000131",
+              "this portal (primary)",
+              1,
+              2,
+              5,
+              0
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "patient": "P-0000138",
+            "sample": "",
+            "values": [
+              "P-0000138",
+              "this portal (primary)",
+              1,
+              33,
+              1,
+              0
+            ]
+          },
+          {
+            "…": "5 more",
+            "sha256": "2f80c61f3b5e2133"
+          }
+        ],
+        "offset": 0,
+        "pageSize": 25,
+        "lists": [
+          {
+            "cohort": "Breast",
+            "study": "msk_chord_2024",
+            "total": 5368,
+            "all": 5368
+          }
+        ],
+        "total": 5368,
+        "all": 5368,
+        "patient": {
+          "study": "msk_chord_2024",
+          "id": "P-0000012",
+          "samples": [
+            {
+              "id": "P-0000012-T02-IM3",
+              "type": "Primary"
+            },
+            {
+              "id": "P-0000012-T03-IM3",
+              "type": "Metastasis"
+            }
+          ]
+        },
+        "position": {
+          "index": 0,
+          "prev": null,
+          "next": {
+            "study": "msk_chord_2024",
+            "id": "P-0000015"
+          }
+        },
+        "tables": {
+          "mutations": {
+            "columns": [
+              {
+                "id": "samples",
+                "name": "Samples",
+                "numeric": false
+              },
+              {
+                "id": "gene",
+                "name": "Gene",
+                "numeric": false
+              },
+              {
+                "id": "proteinChange",
+                "name": "Protein Change",
+                "numeric": false
+              },
+              {
+                "id": "annotation",
+                "name": "Annotation (OncoKB)",
+                "numeric": false
+              },
+              {
+                "id": "mutationType",
+                "name": "Mutation Type",
+                "numeric": false
+              },
+              {
+                "id": "copy",
+                "name": "Copy #",
+                "numeric": false
+              },
+              {
+                "id": "freq",
+                "name": "Cohort %",
+                "numeric": true
+              },
+              {
+                "id": "vaf",
+                "name": "Allele Freq",
+                "numeric": true
+              },
+              {
+                "id": "altCount",
+                "name": "Variant Reads",
+                "numeric": true
+              },
+              {
+                "id": "refCount",
+                "name": "Ref Reads",
+                "numeric": true
+              },
+              {
+                "id": "variantType",
+                "name": "Variant Type",
+                "numeric": false
+              },
+              {
+                "id": "chr",
+                "name": "Chromosome",
+                "numeric": false
+              },
+              {
+                "id": "start",
+                "name": "Start Pos",
+                "numeric": true
+              },
+              {
+                "id": "end",
+                "name": "End Pos",
+                "numeric": true
+              },
+              {
+                "id": "ref",
+                "name": "Ref",
+                "numeric": false
+              },
+              {
+                "id": "var",
+                "name": "Var",
+                "numeric": false
+              },
+              {
+                "id": "status",
+                "name": "MS",
+                "numeric": false
+              }
+            ],
+            "shown": [
+              "samples",
+              "gene",
+              "proteinChange",
+              "annotation",
+              "mutationType",
+              "copy",
+              "freq",
+              "vaf"
+            ],
+            "defaults": [
+              "samples",
+              "gene",
+              "proteinChange",
+              "annotation",
+              "mutationType",
+              "copy",
+              "freq",
+              "vaf"
+            ],
+            "query": {},
+            "rows": [
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "ATRX",
+                  "K983*",
+                  "Likely Oncogenic",
+                  "Nonsense_Mutation",
+                  "",
+                  3.3,
+                  0.198,
+                  110,
+                  446,
+                  "SNP",
+                  "23",
+                  76937801,
+                  76937801,
+                  "T",
+                  "A",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "BLM",
+                  "A363fs",
+                  "Likely Oncogenic",
+                  "Frame_Shift_Del",
+                  "",
+                  1.4,
+                  0.128,
+                  43,
+                  294,
+                  "DEL",
+                  "15",
+                  91298168,
+                  91298168,
+                  "G",
+                  "-",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "FBXW7",
+                  "G61*",
+                  "Likely Oncogenic · Level 3A",
+                  "Nonsense_Mutation",
+                  "",
+                  4.5,
+                  0.228,
+                  130,
+                  440,
+                  "SNP",
+                  "4",
+                  153332775,
+                  153332775,
+                  "C",
+                  "A",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "FBXW7",
+                  "X413_splice",
+                  "Likely Oncogenic · Level 3A",
+                  "Splice_Site",
+                  "",
+                  4.5,
+                  0.255,
+                  85,
+                  248,
+                  "SNP",
+                  "4",
+                  153249542,
+                  153249542,
+                  "C",
+                  "A",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "MAP3K1",
+                  "E302*",
+                  "Likely Oncogenic",
+                  "Nonsense_Mutation",
+                  "",
+                  3.1,
+                  0.174,
+                  72,
+                  341,
+                  "SNP",
+                  "5",
+                  56160630,
+                  56160630,
+                  "G",
+                  "T",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "MAP3K1",
+                  "X696_splice",
+                  "Likely Oncogenic",
+                  "Splice_Site",
+                  "",
+                  3.1,
+                  0.201,
+                  57,
+                  227,
+                  "SNP",
+                  "5",
+                  56174930,
+                  56174930,
+                  "T",
+                  "G",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "PTPRD",
+                  "E915*",
+                  "Likely Oncogenic",
+                  "Nonsense_Mutation",
+                  "",
+                  4.3,
+                  0.176,
+                  94,
+                  439,
+                  "SNP",
+                  "9",
+                  8486074,
+                  8486074,
+                  "C",
+                  "A",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "PTPRD",
+                  "P1338T",
+                  "Unknown",
+                  "Missense_Mutation",
+                  "",
+                  4.3,
+                  0.298,
+                  135,
+                  318,
+                  "SNP",
+                  "9",
+                  8436666,
+                  8436666,
+                  "G",
+                  "T",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "PTPRT",
+                  "G969V",
+                  "Unknown",
+                  "Missense_Mutation",
+                  "",
+                  4.8,
+                  0.142,
+                  63,
+                  380,
+                  "SNP",
+                  "20",
+                  40748610,
+                  40748610,
+                  "C",
+                  "A",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "PTPRT",
+                  "X1053_splice",
+                  "Likely Oncogenic",
+                  "Splice_Site",
+                  "",
+                  4.8,
+                  0.051,
+                  13,
+                  243,
+                  "SNP",
+                  "20",
+                  40739128,
+                  40739128,
+                  "C",
+                  "G",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "SMARCA4",
+                  "E1211*",
+                  "Likely Oncogenic · Level 3A",
+                  "Nonsense_Mutation",
+                  "",
+                  4.3,
+                  0.208,
+                  82,
+                  313,
+                  "SNP",
+                  "19",
+                  11144050,
+                  11144050,
+                  "G",
+                  "T",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T02-IM3",
+                "values": [
+                  "P-0000012-T02-IM3",
+                  "TP53",
+                  "T256P",
+                  "Likely Oncogenic",
+                  "Missense_Mutation",
+                  "",
+                  52.4,
+                  0.502,
+                  114,
+                  113,
+                  "SNP",
+                  "17",
+                  7577515,
+                  7577515,
+                  "T",
+                  "G",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "TP53",
+                  "P67Qfs*56",
+                  "Likely Oncogenic",
+                  "Frame_Shift_Del",
+                  "",
+                  52.4,
+                  0.402,
+                  88,
+                  131,
+                  "DEL",
+                  "17",
+                  7579487,
+                  7579487,
+                  "G",
+                  "-",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "ATR",
+                  "R2431M",
+                  "Unknown",
+                  "Missense_Mutation",
+                  "",
+                  2.7,
+                  0.174,
+                  84,
+                  398,
+                  "SNP",
+                  "3",
+                  142178126,
+                  142178126,
+                  "C",
+                  "A",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "AXIN2",
+                  "I375M",
+                  "Unknown",
+                  "Missense_Mutation",
+                  "",
+                  2.1,
+                  0.137,
+                  89,
+                  561,
+                  "SNP",
+                  "17",
+                  63534396,
+                  63534396,
+                  "G",
+                  "C",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "BRIP1",
+                  "D393V",
+                  "Unknown",
+                  "Missense_Mutation",
+                  "",
+                  1.4,
+                  0.146,
+                  92,
+                  538,
+                  "SNP",
+                  "17",
+                  59876623,
+                  59876623,
+                  "T",
+                  "A",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "CCNE1",
+                  "A47V",
+                  "Unknown",
+                  "Missense_Mutation",
+                  "",
+                  0.5,
+                  0.149,
+                  39,
+                  222,
+                  "SNP",
+                  "19",
+                  30303904,
+                  30303904,
+                  "C",
+                  "T",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "CREBBP",
+                  "M2161I",
+                  "Unknown",
+                  "Missense_Mutation",
+                  "",
+                  3.4,
+                  0.248,
+                  67,
+                  203,
+                  "SNP",
+                  "16",
+                  3778565,
+                  3778565,
+                  "C",
+                  "A",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "DOT1L",
+                  "W305C",
+                  "Unknown",
+                  "Missense_Mutation",
+                  "",
+                  2.3,
+                  0.158,
+                  61,
+                  324,
+                  "SNP",
+                  "19",
+                  2207631,
+                  2207631,
+                  "G",
+                  "T",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "FLT4",
+                  "S293R",
+                  "Unknown",
+                  "Missense_Mutation",
+                  "",
+                  2.8,
+                  0.179,
+                  42,
+                  193,
+                  "SNP",
+                  "5",
+                  180056365,
+                  180056365,
+                  "G",
+                  "T",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "…": "5 more",
+                "sha256": "b95108249fcda8db"
+              }
+            ],
+            "offset": 0,
+            "pageSize": 25,
+            "lists": [
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "total": 31,
+                "all": 31
+              }
+            ],
+            "total": 31,
+            "all": 31
+          },
+          "cna": {
+            "columns": [
+              {
+                "id": "samples",
+                "name": "Samples",
+                "numeric": false
+              },
+              {
+                "id": "gene",
+                "name": "Gene",
+                "numeric": false
+              },
+              {
+                "id": "cna",
+                "name": "CNA",
+                "numeric": false
+              },
+              {
+                "id": "annotation",
+                "name": "Annotation (OncoKB)",
+                "numeric": false
+              },
+              {
+                "id": "cytoband",
+                "name": "Cytoband",
+                "numeric": false
+              },
+              {
+                "id": "freq",
+                "name": "Cohort %",
+                "numeric": true
+              }
+            ],
+            "shown": [
+              "samples",
+              "gene",
+              "cna",
+              "annotation",
+              "cytoband",
+              "freq"
+            ],
+            "defaults": [
+              "samples",
+              "gene",
+              "cna",
+              "annotation",
+              "cytoband",
+              "freq"
+            ],
+            "query": {},
+            "rows": [
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T03-IM3",
+                "values": [
+                  "P-0000012-T03-IM3",
+                  "CDK4",
+                  "AMP",
+                  "Oncogenic · Level 4",
+                  "12q14.1",
+                  1.6
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T02-IM3",
+                "values": [
+                  "P-0000012-T02-IM3",
+                  "MCL1",
+                  "AMP",
+                  "Oncogenic",
+                  "1q21.2",
+                  1.5
+                ]
+              },
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "patient": "P-0000012",
+                "sample": "P-0000012-T02-IM3",
+                "values": [
+                  "P-0000012-T02-IM3",
+                  "RIT1",
+                  "AMP",
+                  "Unknown",
+                  "1q22",
+                  0.7
+                ]
+              }
+            ],
+            "offset": 0,
+            "pageSize": 25,
+            "lists": [
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "total": 3,
+                "all": 3
+              }
+            ],
+            "total": 3,
+            "all": 3
+          },
+          "sv": {
+            "columns": [
+              {
+                "id": "samples",
+                "name": "Samples",
+                "numeric": false
+              },
+              {
+                "id": "gene1",
+                "name": "Gene 1",
+                "numeric": false
+              },
+              {
+                "id": "gene2",
+                "name": "Gene 2",
+                "numeric": false
+              },
+              {
+                "id": "class",
+                "name": "Variant Class",
+                "numeric": false
+              },
+              {
+                "id": "eventInfo",
+                "name": "Event Info",
+                "numeric": false
+              },
+              {
+                "id": "breakpointType",
+                "name": "Breakpoint Type",
+                "numeric": false
+              },
+              {
+                "id": "connectionType",
+                "name": "Connection Type",
+                "numeric": false
+              },
+              {
+                "id": "frame",
+                "name": "Effect on Frame",
+                "numeric": false
+              },
+              {
+                "id": "site1",
+                "name": "Site 1 Description",
+                "numeric": false
+              },
+              {
+                "id": "site2",
+                "name": "Site 2 Description",
+                "numeric": false
+              },
+              {
+                "id": "pos1",
+                "name": "Site 1 Position",
+                "numeric": false
+              },
+              {
+                "id": "pos2",
+                "name": "Site 2 Position",
+                "numeric": false
+              },
+              {
+                "id": "length",
+                "name": "Length",
+                "numeric": true
+              },
+              {
+                "id": "tumorVariantCount",
+                "name": "Tumor Variant Count",
+                "numeric": true
+              },
+              {
+                "id": "tumorReadCount",
+                "name": "Tumor Read Count",
+                "numeric": true
+              },
+              {
+                "id": "dnaSupport",
+                "name": "DNA Support",
+                "numeric": false
+              },
+              {
+                "id": "rnaSupport",
+                "name": "RNA Support",
+                "numeric": false
+              },
+              {
+                "id": "status",
+                "name": "Status",
+                "numeric": false
+              },
+              {
+                "id": "svAnnotation",
+                "name": "Study Annotation",
+                "numeric": false
+              },
+              {
+                "id": "comments",
+                "name": "Comments",
+                "numeric": false
+              }
+            ],
+            "shown": [
+              "samples",
+              "gene1",
+              "gene2",
+              "class",
+              "eventInfo",
+              "breakpointType",
+              "connectionType"
+            ],
+            "defaults": [
+              "samples",
+              "gene1",
+              "gene2",
+              "class",
+              "eventInfo",
+              "breakpointType",
+              "connectionType"
+            ],
+            "query": {},
+            "rows": [],
+            "offset": 0,
+            "pageSize": 25,
+            "lists": [
+              {
+                "cohort": "Breast",
+                "study": "msk_chord_2024",
+                "total": 0,
+                "all": 0
+              }
+            ],
+            "total": 0,
+            "all": 0
+          }
+        },
+        "oncokbPin": "v7.5"
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "P-0000012 — Mutations: 31 rows; Copy Number Alterations: 3 rows; Structural Variants: 0 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 5,368 patients. Sorted with patients who have any alteration first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the patients per cohort and study",
+            "detail": "The alterations:counts query above: every patient of each cohort, with their sample count and how many rows each of the three tables lists for them (a mutation, a gene's deep copy-number call, a structural variant — each counted once however many samples carry it).",
+            "params": [
+              [
+                "Breast · msk_chord_2024",
+                "5,368"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Sort them together and take one page",
+            "detail": "The alterations:rows query above: the patients of every cohort and study combined in one query, sorted patients with any alteration first, then by patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset."
+          },
+          {
+            "kind": "fetch",
+            "title": "Read P-0000012's three tables",
+            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Mutations: every called mutation of the patient's samples (uncalled calls left out), one row per variant with the samples carrying it, the highest allele frequency among them (variant / (variant + reference) reads) with that sample's reads, and the gene's deep copy-number calls in the patient (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event (both genes and breakpoints, class, event info), the highest read counts among its samples. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
+            "params": [
+              [
+                "Mutations",
+                "31 rows"
+              ],
+              [
+                "Copy Number Alterations",
+                "3 rows"
+              ],
+              [
+                "Structural Variants",
+                "0 rows"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "runAlterations",
+            "alterationPatientRowSource",
+            "patientMutationsSource",
+            "patientCnaSource",
+            "patientSvSource",
+            "pageSql",
+            "countsSql",
+            "rankSql"
+          ],
+          "file": "lib/views/alterations.ts, lib/patient-alterations.ts, lib/table-query.ts",
+          "commit": null
+        },
+        "verification": "A listing: no statistic is computed, so there is no script — the queries are the numbers."
+      }
+    }
+  ]
+}

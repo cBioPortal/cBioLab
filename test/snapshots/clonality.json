@@ -1,0 +1,731 @@
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "Colorectal": {
+      "count": 4993,
+      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample)",
+      "studies": [
+        "msk_impact_50k_2026"
+      ]
+    },
+    "Breast": {
+      "count": 5803,
+      "text": "CANCER_TYPE in [Breast Cancer] (any sample)",
+      "studies": [
+        "msk_impact_50k_2026"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "clonality",
+      "cohorts": [
+        "Colorectal",
+        "Breast"
+      ],
+      "clonality": {
+        "measure": "driver",
+        "qc": true,
+        "panels": [
+          {
+            "cohort": "Colorectal",
+            "samples": 5395,
+            "ascnSamples": 5379,
+            "qcPass": 4912,
+            "qcFail": 451,
+            "wgd": {
+              "yes": 1749,
+              "no": 3163
+            },
+            "purity": [
+              0,
+              1,
+              114,
+              171,
+              335,
+              503,
+              522,
+              410,
+              514,
+              453,
+              459,
+              454,
+              295,
+              269,
+              135,
+              117,
+              79,
+              51,
+              27,
+              3
+            ],
+            "ploidy": [
+              0,
+              0,
+              1,
+              1,
+              1,
+              6,
+              98,
+              328,
+              1622,
+              647,
+              609,
+              339,
+              471,
+              254,
+              265,
+              96,
+              77,
+              34,
+              41,
+              6,
+              {
+                "…": "12 more",
+                "sha256": "92b15c3938b83399"
+              }
+            ],
+            "genes": [
+              {
+                "gene": "TP53",
+                "calls": 3839,
+                "samples": 3571,
+                "clonal": 3160,
+                "subclonal": 420,
+                "indeterminate": 255,
+                "uncalled": 4,
+                "loh": 2803,
+                "lohKnown": 3650,
+                "ccf": [
+                  10,
+                  34,
+                  42,
+                  45,
+                  46,
+                  50,
+                  62,
+                  177,
+                  488,
+                  2879
+                ],
+                "p": 0.5947092735836579,
+                "q": 0.5947092735836579
+              },
+              {
+                "gene": "KRAS",
+                "calls": 2145,
+                "samples": 2099,
+                "clonal": 1508,
+                "subclonal": 290,
+                "indeterminate": 346,
+                "uncalled": 1,
+                "loh": 423,
+                "lohKnown": 1973,
+                "ccf": [
+                  2,
+                  18,
+                  18,
+                  22,
+                  30,
+                  48,
+                  66,
+                  185,
+                  446,
+                  1305
+                ],
+                "p": 0.1286939990837484,
+                "q": 0.22521449839655971
+              },
+              {
+                "gene": "APC",
+                "calls": 5344,
+                "samples": 3577,
+                "clonal": 3889,
+                "subclonal": 897,
+                "indeterminate": 554,
+                "uncalled": 4,
+                "loh": 1748,
+                "lohKnown": 5217,
+                "ccf": [
+                  0,
+                  9,
+                  28,
+                  100,
+                  121,
+                  139,
+                  267,
+                  577,
+                  1083,
+                  3011
+                ],
+                "p": 0.5160703794843146,
+                "q": 0.5947092735836579
+              },
+              {
+                "gene": "PIK3CA",
+                "calls": 1018,
+                "samples": 917,
+                "clonal": 634,
+                "subclonal": 302,
+                "indeterminate": 82,
+                "uncalled": 0,
+                "loh": 117,
+                "lohKnown": 1010,
+                "ccf": [
+                  10,
+                  42,
+                  35,
+                  25,
+                  41,
+                  45,
+                  52,
+                  97,
+                  134,
+                  537
+                ],
+                "p": 4.394795388579005e-24,
+                "q": 3.076356772005303e-23
+              },
+              {
+                "gene": "SMAD4",
+                "calls": 673,
+                "samples": 621,
+                "clonal": 494,
+                "subclonal": 164,
+                "indeterminate": 15,
+                "uncalled": 0,
+                "loh": 526,
+                "lohKnown": 664,
+                "ccf": [
+                  3,
+                  17,
+                  16,
+                  24,
+                  16,
+                  16,
+                  31,
+                  55,
+                  113,
+                  382
+                ],
+                "p": 0.00601102198333149,
+                "q": 0.01402571796110681
+              },
+              {
+                "gene": "CDH1",
+                "calls": 62,
+                "samples": 55,
+                "clonal": 42,
+                "subclonal": 17,
+                "indeterminate": 3,
+                "uncalled": 0,
+                "loh": 10,
+                "lohKnown": 61,
+                "ccf": [
+                  1,
+                  1,
+                  3,
+                  2,
+                  2,
+                  4,
+                  4,
+                  3,
+                  9,
+                  33
+                ],
+                "p": 0.0028190005173689085,
+                "q": 0.00986650181079118
+              },
+              {
+                "gene": "GATA3",
+                "calls": 42,
+                "samples": 41,
+                "clonal": 28,
+                "subclonal": 12,
+                "indeterminate": 2,
+                "uncalled": 0,
+                "loh": 3,
+                "lohKnown": 42,
+                "ccf": [
+                  0,
+                  0,
+                  1,
+                  2,
+                  3,
+                  2,
+                  3,
+                  3,
+                  12,
+                  16
+                ],
+                "p": 0.23422973174670686,
+                "q": 0.32792162444538964
+              }
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "samples": 6907,
+            "ascnSamples": 6703,
+            "qcPass": 6204,
+            "qcFail": 671,
+            "wgd": {
+              "yes": 2159,
+              "no": 4045
+            },
+            "purity": [
+              0,
+              2,
+              95,
+              160,
+              385,
+              548,
+              545,
+              450,
+              529,
+              552,
+              502,
+              576,
+              363,
+              497,
+              277,
+              299,
+              202,
+              135,
+              63,
+              23
+            ],
+            "ploidy": [
+              0,
+              0,
+              1,
+              1,
+              6,
+              21,
+              330,
+              875,
+              2071,
+              548,
+              565,
+              352,
+              508,
+              300,
+              295,
+              120,
+              104,
+              38,
+              35,
+              11,
+              {
+                "…": "12 more",
+                "sha256": "8b7b77625894c711"
+              }
+            ],
+            "genes": [
+              {
+                "gene": "TP53",
+                "calls": 2672,
+                "samples": 2615,
+                "clonal": 2188,
+                "subclonal": 278,
+                "indeterminate": 195,
+                "uncalled": 11,
+                "loh": 2198,
+                "lohKnown": 2467,
+                "ccf": [
+                  25,
+                  23,
+                  29,
+                  20,
+                  17,
+                  39,
+                  31,
+                  129,
+                  395,
+                  1951
+                ],
+                "p": 0.5947092735836579,
+                "q": 0.5947092735836579
+              },
+              {
+                "gene": "KRAS",
+                "calls": 59,
+                "samples": 59,
+                "clonal": 40,
+                "subclonal": 13,
+                "indeterminate": 6,
+                "uncalled": 0,
+                "loh": 9,
+                "lohKnown": 52,
+                "ccf": [
+                  1,
+                  1,
+                  3,
+                  2,
+                  1,
+                  2,
+                  2,
+                  4,
+                  13,
+                  30
+                ],
+                "p": 0.1286939990837484,
+                "q": 0.22521449839655971
+              },
+              {
+                "gene": "APC",
+                "calls": 39,
+                "samples": 35,
+                "clonal": 27,
+                "subclonal": 8,
+                "indeterminate": 4,
+                "uncalled": 0,
+                "loh": 16,
+                "lohKnown": 36,
+                "ccf": [
+                  0,
+                  0,
+                  1,
+                  1,
+                  1,
+                  0,
+                  2,
+                  5,
+                  6,
+                  23
+                ],
+                "p": 0.5160703794843146,
+                "q": 0.5947092735836579
+              },
+              {
+                "gene": "PIK3CA",
+                "calls": 2350,
+                "samples": 2130,
+                "clonal": 1793,
+                "subclonal": 334,
+                "indeterminate": 221,
+                "uncalled": 2,
+                "loh": 294,
+                "lohKnown": 2224,
+                "ccf": [
+                  4,
+                  35,
+                  37,
+                  36,
+                  56,
+                  65,
+                  62,
+                  129,
+                  344,
+                  1579
+                ],
+                "p": 4.394795388579005e-24,
+                "q": 3.076356772005303e-23
+              },
+              {
+                "gene": "SMAD4",
+                "calls": 79,
+                "samples": 75,
+                "clonal": 46,
+                "subclonal": 31,
+                "indeterminate": 2,
+                "uncalled": 0,
+                "loh": 72,
+                "lohKnown": 78,
+                "ccf": [
+                  2,
+                  3,
+                  4,
+                  3,
+                  6,
+                  4,
+                  6,
+                  7,
+                  12,
+                  32
+                ],
+                "p": 0.00601102198333149,
+                "q": 0.01402571796110681
+              },
+              {
+                "gene": "CDH1",
+                "calls": 773,
+                "samples": 769,
+                "clonal": 639,
+                "subclonal": 96,
+                "indeterminate": 36,
+                "uncalled": 2,
+                "loh": 711,
+                "lohKnown": 750,
+                "ccf": [
+                  0,
+                  4,
+                  4,
+                  12,
+                  12,
+                  14,
+                  20,
+                  46,
+                  84,
+                  573
+                ],
+                "p": 0.0028190005173689085,
+                "q": 0.00986650181079118
+              },
+              {
+                "gene": "GATA3",
+                "calls": 847,
+                "samples": 836,
+                "clonal": 566,
+                "subclonal": 152,
+                "indeterminate": 123,
+                "uncalled": 6,
+                "loh": 58,
+                "lohKnown": 765,
+                "ccf": [
+                  0,
+                  0,
+                  13,
+                  15,
+                  19,
+                  31,
+                  38,
+                  79,
+                  144,
+                  499
+                ],
+                "p": 0.23422973174670686,
+                "q": 0.32792162444538964
+              }
+            ]
+          }
+        ],
+        "wgdP": 0.37889995587930314
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_impact_50k_2026",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "FACETS allele-specific copy number: each OncoKB driver (v7.5) mutation call — one mutation in one sample — is clonal, subclonal or indeterminate as FACETS called it from its cancer-cell fraction; uncalled calls have an estimate but no call. LOH at the locus is a minor copy number of 0 where one was estimated. Only samples whose FACETS_QC is Pass are used (Colorectal: 4,912 pass, 451 fail; Breast: 6,204 pass, 671 fail); qc: false uses every sample. Whole-genome doubling, purity and ploidy are FACETS's own per-sample calls. Clonality is only as good as the purity estimate behind it: a low-purity sample's clonal mutation can be called subclonal, and a panel's handful of mutations per sample makes each estimate coarse. Two cohorts: Fisher on clonal against subclonal calls per gene (BH across genes) and on WGD.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count FACETS's calls per gene",
+            "detail": "The clonality:summary, clonality:purity-ploidy and clonality:genes queries above. Per gene, each an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5) in one sample is one call, which FACETS labels clonal, subclonal or indeterminate from its cancer-cell fraction (or leaves uncalled); loss of heterozygosity is a minor copy number of 0 where one was estimated. Per sample: whole-genome doubling, purity and ploidy as FACETS called them. Counts only.",
+            "scope": "Colorectal · msk_impact_50k_2026",
+            "rowsIn": 4993
+          },
+          {
+            "kind": "fetch",
+            "title": "Count FACETS's calls per gene",
+            "detail": "The clonality:summary, clonality:purity-ploidy and clonality:genes queries above. Per gene, each an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5) in one sample is one call, which FACETS labels clonal, subclonal or indeterminate from its cancer-cell fraction (or leaves uncalled); loss of heterozygosity is a minor copy number of 0 where one was estimated. Per sample: whole-genome doubling, purity and ploidy as FACETS called them. Counts only.",
+            "scope": "Breast · msk_impact_50k_2026",
+            "rowsIn": 5803
+          },
+          {
+            "kind": "transform",
+            "title": "Keep samples that pass FACETS QC",
+            "detail": "Only samples whose FACETS_QC is Pass (matched ignoring case) contribute calls, WGD, purity and ploidy.",
+            "params": [
+              [
+                "Colorectal",
+                "4,912 pass, 451 fail, of 5,379 samples with allele-specific copy number"
+              ],
+              [
+                "Breast",
+                "6,204 pass, 671 fail, of 6,703 samples with allele-specific copy number"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Fisher's exact test per gene, and on WGD",
+            "detail": "Two-sided, on clonal against subclonal calls between the two cohorts, for each gene with at least one such call in both; indeterminate and uncalled calls do not enter. And on whole-genome doubled against not, per sample."
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across genes",
+            "detail": "q-values over the genes tested."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "fisherExact",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
+        "check": {
+          "clonality:Colorectal:TP53:clonal": {
+            "v": 3160,
+            "abs": 0
+          },
+          "clonality:Colorectal:TP53:subclonal": {
+            "v": 420,
+            "abs": 0
+          },
+          "clonality:Colorectal:KRAS:clonal": {
+            "v": 1508,
+            "abs": 0
+          },
+          "clonality:Colorectal:KRAS:subclonal": {
+            "v": 290,
+            "abs": 0
+          },
+          "clonality:Colorectal:APC:clonal": {
+            "v": 3889,
+            "abs": 0
+          },
+          "clonality:Colorectal:APC:subclonal": {
+            "v": 897,
+            "abs": 0
+          },
+          "clonality:Colorectal:PIK3CA:clonal": {
+            "v": 634,
+            "abs": 0
+          },
+          "clonality:Colorectal:PIK3CA:subclonal": {
+            "v": 302,
+            "abs": 0
+          },
+          "clonality:Colorectal:SMAD4:clonal": {
+            "v": 494,
+            "abs": 0
+          },
+          "clonality:Colorectal:SMAD4:subclonal": {
+            "v": 164,
+            "abs": 0
+          },
+          "clonality:Colorectal:CDH1:clonal": {
+            "v": 42,
+            "abs": 0
+          },
+          "clonality:Colorectal:CDH1:subclonal": {
+            "v": 17,
+            "abs": 0
+          },
+          "clonality:Colorectal:GATA3:clonal": {
+            "v": 28,
+            "abs": 0
+          },
+          "clonality:Colorectal:GATA3:subclonal": {
+            "v": 12,
+            "abs": 0
+          },
+          "clonality:Breast:TP53:clonal": {
+            "v": 2188,
+            "abs": 0
+          },
+          "clonality:Breast:TP53:subclonal": {
+            "v": 278,
+            "abs": 0
+          },
+          "clonality:Breast:KRAS:clonal": {
+            "v": 40,
+            "abs": 0
+          },
+          "clonality:Breast:KRAS:subclonal": {
+            "v": 13,
+            "abs": 0
+          },
+          "clonality:Breast:APC:clonal": {
+            "v": 27,
+            "abs": 0
+          },
+          "clonality:Breast:APC:subclonal": {
+            "v": 8,
+            "abs": 0
+          },
+          "clonality:Breast:PIK3CA:clonal": {
+            "v": 1793,
+            "abs": 0
+          },
+          "clonality:Breast:PIK3CA:subclonal": {
+            "v": 334,
+            "abs": 0
+          },
+          "clonality:Breast:SMAD4:clonal": {
+            "v": 46,
+            "abs": 0
+          },
+          "clonality:Breast:SMAD4:subclonal": {
+            "v": 31,
+            "abs": 0
+          },
+          "clonality:Breast:CDH1:clonal": {
+            "v": 639,
+            "abs": 0
+          },
+          "clonality:Breast:CDH1:subclonal": {
+            "v": 96,
+            "abs": 0
+          },
+          "clonality:Breast:GATA3:clonal": {
+            "v": 566,
+            "abs": 0
+          },
+          "clonality:Breast:GATA3:subclonal": {
+            "v": 152,
+            "abs": 0
+          },
+          "clonality:TP53:p": {
+            "v": 0.5947092735836579
+          },
+          "clonality:TP53:q": {
+            "v": 0.5947092735836579
+          },
+          "clonality:KRAS:p": {
+            "v": 0.1286939990837484
+          },
+          "clonality:KRAS:q": {
+            "v": 0.22521449839655971
+          },
+          "clonality:APC:p": {
+            "v": 0.5160703794843146
+          },
+          "clonality:APC:q": {
+            "v": 0.5947092735836579
+          },
+          "clonality:PIK3CA:p": {
+            "v": 4.394795388579005e-24
+          },
+          "clonality:PIK3CA:q": {
+            "v": 3.076356772005303e-23
+          },
+          "clonality:SMAD4:p": {
+            "v": 0.00601102198333149
+          },
+          "clonality:SMAD4:q": {
+            "v": 0.01402571796110681
+          },
+          "clonality:CDH1:p": {
+            "v": 0.0028190005173689085
+          },
+          "clonality:CDH1:q": {
+            "v": 0.00986650181079118
+          },
+          "clonality:GATA3:p": {
+            "v": 0.23422973174670686
+          },
+          "clonality:GATA3:q": {
+            "v": 0.32792162444538964
+          },
+          "clonality:wgd:p": {
+            "v": 0.37889995587930314
+          }
+        }
+      }
+    }
+  ]
+}

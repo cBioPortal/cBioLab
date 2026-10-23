@@ -1,0 +1,13 @@
+Analysis over sarcoma_msk_2022 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- Well-diff liposarcoma: 444 patients — CANCER_TYPE_DETAILED in [Well-Differentiated Liposarcoma] (any sample)
+
+Compare (driver%/any%, panel-aware denominators; annotation OncoKB v7.5 (pinned)):
+  MDM2: Well-diff liposarcoma 0%/0%
+  TP53: Well-diff liposarcoma 1.6%/3.8%
+  no copy-number data exists for sarcoma_msk_2022 — altered% reflects only mutation/structural-variant status, not a real negative for the missing type(s)
+  METHOD:
+    - Count profiled and altered patients per gene [Well-diff liposarcoma · sarcoma_msk_2022]: The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.
+        genes: 2
+    - No test: One cohort: frequencies only, nothing to compare against.

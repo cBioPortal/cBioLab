@@ -1,0 +1,681 @@
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "all samples": {
+      "count": 1084,
+      "text": "all patients in the study",
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "plot",
+      "plot": {
+        "shape": "box",
+        "n": 1068,
+        "x": {
+          "label": "ERBB2: Putative copy-number alterations from GISTIC",
+          "kind": "cat"
+        },
+        "y": {
+          "label": "ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)",
+          "kind": "num"
+        },
+        "groups": [
+          {
+            "g": "Shallow deletion",
+            "n": 260,
+            "lo": -3.8045,
+            "hi": 0.351,
+            "q1": -0.9513,
+            "median": -0.6594,
+            "q3": -0.4083,
+            "loWhisker": -1.7658,
+            "hiWhisker": 0.351
+          },
+          {
+            "g": "Diploid",
+            "n": 480,
+            "lo": -2.742,
+            "hi": 1.1073,
+            "q1": -0.4187,
+            "median": -0.1185,
+            "q3": 0.1519,
+            "loWhisker": -1.2746,
+            "hiWhisker": 1.0078
+          },
+          {
+            "g": "Gain",
+            "n": 206,
+            "lo": -1.5533000000000001,
+            "hi": 3.1795,
+            "q1": -0.23,
+            "median": 0.1592,
+            "q3": 0.415,
+            "loWhisker": -1.1975,
+            "hiWhisker": 1.3825
+          },
+          {
+            "g": "Amplification",
+            "n": 122,
+            "lo": -0.7721,
+            "hi": 3.7214,
+            "q1": 1.4466999999999999,
+            "median": 2.3303,
+            "q3": 2.8102,
+            "loWhisker": -0.5985500000000004,
+            "hiWhisker": 3.7214
+          }
+        ],
+        "violin": [
+          {
+            "g": "Gain",
+            "b": 15,
+            "n": 17
+          },
+          {
+            "g": "Diploid",
+            "b": 3,
+            "n": 2
+          },
+          {
+            "g": "Gain",
+            "b": 29,
+            "n": 1
+          },
+          {
+            "g": "Diploid",
+            "b": 16,
+            "n": 67
+          },
+          {
+            "g": "Shallow deletion",
+            "b": 9,
+            "n": 13
+          },
+          {
+            "g": "Amplification",
+            "b": 25,
+            "n": 2
+          },
+          {
+            "g": "Shallow deletion",
+            "b": 5,
+            "n": 4
+          },
+          {
+            "g": "Gain",
+            "b": 12,
+            "n": 6
+          },
+          {
+            "g": "Gain",
+            "b": 30,
+            "n": 1
+          },
+          {
+            "g": "Amplification",
+            "b": 36,
+            "n": 12
+          },
+          {
+            "g": "Diploid",
+            "b": 15,
+            "n": 65
+          },
+          {
+            "g": "Amplification",
+            "b": 21,
+            "n": 3
+          },
+          {
+            "g": "Gain",
+            "b": 9,
+            "n": 1
+          },
+          {
+            "g": "Amplification",
+            "b": 22,
+            "n": 3
+          },
+          {
+            "g": "Shallow deletion",
+            "b": 6,
+            "n": 6
+          },
+          {
+            "g": "Diploid",
+            "b": 12,
+            "n": 24
+          },
+          {
+            "g": "Amplification",
+            "b": 39,
+            "n": 12
+          },
+          {
+            "g": "Gain",
+            "b": 10,
+            "n": 2
+          },
+          {
+            "g": "Gain",
+            "b": 24,
+            "n": 1
+          },
+          {
+            "g": "Amplification",
+            "b": 26,
+            "n": 6
+          },
+          {
+            "…": "68 more",
+            "sha256": "6226d739d598cb9a"
+          }
+        ],
+        "violinBins": 40,
+        "overlay": "points",
+        "violinExtent": [
+          -2.435,
+          3.1795
+        ],
+        "coverage": {
+          "total": 1084,
+          "nx": 1070,
+          "ny": 1082
+        },
+        "points": [
+          {
+            "id": "TCGA-BH-A0BC-01",
+            "g": "Shallow deletion",
+            "v": -1.0313
+          },
+          {
+            "id": "TCGA-GM-A2DO-01",
+            "g": "Diploid",
+            "v": -0.5257
+          },
+          {
+            "id": "TCGA-D8-A27M-01",
+            "g": "Shallow deletion",
+            "v": -1.1943
+          },
+          {
+            "id": "TCGA-A2-A0YG-01",
+            "g": "Amplification",
+            "v": 2.6454
+          },
+          {
+            "id": "TCGA-AR-A1AY-01",
+            "g": "Shallow deletion",
+            "v": -0.8701
+          },
+          {
+            "id": "TCGA-A7-A3IZ-01",
+            "g": "Diploid",
+            "v": 0.2288
+          },
+          {
+            "id": "TCGA-C8-A1HN-01",
+            "g": "Gain",
+            "v": 0.221
+          },
+          {
+            "id": "TCGA-AR-A2LJ-01",
+            "g": "Amplification",
+            "v": 2.1318
+          },
+          {
+            "id": "TCGA-LL-A5YP-01",
+            "g": "Diploid",
+            "v": -0.9265
+          },
+          {
+            "id": "TCGA-OL-A6VR-01",
+            "g": "Diploid",
+            "v": -0.1528
+          },
+          {
+            "id": "TCGA-AR-A1AO-01",
+            "g": "Diploid",
+            "v": -0.9581
+          },
+          {
+            "id": "TCGA-A2-A3XV-01",
+            "g": "Amplification",
+            "v": 1.5072
+          },
+          {
+            "id": "TCGA-A2-A0ES-01",
+            "g": "Diploid",
+            "v": 0.0208
+          },
+          {
+            "id": "TCGA-AC-A3QP-01",
+            "g": "Diploid",
+            "v": 0.2131
+          },
+          {
+            "id": "TCGA-AR-A24P-01",
+            "g": "Gain",
+            "v": 0.2602
+          },
+          {
+            "id": "TCGA-B6-A0X0-01",
+            "g": "Diploid",
+            "v": 0.3066
+          },
+          {
+            "id": "TCGA-AR-A0U0-01",
+            "g": "Diploid",
+            "v": -0.5601
+          },
+          {
+            "id": "TCGA-BH-A1EU-01",
+            "g": "Shallow deletion",
+            "v": -1.0684
+          },
+          {
+            "id": "TCGA-AC-A2FF-01",
+            "g": "Diploid",
+            "v": 0.2463
+          },
+          {
+            "id": "TCGA-AN-A04C-01",
+            "g": "Amplification",
+            "v": 2.8872999999999998
+          },
+          {
+            "…": "1048 more",
+            "sha256": "ae5b2d782b1b6fdf"
+          }
+        ],
+        "pointSet": {
+          "rule": "all",
+          "drawn": 1068
+        },
+        "layers": [
+          {
+            "kind": "outliers",
+            "label": "outliers",
+            "color": "#D55E00",
+            "n": 0,
+            "shown": "none",
+            "why": "at or under 10,000 cases there is no density for them to stand out of"
+          }
+        ]
+      },
+      "cohorts": [
+        "all samples"
+      ],
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018"
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "1,068 of 1,084 samples have a value on both axes (14 have no ERBB2: Putative copy-number alterations from GISTIC; 2 have no ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)); only those are drawn. Point layers — outliers: not drawn, at or under 10,000 cases there is no density for them to stand out of."
+    },
+    {
+      "kind": "plot",
+      "plot": {
+        "shape": "box",
+        "n": 1068,
+        "x": {
+          "label": "TP53 mutation type",
+          "kind": "cat"
+        },
+        "y": {
+          "label": "FRACTION_GENOME_ALTERED",
+          "kind": "num"
+        },
+        "groups": [
+          {
+            "g": "Not mutated",
+            "n": 706,
+            "lo": 0,
+            "hi": 0.9971,
+            "q1": 0.1049,
+            "median": 0.1949,
+            "q3": 0.346,
+            "loWhisker": 0,
+            "hiWhisker": 0.7076499999999999
+          },
+          {
+            "g": "Missense",
+            "n": 209,
+            "lo": 0,
+            "hi": 0.9463,
+            "q1": 0.2622,
+            "median": 0.3797,
+            "q3": 0.5222,
+            "loWhisker": 0,
+            "hiWhisker": 0.9122
+          },
+          {
+            "g": "Truncating",
+            "n": 102,
+            "lo": 0.0002,
+            "hi": 0.947,
+            "q1": 0.2982,
+            "median": 0.4656,
+            "q3": 0.6182,
+            "loWhisker": 0.0002,
+            "hiWhisker": 0.947
+          },
+          {
+            "g": "Splice",
+            "n": 24,
+            "lo": 0.0027,
+            "hi": 0.8331,
+            "q1": 0.2373,
+            "median": 0.4675,
+            "q3": 0.5381,
+            "loWhisker": 0.0027,
+            "hiWhisker": 0.8331
+          },
+          {
+            "g": "Not profiled",
+            "n": 18,
+            "lo": 0,
+            "hi": 0.6502,
+            "q1": 0.0052,
+            "median": 0.1065,
+            "q3": 0.1675,
+            "loWhisker": 0,
+            "hiWhisker": 0.41095000000000004
+          },
+          {
+            "g": "Inframe",
+            "n": 5,
+            "lo": 0.2493,
+            "hi": 0.5605,
+            "q1": 0.2545,
+            "median": 0.2741,
+            "q3": 0.4806,
+            "loWhisker": 0.2493,
+            "hiWhisker": 0.5605
+          },
+          {
+            "g": "Multiple",
+            "n": 4,
+            "lo": 0.1011,
+            "hi": 0.6513,
+            "q1": 0.4622,
+            "median": 0.6276,
+            "q3": 0.6513,
+            "loWhisker": 0.17855000000000004,
+            "hiWhisker": 0.6513
+          }
+        ],
+        "violin": [
+          {
+            "g": "Not profiled",
+            "b": 0,
+            "n": 6
+          },
+          {
+            "g": "Missense",
+            "b": 34,
+            "n": 1
+          },
+          {
+            "g": "Not mutated",
+            "b": 30,
+            "n": 4
+          },
+          {
+            "g": "Missense",
+            "b": 28,
+            "n": 5
+          },
+          {
+            "g": "Not mutated",
+            "b": 8,
+            "n": 33
+          },
+          {
+            "g": "Truncating",
+            "b": 19,
+            "n": 1
+          },
+          {
+            "g": "Missense",
+            "b": 3,
+            "n": 1
+          },
+          {
+            "g": "Truncating",
+            "b": 12,
+            "n": 4
+          },
+          {
+            "g": "Truncating",
+            "b": 20,
+            "n": 6
+          },
+          {
+            "g": "Splice",
+            "b": 25,
+            "n": 1
+          },
+          {
+            "g": "Missense",
+            "b": 27,
+            "n": 8
+          },
+          {
+            "g": "Truncating",
+            "b": 11,
+            "n": 6
+          },
+          {
+            "g": "Missense",
+            "b": 4,
+            "n": 1
+          },
+          {
+            "g": "Not mutated",
+            "b": 23,
+            "n": 13
+          },
+          {
+            "g": "Not mutated",
+            "b": 1,
+            "n": 19
+          },
+          {
+            "g": "Truncating",
+            "b": 26,
+            "n": 5
+          },
+          {
+            "g": "Splice",
+            "b": 23,
+            "n": 2
+          },
+          {
+            "g": "Missense",
+            "b": 21,
+            "n": 9
+          },
+          {
+            "g": "Splice",
+            "b": 8,
+            "n": 1
+          },
+          {
+            "g": "Missense",
+            "b": 10,
+            "n": 6
+          },
+          {
+            "…": "123 more",
+            "sha256": "ddb05dbc992682e5"
+          }
+        ],
+        "violinBins": 40,
+        "overlay": "points",
+        "violinExtent": [
+          0,
+          0.9228
+        ],
+        "coverage": {
+          "total": 1084,
+          "nx": 1084,
+          "ny": 1068
+        },
+        "points": [
+          {
+            "id": "TCGA-AO-A0J6-01",
+            "g": "Truncating",
+            "v": 0.4668
+          },
+          {
+            "id": "TCGA-AO-A12B-01",
+            "g": "Not mutated",
+            "v": 0.1121
+          },
+          {
+            "id": "TCGA-BH-A0DI-01",
+            "g": "Missense",
+            "v": 0.2622
+          },
+          {
+            "id": "TCGA-A8-A07F-01",
+            "g": "Not mutated",
+            "v": 0.6103
+          },
+          {
+            "id": "TCGA-C8-A12P-01",
+            "g": "Missense",
+            "v": 0.3385
+          },
+          {
+            "id": "TCGA-A8-A091-01",
+            "g": "Not mutated",
+            "v": 0.3068
+          },
+          {
+            "id": "TCGA-E2-A1L8-01",
+            "g": "Not mutated",
+            "v": 0.1645
+          },
+          {
+            "id": "TCGA-A7-A26F-01",
+            "g": "Missense",
+            "v": 0.3177
+          },
+          {
+            "id": "TCGA-BH-A0W7-01",
+            "g": "Not mutated",
+            "v": 0.3048
+          },
+          {
+            "id": "TCGA-A2-A0YH-01",
+            "g": "Missense",
+            "v": 0.3154
+          },
+          {
+            "id": "TCGA-E9-A243-01",
+            "g": "Multiple",
+            "v": 0.1011
+          },
+          {
+            "id": "TCGA-E2-A150-01",
+            "g": "Truncating",
+            "v": 0.671
+          },
+          {
+            "id": "TCGA-AO-A1KQ-01",
+            "g": "Not mutated",
+            "v": 0.5026
+          },
+          {
+            "id": "TCGA-C8-A12K-01",
+            "g": "Missense",
+            "v": 0.4856
+          },
+          {
+            "id": "TCGA-C8-A9FZ-01",
+            "g": "Not mutated",
+            "v": 0.6245
+          },
+          {
+            "id": "TCGA-OL-A66N-01",
+            "g": "Not mutated",
+            "v": 0.2094
+          },
+          {
+            "id": "TCGA-BH-A28Q-01",
+            "g": "Not mutated",
+            "v": 0.1605
+          },
+          {
+            "id": "TCGA-A2-A04Y-01",
+            "g": "Not mutated",
+            "v": 0.147
+          },
+          {
+            "id": "TCGA-D8-A1XU-01",
+            "g": "Not mutated",
+            "v": 0.9465
+          },
+          {
+            "id": "TCGA-B6-A0I1-01",
+            "g": "Missense",
+            "v": 0.3742
+          },
+          {
+            "…": "1048 more",
+            "sha256": "720bf7719a5722b2"
+          }
+        ],
+        "pointSet": {
+          "rule": "all",
+          "drawn": 1068
+        },
+        "layers": [
+          {
+            "kind": "outliers",
+            "label": "outliers",
+            "color": "#D55E00",
+            "n": 0,
+            "shown": "none",
+            "why": "at or under 10,000 cases there is no density for them to stand out of"
+          }
+        ]
+      },
+      "cohorts": [
+        "all samples"
+      ],
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018"
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: not drawn, at or under 10,000 cases there is no density for them to stand out of."
+    }
+  ]
+}

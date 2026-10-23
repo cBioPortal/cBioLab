@@ -67,3 +67,16 @@ export async function cytobands(ok: Record<string, ViewResolver>, genes: string[
 export async function studyCatalogs(c: ViewRun, studies: string[]): Promise<StudyCatalog[]> {
   return Promise.all(studies.map(async (st) => ({ study: st, catalog: (await c.studyProfiles(st)).catalog || [] })));
 }
+
+/**
+ * Asks every (cohort, study) the view draws that `resolvers` holds, concurrently, and returns the
+ * answers in the view's order (its cohorts, then each cohort's studies), never in the order they
+ * finish. Combine them after this returns: combining inside `ask` as each answer lands makes the
+ * result depend on which query finished first (test/view-snapshots.test.ts checks for that).
+ */
+export async function askEachSite<R, T>(ctx: ViewRun, resolvers: Record<string, R>,
+  ask: (cohort: string, study: string, r: R) => Promise<T>): Promise<{ cohort: string; study: string; answer: T }[]> {
+  const sites = ctx.vNames.flatMap((cohort) => ctx.cohorts[cohort].studies.filter((st) => resolvers[st]).map((study) => ({ cohort, study })));
+  const answers = await Promise.all(sites.map((s) => ask(s.cohort, s.study, resolvers[s.study])));
+  return sites.map((s, i) => ({ ...s, answer: answers[i] }));
+}

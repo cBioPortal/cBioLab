@@ -1,0 +1,138 @@
+{
+  "study": "crc_apc_impact_2020",
+  "cohorts": {
+    "all patients": {
+      "count": 471,
+      "text": "all patients in the study",
+      "studies": [
+        "crc_apc_impact_2020"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "cox",
+      "cohorts": [
+        "all patients"
+      ],
+      "endpoint": "OS",
+      "cox": {
+        "coefficients": [
+          {
+            "label": "TP53/KRAS/PIK3CA (any) mutation status: Mutated",
+            "reference": "Not mutated",
+            "level": "Mutated",
+            "axisIndex": 0,
+            "beta": -0.3285283537241268,
+            "se": 0.21751119615856146,
+            "hr": 0.7199825137508375,
+            "ciLow": 0.47008466395358267,
+            "ciHigh": 1.1027265083426774,
+            "p": 0.1309420416160914
+          }
+        ],
+        "n": 471,
+        "events": 311
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "crc_apc_impact_2020",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Cox proportional-hazards regression (Efron ties) on 471 patients, 311 events, 1 term. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Fetch one row per patient",
+            "detail": "The coxRows:OS query above. Patients with a OS_MONTHS value and a value for every covariate are kept. Event: OS_STATUS starting with “1” (e.g. “1:DECEASED”); any other value, including a missing one, is censored. Every cohort patient had a row.",
+            "scope": "crc_apc_impact_2020",
+            "rowsIn": 471,
+            "rowsOut": 471
+          },
+          {
+            "kind": "transform",
+            "title": "Code the covariates",
+            "detail": "Each numeric covariate is one term. Each categorical covariate becomes one 0/1 term per level, measured against a reference level that gets no term.",
+            "params": [
+              [
+                "TP53/KRAS/PIK3CA (any) mutation status: Mutated",
+                "1 if c0 = “Mutated”, else 0 · 440 of 471 patients · reference “Not mutated”: the fixed default for a mutated-vs-not axis"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Fit a Cox proportional-hazards model",
+            "detail": "Maximum partial likelihood with Efron's method for tied event times, by Newton–Raphson with step-halving.",
+            "params": [
+              [
+                "patients / events",
+                "471 / 311"
+              ],
+              [
+                "terms",
+                "1"
+              ],
+              [
+                "baseline hazard",
+                "one, shared by every patient"
+              ],
+              [
+                "standard errors",
+                "from the observed information at the estimate"
+              ],
+              [
+                "95% interval",
+                "exp(β ± 1.959964·SE), Wald"
+              ],
+              [
+                "p-value",
+                "Wald χ² on 1 df, (β/SE)²"
+              ],
+              [
+                "fit",
+                "converged in 5 iterations"
+              ],
+              [
+                "log partial likelihood",
+                "-1635.6078"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "coxRegression"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Matches lifelines 0.30.3 CoxPHFitter (Efron ties) to a relative 1e-6 on coefficients, SEs, p-values and intervals (test/regression-golden.test.ts).",
+        "check": {
+          "cox::TP53/KRAS/PIK3CA (any) mutation status: Mutated:beta": {
+            "v": -0.3285283537241268,
+            "rel": 0.0001,
+            "abs": 0.000001
+          },
+          "cox::TP53/KRAS/PIK3CA (any) mutation status: Mutated:se": {
+            "v": 0.21751119615856146,
+            "rel": 0.0001
+          },
+          "cox::TP53/KRAS/PIK3CA (any) mutation status: Mutated:p": {
+            "v": 0.1309420416160914,
+            "rel": 0.001,
+            "abs": 1e-12
+          }
+        }
+      }
+    }
+  ]
+}

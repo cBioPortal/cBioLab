@@ -1,0 +1,888 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Pancreatic": {
+      "count": 3109,
+      "text": "CANCER_TYPE in [Pancreatic Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "table",
+      "cohorts": [
+        "Pancreatic"
+      ],
+      "table": {
+        "unit": "sample",
+        "columns": [
+          {
+            "id": "patient",
+            "name": "Patient ID",
+            "numeric": false
+          },
+          {
+            "id": "sample",
+            "name": "Sample ID",
+            "numeric": false
+          },
+          {
+            "id": "CANCER_TYPE",
+            "name": "Cancer Type",
+            "numeric": false
+          },
+          {
+            "id": "CLINICAL_GROUP",
+            "name": "Clinical Group",
+            "numeric": false
+          },
+          {
+            "id": "CLINICAL_SUMMARY",
+            "name": "Clinical Summary",
+            "numeric": false
+          },
+          {
+            "id": "DIAGNOSIS_DESCRIPTION",
+            "name": "Diagnosis Description",
+            "numeric": false
+          },
+          {
+            "id": "ICD_O_HISTOLOGY_DESCRIPTION",
+            "name": "ICD-O Histology Description",
+            "numeric": false
+          },
+          {
+            "id": "PATHOLOGICAL_GROUP",
+            "name": "Pathological Group",
+            "numeric": false
+          },
+          {
+            "id": "CANCER_TYPE_DETAILED",
+            "name": "Cancer Type Detailed",
+            "numeric": false
+          },
+          {
+            "id": "OS_STATUS",
+            "name": "Overall Survival Status",
+            "numeric": false
+          },
+          {
+            "id": "SAMPLE_TYPE",
+            "name": "Sample Type",
+            "numeric": false
+          },
+          {
+            "id": "RACE",
+            "name": "Race",
+            "numeric": false
+          },
+          {
+            "id": "GENDER",
+            "name": "Sex",
+            "numeric": false
+          },
+          {
+            "id": "STAGE_HIGHEST_RECORDED",
+            "name": "Stage (Highest Recorded)",
+            "numeric": false
+          },
+          {
+            "id": "ETHNICITY",
+            "name": "Ethnicity",
+            "numeric": false
+          },
+          {
+            "id": "MSI_TYPE",
+            "name": "MSI Type",
+            "numeric": false
+          },
+          {
+            "id": "GENE_PANEL",
+            "name": "Gene Panel",
+            "numeric": false
+          },
+          {
+            "id": "CURRENT_AGE_DEID",
+            "name": "Current Age",
+            "numeric": true
+          },
+          {
+            "id": "SMOKING_PREDICTIONS_3_CLASSES",
+            "name": "Smoking History (NLP)",
+            "numeric": false
+          },
+          {
+            "id": "SOMATIC_STATUS",
+            "name": "Somatic Status",
+            "numeric": false
+          },
+          {
+            "…": "32 more",
+            "sha256": "0faca185ba41eeac"
+          }
+        ],
+        "shown": [
+          "patient",
+          "sample",
+          "CANCER_TYPE",
+          "CLINICAL_GROUP",
+          "CLINICAL_SUMMARY",
+          "DIAGNOSIS_DESCRIPTION",
+          "ICD_O_HISTOLOGY_DESCRIPTION",
+          "PATHOLOGICAL_GROUP",
+          "CANCER_TYPE_DETAILED",
+          "OS_STATUS",
+          "SAMPLE_TYPE",
+          "RACE",
+          "GENDER",
+          "STAGE_HIGHEST_RECORDED",
+          "ETHNICITY",
+          "MSI_TYPE",
+          "GENE_PANEL",
+          "CURRENT_AGE_DEID",
+          "SMOKING_PREDICTIONS_3_CLASSES",
+          "SOMATIC_STATUS",
+          {
+            "…": "32 more",
+            "sha256": "5b17d65b1df7f010"
+          }
+        ],
+        "defaults": [
+          "patient",
+          "sample",
+          "CANCER_TYPE",
+          "CLINICAL_GROUP",
+          "CLINICAL_SUMMARY",
+          "DIAGNOSIS_DESCRIPTION",
+          "ICD_O_HISTOLOGY_DESCRIPTION",
+          "PATHOLOGICAL_GROUP",
+          "CANCER_TYPE_DETAILED",
+          "OS_STATUS",
+          "SAMPLE_TYPE",
+          "RACE",
+          "GENDER",
+          "STAGE_HIGHEST_RECORDED",
+          "ETHNICITY",
+          "MSI_TYPE",
+          "GENE_PANEL",
+          "CURRENT_AGE_DEID",
+          "SMOKING_PREDICTIONS_3_CLASSES",
+          "SOMATIC_STATUS",
+          {
+            "…": "32 more",
+            "sha256": "5b17d65b1df7f010"
+          }
+        ],
+        "query": {
+          "sort": {
+            "column": "CURRENT_AGE_DEID",
+            "desc": true
+          }
+        },
+        "rows": [
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0006018",
+            "sample": "P-0006018-T01-IM5",
+            "values": [
+              "P-0006018",
+              "P-0006018-T01-IM5",
+              "Pancreatic Cancer",
+              "2A",
+              "Regional,Extension and Nodes",
+              "Pancreas",
+              "Blastoma, Nos",
+              "2B",
+              "Pancreatic Neuroendocrine Tumor",
+              "0:LIVING",
+              "Metastasis",
+              "White",
+              "Female",
+              "Stage 1-3",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT410",
+              "89",
+              "Unknown",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "afc13182844dc3f9"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0006930",
+            "sample": "P-0006930-T01-IM5",
+            "values": [
+              "P-0006930",
+              "P-0006930-T01-IM5",
+              "Pancreatic Cancer",
+              "1A",
+              "Regional,Direct Extension",
+              "Pancreas",
+              "Adenocarcinoma, Nos",
+              "2A",
+              "Pancreatic Adenocarcinoma",
+              "0:LIVING",
+              "Primary",
+              "White",
+              "Female",
+              "Stage 1-3",
+              "Unknown whether Spanish or not",
+              "Stable",
+              "IMPACT410",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "8020c700bdb025bc"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0007791",
+            "sample": "P-0007791-T01-IM5",
+            "values": [
+              "P-0007791",
+              "P-0007791-T01-IM5",
+              "Pancreatic Cancer",
+              "2A",
+              "Regional,Extension and Nodes",
+              "Pancreas",
+              "Tubular Adenocarcinoma",
+              "2B",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Male",
+              "Stage 1-3",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT410",
+              "89",
+              "Former/Current Smoker",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "e8e76e157522be59"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0009404",
+            "sample": "P-0009404-T01-IM5",
+            "values": [
+              "P-0009404",
+              "P-0009404-T01-IM5",
+              "Pancreatic Cancer",
+              "1A",
+              "Regional,Direct Extension",
+              "Pancreas",
+              "Adenocarcinoma, Nos",
+              "2A",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Female",
+              "Stage 1-3",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT410",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "eb82e2189938f90b"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0010195",
+            "sample": "P-0010195-T01-IM5",
+            "values": [
+              "P-0010195",
+              "P-0010195-T01-IM5",
+              "Pancreatic Cancer",
+              "3",
+              "Regional,Direct Extension",
+              "Pancreas",
+              "Adenocarcinoma, Nos",
+              "0",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Female",
+              "Stage 1-3",
+              "Spanish  NOS; Hispanic NOS, Latino NOS",
+              "Stable",
+              "IMPACT410",
+              "89",
+              "Former/Current Smoker",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "7df155ddfc1b5f7e"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0011111",
+            "sample": "P-0011111-T01-IM5",
+            "values": [
+              "P-0011111",
+              "P-0011111-T01-IM5",
+              "Pancreatic Cancer",
+              "1B",
+              "Regional Both 2 and 3",
+              "Pancreas",
+              "Infiltrating Duct Carcinoma",
+              "2B",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Male",
+              "Stage 1-3",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT410",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "efbfdff8d7af63df"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0012579",
+            "sample": "P-0012579-T01-IM5",
+            "values": [
+              "P-0012579",
+              "P-0012579-T01-IM5",
+              "Pancreatic Cancer",
+              "1B",
+              "Regional by Direct Extension",
+              "Pancreas",
+              "Infiltrating Duct Carcinoma",
+              "2A",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Female",
+              "Stage 1-3",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT410",
+              "89",
+              "Former/Current Smoker",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "10f4e2e8ae1fcfda"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0013009",
+            "sample": "P-0013009-T01-IM5",
+            "values": [
+              "P-0013009",
+              "P-0013009-T01-IM5",
+              "Pancreatic Cancer",
+              "4",
+              "Distant Metastases/Systemic Disease",
+              "Pancreas",
+              "Adenocarcinoma, Nos",
+              "",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Female",
+              "Stage 4",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT410",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "1fea999693130f2a"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0018639",
+            "sample": "P-0018639-T01-IM6",
+            "values": [
+              "P-0018639",
+              "P-0018639-T01-IM6",
+              "Pancreatic Cancer",
+              "1A",
+              "Regional by Direct Extension",
+              "Pancreas",
+              "Infiltrating Duct Carcinoma",
+              "2A",
+              "Pancreatic Adenocarcinoma",
+              "0:LIVING",
+              "Primary",
+              "White",
+              "Female",
+              "Stage 1-3",
+              "Unknown whether Spanish or not",
+              "Do not report",
+              "IMPACT468",
+              "89",
+              "Former/Current Smoker",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "2c220bf4e83f8721"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0023044",
+            "sample": "P-0023044-T01-IM6",
+            "values": [
+              "P-0023044",
+              "P-0023044-T01-IM6",
+              "Pancreatic Cancer",
+              "2A",
+              "Regional by Direct Extension",
+              "Pancreas",
+              "Adenocarcinoma, Nos",
+              "",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Female",
+              "Stage 1-3",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "2364ccef24263596"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0024552",
+            "sample": "P-0024552-T01-IM6",
+            "values": [
+              "P-0024552",
+              "P-0024552-T01-IM6",
+              "Pancreatic Cancer",
+              "4",
+              "Distant Metastases/Systemic Disease",
+              "Pancreas",
+              "Adenocarcinoma, Nos",
+              "4",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Metastasis",
+              "White",
+              "Male",
+              "Stage 4",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Former/Current Smoker",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "1edffbaf7be9de84"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0028084",
+            "sample": "P-0028084-T01-IM6",
+            "values": [
+              "P-0028084",
+              "P-0028084-T01-IM6",
+              "Pancreatic Cancer",
+              "1B",
+              "Regional Both 2 and 3",
+              "Pancreas",
+              "Infiltrating Duct Carcinoma",
+              "2B",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Female",
+              "Stage 1-3",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "a37511482894836f"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0028158",
+            "sample": "P-0028158-T01-IM6",
+            "values": [
+              "P-0028158",
+              "P-0028158-T01-IM6",
+              "Pancreatic Cancer",
+              "2A",
+              "Regional by Direct Extension",
+              "Pancreas",
+              "Carcinoma, Undifferentiated Type, Nos",
+              "",
+              "Undifferentiated Carcinoma of the Pancreas",
+              "1:DECEASED",
+              "Metastasis",
+              "White",
+              "Female",
+              "Stage 1-3",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "bf27641e9a00df42"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0028249",
+            "sample": "P-0028249-T01-IM6",
+            "values": [
+              "P-0028249",
+              "P-0028249-T01-IM6",
+              "Pancreatic Cancer",
+              "1A",
+              "Regional Both 2 and 3",
+              "Pancreas",
+              "Infiltrating Duct Carcinoma",
+              "3",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Male",
+              "Stage 1-3",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "268d734a7e163257"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0029109",
+            "sample": "P-0029109-T01-IM6",
+            "values": [
+              "P-0029109",
+              "P-0029109-T01-IM6",
+              "Pancreatic Cancer",
+              "",
+              "Localized",
+              "Pancreas",
+              "Adenocarcinoma, Nos",
+              "1A",
+              "Pancreatic Adenocarcinoma",
+              "0:LIVING",
+              "Primary",
+              "White",
+              "Female",
+              "Stage 1-3",
+              "Spanish  NOS; Hispanic NOS, Latino NOS",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Former/Current Smoker",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "a2854bf8c1d89271"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0030506",
+            "sample": "P-0030506-T01-IM6",
+            "values": [
+              "P-0030506",
+              "P-0030506-T01-IM6",
+              "Pancreatic Cancer",
+              "1B",
+              "Regional,Extension and Nodes",
+              "Pancreas",
+              "Infiltrating Duct Carcinoma",
+              "2B",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Male",
+              "Stage 1-3",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "b9188b83e59a6f8e"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0031431",
+            "sample": "P-0031431-T01-IM6",
+            "values": [
+              "P-0031431",
+              "P-0031431-T01-IM6",
+              "Pancreatic Cancer",
+              "4",
+              "Distant Metastases/Systemic Disease",
+              "Pancreas",
+              "Adenocarcinoma, Nos",
+              "4",
+              "Pancreatic Adenocarcinoma",
+              "0:LIVING",
+              "Primary",
+              "White",
+              "Male",
+              "Stage 4",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Former/Current Smoker",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "323df33aeef91a2c"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0032403",
+            "sample": "P-0032403-T01-IM6",
+            "values": [
+              "P-0032403",
+              "P-0032403-T01-IM6",
+              "Pancreatic Cancer",
+              "4",
+              "Distant Metastases/Systemic Disease",
+              "Pancreas",
+              "Adenocarcinoma, Nos",
+              "4",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Female",
+              "Stage 4",
+              "Non-Spanish; Non-Hispanic",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "3c6e36eaac9ab4c3"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0037989",
+            "sample": "P-0037989-T01-IM6",
+            "values": [
+              "P-0037989",
+              "P-0037989-T01-IM6",
+              "Pancreatic Cancer",
+              "1B",
+              "Regional To Lymph Nodes",
+              "Pancreas",
+              "Infiltrating Duct Carcinoma",
+              "2B",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Male",
+              "Stage 1-3",
+              "Unknown whether Spanish or not",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Never",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "c0d401658333a605"
+              }
+            ]
+          },
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "patient": "P-0038511",
+            "sample": "P-0038511-T01-IM6",
+            "values": [
+              "P-0038511",
+              "P-0038511-T01-IM6",
+              "Pancreatic Cancer",
+              "1B",
+              "Localized",
+              "Pancreas",
+              "Adenocarcinoma, Nos",
+              "",
+              "Pancreatic Adenocarcinoma",
+              "1:DECEASED",
+              "Primary",
+              "White",
+              "Male",
+              "Stage 1-3",
+              "Unknown whether Spanish or not",
+              "Stable",
+              "IMPACT468",
+              "89",
+              "Former/Current Smoker",
+              "Matched",
+              {
+                "…": "32 more",
+                "sha256": "15bf9c98fecb5f7c"
+              }
+            ]
+          },
+          {
+            "…": "5 more",
+            "sha256": "627de08f5ae47ff2"
+          }
+        ],
+        "offset": 0,
+        "pageSize": 25,
+        "lists": [
+          {
+            "cohort": "Pancreatic",
+            "study": "msk_chord_2024",
+            "total": 3134,
+            "all": 3134
+          }
+        ],
+        "total": 3134,
+        "all": 3134
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "One row per sample of each cohort's patients, carrying its patient's attributes too, with 50 attributes as each study recorded them — vocabularies are not harmonized across studies. 3,134 samples. Sorted by Current Age (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the samples per cohort and study",
+            "detail": "The table:counts query above: every sample of each cohort's patients (from the study's sample list, so a sample with no sample attribute still has a row), each with the value of each of the 50 attributes as recorded — blank where none was.",
+            "params": [
+              [
+                "Pancreatic · msk_chord_2024",
+                "3,134"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Sort them together and take one page",
+            "detail": "The table:rows query above: the samples of every cohort and study combined in one query, sorted by Current Age descending with missing values last, then patient and sample id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "clinicalRowSource",
+            "pageSql",
+            "countsSql"
+          ],
+          "file": "lib/clinical-table.ts, lib/table-query.ts",
+          "commit": null
+        },
+        "verification": "A listing: no statistic is computed, so there is no script — the queries are the numbers."
+      }
+    }
+  ]
+}

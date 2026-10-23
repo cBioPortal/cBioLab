@@ -1,0 +1,254 @@
+{
+  "study": "crc_apc_impact_2020",
+  "cohorts": {
+    "liver mets": {
+      "count": 227,
+      "text": "OQL[APC: MUT] AND METASTASIS_LIVER in [Yes]",
+      "studies": [
+        "crc_apc_impact_2020"
+      ]
+    },
+    "no liver mets": {
+      "count": 98,
+      "text": "OQL[APC: MUT] AND METASTASIS_LIVER in [No]",
+      "studies": [
+        "crc_apc_impact_2020"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "clinical",
+      "cohorts": [
+        "liver mets",
+        "no liver mets"
+      ],
+      "clinical": [
+        {
+          "attribute": "MSI_SCORE",
+          "per": "sample",
+          "kind": "num",
+          "q": 0.06716509090323068,
+          "cells": [
+            {
+              "cohort": "liver mets",
+              "n": 227,
+              "mean": 1.09,
+              "sd": 2.264,
+              "min": -1,
+              "max": 21.96,
+              "median": 0.6,
+              "q1": 0.26,
+              "q3": 1.29,
+              "histogramTruncated": false
+            },
+            {
+              "cohort": "no liver mets",
+              "n": 98,
+              "mean": 2.892,
+              "sd": 8.147,
+              "min": 0,
+              "max": 48.45,
+              "median": 0.595,
+              "q1": 0.205,
+              "q3": 1.248,
+              "histogramTruncated": false
+            }
+          ],
+          "test": "Welch t",
+          "statistic": -2.1537,
+          "df": 103.52,
+          "p": 0.03358254545161534,
+          "rankStatistic": 10602,
+          "rankP": 0.5029628540374218
+        },
+        {
+          "attribute": "AGE_AT_MET",
+          "per": "patient",
+          "kind": "num",
+          "q": 0.7656913780960357,
+          "cells": [
+            {
+              "cohort": "liver mets",
+              "n": 227,
+              "mean": 58.952,
+              "sd": 13.101,
+              "min": 23,
+              "max": 93,
+              "median": 59,
+              "q1": 51,
+              "q3": 68,
+              "histogramTruncated": false
+            },
+            {
+              "cohort": "no liver mets",
+              "n": 98,
+              "mean": 59.439,
+              "sd": 13.677,
+              "min": 24,
+              "max": 95,
+              "median": 58.5,
+              "q1": 50.25,
+              "q3": 68.75,
+              "histogramTruncated": false
+            }
+          ],
+          "test": "Welch t",
+          "statistic": -0.2985,
+          "df": 177.14,
+          "p": 0.7656913780960357,
+          "rankStatistic": 11113.5,
+          "rankP": 0.9907597366429025
+        }
+      ],
+      "studies": [
+        "crc_apc_impact_2020"
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "crc_apc_impact_2020",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary; numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across the 2 tested attributes. Numeric attributes also show median/IQR and a rank-based test alongside the moment-based one — a Mann-Whitney U for 2 cohorts, Kruskal-Wallis for 3+ (neither itself part of the q-value correction) — computed from the attribute's complete value distribution, which is only exact and only requested because this view is confined to a single study.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Describe each attribute",
+            "detail": "The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies), plus its complete value distribution as (value, count) pairs for the median, IQR and rank tests. Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database except as a count of how many share it.",
+            "scope": "liver mets · crc_apc_impact_2020",
+            "rowsIn": 227
+          },
+          {
+            "kind": "fetch",
+            "title": "Describe each attribute",
+            "detail": "The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies), plus its complete value distribution as (value, count) pairs for the median, IQR and rank tests. Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database except as a count of how many share it.",
+            "scope": "no liver mets · crc_apc_impact_2020",
+            "rowsIn": 98
+          },
+          {
+            "kind": "statistic",
+            "title": "Welch's t-test for each numeric attribute",
+            "detail": "Unequal-variance t from each cohort's n, mean and variance, with Welch–Satterthwaite degrees of freedom; two-sided. Mean and variance are from the summed moments: variance = (Σx² − (Σx)²/n) / (n − 1).",
+            "params": [
+              [
+                "MSI_SCORE",
+                "t -2.1537 on 103.52 df · p 0.0336"
+              ],
+              [
+                "AGE_AT_MET",
+                "t -0.2985 on 177.14 df · p 0.766"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Mann–Whitney U alongside",
+            "detail": "From each cohort's complete value distribution: ranks averaged within tied values, the variance tie-corrected, the normal approximation with a 0.5 continuity correction; two-sided. Medians and quartiles from the same distribution, interpolating linearly between ranks. A check against skew and outliers — not part of the q-value correction.",
+            "params": [
+              [
+                "MSI_SCORE",
+                "U 10602 · p 0.503"
+              ],
+              [
+                "AGE_AT_MET",
+                "U 11113.5 · p 0.991"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across attributes",
+            "detail": "q-values over the 2 tested attributes, from the χ² and Welch p-values together."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "welchT",
+            "mannWhitneyU",
+            "quantilesFromHistogram",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "χ² matches scipy 1.18.1 chi2_contingency; Welch's t scipy ttest_ind(equal_var=False) and Welch's ANOVA statsmodels 0.15.0 anova_generic from the same moments; Mann–Whitney, Kruskal–Wallis and quantiles scipy/numpy on the expanded distribution; Benjamini–Hochberg statsmodels multipletests — all to a relative 1e-6 (test/tables-golden.test.ts, test/moments-golden.test.ts).",
+        "check": {
+          "clinical:MSI_SCORE:p": {
+            "v": 0.03358254545161534
+          },
+          "clinical:MSI_SCORE:q": {
+            "v": 0.06716509090323068
+          },
+          "clinical:MSI_SCORE:rank_p": {
+            "v": 0.5029628540374218
+          },
+          "clinical:AGE_AT_MET:p": {
+            "v": 0.7656913780960357
+          },
+          "clinical:AGE_AT_MET:q": {
+            "v": 0.7656913780960357
+          },
+          "clinical:AGE_AT_MET:rank_p": {
+            "v": 0.9907597366429025
+          },
+          "clinical:MSI_SCORE:liver mets:median": {
+            "v": 0.6,
+            "abs": 0.000500001
+          },
+          "clinical:MSI_SCORE:liver mets:q1": {
+            "v": 0.26,
+            "abs": 0.000500001
+          },
+          "clinical:MSI_SCORE:liver mets:q3": {
+            "v": 1.29,
+            "abs": 0.000500001
+          },
+          "clinical:MSI_SCORE:no liver mets:median": {
+            "v": 0.595,
+            "abs": 0.000500001
+          },
+          "clinical:MSI_SCORE:no liver mets:q1": {
+            "v": 0.205,
+            "abs": 0.000500001
+          },
+          "clinical:MSI_SCORE:no liver mets:q3": {
+            "v": 1.248,
+            "abs": 0.000500001
+          },
+          "clinical:AGE_AT_MET:liver mets:median": {
+            "v": 59,
+            "abs": 0.000500001
+          },
+          "clinical:AGE_AT_MET:liver mets:q1": {
+            "v": 51,
+            "abs": 0.000500001
+          },
+          "clinical:AGE_AT_MET:liver mets:q3": {
+            "v": 68,
+            "abs": 0.000500001
+          },
+          "clinical:AGE_AT_MET:no liver mets:median": {
+            "v": 58.5,
+            "abs": 0.000500001
+          },
+          "clinical:AGE_AT_MET:no liver mets:q1": {
+            "v": 50.25,
+            "abs": 0.000500001
+          },
+          "clinical:AGE_AT_MET:no liver mets:q3": {
+            "v": 68.75,
+            "abs": 0.000500001
+          }
+        }
+      }
+    }
+  ]
+}

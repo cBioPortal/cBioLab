@@ -1,0 +1,22 @@
+Analysis over crc_apc_impact_2020 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- all patients: 471 patients — all patients in the study
+
+Logistic regression (n=470, 27 with the outcome):
+  APC mutation status: Mutated vs Not mutated: OR 0.28 (95% CI 0.13-0.63) p=0.0018
+  CAVEAT (tell the user): Logistic regression on 470 patients, 27 with MSI_TYPE = Instable (1 term). Every other observed value of MSI_TYPE (Do not report, Indeterminate, Stable) was treated as “not event.” 1 patient from patient-level participants lacked the outcome or a covariate and were excluded. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers.
+  METHOD:
+    - Fetch one row per patient [crc_apc_impact_2020] (471 → 470 rows): The logisticRows query above. Patients with a value for MSI_TYPE and for every covariate are kept. 1 cohort patient had no row.
+    - Code the outcome: 1 if MSI_TYPE = “Instable”, else 0 — every other observed value (Do not report, Indeterminate, Stable) counts as not the event.
+    - Code the covariates: Each numeric covariate is one term. Each categorical covariate becomes one 0/1 term per level, measured against a reference level that gets no term.
+        APC mutation status: Mutated: 1 if c0 = “Mutated”, else 0 · 325 of 470 patients · reference “Not mutated”: the fixed default for a mutated-vs-not axis
+    - Fit a logistic regression: Maximum likelihood for a binomial GLM with a logit link and an intercept, by Newton–Raphson with step-halving.
+        patients / events: 470 / 27
+        terms: 1 plus an intercept (not drawn)
+        standard errors: from the Fisher information at the estimate
+        95% interval: exp(β ± 1.959964·SE), Wald
+        p-value: Wald χ² on 1 df, (β/SE)²
+        fit: converged in 8 iterations
+        log likelihood: -98.4061
+    Matches statsmodels 0.15.0 Logit to a relative 1e-6 on coefficients, SEs, p-values and intervals (test/regression-golden.test.ts).

@@ -1,0 +1,873 @@
+{
+  "study": "luad_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "Lung (TCGA)": {
+      "count": 1053,
+      "text": "all patients in the study — across 2 studies",
+      "studies": [
+        "luad_tcga_pan_can_atlas_2018",
+        "lusc_tcga_pan_can_atlas_2018"
+      ]
+    },
+    "KRAS mut": {
+      "count": 175,
+      "text": "OQL[KRAS: MUT] — across 2 studies",
+      "studies": [
+        "luad_tcga_pan_can_atlas_2018",
+        "lusc_tcga_pan_can_atlas_2018"
+      ]
+    },
+    "TP53 mut": {
+      "count": 699,
+      "text": "OQL[TP53: MUT] — across 2 studies",
+      "studies": [
+        "luad_tcga_pan_can_atlas_2018",
+        "lusc_tcga_pan_can_atlas_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "plot",
+      "plot": {
+        "shape": "scatter",
+        "n": 968,
+        "x": {
+          "label": "AGE",
+          "kind": "num"
+        },
+        "y": {
+          "label": "TMB_NONSYNONYMOUS",
+          "kind": "num"
+        },
+        "extent": {
+          "x0": 33,
+          "x1": 90,
+          "y0": 0,
+          "y1": 67.2
+        },
+        "grid": [
+          240,
+          160
+        ],
+        "bins": [
+          {
+            "bx": 37,
+            "by": 11,
+            "n": 1
+          },
+          {
+            "bx": 181,
+            "by": 8,
+            "n": 1
+          },
+          {
+            "bx": 105,
+            "by": 31,
+            "n": 1
+          },
+          {
+            "bx": 134,
+            "by": 14,
+            "n": 2
+          },
+          {
+            "bx": 134,
+            "by": 29,
+            "n": 1
+          },
+          {
+            "bx": 113,
+            "by": 19,
+            "n": 3
+          },
+          {
+            "bx": 227,
+            "by": 15,
+            "n": 1
+          },
+          {
+            "bx": 202,
+            "by": 26,
+            "n": 1
+          },
+          {
+            "bx": 138,
+            "by": 8,
+            "n": 1
+          },
+          {
+            "bx": 164,
+            "by": 27,
+            "n": 2
+          },
+          {
+            "bx": 122,
+            "by": 0,
+            "n": 3
+          },
+          {
+            "bx": 164,
+            "by": 8,
+            "n": 1
+          },
+          {
+            "bx": 168,
+            "by": 14,
+            "n": 4
+          },
+          {
+            "bx": 71,
+            "by": 31,
+            "n": 1
+          },
+          {
+            "bx": 176,
+            "by": 2,
+            "n": 1
+          },
+          {
+            "bx": 155,
+            "by": 8,
+            "n": 2
+          },
+          {
+            "bx": 155,
+            "by": 14,
+            "n": 1
+          },
+          {
+            "bx": 75,
+            "by": 31,
+            "n": 1
+          },
+          {
+            "bx": 151,
+            "by": 8,
+            "n": 2
+          },
+          {
+            "bx": 143,
+            "by": 4,
+            "n": 1
+          },
+          {
+            "…": "707 more",
+            "sha256": "b764315ea2e5f343"
+          }
+        ],
+        "stats": {
+          "pearson": -0.1312,
+          "spearman": null,
+          "slope": -0.12815725764648467,
+          "intercept": 18.373049900699872,
+          "pPearson": 0.000042245416729427556,
+          "pSpearman": null
+        },
+        "note": "2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for Pearson's r and the regression line; the bin grid uses one shared scale (each site's own extent, pooled) so cells sum correctly. Spearman rank correlation is not reported for a federated plot: it needs the pooled GLOBAL ranking, which per-site aggregates cannot reconstruct exactly.",
+        "coverage": {
+          "total": 1053,
+          "nx": 971,
+          "ny": 1050,
+          "multi": 0
+        },
+        "layers": [
+          {
+            "kind": "cohort",
+            "label": "KRAS mut",
+            "color": "#D55E00",
+            "name": "KRAS mut",
+            "patients": 175,
+            "inPlot": 175,
+            "n": 158,
+            "shown": "points",
+            "points": [
+              {
+                "id": "TCGA-MP-A4T7",
+                "x": 75,
+                "y": 4.166666667
+              },
+              {
+                "id": "TCGA-91-6836",
+                "x": 52,
+                "y": 15.33333333
+              },
+              {
+                "id": "TCGA-69-8253",
+                "x": 59,
+                "y": 4.366666667
+              },
+              {
+                "id": "TCGA-64-5778",
+                "x": 60,
+                "y": 14.26666667
+              },
+              {
+                "id": "TCGA-95-A4VP",
+                "x": 66,
+                "y": 3.766666667
+              },
+              {
+                "id": "TCGA-99-8032",
+                "x": 61,
+                "y": 12.26666667
+              },
+              {
+                "id": "TCGA-78-7145",
+                "x": 52,
+                "y": 6.266666667
+              },
+              {
+                "id": "TCGA-05-4417",
+                "x": 51,
+                "y": 9.633333333
+              },
+              {
+                "id": "TCGA-97-8176",
+                "x": 63,
+                "y": 4.6
+              },
+              {
+                "id": "TCGA-78-7166",
+                "x": 84,
+                "y": 6.466666667
+              },
+              {
+                "id": "TCGA-73-4670",
+                "x": 69,
+                "y": 10.96666667
+              },
+              {
+                "id": "TCGA-44-3917",
+                "x": 33,
+                "y": 6.666666667
+              },
+              {
+                "id": "TCGA-95-7039",
+                "x": 54,
+                "y": 40.36666667
+              },
+              {
+                "id": "TCGA-62-A46R",
+                "x": 54,
+                "y": 5.666666667
+              },
+              {
+                "id": "TCGA-49-4506",
+                "x": 68,
+                "y": 3.9
+              },
+              {
+                "id": "TCGA-50-7109",
+                "x": 60,
+                "y": 8
+              },
+              {
+                "id": "TCGA-NJ-A4YI",
+                "x": 87,
+                "y": 13.16666667
+              },
+              {
+                "id": "TCGA-50-5933",
+                "x": 72,
+                "y": 16.5
+              },
+              {
+                "id": "TCGA-55-8090",
+                "x": 80,
+                "y": 2.566666667
+              },
+              {
+                "id": "TCGA-95-7562",
+                "x": 71,
+                "y": 13.1
+              },
+              {
+                "…": "138 more",
+                "sha256": "d53b61b911fb2f10"
+              }
+            ],
+            "drawn": 158
+          },
+          {
+            "kind": "cohort",
+            "label": "TP53 mut",
+            "color": "#0072B2",
+            "name": "TP53 mut",
+            "patients": 699,
+            "inPlot": 699,
+            "n": 652,
+            "shown": "points",
+            "points": [
+              {
+                "id": "TCGA-71-8520",
+                "x": 60,
+                "y": 2.666666667
+              },
+              {
+                "id": "TCGA-49-4490",
+                "x": 45,
+                "y": 1.6
+              },
+              {
+                "id": "TCGA-78-7150",
+                "x": 59,
+                "y": 12.26666667
+              },
+              {
+                "id": "TCGA-05-4402",
+                "x": 57,
+                "y": 4.033333333
+              },
+              {
+                "id": "TCGA-62-A471",
+                "x": 64,
+                "y": 3.033333333
+              },
+              {
+                "id": "TCGA-44-7662",
+                "x": 61,
+                "y": 36.23333333
+              },
+              {
+                "id": "TCGA-53-A4EZ",
+                "x": 63,
+                "y": 15.13333333
+              },
+              {
+                "id": "TCGA-55-8085",
+                "x": 64,
+                "y": 7.5
+              },
+              {
+                "id": "TCGA-55-6980",
+                "x": 56,
+                "y": 1
+              },
+              {
+                "id": "TCGA-95-7043",
+                "x": 63,
+                "y": 34.16666667
+              },
+              {
+                "id": "TCGA-55-A4DG",
+                "x": 71,
+                "y": 20.9
+              },
+              {
+                "id": "TCGA-49-AAQV",
+                "x": 63,
+                "y": 2.233333333
+              },
+              {
+                "id": "TCGA-05-4410",
+                "x": 62,
+                "y": 33.8
+              },
+              {
+                "id": "TCGA-44-7670",
+                "x": 47,
+                "y": 67.2
+              },
+              {
+                "id": "TCGA-55-1594",
+                "x": 68,
+                "y": 5.6
+              },
+              {
+                "id": "TCGA-MP-A4T9",
+                "x": 54,
+                "y": 1.033333333
+              },
+              {
+                "id": "TCGA-55-6968",
+                "x": 61,
+                "y": 15.4
+              },
+              {
+                "id": "TCGA-86-8672",
+                "x": 59,
+                "y": 8.766666666999999
+              },
+              {
+                "id": "TCGA-38-6178",
+                "x": 70,
+                "y": 2.233333333
+              },
+              {
+                "id": "TCGA-55-8511",
+                "x": 73,
+                "y": 17.16666667
+              },
+              {
+                "…": "574 more",
+                "sha256": "95e1b03d778f70ae"
+              }
+            ],
+            "drawn": 594,
+            "shared": [
+              {
+                "id": "TCGA-91-6836",
+                "x": 52,
+                "y": 15.33333333
+              },
+              {
+                "id": "TCGA-64-5778",
+                "x": 60,
+                "y": 14.26666667
+              },
+              {
+                "id": "TCGA-95-7039",
+                "x": 54,
+                "y": 40.36666667
+              },
+              {
+                "id": "TCGA-62-A46R",
+                "x": 54,
+                "y": 5.666666667
+              },
+              {
+                "id": "TCGA-05-4433",
+                "x": 82,
+                "y": 1.1
+              },
+              {
+                "id": "TCGA-83-5908",
+                "x": 59,
+                "y": 7.2
+              },
+              {
+                "id": "TCGA-55-8094",
+                "x": 51,
+                "y": 13.23333333
+              },
+              {
+                "id": "TCGA-MN-A4N5",
+                "x": 63,
+                "y": 13.5
+              },
+              {
+                "id": "TCGA-44-6144",
+                "x": 58,
+                "y": 13.1
+              },
+              {
+                "id": "TCGA-55-7576",
+                "x": 54,
+                "y": 24.26666667
+              },
+              {
+                "id": "TCGA-44-8117",
+                "x": 54,
+                "y": 22.7
+              },
+              {
+                "id": "TCGA-55-7914",
+                "x": 71,
+                "y": 5.366666667
+              },
+              {
+                "id": "TCGA-44-7661",
+                "x": 69,
+                "y": 18.16666667
+              },
+              {
+                "id": "TCGA-MP-A4TK",
+                "x": 56,
+                "y": 10.5
+              },
+              {
+                "id": "TCGA-55-7726",
+                "x": 72,
+                "y": 3.7
+              },
+              {
+                "id": "TCGA-99-8025",
+                "x": 72,
+                "y": 14.63333333
+              },
+              {
+                "id": "TCGA-69-7980",
+                "x": 70,
+                "y": 24.56666667
+              },
+              {
+                "id": "TCGA-05-4415",
+                "x": 57,
+                "y": 6.233333333
+              },
+              {
+                "id": "TCGA-55-8514",
+                "x": 70,
+                "y": 8.333333333
+              },
+              {
+                "id": "TCGA-55-7283",
+                "x": 76,
+                "y": 14.06666667
+              },
+              {
+                "…": "38 more",
+                "sha256": "a8eb0df5226d320c"
+              }
+            ],
+            "sharedOwners": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              {
+                "…": "38 more",
+                "sha256": "e25d6ef7100931ea"
+              }
+            ]
+          }
+        ]
+      },
+      "cohorts": [
+        "Lung (TCGA)"
+      ],
+      "studies": [
+        "luad_tcga_pan_can_atlas_2018",
+        "lusc_tcga_pan_can_atlas_2018"
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "luad_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "lusc_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "968 of 1,053 patients have a value on both axes (82 have no AGE; 3 have no TMB_NONSYNONYMOUS); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for Pearson's r and the regression line; the bin grid uses one shared scale (each site's own extent, pooled) so cells sum correctly. Spearman rank correlation is not reported for a federated plot: it needs the pooled GLOBAL ranking, which per-site aggregates cannot reconstruct exactly. Point layers — “KRAS mut”: 175 patients, 158 patients drawn as points; “TP53 mut”: 699 patients, 652 patients drawn as points (58 drawn by an earlier layer). The statistics are over the whole plotted cohort."
+    },
+    {
+      "kind": "plot",
+      "plot": {
+        "shape": "box",
+        "n": 996,
+        "x": {
+          "label": "SEX",
+          "kind": "cat"
+        },
+        "y": {
+          "label": "TMB_NONSYNONYMOUS",
+          "kind": "num"
+        },
+        "groups": [
+          {
+            "g": "Female",
+            "n": 402,
+            "lo": 0,
+            "hi": 67.2,
+            "q1": 3.4337479268034823,
+            "median": 6.917744610159204,
+            "q3": 12.18067993243781,
+            "loWhisker": 0,
+            "hiWhisker": 25.3010779408893
+          },
+          {
+            "g": "Male",
+            "n": 594,
+            "lo": 0,
+            "hi": 53.36666667,
+            "q1": 4.387598204329966,
+            "median": 7.345566778835017,
+            "q3": 12.602132434124579,
+            "loWhisker": 0,
+            "hiWhisker": 24.923933778816497
+          }
+        ],
+        "overlay": "points",
+        "note": "2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Counts and extremes per group sum exactly; the quartiles are a size-weighted approximation across sites (it can shift where an outlier bar falls, never a count). A federated box does not draw a density behind it — that needs the same shared-scale binning a scatter does, not yet built for this shape — so points are shown when an entitled site has few enough to draw.",
+        "points": [
+          {
+            "id": "TCGA-NJ-A7XG",
+            "g": "Male",
+            "v": 0.9
+          },
+          {
+            "id": "TCGA-91-6836",
+            "g": "Female",
+            "v": 15.33333333
+          },
+          {
+            "id": "TCGA-62-8397",
+            "g": "Female",
+            "v": 0.8
+          },
+          {
+            "id": "TCGA-64-5778",
+            "g": "Male",
+            "v": 14.26666667
+          },
+          {
+            "id": "TCGA-95-A4VP",
+            "g": "Female",
+            "v": 3.766666667
+          },
+          {
+            "id": "TCGA-49-4490",
+            "g": "Female",
+            "v": 1.6
+          },
+          {
+            "id": "TCGA-99-AA5R",
+            "g": "Female",
+            "v": 1.8
+          },
+          {
+            "id": "TCGA-05-4402",
+            "g": "Female",
+            "v": 4.033333333
+          },
+          {
+            "id": "TCGA-62-A471",
+            "g": "Male",
+            "v": 3.033333333
+          },
+          {
+            "id": "TCGA-78-7159",
+            "g": "Female",
+            "v": 10.2
+          },
+          {
+            "id": "TCGA-44-7662",
+            "g": "Male",
+            "v": 36.23333333
+          },
+          {
+            "id": "TCGA-95-7039",
+            "g": "Female",
+            "v": 40.36666667
+          },
+          {
+            "id": "TCGA-78-7537",
+            "g": "Male",
+            "v": 4.466666667
+          },
+          {
+            "id": "TCGA-55-8085",
+            "g": "Male",
+            "v": 7.5
+          },
+          {
+            "id": "TCGA-69-7761",
+            "g": "Male",
+            "v": 0.966666667
+          },
+          {
+            "id": "TCGA-95-7043",
+            "g": "Female",
+            "v": 34.16666667
+          },
+          {
+            "id": "TCGA-NJ-A55R",
+            "g": "Male",
+            "v": 7.7
+          },
+          {
+            "id": "TCGA-69-8453",
+            "g": "Male",
+            "v": 0
+          },
+          {
+            "id": "TCGA-55-A4DG",
+            "g": "Male",
+            "v": 20.9
+          },
+          {
+            "id": "TCGA-75-7025",
+            "g": "Male",
+            "v": 1.033333333
+          },
+          {
+            "…": "976 more",
+            "sha256": "178485cca72f6fe3"
+          }
+        ],
+        "pointSet": {
+          "rule": "all",
+          "drawn": 996
+        },
+        "coverage": {
+          "total": 1053,
+          "nx": 999,
+          "ny": 1050,
+          "multi": 0
+        },
+        "layers": [
+          {
+            "kind": "cohort",
+            "label": "KRAS mut",
+            "color": "#D55E00",
+            "name": "KRAS mut",
+            "patients": 175,
+            "inPlot": 175,
+            "n": 164,
+            "shown": "points",
+            "points": [
+              {
+                "id": "TCGA-MP-A4T7",
+                "g": "Female",
+                "v": 4.166666667
+              },
+              {
+                "id": "TCGA-91-6836",
+                "g": "Female",
+                "v": 15.33333333
+              },
+              {
+                "id": "TCGA-69-8253",
+                "g": "Female",
+                "v": 4.366666667
+              },
+              {
+                "id": "TCGA-64-5778",
+                "g": "Male",
+                "v": 14.26666667
+              },
+              {
+                "id": "TCGA-95-A4VP",
+                "g": "Female",
+                "v": 3.766666667
+              },
+              {
+                "id": "TCGA-99-8032",
+                "g": "Male",
+                "v": 12.26666667
+              },
+              {
+                "id": "TCGA-78-7145",
+                "g": "Female",
+                "v": 6.266666667
+              },
+              {
+                "id": "TCGA-05-4417",
+                "g": "Female",
+                "v": 9.633333333
+              },
+              {
+                "id": "TCGA-97-8176",
+                "g": "Male",
+                "v": 4.6
+              },
+              {
+                "id": "TCGA-78-7166",
+                "g": "Male",
+                "v": 6.466666667
+              },
+              {
+                "id": "TCGA-73-4670",
+                "g": "Female",
+                "v": 10.96666667
+              },
+              {
+                "id": "TCGA-44-3917",
+                "g": "Female",
+                "v": 6.666666667
+              },
+              {
+                "id": "TCGA-95-7039",
+                "g": "Female",
+                "v": 40.36666667
+              },
+              {
+                "id": "TCGA-62-A46R",
+                "g": "Female",
+                "v": 5.666666667
+              },
+              {
+                "id": "TCGA-49-4506",
+                "g": "Female",
+                "v": 3.9
+              },
+              {
+                "id": "TCGA-50-7109",
+                "g": "Male",
+                "v": 8
+              },
+              {
+                "id": "TCGA-NJ-A4YI",
+                "g": "Female",
+                "v": 13.16666667
+              },
+              {
+                "id": "TCGA-50-5933",
+                "g": "Male",
+                "v": 16.5
+              },
+              {
+                "id": "TCGA-55-8090",
+                "g": "Male",
+                "v": 2.566666667
+              },
+              {
+                "id": "TCGA-95-7562",
+                "g": "Male",
+                "v": 13.1
+              },
+              {
+                "…": "144 more",
+                "sha256": "1cf2834cffb46c2d"
+              }
+            ],
+            "drawn": 164
+          }
+        ]
+      },
+      "cohorts": [
+        "Lung (TCGA)"
+      ],
+      "studies": [
+        "luad_tcga_pan_can_atlas_2018",
+        "lusc_tcga_pan_can_atlas_2018"
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "luad_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "lusc_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "996 of 1,053 patients have a value on both axes (54 have no SEX; 3 have no TMB_NONSYNONYMOUS); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Counts and extremes per group sum exactly; the quartiles are a size-weighted approximation across sites (it can shift where an outlier bar falls, never a count). A federated box does not draw a density behind it — that needs the same shared-scale binning a scatter does, not yet built for this shape — so points are shown when an entitled site has few enough to draw. Point layers — “KRAS mut”: 175 patients, 164 patients drawn as points. The statistics are over the whole plotted cohort."
+    }
+  ]
+}

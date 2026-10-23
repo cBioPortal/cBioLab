@@ -1,0 +1,810 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "TP53 mut": {
+      "count": 13105,
+      "text": "OQL[TP53: MUT]",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    },
+    "TP53 wt": {
+      "count": 11594,
+      "text": "NOT OQL[TP53:] AND profiled for TP53 MUTATION",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "sequence",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
+      "studies": [
+        "msk_chord_2024"
+      ],
+      "sequence": {
+        "labelKey": "SUBTYPE",
+        "lineGap": 90,
+        "steps": 3,
+        "foldedLabels": 51,
+        "truncated": false,
+        "keyOptions": [
+          {
+            "key": "subtype",
+            "label": "SUBTYPE",
+            "patients": 12738,
+            "values": 10
+          },
+          {
+            "key": "agent",
+            "label": "AGENT",
+            "patients": 11575,
+            "values": 220
+          },
+          {
+            "key": "flag_orotopical",
+            "label": "FLAG_OROTOPICAL",
+            "patients": 11575,
+            "values": 2
+          },
+          {
+            "key": "rx_investigative",
+            "label": "RX_INVESTIGATIVE",
+            "patients": 11575,
+            "values": 2
+          },
+          {
+            "key": "inferred_tx_prob",
+            "label": "INFERRED_TX_PROB",
+            "patients": 10877,
+            "values": 99
+          },
+          {
+            "key": "prior_med_to_msk",
+            "label": "PRIOR_MED_TO_MSK",
+            "patients": 10877,
+            "values": 2
+          },
+          {
+            "key": "style_color",
+            "label": "STYLE_COLOR",
+            "patients": 10877,
+            "values": 2
+          },
+          {
+            "key": "treatment_type",
+            "label": "Treatment_TYPE",
+            "patients": 10877,
+            "values": 1
+          }
+        ],
+        "panels": [
+          {
+            "cohort": "TP53 mut",
+            "nodes": [
+              {
+                "column": 1,
+                "label": "Chemo",
+                "kind": "regimen",
+                "n": 5239
+              },
+              {
+                "column": 1,
+                "label": "other",
+                "kind": "regimen",
+                "n": 2689
+              },
+              {
+                "column": 1,
+                "label": "Biologic + Chemo",
+                "kind": "regimen",
+                "n": 995
+              },
+              {
+                "column": 1,
+                "label": "Hormone",
+                "kind": "regimen",
+                "n": 672
+              },
+              {
+                "column": 1,
+                "label": "Chemo + Hormone",
+                "kind": "regimen",
+                "n": 644
+              },
+              {
+                "column": 1,
+                "label": "Chemo + Immuno",
+                "kind": "regimen",
+                "n": 639
+              },
+              {
+                "column": 1,
+                "label": "Targeted",
+                "kind": "regimen",
+                "n": 273
+              },
+              {
+                "column": 1,
+                "label": "Investigational",
+                "kind": "regimen",
+                "n": 254
+              },
+              {
+                "column": 1,
+                "label": "Chemo + Hormone + Targeted",
+                "kind": "regimen",
+                "n": 159
+              },
+              {
+                "column": 2,
+                "label": "",
+                "kind": "censored",
+                "n": 4206
+              },
+              {
+                "column": 2,
+                "label": "",
+                "kind": "stopped",
+                "n": 3285
+              },
+              {
+                "column": 2,
+                "label": "Chemo",
+                "kind": "regimen",
+                "n": 1400
+              },
+              {
+                "column": 2,
+                "label": "other",
+                "kind": "regimen",
+                "n": 1038
+              },
+              {
+                "column": 2,
+                "label": "Biologic + Chemo",
+                "kind": "regimen",
+                "n": 538
+              },
+              {
+                "column": 2,
+                "label": "Hormone",
+                "kind": "regimen",
+                "n": 489
+              },
+              {
+                "column": 2,
+                "label": "Targeted",
+                "kind": "regimen",
+                "n": 174
+              },
+              {
+                "column": 2,
+                "label": "Investigational",
+                "kind": "regimen",
+                "n": 140
+              },
+              {
+                "column": 2,
+                "label": "Chemo + Immuno",
+                "kind": "regimen",
+                "n": 133
+              },
+              {
+                "column": 2,
+                "label": "Chemo + Hormone",
+                "kind": "regimen",
+                "n": 115
+              },
+              {
+                "column": 2,
+                "label": "Chemo + Hormone + Targeted",
+                "kind": "regimen",
+                "n": 46
+              },
+              {
+                "…": "22 more",
+                "sha256": "4b96ee2a5c623769"
+              }
+            ],
+            "flows": [
+              {
+                "column": 1,
+                "from": "Chemo",
+                "to": "",
+                "n": 1966,
+                "kind": "stopped"
+              },
+              {
+                "column": 1,
+                "from": "other",
+                "to": "",
+                "n": 1700,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo",
+                "to": "Chemo",
+                "n": 1097,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Chemo",
+                "to": "",
+                "n": 964,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo",
+                "to": "other",
+                "n": 488,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "other",
+                "to": "",
+                "n": 437,
+                "kind": "stopped"
+              },
+              {
+                "column": 1,
+                "from": "Biologic + Chemo",
+                "to": "",
+                "n": 428,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Hormone",
+                "to": "",
+                "n": 335,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo",
+                "to": "Biologic + Chemo",
+                "n": 329,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Immuno",
+                "to": "",
+                "n": 317,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Immuno",
+                "to": "",
+                "n": 222,
+                "kind": "stopped"
+              },
+              {
+                "column": 1,
+                "from": "other",
+                "to": "other",
+                "n": 218,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Biologic + Chemo",
+                "to": "",
+                "n": 216,
+                "kind": "stopped"
+              },
+              {
+                "column": 1,
+                "from": "Hormone",
+                "to": "Hormone",
+                "n": 211,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Hormone",
+                "to": "",
+                "n": 170,
+                "kind": "stopped"
+              },
+              {
+                "column": 1,
+                "from": "Hormone",
+                "to": "",
+                "n": 161,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Targeted",
+                "to": "",
+                "n": 136,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Biologic + Chemo",
+                "to": "Biologic + Chemo",
+                "n": 135,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Hormone",
+                "to": "",
+                "n": 135,
+                "kind": "stopped"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Hormone + Targeted",
+                "to": "",
+                "n": 134,
+                "kind": "censored"
+              },
+              {
+                "…": "227 more",
+                "sha256": "0f4c33632dbcf0ee"
+              }
+            ],
+            "started": 11564,
+            "censored": 6417
+          },
+          {
+            "cohort": "TP53 wt",
+            "nodes": [
+              {
+                "column": 1,
+                "label": "Chemo",
+                "kind": "regimen",
+                "n": 2551
+              },
+              {
+                "column": 1,
+                "label": "other",
+                "kind": "regimen",
+                "n": 2434
+              },
+              {
+                "column": 1,
+                "label": "Hormone",
+                "kind": "regimen",
+                "n": 2209
+              },
+              {
+                "column": 1,
+                "label": "Chemo + Hormone",
+                "kind": "regimen",
+                "n": 781
+              },
+              {
+                "column": 1,
+                "label": "Chemo + Immuno",
+                "kind": "regimen",
+                "n": 365
+              },
+              {
+                "column": 1,
+                "label": "Biologic + Chemo",
+                "kind": "regimen",
+                "n": 351
+              },
+              {
+                "column": 1,
+                "label": "Chemo + Hormone + Targeted",
+                "kind": "regimen",
+                "n": 344
+              },
+              {
+                "column": 1,
+                "label": "Targeted",
+                "kind": "regimen",
+                "n": 320
+              },
+              {
+                "column": 1,
+                "label": "Investigational",
+                "kind": "regimen",
+                "n": 290
+              },
+              {
+                "column": 2,
+                "label": "",
+                "kind": "censored",
+                "n": 3577
+              },
+              {
+                "column": 2,
+                "label": "",
+                "kind": "stopped",
+                "n": 2399
+              },
+              {
+                "column": 2,
+                "label": "Hormone",
+                "kind": "regimen",
+                "n": 1172
+              },
+              {
+                "column": 2,
+                "label": "other",
+                "kind": "regimen",
+                "n": 910
+              },
+              {
+                "column": 2,
+                "label": "Chemo",
+                "kind": "regimen",
+                "n": 740
+              },
+              {
+                "column": 2,
+                "label": "Targeted",
+                "kind": "regimen",
+                "n": 212
+              },
+              {
+                "column": 2,
+                "label": "Biologic + Chemo",
+                "kind": "regimen",
+                "n": 164
+              },
+              {
+                "column": 2,
+                "label": "Investigational",
+                "kind": "regimen",
+                "n": 150
+              },
+              {
+                "column": 2,
+                "label": "Chemo + Hormone",
+                "kind": "regimen",
+                "n": 133
+              },
+              {
+                "column": 2,
+                "label": "Chemo + Hormone + Targeted",
+                "kind": "regimen",
+                "n": 106
+              },
+              {
+                "column": 2,
+                "label": "Chemo + Immuno",
+                "kind": "regimen",
+                "n": 82
+              },
+              {
+                "…": "22 more",
+                "sha256": "731466154026352e"
+              }
+            ],
+            "flows": [
+              {
+                "column": 1,
+                "from": "other",
+                "to": "",
+                "n": 1449,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo",
+                "to": "",
+                "n": 868,
+                "kind": "stopped"
+              },
+              {
+                "column": 1,
+                "from": "Hormone",
+                "to": "",
+                "n": 643,
+                "kind": "stopped"
+              },
+              {
+                "column": 1,
+                "from": "Hormone",
+                "to": "Hormone",
+                "n": 630,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Hormone",
+                "to": "",
+                "n": 612,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo",
+                "to": "Chemo",
+                "n": 479,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Hormone",
+                "to": "",
+                "n": 432,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "other",
+                "to": "",
+                "n": 393,
+                "kind": "stopped"
+              },
+              {
+                "column": 1,
+                "from": "Chemo",
+                "to": "",
+                "n": 363,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo",
+                "to": "other",
+                "n": 288,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Chemo",
+                "to": "Hormone",
+                "n": 270,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Hormone + Targeted",
+                "to": "",
+                "n": 269,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "other",
+                "to": "other",
+                "n": 223,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Hormone",
+                "to": "other",
+                "n": 171,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Targeted",
+                "to": "",
+                "n": 159,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Immuno",
+                "to": "",
+                "n": 155,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Hormone",
+                "to": "Hormone",
+                "n": 134,
+                "kind": "regimen"
+              },
+              {
+                "column": 1,
+                "from": "Biologic + Chemo",
+                "to": "",
+                "n": 119,
+                "kind": "censored"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Hormone",
+                "to": "",
+                "n": 115,
+                "kind": "stopped"
+              },
+              {
+                "column": 1,
+                "from": "Chemo + Immuno",
+                "to": "",
+                "n": 115,
+                "kind": "stopped"
+              },
+              {
+                "…": "234 more",
+                "sha256": "b7b472db490e48ad"
+              }
+            ],
+            "started": 9645,
+            "censored": 5474
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Therapies are grouped into LINES before being sequenced, by the definition every line count here shares: systemic-therapy treatment records (class, from SUBTYPE or else TREATMENT_TYPE, on the systemic list: chemotherapy, immunotherapy, targeted, hormone, biologic, investigational and their spellings; radiation, surgery, bone and ancillary treatment are not lines). A record starting more than 90 days after every earlier one has stopped begins a new line; anything closer is the same line, and a line is labelled by its whole combination (sorted, so 'A + B' and 'B + A' are one regimen). That grouping is the point — a patient here has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision, not several lines. Lines are labelled by SUBTYPE. ENDING A PATH IS SPLIT IN TWO, because the difference matters more than anything else here: 'no further line' means the study kept watching for at least 90 days (one line gap, the same rule that defines a line) and saw no further therapy; 'record ends here' means it did not, so nothing can be concluded about that patient. 55.5% of paths end censored — reading those as patients who finished treatment would be a claim about the record-keeping dressed up as one about the patient. Neither terminal is an outcome measure. 51 less common regimens folded into 'other', which is 23.3% of first-line patients in the first panel — combination regimens have a genuinely long tail, so 'other' is real diversity rather than a rounding bucket. Raise topN to split it further. Both panels share one scale and one colour per regimen, so their heights are directly comparable. TP53 mut: 11,564 with a first line; TP53 wt: 9,645 with a first line.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Build lines and count what follows what",
+            "detail": "The treatmentSequence query above builds every patient's lines in the database and returns, per line number, how many patients went from one regimen to the next, stopped, or were lost to follow-up — counts only — plus how many records it set aside.",
+            "scope": "TP53 mut · msk_chord_2024",
+            "rowsIn": 13105
+          },
+          {
+            "kind": "fetch",
+            "title": "Build lines and count what follows what",
+            "detail": "The treatmentSequence query above builds every patient's lines in the database and returns, per line number, how many patients went from one regimen to the next, stopped, or were lost to follow-up — counts only — plus how many records it set aside.",
+            "scope": "TP53 wt · msk_chord_2024",
+            "rowsIn": 11594
+          },
+          {
+            "kind": "transform",
+            "title": "Choose the records that form lines",
+            "detail": "The one definition every line count shares (lib/treatment-lines.ts): treatment records whose class is systemic therapy (chemo, chemotherapy, immuno, immunotherapy, immunotherapy (including vaccines), vaccine, targeted, targeted therapy, targeted molecular therapy, targeted antibody therapy, hormone, hormone therapy, hormonal therapy, biologic, investigational, systemic therapy, medical therapy, pharmaceutical therapy, nos). A record's class is its SUBTYPE, or its TREATMENT_TYPE where it has none; names and values match ignoring case.",
+            "params": [
+              [
+                "Radiation Therapy",
+                "28,738 records set aside: not a line class"
+              ],
+              [
+                "Prior Medications to MSK",
+                "19,366 records set aside: not a line class"
+              ],
+              [
+                "Bone Treatment",
+                "5,548 records set aside: not a line class"
+              ],
+              [
+                "Other",
+                "12 records set aside: not a line class"
+              ]
+            ]
+          },
+          {
+            "kind": "transform",
+            "title": "Group records into lines",
+            "detail": "Per patient, by start date: a record starting more than 90 days after every earlier one has stopped begins a new line; anything closer — overlapping, or a switch within the gap — is the same line. A line is named by its sorted combination of classes ('A + B'); the label never decides which records form a line."
+          },
+          {
+            "kind": "transform",
+            "title": "Decide how each path ends",
+            "detail": "A patient's last line ends in 'no further line' only if they were observed for at least 90 days after it — their last contact being the later of their last recorded event of any type and their OS follow-up (OS_MONTHS × 30.4375 days) — and in 'record ends here' otherwise. Lines are followed up to line 3."
+          },
+          {
+            "kind": "transform",
+            "title": "Keep the 8 most common regimens",
+            "detail": "Flows are summed across studies, then regimens ranked by the patients leaving them (or, for one seen only as a destination, arriving), ties by name, across every panel so a regimen keeps one identity; the rest are drawn as 'other'.",
+            "params": [
+              [
+                "regimens folded into 'other'",
+                "51"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [],
+          "file": "lib/treatment-lines.ts, lib/views/sequence.ts",
+          "commit": null
+        },
+        "check": {
+          "sequence:TP53 mut:started": {
+            "v": 11564,
+            "abs": 0
+          },
+          "sequence:TP53 mut:censored": {
+            "v": 6417,
+            "abs": 0
+          },
+          "sequence:TP53 mut:1:regimen:Chemo:n": {
+            "v": 5239,
+            "abs": 0
+          },
+          "sequence:TP53 mut:1:regimen:other:n": {
+            "v": 2689,
+            "abs": 0
+          },
+          "sequence:TP53 mut:1:regimen:Biologic + Chemo:n": {
+            "v": 995,
+            "abs": 0
+          },
+          "sequence:TP53 mut:1:regimen:Hormone:n": {
+            "v": 672,
+            "abs": 0
+          },
+          "sequence:TP53 mut:1:regimen:Chemo + Hormone:n": {
+            "v": 644,
+            "abs": 0
+          },
+          "sequence:TP53 mut:1:regimen:Chemo + Immuno:n": {
+            "v": 639,
+            "abs": 0
+          },
+          "sequence:TP53 mut:1:regimen:Targeted:n": {
+            "v": 273,
+            "abs": 0
+          },
+          "sequence:TP53 mut:1:regimen:Investigational:n": {
+            "v": 254,
+            "abs": 0
+          },
+          "sequence:TP53 mut:1:regimen:Chemo + Hormone + Targeted:n": {
+            "v": 159,
+            "abs": 0
+          },
+          "sequence:TP53 mut:2:censored::n": {
+            "v": 4206,
+            "abs": 0
+          },
+          "sequence:TP53 mut:2:stopped::n": {
+            "v": 3285,
+            "abs": 0
+          },
+          "sequence:TP53 mut:2:regimen:Chemo:n": {
+            "v": 1400,
+            "abs": 0
+          },
+          "sequence:TP53 mut:2:regimen:other:n": {
+            "v": 1038,
+            "abs": 0
+          },
+          "sequence:TP53 mut:2:regimen:Biologic + Chemo:n": {
+            "v": 538,
+            "abs": 0
+          },
+          "sequence:TP53 mut:2:regimen:Hormone:n": {
+            "v": 489,
+            "abs": 0
+          },
+          "sequence:TP53 mut:2:regimen:Targeted:n": {
+            "v": 174,
+            "abs": 0
+          },
+          "sequence:TP53 mut:2:regimen:Investigational:n": {
+            "v": 140,
+            "abs": 0
+          },
+          "sequence:TP53 mut:2:regimen:Chemo + Immuno:n": {
+            "v": 133,
+            "abs": 0
+          },
+          "…": {
+            "more": 68,
+            "sha256": "2abab4efd36844fb"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import { assayProfileSql, assayMomentsSql, assayValueCountsSql, assayEntityNames
 import { chiSquareTest, benjaminiHochberg, welchT, welchAnovaTest, varianceFromMoments } from "../stats.ts";
 import { assaysMethod } from "../method.ts";
 import type { ViewRun } from "./run.ts";
-import { overLimit, answering, refuse, niceCeil, PROFILE_NAME } from "./shared.ts";
+import { overLimit, answering, refuse, niceCeil, PROFILE_NAME, askEachSite } from "./shared.ts";
 
 const ASSAY_ROWS = 300;
 /** past this many entities a profile is refused rather than compared: the per-cohort answer
@@ -54,35 +54,35 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
   const names = new Map<string, string>();
   let missing = 0;
   const perSite: { cohort: string; study: string; rows: number }[] = [];
-  await Promise.all([
-    ...holders.map(async (st) => {
-      for (const r of await ok[st].viewMeta("assays:names", (s, d) => assayEntityNamesSql(s, d, pt))) if (!names.has(String(r.entity))) names.set(String(r.entity), String(r.name));
-    }),
-    ...vNames.flatMap((n) => cohorts[n].studies.filter((st) => holders.includes(st)).map(async (st) => {
-      const def = doc.cohorts[n];
-      if (isCat) {
-        const rows = await ok[st].viewAggregate("assays:values:" + n, def, (c, s, d) => assayValueCountsSql(c, s, d, pt));
-        for (const r of rows) {
-          const v = String(r.value ?? "").trim(), c = Number(r.n);
-          if (MISSING_VALUES.has(v)) { missing += c; continue; }
-          const k = n + "\t" + r.entity;
-          entities.add(String(r.entity));
-          const m = counts.get(k) || new Map<string, number>();
-          m.set(v, (m.get(v) || 0) + c); counts.set(k, m);
-        }
-        perSite.push({ cohort: n, study: st, rows: rows.length });
-      } else {
-        const rows = await ok[st].viewAggregate("assays:moments:" + n, def, (c, s, d) => assayMomentsSql(c, s, d, pt));
-        for (const r of rows) {
-          const k = n + "\t" + r.entity, cur = mom.get(k) || { n: 0, sx: 0, sxx: 0 };
-          cur.n += Number(r.n); cur.sx += Number(r.sx); cur.sxx += Number(r.sxx); mom.set(k, cur);
-          missing += Number(r.other);
-          entities.add(String(r.entity));
-        }
-        perSite.push({ cohort: n, study: st, rows: rows.length });
-      }
-    }))
+  const holding = Object.fromEntries(holders.map((st) => [st, ok[st]]));
+  const [nameRows, answers] = await Promise.all([
+    Promise.all(holders.map((st) => ok[st].viewMeta("assays:names", (s, d) => assayEntityNamesSql(s, d, pt)))),
+    askEachSite(ctx, holding, (n, _st, r) => isCat
+      ? r.viewAggregate("assays:values:" + n, doc.cohorts[n], (c, s, d) => assayValueCountsSql(c, s, d, pt))
+      : r.viewAggregate("assays:moments:" + n, doc.cohorts[n], (c, s, d) => assayMomentsSql(c, s, d, pt)))
   ]);
+  // the first study (in the view's order) to name an entity names it
+  for (const rows of nameRows) for (const r of rows) if (!names.has(String(r.entity))) names.set(String(r.entity), String(r.name));
+  for (const { cohort: n, study: st, answer: rows } of answers) {
+    if (isCat) {
+      for (const r of rows) {
+        const v = String(r.value ?? "").trim(), c = Number(r.n);
+        if (MISSING_VALUES.has(v)) { missing += c; continue; }
+        const k = n + "\t" + r.entity;
+        entities.add(String(r.entity));
+        const m = counts.get(k) || new Map<string, number>();
+        m.set(v, (m.get(v) || 0) + c); counts.set(k, m);
+      }
+    } else {
+      for (const r of rows) {
+        const k = n + "\t" + r.entity, cur = mom.get(k) || { n: 0, sx: 0, sxx: 0 };
+        cur.n += Number(r.n); cur.sx += Number(r.sx); cur.sxx += Number(r.sxx); mom.set(k, cur);
+        missing += Number(r.other);
+        entities.add(String(r.entity));
+      }
+    }
+    perSite.push({ cohort: n, study: st, rows: rows.length });
+  }
   if (!entities.size) return refuse("assays", ctx, "none of these cohorts' " + unit + " has a value in “" + pt + "”");
   if (entities.size > ASSAY_MAX_ENTITIES) return refuse("assays", ctx, "“" + pt + "” has " + entities.size.toLocaleString("en-US") + " entities with values here; an assays view compares at most " + ASSAY_MAX_ENTITIES.toLocaleString("en-US"));
 
