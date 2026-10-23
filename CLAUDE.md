@@ -88,7 +88,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   `POST /api/view-page` (a page, or a column's values) and `POST /api/table` (the CSV) serve every
   table view. A view holding several tables (`alterations`) names one with `table` in those
   requests (`RunOpts.table`), and `pagedTable()` in `lib/views/rows.ts` picks it from the result.
-- **The `alterations` view** (cBioPortal's patient-view genomic tables, runner `lib/views/alterations.ts`) — one
+- **The `alterations` view** (cBioPortal's patient-view genomic tables, runner `lib/views/alterations/run.ts`) — one
   patient's Mutations, Copy Number Alterations and Structural Variants as three table views in one card, each
   with its own query under its own spec key (`mutations`, `cna`, `sv`); the top-level query is the patient list's.
   Row sources in **`lib/patient-alterations.ts`** (one row per variant / call / event however many of the
@@ -97,7 +97,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   Its navigator is the timeline's: **`app/lab/patient-nav.tsx`** (‹ prev / next ›, the List/Search dialog,
   ← / →) serves every view that shows one patient of a cohort at a time, stepping by the result's `position`
   (`listPosition()` in `lib/views/rows.ts`).
-- **The `timeline` view** (cBioPortal's patient-view Timeline, runner `lib/views/timeline.ts`) — one
+- **The `timeline` view** (cBioPortal's patient-view Timeline, runner `lib/views/timeline/run.ts`) — one
   patient's clinical events as tracks, with its cohort's patients (a table view) to pick from. **`lib/timeline-tracks.ts`** is
   the track model, ported from cbioportal-frontend's `cbioportal-clinical-timeline` package and
   `patientView/timeline/timeline_helpers.tsx`: the portal's track order and `trackStructures`
@@ -156,8 +156,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   what it does not know. A change to the document's shape, or to what an unchanged document means,
   bumps DOC_VERSION and adds an upgrade step there; never re-interpret an old shape anywhere else.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
-- **The `composition` view** (runner `lib/views/composition.ts`, SQL `lib/composition.ts`, figure
-  `lib/figures/composition.ts`) — parts of a whole per case (cell types, cell states, signatures):
+- **The `composition` view** (runner `lib/views/composition/run.ts`, SQL `lib/composition.ts`, figure
+  `lib/views/composition/figure.ts`) — parts of a whole per case (cell types, cell states, signatures):
   a generic-assay profile's entities or 2–16 numeric clinical attributes (`custom:` included). Each
   case's vector is built in the database (`casesCte`); every participant returns only sums
   (`compositionMomentsSql`), and the per-case stacked bars come from `PatientLevelResolver.viewRows`

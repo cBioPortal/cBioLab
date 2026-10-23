@@ -1780,7 +1780,7 @@ abstract class BaseResolver implements AggregateCapable {
       ...(spec.colorBy ? { colorLabel: axisLabel(spec.colorBy), legend: legendFor(violin.map((v) => v.c || "")) } : {}) });
   }
 
-  // ---- a federated plot: one pass per site, pooled by lib/views/plot.ts -------
+  // ---- a federated plot: one pass per site, pooled by lib/views/plot/run.ts -------
   //
   // plot() above answers a single study end to end. A cohort spanning several studies cannot
   // just call plot() per site and stack the results — a scatter's bin grid is scaled to
@@ -1813,7 +1813,7 @@ abstract class BaseResolver implements AggregateCapable {
       unit: spec.unit === "sample" ? "sample" as const : "patient" as const, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
   }
 
-  /** This site's cases, and how many carry each axis — summed across sites by lib/views/plot.ts. */
+  /** This site's cases, and how many carry each axis — summed across sites by lib/views/plot/run.ts. */
   async plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<NonNullable<PlotData["coverage"]>> {
     const ctx = this.plotCtx(def, spec);
@@ -1867,7 +1867,7 @@ abstract class BaseResolver implements AggregateCapable {
   /**
    * This site's per-group quartile summary for a numeric x categorical pair. n/lo/hi sum and
    * pool exactly; q1/median/q3 do not decompose exactly across sites and are approximated by
-   * lib/views/plot.ts with the same size-weighted mean Explore's federated numeric histograms
+   * lib/views/plot/run.ts with the same size-weighted mean Explore's federated numeric histograms
    * already use for the same reason — stated as an approximation, never silent.
    */
   async plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):

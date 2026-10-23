@@ -9,7 +9,8 @@
 // the replication step. Pure and browser-safe; the ledger is lib/campaign.ts.
 import { benjaminiHochberg } from "./stats.ts";
 import { upgradeDocument } from "./doc-version.ts";
-import type { AnalysisDoc, AnalysisResult, ClinicalCell, CohortDef, ViewResult } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef, ViewResult } from "./types.ts";
+import type { ClinicalCell } from "./views/clinical/types.ts";
 
 export type Primary =
   /** one gene's alteration frequency, first cohort vs second, from a compare view */

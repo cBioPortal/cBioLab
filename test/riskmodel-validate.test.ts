@@ -2,8 +2,8 @@
 // training thresholds, and a patient not covered for a model gene left out, never wild-type.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { riskExternal } from "../lib/views/riskmodel-validate.ts";
-import type { RiskFit, RiskGrouping, RiskFitArgs, RiskResolver } from "../lib/views/riskmodel.ts";
+import { riskExternal } from "../lib/views/riskmodel/validate.ts";
+import type { RiskFit, RiskGrouping, RiskFitArgs, RiskResolver } from "../lib/views/riskmodel/run.ts";
 
 test("scores by selected × mean coefficient, cuts at the training threshold, leaves the uncovered out", async () => {
   const rows = [

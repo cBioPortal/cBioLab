@@ -13,7 +13,7 @@ import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { Choice, OptionSelect } from "../_ui/choice.tsx";
 import { FIELD } from "../_ui/toolbar.ts";
-import { RISK_LABEL_ABOVE } from "../../lib/figures/riskmodel.ts";
+import { RISK_LABEL_ABOVE } from "../../lib/views/riskmodel/figure.ts";
 import { RiskTable1Button } from "./risk-table1-dialog.tsx";
 import { RiskGroupsButton } from "./risk-groups-dialog.tsx";
 import { GearMenu } from "../_ui/gear-menu";
@@ -1304,7 +1304,7 @@ export function KindCardBody({ c }: { c: KindCardCtx }): React.ReactNode | null 
 
 /** The clinical data table's body, on the shared table (app/_table/DataTable.tsx). */
 function ClinicalTableBody({ c }: { c: KindCardCtx }) {
-  const t = c.v.table as import("../../lib/types").TableResult;
+  const t = c.v.table as import("../../lib/views/table/types.ts").TableResult;
   return <DataTable t={t} query={specQuery(c.spec)} updating={c.updating ?? c.busy} vi={c.vi} docJson={c.docJson} unit={t.unit + "s"}
     onQuery={(q) => c.patch({ ...q, attributes: undefined })}
     cell={(id, x) => (id === "patient" || id === "sample") ? <span className="mono">{x}</span> : undefined} />;

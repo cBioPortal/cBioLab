@@ -51,6 +51,7 @@ const { viewToSvg } = await import("../../lib/view-svg.ts");
 const { analysisText } = await import("../../lib/result-text.ts");
 const { renderViewCards } = await import("./render-views.ts");
 import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
+import { viewKinds } from "./view-kinds.ts";
 
 /**
  * One case per view kind: the smallest gallery example that draws it (the oncoprint is pinned by
@@ -255,10 +256,6 @@ export function snapshotCases(shard: number, of: number): [string, () => Promise
 
 /** That CASES covers every view kind; the first shard runs it. */
 export function everyKindHasACase(): void {
-  const types = readFileSync(join(import.meta.dirname, "..", "..", "lib", "types.ts"), "utf8");
-  const m = /export type View = ([^;]+);/.exec(types);
-  assert.ok(m, "could not find the View union in lib/types.ts — did it move?");
-  const kinds = [...new Set([...m[1].matchAll(/(\w+)View/g)].map((x) => x[1].toLowerCase()))];
-  assert.deepEqual(kinds.filter((k) => k !== "oncoprint" && !(k in CASES)), [],
+  assert.deepEqual(viewKinds().filter((k) => k !== "oncoprint" && !(k in CASES)), [],
     "add a case for each to CASES above (its smallest gallery example), then RECORD_SNAPSHOTS=1");
 }

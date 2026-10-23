@@ -11,19 +11,15 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { viewKinds } from "./support/view-kinds.ts";
 
 const tools = readFileSync(new URL("../mcp/tools.ts", import.meta.url), "utf8");
 // the per-view text lives in lib/result-text.ts, shared by run_analysis and the WebMCP tools
 const renderer = readFileSync(new URL("../lib/result-text.ts", import.meta.url), "utf8");
-const types = readFileSync(new URL("../lib/types.ts", import.meta.url), "utf8");
 const reference = readFileSync(new URL("../lib/dsl-reference.ts", import.meta.url), "utf8");
 
-/** every kind in the View union, e.g. CompareView -> "compare" */
-function engineViewKinds(): string[] {
-  const m = /export type View = ([^;]+);/.exec(types);
-  assert.ok(m, "could not find the View union in lib/types.ts — did it move?");
-  return [...new Set([...m![1].matchAll(/(\w+)View/g)].map((x) => x[1].toLowerCase()))].sort();
-}
+/** every view kind the document language has (test/support/view-kinds.ts) */
+const engineViewKinds = viewKinds;
 
 /** the kinds run_analysis has a formatter branch for */
 function viewLoop(): string {

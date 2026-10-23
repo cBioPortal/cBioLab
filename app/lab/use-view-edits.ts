@@ -7,13 +7,14 @@
 import { hasKindCard, defaultKindView, KIND_CARDS } from "./kind-cards";
 import { pruneSort } from "../_oncoprint/OncoprintCard.tsx";
 import type { GeneTrackSpec } from "../../lib/gene-tracks.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, OncoprintView } from "../../lib/types.ts";
+import type { AnalysisDoc, AnalysisResult, CohortDef } from "../../lib/types.ts";
 import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
 import { expandSplits, type PartitionShape } from "../../lib/partition-arms.ts";
 import { treatmentEventOf } from "../../lib/event-names.ts";
-import { CohortNode } from "./view-chrome.tsx";
+import type { CohortNode } from "./view-chrome.tsx";
 
 import type { DocStore } from "./doc-store.ts";
+import type { OncoprintView } from "../../lib/views/oncoprint/types.ts";
 
 /** What useViewEdits needs from the analysis page. */
 export interface ViewEditsPage {

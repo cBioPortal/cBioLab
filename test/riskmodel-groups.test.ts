@@ -1,10 +1,11 @@
-// The risk model's group step (lib/views/riskmodel.ts groupRiskmodel): how held-out scores become
+// The risk model's group step (lib/views/riskmodel/run.ts groupRiskmodel): how held-out scores become
 // risk groups, from a fit alone. Synthetic fits, so each rule is checked on numbers it can be read off.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { groupRiskmodel as groupAt, groupQuantiles, riskFitSpec, riskModelView, RISK_PRESENTATION_KEYS, type RiskFit } from "../lib/views/riskmodel.ts";
-import type { RiskmodelView } from "../lib/types.ts";
-import { cutLandsAt } from "../lib/figures/riskmodel.ts";
+import { groupRiskmodel as groupAt, groupQuantiles, riskFitSpec, riskModelView, RISK_PRESENTATION_KEYS, type RiskFit } from "../lib/views/riskmodel/run.ts";
+
+import { cutLandsAt } from "../lib/views/riskmodel/figure.ts";
+import type { RiskmodelView } from "../lib/views/riskmodel/types.ts";
 
 /** A fit over these held-out scores (null: never held out): survival times 1…n, every third an event. */
 function fitOf(heldOut: (number | null)[], o: { validation?: number[]; external?: (number | null)[] } = {}): RiskFit {

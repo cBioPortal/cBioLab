@@ -2,12 +2,14 @@
 // the author's notes, the way a model should read it. One renderer for every agent-facing
 // surface — the MCP run_analysis tool, the analysis page's WebMCP tools — so they cannot
 // describe the same result differently. Pure and browser-safe.
-import { isDrawn, type AnalysisDoc, type AnalysisResult, type ViewResult, type AssaysEntity, type CorrelatesGene } from "./types.ts";
+import { isDrawn, type AnalysisDoc, type AnalysisResult, type ViewResult } from "./types.ts";
 import { lollipopSummaryText } from "./lollipop-svg.ts";
-import { riskSpan } from "./figures/riskmodel.ts";
-import { txMedianText } from "./figures/txendpoints.ts";
-import { MS_TRANSITIONS, msRateText } from "./figures/multistate.ts";
-import { rmstText, rmstDiffText, rmstRatioText } from "./figures/rmst.ts";
+import { riskSpan } from "./views/riskmodel/figure.ts";
+import { txMedianText } from "./views/txendpoints/figure.ts";
+import { MS_TRANSITIONS, msRateText } from "./views/multistate/figure.ts";
+import { rmstText, rmstDiffText, rmstRatioText } from "./views/rmst/figure.ts";
+import type { AssaysEntity } from "./views/assays/types.ts";
+import type { CorrelatesGene } from "./views/correlates/types.ts";
 
 /** a timeline's events listed in text (MCP); the figure draws every one */
 const TIMELINE_TEXT_EVENTS = 400;

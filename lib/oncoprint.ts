@@ -6,7 +6,7 @@
 //   panel-aware track frequencies, group ranges. The renderer does zero data logic.
 import { chQuery, chQueryRows, DB, STUDY, PRIMARY, type ChConn } from "./ch.ts";
 import { compileCohort, sq } from "./compiler.ts";
-import type { CohortDef, Contract, OncoprintSpec, HeatmapSpec, ChRow } from "./types.ts";
+import type { CohortDef, Contract, ChRow } from "./types.ts";
 
 // Internal-only: analysis.js passes an evaluated cohort's SQL as a subquery via this
 // Symbol key. JSON.parse cannot produce Symbol keys, so client specs can never inject
@@ -28,6 +28,7 @@ import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, 
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
 import { clinicalTable, assertCustomDataPresent } from "./custom-data.ts";
 import { finiteSql } from "./sql-number.ts";
+import type { OncoprintSpec, HeatmapSpec } from "./views/oncoprint/types.ts";
 export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;

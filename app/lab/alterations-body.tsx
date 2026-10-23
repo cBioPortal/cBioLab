@@ -7,9 +7,10 @@
 import React, { useMemo, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { sampleMarks } from "../../lib/timeline-tracks.ts";
-import type { AlterationsResult, TableQuery } from "../../lib/types";
+import type { TableQuery } from "../../lib/types";
 import { AnnotationBadge } from "./portal-bodies";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
+import type { AlterationsResult } from "../../lib/views/alterations/types";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
 

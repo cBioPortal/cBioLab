@@ -6,7 +6,7 @@
 // The figure itself (lib/view-svg.ts) is the plot alone; a figure that travels without the app
 // carries the summary and the selection in its caption instead.
 import React, { useMemo } from "react";
-import type { HotspotGene, ViewResultOf } from "../../lib/types.ts";
+import type { ViewResultOf } from "../../lib/types.ts";
 import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellOf, type AlterationCell, type ImpactType } from "../../lib/lollipop.ts";
 import { lollipopPanelsSvg } from "../../lib/lollipop-svg.ts";
 import { DrawAtWidth } from "../lab/figure.tsx";
@@ -14,6 +14,7 @@ import { fmtShare } from "../../lib/chart/format.ts";
 import { X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { TB } from "../_ui/toolbar.ts";
+import type { HotspotGene } from "../../lib/views/hotspots/types.ts";
 
 type Col = "driver" | "vus";
 const COLS: Col[] = ["driver", "vus"];

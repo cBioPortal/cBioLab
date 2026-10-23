@@ -7,7 +7,7 @@
 import { chQueryRows, STUDY } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
-import type { OncoprintSpec } from "./types.ts";
+import type { OncoprintSpec } from "./views/oncoprint/types.ts";
 
 export interface ColumnDetail {
   column: string;

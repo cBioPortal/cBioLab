@@ -7,18 +7,14 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { VIEW_HELP } from "../lib/view-help.ts";
+import { viewKinds } from "./support/view-kinds.ts";
 
-const types = readFileSync(new URL("../lib/types.ts", import.meta.url), "utf8");
 // the view cards (app/lab/view-cards.tsx) are where course and sequence draw their own headers
 const cards = readFileSync(new URL("../app/lab/view-cards.tsx", import.meta.url), "utf8");
 const chrome = readFileSync(new URL("../app/lab/view-chrome.tsx", import.meta.url), "utf8");
 
-/** every kind in the View union, e.g. CompareView -> "compare" */
-function engineViewKinds(): string[] {
-  const m = /export type View = ([^;]+);/.exec(types);
-  assert.ok(m, "could not find the View union in lib/types.ts — did it move?");
-  return [...new Set([...m![1].matchAll(/(\w+)View/g)].map((x) => x[1].toLowerCase()))].sort();
-}
+/** every view kind the document language has (test/support/view-kinds.ts) */
+const engineViewKinds = viewKinds;
 
 describe("VIEW_HELP: every view kind has a plain-language explanation", () => {
   test("no view kind is missing an entry", () => {

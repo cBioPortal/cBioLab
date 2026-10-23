@@ -1,6 +1,7 @@
-import type { OncoprintSpec } from "../../../../lib/types.ts";
+
 import { parseBody, OncoprintDetailRequest } from "../../../../lib/api-schemas.ts";
 import { columnDetail } from "../../../../lib/oncoprint-detail";
+import type { OncoprintSpec } from "../../../../lib/views/oncoprint/types.ts";
 
 export const maxDuration = 30;
 

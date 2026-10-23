@@ -1,13 +1,13 @@
-// Table 1 of the risk model (lib/views/riskmodel-table1.ts buildTable1, lib/views/riskmodel.ts riskTable1):
+// Table 1 of the risk model (lib/views/riskmodel/table1.ts buildTable1, lib/views/riskmodel/run.ts riskTable1):
 // each risk group's makeup, counted from patients by position. Synthetic patients, so every count
 // can be read off — above all the panel-aware denominator: a patient whose panels do not cover a
 // gene is not profiled for it, never unaltered.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { buildTable1, table1DefaultCandidates, TABLE1_DEFAULT_ATTRIBUTES, TABLE1_DEFAULT_MAX_VALUES, type Table1Input, type Table1Patient } from "../lib/views/riskmodel-table1.ts";
-import { riskTable1, RiskRefusal, type RiskFit, type RiskGrouping, type RiskFitArgs } from "../lib/views/riskmodel.ts";
+import { buildTable1, table1DefaultCandidates, TABLE1_DEFAULT_ATTRIBUTES, TABLE1_DEFAULT_MAX_VALUES, type Table1Input, type Table1Patient } from "../lib/views/riskmodel/table1.ts";
+import { riskTable1, RiskRefusal, type RiskFit, type RiskGrouping, type RiskFitArgs } from "../lib/views/riskmodel/run.ts";
 import { chiSquareTest } from "../lib/stats.ts";
-import type { RiskTable1Row } from "../lib/types.ts";
+import type { RiskTable1Row } from "../lib/views/riskmodel/types.ts";
 
 const patient = (o: Partial<Table1Patient> = {}): Table1Patient => ({ panels: ["IMPACT468"], genes: [], d: [], r: [], u: [], ...o });
 

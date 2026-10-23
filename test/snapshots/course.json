@@ -687,7 +687,7 @@
         ],
         "implementation": {
           "functions": [],
-          "file": "lib/views/course.ts",
+          "file": "lib/views/course/run.ts",
           "commit": null
         },
         "check": {

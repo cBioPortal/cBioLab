@@ -4,9 +4,10 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
 import { wrap } from "../lib/figures/common.ts";
-import { defaultLog2 } from "../lib/views/diffexpr.ts";
+import { defaultLog2 } from "../lib/views/diffexpr/run.ts";
 import { niceCeil } from "../lib/views/shared.ts";
-import type { ViewResult, GenomeResult } from "../lib/types.ts";
+import type { ViewResult } from "../lib/types.ts";
+import type { GenomeResult } from "../lib/views/genome/types.ts";
 
 describe("wrap", () => {
   test("breaks on words within the width and keeps an over-long word whole", () => {

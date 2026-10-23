@@ -6,8 +6,8 @@
 // distance between its cuts — nothing is asked of the server), and nothing reaches the document
 // until Apply. The dialog owns its draft, so dragging re-renders it alone, not the page.
 import { useLayoutEffect, useMemo, useState } from "react";
-import type { RiskmodelResult } from "../../lib/types.ts";
-import { riskHistogramFigure, riskGroupNames, riskScaled, cutLandsAt } from "../../lib/figures/riskmodel.ts";
+
+import { riskHistogramFigure, riskGroupNames, riskScaled, cutLandsAt } from "../../lib/views/riskmodel/figure.ts";
 import { fmtInt } from "../../lib/svg-kit.ts";
 import { Button } from "../_ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
@@ -17,6 +17,7 @@ import { Slider } from "../_ui/slider";
 import { TB, FIELD } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 import { SvgAtWidth } from "./figure.tsx";
+import type { RiskmodelResult } from "../../lib/views/riskmodel/types.ts";
 
 /** what the view's groups are: n equal quantiles, or cuts at whole percentiles */
 type Groups = { groups: number } | { cuts: number[] };

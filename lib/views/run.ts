@@ -3,7 +3,7 @@
 import type { ProfileInfo } from "../profile-catalog.ts";
 import type { AnalysisDoc, ViewResult, ViewParticipation } from "../types.ts";
 import type { Resolver } from "../federation.ts";
-import type { RiskFit, RiskFitArgs } from "./riskmodel.ts";
+import type { RiskFit, RiskFitArgs } from "./riskmodel/run.ts";
 
 /** one view of a document, as authored */
 export type DocView = NonNullable<AnalysisDoc["views"]>[number];

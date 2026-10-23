@@ -1,15 +1,15 @@
 "use client";
 // The risk model's Table 1: each risk group's clinical and genomic makeup, side by side, opened from
-// the card's toolbar. Computed on the server with the model (lib/views/riskmodel-table1.ts) — the
+// the card's toolbar. Computed on the server with the model (lib/views/riskmodel/table1.ts) — the
 // dialog sends the view with its draft `describe` and shows the counts that come back; no patient
 // reaches the browser. The draft is the dialog's own (attributes and genes added or dropped re-run
 // only this request, never the page), and is ephemeral until "Add to document" writes it into the
 // view, so a table someone keeps is reproducible from the link.
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { AnalysisDoc, RiskTable1, RiskTable1Row, RiskmodelResult } from "../../lib/types.ts";
+import type { AnalysisDoc } from "../../lib/types.ts";
 import { fmtInt, fmtNum, fmtPct, pDigits } from "../../lib/svg-kit.ts";
-import { TABLE1_MAX_ATTRIBUTES, TABLE1_MAX_GENES } from "../../lib/views/riskmodel-table1.ts";
+import { TABLE1_MAX_ATTRIBUTES, TABLE1_MAX_GENES } from "../../lib/views/riskmodel/table1.ts";
 import { api } from "./api.ts";
 import { viewRequest } from "./use-analysis.ts";
 import { PickMenu } from "./view-chrome.tsx";
@@ -20,6 +20,7 @@ import { RemoveBadge } from "../_ui/remove-badge";
 import { ErrorAlert } from "../_ui/error-alert";
 import { TB, FIELD } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
+import type { RiskTable1, RiskTable1Row, RiskmodelResult } from "../../lib/views/riskmodel/types.ts";
 
 type Describe = { attributes?: string[]; genes?: string[] };
 /** a categorical row shows this many values; the rest are pooled into one disclosed "other" line */

@@ -26,7 +26,8 @@ import { buildContract } from "../lib/oncoprint.ts";
 import { studyProfiles } from "../lib/analysis.ts";
 import { chQuery, DB } from "../lib/ch.ts";
 import { sq } from "../lib/compiler.ts";
-import type { ClinicalFacet, CohortDef, OncoprintSpec } from "../lib/types.ts";
+import type { ClinicalFacet, CohortDef } from "../lib/types.ts";
+import type { OncoprintSpec } from "../lib/views/oncoprint/types.ts";
 
 const STUDIES = [
   "utuc_mskcc_2015",               // IMPACT341

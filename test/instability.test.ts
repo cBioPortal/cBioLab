@@ -1,9 +1,10 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { HG19_CENTROMERES, CHROM_LENGTHS, GENOME_CHROMS, instabilityArms } from "../lib/federation-views.ts";
+import { CHROM_LENGTHS, GENOME_CHROMS } from "../lib/federation-views.ts";
 import { viewToSvg } from "../lib/view-svg.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 import type { DrawnResultOf } from "../lib/types.ts";
+import { instabilityArms, HG19_CENTROMERES } from "../lib/views/instability/sql.ts";
 
 describe("instability arms", () => {
   test("39 autosomal arms (no acrocentric p arms), 41 with X; every centromere inside its chromosome", () => {

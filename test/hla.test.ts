@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { hlaPanel, covariateColumns, type HlaRec } from "../lib/views/hla.ts";
+import { hlaPanel, covariateColumns, type HlaRec } from "../lib/views/hla/run.ts";
 import { viewToSvg } from "../lib/view-svg.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 

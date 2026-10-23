@@ -2,11 +2,15 @@
 // clinical): what MCP and `?figures=svg` get for them. Compare is grouped bars, one group per gene
 // and one bar per cohort; the other three are one horizontal bar per row on a labelled value axis,
 // signed about a zero line where the value has a direction.
-import type { CooccurRow, CompareRow, ClinicalRow, CoexprRow, DrawnResultOf } from "../types.ts";
+import type { DrawnResultOf } from "../types.ts";
 import {
   esc, palette, frame, caption, linear, axisBottom, bottomAxisHeight, legend, label, textWidth,
   seriesStyle, fmtNum, fmtPct, fmtQ, fmtInt, FS, SW, OTHER, SERIES, type SvgOpts, type LegendItem, type Scale
 } from "../svg-kit.ts";
+import type { ClinicalRow } from "../views/clinical/types.ts";
+import type { CoexprRow } from "../views/coexpression/types.ts";
+import type { CompareRow } from "../views/compare/types.ts";
+import type { CooccurRow } from "../views/cooccurrence/types.ts";
 
 type Pal = ReturnType<typeof palette>;
 

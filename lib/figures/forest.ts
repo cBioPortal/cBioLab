@@ -5,11 +5,12 @@
 // glance. The scale is set by the estimates, not by the widest interval: a covariate that barely
 // converged can have an upper bound in the millions, which would otherwise squash every other row
 // to a dot. An interval running past the scale ends in an arrow, and the caption says so.
-import type { DrawnResultOf, ForestPooled } from "../types.ts";
+import type { DrawnResultOf } from "../types.ts";
 import {
   palette, frame, caption, log, axisBottom, bottomAxisHeight, label, textWidth,
   fmtRatio, pDigits, FS, SW, SERIES, type SvgOpts
 } from "../svg-kit.ts";
+import type { ForestPooled } from "../views/forest/types.ts";
 
 interface Coef { label: string; reference?: string; ciLow: number; ciHigh: number; ratio: number; p: number }
 interface Panel { heading: string | null; coefs: Coef[] }

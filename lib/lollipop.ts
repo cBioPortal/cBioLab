@@ -2,7 +2,7 @@
 // cbioportal-frontend-commons). Each rule below cites the function it copies, so a difference
 // from the portal is a bug here rather than a design choice. Pure except fetchProteinInfo.
 import type { LollipopReport } from "./federation.ts";
-import type { HotspotGene, LollipopPosition, LollipopDomain } from "./types.ts";
+import type { HotspotGene, LollipopPosition, LollipopDomain } from "./views/hotspots/types.ts";
 
 // ---- mutation types: getCanonicalMutationType / getProteinImpactTypeFromCanonical ----------
 

@@ -18,7 +18,7 @@ import { setPngDpi } from "../../lib/png-dpi.ts";
 import { api } from "../lab/api.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
 import type { OncoprintBody } from "../../lib/api-schemas.ts";
-import type { OncoprintSpec } from "../../lib/types.ts";
+
 import { Check, Download, Ellipsis, ImageDown, ListOrdered, LoaderCircle, Minus, Plus, Sheet, SlidersHorizontal, Tag, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { ErrorAlert } from "../_ui/error-alert.tsx";
@@ -30,6 +30,7 @@ import { OptionSelect } from "../_ui/choice.tsx";
 import { Slider } from "../_ui/slider";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
+import type { OncoprintSpec } from "../../lib/views/oncoprint/types.ts";
 
 /** one of the zoom group's buttons: the group draws the border */
 const ZOOM = "h-full rounded-none text-muted-foreground hover:bg-muted hover:text-foreground";

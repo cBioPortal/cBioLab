@@ -22,16 +22,17 @@
 import { filterHotspotGene } from "./lollipop.ts";
 import { lollipopPanelsSvg, lollipopSummaryText } from "./lollipop-svg.ts";
 export { lollipopSummaryText };
-import { isDrawn, type ViewResult, type HotspotGene, type DrawnResultOf } from "./types.ts";
+import { isDrawn, type ViewResult, type DrawnResultOf } from "./types.ts";
 import { kindFigure, kindTitle } from "./figures/index.ts";
-import { survivalSvg } from "./figures/survival.ts";
+import { survivalSvg } from "./views/survival/figure.ts";
 import { coxSvg, logisticSvg } from "./figures/forest.ts";
 import { cooccurrenceSvg, compareSvg, coexpressionSvg, clinicalSvg } from "./figures/bars.ts";
-import { courseSvg, RISK_FLOOR } from "./figures/course.ts";
-import { sequenceSvg } from "./figures/sequence.ts";
-import { plotSvg } from "./figures/plot.ts";
+import { courseSvg, RISK_FLOOR } from "./views/course/figure.ts";
+import { sequenceSvg } from "./views/sequence/figure.ts";
+import { plotSvg } from "./views/plot/figure.ts";
 export { RISK_FLOOR };
 import { esc, SERIES, type SvgOpts } from "./svg-kit.ts";
+import type { HotspotGene } from "./views/hotspots/types.ts";
 export { esc, SERIES, type SvgOpts };
 
 /** The lollipop standing alone (an MCP client's image): the selection applied, the app's controls in words in the caption. */

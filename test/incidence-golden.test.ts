@@ -6,7 +6,8 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { aalenJohansen, grayPermutationTest, type CrRecord } from "../lib/stats.ts";
-import { GRAY_NULL_PY, VERIFIED } from "../lib/method.ts";
+import { VERIFIED } from "../lib/method.ts";
+import { GRAY_NULL_PY } from "../lib/views/incidence/method.ts";
 
 const golden = JSON.parse(readFileSync("test/fixtures/golden/incidence.json", "utf8"));
 const TOL = 1e-12;

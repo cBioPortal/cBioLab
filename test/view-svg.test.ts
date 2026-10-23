@@ -4,7 +4,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle, esc } from "../lib/view-svg.ts";
-import { PLOT_POINT_R } from "../lib/figures/plot.ts";
+import { PLOT_POINT_R } from "../lib/views/plot/figure.ts";
 import { buildLollipopGene } from "../lib/lollipop.ts";
 import type { DrawnResultOf } from "../lib/types.ts";
 import { LAYER_BASE, LAYER_COLORS } from "../lib/plot-layers.ts";

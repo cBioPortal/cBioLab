@@ -1,4 +1,4 @@
-import type { OncoprintSpec } from "../../../lib/types.ts";
+
 import { parseBody, OncoprintRequest } from "../../../lib/api-schemas.ts";
 import { cachedContract } from "../../../lib/next-cache.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
@@ -6,6 +6,7 @@ import { packContract } from "../../../lib/oncoprint-binary";
 import { gzipSync } from "node:zlib";
 import { contractToSvg } from "../../../lib/oncoprint-svg";
 import { contractToTsv } from "../../../lib/oncoprint-tabular";
+import type { OncoprintSpec } from "../../../lib/views/oncoprint/types.ts";
 
 export const maxDuration = 120;
 

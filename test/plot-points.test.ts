@@ -4,7 +4,7 @@
 // what was asked of whom, and what was NOT.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { runPlot } from "../lib/views/plot.ts";
+import { runPlot } from "../lib/views/plot/run.ts";
 import { POINTS_CAP, OUTLIER_CELL_MAX, sparseCellMax } from "../lib/plot.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { PlotData, ViewResultOf } from "../lib/types.ts";

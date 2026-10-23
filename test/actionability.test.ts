@@ -1,7 +1,7 @@
 // The actionability view's grouping, on fixed inputs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { topGroups } from "../lib/views/actionability.ts";
+import { topGroups } from "../lib/views/actionability/run.ts";
 
 test("the largest groups are kept and the rest pooled into a named Other, counts conserved", () => {
   const g = (n: number, l1: number) => ({ sequenced: n, levels: [l1, 0, 0, 0, 0, n - l1], resistance: [1, 0] });

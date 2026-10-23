@@ -8,7 +8,7 @@ import { KIND_CARDS, hasKindCard, kindSub, KindCardControls, KindCardBody, draws
 import type { ColumnSelection } from "../_oncoprint/OncoprintFigure.tsx";
 import { OncoprintCard, Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { isDrawn, type AnalysisDoc, type AnalysisResult, type OncoprintView, type ExploreResult } from "../../lib/types.ts";
+import { isDrawn, type AnalysisDoc, type AnalysisResult, type ExploreResult } from "../../lib/types.ts";
 import { pDigits } from "../../lib/chart/format.ts";
 import { MethodPanel } from "./method-panel.tsx";
 import { viewRequest } from "./use-analysis.ts";
@@ -25,6 +25,7 @@ import { cn } from "../../lib/cn";
 import { Choice } from "../_ui/choice.tsx";
 import { GearMenu, MenuSeparator } from "../_ui/gear-menu.tsx";
 import { CHIP, TB } from "../_ui/toolbar.ts";
+import type { OncoprintView } from "../../lib/views/oncoprint/types.ts";
 
 type ResultView = AnalysisResult["views"][number];
 type ViewChoice = NonNullable<React.ComponentProps<typeof ViewHead>["cohorts"]>;

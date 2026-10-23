@@ -915,7 +915,7 @@
             "countsSql",
             "rankSql"
           ],
-          "file": "lib/views/timeline.ts, lib/patient-timeline.ts, lib/timeline-tracks.ts, lib/table-query.ts",
+          "file": "lib/views/timeline/run.ts, lib/patient-timeline.ts, lib/timeline-tracks.ts, lib/table-query.ts",
           "commit": null
         },
         "verification": "A listing and one patient's record: no statistic is computed, so there is no script — the queries are the numbers."
@@ -2233,7 +2233,7 @@
             "countsSql",
             "rankSql"
           ],
-          "file": "lib/views/alterations.ts, lib/patient-alterations.ts, lib/table-query.ts",
+          "file": "lib/views/alterations/run.ts, lib/patient-alterations.ts, lib/table-query.ts",
           "commit": null
         },
         "verification": "A listing: no statistic is computed, so there is no script — the queries are the numbers."

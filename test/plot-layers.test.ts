@@ -4,7 +4,7 @@
 // calls, so the test can say what was NOT asked.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { runPlot } from "../lib/views/plot.ts";
+import { runPlot } from "../lib/views/plot/run.ts";
 import { highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, axisSelect, POINTS_CAP, LAYER_COLORS } from "../lib/plot.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { PlotData, ViewResultOf } from "../lib/types.ts";
