@@ -126,6 +126,14 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         a.panels.map((pn) => [line(pn.cohort, pn), ...(pn.groups || []).map((g) => line("  " + g.label, g)),
           ...(pn.concordance ? [`    ${a.pairBy!.a.join("/")} vs ${a.pairBy!.b.join("/")} highest level, ${pn.concordance.pairs} patients with both: ${pn.concordance.discordant} discordant (${pct(pn.concordance.discordant, pn.concordance.pairs)}); rows ${a.pairBy!.a.join("/")}, columns ${a.pairBy!.b.join("/")} (1, 2, 3A, 3B, 4, none): ` +
             pn.concordance.table.map((r) => "[" + r.join(", ") + "]").join(" ")] : [])].join("\n")).join("\n") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "drivernegative") {
+      const d = v.drivernegative, pct = (k: number, n: number) => n ? (100 * k / n).toFixed(1) + "%" : "–";
+      out.push(`Driver-negative analysis (drivers: ${d.drivers.join(", ")}): of ${d.sequenced.toLocaleString()} patients sequenced, ` +
+        `${d.positive.toLocaleString()} driver-positive (${pct(d.positive, d.sequenced)}), ${d.negative.toLocaleString()} driver-negative (${pct(d.negative, d.sequenced)}), ` +
+        `${d.unprofiled.toLocaleString()} not fully profiled (in neither group).\n` +
+        `  ${d.alteration} frequency, driver-negative vs driver-positive, Fisher + BH over ${d.tested} genes, ${d.significant} at q<0.05:\n` +
+        d.rows.slice(0, 30).map((g) => `  ${g.gene}: ${g.altered[0]}/${g.profiled[0]} (${pct(g.altered[0], g.profiled[0])}) vs ${g.altered[1]}/${g.profiled[1]} (${pct(g.altered[1], g.profiled[1])}), ` +
+          `log2 ratio ${g.log2Ratio == null ? "undefined" : g.log2Ratio.toFixed(2)}, p=${pFmt(g.p)} q=${pFmt(g.q)}`).join("\n") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "logistic") {
       out.push(`Logistic regression (n=${v.logistic.n.toLocaleString()}, ${v.logistic.events.toLocaleString()} with the outcome):\n` +
         v.logistic.coefficients.map((c) =>

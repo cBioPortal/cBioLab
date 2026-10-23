@@ -94,6 +94,7 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   exclusivity: { label: "Mutual exclusivity (DISCOVER, burden-aware)", title: "Mutual exclusivity", genes: true, maxCohorts: 1, cohortInHeader: true },
   ctdna: { label: "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)", title: "ctDNA vs tissue", genes: true, maxCohorts: 3 },
   riskmodel: { label: "Risk model (elastic-net Cox, OncoCast-style)", title: "Risk model", maxCohorts: 1 },
+  drivernegative: { label: "Driver-negative analysis (genes enriched without a canonical driver)", title: "Driver-negative analysis", maxCohorts: 1 },
   actionability: { label: "Clinical actionability (OncoKB levels, primary vs metastasis)", title: "Clinical actionability", maxCohorts: 4 },
   adjusted: { label: "Adjusted enrichment (every gene, logistic on covariates)", title: "Adjusted enrichment", maxCohorts: 2, minCohorts: 2 },
   forest: { label: "Pan-cancer forest (one exposure's HR per cancer type, random-effects pooled)", title: "Forest plot", maxCohorts: 6 },
@@ -210,6 +211,8 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") +
     (spec.strata ? ", stratified by " + spec.strata : "") + " · " + (spec.runs ?? 10) + " held-out splits" + (spec.validate ? ", validated on the held-out half" : "") +
     (spec.validateOn ? ", scored on “" + spec.validateOn + "”" : "");
+  if (kind === "drivernegative") return (spec.alteration === "sv" ? "structural variants" : spec.alteration === "cna" ? "copy-number alterations" : "mutations") +
+    " without vs with a driver in " + (spec.drivers?.length ? spec.drivers.length + " genes" : "the NSCLC set") + ", per patient";
   if (kind === "actionability") return "highest OncoKB level per patient, any cancer type" + (spec.groupBy ? " · by " + spec.groupBy : "") +
     (spec.pairBy === null ? "" : " · " + (spec.pairBy?.attribute || "SAMPLE_TYPE") + " concordance");
   if (kind === "adjusted") return "mutations in every gene mutated in ≥" + (100 * (spec.minShare ?? 0.05)).toFixed(0) + "% · adjusted for " + (spec.covariates?.length ? spec.covariates.join(", ") : "nothing");
@@ -538,6 +541,29 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
             label genes kept in ≥ <OptionSelect value={String(labelAbove)} disabled={busy} onValueChange={(v) => patch({ labelAbove: Number(v) === RISK_LABEL_ABOVE ? undefined : Number(v) })}>
               {!RISK_LABEL_STEPS.includes(labelAbove) && <option value={labelAbove}>{Math.round(labelAbove * 100)}%</option>}
               {RISK_LABEL_STEPS.map((t) => <option key={t} value={t}>{Math.round(t * 100)}%</option>)}
+            </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
+  if (spec.kind === "drivernegative") {
+    const drv: string[] = Array.isArray(spec.drivers) ? spec.drivers : [];
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="the canonical drivers, comma-separated; empty for the NSCLC set (EGFR, KRAS, ALK, ROS1, BRAF, MET, RET, ERBB2, NTRK1–3)">
+            drivers <DraftInput value={drv.join(", ")} disabled={busy} width="16rem" placeholder="NSCLC set"
+              onCommit={(t) => { const l = t.split(/[,\s]+/).map((x) => x.trim().toUpperCase()).filter(Boolean); patch({ drivers: l.length ? l : undefined }); }} />
+          </label>
+          <label className="tbfield" title="what is compared between the two groups">
+            compare <OptionSelect value={spec.alteration || "mutation"} disabled={busy} onValueChange={(v) => patch({ alteration: v === "mutation" ? undefined : v })}>
+              <option value="mutation">mutations</option><option value="sv">structural variants</option><option value="cna">amp or deep deletion</option>
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="count every alteration, or only OncoKB drivers">
+            count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
+              <option value="any">any</option><option value="driver">drivers</option>
             </OptionSelect>
           </label>
         </div>
@@ -1014,6 +1040,7 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "cancertypes") return { kind, genes: known.genes.length ? known.genes.slice(0, 5) : ["TP53", "KRAS"] };
   if (kind === "adjusted") return { kind };
   if (kind === "actionability") return { kind, groupBy: "CANCER_TYPE" };
+  if (kind === "drivernegative") return { kind };
   if (kind === "forest") return { kind, exposure: { source: "alteration", gene: known.genes[0] || "TP53" } };
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));

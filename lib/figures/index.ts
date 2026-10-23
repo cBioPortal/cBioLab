@@ -28,6 +28,7 @@ import { metaForestSvg } from "./forest.ts";
 import { adjustedSvg } from "./adjusted.ts";
 import { instabilitySvg } from "./instability.ts";
 import { actionabilitySvg } from "./actionability.ts";
+import { drivernegativeSvg } from "./drivernegative.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -101,6 +102,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   actionability: {
     draw: (v, o) => v.actionability.panels.some((pn) => pn.sequenced) ? actionabilitySvg(v, o) : null,
     title: (v) => "Clinical actionability" + (v.actionability ? " — OncoKB " + v.actionability.pin + (v.actionability.groupBy ? " by " + v.actionability.groupBy : "") : "")
+  },
+  drivernegative: {
+    draw: (v, o) => v.drivernegative.sequenced ? drivernegativeSvg(v, o) : null,
+    title: (v) => "Driver-negative analysis" + (v.drivernegative ? " — " + v.drivernegative.alteration + ", driver-negative vs driver-positive" : "")
   },
   correlates: {
     draw: (v, o) => v.correlates && v.correlates.tested > 0 ? correlatesSvg(v, o) : null,

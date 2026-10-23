@@ -429,6 +429,11 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "actionLevelsSql:ungrouped": () => federation.actionLevelsSql(cohortSql, "x", "db", "v7.5", null),
     "actionConcordanceSql": () => federation.actionConcordanceSql(cohortSql, "x", "db", "v7.5", { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }),
     "actionStoreTypesSql": () => federation.actionStoreTypesSql("x", "db", "v7.5"),
+    // drivernegative: per-patient groups stay in CTEs; patients are counted per group and gene
+    "dnegGroupsSql": () => federation.dnegGroupsSql(cohortSql, "x", "db", "v7.5", ["EGFR", "KRAS", "ALK"]),
+    "dnegAlteredSql": () => federation.dnegAlteredSql(cohortSql, "x", "db", "v7.5", ["EGFR", "KRAS"], "mutation", false),
+    "dnegAlteredSql:sv-drivers": () => federation.dnegAlteredSql(cohortSql, "x", "db", "v7.5", ["EGFR"], "sv", true),
+    "dnegProfiledSql": () => federation.dnegProfiledSql(cohortSql, "x", "db", "v7.5", ["EGFR", "KRAS"], "mutation"),
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),
     // run only by PatientLevelResolver.viewRows: one row of values per patient, no identifier
     "cutpointRowsSql": () => federation.cutpointRowsSql(cohortSql, "x", "db", { attribute: "TMB_NONSYNONYMOUS", months: "OS_MONTHS", status: "OS_STATUS" }),

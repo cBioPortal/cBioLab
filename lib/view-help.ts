@@ -163,6 +163,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "For each patient, finds the strongest evidence OncoKB lists for a drug that targets one of their tumour's genetic changes — Level 1 means an FDA-approved drug for that change, down to Level 4 for early biological evidence — and shows what share of patients reach each level, overall or per cancer type. The levels here are the best OncoKB gives the change in ANY cancer, so a change that is only actionable in another cancer still counts: read the bars as an upper bound. The table below compares, for patients sequenced twice, the level found in their primary tumour against their metastasis."
   },
+  drivernegative: {
+    title: "What is this?",
+    text: "Splits one group of patients — say, lung cancers — into those whose tumour carries one of the well-known, usually treatable cancer-driving changes (EGFR, KRAS, ALK and the rest of the list) and those whose tumour carries none, and then asks which other genes are changed more often in the second group. Those genes are candidates for what drives the tumours without a known driver. Patients whose test did not cover every gene on the list are kept apart, since we cannot tell whether they have a driver. The bar shows how big each group is; in the chart, genes to the right are more common without a known driver."
+  },
   labs: {
     title: "What is this?",
     text: "Follows a blood test — such as PSA in prostate cancer — from the moment a treatment started, as the change from each patient's own starting level. The line shows the typical patient, the shaded band the middle half of patients, and the bars on the right each patient's best result: how far their level fell, or rose, after treatment began."

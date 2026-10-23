@@ -672,6 +672,42 @@ export interface ActionabilityResult {
   excluded?: { study: string; reason: string }[];
 }
 /**
+ * Driver-negative analysis: one cohort split into patients with an OncoKB driver in a canonical
+ * driver list, patients with none who were profiled for every listed gene, and those not fully
+ * profiled (neither); then every other gene's alteration frequency compared between the first two.
+ * Counts only.
+ */
+export interface DrivernegativeView {
+  note?: string;
+  kind: "drivernegative"; cohorts?: string[];
+  /** the canonical drivers (default the NSCLC set: EGFR, KRAS, ALK, ROS1, BRAF, MET, RET, ERBB2, NTRK1–3) */
+  drivers?: string[];
+  /** what is compared between the groups (default mutation; sv counts either fusion partner) */
+  alteration?: "mutation" | "sv" | "cna";
+  /** count every alteration (default), or only OncoKB drivers */
+  measure?: "any" | "driver";
+  /** genes altered in fewer patients than this, both groups together, are not tested (default 5) */
+  minAltered?: number;
+  /** genes named on the volcano (default 12) */
+  label?: number;
+}
+export interface DrivernegativeGene {
+  gene: string; cytoband?: string;
+  /** [driver-negative, driver-positive] patients altered, and profiled for the gene */
+  altered: [number, number]; profiled: [number, number];
+  log2Ratio: number | null; p: number; q: number;
+}
+export interface DrivernegativeResult {
+  drivers: string[]; alteration: string; measure: "any" | "driver"; minAltered: number;
+  /** the cohort's patients, those sequenced for mutations, and the three groups of those */
+  patients: number; sequenced: number; positive: number; negative: number; unprofiled: number;
+  tested: number; untested: number; significant: number;
+  /** the most significant genes (≤300) */
+  rows: DrivernegativeGene[];
+  labels: string[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
  * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
  * what the axes are, exactly as it does in the portal, rather than being asked for.
  */
@@ -1980,7 +2016,7 @@ import type { PlotAxis, PlotData } from "./plot.ts";
 import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView | ActionabilityView
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView | ActionabilityView | DrivernegativeView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | PredictiveView | CutpointView | InstabilityView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
@@ -2335,6 +2371,9 @@ export interface ViewResultFields {
   actionability: {
     actionability?: ActionabilityResult;
   };
+  drivernegative: {
+    drivernegative?: DrivernegativeResult;
+  };
   course: {
     course?: CourseSeries[];
     /** bin width and window actually used, in months */
@@ -2464,7 +2503,7 @@ export interface ViewResultFields {
  * nor waits for cohorts). The oncoprint has none: it carries its figure or its spec, by request.
  */
 export interface ViewResultMain {
-  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; adjusted: "adjusted"; actionability: "actionability"; course: "course"; sequence: "sequence";
+  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; adjusted: "adjusted"; actionability: "actionability"; drivernegative: "drivernegative"; course: "course"; sequence: "sequence";
   hotspots: "hotspots"; plot: "plot"; coexpression: "coexpression"; clinical: "clinical"; cooccurrence: "pairs";
   oncoprint: never; attrition: "attrition"; genome: "genome"; pathways: "pathways"; diffexpr: "diffexpr";
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
