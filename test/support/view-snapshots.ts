@@ -1,12 +1,14 @@
 // Every view kind's output, pinned: one gallery example per kind (and a few that combine studies)
 // runs through the whole engine (cohort compiler, runner, statistics, figure, results text) with
-// the warehouse replaced by answers recorded from it. Four files per case in test/snapshots/ are
+// the warehouse replaced by answers recorded from it. Five files per case in test/snapshots/ are
 // compared byte for byte:
 //   <case>.sql   each cohort's compiled SQL and each view's queries, by label and study
 //   <case>.json  what each view computed (its result, without timings or the queries above; a long
 //                array, or an object of more than 50 keys, as its first 20 items, then the rest's
 //                count and digest)
 //   <case>.svg   each view's figure;  <case>.txt  the results text MCP clients and the AI tools read
+//   <case>.html  each view's card as the lab page draws it: header, controls, body
+//                (test/support/render-views.ts)
 // A change to shared code that moves another view's numbers, figure, text or queries fails here,
 // named by the case. A changed query has no recorded answer, so it fails as "not recorded".
 // Each case runs twice, its answers delivered in the order its queries were sent and then in the
@@ -47,6 +49,7 @@ const { runAnalysis } = await import("../../lib/analysis.ts");
 const { withRequestCustomData } = await import("../../lib/custom-data-server.ts");
 const { viewToSvg } = await import("../../lib/view-svg.ts");
 const { analysisText } = await import("../../lib/result-text.ts");
+const { renderViewCards } = await import("./render-views.ts");
 import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
 
 /**
@@ -167,6 +170,7 @@ function render(doc: AnalysisDoc, r: AnalysisResult): Record<string, string> {
     json: json({ study: r.study, cohorts, splits: r.splits, views }),
     svg,
     txt: analysisText(doc, r).join("\n\n").replace(/ — \d+ms\./, " — (time)ms.") + "\n",
+    html: renderViewCards(doc, r),
   };
 }
 
