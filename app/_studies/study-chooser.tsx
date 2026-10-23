@@ -16,8 +16,12 @@ const QUICK: [string, string, (s: StudyInfo) => boolean][] = [
   ["TCGA PanCancer Atlas", "every TCGA PanCancer Atlas study: one pipeline, so their expression can be compared across studies", (s) => /pan_can_atlas/.test(s.id)],
 ];
 
-export function StudyChooser({ studies, loading, selected, onChange, query, onQuery, caps, onCaps, actions, addAllLimit, className }: {
-  studies: StudyInfo[]; loading?: boolean;
+export function StudyChooser({ studies, loading, error, onRetry, selected, onChange, query, onQuery, caps, onCaps, actions, addAllLimit, className }: {
+  studies: StudyInfo[];
+  /** the study list is still loading: the chooser stands as a skeleton of itself */
+  loading?: boolean;
+  /** the study list failed to load, and how to ask again */
+  error?: string | null; onRetry?: () => void;
   selected: string[]; onChange: (ids: string[]) => void;
   /** the search and the data filters, when the caller keeps them (Explore's outlive its panel) */
   query?: string; onQuery?: (q: string) => void; caps?: Set<string>; onCaps?: (next: Set<string>) => void;
@@ -42,6 +46,13 @@ export function StudyChooser({ studies, loading, selected, onChange, query, onQu
   const listed = selected.filter((id) => hitIds.has(id)).length;
   const after = new Set([...selected, ...hits.map((h) => h.id)]).size;
   const over = addAllLimit != null && after > addAllLimit;
+  if (error) return (
+    <div data-tw role="alert" className={cn("rounded-md border border-destructive/40 bg-destructive-soft px-3 py-2.5 text-md", className)}>
+      The study list could not be loaded: {error}{" "}
+      {onRetry && <Button variant="link" size="inline" onClick={onRetry}>try again</Button>}
+    </div>
+  );
+  if (loading) return <StudyChooserSkeleton className={className} />;
   return (
     <div data-tw className={cn("grid min-w-0 gap-x-6 gap-y-2.5 lg:grid-cols-[15rem_minmax(0,1fr)]", className)}>
       <nav aria-label="cancer types" className="hidden min-w-0 lg:block">
@@ -82,7 +93,7 @@ export function StudyChooser({ studies, loading, selected, onChange, query, onQu
           <span className="flex-1" />
           <Button variant="ghost" size="xs" className={CHIP} disabled={!selected.length} onClick={() => onChange([])}>clear selection</Button>
         </div>
-        <StudyRows hits={hits} loading={loading} selected={selected} actions={actions}
+        <StudyRows hits={hits} selected={selected} actions={actions}
           onToggle={(id) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])}
           selectAll={{
             label: "Select all " + hits.length.toLocaleString() + " listed",
@@ -99,8 +110,33 @@ export function StudyChooser({ studies, loading, selected, onChange, query, onQu
   );
 }
 
+/** The chooser while the study list loads, shaped like it — the cancer types, the search row, the quick select and the rows — so the page does not jump when it lands. */
+function StudyChooserSkeleton({ className }: { className?: string }) {
+  const bar = (w: string, h = "h-4") => <span className={cn("skeleton block", h)} style={{ width: w }} />;
+  return (
+    <div data-tw role="status" aria-label="loading the study list" className={cn("grid min-w-0 gap-x-6 gap-y-2.5 lg:grid-cols-[15rem_minmax(0,1fr)]", className)}>
+      <div className="hidden flex-col gap-2.5 lg:flex">
+        {bar("7rem", "h-3.5")}
+        {Array.from({ length: 12 }, (_, i) => <div key={i} className="flex justify-between gap-2.5 px-2 py-0.5">{bar(["70%", "55%", "80%", "60%"][i % 4])}{bar("1.5rem")}</div>)}
+      </div>
+      <div className="flex min-w-0 flex-col gap-2.5">
+        <div className="mt-2.5 flex gap-2.5">{bar("100%", "h-8")}{bar("6rem", "h-8")}</div>
+        <div className="flex items-center gap-2">{bar("5rem")}{bar("10rem", "h-6")}</div>
+        <div className="flex flex-col gap-3.5 border-t pt-3">
+          {Array.from({ length: 10 }, (_, i) => (
+            <div key={i} className="flex items-center gap-2.5">
+              {bar("1rem")}<span className="flex-1">{bar(["55%", "40%", "65%", "48%", "35%"][i % 5])}</span>{bar("8rem")}{bar("3.5rem")}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** "N studies selected (M patients)", or what is available before anything is */
-export function SelectionStats({ studies, selected, onClear }: { studies: StudyInfo[]; selected: string[]; onClear?: () => void }) {
+export function SelectionStats({ studies, selected, onClear, loading }: { studies: StudyInfo[]; selected: string[]; onClear?: () => void; loading?: boolean }) {
+  if (loading && !selected.length) return <span data-tw className="skeleton inline-block h-4 w-56 align-middle" role="status" aria-label="counting studies" />;
   const byId = new Map(studies.map((s) => [s.id, s] as const));
   const pts = (ids: string[]) => ids.reduce((n, id) => n + (byId.get(id)?.patients ?? 0), 0);
   return (

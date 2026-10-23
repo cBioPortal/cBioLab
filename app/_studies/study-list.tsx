@@ -84,14 +84,13 @@ export interface SelectAll { checked: boolean | "indeterminate"; onChange: () =>
  * holds "select all" over the rows listed. `actions` draws a row's own buttons (the quick jumps),
  * which act on that study alone.
  */
-export function StudyRows({ hits, loading, selected, onToggle, selectAll, actions }: {
-  hits: StudyInfo[]; loading?: boolean;
+export function StudyRows({ hits, selected, onToggle, selectAll, actions }: {
+  hits: StudyInfo[];
   selected: string[]; onToggle: (id: string) => void;
   selectAll?: SelectAll;
   actions?: (id: string) => React.ReactNode;
 }) {
   return <>
-    {loading && <div className="loading-block"><span className="spinner" /> Loading studies…</div>}
     <div className="scrollbox studylist">
       {hits.length > 0 && (
         <div className="study-row study-head pb-2">

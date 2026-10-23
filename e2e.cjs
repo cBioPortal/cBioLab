@@ -1574,6 +1574,37 @@ async function main() {
     await ctx.close();
   }
 
+  // The homepage while its study list loads, checked by holding the request: a skeleton shaped like
+  // the chooser, never "0 studies"; and a failed list says so and asks again.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const name = "homepage: a skeleton while the study list loads, and a failed list offers to try again";
+    try {
+      let release; const gate = new Promise((r) => (release = r));
+      await page.route("**/api/studies", async (route) => { await gate; try { await route.continue(); } catch {} });
+      await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+      await page.locator("[aria-label='loading the study list']").waitFor({ timeout: 60000 });
+      await page.waitForTimeout(500);
+      const held = { zero: /\b0 studies\b/.test(await page.locator("main").innerText()), rows: await page.locator(".study-row").count(),
+        query: await page.locator("button.querybygene").isDisabled() };
+      release(); await page.unroute("**/api/studies");
+      await page.locator(".study-row:not(.study-head)").first().waitFor({ timeout: 120000 });
+      const gone = await page.locator("[aria-label='loading the study list']").count();
+      await page.route("**/api/studies", (route) => route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "warehouse unreachable" }) }));
+      await page.goto(BASE + "/", { waitUntil: "domcontentloaded" });
+      const failed = await page.locator("[role=alert][data-tw]").innerText({ timeout: 120000 });
+      await page.unroute("**/api/studies");
+      await page.getByRole("button", { name: "try again" }).click();
+      await page.locator(".study-row:not(.study-head)").first().waitFor({ timeout: 120000 });
+      ok(name, !held.zero && held.rows === 0 && held.query && gone === 0 && /could not be loaded: warehouse unreachable/.test(failed),
+        JSON.stringify({ held, gone, failed: failed.replace(/\s+/g, " ").slice(0, 80) }));
+    } catch (e) {
+      ok(name, false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    await ctx.close();
+  }
+
   // From the study list to a gene query's results: a study row's query icon opens the gene query
   // dialog for that study, and its Submit opens the Results page with the study and the query.
   {
