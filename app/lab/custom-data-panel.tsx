@@ -13,7 +13,7 @@ import {
 } from "./custom-data-client.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { LIMITS } from "../../lib/custom-data-names.ts";
-import { Download, LoaderCircle, Share2, Trash2 } from "lucide-react";
+import { Download, LoaderCircle, Share2, Trash2, Users } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Input } from "../_ui/input";
@@ -22,6 +22,8 @@ import { Textarea } from "../_ui/textarea";
 import { cn } from "../../lib/cn";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { TB } from "../_ui/toolbar.ts";
+import { encodeParam } from "../portal/page-doc.ts";
+import { DOC_VERSION } from "../../lib/doc-version.ts";
 
 /** a tab of the custom-data manager */
 const TAB = "h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary";
@@ -245,6 +247,14 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
   );
 }
 
+/** A new analysis of the patients with a row in this upload, pinned to its latest version */
+function analyzeUploadHref(d: DatasetMeta, studies: string[]): string {
+  const where = studies.length > 1 ? { studies } : { study: studies[0] };
+  const doc = { dsl: DOC_VERSION, study: studies[0], uploads: [{ as: d.slug, dataset: d.id, version: d.latestVersion }],
+    cohorts: { [d.name]: { ...where, all: [{ kind: "upload", dataset: "custom:" + d.slug }] } }, views: [] };
+  return "/lab?" + new URLSearchParams({ tab: "analysis", doc: encodeParam(doc) }).toString();
+}
+
 function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: () => void }) {
   const server = useCustomDataState();
   const [serverBusy, setServerBusy] = useState<string | null>(null);
@@ -291,6 +301,9 @@ function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: (
                     <td className="meta">{v?.rowCount.toLocaleString()} {d.level}s</td>
                     <td className="meta">{v?.studies.join(", ")}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
+                      {v && v.studies.length > 0 && <><Button variant="outline" size="sm" className={TB} asChild>
+                        <a href={analyzeUploadHref(d, v.studies)} title={"start an analysis with one cohort: the " + v.rowCount.toLocaleString() + " " + d.level + "s' patients with a row in this upload"}>
+                          <Users />Analyze</a></Button>{" "}</>}
                       <Button variant="outline" size="sm" className={TB} disabled={!!serverBusy} onClick={() => exportServer(d)}><Download />Export</Button>{" "}
                       {d.rights.share && <><Button variant="outline" size="sm" className={TB} disabled={!!serverBusy} onClick={() => setSharing(d)}><Share2 />Share…</Button>{" "}
                         <Button variant="outline" size="sm" className={cn(TB, "text-destructive hover:text-destructive")} disabled={!!serverBusy} onClick={() => removeServer(d)}><Trash2 />Delete</Button></>}

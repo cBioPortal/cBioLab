@@ -21,7 +21,8 @@ const KIND_META: Record<string, { label: string; color: string }> = {
   genomicData: { label: "data", color: "#CC79A7" },
   genericAssay: { label: "assay", color: "#CC79A7" },
   derived: { label: "derived", color: "#D55E00" },
-  split: { label: "held-out", color: "#E69F00" }
+  split: { label: "held-out", color: "#E69F00" },
+  upload: { label: "custom data", color: "#0072B2" }
 };
 
 function leafKind(leaf: any) {
@@ -89,6 +90,7 @@ function leafText(leaf: any) {
   // mutations at all", where the clause a gene-status facet builds means "no
   // panel of theirs covers THIS gene". Two different cohorts, and the narrower
   // one is the whole point of that facet.
+  if (k === "upload") return "a row in " + String(leaf.dataset).slice("custom:".length);
   if (k === "profiled") return "profiled: " + leaf.type + (leaf.gene ? " · " + leaf.gene : "");
   if (k === "caseList") return leaf.id;
   if (k === "split") return leaf.part + " half";

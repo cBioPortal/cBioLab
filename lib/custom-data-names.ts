@@ -22,6 +22,12 @@ export const ATTR_NAME_RE = /^(?:[A-Za-z0-9_]{1,64}|custom:[a-z0-9][a-z0-9-]{0,3
 /** An attribute name a view setting may hold: ATTR_NAME_RE's two forms, a built-in name also taking "." and "-" (HLA-A1). */
 export const VIEW_ATTR_RE = /^(?:[A-Za-z0-9_.-]{1,64}|custom:[a-z0-9][a-z0-9-]{0,39}\/[A-Za-z0-9_]{1,64})$/;
 
+/** A document's mention of an upload: an attribute of it ("custom:<name>/<COLUMN>") or the upload
+ *  itself ("custom:<name>", an upload clause's dataset). Group 1 is the upload's name. */
+export const CUSTOM_REF_RE = /"custom:([a-z0-9][a-z0-9-]{0,39})[/"]/g;
+/** An upload clause's dataset: the upload's name as its attributes carry it */
+export const UPLOAD_DATASET_RE = /^custom:([a-z0-9][a-z0-9-]{0,39})$/;
+
 export const LIMITS = {
   datasets: 10,
   columns: 64,

@@ -67,7 +67,7 @@ function leafEvaluability(leaf: Leaf): Evaluability {
   // Membership facts (a list, a case list, a profiling status, the held-out half) are known for
   // every patient. Measurements and timelines are not, and this engine has no "was measured"
   // condition for them yet, so they are named rather than silently treated as known.
-  if (kind === "patientList" || kind === "sampleList" || kind === "caseList" || kind === "profiled" || kind === "split")
+  if (kind === "patientList" || kind === "sampleList" || kind === "caseList" || kind === "profiled" || kind === "split" || kind === "upload")
     return { leaves: [], unchecked: [] };
   return { leaves: [], unchecked: [describeLeafBrief(leaf)] };
 }

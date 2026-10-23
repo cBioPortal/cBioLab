@@ -165,7 +165,20 @@ async function savedLists(browser, ok, BASE, LOGIN) {
         return /rows matched/.test(t) && t;
       }, null, { timeout: 60000 }).then((h) => h.jsonValue()).catch(() => "");
       ok("the upload example matches the explored study in full", /(\d+) of \1 rows matched a patient of msk_chord_2024/.test(ex), ex.slice(0, 120));
-      await page.keyboard.press("Escape");
+      // saved, its "Analyze" opens a new analysis whose one cohort is every patient with a row in it
+      const rows = Number((ex.match(/(\d[\d,]*) of/) || [])[1]?.replace(/,/g, ""));
+      let cohort = "";
+      try {
+        await page.locator("[role=dialog].customdatamanager button", { hasText: /^Add data to/ }).click();
+        await page.locator("[role=dialog].customdatamanager .customlist a", { hasText: "Analyze" }).first().click({ timeout: 60000 });
+        cohort = await page.waitForFunction(() => {
+          const b = [...document.querySelectorAll(".cohortbox")].find((x) => /a row in /.test(x.textContent || ""));
+          return b && /\d+ patients/.test(b.textContent) && b.textContent.replace(/\s+/g, " ");
+        }, null, { timeout: 120000 }).then((h) => h.jsonValue());
+      } catch (e) { cohort = cohort || String(e.message).split("\n")[0]; }
+      const n = Number((cohort.match(/([\d,]+) patients/) || [])[1]?.replace(/,/g, ""));
+      ok("a saved upload's Analyze opens an analysis of the patients with a row in it", rows > 0 && n === rows,
+        rows + " rows · " + cohort.slice(0, 140));
     }
 
     ok("Saved tab: no page errors", errors.length === 0, errors.join(" | ").slice(0, 200));

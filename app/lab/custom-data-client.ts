@@ -16,7 +16,7 @@
 //                           (`uploads`, see bindUploads) resolves to that version; a body that
 //                           carries a spec rather than the document is given the pins with it.
 import type { Sharing } from "../../lib/access.ts";
-import { CUSTOM_PREFIX, LIMITS, type CustomColumn, type CustomDataset, type CustomLevel } from "../../lib/custom-data-names.ts";
+import { CUSTOM_PREFIX, CUSTOM_REF_RE, LIMITS, type CustomColumn, type CustomDataset, type CustomLevel } from "../../lib/custom-data-names.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { EXAMPLES } from "../../lib/dsl-reference.ts";
 import type { MembersBody } from "../../lib/api-schemas.ts";
@@ -42,7 +42,7 @@ export function datasetStudies(d: CustomDataset): string[] { return [...new Set(
 export function referencedDatasets(x: unknown): string[] {
   const text = typeof x === "string" ? x : JSON.stringify(x ?? null);
   if (!text.includes(CUSTOM_PREFIX)) return [];
-  return [...new Set([...text.matchAll(/"custom:([a-z0-9][a-z0-9-]{0,39})\//g)].map((m) => m[1]))];
+  return [...new Set([...text.matchAll(CUSTOM_REF_RE)].map((m) => m[1]))];
 }
 
 // ---------------------------------------------------------------------------

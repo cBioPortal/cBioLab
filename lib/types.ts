@@ -72,6 +72,12 @@ export interface PatientListLeaf { kind: "patientList"; ids?: string[]; set?: st
  * and never passes through the client as an id list.
  */
 export interface SplitLeaf { kind: "split"; part: "discovery" | "validation" }
+/**
+ * The patients with a row in an upload: a value in any of its columns (blank cells are not
+ * stored). `dataset` names the upload as its attributes do, "custom:<name>", pinned by the
+ * document's `uploads` like any of its attributes.
+ */
+export interface UploadLeaf { kind: "upload"; dataset: string }
 export interface GeneStateFacet {
   gene: string;
   type: "MUTATION" | "CNA";
@@ -195,7 +201,7 @@ export interface DerivedLeaf {
 export type Leaf =
   | OqlLeaf | ClinicalLeaf | EventLeaf | SampleListLeaf | PatientListLeaf | ProfiledLeaf
   | CaseListLeaf | GenomicDataLeaf | GenericAssayLeaf | AlterationLeaf | DerivedLeaf
-  | ProteinPositionLeaf | SplitLeaf
+  | ProteinPositionLeaf | SplitLeaf | UploadLeaf
   /** back-compat: the flat v1 event shape, accepted without a `kind` */
   | EventLeafFields;
 
