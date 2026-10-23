@@ -220,6 +220,11 @@
     "Mutual exclusivity that accounts for each tumour's burden (DISCOVER)": {
       "NSCLC": 1567
     },
+    "Genomic instability by cancer type: aneuploidy score, FGA and arm-level changes": {
+      "Colorectal": 4993,
+      "Breast": 5803,
+      "Pancreatic": 2729
+    },
     "Clonality, LOH and genome doubling from FACETS": {
       "Colorectal": 4993,
       "Breast": 5803

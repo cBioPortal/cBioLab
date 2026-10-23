@@ -1128,6 +1128,40 @@ export interface ExclusivityResult {
   excluded?: { study: string; reason: string }[];
 }
 /**
+ * Genomic instability from copy-number segments (hg19): per sample, the fraction of the genome
+ * altered and arm-level gains and losses, whose count is the aneuploidy score (Taylor et al. 2018);
+ * per cohort their distributions, a rank test between cohorts, and each arm's gain/loss frequency.
+ */
+export interface InstabilityView {
+  note?: string;
+  kind: "instability"; cohorts?: string[];
+  /** |log2 segment mean| at or past which a segment is gained or lost (default 0.2) */
+  threshold?: number;
+  /** an arm is called when more than this share of its length is past the threshold (default 0.5) */
+  armShare?: number;
+  /** score chromosome X too (default false: its log ratio mostly records sex) */
+  includeX?: boolean;
+}
+export interface InstabilitySpread { p5: number | null; q1: number | null; median: number | null; q3: number | null; p95: number | null; mean: number | null }
+export interface InstabilityPanel {
+  cohort: string;
+  /** the cohort's samples, those with segments, and those with every scored arm measured */
+  samples: number; segmented: number; allArms: number;
+  /** samples by aneuploidy score (index = arms altered), and by FGA in 1-point bins (index = percent) */
+  score: number[]; fga: number[];
+  scoreSpread: InstabilitySpread; fgaSpread: InstabilitySpread;
+  /** per arm (in `arms` order): the samples that measured it, and those gaining or losing it */
+  arms: { arm: string; measured: number; gain: number; loss: number }[];
+}
+export interface InstabilityResult {
+  build: "hg19"; threshold: number; armShare: number; includeX: boolean;
+  arms: string[];
+  panels: InstabilityPanel[];
+  /** two cohorts: Mann–Whitney; more: Kruskal–Wallis — on the aneuploidy score and on FGA */
+  test: { name: "Mann–Whitney U" | "Kruskal–Wallis"; scoreP: number; fgaP: number } | null;
+  excluded?: { study: string; reason: string }[];
+}
+/**
  * Clonality from FACETS allele-specific copy number: for each gene, whether the cohort's
  * mutation calls are clonal or subclonal, how often the mutated locus has lost its other allele,
  * and their cancer-cell fractions; per cohort, whole-genome doubling, purity and ploidy. Only
@@ -1887,7 +1921,7 @@ import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | PredictiveView | CutpointView
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | PredictiveView | CutpointView | InstabilityView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
 export type ViewKind = View["kind"];
@@ -2307,6 +2341,9 @@ export interface ViewResultFields {
   exclusivity: {
     exclusivity?: ExclusivityResult;
   };
+  instability: {
+    instability?: InstabilityResult;
+  };
   clonality: {
     clonality?: ClonalityResult;
   };
@@ -2370,7 +2407,7 @@ export interface ViewResultMain {
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
   cancertypes: "cancertypes"; overlap: "overlap"; enrichment: "enrichment"; assays: "assays";
   composition: "composition"; correlates: "correlates"; table: "table"; timeline: "timeline";
-  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity"; txendpoints: "txendpoints"; predictive: "predictive"; cutpoint: "cutpoint";
+  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity"; txendpoints: "txendpoints"; predictive: "predictive"; cutpoint: "cutpoint"; instability: "instability";
 }
 /** a result that was drawn: no error, not waiting, and its main field present */
 type Drawn<K extends ViewKind> = { error?: undefined; empty?: undefined } & ViewResultFields[K]

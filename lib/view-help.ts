@@ -155,6 +155,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "Compares how often each commonly mutated gene is mutated in two groups of patients — say, colorectal cancers diagnosed before and after age 50 — after taking into account other things that differ between the groups and also change mutation rates, such as how many mutations a tumour carries overall. Each dot is a gene: right of centre means more often mutated in the first group, left in the second, and higher means more certain. The table shows each gene's raw difference beside the adjusted one, so you can see which differences were explained away. A difference here is a clue, not proof of a cause."
   },
+  instability: {
+    title: "What is this?",
+    text: "Cancer cells often gain or lose whole chromosome arms, and how much of a tumour's genome is out of balance is a measure of how unstable it is. For each group of tumours, this shows how many chromosome arms are typically gained or lost (the \"aneuploidy score\") and what share of the genome is altered, then which arms are gained (red) or lost (blue) most often — patterns that differ by cancer type, such as chromosome 20q gained and 18q lost in colorectal cancer."
+  },
   labs: {
     title: "What is this?",
     text: "Follows a blood test — such as PSA in prostate cancer — from the moment a treatment started, as the change from each patient's own starting level. The line shows the typical patient, the shaded band the middle half of patients, and the bars on the right each patient's best result: how far their level fell, or rose, after treatment began."

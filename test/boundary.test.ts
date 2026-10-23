@@ -394,6 +394,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "exclusivityGroupsSql:any": () => federation.exclusivityGroupsSql(cohortSql, "x", "db", ["KRAS", "EGFR", "TP53"], null, null, "any"),
     "exclusivityColumnsSql": () => federation.exclusivityColumnsSql(cohortSql, "x", "db", null, null, "any"),
     "exclusivityCoverageSql": () => federation.exclusivityCoverageSql(cohortSql, "x", "db"),
+    // instability: `parts`/`arms`/`calls`/`per` hold samples' segments and calls; the outer SELECTs are histograms and per-arm counts
+    "instabilityScoresSql": () => federation.instabilityScoresSql(cohortSql, "x", "db", { threshold: 0.2, armShare: 0.5, includeX: false }),
+    "instabilityArmsSql": () => federation.instabilityArmsSql(cohortSql, "x", "db", { threshold: 0.3, armShare: 0.8, includeX: true }),
     "ctdnaSurvivalSql": () => federation.ctdnaSurvivalSql(cohortSql, "x", "db", { ...CTD, withinDays: 30 }, null, "any"),
     "sampleAttributeValuesSql": () => federation.sampleAttributeValuesSql(cohortSql, "x", "db", "SAMPLE_TYPE"),
     // clonality: `calls` is per (gene, sample); only per-gene counts and CCF bins leave

@@ -27,7 +27,7 @@ const NEEDS: Record<string, Need> = {
   // aggregates every local participant computes and a remote peer does not serve yet
   genome: "local", pathways: "local", enrichment: "local", diffexpr: "local", paired: "local", clonality: "local",
   incidence: "local", labs: "local", cancertypes: "local", overlap: "local", assays: "local", composition: "local",
-  correlates: "local", plot: "local", acquired: "local", ctdna: "local", exclusivity: "local", txendpoints: "local"
+  correlates: "local", plot: "local", acquired: "local", ctdna: "local", exclusivity: "local", txendpoints: "local", instability: "local"
 };
 
 /** What `kind` needs of every study it draws (null: only counts, which every participant gives). */

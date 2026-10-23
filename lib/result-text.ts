@@ -303,6 +303,14 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
           `${x.exact ? "" : " (normal approx.)"}; Fisher q=${pFmt(x.fisherQ)}${x.log2Odds != null ? `, log2 OR ${x.log2Odds.toFixed(2)}` : ""}`).join("\n") +
         (ex.unassessable.length ? `\n  not assessable: ${ex.unassessable.join(", ")}` : "") +
         caveatOf(v) + noteOf(v));
+    } else if (v.kind === "instability") {
+      const ir = v.instability, f = (s: { median: number | null; q1: number | null; q3: number | null }) => s.median == null ? "—" : `${s.median} [${s.q1}–${s.q3}]`;
+      out.push(`Genomic instability (hg19 segments, threshold ±${ir.threshold}, arm called past ${Math.round(ir.armShare * 100)}% of its length; ${ir.arms.length} arms):\n` +
+        ir.panels.map((pn) => `  ${pn.cohort}: ${pn.score.reduce((s, x) => s + x, 0).toLocaleString()} samples scored; aneuploidy score median [IQR] ${f(pn.scoreSpread)}, FGA ${f(pn.fgaSpread)}%\n` +
+          `    most often gained: ${[...pn.arms].filter((a) => a.measured).sort((a, b) => b.gain / b.measured - a.gain / a.measured).slice(0, 5).map((a) => `${a.arm} ${Math.round(100 * a.gain / a.measured)}%`).join(", ")}\n` +
+          `    most often lost: ${[...pn.arms].filter((a) => a.measured).sort((a, b) => b.loss / b.measured - a.loss / a.measured).slice(0, 5).map((a) => `${a.arm} ${Math.round(100 * a.loss / a.measured)}%`).join(", ")}`).join("\n") +
+        (ir.test ? `\n  ${ir.test.name}: aneuploidy score p=${pFmt(ir.test.scoreP)}, FGA p=${pFmt(ir.test.fgaP)}` : "") +
+        caveatOf(v) + noteOf(v));
     } else if (v.kind === "clonality") {
       const cr = v.clonality;
       out.push(`Clonality (FACETS; ${cr.measure === "driver" ? "driver mutation calls" : "all mutation calls"}${cr.qc ? ", QC-passing samples" : ""}):\n` +

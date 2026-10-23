@@ -11,6 +11,7 @@ export const PREVIEW_KINDS: Record<string, string> = {
   txendpoints: "no method record or golden test of the endpoint derivation (lines, stops, progression) or the median intervals yet",
   forest: "no method record or golden test of the per-stratum Cox fits and the DerSimonian–Laird pooling yet",
   adjusted: "no method record or golden test of the per-gene logistic fits yet",
+  instability: "no method record, and no check of the arm calls and aneuploidy scores against Taylor et al.'s published values yet",
 };
 
 /** what a preview kind still lacks, or null for a kind held to the full checks */

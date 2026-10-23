@@ -90,6 +90,7 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   paired: { label: "Paired samples (primary vs metastasis, before vs after)", title: "Paired samples", genes: true, maxCohorts: 3 },
   acquired: { label: "Acquired under therapy (samples before vs after a treatment start)", title: "Acquired under therapy", genes: true, maxCohorts: 3,
     why: (k) => k.events.some((e) => /treat|therap|drug|medicat/i.test(e.canonical)) ? null : "this study records no treatment timeline events to anchor on" },
+  instability: { label: "Genomic instability (aneuploidy score, FGA, arm-level calls)", title: "Genomic instability", maxCohorts: 6 },
   exclusivity: { label: "Mutual exclusivity (DISCOVER, burden-aware)", title: "Mutual exclusivity", genes: true, maxCohorts: 1, cohortInHeader: true },
   ctdna: { label: "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)", title: "ctDNA vs tissue", genes: true, maxCohorts: 3 },
   riskmodel: { label: "Risk model (elastic-net Cox, OncoCast-style)", title: "Risk model", maxCohorts: 1 },
@@ -244,6 +245,7 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     return "last sample before the first " + (an.eventType || "?") + (an.key ? " [" + an.key + "=" + an.value + "]" : "") + " vs the first ≥" + (spec.minGapDays ?? 30) + " days after" +
       (spec.measure === "driver" ? ", oncogenic only" : ", any alteration") + (spec.genes && spec.genes.length ? "" : ", every gene scanned");
   }
+  if (kind === "instability") return "from hg19 segments, ±" + (spec.threshold ?? 0.2) + ", arm called past " + Math.round(100 * (spec.armShare ?? 0.5)) + "% of its length" + (spec.includeX ? ", with chrX" : "");
   if (kind === "exclusivity") {
     const cohort = Array.isArray(v.cohorts) && v.cohorts[0] ? String(v.cohorts[0]).split(" / ").join(" › ") : null;
     return <>{cohort && <><strong>{cohort}</strong> · </>}{(spec.measure === "driver" ? "oncogenic alterations" : "any alteration") + ", background from each tumour's burden" +
@@ -880,6 +882,25 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       </div>
     );
   }
+  if (spec.kind === "instability") return (
+    <div className="viewtb">
+      <div className="tbz"><span className="tbl">data</span>
+        <label className="tbfield" title="the |log2 segment mean| at or past which a segment counts as gained or lost">
+          threshold <OptionSelect value={String(spec.threshold ?? 0.2)} disabled={busy} onValueChange={(v) => patch({ threshold: v === "0.2" ? undefined : Number(v) })}>
+            {[...new Set([0.1, 0.2, 0.3, 0.5, Number(spec.threshold ?? 0.2)])].sort((x, y) => x - y).map((t) => <option key={t} value={t}>±{t}</option>)}
+          </OptionSelect>
+        </label>
+        <label className="tbfield" title="an arm is gained or lost when more than this share of its length is past the threshold">
+          arm call <OptionSelect value={String(spec.armShare ?? 0.5)} disabled={busy} onValueChange={(v) => patch({ armShare: v === "0.5" ? undefined : Number(v) })}>
+            {[...new Set([0.5, 0.75, 0.8, Number(spec.armShare ?? 0.5)])].sort((x, y) => x - y).map((t) => <option key={t} value={t}>&gt;{Math.round(t * 100)}% of arm</option>)}
+          </OptionSelect>
+        </label>
+        <label className="chk" title="chromosome X's log ratio mostly records sex against the reference, so it is off by default">
+          <Checkbox checked={spec.includeX === true} disabled={busy} onCheckedChange={(on) => patch({ includeX: (on === true) || undefined })} /> chrX
+        </label>
+      </div>
+    </div>
+  );
   if (spec.kind === "exclusivity") {
     const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
     return (

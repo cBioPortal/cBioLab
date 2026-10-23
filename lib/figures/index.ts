@@ -26,6 +26,7 @@ import { predictiveSvg } from "./predictive.ts";
 import { cutpointSvg } from "./cutpoint.ts";
 import { metaForestSvg } from "./forest.ts";
 import { adjustedSvg } from "./adjusted.ts";
+import { instabilitySvg } from "./instability.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -123,6 +124,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   txendpoints: {
     draw: (v, o) => v.txendpoints.curves.some((c) => c.n) ? txendpointsSvg(v, o) : null,
     title: (v) => "Treatment endpoints" + (v.txendpoints ? " — " + v.txendpoints.endpointLabel + " from " + v.txendpoints.anchoredTo : "")
+  },
+  instability: {
+    draw: (v, o) => v.instability && v.instability.panels.some((pn) => pn.score.some((n) => n > 0)) ? instabilitySvg(v, o) : null,
+    title: () => "Genomic instability — aneuploidy score and FGA"
   },
 };
 
