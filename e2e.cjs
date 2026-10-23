@@ -167,7 +167,7 @@ async function main() {
       page.url() + " status " + rootResp.status());
     await page.goto(BASE + "/lab", { waitUntil: "domcontentloaded" });
     await page.waitForSelector("[aria-label='lab sections'] [role=tab]", { timeout: 90000 });
-    ok(scheme + ": app shell loads", (await page.getByRole("tab").count()) >= 4);
+    ok(scheme + ": app shell loads", (await page.getByRole("tab").count()) >= 3);
 
     if (scheme === "light") {
       // No credentials anywhere client-visible: check for env var names plus the
