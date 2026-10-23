@@ -6,6 +6,7 @@ import { useState } from "react";
 import { attributeLabel } from "../../lib/custom-data-names.ts";
 import type { AnalysisSource, ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
+import { previewPending } from "../../lib/preview-kinds.ts";
 import { SERIES, seriesStyle } from "../../lib/chart/style.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, ListChecks, Lock, LockOpen, Pencil, Plus, Save, Split, StickyNote, Trash2 } from "lucide-react";
@@ -16,6 +17,7 @@ import { OQL_STATEMENT_CAP } from "../../lib/plot-oql.ts";
 import { plottableProfiles, profileGroup, profileUse, type ProfileInfo } from "../../lib/profile-catalog.ts";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "../_ui/select";
 import { Button } from "../_ui/button";
+import { Badge } from "../_ui/badge";
 import { cn } from "../../lib/cn";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { FIELD } from "../_ui/toolbar.ts";
@@ -509,6 +511,7 @@ export function ViewHead({ v, title, sub, actions, chips, cohorts, cohortInSub, 
           )}
           {actions}
           {chips}
+          <PreviewBadge kind={v.kind} />
           <Latency v={v} />
           <Participation p={v.participation} />
           {(onMoveUp || onMoveDown || onRemove || onEditNote) && (
@@ -627,6 +630,13 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
 }
 
 /** the server-side wall clock for one view, and what that number does and does not include */
+/** A preview kind's badge: its numbers are not yet checked by a method record (lib/preview-kinds.ts). */
+function PreviewBadge({ kind }: { kind: unknown }) {
+  const pending = previewPending(kind);
+  if (!pending) return null;
+  return <Badge variant="outline" className="border-mark bg-mark-soft text-foreground" title={"Preview view: " + pending}>Preview</Badge>;
+}
+
 export function Latency({ v }: { v: any }) {
   if (v.ms == null) return null;
   return (
