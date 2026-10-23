@@ -1248,6 +1248,45 @@ export interface RiskmodelResult {
   table1?: RiskTable1;
 }
 
+export interface TxendpointsView {
+  note?: string;
+  kind: "txendpoints"; cohorts?: string[];
+  /** the clock's start: a treatment record (event type, key = value), its first occurrence unless LAST */
+  anchor: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** ttnt time to next treatment (default), tot time on treatment, rwpfs real-world progression-free survival */
+  endpoint?: "ttnt" | "tot" | "rwpfs";
+  /** treatment lines (lib/treatment-lines.ts): days without therapy that start a new line (default 90), and which records form lines */
+  lineGap?: number; lineClasses?: "systemic" | "all" | string[];
+  /** rwpfs: the progression event (default event type Diagnosis, key PROGRESSION, values Y / Yes), and an optional probability floor */
+  progression?: { eventType?: string; key?: string; values?: string[]; probabilityKey?: string; minProbability?: number };
+  /** tot: a living patient whose stop lies within this many days of the last follow-up is censored as still on treatment (default 30) */
+  ongoingDays?: number;
+  /** administrative censoring, months */
+  cutoffMonths?: number;
+}
+export interface TxendpointsCurve extends Omit<KmCurve, "cohort"> {
+  cohort: string;
+  /** the median's 95% interval (Greenwood, log scale), null where the band never reaches 0.5 */
+  medianLo: number | null; medianHi: number | null;
+  /** the cohort's patients, those anchored, and those left out with why */
+  cohortPatients: number; anchored: number;
+  excluded: { noAnchor: number; noFollowup: number; noStop: number };
+  /** patients whose timeline runs past their last follow-up (the clock check) */
+  late: number;
+}
+export interface TxendpointsResult {
+  endpoint: "ttnt" | "tot" | "rwpfs"; endpointLabel: string; anchoredTo: string;
+  lineGap: number; lineClasses: string;
+  progression?: { eventType: string; key: string; values: string[]; probabilityKey?: string; minProbability?: number };
+  ongoingDays?: number; cutoffMonths?: number;
+  curves: TxendpointsCurve[];
+  /** k-group log-rank over the cohorts, stratified by study where several answer */
+  logrank: LogRankK | null;
+  /** why there is no test */
+  noTest?: string;
+  excludedStudies?: { study: string; reason: string }[];
+}
+
 export interface LabsView {
   note?: string;
   kind: "labs"; cohorts?: string[];
@@ -1673,7 +1712,7 @@ import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
 export type ViewKind = View["kind"];
@@ -2096,6 +2135,9 @@ export interface ViewResultFields {
   labs: {
     labs?: LabsResult;
   };
+  txendpoints: {
+    txendpoints?: TxendpointsResult;
+  };
   riskmodel: {
     riskmodel?: RiskmodelResult;
   };
@@ -2141,7 +2183,7 @@ export interface ViewResultMain {
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
   cancertypes: "cancertypes"; overlap: "overlap"; enrichment: "enrichment"; assays: "assays";
   composition: "composition"; correlates: "correlates"; table: "table"; timeline: "timeline";
-  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity";
+  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity"; txendpoints: "txendpoints";
 }
 /** a result that was drawn: no error, not waiting, and its main field present */
 type Drawn<K extends ViewKind> = { error?: undefined; empty?: undefined } & ViewResultFields[K]

@@ -222,6 +222,10 @@
       "Breast": 5368,
       "Colorectal": 5543
     },
+    "Real-world PFS on immunotherapy in lung cancer, by KRAS status": {
+      "NSCLC, KRAS mutant": 2194,
+      "NSCLC, KRAS wild-type": 5540
+    },
     "PSA response to hormone therapy, by TP53 status": {
       "Prostate, TP53 mutant": 849,
       "Prostate, TP53 wild-type": 2284

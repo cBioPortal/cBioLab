@@ -405,6 +405,11 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // incidence: `per`/`cls` are per patient; the outer SELECT groups them into (kind, entry, t, cause) tallies
     "incidenceCountsSql": () => federation.incidenceCountsSql(cohortSql, "x", "db", { eventType: "Diagnosis", attrs: [{ key: "TUMOR_SITE", value: "CNS/Brain" }] }, null),
     "incidenceCountsSql:anchored": () => federation.incidenceCountsSql(cohortSql, "x", "db", { eventType: "Status" }, { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" }),
+    // txendpoints: `per`/`cls` are per patient; the outer SELECT groups them into (kind, entry, t, ev) tallies
+    "txEndpointCountsSql:ttnt": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "ttnt", anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Immuno" }, lines: { gap: 90 } }),
+    "txEndpointCountsSql:tot": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "tot", anchor: { eventType: "Treatment", key: "AGENT", value: "PEMBROLIZUMAB", occurrence: "LAST" }, lines: { gap: 60, classes: "all" }, ongoingDays: 30 }),
+    "txEndpointCountsSql:rwpfs": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "rwpfs", anchor: { eventType: "Treatment" }, lines: { gap: 90 },
+      progression: { eventType: "Diagnosis", key: "PROGRESSION", values: ["Y", "Yes"], probabilityKey: "NLP_PROGRESSION_PROBABILITY", minProbability: 0.8 } }),
     // labs: per-patient % changes stay inside; the course and best-response queries return histograms
     "labCourseSql": () => federation.labCourseSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS),
     "labBestSql": () => federation.labBestSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 50),

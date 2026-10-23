@@ -47,7 +47,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   error for a kind known only at run time is `plainResult(kind, {…})`. **Kinds never import each other:** a
   kind's runner, figure and `<kind>-<part>.ts` modules import only one another and the shared
   modules (`lib/views/`: run, shared, rows, covariates; `lib/figures/`: common, volcano, bars,
-  forest) — `local/kind-boundary` in `eslint.config.mjs` enforces it; what two kinds need moves
+  forest, km) — `local/kind-boundary` in `eslint.config.mjs` enforces it; what two kinds need moves
   into a shared module, listed there. Kinds registered through `drawn()`
   have their figure drawn from the result and a throw reported as the view's error.
 - **`lib/oncoprint.ts`** — spec → rows (ClickHouse fetch); **`lib/oncoprint-assemble.ts`** — rows →

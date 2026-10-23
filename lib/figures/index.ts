@@ -21,6 +21,7 @@ import { correlatesSvg } from "./correlates.ts";
 import { acquiredSvg } from "./acquired.ts";
 import { ctdnaSvg } from "./ctdna.ts";
 import { exclusivitySvg } from "./exclusivity.ts";
+import { txendpointsSvg } from "./txendpoints.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -98,6 +99,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   exclusivity: {
     draw: (v, o) => v.exclusivity && v.exclusivity.pairs.length ? exclusivitySvg(v, o) : null,
     title: (v) => "Mutual exclusivity (DISCOVER)" + (v.exclusivity ? " — " + v.exclusivity.cohort : "")
+  },
+  txendpoints: {
+    draw: (v, o) => v.txendpoints.curves.some((c) => c.n) ? txendpointsSvg(v, o) : null,
+    title: (v) => "Treatment endpoints" + (v.txendpoints ? " — " + v.txendpoints.endpointLabel + " from " + v.txendpoints.anchoredTo : "")
   },
 };
 

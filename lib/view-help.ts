@@ -135,6 +135,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "Asks, for each pair of genes, whether tumours carry changes in both more or less often than chance — \"mutually exclusive\" genes are rarely changed together, which can mean either change alone is enough to drive the cancer. Its sense of \"chance\" accounts for how many changes each tumour has overall: a tumour with hundreds of changes is expected to share genes with many others, so it does not make two genes look linked just because they both turn up in heavily altered tumours. Beside it is the simpler test that ignores this, to show the difference."
   },
+  txendpoints: {
+    title: "What is this?",
+    text: "Starts each patient's clock on the day a treatment began — for example their first immunotherapy — and follows them to an outcome that real-world studies use in place of a trial's: when they moved on to their next treatment (time to next treatment), when they stopped this one (time on treatment), or when their cancer was recorded as growing (real-world progression-free survival). Death counts as the outcome too, and patients still followed without it are counted up to their last visit. Each group's curve shows the share not yet there at each month, with the number still followed below. The groups were not randomised to the treatment, so a gap between curves is a clue, not proof that a gene or a group changes how well the treatment works."
+  },
   labs: {
     title: "What is this?",
     text: "Follows a blood test — such as PSA in prostate cancer — from the moment a treatment started, as the change from each patient's own starting level. The line shows the typical patient, the shaded band the middle half of patients, and the bars on the right each patient's best result: how far their level fell, or rose, after treatment began."

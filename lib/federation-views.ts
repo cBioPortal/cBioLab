@@ -10,6 +10,7 @@ import { clinicalTable } from "./custom-data.ts";
 import { splitBucketSql } from "./cohort2.ts";
 import { casesCte, type CompositionSource } from "./composition.ts";
 import { finiteSql } from "./sql-number.ts";
+import { linesCtes, type LineSpec } from "./treatment-lines.ts";
 
 /** bare patient id for a *_unique_id column of this study */
 const pidOf = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
@@ -1361,4 +1362,145 @@ export function riskmodelPanelGenesSql(study: string, db: string): string {
     "  WHERE cancer_study_identifier = " + sq(study) + " AND alteration_type = 'MUTATION_EXTENDED')\n" +
     "GROUP BY panel"
   );
+}
+
+// ---------------------------------------------------------------------------
+// txendpoints: real-world treatment endpoints from a treatment anchor
+
+/** Days per month on the timeline clock: OS_MONTHS × this is the last follow-up's timeline day. */
+export const DAYS_PER_MONTH = 30.4375;
+/** a timeline event this many days past OS_MONTHS × DAYS_PER_MONTH says the two clocks disagree */
+export const CLOCK_SLACK_DAYS = 31;
+
+export interface TxEndpointOpts {
+  endpoint: "ttnt" | "tot" | "rwpfs";
+  /** the anchored treatment (event type, optional key = value; the first or last such record) */
+  anchor: IncidenceAnchor;
+  /** how records form lines (lib/treatment-lines.ts) */
+  lines: LineSpec;
+  /** rwpfs: the progression event — its type, key and accepted values, and an optional probability floor */
+  progression?: { eventType: string; key: string; values: string[]; probabilityKey?: string; minProbability?: number };
+  /** tot: a stop this many days or fewer before the last follow-up of a living patient counts as ongoing */
+  ongoingDays?: number;
+}
+
+/**
+ * Per cohort, counts of (entry, t, ev) in months from the anchored treatment's start (day `a`): the
+ * time to the endpoint (`ev` 1) or to censoring at the last follow-up (`ev` 0), the last follow-up
+ * being day OS_MONTHS × DAYS_PER_MONTH of the timeline clock and death (OS_STATUS 1:…) an event for
+ * every endpoint. `entry` is the delay from the anchor to day 0 when the anchor precedes it — the
+ * left truncation of the survival and incidence views.
+ *   ttnt   the start of the next treatment line after the anchor's (lines as lib/treatment-lines.ts
+ *          builds them; for an anchor no line holds, the first line starting after it), or death
+ *   tot    the latest stop of the anchored records in the anchor's line (or, outside a line, those
+ *          starting on day `a`), or death; a living patient whose stop lies within `ongoingDays` of
+ *          the last follow-up is censored there as still on it
+ *   rwpfs  the first progression event after day `a`, or death
+ * Patients who cannot enter are counted under `kind`: 'nofollowup' (no OS, or follow-up ending at
+ * or before the anchor) and, for tot, 'nostop' (an anchored record of the line without a stop
+ * date). `late` flags patients with a timeline event more than CLOCK_SLACK_DAYS past their last
+ * follow-up — the check that the timeline and OS_MONTHS share day 0. A cohort patient with no
+ * anchored record is in no row; the caller counts them from the cohort's size.
+ */
+export function txEndpointCountsSql(cohortSql: string, study: string, db: string, o: TxEndpointOpts): string {
+  const pid = pidOf("patient_unique_id", study);
+  const pick = o.anchor.occurrence === "LAST" ? "max" : "min";
+  const evFrom = (alias: string) =>
+    "  FROM " + db + ".clinical_event " + alias + "\n" +
+    "  JOIN " + db + ".patient p ON p.internal_id = " + alias + ".patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND p.stable_id IN (SELECT pid FROM cohort)\n";
+  const hasKv = (alias: string, key: string, valueCond: string) =>
+    "    AND " + alias + ".clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE " +
+    foldedEqualsSql("key", key) + " AND " + valueCond + ")\n";
+  const ctes: string[] = [
+    "os AS (\n" +
+    "  SELECT " + pid + " AS pid,\n" +
+    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
+    "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
+    "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    ")",
+    "arec AS (\n" +
+    "  SELECT p.stable_id AS pid, ce.clinical_event_id AS eid, ce.start_date AS s, ce.stop_date AS e\n" + evFrom("ce") +
+    "    AND " + foldedEqualsSql("ce.event_type", o.anchor.eventType) + "\n" +
+    (o.anchor.key ? hasKv("ce", o.anchor.key, foldedEqualsSql("value", String(o.anchor.value ?? ""))) : "") +
+    ")",
+    "anch AS (SELECT pid, " + pick + "(s) AS a FROM arec GROUP BY pid)",
+    "lastday AS (\n" +
+    "  SELECT p.stable_id AS pid, max(greatest(ce.start_date, coalesce(ce.stop_date, ce.start_date))) AS d\n" + evFrom("ce") +
+    "  GROUP BY pid\n" +
+    ")",
+  ];
+  let x: string;
+  if (o.endpoint === "rwpfs") {
+    const pr = o.progression!;
+    ctes.push(
+      "prog AS (\n" +
+      "  SELECT p.stable_id AS pid, ce.start_date AS day\n" + evFrom("ce") +
+      "    AND " + foldedEqualsSql("ce.event_type", pr.eventType) + "\n" +
+      hasKv("ce", pr.key, foldedInSql("value", pr.values)) +
+      (pr.probabilityKey && pr.minProbability != null
+        ? hasKv("ce", pr.probabilityKey, "toFloat64OrNull(value) >= " + Number(pr.minProbability)) : "") +
+      ")",
+      "x AS (SELECT prog.pid AS pid, min(prog.day) AS d, 0 AS nostop FROM prog INNER JOIN anch ON anch.pid = prog.pid WHERE prog.day > anch.a GROUP BY prog.pid)");
+    x = "x";
+  } else {
+    ctes.push(...linesCtes({ db, study, patientFilter: "p.stable_id IN (SELECT pid FROM cohort)", spec: o.lines }),
+      // the anchor's line: the line of a record that is anchored and starts on day a
+      "aline AS (\n" +
+      "  SELECT n.pid AS pid, min(n.line_no) AS ln FROM numbered n\n" +
+      "  INNER JOIN arec ON arec.eid = n.eid INNER JOIN anch ON anch.pid = n.pid\n" +
+      "  WHERE arec.s = anch.a GROUP BY n.pid\n" +
+      ")");
+    if (o.endpoint === "ttnt") {
+      ctes.push(
+        "x AS (\n" +
+        "  SELECT anch.pid AS pid, minIf(l.ls, if(al.pid != '', l.line_no > al.ln, l.ls > anch.a)) AS d,\n" +
+        "         countIf(if(al.pid != '', l.line_no > al.ln, l.ls > anch.a)) AS k, 0 AS nostop\n" +
+        "  FROM anch LEFT JOIN aline al ON al.pid = anch.pid INNER JOIN lines l ON l.pid = anch.pid\n" +
+        "  GROUP BY anch.pid HAVING k > 0\n" +
+        ")");
+    } else {
+      ctes.push(
+        "x AS (\n" +
+        "  SELECT anch.pid AS pid, max(arec.e) AS d, countIf(arec.e IS NULL) AS nostop\n" +
+        "  FROM anch INNER JOIN arec ON arec.pid = anch.pid\n" +
+        "  LEFT JOIN aline al ON al.pid = anch.pid LEFT JOIN numbered n ON n.eid = arec.eid\n" +
+        "  WHERE arec.s >= anch.a AND if(al.pid != '', n.line_no = al.ln, arec.s = anch.a)\n" +
+        "  GROUP BY anch.pid\n" +
+        ")");
+    }
+    x = "x";
+  }
+  const ongoing = Math.max(0, Math.floor(Number(o.ongoingDays ?? 30)));
+  ctes.push(
+    "per AS (\n" +
+    "  SELECT anch.a AS a, os.months * " + DAYS_PER_MONTH + " AS fu, os.months IS NOT NULL AS has_os, os.dead AS dead,\n" +
+    "         " + x + ".pid != '' AS has_x, toFloat64(" + x + ".d) AS xd, " + x + ".nostop AS nostop, lastday.d AS ld\n" +
+    "  FROM anch\n" +
+    "  LEFT JOIN os ON os.pid = anch.pid\n" +
+    "  LEFT JOIN " + x + " ON " + x + ".pid = anch.pid\n" +
+    "  LEFT JOIN lastday ON lastday.pid = anch.pid\n" +
+    ")",
+    "cls AS (\n" +
+    "  SELECT multiIf(NOT has_os OR fu - a <= 0, 'nofollowup',\n" +
+    (o.endpoint === "tot" ? "                 NOT has_x OR nostop > 0 OR xd IS NULL, 'nostop',\n" : "") +
+    "                 'record') AS kind,\n" +
+    "         greatest(0, -a) / " + DAYS_PER_MONTH + " AS entry,\n" +
+    (o.endpoint === "tot"
+      ? "         (least(xd, fu) - a) / " + DAYS_PER_MONTH + " AS tt,\n" +
+        "         if(NOT dead AND xd + " + ongoing + " >= fu, 0, 1) AS ev,\n"
+      : "         has_x AND xd <= fu AS hit,\n" +
+        "         if(hit, xd - a, fu - a) / " + DAYS_PER_MONTH + " AS tt,\n" +
+        "         if(hit, 1, if(dead, 1, 0)) AS ev,\n") +
+    "         ld > fu + " + CLOCK_SLACK_DAYS + " AS late\n" +
+    "  FROM per\n" +
+    ")");
+  return "WITH cohort AS (" + cohortSql + "),\n" + ctes.join(",\n") + "\n" +
+    "SELECT kind, if(kind = 'record', round(entry, 4), 0) AS entry, if(kind = 'record', round(tt, 4), 0) AS t,\n" +
+    "       if(kind = 'record', ev, 0) AS ev, late, count() AS n\n" +
+    "FROM cls GROUP BY kind, entry, t, ev, late ORDER BY t";
 }

@@ -80,6 +80,8 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
     why: (k) => k.events.some((e) => /lab/i.test(e.canonical)) ? null : "this study records no lab-test timeline events" },
   incidence: { label: "Cumulative incidence (competing risks)", title: "Cumulative incidence", maxCohorts: 6,
     why: (k) => k.events.length ? null : "this study records no timeline events to estimate the incidence of" },
+  txendpoints: { label: "Treatment endpoints (TTNT, time on treatment, real-world PFS)", title: "Treatment endpoints", maxCohorts: 6,
+    why: (k) => k.events.some((e) => /treat|therap|drug|medicat/i.test(e.canonical)) ? null : "this study records no treatment timeline events" },
   clonality: { label: "Clonality (FACETS)", title: "Clonality", genes: true, maxCohorts: 3 },
   paired: { label: "Paired samples (primary vs metastasis, before vs after)", title: "Paired samples", genes: true, maxCohorts: 3 },
   acquired: { label: "Acquired under therapy (samples before vs after a treatment start)", title: "Acquired under therapy", genes: true, maxCohorts: 3,
@@ -204,6 +206,11 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     const an = spec.anchor;
     return (e.label || e.eventType || "no event chosen") +
       (an && an.eventType ? " from first " + an.eventType + (an.key ? " [" + an.key + "=" + an.value + "]" : "") : " from day 0") + ", death competing";
+  }
+  if (kind === "txendpoints") {
+    const an = spec.anchor || {};
+    const ep = spec.endpoint === "tot" ? "time on treatment" : spec.endpoint === "rwpfs" ? "real-world PFS" : "time to next treatment";
+    return ep + " from " + (an.occurrence === "LAST" ? "last " : "first ") + (an.eventType || "?") + (an.key ? " [" + an.key + "=" + an.value + "]" : "") + ", death an event";
   }
   if (kind === "clonality") return "FACETS allele-specific copy number" + (spec.measure === "any" ? ", every mutation" : ", driver mutations") + (spec.qc === false ? ", all samples" : ", QC-passing samples");
   if (kind === "paired") {
@@ -546,6 +553,44 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       </div>
     );
   }
+  if (spec.kind === "txendpoints") {
+    const an = spec.anchor || { eventType: "Treatment" };
+    const types = c.events.map((x) => x.label);
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">endpoint</span>
+          <label className="tbfield" title="what ends each patient's time: the next treatment line, stopping this treatment, or recorded progression — death ends it too">
+            to <OptionSelect value={spec.endpoint || "ttnt"} disabled={busy} onValueChange={(v) => patch({ endpoint: v })}>
+              <option value="ttnt">next treatment (TTNT)</option>
+              <option value="tot">end of treatment (TOT)</option>
+              <option value="rwpfs">progression (rwPFS)</option>
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="days without therapy that start a new treatment line">
+            line gap <OptionSelect value={String(spec.lineGap ?? 90)} disabled={busy} onValueChange={(v) => patch({ lineGap: Number(v) })}>
+              {[30, 60, 90, 120, 180].map((d) => <option key={d} value={d}>{d} days</option>)}
+            </OptionSelect>
+          </label>
+        </div>
+        <div className="tbz"><span className="tbl">clock</span>
+          <label className="tbfield" title="the treatment record whose start begins the clock">
+            from first <OptionSelect value={an.eventType || ""} disabled={busy} onValueChange={(v) => patch({ anchor: { ...an, eventType: v } })}>
+              {!types.includes(an.eventType) && <option value={an.eventType || ""}>{an.eventType || "choose…"}</option>}
+              {types.map((t) => <option key={t} value={t}>{t}</option>)}
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="only treatment records with this attribute (e.g. SUBTYPE, AGENT); empty for any">
+            where <DraftInput value={an.key || ""} disabled={busy} width="6rem" placeholder="attribute"
+              onCommit={(t) => patch({ anchor: { eventType: an.eventType, ...(an.occurrence ? { occurrence: an.occurrence } : {}), ...(t.trim() ? { key: t.trim(), value: an.value || "" } : {}) } })} />
+          </label>
+          <label className="tbfield" title="the value that attribute must take (e.g. Immuno, PEMBROLIZUMAB)">
+            = <DraftInput value={an.value || ""} disabled={busy} width="7rem" placeholder="value"
+              onCommit={(t) => patch({ anchor: { ...an, value: t } })} />
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "incidence") {
     const e = spec.event || { eventType: "" }, a0 = (e.attrs || [])[0] || { key: "", value: "" };
     const an = spec.anchor || null;
@@ -765,6 +810,10 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
     return { kind, test: "PSA", anchor: { eventType: tx ? tx.label : "Treatment" } };
+  }
+  if (kind === "txendpoints") {
+    const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
+    return { kind, endpoint: "ttnt", anchor: { eventType: tx ? tx.label : "Treatment", key: "SUBTYPE", value: "Immuno" } };
   }
   if (kind === "incidence") {
     const ev = known.events.find((e) => /diagnos|progress|status/i.test(e.canonical)) || known.events[0];

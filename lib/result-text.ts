@@ -5,6 +5,7 @@
 import { isDrawn, type AnalysisDoc, type AnalysisResult, type ViewResult, type AssaysEntity, type CorrelatesGene } from "./types.ts";
 import { lollipopSummaryText } from "./lollipop-svg.ts";
 import { riskSpan } from "./figures/riskmodel.ts";
+import { txMedianText } from "./figures/txendpoints.ts";
 
 /** a timeline's events listed in text (MCP); the figure draws every one */
 const TIMELINE_TEXT_EVENTS = 400;
@@ -319,6 +320,14 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         "\n  genes kept most often: " + m.features.slice(0, 15).map((f) => `${f.gene} ${Math.round(f.selected * 100)}% HR ${f.hr.toFixed(2)}`).join(", ") +
         (m.neverHeldOut ? `\n  ${m.neverHeldOut} patients were never held out, so have no score` : "") +
         caveatOf(v) + methodOf(v) + noteOf(v));
+    } else if (v.kind === "txendpoints") {
+      const t = v.txendpoints;
+      out.push(`Treatment endpoint: ${t.endpointLabel} from ${t.anchoredTo} (Kaplan-Meier):\n` +
+        t.curves.map((c) => `  ${c.cohort}: n=${c.n.toLocaleString()}, ${c.events} events, ${txMedianText(c)}; ` +
+          `${c.anchored} of ${c.cohortPatients} anchored; left out ${c.excluded.noAnchor} without the anchor, ${c.excluded.noFollowup} without follow-up` +
+          (t.endpoint === "tot" ? `, ${c.excluded.noStop} without a stop date` : "")).join("\n") +
+        (t.logrank ? `\n  log-rank chi2=${t.logrank.chi2.toFixed(2)} (${t.logrank.df} df), p=${pFmt(t.logrank.p)}` : t.noTest ? `\n  ${t.noTest}` : "") +
+        caveatOf(v) + noteOf(v));
     } else if (v.kind === "labs") {
       const lb = v.labs;
       out.push(`Lab course: ${lb.test} % change from baseline, weeks from ${lb.anchoredTo}:\n` +

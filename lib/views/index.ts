@@ -35,6 +35,7 @@ import { runTimeline } from "./timeline.ts";
 import { runAcquired } from "./acquired.ts";
 import { runCtdna } from "./ctdna.ts";
 import { runExclusivity } from "./exclusivity.ts";
+import { runTxendpoints } from "./txendpoints.ts";
 
 /**
  * A runner that lets a throw stand for its error: an error is reported as the view's, with its
@@ -85,6 +86,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   acquired: drawn(runAcquired),
   ctdna: drawn(runCtdna),
   exclusivity: drawn(runExclusivity),
+  txendpoints: drawn(runTxendpoints),
 };
 
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */

@@ -96,6 +96,37 @@ export function kaplanMeier(data: SurvRecord[]): Omit<KmCurve, "cohort"> {
 }
 
 /**
+ * The Kaplan–Meier median with its 95% interval, read off the pointwise band of S(t) — Greenwood
+ * variance on the log scale (R survfit's default conf.type "log"): the lower end is the first time
+ * the band's lower edge reaches 0.5, the upper end the first time its upper edge does. Null where a
+ * curve never gets there. Same risk sets as kaplanMeier, delayed entry included.
+ */
+export function kmMedianCi(data: SurvRecord[]): { median: number | null; lo: number | null; hi: number | null } {
+  const clean = data.filter(d => Number.isFinite(d.t) && d.t >= 0).filter(observable).sort((x, y) => x.t - y.t);
+  const atRiskAt = riskSweep(clean);
+  let s = 1, v = 0, i = 0;
+  let median: number | null = null, lo: number | null = null, hi: number | null = null;
+  while (i < clean.length) {
+    const t = clean[i].t;
+    let d = 0;
+    while (i < clean.length && clean[i].t === t) { if (clean[i].event) d++; i++; }
+    const n = atRiskAt(t);
+    if (d > 0 && n > 0) {
+      s *= 1 - d / n;
+      v += n > d ? d / (n * (n - d)) : Infinity;
+      if (median === null && s <= 0.5) median = t;
+      // where S reaches 0 the log-scale band is undefined (R reports NA), so it sets no end
+      const half = Z_975 * Math.sqrt(v);
+      if (s > 0 && Number.isFinite(half)) {
+        if (lo === null && s * Math.exp(-half) <= 0.5) lo = t;
+        if (hi === null && s * Math.exp(half) <= 0.5) hi = t;
+      }
+    }
+  }
+  return { median, lo, hi };
+}
+
+/**
  * Administrative censoring at a fixed month: anyone still under observation past `cutoff`
  * is treated as censored AT the cutoff rather than dropped. Dropping would bias the risk set
  * (their at-risk time up to the cutoff is real and must still count); this only removes what
