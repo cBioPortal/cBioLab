@@ -945,6 +945,58 @@ export interface AcquiredResult {
   excluded?: { study: string; reason: string }[];
 }
 /**
+ * ctDNA against tissue: patients with a plasma (cfDNA) sample and a tissue sample, per gene covered
+ * by both, altered in both, tissue only, plasma only or neither; plasma's positive percent
+ * agreement with tissue as the reference; the share of plasma patients with any alteration
+ * detected; and overall survival by ctDNA detected or not.
+ */
+export interface CtdnaView {
+  note?: string;
+  kind: "ctdna"; cohorts?: string[];
+  /** the genes (at most 30); omitted, the `top` (default 15, at most 30) most altered in the paired patients */
+  genes?: string[]; top?: number;
+  /** the sample attribute classing samples (default SAMPLE_CLASS) and its plasma (default cfDNA, ctDNA) and tissue (default Tumor) values */
+  attribute?: string; plasma?: string[]; tissue?: string[];
+  /** samples on these panels count as plasma whatever the attribute says (e.g. ["ACCESS129"]) */
+  plasmaPanels?: string[];
+  /** keep only samples the timeline dates within this many days of a sample of the other kind (default: no dates needed) */
+  withinDays?: number;
+  sampleEvents?: string[]; sampleKey?: string;
+  /** any alteration (default) or OncoKB oncogenic only */
+  measure?: "driver" | "any";
+}
+export interface CtdnaGene {
+  gene: string;
+  /** patients whose plasma and tissue samples both cover the gene */
+  pairs: number; both: number; tissueOnly: number; plasmaOnly: number; neither: number;
+  /** positive percent agreement: both ÷ altered in tissue, with its 95% Wilson interval (null when tissue has none) */
+  ppa: number | null; ppaLow: number | null; ppaHigh: number | null;
+  /** (both + neither) ÷ pairs */
+  concordance: number | null;
+}
+export interface CtdnaPanel {
+  cohort: string;
+  /** patients with a plasma sample, a tissue sample, both; samples of each kind among those with both */
+  plasmaPatients: number; tissuePatients: number; patients: number; plasmaSamples: number; tissueSamples: number;
+  /** with withinDays: before the date rule, patients with plasma and tissue; and the classed samples the timeline dated */
+  undated?: { plasmaPatients: number; tissuePatients: number; datedSamples: number };
+  /** of the plasma patients, those with any (driver) alteration called in plasma, with a 95% Wilson interval */
+  detected: number; detectedLow: number | null; detectedHigh: number | null;
+  genes: CtdnaGene[];
+  /** overall survival of the plasma patients by ctDNA detected or not; null with why when not drawn */
+  survival: { curves: (Omit<KmCurve, "cohort"> & { label: string })[]; logrank: LogRank | null; missing: number } | null;
+  survivalWhy?: string;
+}
+export interface CtdnaResult {
+  attribute: string; plasma: string[]; tissue: string[]; plasmaPanels: string[];
+  withinDays: number | null;
+  measure: "driver" | "any";
+  /** present when the genes were chosen as the most altered */
+  top?: number;
+  panels: CtdnaPanel[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
  * Clonality from FACETS allele-specific copy number: for each gene, whether the cohort's
  * mutation calls are clonal or subclonal, how often the mutated locus has lost its other allele,
  * and their cancer-cell fractions; per cohort, whole-genome doubling, purity and ploidy. Only
@@ -1583,7 +1635,7 @@ import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
 export type ViewKind = View["kind"];
@@ -1991,6 +2043,9 @@ export interface ViewResultFields {
   acquired: {
     acquired?: AcquiredResult;
   };
+  ctdna: {
+    ctdna?: CtdnaResult;
+  };
   clonality: {
     clonality?: ClonalityResult;
   };
@@ -2045,7 +2100,7 @@ export interface ViewResultMain {
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
   cancertypes: "cancertypes"; overlap: "overlap"; enrichment: "enrichment"; assays: "assays";
   composition: "composition"; correlates: "correlates"; table: "table"; timeline: "timeline";
-  mutations: "mutations"; alterations: "alterations"; acquired: "acquired";
+  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna";
 }
 /** a result that was drawn: no error, not waiting, and its main field present */
 type Drawn<K extends ViewKind> = { error?: undefined; empty?: undefined } & ViewResultFields[K]

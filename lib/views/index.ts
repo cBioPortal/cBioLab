@@ -33,6 +33,7 @@ import { runMutations } from "./mutations.ts";
 import { runAlterations } from "./alterations.ts";
 import { runTimeline } from "./timeline.ts";
 import { runAcquired } from "./acquired.ts";
+import { runCtdna } from "./ctdna.ts";
 
 /**
  * A runner that lets a throw stand for its error: an error is reported as the view's, with its
@@ -81,6 +82,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   alterations: drawn(runAlterations),
   timeline: drawn(runTimeline),
   acquired: drawn(runAcquired),
+  ctdna: drawn(runCtdna),
 };
 
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */

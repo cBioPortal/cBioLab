@@ -19,6 +19,7 @@ import { assaysSvg } from "./assays.ts";
 import { compositionSvg } from "./composition.ts";
 import { correlatesSvg } from "./correlates.ts";
 import { acquiredSvg } from "./acquired.ts";
+import { ctdnaSvg } from "./ctdna.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -88,6 +89,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   acquired: {
     draw: (v, o) => v.acquired && v.acquired.panels.some((pn) => pn.patients && pn.genes.length) ? acquiredSvg(v, o) : null,
     title: (v) => "Acquired under therapy" + (v.acquired ? " — samples before and after " + v.acquired.anchoredTo : "")
+  },
+  ctdna: {
+    draw: (v, o) => v.ctdna && v.ctdna.panels.some((pn) => pn.patients) ? ctdnaSvg(v, o) : null,
+    title: () => "ctDNA vs tissue"
   },
 };
 

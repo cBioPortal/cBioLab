@@ -1160,6 +1160,14 @@ export function mcnemarExact(b: number, c: number): number {
   return Math.min(1, 2 * tail);
 }
 
+/** Wilson score interval for k successes in n trials at 95%; null for n = 0. */
+export function wilsonInterval(k: number, n: number): { low: number; high: number } | null {
+  if (!(n > 0)) return null;
+  const z2 = Z_975 * Z_975, ph = k / n, den = 1 + z2 / n;
+  const mid = (ph + z2 / (2 * n)) / den, half = (Z_975 / den) * Math.sqrt(ph * (1 - ph) / n + z2 / (4 * n * n));
+  return { low: Math.max(0, mid - half), high: Math.min(1, mid + half) };
+}
+
 // ---------------------------------------------------------------------------
 // Competing risks: cumulative incidence (Aalen–Johansen) and Gray's test
 

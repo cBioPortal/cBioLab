@@ -266,6 +266,17 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
           pn.genes.map((g) => `    ${g.gene}: acquired ${g.acquired}, lost ${g.lost}, shared ${g.shared}, neither ${g.neither} of ${g.pairs} pairs` +
             (g.acquired + g.lost ? `, McNemar p=${pFmt(g.p)} q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +
         caveatOf(v) + noteOf(v));
+    } else if (v.kind === "ctdna") {
+      const cr = v.ctdna, pc = (x: number | null) => x == null ? "—" : (100 * x).toFixed(0) + "%";
+      out.push(`ctDNA vs tissue (plasma ${cr.attribute} = ${cr.plasma.join("/")}${cr.plasmaPanels.length ? " or panel " + cr.plasmaPanels.join("/") : ""}, tissue ${cr.tissue.join("/")}; ` +
+        `${cr.measure === "driver" ? "OncoKB oncogenic" : "any alteration"}${cr.withinDays != null ? `; samples within ${cr.withinDays} days` : ""}; both panels cover the gene):\n` +
+        cr.panels.map((pn) => `  ${pn.cohort} (${pn.patients.toLocaleString()} patients with both; ctDNA detected in ${pn.detected.toLocaleString()} of ${pn.plasmaPatients.toLocaleString()} with plasma, ` +
+          `${pc(pn.plasmaPatients ? pn.detected / pn.plasmaPatients : null)} [95% CI ${pc(pn.detectedLow)}–${pc(pn.detectedHigh)}]):\n` +
+          pn.genes.map((g) => `    ${g.gene}: both ${g.both}, tissue-only ${g.tissueOnly}, plasma-only ${g.plasmaOnly}, neither ${g.neither} of ${g.pairs}; ` +
+            `PPA ${pc(g.ppa)}${g.ppa != null ? ` [${pc(g.ppaLow)}–${pc(g.ppaHigh)}]` : ""}, concordance ${pc(g.concordance)}`).join("\n") +
+          (pn.survival ? `\n    OS: ` + pn.survival.curves.map((c) => `${c.label} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : c.median.toFixed(1) + "mo"}`).join("; ") +
+            (pn.survival.logrank ? `; log-rank p=${pFmt(pn.survival.logrank.p)}` : "") : pn.survivalWhy ? `\n    OS by ctDNA not drawn: ${pn.survivalWhy}` : "")).join("\n") +
+        caveatOf(v) + noteOf(v));
     } else if (v.kind === "clonality") {
       const cr = v.clonality;
       out.push(`Clonality (FACETS; ${cr.measure === "driver" ? "driver mutation calls" : "all mutation calls"}${cr.qc ? ", QC-passing samples" : ""}):\n` +

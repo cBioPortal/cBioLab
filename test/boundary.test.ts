@@ -291,6 +291,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   const LAB_ANCHOR = { eventType: "Treatment", key: "SUBTYPE", value: "Hormone", occurrence: "FIRST" as const };
   const LAB_OPTS = { baselineDays: 90, fromDays: -84, toDays: 364, binDays: 28 };
   const ACQ = { anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Hormone" }, sampleEvents: ["Sample acquisition", "Sequencing"], sampleKey: "SAMPLE_ID", preWindowDays: null, minGapDays: 30 };
+  const CTD = { attribute: "SAMPLE_CLASS", plasma: ["cfDNA", "ctDNA"], tissue: ["Tumor"], plasmaPanels: [] as string[], withinDays: null as number | null, sampleEvents: ["Sequencing"], sampleKey: "SAMPLE_ID" };
   const BUILDERS: Record<string, () => string> = {
     // Plots: an axis selects (id, value) per case, but every builder here groups the id away.
   // If one ever projected a case id, this suite is what would stop it reaching a peer.
@@ -384,6 +385,11 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "acquiredCountsSql": () => federation.acquiredCountsSql(cohortSql, "x", "db", ["TP53", "ESR1"], ACQ, "v7.5", "driver"),
     "acquiredCountsSql:scan-any": () => federation.acquiredCountsSql(cohortSql, "x", "db", null, { ...ACQ, preWindowDays: 365 }, null, "any"),
     "acquiredFunnelSql": () => federation.acquiredFunnelSql(cohortSql, "x", "db", ACQ),
+    // ctdna: `classed`/`sides`/`ps` hold samples by kind; the outer SELECTs count them per gene, along the funnel, or per (detected, months, dead)
+    "ctdnaCountsSql": () => federation.ctdnaCountsSql(cohortSql, "x", "db", ["EGFR"], CTD, "v7.5", "driver"),
+    "ctdnaCountsSql:dated-panels": () => federation.ctdnaCountsSql(cohortSql, "x", "db", null, { ...CTD, plasmaPanels: ["ACCESS129"], withinDays: 90 }, null, "any"),
+    "ctdnaFunnelSql": () => federation.ctdnaFunnelSql(cohortSql, "x", "db", CTD, "v7.5", "driver"),
+    "ctdnaSurvivalSql": () => federation.ctdnaSurvivalSql(cohortSql, "x", "db", { ...CTD, withinDays: 30 }, null, "any"),
     "sampleAttributeValuesSql": () => federation.sampleAttributeValuesSql(cohortSql, "x", "db", "SAMPLE_TYPE"),
     // clonality: `calls` is per (gene, sample); only per-gene counts and CCF bins leave
     "clonalityGenesSql": () => federation.clonalityGenesSql(cohortSql, "x", "db", ["TP53"], "v7.5", "driver", true),

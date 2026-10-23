@@ -207,6 +207,9 @@
     "Acquired under therapy: the sample before a treatment against the sample after it": {
       "all patients": 172
     },
+    "ctDNA against tissue: what a blood test sees of the tumour, and what detecting it says": {
+      "all patients": 1127
+    },
     "Clonality, LOH and genome doubling from FACETS": {
       "Colorectal": 4993,
       "Breast": 5803
