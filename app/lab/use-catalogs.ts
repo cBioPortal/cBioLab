@@ -37,12 +37,17 @@ async function answer(res: Response) {
   return j;
 }
 
-export function useStudies(): StudyInfo[] {
+/** The study list, and whether it is still loading or failed (with a retry) — three states, so a page never reads "0 studies" while waiting. */
+export function useStudyList(): { studies: StudyInfo[]; loading: boolean; error: string | null; retry: () => void } {
   const q = useQuery({
     queryKey: ["studies"],
     queryFn: async ({ signal }) => ((await answer(await api.studies({ signal }))).studies || []) as StudyInfo[],
   });
-  return q.data ?? NO_STUDIES;
+  return { studies: q.data ?? NO_STUDIES, loading: q.isPending, error: q.error ? String(q.error.message || q.error) : null, retry: () => { void q.refetch(); } };
+}
+
+export function useStudies(): StudyInfo[] {
+  return useStudyList().studies;
 }
 
 /** The study catalog the survival, course and sequence controls read. A templated document holds
