@@ -312,7 +312,12 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
           pn.genes.map((g) => `    ${g.gene}: both ${g.both}, tissue-only ${g.tissueOnly}, plasma-only ${g.plasmaOnly}, neither ${g.neither} of ${g.pairs}; ` +
             `PPA ${pc(g.ppa)}${g.ppa != null ? ` [${pc(g.ppaLow)}–${pc(g.ppaHigh)}]` : ""}, concordance ${pc(g.concordance)}`).join("\n") +
           (pn.survival ? `\n    OS: ` + pn.survival.curves.map((c) => `${c.label} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : c.median.toFixed(1) + "mo"}`).join("; ") +
-            (pn.survival.logrank ? `; log-rank p=${pFmt(pn.survival.logrank.p)}` : "") : pn.survivalWhy ? `\n    OS by ctDNA not drawn: ${pn.survivalWhy}` : "")).join("\n") +
+            (pn.survival.logrank ? `; log-rank p=${pFmt(pn.survival.logrank.p)}` : "") : pn.survivalWhy ? `\n    OS by ctDNA not drawn: ${pn.survivalWhy}` : "") +
+          (pn.ch ? `\n    CH filter: removed ${pn.ch.removed} of ${pn.ch.calls} plasma mutation calls in ${pn.ch.patients} patients (${pn.ch.byGene} by gene, ${pn.ch.byNormal} by the matched normal)` +
+            (pn.ch.genes.length ? ": " + pn.ch.genes.map((g) => `${g.gene} ${g.calls}`).join(", ") : "") +
+            `; unfiltered: ctDNA detected ${pn.ch.before.detected.toLocaleString()} (${pc(pn.plasmaPatients ? pn.ch.before.detected / pn.plasmaPatients : null)})` +
+            (pn.ch.before.survival && pn.ch.before.survival.p != null ? `, OS log-rank p=${pFmt(pn.ch.before.survival.p)}` : "") +
+            `; plasma-only unfiltered ` + pn.ch.before.genes.map((g) => `${g.gene} ${g.plasmaOnly}`).join(", ") : "")).join("\n") +
         caveatOf(v) + noteOf(v));
     } else if (v.kind === "exclusivity") {
       const ex = v.exclusivity;

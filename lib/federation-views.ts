@@ -247,7 +247,7 @@ export function pairedCountsSql(cohortSql: string, study: string, db: string, ge
  * puts each patient's samples on two sides: the paired view's sample attribute, the acquired
  * view's samples before and after a treatment start.
  */
-function sideCountsTail(study: string, db: string, genes: string[] | null, pin: string | null, measure: "driver" | "any"): string {
+function sideCountsTail(study: string, db: string, genes: string[] | null, pin: string | null, measure: "driver" | "any", exclude?: string): string {
   const scan = genes == null;
   const geneList = scan ? "SELECT DISTINCT gene FROM alt" : genes.map(sq).join(",");
   const hit = measure === "driver" ? "max(ann.is_driver)" : "1";
@@ -259,7 +259,7 @@ function sideCountsTail(study: string, db: string, genes: string[] | null, pin: 
     "  INNER JOIN ps ON ps.suid = g.sample_unique_id\n" +
     "  WHERE g.cancer_study_identifier = " + sq(study) + (scan ? "" : " AND g.hugo_gene_symbol IN (" + geneList + ")") + " AND " + ALTERED_COND + "\n" +
     // narrows the events before the annotation join rather than after it
-    "    AND g.sample_unique_id IN (SELECT suid FROM ps)\n" +
+    "    AND g.sample_unique_id IN (SELECT suid FROM ps)" + (exclude ? " AND " + exclude : "") + "\n" +
     "  GROUP BY gene, pid, side\n" +
     (scan ? "  HAVING hit > 0\n" : "") +
     "),\n" +
@@ -397,6 +397,12 @@ export interface CtdnaSides {
   /** keep only samples with a sample of the other kind dated within this many days (timeline dates); null: no dates needed */
   withinDays: number | null;
   sampleEvents: string[]; sampleKey: string;
+  /**
+   * leave out plasma mutation calls likely from clonal haematopoiesis: those in `genes`, and (with
+   * `normalMinAlt`) those whose matched normal (white-cell) sample carries at least that many
+   * alternate reads at an allele fraction at least `normalMinRatio` of the plasma's; absent, every call counts
+   */
+  ch?: { genes: string[]; normalMinAlt: number | null; normalMinRatio: number };
 }
 
 /**
@@ -445,14 +451,51 @@ function ctdnaSidesCtes(cohortSql: string, study: string, db: string, o: CtdnaSi
         "sides AS (SELECT suid, pid, side FROM classed WHERE side != '' AND suid IN (SELECT suid FROM near)),\n"
       : "sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),\n") +
     "paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),\n" +
-    "ps AS (SELECT suid, pid, side FROM sides WHERE pid IN (SELECT pid FROM paired))"
+    "ps AS (SELECT suid, pid, side FROM sides WHERE pid IN (SELECT pid FROM paired))" +
+    (o.ch ? ",\n" + ctdnaChCte(study, db, o.ch) : "")
   );
 }
+
+/**
+ * `chx`: the plasma samples' mutation calls a clonal-haematopoiesis rule removes — by gene, or by
+ * alternate reads in the matched normal (mutation_derived's normal counts, where the study loads them).
+ */
+function ctdnaChCte(study: string, db: string, ch: NonNullable<CtdnaSides["ch"]>): string {
+  const byGene = ch.genes.length ? "g.hugo_gene_symbol IN (" + ch.genes.map(sq).join(",") + ")" : "0";
+  const normal = ch.normalMinAlt != null;
+  return (
+    (normal
+      ? "nm AS (\n" +
+        "  SELECT concat(studyId, '_', sampleId) AS suid, `GENE.hugoGeneSymbol` AS gene, proteinChange AS mv,\n" +
+        "         max(normalAltCount >= " + Math.floor(ch.normalMinAlt!) + " AND normalAltCount / (normalAltCount + normalRefCount) >= " + Number(ch.normalMinRatio) +
+        " * tumorAltCount / greatest(1, tumorAltCount + tumorRefCount)) AS hit, max(normalAltCount IS NOT NULL) AS loaded\n" +
+        "  FROM " + db + ".mutation_derived\n" +
+        "  WHERE studyId = " + sq(study) + " AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')\n" +
+        "  GROUP BY suid, gene, mv\n" +
+        "),\n"
+      : "") +
+    "chx AS (\n" +
+    "  SELECT g.sample_unique_id AS suid, g.hugo_gene_symbol AS gene, g.mutation_variant AS mv,\n" +
+    "         max(" + byGene + ") AS by_gene, " + (normal ? "max(ifNull(nm.hit, 0) = 1)" : "toUInt8(0)") + " AS by_normal,\n" +
+    "         " + (normal ? "max(ifNull(nm.loaded, 0) = 1)" : "toUInt8(0)") + " AS has_normal\n" +
+    "  FROM " + db + ".genomic_event_derived g\n" +
+    (normal ? "  LEFT JOIN nm ON nm.suid = g.sample_unique_id AND nm.gene = g.hugo_gene_symbol AND nm.mv = g.mutation_variant\n" : "") +
+    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation'\n" +
+    "    AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b')\n" +
+    "  GROUP BY suid, gene, mv\n" +
+    ")"
+  );
+}
+
+/** with a CH rule, the condition that keeps an event: not a plasma mutation call `chx` removes (`side` is the side column) */
+const chKeep = (o: CtdnaSides, side: string): string | undefined => o.ch
+  ? "NOT (" + side + " = 'b' AND g.variant_type = 'mutation' AND (g.sample_unique_id, g.hugo_gene_symbol, g.mutation_variant) IN (SELECT suid, gene, mv FROM chx WHERE by_gene OR by_normal))"
+  : undefined;
 
 /** Per gene, among patients with plasma and tissue both profiled for it: as pairedCountsSql (a = tissue, b = plasma). */
 export function ctdnaCountsSql(cohortSql: string, study: string, db: string, genes: string[] | null, o: CtdnaSides,
   pin: string | null, measure: "driver" | "any"): string {
-  return ctdnaSidesCtes(cohortSql, study, db, o) + ",\n" + sideCountsTail(study, db, genes, pin, measure);
+  return ctdnaSidesCtes(cohortSql, study, db, o) + ",\n" + sideCountsTail(study, db, genes, pin, measure, chKeep(o, "ps.side"));
 }
 
 /**
@@ -464,25 +507,29 @@ export function ctdnaCountsSql(cohortSql: string, study: string, db: string, gen
 export function ctdnaFunnelSql(cohortSql: string, study: string, db: string, o: CtdnaSides, pin: string | null, measure: "driver" | "any"): string {
   return (
     ctdnaSidesCtes(cohortSql, study, db, o) + ",\n" +
-    ctdnaDetectedCte(study, db, pin, measure) + "\n" +
+    ctdnaDetectedCte(study, db, pin, measure, chKeep(o, "s.side")) + "\n" +
     "SELECT (SELECT uniqExactIf(pid, side = 'b') FROM classed) AS plasma_all, (SELECT uniqExactIf(pid, side = 'a') FROM classed) AS tissue_all,\n" +
     "       (SELECT uniqExactIf(pid, side = 'b') FROM sides) AS plasma, (SELECT uniqExactIf(pid, side = 'a') FROM sides) AS tissue,\n" +
     "       (SELECT count() FROM paired) AS both, (SELECT count() FROM det) AS detected,\n" +
     "       (SELECT countIf(side = 'b') FROM ps) AS plasma_samples, (SELECT countIf(side = 'a') FROM ps) AS tissue_samples,\n" +
-    "       " + (o.withinDays != null ? "(SELECT count() FROM dated)" : "toUInt64(0)") + " AS dated_samples\n" +
+    "       " + (o.withinDays != null ? "(SELECT count() FROM dated)" : "toUInt64(0)") + " AS dated_samples" +
+    (o.ch ? ",\n       (SELECT count() FROM chx) AS ch_calls, (SELECT countIf(has_normal) FROM chx) AS ch_with_normal,\n" +
+      "       (SELECT countIf(by_gene) FROM chx) AS ch_by_gene, (SELECT countIf(by_normal) FROM chx) AS ch_by_normal, (SELECT countIf(by_gene OR by_normal) FROM chx) AS ch_removed,\n" +
+      "       (SELECT uniqExact(s.pid) FROM chx INNER JOIN sides s ON s.suid = chx.suid WHERE by_gene OR by_normal) AS ch_patients" : "") + "\n" +
     "FROM system.one"
   );
 }
 
 /** the patients with any (driver) alteration called in a plasma sample */
-function ctdnaDetectedCte(study: string, db: string, pin: string | null, measure: "driver" | "any"): string {
+function ctdnaDetectedCte(study: string, db: string, pin: string | null, measure: "driver" | "any", exclude?: string): string {
   return (
     "det AS (\n" +
     "  SELECT DISTINCT s.pid AS pid FROM " + db + ".genomic_event_derived g\n" +
     (pin && measure === "driver" ? driverJoin(pin) : "") +
     "  INNER JOIN sides s ON s.suid = g.sample_unique_id\n" +
     "  WHERE g.cancer_study_identifier = " + sq(study) + " AND s.side = 'b' AND " + ALTERED_COND + "\n" +
-    "    AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b')" + (pin && measure === "driver" ? " AND ann.is_driver" : measure === "driver" ? " AND 0" : "") + "\n" +
+    "    AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b')" + (pin && measure === "driver" ? " AND ann.is_driver" : measure === "driver" ? " AND 0" : "") +
+    (exclude ? " AND " + exclude : "") + "\n" +
     ")"
   );
 }
@@ -495,7 +542,7 @@ export function ctdnaSurvivalSql(cohortSql: string, study: string, db: string, o
   const pid = pidOf("patient_unique_id", study);
   return (
     ctdnaSidesCtes(cohortSql, study, db, o) + ",\n" +
-    ctdnaDetectedCte(study, db, pin, measure) + ",\n" +
+    ctdnaDetectedCte(study, db, pin, measure, chKeep(o, "s.side")) + ",\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid, toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead, " + pid + " IN (SELECT pid FROM det) AS detected\n" +
@@ -506,6 +553,18 @@ export function ctdnaSurvivalSql(cohortSql: string, study: string, db: string, o
     ")\n" +
     "SELECT detected, round(months, 2) AS t, dead, count() AS n\n" +
     "FROM os WHERE months IS NOT NULL AND months >= 0 GROUP BY detected, t, dead ORDER BY t"
+  );
+}
+
+/** with a CH rule: per gene, the plasma mutation calls it removes and their patients, by which rule */
+export function ctdnaChRemovedSql(cohortSql: string, study: string, db: string, o: CtdnaSides): string {
+  if (!o.ch) throw new Error("ctdnaChRemovedSql needs a CH rule");
+  return (
+    ctdnaSidesCtes(cohortSql, study, db, o) + "\n" +
+    "SELECT chx.gene AS gene, countIf(by_gene OR by_normal) AS calls, uniqExactIf(s.pid, by_gene OR by_normal) AS patients,\n" +
+    "       countIf(by_gene) AS gene_calls, countIf(by_normal) AS normal_calls\n" +
+    "FROM chx INNER JOIN sides s ON s.suid = chx.suid\n" +
+    "GROUP BY gene HAVING calls > 0 ORDER BY calls DESC, gene LIMIT 40"
   );
 }
 

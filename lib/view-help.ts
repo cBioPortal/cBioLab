@@ -129,7 +129,7 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
   },
   ctdna: {
     title: "What is this?",
-    text: "Tumours shed DNA into the blood, and a blood test (a \"liquid biopsy\") can read it. For patients who had both a blood sample and a tumour tissue sample tested, this shows gene by gene how often a change was found in both, only in the tissue, or only in the blood — and how often the blood test caught what the tissue showed. Below, it shows how many patients had tumour DNA detected in their blood at all, and whether those patients lived shorter or longer than those without it."
+    text: "Tumours shed DNA into the blood, and a blood test (a \"liquid biopsy\") can read it. For patients who had both a blood sample and a tumour tissue sample tested, this shows gene by gene how often a change was found in both, only in the tissue, or only in the blood — and how often the blood test caught what the tissue showed. Below, it shows how many patients had tumour DNA detected in their blood at all, and whether those patients lived shorter or longer than those without it. With the clonal-haematopoiesis filter on, changes that probably come from ageing blood cells rather than the tumour — in genes such as DNMT3A and TET2, or also found in the patient's white blood cells — are left out first, and the figure says how many were removed and what the numbers were without the filter."
   },
   exclusivity: {
     title: "What is this?",

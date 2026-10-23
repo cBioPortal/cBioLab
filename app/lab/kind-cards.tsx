@@ -282,6 +282,7 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
   }
   if (kind === "ctdna") return "plasma " + (spec.attribute || "SAMPLE_CLASS") + " = " + (spec.plasma || ["cfDNA", "ctDNA"]).join("/") + " vs tissue " + (spec.tissue || ["Tumor"]).join("/") +
     (spec.measure === "driver" ? ", oncogenic only" : ", any alteration") + (spec.withinDays != null ? ", drawn within " + spec.withinDays + " days" : "") +
+    (spec.chFilter ? ", clonal haematopoiesis filtered" : "") +
     (spec.genes && spec.genes.length ? "" : ", the most altered genes");
   if (kind === "diffexpr") return (spec.profileType || "no profile") + (v.diffexpr ? (v.diffexpr.log2 ? ", log2(v+1)" : "") + " · volcano and GSEA" : "");
   if (kind === "pathways") return (spec.measure === "any" ? "any alteration" : "OncoKB drivers") + ", Sanchez-Vega et al. 2018";
@@ -1022,6 +1023,11 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
           <label className="tbfield" title="any alteration, or only those OncoKB calls oncogenic">
             count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
               <option value="any">any alteration</option><option value="driver">oncogenic only</option>
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="leave out plasma mutation calls likely from clonal haematopoiesis: in the canonical CH genes, or seen in the matched white-cell sample">
+            clonal haematopoiesis <OptionSelect value={spec.chFilter ? "filter" : "keep"} disabled={busy} onValueChange={(v) => patch({ chFilter: v === "filter" ? (spec.chFilter || true) : undefined })}>
+              <option value="keep">kept</option><option value="filter">filtered out</option>
             </OptionSelect>
           </label>
         </div>

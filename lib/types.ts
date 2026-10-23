@@ -1083,6 +1083,19 @@ export interface AcquiredView {
   /** any alteration (default) or OncoKB oncogenic only */
   measure?: "driver" | "any";
 }
+/** what the clonal-haematopoiesis filter removed from a cohort's plasma calls, and the headline numbers without it */
+export interface CtdnaChPanel {
+  /** plasma mutation calls, those with matched-normal counts loaded, removed by gene / by the normal / by either, and the patients with a removed call */
+  calls: number; withNormal: number; byGene: number; byNormal: number; removed: number; patients: number;
+  /** per gene, the calls and patients removed */
+  genes: { gene: string; calls: number; patients: number; byGene: number; byNormal: number }[];
+  /** without the filter */
+  before: {
+    detected: number; detectedLow: number | null; detectedHigh: number | null;
+    genes: { gene: string; both: number; plasmaOnly: number; ppa: number | null }[];
+    survival: { curves: { label: string; n: number; events: number; median: number | null }[]; p: number | null } | null;
+  };
+}
 export interface AcquiredGene {
   gene: string;
   /** patients whose before- and after-sample both cover the gene */
@@ -1129,6 +1142,13 @@ export interface CtdnaView {
   sampleEvents?: string[]; sampleKey?: string;
   /** any alteration (default) or OncoKB oncogenic only */
   measure?: "driver" | "any";
+  /**
+   * leave out plasma mutation calls likely from clonal haematopoiesis: true for the defaults, or
+   * `genes` (default the canonical CH genes; [] for none) and `normal` (default true: calls whose
+   * matched white-cell sample has at least `normalMinAlt`, default 2, alternate reads at an allele
+   * fraction at least `normalMinRatio`, default 0.3, of the plasma's)
+   */
+  chFilter?: boolean | { genes?: string[]; normal?: boolean; normalMinAlt?: number; normalMinRatio?: number };
 }
 export interface CtdnaGene {
   gene: string;
@@ -1151,6 +1171,8 @@ export interface CtdnaPanel {
   /** overall survival of the plasma patients by ctDNA detected or not; null with why when not drawn */
   survival: { curves: (Omit<KmCurve, "cohort"> & { label: string })[]; logrank: LogRank | null; missing: number } | null;
   survivalWhy?: string;
+  /** with chFilter */
+  ch?: CtdnaChPanel;
 }
 export interface CtdnaResult {
   attribute: string; plasma: string[]; tissue: string[]; plasmaPanels: string[];
@@ -1160,6 +1182,8 @@ export interface CtdnaResult {
   top?: number;
   panels: CtdnaPanel[];
   excluded?: { study: string; reason: string }[];
+  /** with chFilter: the rule applied */
+  chFilter?: { genes: string[]; normalMinAlt: number | null; normalMinRatio: number };
 }
 /**
  * Mutual exclusivity and co-occurrence against each tumour's own alteration burden (DISCOVER,

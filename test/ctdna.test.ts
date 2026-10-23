@@ -4,6 +4,7 @@ import { viewToSvg } from "../lib/view-svg.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 import { wilsonInterval } from "../lib/stats.ts";
 import type { DrawnResultOf } from "../lib/types.ts";
+import { CH_GENES } from "../lib/views/ctdna.ts";
 
 describe("wilsonInterval", () => {
   test("matches statsmodels' proportion_confint(method='wilson')", () => {
@@ -35,5 +36,19 @@ describe("ctdna figure", () => {
   test("says why survival is not drawn", () => {
     const svg = viewToSvg({ ...v, ctdna: { ...v.ctdna, panels: [{ ...v.ctdna.panels[0], survival: null, survivalWhy: "no plasma patient has OS_MONTHS" }] } })!;
     assert.ok(svg.includes("no plasma patient has OS_MONTHS"));
+  });
+  test("with the CH filter, says what it removed and the unfiltered numbers, and lints clean", () => {
+    const pn = v.ctdna.panels[0];
+    const ch = { calls: 200, withNormal: 200, byGene: 12, byNormal: 5, removed: 16, patients: 9, genes: [{ gene: "DNMT3A", calls: 10, patients: 6, byGene: 10, byNormal: 1 }],
+      before: { detected: 70, detectedLow: 0.6, detectedHigh: 0.79, genes: [{ gene: "EGFR", both: 20, plasmaOnly: 3, ppa: 2 / 3 }], survival: { curves: [], p: 0.01 } } };
+    for (const width of [560, 936]) {
+      const svg = viewToSvg({ ...v, ctdna: { ...v.ctdna, chFilter: { genes: CH_GENES, normalMinAlt: 2, normalMinRatio: 0.3 }, panels: [{ ...pn, ch }] } }, { width })!;
+      assert.ok(svg.includes("Clonal-haematopoiesis filter removed 16 of 200"));
+      assert.ok(svg.includes("plasma-only unfiltered"));
+      assert.deepEqual(lintSvg(svg), []);
+    }
+  });
+  test("TP53 is not on the default CH gene list (a tumour driver as often as a CH gene)", () => {
+    assert.ok(CH_GENES.includes("DNMT3A") && !CH_GENES.includes("TP53"));
   });
 });

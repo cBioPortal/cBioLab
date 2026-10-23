@@ -2,7 +2,7 @@
 // plasma's positive percent agreement), then overall survival by ctDNA detected or not.
 import {
   esc, palette, frame, caption, linear, axisBottom, axisLeft, leftAxisWidth, bottomAxisHeight, legend, label, textWidth, wrapWidth,
-  fmtInt, fmtShare, fmtP, fmtNum, fmtMonths, textOn, seriesStyle, timeScale, timeTitle, stepPath, FS, SW, OTHER, SERIES, type SvgOpts
+  fmtInt, fmtShare, fmtP, fmtNum, fmtMonths, textOn, seriesStyle, timeScale, timeTitle, stepPath, paragraph, FS, SW, OTHER, SERIES, type SvgOpts
 } from "../svg-kit.ts";
 import { plotHeight } from "./common.ts";
 import type { DrawnResultOf, CtdnaGene, CtdnaPanel } from "../types.ts";
@@ -20,6 +20,11 @@ export function ctdnaSvg(v: DrawnResultOf<"ctdna">, o: SvgOpts): string {
     { head: "concordant", text: (g) => g.concordance == null ? "–" : fmtShare(g.concordance, 0), w: 0 },
     { head: "pairs", text: (g) => fmtInt(g.pairs), w: 0 }
   ];
+  if (r.chFilter) {
+    const before = new Map(r.panels.flatMap((pn) => (pn.ch ? pn.ch.before.genes : []).map((g) => [pn.cohort + "\u0000" + g.gene, g] as const)));
+    const at = (g: CtdnaGene) => before.get(r.panels.find((pn) => pn.genes.includes(g))!.cohort + "\u0000" + g.gene);
+    cols.unshift({ head: "plasma-only unfiltered", text: (g) => { const b = at(g); return b ? fmtInt(b.plasmaOnly) : "–"; }, w: 0 });
+  }
   for (const c of cols) c.w = Math.max(textWidth(c.head, FS.small), ...genes.map((g) => textWidth(c.text(g), FS.small)), 0);
   const statW = cols.reduce((s, c) => s + c.w + GUT, 0);
   const geneW = Math.max(30, ...genes.map((g) => textWidth(g.gene, FS.body, 600)));
@@ -44,6 +49,16 @@ export function ctdnaSvg(v: DrawnResultOf<"ctdna">, o: SvgOpts): string {
     const lines = wrapWidth(detail, W - PAD - hw - 12 - PAD, FS.small);
     lines.forEach((l, i) => out.push(label(PAD + hw + 12, y + FS.title + i * (FS.small + 3), l, { size: FS.small, fill: p.muted })));
     y += FS.title + (lines.length - 1) * (FS.small + 3) + 8;
+    if (pn.ch) {
+      const c = pn.ch, b = c.before;
+      const text = "Clonal-haematopoiesis filter removed " + fmtInt(c.removed) + " of " + fmtInt(c.calls) + " plasma mutation calls in " + fmtInt(c.patients) + " patients (" +
+        fmtInt(c.byGene) + " by gene, " + fmtInt(c.byNormal) + " seen in the matched normal)" + (c.genes.length ? ": " + c.genes.slice(0, 8).map((g) => g.gene + " " + fmtInt(g.calls)).join(", ") + (c.genes.length > 8 ? ", " + fmtInt(c.genes.length - 8) + " more genes" : "") : "") +
+        " · unfiltered, ctDNA detected in " + fmtInt(b.detected) + (pn.plasmaPatients ? " (" + fmtShare(b.detected / pn.plasmaPatients, 0) + ")" : "") +
+        (b.survival && b.survival.p != null ? ", OS log-rank " + fmtP(b.survival.p) : "");
+      const para = paragraph(text, PAD, y, W - 2 * PAD, p.ink, { size: FS.small });
+      out.push(para.svg);
+      y += para.height + 6;
+    }
     let cx = BR;
     for (const c of cols) { cx += GUT; out.push(label(cx + c.w, y + FS.small, c.head, { size: FS.small, fill: p.muted, anchor: "end" })); cx += c.w; }
     y += FS.small + 4;

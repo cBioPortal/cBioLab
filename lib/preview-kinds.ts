@@ -4,7 +4,7 @@
 // so a kind leaves both the moment its entry is removed. Browser-safe.
 export const PREVIEW_KINDS: Record<string, string> = {
   acquired: "no method record or golden test of the before/after pairing and McNemar counts yet",
-  ctdna: "no method record or golden test of the agreement counts, Wilson intervals and survival split yet",
+  ctdna: "no method record or golden test of the agreement counts, Wilson intervals and survival split, or of the clonal-haematopoiesis filter (chFilter) yet",
   exclusivity: "no method record or golden test of the DISCOVER background fit against the R package yet",
   hla: "no method record or golden test of the homozygosity and LOH counts or the survival splits yet",
   cutpoint: "no method record or golden test of the maximally selected log-rank scan against R maxstat yet",

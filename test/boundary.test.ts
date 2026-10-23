@@ -397,6 +397,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // instability: `parts`/`arms`/`calls`/`per` hold samples' segments and calls; the outer SELECTs are histograms and per-arm counts
     "instabilityScoresSql": () => federation.instabilityScoresSql(cohortSql, "x", "db", { threshold: 0.2, armShare: 0.5, includeX: false }),
     "instabilityArmsSql": () => federation.instabilityArmsSql(cohortSql, "x", "db", { threshold: 0.3, armShare: 0.8, includeX: true }),
+    "ctdnaCountsSql:ch": () => federation.ctdnaCountsSql(cohortSql, "x", "db", ["EGFR"], { ...CTD, ch: { genes: ["DNMT3A", "TET2"], normalMinAlt: 2, normalMinRatio: 0.3 } }, "v7.5", "driver"),
+    "ctdnaFunnelSql:ch-genes-only": () => federation.ctdnaFunnelSql(cohortSql, "x", "db", { ...CTD, ch: { genes: ["DNMT3A"], normalMinAlt: null, normalMinRatio: 0.3 } }, null, "any"),
+    "ctdnaChRemovedSql": () => federation.ctdnaChRemovedSql(cohortSql, "x", "db", { ...CTD, ch: { genes: ["DNMT3A"], normalMinAlt: 2, normalMinRatio: 0.3 } }),
     "ctdnaSurvivalSql": () => federation.ctdnaSurvivalSql(cohortSql, "x", "db", { ...CTD, withinDays: 30 }, null, "any"),
     "sampleAttributeValuesSql": () => federation.sampleAttributeValuesSql(cohortSql, "x", "db", "SAMPLE_TYPE"),
     // clonality: `calls` is per (gene, sample); only per-gene counts and CCF bins leave

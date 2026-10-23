@@ -231,6 +231,9 @@
       "Breast": 5803,
       "Pancreatic": 2729
     },
+    "ctDNA with clonal haematopoiesis filtered out: MSK-ACCESS plasma against tissue": {
+      "all patients": 617
+    },
     "Clonality, LOH and genome doubling from FACETS": {
       "Colorectal": 4993,
       "Breast": 5803
