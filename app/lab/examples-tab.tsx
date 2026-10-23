@@ -28,6 +28,8 @@ const FEATURES = new Map(EXAMPLES.map(e => [e, exampleFeatures(e)]));
 const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
 const VIEWS = [...new Set([...FEATURES.values()].flatMap(f => f.views))].sort(byName);
 const TOPICS = [...new Set([...FEATURES.values()].flatMap(f => f.topics))].sort(byName);
+/** chips (a view kind, or a topic) under which at least one example draws a NEW view */
+const HAS_NEW = new Set([...FEATURES.values()].filter(f => f.views.some(isNewKind)).flatMap(f => [...f.views.filter(isNewKind), ...f.topics]));
 const has = (ex: DslExample, t: string) => { const f = FEATURES.get(ex)!; return f.views.includes(t) || f.topics.includes(t); };
 
 const hostOf = (url: string) => { try { return new URL(url).host; } catch { return url; } };
@@ -91,7 +93,7 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
     const n = searched.filter(e => has(e, t)).length;
     return (
       <Button key={t} variant="outline" size="xs" className={cn(TAG, n === 0 && "opacity-50")} aria-pressed={tag === t} onClick={() => onTag(tag === t ? "all" : t)}>
-        {t} <span className={TAG_N}>{n}</span>
+        {t} <span className={TAG_N}>{n}</span>{HAS_NEW.has(t) && <NewMark />}
       </Button>
     );
   };

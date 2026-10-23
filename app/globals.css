@@ -31,6 +31,7 @@
   --color-border: var(--line); --color-input: var(--line); --color-ring: var(--accent);
   --color-paper: var(--paper); --color-link: var(--accent-ink);
   --color-ok: var(--ok); --color-ok-soft: var(--ok-soft);
+  --color-new: var(--new);
   --color-mark: var(--mark); --color-mark-soft: var(--mark-soft);
   --color-amp: var(--amp); --color-del: var(--del);
   --color-white: #fff; --color-black: #000; --color-transparent: transparent; --color-current: currentColor;
@@ -89,6 +90,8 @@
   --accent: #0f86a1; --accent-ink: #0b6478; --accent-soft: #e3f0f3;
   --line: #dde4e8; --code-bg: #f1f5f7; --mark: #b25e09; --mark-soft: #fbf0e2;
   --ok: #2e7d32; --ok-soft: #e6f2e6; --err: #b3261e; --err-soft: #fbeae9;
+  /* the NEW mark's text (app/lab/new-mark.tsx) */
+  --new: #ea580c;
   /* copy-number calls as text: amplification red, deep deletion blue */
   --amp: #c62828; --del: #1f5fbf;
 
@@ -114,6 +117,7 @@
     --accent: #45b8c2; --accent-ink: #7fd3da; --accent-soft: #16333a;
     --line: #2a353c; --code-bg: #1a242a; --mark: #e0a35c; --mark-soft: #35270f;
     --ok: #7bc47f; --ok-soft: #17301a; --err: #f2b8b5; --err-soft: #3a2323;
+    --new: #fb923c;
     --amp: #ff8a80; --del: #82b1ff;
     --on-accent: #0d1417;
   }
