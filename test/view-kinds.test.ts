@@ -93,9 +93,13 @@ function facts() {
   return { menuOrder: rich.opts.VIEW_KINDS.map((k) => k.kind), cardOrder: Object.keys(kindCards.KIND_CARDS), kinds: out };
 }
 
+/** a value with every object's keys in order, so the file pins what is said, not the order it was written in */
+const sortKeys = (x: unknown): unknown => Array.isArray(x) ? x.map(sortKeys)
+  : x && typeof x === "object" ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, sortKeys((x as Record<string, unknown>)[k])])) : x;
+
 test("what every view kind tells the page before data arrives", () => {
   const file = join(import.meta.dirname, "snapshots", "kinds.json");
-  const text = JSON.stringify(facts(), null, 2) + "\n";
+  const text = JSON.stringify(sortKeys(facts()), null, 2) + "\n";
   if (process.env.UPDATE_SNAPSHOTS || !existsSync(file)) writeFileSync(file, text);
   assert.equal(text, readFileSync(file, "utf8"), "kinds.json changed — review the diff; if intended, UPDATE_SNAPSHOTS=1 npm test");
 });
