@@ -229,6 +229,9 @@
     "Which mutations change survival on immunotherapy in lung cancer?": {
       "NSCLC": 7809
     },
+    "A tumour mutational burden cut-point for survival on immunotherapy": {
+      "all patients": 1661
+    },
     "PSA response to hormone therapy, by TP53 status": {
       "Prostate, TP53 mutant": 849,
       "Prostate, TP53 wild-type": 2284

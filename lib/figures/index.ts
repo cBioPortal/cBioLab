@@ -23,6 +23,7 @@ import { ctdnaSvg } from "./ctdna.ts";
 import { exclusivitySvg } from "./exclusivity.ts";
 import { txendpointsSvg } from "./txendpoints.ts";
 import { predictiveSvg } from "./predictive.ts";
+import { cutpointSvg } from "./cutpoint.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -100,6 +101,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   exclusivity: {
     draw: (v, o) => v.exclusivity && v.exclusivity.pairs.length ? exclusivitySvg(v, o) : null,
     title: (v) => "Mutual exclusivity (DISCOVER)" + (v.exclusivity ? " — " + v.exclusivity.cohort : "")
+  },
+  cutpoint: {
+    draw: (v, o) => v.cutpoint.candidates.length ? cutpointSvg(v, o) : null,
+    title: (v) => "Cut-point" + (v.cutpoint ? " — " + v.cutpoint.attribute + " on " + v.cutpoint.endpoint : "")
   },
   predictive: {
     draw: (v, o) => v.predictive.genes.length ? predictiveSvg(v, o) : null,

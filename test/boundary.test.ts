@@ -419,6 +419,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "riskmodelRowsSql": () => federation.riskmodelRowsSql(cohortSql, "x", "db", { endpoint: "OS", strata: "CANCER_TYPE", driverPin: "v7",
       covariates: ["AGE", "STAGE"], anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Immuno" } }),
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),
+    // run only by PatientLevelResolver.viewRows: one row of values per patient, no identifier
+    "cutpointRowsSql": () => federation.cutpointRowsSql(cohortSql, "x", "db", { attribute: "TMB_NONSYNONYMOUS", months: "OS_MONTHS", status: "OS_STATUS" }),
+    "cutpointRowsSql:stratified": () => federation.cutpointRowsSql(cohortSql, "x", "db", { attribute: "TMB_NONSYNONYMOUS", months: "OS_MONTHS", status: "OS_STATUS", stratum: "CANCER_TYPE" }),
     "labTestsSql": () => federation.labTestsSql(cohortSql, "x", "db", "Lab_Test", "TEST"),
     // cancertypes: `alt`/`per`/`covered` hold samples; the outer SELECT counts them per group
     "cancerTypesSql": () => federation.cancerTypesSql(cohortSql, "x", "db", ["KRAS", "NRAS"], "CANCER_TYPE", "v7.5", "driver"),

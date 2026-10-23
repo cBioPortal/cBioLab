@@ -135,6 +135,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "Asks, for each pair of genes, whether tumours carry changes in both more or less often than chance — \"mutually exclusive\" genes are rarely changed together, which can mean either change alone is enough to drive the cancer. Its sense of \"chance\" accounts for how many changes each tumour has overall: a tumour with hundreds of changes is expected to share genes with many others, so it does not make two genes look linked just because they both turn up in heavily altered tumours. Beside it is the simpler test that ignores this, to show the difference."
   },
+  cutpoint: {
+    title: "What is this?",
+    text: "Looks for the value of a measurement — such as tumour mutational burden — that best splits patients into a group that did better and a group that did worse. It tries every reasonable dividing line (from the lowest tenth of patients to the highest) and draws how strongly each one separates survival; the dot marks the best. Because trying many lines and keeping the best always finds something, the view also reshuffles the measurement among the patients a thousand times to see how good a 'best line' chance alone produces, and reports how surprising the real best line is once that search is accounted for. A line found this way needs checking in other patients before anyone relies on it."
+  },
   predictive: {
     title: "What is this?",
     text: "Asks, gene by gene, whether a mutation changes how patients do on a particular treatment — not just whether it marks a better or worse outlook in general. For each gene it compares patients with and without the mutation twice: among those who received the treatment (upper marker) and among those who did not (lower marker). A gene whose markers sit far apart — say, much worse with the mutation only among the treated — may predict who benefits from that treatment; the right-hand column tests that difference. Treatment here was not assigned at random, and patients had to live long enough to receive it, so a finding is a lead to test properly, not proof."

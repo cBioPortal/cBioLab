@@ -320,6 +320,15 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         "\n  genes kept most often: " + m.features.slice(0, 15).map((f) => `${f.gene} ${Math.round(f.selected * 100)}% HR ${f.hr.toFixed(2)}`).join(", ") +
         (m.neverHeldOut ? `\n  ${m.neverHeldOut} patients were never held out, so have no score` : "") +
         caveatOf(v) + methodOf(v) + noteOf(v));
+    } else if (v.kind === "cutpoint") {
+      const m = v.cutpoint;
+      const side = (s: { n: number; events: number; median: number | null }) => `n=${s.n}, ${s.events} events, median ${s.median == null ? "not reached" : s.median.toFixed(1) + "mo"}`;
+      out.push(`Cut-point of ${m.attribute} on ${m.endpoint} (maximally selected log-rank, ${m.candidates.length} candidate cuts between the 10th and 90th percentiles; ${m.n.toLocaleString()} patients, ${m.events.toLocaleString()} events):\n` +
+        `  best cut ${m.attribute} > ${m.cut}: high ${side(m.high)}; low ${side(m.low)}` + (m.hr ? `; HR ${m.hr.hr.toFixed(2)} (95% CI ${m.hr.ciLow.toFixed(2)}-${m.hr.ciHigh.toFixed(2)})` : "") + "\n" +
+        `  corrected p=${pFmt(m.permP)} (${m.permutations} permutations, seed ${m.seed}); naive log-rank p=${pFmt(m.naiveP)}, which ignores the search` +
+        (m.strata ? "\n  per " + m.strata.attribute + ":\n" + m.strata.rows.map((s) => `    ${s.stratum}: n=${s.n}, cut ${s.cut}, high ${s.high.n}, ` +
+          (s.hr ? `HR ${s.hr.hr.toFixed(2)}, ` : "") + `corrected p=${pFmt(s.permP)}, naive p=${pFmt(s.naiveP)}`).join("\n") : "") +
+        caveatOf(v) + noteOf(v));
     } else if (v.kind === "predictive") {
       const m = v.predictive;
       const eff = (e: { hr: number; ciLow: number; ciHigh: number; p: number } | null) => e ? `HR ${e.hr.toFixed(2)} (95% CI ${e.ciLow.toFixed(2)}-${e.ciHigh.toFixed(2)}, ${pFmt(e.p)})` : "n/a";
