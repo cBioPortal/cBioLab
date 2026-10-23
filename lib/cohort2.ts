@@ -26,6 +26,7 @@ import type {
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
   SampleListLeaf, PatientListLeaf, SplitLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
 } from "./types.ts";
+import { finiteSql } from "./sql-number.ts";
 
 /** Every leaf compiler receives a fully-resolved context. */
 type Ctx = CompileCtx & { study: string };
@@ -69,7 +70,7 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
       leaf.values.slice(0, 50).map(v => clinicalValueFoldSql(sq(String(v)))).join(",") + ")");
   }
   if (leaf.range && typeof leaf.range === "object") {
-    const r = leaf.range as Record<string, number | undefined>, num = "toFloat64OrNull(attribute_value)";
+    const r = leaf.range as Record<string, number | undefined>, num = finiteSql("attribute_value");
     for (const [k, opSym] of [["gt", ">"], ["gte", ">="], ["lt", "<"], ["lte", "<="]]) {
       if (r[k] != null) {
         if (!Number.isFinite(Number(r[k]))) throw new Error("clinical range." + k + " must be a number");
@@ -84,7 +85,7 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
     const op = CLIN_OP[leaf.op];
     if (!op) throw new Error("invalid clinical op (use = != > >= < <=)");
     conds.push(typeof leaf.value === "number"
-      ? "toFloat64OrNull(attribute_value) " + op + " " + Number(leaf.value)
+      ? finiteSql("attribute_value") + " " + op + " " + Number(leaf.value)
       // Equality folds case and whitespace, matching how the facet that offered
       // this value counted it. Ordering comparisons do not: they are for
       // numbers, and folding a string range would change what it means.
@@ -320,7 +321,7 @@ function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): string {
   const pt = String(leaf.profileType || "");
   if (ctx.profiles && !ctx.profiles.includes(pt))
     throw new Error("genomicData: profile '" + pt + "' not in this study (available: " + (ctx.profiles.join(", ") || "none") + ")");
-  const conds = numRangeConds(leaf.range, "toFloat64OrNull(ga.alteration_value)");
+  const conds = numRangeConds(leaf.range, finiteSql("ga.alteration_value"));
   if (Array.isArray(leaf.values) && leaf.values.length)
     conds.push("ga.alteration_value IN (" + leaf.values.slice(0, 20).map(v => sq(String(v))).join(",") + ")");
   if (!conds.length) throw new Error("genomicData clause needs range{gt,gte,lt,lte} or values[]");
@@ -339,7 +340,7 @@ function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): string {
   if (!pt || !entity) throw new Error("genericAssay clause needs profileType and entity");
   if (ctx.gaProfiles && !ctx.gaProfiles.includes(pt))
     throw new Error("genericAssay: profile '" + pt + "' not in this study (available: " + ctx.gaProfiles.join(", ") + ")");
-  const conds = numRangeConds(leaf.range, "toFloat64OrNull(value)");
+  const conds = numRangeConds(leaf.range, finiteSql("value"));
   if (Array.isArray(leaf.values) && leaf.values.length)
     conds.push("value IN (" + leaf.values.slice(0, 20).map(v => sq(String(v))).join(",") + ")");
   if (!conds.length) throw new Error("genericAssay clause needs range or values[]");

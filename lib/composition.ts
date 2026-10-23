@@ -9,6 +9,7 @@
 import { sq } from "./compiler.ts";
 import { axisSelect } from "./plot.ts";
 import { ATTR_NAME_RE } from "./custom-data.ts";
+import { finiteSql } from "./sql-number.ts";
 
 /** the most parts one figure can tell apart: the categorical palette, then its tints */
 export const COMPOSITION_MAX_PARTS = 16;
@@ -57,7 +58,7 @@ export function partsSql(s: CompositionSource, study: string, db: string, cohort
     const idCol = s.unit === "patient" ? "patient_unique_id" : "sample_unique_id";
     return "SELECT id, c, assumeNotNull(avg(val)) AS v FROM (\n" +
       "  SELECT " + idCol + " AS id, toUInt16(indexOf([" + s.parts.map(sq).join(",") + "], entity_stable_id) - 1) AS c,\n" +
-      "         toFloat64OrNull(value) AS val\n" +
+      "         " + finiteSql("value") + " AS val\n" +
       "  FROM " + db + ".generic_assay_data_derived\n" +
       "  WHERE profile_type = " + sq(s.profileType!) + " AND profile_stable_id = " + sq(study + "_" + s.profileType) + "\n" +
       "    AND entity_stable_id IN (" + s.parts.map(sq).join(",") + ")\n" +

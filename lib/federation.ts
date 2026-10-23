@@ -56,6 +56,7 @@ import type { StudyAccess } from "./view-coverage.ts";
 import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } from "./patient-timeline.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
+import { finiteSql } from "./sql-number.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -425,12 +426,12 @@ export function profileMomentsSql(cohortSql: string, genes: string[], profileTyp
     "WITH cohort AS (" + cohortSql + "),\n" +
     "vals AS (\n" +
     "  SELECT " + pid + " AS pid, ga.hugo_gene_symbol AS gene,\n" +
-    "         avg(toFloat64OrNull(ga.alteration_value)) AS v\n" +
+    "         avg(" + finiteSql("ga.alteration_value") + ") AS v\n" +
     "  FROM " + db + ".genetic_alteration_derived ga\n" +
     "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
     "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
     "    AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
-    "    AND toFloat64OrNull(ga.alteration_value) IS NOT NULL\n" +
+    "    AND " + finiteSql("ga.alteration_value") + " IS NOT NULL\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "  GROUP BY pid, gene\n" +
     ")\n" +
@@ -567,12 +568,12 @@ export function momentPairsSql(cohortSql: string, pairs: [string, string][], pro
     "WITH cohort AS (" + cohortSql + "),\n" +
     "vals AS (\n" +
     "  SELECT " + pid + " AS pid, ga.hugo_gene_symbol AS gene,\n" +
-    "         avg(toFloat64OrNull(ga.alteration_value)) AS v\n" +
+    "         avg(" + finiteSql("ga.alteration_value") + ") AS v\n" +
     "  FROM " + db + ".genetic_alteration_derived ga\n" +
     "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
     "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
     "    AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
-    "    AND toFloat64OrNull(ga.alteration_value) IS NOT NULL\n" +
+    "    AND " + finiteSql("ga.alteration_value") + " IS NOT NULL\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "  GROUP BY pid, gene\n" +
     "),\n" +
@@ -632,7 +633,7 @@ export function clinicalMomentsSql(cohortSql: string, attrs: string[], study: st
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx\n" +
     "FROM (\n" +
-    "  SELECT attribute_name AS a, type AS per, toFloat64OrNull(attribute_value) AS x\n" +
+    "  SELECT attribute_name AS a, type AS per, " + finiteSql("attribute_value") + " AS x\n" +
     "  FROM " + clinicalTable(db, attrs) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "    AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
@@ -663,7 +664,7 @@ export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: 
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
     "     raw AS (\n" +
-    "       SELECT attribute_name AS a, type AS per, toFloat64OrNull(attribute_value) AS x\n" +
+    "       SELECT attribute_name AS a, type AS per, " + finiteSql("attribute_value") + " AS x\n" +
     "       FROM " + clinicalTable(db, attrs) + "\n" +
     "       WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "         AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
@@ -691,7 +692,7 @@ export function attributeQuantileSql(cohortSql: string, attribute: string, per: 
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   return (
     "WITH cohort AS (" + cohortSql + ")\n" +
-    "SELECT quantileExact(" + p + ")(toFloat64OrNull(attribute_value)) AS q\n" +
+    "SELECT quantileExact(" + p + ")(" + finiteSql("attribute_value") + ") AS q\n" +
     "FROM " + clinicalTable(db, [attribute]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attribute) + "\n" +
     "  AND type = " + sq(per) + " AND attribute_value != ''\n" +
@@ -732,8 +733,8 @@ export function survivalCountsSql(cohortSql: string, study: string, db: string =
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "  GROUP BY pid\n" +
     ")\n" +
-    "SELECT toFloat64OrNull(months) AS m, if(status LIKE '1%', 1, 0) AS ev, count() AS n\n" +
-    "FROM os WHERE toFloat64OrNull(months) IS NOT NULL\n" +
+    "SELECT " + finiteSql("months") + " AS m, if(status LIKE '1%', 1, 0) AS ev, count() AS n\n" +
+    "FROM os WHERE " + finiteSql("months") + " IS NOT NULL\n" +
     "GROUP BY m, ev ORDER BY m"
   );
 }
@@ -769,7 +770,7 @@ export function anchoredSurvivalSql(
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         toFloat64OrNull(anyIf(attribute_value, attribute_name=" + sq(months) + ")) AS months,\n" +
+    "         " + finiteSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
@@ -839,7 +840,7 @@ export function coxRowsSql(
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         toFloat64OrNull(anyIf(attribute_value, attribute_name=" + sq(months) + ")) AS months,\n" +
+    "         " + finiteSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
@@ -1026,7 +1027,7 @@ export function eventCourseSql(
     // Observation window: first recorded event to last contact.
     "os AS (\n" +
     "  SELECT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid,\n" +
-    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) * " + DAYS_PER_MONTH + " AS os_day\n" +
+    "         " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " * " + DAYS_PER_MONTH + " AS os_day\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient'\n" +
     "    AND attribute_name = 'OS_MONTHS'\n" +
@@ -1141,7 +1142,7 @@ export function sequenceSql(
     // records simply stop" — see the fate expression below.
     "os AS (\n" +
     "  SELECT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid,\n" +
-    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) * " + DAYS_PER_MONTH + " AS os_day\n" +
+    "         " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " * " + DAYS_PER_MONTH + " AS os_day\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient'\n" +
     "    AND attribute_name = 'OS_MONTHS'\n" +

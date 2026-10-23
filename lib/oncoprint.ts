@@ -27,6 +27,7 @@ import { PROFILED_TYPES, type ProfiledType } from "./profile-names.ts";
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
 import { clinicalTable, assertCustomDataPresent } from "./custom-data.ts";
+import { finiteSql } from "./sql-number.ts";
 export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
@@ -200,12 +201,12 @@ export function vafSql(genes: string[], study: string = STUDY, db: string = DB, 
 export function heatmapSql(profileType: string, genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient"): string {
   // values are stored per sample; only patient mode has to average them
   return "SELECT " + (unit === "sample" ? "replaceOne(ga.sample_unique_id, " + sq(study + "_") + ", '')" : "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')") + " AS pid,\n" +
-    "       ga.hugo_gene_symbol AS gene, avg(toFloat64OrNull(ga.alteration_value)) AS v\n" +
+    "       ga.hugo_gene_symbol AS gene, avg(" + finiteSql("ga.alteration_value") + ") AS v\n" +
     "FROM " + db + ".genetic_alteration_derived ga\n" +
     (unit === "sample" ? "" : "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n") +
     "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
     "  AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
-    "  AND toFloat64OrNull(ga.alteration_value) IS NOT NULL\n" +
+    "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL\n" +
     "GROUP BY pid, gene";
 }
 
