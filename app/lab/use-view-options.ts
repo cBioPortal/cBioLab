@@ -4,9 +4,10 @@
 // attributes, events and molecular profiles a picker lists, which view kinds can be added
 // (VIEW_KINDS, each with why it cannot when it cannot, and whether that is still being
 // fetched), and which kinds draw their own header. Read-only: it edits nothing.
-import { KIND_CARDS, hasKindCard } from "./kind-cards";
+import { KIND_UI, kindUi, type AnyKindUi } from "./kinds/index.ts";
+import type { Known, MenuPage } from "./kinds/kind-ui.ts";
 import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
-import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
+import { foldEventNames } from "../../lib/event-names.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import type { ExploreResult } from "../../lib/types.ts";
 import type { ProfileInfo } from "../../lib/profile-catalog.ts";
@@ -130,35 +131,18 @@ export function useViewOptions(page: ViewOptionsPage) {
     if (!Array.isArray(cat.survivalEndpoints) || cat.survivalEndpoints.length) return null;
     return cat.study + " has no survival data (no <X>_MONTHS/<X>_STATUS pair), so there is no endpoint to fit";
   };
+  /** what the page knows about the study, for an add button's `why` */
+  const known = (): Known => ({ genes: [], attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) });
+  const menuPage: MenuPage = { catLoading, exploreBusy, trackAttrsLoading, noSurvivalWhy, viewAttrs, contProfile, attrsLoading };
   /**
    * `loading`: the data this button's `why` decides on is still being fetched. The button waits
    * with a spinner rather than guessing — enabling it could add a view that can only error, and
    * `why` alone would call a study empty when its catalog simply hasn't arrived.
    */
-  const VIEW_KINDS: { kind: string; label: string; why?: () => string | null; loading?: () => boolean }[] = [
-    { kind: "compare", label: "Compare genes" },
-    { kind: "survival", label: "Survival", why: noSurvivalWhy, loading: () => catLoading },
-    { kind: "cox", label: "Cox regression (forest plot)", why: noSurvivalWhy, loading: () => catLoading },
-    { kind: "logistic", label: "Logistic regression (odds ratios)" },
-    { kind: "oncoprint", label: "Oncoprint" },
-    { kind: "hotspots", label: "Lollipop (hotspots)" },
-    { kind: "plot", label: "Plot", loading: attrsLoading,
-      why: () => viewAttrs().length ? null : "this study declares no clinical attributes to plot" },
-    { kind: "cooccurrence", label: "Co-occurrence" },
-    { kind: "clinical", label: "Clinical comparison", loading: attrsLoading,
-      why: () => viewAttrs().length ? null : "this study declares no clinical attributes to compare" },
-    { kind: "coexpression", label: "Co-expression", loading: () => !contProfile() && (trackAttrsLoading || exploreBusy),
-      why: () => contProfile() ? null : "this study has no continuous molecular profile (mRNA z-scores) to correlate" },
-    { kind: "course", label: "Clinical course", loading: () => !viewEvents().length && (catLoading || exploreBusy),
-      why: () => viewEvents().length ? null
-        : "this study records no timeline events (only 131 of 545 studies have any)" },
-    { kind: "sequence", label: "Treatment sequence", loading: () => !viewEvents().length && (catLoading || exploreBusy),
-      why: () => treatmentEventOf(viewEvents()) ? null
-        : "this study records no treatment events, so there are no lines of therapy to sequence" },
-    ...Object.entries(KIND_CARDS).map(([kind, k]) => ({ kind, label: k.label,
-      ...(k.why ? { why: () => k.why!({ genes: [], attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) }),
-                    loading: () => !profileOptions().length && (trackAttrsLoading || exploreBusy) } : {}) }))
-  ].map((k) => ({ ...k,
+  const VIEW_KINDS: { kind: string; label: string; why?: () => string | null; loading?: () => boolean }[] = (Object.values(KIND_UI) as AnyKindUi[]).map((k) => ({ kind: k.kind, label: k.label,
+    ...(k.why ? { why: () => k.why!(known(), menuPage),
+                  loading: () => k.loading ? k.loading(known(), menuPage) : !profileOptions().length && (trackAttrsLoading || exploreBusy) } : {}) }))
+  .map((k) => ({ ...k,
     // federation first: it decides whether the view can be drawn at all, the data whether it has anything to draw
     why: () => federationWhy(k.kind) ?? (k.why ? k.why() : null),
     loading: () => (!studies.length && Object.keys(doc.cohorts || {}).length > 0) || (k.loading ? k.loading() : false) }));
@@ -168,27 +152,15 @@ export function useViewOptions(page: ViewOptionsPage) {
    * Most kinds only draw theirs once they have data, so a view that came back with only an error
    * would otherwise be a bare red box the reader can't remove without editing the JSON.
    */
-  const drawsOwnHead = (v: any): boolean =>
-    hasKindCard(v.kind) || v.kind === "cox" || v.kind === "logistic" || v.kind === "plot" ||
-    (v.kind === "compare" && !!v.rows) || (v.kind === "hotspots" && !!v.hotspots) ||
-    (v.kind === "coexpression" && !!v.coexpression) || (v.kind === "clinical" && !!v.clinical) ||
-    (v.kind === "cooccurrence" && !!v.pairs) || (v.kind === "survival" && !!v.curves) ||
-    ((v.kind === "sequence" || v.kind === "course") && !!v.svg) || (v.kind === "oncoprint" && !!v.spec);
+  const drawsOwnHead = (v: any): boolean => {
+    const ui = kindUi(v.kind);
+    return !!ui && (!ui.Card || !!ui.drawsOwnHead?.(v));
+  };
 
-  /**
-   * The gene list of a view, editable in place.
-   *
-   * Genes used to be settable only by hand-editing the document JSON: addView
-   * seeded them from the most-altered genes in Explore (or a hardcoded fallback)
-   * and nothing could change them afterwards. Five view kinds take genes, so
-   * this is one control rendered in each one's settings panel rather than five
-   * near-identical ones.
-   */
-  const GENE_VIEWS = ["compare", "oncoprint", "cooccurrence", "coexpression", "hotspots"];
   /** the most-altered genes this exploration found, for the suggestion list */
   const geneChoices = (): string[] => {
     return mostAlteredGenes(explore).slice(0, 60);
   };
 
-  return { viewGenes, viewAttrs, viewEvents, catalogAttrs, numericAttrs, attrsLoading, profileOptions, profileCatalog, assayOptions, contProfile, noSurvivalWhy, VIEW_KINDS, drawsOwnHead, GENE_VIEWS, geneChoices, cantDrawCohort };
+  return { viewGenes, viewAttrs, viewEvents, catalogAttrs, numericAttrs, attrsLoading, profileOptions, profileCatalog, assayOptions, contProfile, noSurvivalWhy, VIEW_KINDS, drawsOwnHead, geneChoices, cantDrawCohort };
 }

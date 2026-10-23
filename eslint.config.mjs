@@ -17,7 +17,7 @@ import path from "node:path";
 // kind; a shared view module imports no kind at all. So a change to one view cannot break another,
 // and what two kinds need goes into a shared module.
 const SHARED_VIEW_MODULES = ["lib/views/run.ts", "lib/views/shared.ts", "lib/views/rows.ts", "lib/views/covariates.ts",
-  "lib/views/kind-def.ts", "lib/views/text.ts"];
+  "lib/views/kind-def.ts", "lib/views/text.ts", "app/lab/kinds/kind-ui.ts", "app/lab/kinds/parts.tsx"];
 const VIEW_REGISTRIES = ["lib/views/index.ts", "lib/views/kinds.ts", "app/lab/kinds/index.ts"];
 const kindBoundary = {
   meta: { type: "problem", schema: [] },
@@ -25,7 +25,7 @@ const kindBoundary = {
     const rel = (f) => path.relative(context.cwd, f).split(path.sep).join("/");
     const resolve = (f) => [f, f + ".ts", f + ".tsx"].find((x) => /\.tsx?$/.test(x)) && (/\.tsx?$/.test(f) ? f : f + ".ts");
     /** the kind a file belongs to, or null for shared code */
-    const kindOf = (f) => (/^lib\/views\/([^/]+)\//.exec(f) || /^app\/lab\/kinds\/([^/.]+)(\/|\.tsx?$)/.exec(f) || [])[1] ?? null;
+    const kindOf = (f) => SHARED_VIEW_MODULES.includes(f) ? null : (/^lib\/views\/([^/]+)\//.exec(f) || /^app\/lab\/kinds\/([^/.]+)(\/|\.tsx?$)/.exec(f) || [])[1] ?? null;
     const from = rel(context.filename);
     if (VIEW_REGISTRIES.includes(from)) return {};
     const fromKind = kindOf(from);

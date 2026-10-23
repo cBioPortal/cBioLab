@@ -2,7 +2,7 @@
 // menu, the spec a fresh view starts from, its card's title, limits and subtitle, its help, its
 // federation needs and marks — pinned in test/snapshots/kinds.json, for a study that has everything
 // a kind might look for and for one that has nothing. Read through the same functions the page calls
-// (app/lab/use-view-options.ts, use-view-edits.ts, kind-cards.tsx), with a fixed stand-in page.
+// (app/lab/use-view-options.ts, use-view-edits.ts, kind-cards.tsx, kinds/index.ts), with a fixed stand-in page.
 // UPDATE_SNAPSHOTS=1 rewrites the file after an intended change.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -14,6 +14,7 @@ register("./support/tsx-loader.mjs", import.meta.url);
 const { useViewOptions } = await import("../app/lab/use-view-options.ts");
 const { useViewEdits } = await import("../app/lab/use-view-edits.ts");
 const kindCards = await import("../app/lab/kind-cards.tsx");
+const { KIND_UI } = await import("../app/lab/kinds/index.ts");
 const { viewHeadTitle } = await import("../app/lab/view-cards.tsx");
 const { VIEW_HELP } = await import("../lib/view-help.ts");
 const { viewNeed } = await import("../lib/view-coverage.ts");
@@ -72,7 +73,9 @@ function facts() {
     const menu = rich.opts.VIEW_KINDS.find((k) => k.kind === kind);
     const emptyMenu = empty.opts.VIEW_KINDS.find((k) => k.kind === kind);
     const aggregateMenu = aggregate.opts.VIEW_KINDS.find((k) => k.kind === kind);
-    const card = kindCards.hasKindCard(kind) ? kindCards.KIND_CARDS[kind] : null;
+    const ui = (KIND_UI as Record<string, any>)[kind];
+    const card = kindCards.hasKindCard(kind)
+      ? Object.fromEntries(["label", "title", "genes", "maxCohorts", "minCohorts", "cohortInHeader"].filter((f) => ui[f] !== undefined).map((f) => [f, ui[f]])) : null;
     const spec = rich.addView(kind) as Record<string, unknown> | null;
     out[kind] = {
       menu: menu ? { label: menu.label, why: menu.why?.() ?? null, loading: menu.loading?.() ?? false } : null,
@@ -82,15 +85,15 @@ function facts() {
       maxCohorts: rich.edits.maxCohortsOf(kind) ?? null, emptyHint: rich.edits.emptyViewHint(kind), title: rich.edits.viewTitle(kind),
       headTitle: viewHeadTitle(kind),
       drawsOwnHead: { error: rich.opts.drawsOwnHead({ kind, error: "x" }), withData: rich.opts.drawsOwnHead({ kind, rows: [], hotspots: [], coexpression: [], clinical: [], pairs: [], curves: [], svg: "x", spec: {} }) },
-      card: card ? { ...card, why: card.why?.(known(RICH)) ?? null, whyBareStudy: card.why?.(known(EMPTY)) ?? null,
-        defaults: kindCards.defaultKindView(kind, known(RICH)), defaultsBareStudy: kindCards.defaultKindView(kind, known(EMPTY)) } : null,
+      card: card ? { ...card, why: ui.why?.(known(RICH), {}) ?? null, whyBareStudy: ui.why?.(known(EMPTY), {}) ?? null,
+        defaults: kindCards.defaultView(kind, known(RICH), {} as never), defaultsBareStudy: kindCards.defaultView(kind, known(EMPTY), {} as never) } : null,
       drawsOwnWaiting: kindCards.drawsOwnWaiting(kind),
       sub: spec && card ? (() => { const s = kindCards.kindSub(kind, spec, {}); return typeof s === "string" || s == null ? s : "(element)"; })() : null,
       help: VIEW_HELP[kind] ?? null, need: viewNeed(kind), preview: previewPending(kind), isNew: isNewKind(kind),
       figureTitle: viewTitle({ kind, cohorts: ["A", "B"] } as never),
     };
   }
-  return { menuOrder: rich.opts.VIEW_KINDS.map((k) => k.kind), cardOrder: Object.keys(kindCards.KIND_CARDS), kinds: out };
+  return { menuOrder: rich.opts.VIEW_KINDS.map((k) => k.kind), cardOrder: Object.keys(KIND_UI).filter(kindCards.hasKindCard), kinds: out };
 }
 
 /** a value with every object's keys in order, so the file pins what is said, not the order it was written in */

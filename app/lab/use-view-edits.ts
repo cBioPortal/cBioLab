@@ -4,13 +4,13 @@
 // `updateViewLocal` when the browser can apply it alone (use-analysis.ts leaves those out of its
 // keys). Also what a view's header offers: which cohorts it may draw (cohortChoice). Every edit
 // goes through the document store (doc-store.ts), so a view keeps its id and its card.
-import { hasKindCard, defaultKindView, KIND_CARDS } from "./kind-cards";
+import { kindUi } from "./kinds/index.ts";
+import { defaultView } from "./kind-cards";
 import { pruneSort } from "../_oncoprint/OncoprintCard.tsx";
 import type { GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef } from "../../lib/types.ts";
 import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
 import { expandSplits, type PartitionShape } from "../../lib/partition-arms.ts";
-import { treatmentEventOf } from "../../lib/event-names.ts";
 import type { CohortNode } from "./view-chrome.tsx";
 
 import type { DocStore } from "./doc-store.ts";
@@ -45,13 +45,10 @@ export function useViewEdits(page: ViewEditsPage) {
 
   const viewTitle = (kind: string): string => (VIEW_KINDS.find((k) => k.kind === kind) || { label: kind }).label;
   /** the most cohorts a view of this kind draws at once (its cohorts menu enforces the same) */
-  const maxCohortsOf = (kind: string): number | undefined =>
-    hasKindCard(kind) ? KIND_CARDS[kind].maxCohorts
-    : ["hotspots", "coexpression", "cooccurrence", "plot", "sequence"].includes(kind) ? 1
-    : kind === "oncoprint" ? 4 : undefined;
+  const maxCohortsOf = (kind: string): number | undefined => kindUi(kind)?.maxCohorts;
   /** what an empty view of this kind will draw, said where its "+ Add cohort" is */
   const emptyViewHint = (kind: string): string => {
-    const max = maxCohortsOf(kind), min = hasKindCard(kind) ? KIND_CARDS[kind].minCohorts : undefined;
+    const max = maxCohortsOf(kind), min = kindUi(kind)?.minCohorts;
     if (max === 1) return "It draws one cohort.";
     if (min && max) return "It compares " + (min === max ? "exactly " + min : min + " to " + max) + " cohorts.";
     if (max) return "It draws up to " + max + " cohorts, side by side.";
@@ -77,59 +74,13 @@ export function useViewEdits(page: ViewEditsPage) {
   };
 
   const addView = (kind: string) => {
-    const genes = viewGenes();
-    const v: any =
-      kind === "survival" ? { kind }
-      : kind === "clinical" ? { kind, attributes: viewAttrs() }
-      : kind === "coexpression" ? { kind, genes: genes.slice(0, 5), profileType: contProfile() }
-      : kind === "hotspots" ? { kind, genes: genes.slice(0, 4), minCount: 1 }
-      : kind === "plot" ? (() => {
-          // start from two attributes this study actually declares, and fall back to an
-          // alteration axis, which every study can answer
-          const nums = numericAttrs();
-          if (nums.length >= 2) return { kind, x: { source: "clinical", attribute: nums[0] }, y: { source: "clinical", attribute: nums[1] }, unit: "sample" };
-          const cat = catalogAttrs().find((a) => a.kind !== "num");
-          return { kind, unit: "sample",
-            x: { source: "alteration", gene: genes[0] || "TP53", by: "mutationType" },
-            y: cat ? { source: "clinical", attribute: cat.attribute } : { source: "alteration", gene: genes[1] || "KRAS", by: "mutated" } };
-        })()
-      : kind === "course" ? (() => {
-          const evs = viewEvents();
-          // Rank by STRUCTURE, not by how common the type is. Picking the two
-          // commonest gives Sequencing and Sample acquisition on MSK-CHORD —
-          // exactly one event per patient and no duration, i.e. filing records
-          // that draw a spike and nothing else. A type that carries durations is
-          // a state worth plotting; one that recurs is an event worth counting;
-          // one that happens once per patient is neither.
-          const tier = (e: any) => e.hasDurations ? 2 : (e.perPatient || 0) >= 1.5 ? 1 : 0;
-          const ranked = [...evs].sort((a, b) => tier(b) - tier(a) || b.n - a.n);
-          // The anchor wants the opposite property: a landmark nearly everyone
-          // has. A therapy start is the classic one; failing that, the most
-          // universal event.
-          const anchorOn = evs.find(e => e.hasDurations)
-            || [...evs].sort((a, b) => b.n - a.n)[0];
-          return { kind, eventTypes: ranked.slice(0, 2).map(e => e.canonical),
-                   ...(anchorOn ? { anchor: { eventType: anchorOn.label, occurrence: "FIRST" } } : {}),
-                   binMonths: 3, fromMonths: -12, toMonths: 60 };
-        })()
-      : kind === "sequence" ? (() => {
-          const tx = treatmentEventOf(viewEvents());
-          return { kind, ...(tx ? { eventType: tx.canonical } : {}), labelKey: "SUBTYPE",
-                   lineGap: 90, maxSteps: 3, topN: 8 };
-        })()
-      : kind === "cooccurrence" ? { kind, genes: genes.slice(0, 6) }
-      : kind === "oncoprint" ? { kind, genes: genes.slice(0, 5) }
-      : kind === "cox" ? { kind, covariates: [{ source: "alteration", gene: genes[0] || "TP53", by: "mutated" }] }
-      : hasKindCard(kind) ? defaultKindView(kind, { genes, attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: [] })
-      : kind === "logistic" ? { kind,
-          outcome: { source: "alteration", gene: genes[0] || "TP53", by: "mutated" }, outcomeEvent: "Mutated",
-          covariates: [{ source: "clinical", attribute: viewAttrs()[0] || "SEX" }] }
-      : { kind, genes };
+    const v: any = defaultView(kind, { genes: viewGenes(), attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: [] },
+      { viewAttrs, contProfile, numericAttrs });
     // With one cohort in the document a new view draws it, unless the view needs more than one;
     // otherwise it draws nothing until a cohort is added to it (its card says so and offers one).
     // Every other card's answer is already cached under its key.
     const names = Object.keys(doc.cohorts || {});
-    const min = (hasKindCard(kind) && KIND_CARDS[kind].minCohorts) || 1;
+    const min = kindUi(kind)?.minCohorts || 1;
     docs.set({ ...doc, views: [{ ...v, cohorts: names.length === 1 && min <= 1 ? names : [] }, ...(doc.views || [])] });
   };
 
