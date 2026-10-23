@@ -997,6 +997,44 @@ export interface CtdnaResult {
   excluded?: { study: string; reason: string }[];
 }
 /**
+ * Mutual exclusivity and co-occurrence against each tumour's own alteration burden (DISCOVER,
+ * Canisius et al. 2016): per sample and gene a background probability fitted from the sample and
+ * gene marginals of the whole altered-gene matrix, so that heavily altered tumours are expected to
+ * share alterations; each pair's co-altered count tested against its Poisson-binomial null.
+ */
+export interface ExclusivityView {
+  note?: string;
+  kind: "exclusivity"; cohorts?: string[];
+  /** 2 to 20 genes */
+  genes: string[];
+  /** estimate the background within each value of this sample attribute (e.g. CANCER_TYPE) */
+  stratifyBy?: string;
+  /** any alteration (default) or OncoKB oncogenic only */
+  measure?: "driver" | "any";
+}
+export interface ExclusivityPair {
+  a: string; b: string;
+  /** samples profiled for both genes, those altered in both, and the background's expected number */
+  profiled: number; both: number; expected: number;
+  /** DISCOVER: lower tail (exclusivity) and upper tail (co-occurrence), BH q in each direction */
+  pExclusive: number; qExclusive: number; pCooccur: number; qCooccur: number;
+  /** false when the tails came from the refined normal approximation, not the exact distribution */
+  exact: boolean;
+  /** the plain two-sided Fisher test on the same samples' 2×2, BH across the pairs */
+  onlyA: number; onlyB: number; neither: number; fisherP: number; fisherQ: number; log2Odds: number | null;
+}
+export interface ExclusivityResult {
+  cohort: string; genes: string[];
+  stratifyBy: string | null; strata: { name: string; samples: number }[];
+  measure: "driver" | "any";
+  /** samples with a panel, the genes in the background matrix, and how the fit ended */
+  samples: number; matrixGenes: number; iterations: number; converged: boolean; maxResidual: number;
+  pairs: ExclusivityPair[];
+  /** pairs no sample was profiled for both genes of */
+  unassessable: string[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
  * Clonality from FACETS allele-specific copy number: for each gene, whether the cohort's
  * mutation calls are clonal or subclonal, how often the mutated locus has lost its other allele,
  * and their cancer-cell fractions; per cohort, whole-genome doubling, purity and ploidy. Only
@@ -1635,7 +1673,7 @@ import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
 export type ViewKind = View["kind"];
@@ -2046,6 +2084,9 @@ export interface ViewResultFields {
   ctdna: {
     ctdna?: CtdnaResult;
   };
+  exclusivity: {
+    exclusivity?: ExclusivityResult;
+  };
   clonality: {
     clonality?: ClonalityResult;
   };
@@ -2100,7 +2141,7 @@ export interface ViewResultMain {
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
   cancertypes: "cancertypes"; overlap: "overlap"; enrichment: "enrichment"; assays: "assays";
   composition: "composition"; correlates: "correlates"; table: "table"; timeline: "timeline";
-  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna";
+  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity";
 }
 /** a result that was drawn: no error, not waiting, and its main field present */
 type Drawn<K extends ViewKind> = { error?: undefined; empty?: undefined } & ViewResultFields[K]

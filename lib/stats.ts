@@ -1168,6 +1168,46 @@ export function wilsonInterval(k: number, n: number): { low: number; high: numbe
   return { low: Math.max(0, mid - half), high: Math.min(1, mid + half) };
 }
 
+/**
+ * Both tails of a Poisson-binomial count X = Σ Bernoulli(p) at x: P(X ≤ x) and P(X ≥ x), the
+ * trials given as groups of `n` alike. Exact (dynamic programming over the counts 0…x+1, the
+ * last state holding "more than x", so each tail is a sum of positive terms and keeps its
+ * precision) while trials × (x + 2) ≤ `maxWork`; past that, the refined normal approximation
+ * (Volkova 1996: the normal with a skewness correction and continuity correction), flagged.
+ */
+export function poissonBinomialTails(groups: { n: number; p: number }[], x: number, maxWork = 5e6):
+  { lower: number; upper: number; mean: number; exact: boolean } {
+  const gs = groups.filter((g) => g.n > 0 && g.p > 0);
+  const mean = gs.reduce((s, g) => s + g.n * g.p, 0);
+  const trials = gs.reduce((s, g) => s + g.n, 0);
+  if (x < 0) return { lower: 0, upper: 1, mean, exact: true };
+  if (trials * (x + 2) <= maxWork) {
+    const K = x + 1;
+    let d = new Float64Array(K + 1), e = new Float64Array(K + 1);
+    d[0] = 1;
+    for (const g of gs) {
+      const p = Math.min(1, g.p), q = 1 - p;
+      for (let t = 0; t < g.n; t++) {
+        e[0] = d[0] * q;
+        for (let k = 1; k < K; k++) e[k] = d[k] * q + d[k - 1] * p;
+        e[K] = d[K] + d[K - 1] * p;
+        [d, e] = [e, d];
+      }
+    }
+    let lower = 0;
+    for (let k = 0; k <= x; k++) lower += d[k];
+    return { lower: Math.min(1, lower), upper: Math.min(1, d[x] + d[K]), mean, exact: true };
+  }
+  const v = gs.reduce((s, g) => s + g.n * g.p * (1 - g.p), 0);
+  if (!(v > 0)) return { lower: x >= mean ? 1 : 0, upper: x <= mean ? 1 : 0, mean, exact: false };
+  const sd = Math.sqrt(v), gamma = gs.reduce((s, g) => s + g.n * g.p * (1 - g.p) * (1 - 2 * g.p), 0) / (sd * sd * sd);
+  const phi = (z: number) => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
+  const corr = (z: number) => gamma * (1 - z * z) * phi(z) / 6;
+  const zl = (x + 0.5 - mean) / sd, zu = (x - 0.5 - mean) / sd;
+  const clamp = (y: number) => Math.min(1, Math.max(0, y));
+  return { lower: clamp(erfc(-zl / Math.SQRT2) / 2 + corr(zl)), upper: clamp(erfc(zu / Math.SQRT2) / 2 - corr(zu)), mean, exact: false };
+}
+
 // ---------------------------------------------------------------------------
 // Competing risks: cumulative incidence (Aalen–Johansen) and Gray's test
 

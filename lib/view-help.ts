@@ -131,6 +131,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "Tumours shed DNA into the blood, and a blood test (a \"liquid biopsy\") can read it. For patients who had both a blood sample and a tumour tissue sample tested, this shows gene by gene how often a change was found in both, only in the tissue, or only in the blood — and how often the blood test caught what the tissue showed. Below, it shows how many patients had tumour DNA detected in their blood at all, and whether those patients lived shorter or longer than those without it."
   },
+  exclusivity: {
+    title: "What is this?",
+    text: "Asks, for each pair of genes, whether tumours carry changes in both more or less often than chance — \"mutually exclusive\" genes are rarely changed together, which can mean either change alone is enough to drive the cancer. Its sense of \"chance\" accounts for how many changes each tumour has overall: a tumour with hundreds of changes is expected to share genes with many others, so it does not make two genes look linked just because they both turn up in heavily altered tumours. Beside it is the simpler test that ignores this, to show the difference."
+  },
   labs: {
     title: "What is this?",
     text: "Follows a blood test — such as PSA in prostate cancer — from the moment a treatment started, as the change from each patient's own starting level. The line shows the typical patient, the shaded band the middle half of patients, and the bars on the right each patient's best result: how far their level fell, or rose, after treatment began."

@@ -277,6 +277,14 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
           (pn.survival ? `\n    OS: ` + pn.survival.curves.map((c) => `${c.label} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : c.median.toFixed(1) + "mo"}`).join("; ") +
             (pn.survival.logrank ? `; log-rank p=${pFmt(pn.survival.logrank.p)}` : "") : pn.survivalWhy ? `\n    OS by ctDNA not drawn: ${pn.survivalWhy}` : "")).join("\n") +
         caveatOf(v) + noteOf(v));
+    } else if (v.kind === "exclusivity") {
+      const ex = v.exclusivity;
+      out.push(`Mutual exclusivity (DISCOVER background over ${ex.samples.toLocaleString()} samples and ${ex.matrixGenes} genes${ex.stratifyBy ? `, within ${ex.strata.length} ${ex.stratifyBy} strata` : ""}; ` +
+        `${ex.measure === "driver" ? "OncoKB oncogenic" : "any alteration"}; fit ${ex.converged ? "converged" : "NOT converged"} in ${ex.iterations} rounds) in ${ex.cohort}:\n` +
+        ex.pairs.map((x) => `  ${x.a}/${x.b}: both ${x.both} of ${x.profiled} profiled, ${x.expected} expected; DISCOVER exclusivity q=${pFmt(x.qExclusive)}, co-occurrence q=${pFmt(x.qCooccur)}` +
+          `${x.exact ? "" : " (normal approx.)"}; Fisher q=${pFmt(x.fisherQ)}${x.log2Odds != null ? `, log2 OR ${x.log2Odds.toFixed(2)}` : ""}`).join("\n") +
+        (ex.unassessable.length ? `\n  not assessable: ${ex.unassessable.join(", ")}` : "") +
+        caveatOf(v) + noteOf(v));
     } else if (v.kind === "clonality") {
       const cr = v.clonality;
       out.push(`Clonality (FACETS; ${cr.measure === "driver" ? "driver mutation calls" : "all mutation calls"}${cr.qc ? ", QC-passing samples" : ""}):\n` +

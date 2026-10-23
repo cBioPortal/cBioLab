@@ -84,6 +84,7 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   paired: { label: "Paired samples (primary vs metastasis, before vs after)", title: "Paired samples", genes: true, maxCohorts: 3 },
   acquired: { label: "Acquired under therapy (samples before vs after a treatment start)", title: "Acquired under therapy", genes: true, maxCohorts: 3,
     why: (k) => k.events.some((e) => /treat|therap|drug|medicat/i.test(e.canonical)) ? null : "this study records no treatment timeline events to anchor on" },
+  exclusivity: { label: "Mutual exclusivity (DISCOVER, burden-aware)", title: "Mutual exclusivity", genes: true, maxCohorts: 1, cohortInHeader: true },
   ctdna: { label: "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)", title: "ctDNA vs tissue", genes: true, maxCohorts: 3 },
   riskmodel: { label: "Risk model (elastic-net Cox, OncoCast-style)", title: "Risk model", maxCohorts: 1 },
   diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2, minCohorts: 2,
@@ -216,6 +217,11 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     const an = spec.anchor || { eventType: "Treatment" };
     return "last sample before the first " + (an.eventType || "?") + (an.key ? " [" + an.key + "=" + an.value + "]" : "") + " vs the first ≥" + (spec.minGapDays ?? 30) + " days after" +
       (spec.measure === "driver" ? ", oncogenic only" : ", any alteration") + (spec.genes && spec.genes.length ? "" : ", every gene scanned");
+  }
+  if (kind === "exclusivity") {
+    const cohort = Array.isArray(v.cohorts) && v.cohorts[0] ? String(v.cohorts[0]).split(" / ").join(" › ") : null;
+    return <>{cohort && <><strong>{cohort}</strong> · </>}{(spec.measure === "driver" ? "oncogenic alterations" : "any alteration") + ", background from each tumour's burden" +
+      (spec.stratifyBy ? ", within " + spec.stratifyBy : "")}</>;
   }
   if (kind === "ctdna") return "plasma " + (spec.attribute || "SAMPLE_CLASS") + " = " + (spec.plasma || ["cfDNA", "ctDNA"]).join("/") + " vs tissue " + (spec.tissue || ["Tumor"]).join("/") +
     (spec.measure === "driver" ? ", oncogenic only" : ", any alteration") + (spec.withinDays != null ? ", drawn within " + spec.withinDays + " days" : "") +
@@ -680,6 +686,27 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       </div>
     );
   }
+  if (spec.kind === "exclusivity") {
+    const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="estimate the background within each value of this sample attribute, so that subtypes with different drivers do not read as exclusivity">
+            stratify by <OptionSelect value={spec.stratifyBy || ""} disabled={busy} onValueChange={(v) => patch({ stratifyBy: v || undefined })}>
+              <option value="">none</option>
+              {spec.stratifyBy && !cats.includes(spec.stratifyBy) && <option value={spec.stratifyBy}>{spec.stratifyBy}</option>}
+              {cats.map((a) => <option key={a} value={a}>{a}</option>)}
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="any alteration, or only those OncoKB calls oncogenic">
+            count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
+              <option value="any">any alteration</option><option value="driver">oncogenic only</option>
+            </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "ctdna") {
     const choosing = !!(spec.genes && spec.genes.length);
     const csv = (x: any, d: string[]) => (Array.isArray(x) && x.length ? x : d).join(", ");
@@ -749,6 +776,7 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
     return { kind, anchor: { eventType: tx ? tx.label : "Treatment" } };
   }
+  if (kind === "exclusivity") return { kind, genes: known.genes.length >= 2 ? known.genes.slice(0, 8) : ["KRAS", "EGFR", "BRAF", "STK11", "KEAP1", "TP53"] };
   if (kind === "ctdna") return known.genes.length ? { kind, genes: known.genes.slice(0, 10) } : { kind };
   if (kind === "mutations") return { kind, gene: known.genes[0] || "TP53" };
   if (kind === "table") return { kind };

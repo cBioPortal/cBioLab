@@ -389,6 +389,11 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "ctdnaCountsSql": () => federation.ctdnaCountsSql(cohortSql, "x", "db", ["EGFR"], CTD, "v7.5", "driver"),
     "ctdnaCountsSql:dated-panels": () => federation.ctdnaCountsSql(cohortSql, "x", "db", null, { ...CTD, plasmaPanels: ["ACCESS129"], withinDays: 90 }, null, "any"),
     "ctdnaFunnelSql": () => federation.ctdnaFunnelSql(cohortSql, "x", "db", CTD, "v7.5", "driver"),
+    // exclusivity: `sp`/`altc`/`per` hold samples; the outer SELECTs count them per (panel signature, stratum, burden, mask) or per gene
+    "exclusivityGroupsSql": () => federation.exclusivityGroupsSql(cohortSql, "x", "db", ["KRAS", "EGFR"], "CANCER_TYPE", "v7.5", "driver"),
+    "exclusivityGroupsSql:any": () => federation.exclusivityGroupsSql(cohortSql, "x", "db", ["KRAS", "EGFR", "TP53"], null, null, "any"),
+    "exclusivityColumnsSql": () => federation.exclusivityColumnsSql(cohortSql, "x", "db", null, null, "any"),
+    "exclusivityCoverageSql": () => federation.exclusivityCoverageSql(cohortSql, "x", "db"),
     "ctdnaSurvivalSql": () => federation.ctdnaSurvivalSql(cohortSql, "x", "db", { ...CTD, withinDays: 30 }, null, "any"),
     "sampleAttributeValuesSql": () => federation.sampleAttributeValuesSql(cohortSql, "x", "db", "SAMPLE_TYPE"),
     // clonality: `calls` is per (gene, sample); only per-gene counts and CCF bins leave
