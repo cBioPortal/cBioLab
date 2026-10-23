@@ -93,6 +93,7 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   exclusivity: { label: "Mutual exclusivity (DISCOVER, burden-aware)", title: "Mutual exclusivity", genes: true, maxCohorts: 1, cohortInHeader: true },
   ctdna: { label: "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)", title: "ctDNA vs tissue", genes: true, maxCohorts: 3 },
   riskmodel: { label: "Risk model (elastic-net Cox, OncoCast-style)", title: "Risk model", maxCohorts: 1 },
+  adjusted: { label: "Adjusted enrichment (every gene, logistic on covariates)", title: "Adjusted enrichment", maxCohorts: 2, minCohorts: 2 },
   forest: { label: "Pan-cancer forest (one exposure's HR per cancer type, random-effects pooled)", title: "Forest plot", maxCohorts: 6 },
   diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2, minCohorts: 2,
     why: (k) => !k.profiles.length ? "this study has no molecular profile to compare expression on" : null }
@@ -201,6 +202,7 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     " on " + (spec.measure === "driver" ? "driver mutations" : "mutated genes") +
     (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") +
     (spec.strata ? ", stratified by " + spec.strata : "") + " · " + (spec.runs ?? 10) + " held-out splits" + (spec.validate ? ", validated on the held-out half" : "");
+  if (kind === "adjusted") return "mutations in every gene mutated in ≥" + (100 * (spec.minShare ?? 0.05)).toFixed(0) + "% · adjusted for " + (spec.covariates?.length ? spec.covariates.join(", ") : "nothing");
   if (kind === "forest") {
     const e = spec.exposure || {};
     const what = e.source === "alteration" ? (e.oql || (e.genes || [e.gene]).join(" or ") + " mutated") : e.attribute ? e.attribute + (spec.threshold != null ? " ≥ " + spec.threshold : spec.exposed ? " = " + spec.exposed : "") : "no exposure chosen";
@@ -525,6 +527,29 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
             label genes kept in ≥ <OptionSelect value={String(labelAbove)} disabled={busy} onValueChange={(v) => patch({ labelAbove: Number(v) === RISK_LABEL_ABOVE ? undefined : Number(v) })}>
               {!RISK_LABEL_STEPS.includes(labelAbove) && <option value={labelAbove}>{Math.round(labelAbove * 100)}%</option>}
               {RISK_LABEL_STEPS.map((t) => <option key={t} value={t}>{Math.round(t * 100)}%</option>)}
+            </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
+  if (spec.kind === "adjusted") {
+    const covs: string[] = Array.isArray(spec.covariates) ? spec.covariates : [];
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="clinical attributes to adjust for, comma-separated (e.g. MSI_TYPE, TMB_NONSYNONYMOUS, CANCER_TYPE)">
+            adjust for <DraftInput value={covs.join(", ")} disabled={busy} width="14rem" placeholder="none"
+              onCommit={(t) => { const l = t.split(",").map((x) => x.trim()).filter(Boolean); patch({ covariates: l.length ? l : undefined }); }} />
+          </label>
+          <label className="tbfield" title="count every called mutation, or only OncoKB drivers">
+            count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
+              <option value="any">any</option><option value="driver">drivers</option>
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="test the genes mutated in at least this share of the patients profiled for them (at most 200 genes)">
+            genes mutated in ≥ <OptionSelect value={String(spec.minShare ?? 0.05)} disabled={busy} onValueChange={(v) => patch({ minShare: v === "0.05" ? undefined : Number(v) })}>
+              {[...new Set([0.02, 0.03, 0.05, 0.1, 0.2, spec.minShare ?? 0.05])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{(100 * n).toFixed(0)}%</option>)}
             </OptionSelect>
           </label>
         </div>
@@ -931,6 +956,7 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
 /** The view a fresh "add view" click starts from, built from what the study is known to have. */
 export function defaultKindView(kind: string, known: Known): Record<string, unknown> {
   if (kind === "cancertypes") return { kind, genes: known.genes.length ? known.genes.slice(0, 5) : ["TP53", "KRAS"] };
+  if (kind === "adjusted") return { kind };
   if (kind === "forest") return { kind, exposure: { source: "alteration", gene: known.genes[0] || "TP53" } };
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));

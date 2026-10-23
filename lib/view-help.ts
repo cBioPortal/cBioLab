@@ -151,6 +151,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "Asks whether one thing — a gene being mutated, a high tumour mutation burden — goes with shorter or longer survival, separately in each cancer type, and then combines those answers. Each row is one cancer type: its square is the hazard ratio (right of the dashed line at 1 means patients with the change died sooner; left means they lived longer) and its line how sure we can be. The diamonds at the bottom combine the rows into one overall estimate. When the rows disagree a lot (a high I²), the overall estimate is an average of different effects, so read the rows. This shows an association, not a cause."
   },
+  adjusted: {
+    title: "What is this?",
+    text: "Compares how often each commonly mutated gene is mutated in two groups of patients — say, colorectal cancers diagnosed before and after age 50 — after taking into account other things that differ between the groups and also change mutation rates, such as how many mutations a tumour carries overall. Each dot is a gene: right of centre means more often mutated in the first group, left in the second, and higher means more certain. The table shows each gene's raw difference beside the adjusted one, so you can see which differences were explained away. A difference here is a clue, not proof of a cause."
+  },
   labs: {
     title: "What is this?",
     text: "Follows a blood test — such as PSA in prostate cancer — from the moment a treatment started, as the change from each patient's own starting level. The line shows the typical patient, the shaded band the middle half of patients, and the bars on the right each patient's best result: how far their level fell, or rose, after treatment began."

@@ -109,6 +109,14 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         (f.random && f.fixed ? `\n  pooled, random effects (DerSimonian–Laird): ${hr(f.random)}\n  pooled, fixed effect: ${hr(f.fixed)}` +
           `\n  heterogeneity: tau²=${f.tau2.toFixed(3)}, I²=${(100 * f.i2).toFixed(0)}%, Q=${f.q.toFixed(1)} on ${f.qDf} df, p=${pFmt(f.qP)}` : "") +
         (f.left.length ? `\n  not estimated: ` + f.left.map((l) => `${l.label} (${l.reason})`).join("; ") : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "adjusted") {
+      const a = v.adjusted, pct = (x: number, n: number) => n ? (100 * x / n).toFixed(1) + "%" : "–";
+      out.push(`Adjusted enrichment: ${a.groups[0]} vs ${a.groups[1]}, mutation${a.measure === "driver" ? " (OncoKB drivers)" : ""} per gene by logistic regression` +
+        (a.covariates.length ? ` adjusted for ${a.covariates.join(", ")}` : " (no covariates)") + `; ${a.rows.length} genes fit, ${a.significant} at q<0.05:\n` +
+        a.rows.slice(0, 30).map((g) => `  ${g.gene}: ${a.groups[0]} ${g.altered[0]}/${g.profiled[0]} (${pct(g.altered[0], g.profiled[0])}), ${a.groups[1]} ${g.altered[1]}/${g.profiled[1]} (${pct(g.altered[1], g.profiled[1])}); ` +
+          `raw OR ${g.rawOr == null ? "undefined" : g.rawOr.toFixed(2)} (Fisher p=${pFmt(g.fisherP)}); adjusted OR ${g.or.toFixed(2)} (95% CI ${g.ciLow.toFixed(2)}-${g.ciHigh.toFixed(2)}) p=${pFmt(g.p)} q=${pFmt(g.q)}`).join("\n") +
+        (a.rows.length > 30 ? `\n  … ${a.rows.length - 30} more genes fit` : "") +
+        (a.failed.length ? `\n  not fit: ` + a.failed.map((f) => `${f.gene} (${f.reason})`).join("; ") : "") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "logistic") {
       out.push(`Logistic regression (n=${v.logistic.n.toLocaleString()}, ${v.logistic.events.toLocaleString()} with the outcome):\n` +
         v.logistic.coefficients.map((c) =>

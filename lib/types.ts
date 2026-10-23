@@ -593,6 +593,49 @@ export interface ForestResult {
   excludedRemote?: { study: string; patients: number }[];
 }
 /**
+ * Covariate-adjusted alteration enrichment between two cohorts: for every gene mutated in at least
+ * a minimum share of the patients profiled for it, a logistic regression of altered on cohort and
+ * covariates, reported as the adjusted odds ratio for the first cohort beside the raw one. Fit from
+ * per-patient rows inside each local study (patient-level participants only).
+ */
+export interface AdjustedView {
+  note?: string;
+  kind: "adjusted"; cohorts?: string[];
+  /** clinical attributes adjusted for (default none): a number as recorded, a category against its commonest value */
+  covariates?: string[];
+  /** count every called mutation (default), or only OncoKB drivers */
+  measure?: "any" | "driver";
+  /** genes tested: mutated in at least this share of the patients profiled for them, both cohorts together (default 0.05) */
+  minShare?: number;
+  /** and in at least this many patients (default 10) */
+  minAltered?: number;
+  /** genes named on the volcano (default 12) */
+  label?: number;
+}
+export interface AdjustedGene {
+  gene: string;
+  /** per cohort, in the view's order: patients altered, and patients profiled for the gene with every covariate */
+  altered: [number, number]; profiled: [number, number];
+  /** unadjusted odds ratio (null with an empty cell) and its two-sided Fisher p */
+  rawOr: number | null; fisherP: number;
+  /** the cohort term's adjusted odds ratio, Wald 95% CI and p; q is Benjamini–Hochberg over the genes fit */
+  or: number; ciLow: number; ciHigh: number; p: number; q: number;
+  /** a covariate category that would separate was merged into its reference for this gene */
+  merged?: boolean;
+}
+export interface AdjustedResult {
+  groups: [string, string]; covariates: string[]; measure: "any" | "driver"; minShare: number; minAltered: number;
+  /** per cohort: patients with a mutation panel, and of those with every covariate (the ones fit) */
+  patients: { cohort: string; withPanel: number; used: number }[];
+  /** genes fit, by adjusted p */
+  rows: AdjustedGene[];
+  /** genes that passed the share threshold but could not be fit, and why */
+  failed: { gene: string; reason: string }[];
+  significant: number;
+  labels: string[];
+  excludedRemote?: { study: string; patients: number }[];
+}
+/**
  * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
  * what the axes are, exactly as it does in the portal, rather than being asked for.
  */
@@ -1843,7 +1886,7 @@ import type { PlotAxis, PlotData } from "./plot.ts";
 import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | PredictiveView | CutpointView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
@@ -2192,6 +2235,9 @@ export interface ViewResultFields {
   forest: {
     forest?: ForestResult;
   };
+  adjusted: {
+    adjusted?: AdjustedResult;
+  };
   course: {
     course?: CourseSeries[];
     /** bin width and window actually used, in months */
@@ -2318,7 +2364,7 @@ export interface ViewResultFields {
  * nor waits for cohorts). The oncoprint has none: it carries its figure or its spec, by request.
  */
 export interface ViewResultMain {
-  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; course: "course"; sequence: "sequence";
+  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; adjusted: "adjusted"; course: "course"; sequence: "sequence";
   hotspots: "hotspots"; plot: "plot"; coexpression: "coexpression"; clinical: "clinical"; cooccurrence: "pairs";
   oncoprint: never; attrition: "attrition"; genome: "genome"; pathways: "pathways"; diffexpr: "diffexpr";
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";

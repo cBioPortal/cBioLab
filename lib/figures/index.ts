@@ -25,6 +25,7 @@ import { txendpointsSvg } from "./txendpoints.ts";
 import { predictiveSvg } from "./predictive.ts";
 import { cutpointSvg } from "./cutpoint.ts";
 import { metaForestSvg } from "./forest.ts";
+import { adjustedSvg } from "./adjusted.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -90,6 +91,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   forest: {
     draw: (v, o) => v.forest.rows.length ? metaForestSvg(v, o) : null,
     title: (v) => "Forest plot" + (v.forest ? " — " + v.forest.exposedLabel + " by " + v.forest.strata + ", " + v.forest.endpoint : "")
+  },
+  adjusted: {
+    draw: (v, o) => v.adjusted.rows.length ? adjustedSvg(v, o) : null,
+    title: (v) => "Adjusted enrichment" + (v.adjusted ? " — " + v.adjusted.groups.join(" vs ") + (v.adjusted.covariates.length ? ", adjusted for " + v.adjusted.covariates.join(", ") : "") : "")
   },
   correlates: {
     draw: (v, o) => v.correlates && v.correlates.tested > 0 ? correlatesSvg(v, o) : null,

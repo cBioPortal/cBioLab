@@ -32,10 +32,12 @@ const EDGE = 6;
 export function volcano(p: Pal, o: {
   x0: number; y0: number; width: number; plotH: number; grid: VolcanoGrid; pts: VolcanoPoint[]; labels: string[];
   xTitle: string; sides?: [string, string]; r?: number; cellColor?: (cls: number) => string; noun?: string;
+  /** what `p` is, for the y axis's title (default "p") */
+  pName?: string;
 }): { svg: string; height: number; unplaced: string[] } {
   const g = o.grid, r = o.r ?? 2.6;
   const T = o.y0 + FS.small;
-  const yTitle = "−log₁₀ p";
+  const yTitle = "−log₁₀ " + (o.pName ?? "p");
   const ys = linear(0, g.yMax, T + o.plotH - PAD, T + PAD, { nice: false });
   const L = o.x0 + EDGE + leftAxisWidth(ys, yTitle), R = o.x0 + o.width - 6;
   const xs = linear(-g.xMax, g.xMax, L + PAD, R - PAD, { nice: false });

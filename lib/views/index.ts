@@ -39,6 +39,7 @@ import { runTxendpoints } from "./txendpoints.ts";
 import { runPredictive } from "./predictive.ts";
 import { runCutpoint } from "./cutpoint.ts";
 import { runForest } from "./forest.ts";
+import { runAdjusted } from "./adjusted.ts";
 
 /**
  * A runner that lets a throw stand for its error: an error is reported as the view's, with its
@@ -93,6 +94,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   predictive: drawn(runPredictive),
   cutpoint: drawn(runCutpoint),
   forest: drawn(runForest),
+  adjusted: drawn(runAdjusted),
 };
 
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */

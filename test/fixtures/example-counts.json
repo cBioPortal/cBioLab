@@ -150,6 +150,10 @@
     "Pan-cancer forest: TP53 mutation and survival in 30 cancer types": {
       "all patients": 48179
     },
+    "Adjusted enrichment: early-onset colorectal cancer, adjusted for MSI and TMB": {
+      "Early-onset CRC": 1699,
+      "Average-onset CRC": 3149
+    },
     "splitBy: one cohort, auto-split into an arm per receptor subtype": {
       "all patients": 1756
     },
