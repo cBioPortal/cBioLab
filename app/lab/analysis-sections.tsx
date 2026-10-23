@@ -37,11 +37,6 @@ import type { ViewCtx } from "./view-cards.tsx";
 import { isNewKind } from "../../lib/new-in-lab.ts";
 import { NewMark } from "./new-mark.tsx";
 
-/** A view kind already in the document: filled with the accent colour, so "on" cannot be mistaken
- *  for a chip still loading (a pale pulsing fill). */
-const VIEW_ON = "aria-pressed:bg-primary aria-pressed:text-primary-foreground hover:aria-pressed:bg-primary/90 " +
-  "hover:aria-pressed:text-primary-foreground dark:aria-pressed:bg-primary dark:hover:aria-pressed:bg-primary/90";
-
 /** A kind not yet in the document: a grey fill, so each pill reads apart from its neighbours on the white card. */
 const ADD_PILL = "border-transparent bg-border text-foreground hover:bg-border/70";
 
@@ -93,7 +88,6 @@ export interface AnalysisCtx {
   openWorkspaceSave: () => void;
   removeCohort: (name: string) => void;
   removePartitionNamed: (name: string) => void;
-  removeViews: (drop: (v: any, i: number) => boolean) => void;
   renamePartitionRow: (name: string, from: string, to: string) => void;
   result: AnalysisResult | null;
   saved: Record<string, SavedCohort>;
@@ -377,7 +371,7 @@ export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
 }
 
 export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
-  const { VIEW_KINDS, addView, busy, doc, docDialog, docHistory, explore, fetchExplore, goTab, openWorkspaceSave, removeViews, result, setCdFocus, spaces, viewCtx, viewIds } = ctx;
+  const { VIEW_KINDS, addView, busy, doc, docDialog, docHistory, explore, fetchExplore, goTab, openWorkspaceSave, result, setCdFocus, spaces, viewCtx, viewIds } = ctx;
   return <>
     <div>
       {(busy || result || (doc.views || []).length > 0) && (
@@ -448,13 +442,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
             <span className="meta">{(doc.views || []).length} of 6 in this document</span>
             <span className="spacer" />
             {VIEW_KINDS.map(({ kind, label, why, loading }) => {
-              // a kind already in the document is selected; clicking it again removes it
-              const present = (doc.views || []).filter((v: any) => v.kind === kind).length;
-              if (present) return (
-                <Button key={kind} variant="outline" size="xs" className={cn(CHIP, VIEW_ON)} aria-pressed disabled={busy}
-                  title={"remove the " + label.toLowerCase() + " view" + (present > 1 ? "s (" + present + ")" : "")}
-                  onClick={() => removeViews((v) => v.kind === kind)}>{label}{isNewKind(kind) && <NewMark />}{present > 1 && " ×" + present}<X /></Button>
-              );
+              // each click adds another view, so a document can hold several of one kind
               const full = (doc.views || []).length >= 6;
               // with no cohorts yet there is no study to ask about: the view's cohorts decide later
               const known = Object.keys(doc.cohorts || {}).length > 0;
@@ -463,7 +451,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
                 : waiting ? "loading this study's catalog — a moment"
                 : (known && why ? why() : null);
               return (
-                <Button key={kind} variant="outline" size="xs" className={cn(CHIP, ADD_PILL, waiting && "chip-wave disabled:opacity-100")} aria-pressed={false}
+                <Button key={kind} variant="outline" size="xs" className={cn(CHIP, ADD_PILL, waiting && "chip-wave disabled:opacity-100")}
                   aria-busy={waiting || undefined} disabled={!!blocked}
                   title={blocked || ("add a " + label.toLowerCase() + " view, then choose its cohorts")}
                   onClick={() => addView(kind)}><Plus />{label}{isNewKind(kind) && <NewMark />}</Button>

@@ -1,23 +1,9 @@
 "use client";
-// The chrome the portal pages share: the app's header (the lab's own), the summary card over the
+// The chrome the portal pages share: the summary card over the
 // tabs (the study, the query, the groups and their sizes).
 import { SeriesSwatch } from "../lab/view-chrome.tsx";
 import { Badge } from "../_ui/badge";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
-
-/** the app's header, as the lab draws it, naming which page this is; the name goes home */
-export function PortalHeader({ page }: { page: string }) {
-  return (
-    <header>
-      <h1><a href="/" className="text-foreground no-underline">cbio-lab</a></h1>
-      <span className="sub">{page}</span>
-      <span className="spacer" />
-      <a className="toplink" href="/">studies</a>
-      <a className="toplink" href="/lab?tab=analysis">analysis</a>
-      <a className="toplink" href="/verification">how we verify</a>
-    </header>
-  );
-}
 
 /** one group's swatch, name and size; the swatch is the colour the figures draw it in */
 function GroupChip({ name, i, n }: { name: string; i: number; n?: number }) {
@@ -84,5 +70,25 @@ export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes
       </div>
       {children}
     </section>
+  );
+}
+
+/**
+ * A portal page while it learns what its studies hold (which decides its tabs): shaped like what
+ * replaces it — the tab row, then a view card's title, toolbar and figure — so the page does not
+ * change shape on the way to its first view.
+ */
+export function PortalLoading() {
+  return (
+    <div role="status" aria-label="loading the page">
+      <div data-tw className="mb-4 flex flex-wrap gap-x-7 gap-y-2.5 border-b px-3.5 pt-2 pb-2.5">
+        {[6, 9.5, 8, 3.5, 5.5, 7, 9, 6.5].map((w, i) => <span key={i} className="skeleton block h-5" style={{ width: w + "rem" }} />)}
+      </div>
+      <div className="card viewcard viewloading" aria-busy="true">
+        <div className="vhead"><span data-tw className="skeleton block h-[34px] w-56" /></div>
+        <div className="viewtb"><span data-tw className="skeleton block h-9 w-[34rem] max-w-full" /></div>
+        <div className="skeleton skeleton-view" />
+      </div>
+    </div>
   );
 }

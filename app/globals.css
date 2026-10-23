@@ -295,6 +295,8 @@ pre {
 .skeleton-counts { display: inline-block; vertical-align: middle; width: 15rem; height: 0.9em; border-radius: var(--r-sm); }
 .skeleton-facet { height: 13rem; }
 .skeleton-view { height: 16rem; margin-bottom: 1rem; }
+/* under a view's toolbar the figure stands where the drawing will be, as far below it as the drawing */
+.viewtb + .skeleton-view { margin-top: var(--s3); }
 .skeleton-addview { height: 3.4rem; margin-bottom: 1rem; }
 /* A view recomputing after a settings change: the figure area only (Updating measures where
    the header and toolbars end), opaque so the stale answer can't be read as the new one. */
@@ -601,6 +603,8 @@ main.analysis-main { max-width: min(132rem, 100%); }
 
 /* ---------------- small shared idioms ---------------- */
 .toplink { color: var(--accent-ink); font-size: var(--t-md); }
+/* the page you are on: plain text colour, no underline (same weight, so the header does not shift) */
+.toplink[aria-current=page] { color: var(--ink); text-decoration: none; }
 .row.center { align-items: center; }
 .row.baseline { align-items: baseline; }
 .row.g5 { gap: 0.5rem; }
@@ -806,9 +810,6 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .chatfigbody svg { display: block; }
 
 /* ---------------- /rationale — RATIONALE.md rendered as a page ---------------- */
-.rationale-nav { margin-bottom: 1.2rem; display: flex; align-items: center; gap: var(--s4); }
-.rationale-nav a { color: var(--accent-ink); font-size: var(--t-md); text-decoration: none; }
-.rationale-nav a:hover { text-decoration: underline; }
 
 .rationale-doc { line-height: 1.65; }
 .rationale-doc h1 {
@@ -1331,9 +1332,6 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
    gallery card per paper, same .card base every other page's cards use.
    --------------------------------------------------------------------------- */
 .repro-page { max-width: 900px; margin: 0 auto; padding: var(--s5) var(--s4) var(--s6); }
-.repro-nav { display: flex; align-items: center; gap: var(--s4); margin-bottom: var(--s5); }
-.repro-nav a { color: var(--accent-ink); font-size: var(--t-md); text-decoration: none; }
-.repro-nav a:hover { text-decoration: underline; }
 .repro-intro h1 { font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-2xl); margin: 0 0 var(--s2); }
 .repro-intro .lede { color: var(--muted); max-width: 68ch; line-height: 1.6; margin: 0; }
 .repro-tiles { display: flex; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s4); }
@@ -1412,8 +1410,6 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 
 /* ---- hypothesis campaigns (/campaign) ---------------------------------------------------- */
 .camp { max-width: 64rem; }
-.camp-home, .camp-home:visited { color: inherit; text-decoration: none; }
-.camp-nav { color: var(--accent-ink); font-size: var(--t-md); }
 .camp-eyebrow { font-size: var(--t-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .camp-q { margin: var(--s3) 0 var(--s5); }
 .camp-q h2 { font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-xl); font-weight: 600; line-height: 1.3; margin: var(--s1) 0 var(--s4); }

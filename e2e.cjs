@@ -207,9 +207,9 @@ async function main() {
         await page.waitForFunction(() => document.querySelector(".mermaid-diagram svg") !== null, null, { timeout: 30000 });
         const svgCount = await page.locator(".mermaid-diagram svg").count();
         const fallback = await page.locator(".mermaid-fallback").count();
-        const backLink = await page.locator(".rationale-nav a").getAttribute("href");
-        rationaleOk = svgCount > 0 && fallback === 0 && backLink === "/lab";
-        rationaleInfo = "svg=" + svgCount + " fallback=" + fallback + " backLink=" + backLink;
+        const here = await page.locator("header a.toplink[aria-current=page]").innerText();
+        rationaleOk = svgCount > 0 && fallback === 0 && here === "rationale";
+        rationaleInfo = "svg=" + svgCount + " fallback=" + fallback + " header marks=" + here;
       } catch (e) { rationaleInfo = String(e.message || e).slice(0, 100); }
       ok("/rationale renders with a live Mermaid diagram", rationaleOk, rationaleInfo);
 
@@ -832,7 +832,7 @@ async function main() {
       await page.goto(BASE + "/lab?tab=examples&doc=" + enc);
       await page.waitForTimeout(1800);
       ok("an explicit ?tab= beats the document's default tab",
-        (await page.locator("[aria-label='lab sections'] [role=tab][aria-selected=true]").innerText()).trim() === "Examples");
+        (await page.locator("header a.toplink[aria-current=page]").innerText()).trim() === "examples");
 
       // Cohorts tab: tick cohorts, submit them together. No per-row "add" links. The example
       // cohorts live on the Examples page, so two saved cohorts are what get ticked here.
@@ -897,18 +897,21 @@ async function main() {
         studyLines.length > 0 && studyLines.every(s => s && s.text && s.title),
         studyLines.map(s => s ? s.text : "missing").join(" | "));
 
-      // A kind already in the document shows as a selected pill, and clicking it removes the view.
-      let pillOn = false, pillOff = false, left = [];
+      // The view buttons only add: a second click on a kind already in the document adds another of
+      // it (undone here, so the checks below see the document as it was).
+      let kinds2 = [], undone = [];
       try {
-        const pill = page.locator(".addview button:has-text('Lollipop')");
-        pillOn = (await pill.getAttribute("aria-pressed")) === "true";
-        await pill.click();
-        await page.waitForFunction(() => !document.querySelector(".lp-plot circle.lollipop-head"), null, { timeout: 30000 });
-        left = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
-        pillOff = (await pill.getAttribute("aria-pressed")) === "false";
+        const kinds = () => page.locator("#docjson").inputValue().then((t) => (JSON.parse(t).views || []).map(v => v.kind));
+        await page.locator(".addview button:has-text('Lollipop')").click();
+        await page.waitForFunction(() => (JSON.parse(document.querySelector("#docjson").value).views || []).filter(v => v.kind === "hotspots").length === 2, null, { timeout: 30000 });
+        kinds2 = await kinds();
+        await page.locator(".undo-doc").click();
+        await page.waitForFunction(() => (JSON.parse(document.querySelector("#docjson").value).views || []).filter(v => v.kind === "hotspots").length === 1, null, { timeout: 30000 });
+        undone = await kinds();
       } catch { /* left as failed */ }
-      ok("a selected view pill removes its view when clicked", pillOn && pillOff && !left.includes("hotspots") && left.length > 0,
-        "selected " + pillOn + " · deselected " + pillOff + " · views now " + (left.join(", ") || "none"));
+      ok("a view button adds another view of a kind already in the document",
+        kinds2.filter(k => k === "hotspots").length === 2 && undone.filter(k => k === "hotspots").length === 1,
+        "after a second click: " + (kinds2.join(", ") || "none") + " · after undo: " + (undone.join(", ") || "none"));
 
       // The oncoprint does not go through a resolver, so its provenance is a separate
       // code path — and the one most likely to be left behind. It is also the one view
@@ -990,7 +993,7 @@ async function main() {
       // The docs gate already proves each one RUNS; this proves the app can
       // launch them and that the federated views actually paint something.
       await page.goto(BASE + "/lab");
-      await page.getByRole("tab", { name: "Examples", exact: true }).click();
+      await page.locator("header a.toplink", { hasText: /^examples$/ }).click();
       await page.waitForSelector(".excard", { timeout: 120000 });
       const nCards = await page.locator(".excard").count();
       const { EXAMPLES } = await import("./lib/dsl-reference.ts");
@@ -1024,7 +1027,7 @@ async function main() {
       ];
       // a multi-view document must render EVERY one of its views, not just the first
       await page.goto(BASE + "/lab");
-      await page.getByRole("tab", { name: "Examples", exact: true }).click();
+      await page.locator("header a.toplink", { hasText: /^examples$/ }).click();
       await page.waitForSelector(".excard", { timeout: 120000 });
       await page.locator(".excard").filter({ hasText: "One cohort, five ways" }).first()
         .locator("button:has-text('Run')").click();
@@ -1102,7 +1105,7 @@ async function main() {
 
       for (const [title, sel, label] of launches) {
         await page.goto(BASE + "/lab");
-        await page.getByRole("tab", { name: "Examples", exact: true }).click();
+        await page.locator("header a.toplink", { hasText: /^examples$/ }).click();
         await page.waitForSelector(".excard", { timeout: 120000 });
         const card = page.locator(".excard").filter({ hasText: title }).first();
         await card.locator("button:has-text('Run')").click();

@@ -11,7 +11,7 @@ import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 import CustomDataDialog, { type CustomDataFocus } from "./custom-data-dialog.tsx";
 import CustomDataManager from "./custom-data-panel.tsx";
-import LoginButton from "./login-button.tsx";
+import { SiteHeader } from "../_ui/site-header.tsx";
 import { upgradeDocument, type DocUpgrade } from "../../lib/doc-version.ts";
 import type { OnCustomData } from "./pills";
 import { requestLogin, referencedDatasets, bindUploads, unresolvedUploads } from "./custom-data-client.ts";
@@ -47,7 +47,8 @@ import { Input } from "../_ui/input";
 import { PAGE_TAB } from "../_ui/toolbar.ts";
 
 const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
-const TAB_LABELS: [typeof TABS[number], string][] = [["explore", "Explore"], ["cohorts", "Saved"], ["analysis", "Analysis"], ["examples", "Examples"]];
+/** the tabs the lab's own bar shows; Examples opens from the site header */
+const TAB_LABELS: [typeof TABS[number], string][] = [["explore", "Explore"], ["cohorts", "Saved"], ["analysis", "Analysis"]];
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -357,7 +358,7 @@ export default function AnalysisPage() {
   const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading, studies });
   const { VIEW_KINDS, assayOptions, attrsLoading, cantDrawCohort, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, profileCatalog, viewAttrs, viewEvents, viewGenes } = viewOptions;
   const viewEdits = useViewEdits({ VIEW_KINDS, assayOptions, busy, cantDrawCohort, catalogAttrs, contProfile, doc, docs, numericAttrs, profileOptions, result, setChooser, setToast, study, viewAttrs, viewEvents, viewGenes, viewIds });
-  const { addCohortToView, addView, cohortChoice, docView, emptyViewHint, maxCohortsOf, moveView, ocView, openCohortChooser, patchView, removeView, removeViews, setViewAttrs, setViewCohorts, setViewGenes, updateView, updateViewLocal, viewTitle } = viewEdits;
+  const { addCohortToView, addView, cohortChoice, docView, emptyViewHint, maxCohortsOf, moveView, ocView, openCohortChooser, patchView, removeView, setViewAttrs, setViewCohorts, setViewGenes, updateView, updateViewLocal, viewTitle } = viewEdits;
 
   // ---- what the sections read ------------------------------------------------------------
   /** what Explore's sections read and the edits they can make (app/lab/explore-sections.tsx) */
@@ -365,7 +366,7 @@ export default function AnalysisPage() {
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
   const viewCtx = { VIEW_KINDS, docHistory, study, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, noteEdit, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, profileCatalog, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   /** what the Analysis tab's sections read and the actions they take (app/lab/analysis-sections.tsx) */
-  const analysisCtx: AnalysisCtx = { lockCohorts, unlockCohort, unlockAll, canSave, analysisStudies, requestLogin, signIn: (!customState.enabled ? "off" : !loggedIn ? "locked" : "ready") as SignInState, VIEW_KINDS, addView, docHistory, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortCells, cohortSaveState, cohortSource, openCohortCells, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, removeViews, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
+  const analysisCtx: AnalysisCtx = { lockCohorts, unlockCohort, unlockAll, canSave, analysisStudies, requestLogin, signIn: (!customState.enabled ? "off" : !loggedIn ? "locked" : "ready") as SignInState, VIEW_KINDS, addView, docHistory, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortCells, cohortSaveState, cohortSource, openCohortCells, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
   // what the page offers the researcher's AI assistant (app/lab/agent-tools.ts), current every render
   const webmcp = useLabTools({
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
@@ -385,18 +386,12 @@ export default function AnalysisPage() {
 
   return (
     <>
-      <header>
-        <h1><a href="/" className="text-foreground no-underline" title="choose studies, then explore or query them">cbio-lab</a></h1>
-        <span className="sub">analysis documents — cohorts and views over one declarative object</span>
-        <span className="spacer" />
-        <a className="toplink" href="/reproductions">paper reproductions</a>
-        <a className="toplink" href="/verification">how we verify</a>
-        <a className="toplink" href="/campaign">hypothesis campaigns</a>
-        <a className="toplink" href="/rationale">rationale</a>
+      <SiteHeader page="analysis documents — cohorts and views over one declarative object"
+        current={tab === "examples" ? tab : undefined}
+        onLink={(l) => l === "examples" ? (openTab(l), true) : false}>
         <AgentToolsMenu page="analysis" tools={LAB_TOOL_NAMES} webmcp={webmcp}
           intro="Your AI assistant — Claude in the Chrome sidebar — can read and edit this analysis with these tools. Every edit is run by the engine first and reaches the page only if it is accepted; analysis_undo reverts the assistant's edits." />
-        <LoginButton />
-      </header>
+      </SiteHeader>
       <main className="analysis-main">
         {/* Suggestions for every view's gene editor: the most-altered genes this
             exploration found. Typing any symbol is still allowed — the list is a

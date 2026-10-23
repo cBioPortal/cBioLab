@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { installIndexTools } from "./agent-tools.ts";
 import { Prompt } from "./prompt.tsx";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
-import LoginButton from "../lab/login-button.tsx";
+import { SiteHeader } from "../_ui/site-header.tsx";
 
 type Row = { id: string; question: string; study: string; status: string; lockedAt: string | null; createdAt: string };
 
@@ -33,16 +33,10 @@ export default function CampaignIndex() {
 
   return (
     <>
-      <header>
-        <h1>Hypothesis campaigns</h1>
-        <span className="sub">cbio-lab as the referee for AI-generated hypotheses</span>
-        <span className="spacer" />
-        <a href="/lab" className="camp-nav">analysis app</a>
-        <a href="/rationale" className="camp-nav">why this exists</a>
-        <LoginButton />
+      <SiteHeader page="hypothesis campaigns — cbio-lab as the referee for AI-generated hypotheses" current="campaigns">
         <AgentToolsMenu page="campaign list" tools={[["campaign_create", "createCampaign(question, study?)"], ["campaign_list", "listCampaigns()"]]} webmcp={webmcp}
           intro="Your AI assistant — Claude in the Chrome sidebar — starts a campaign for your question with these tools; the campaign's own page then has the tools for its hypotheses." />
-      </header>
+      </SiteHeader>
       <main className="camp">
         <section className="camp-explain">
           <div><strong>1 · You ask</strong><p>Your research question, in plain words, to your AI assistant — Claude in the Chrome sidebar.</p></div>
