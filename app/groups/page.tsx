@@ -5,8 +5,8 @@
 // item (the Saved tab's "share…"), not here.
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import LoginButton from "../lab/login-button.tsx";
 import { useCustomDataState } from "../lab/custom-data-panel.tsx";
+import { SiteHeader } from "../_ui/site-header.tsx";
 import { requestLogin } from "../lab/custom-data-client.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import { api } from "../lab/api.ts";
@@ -40,13 +40,7 @@ export default function GroupsPage() {
 
   return (
     <>
-      <header>
-        <h1>Groups</h1>
-        <span className="sub">who you share saved cohorts, analyses and custom data with</span>
-        <span className="spacer" />
-        <a href="/lab?tab=cohorts" className="camp-nav">your saved work</a>
-        <LoginButton />
-      </header>
+      <SiteHeader page="groups — who you share saved cohorts, analyses and custom data with" />
       <main className="camp groups" data-tw>
         {!login.loaded ? <div className="card"><Waiting what="your sign-in" /></div>
           : !login.unlocked ? <div className="card"><p className="m-0 text-md">

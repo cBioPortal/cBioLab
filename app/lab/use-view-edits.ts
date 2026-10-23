@@ -62,13 +62,7 @@ export function useViewEdits(page: ViewEditsPage) {
    *  and the cohort definitions it draws from, neither of which removal
    *  touches — so this splices `result.views` locally instead of re-running
    *  everything, the same way moveView (below) already does. */
-  const removeViews = (drop: (v: any, i: number) => boolean) => {
-    const all = doc.views || [];
-    const keep = all.map((v: any, j: number) => !drop(v, j));
-    const views = all.filter((_: any, j: number) => keep[j]);
-    docs.set({ ...doc, views });
-  };
-  const removeView = (i: number) => removeViews((_, j) => j === i);
+  const removeView = (i: number) => docs.set({ ...doc, views: (doc.views || []).filter((_: any, j: number) => j !== i) });
 
   /** Swap a view with its neighbour. Order is cosmetic — the computed result for
    *  each view is unchanged, so this reorders `result.views` too rather than
@@ -255,5 +249,5 @@ export function useViewEdits(page: ViewEditsPage) {
   /** the view at index vi, read as an oncoprint view (its editor only renders there) */
   const ocView = (vi: number): OncoprintView => ((doc.views || [])[vi] || {}) as OncoprintView;
 
-  return { removeViews, removeView, moveView, addView, patchView, updateView, updateViewLocal, setViewCohorts, setViewAttrs, setViewGenes, docView, partitionShapes, cohortChoice, ocView, viewTitle, maxCohortsOf, emptyViewHint, cohortTarget, openCohortChooser, addCohortToView };
+  return { removeView, moveView, addView, patchView, updateView, updateViewLocal, setViewCohorts, setViewAttrs, setViewGenes, docView, partitionShapes, cohortChoice, ocView, viewTitle, maxCohortsOf, emptyViewHint, cohortTarget, openCohortChooser, addCohortToView };
 }

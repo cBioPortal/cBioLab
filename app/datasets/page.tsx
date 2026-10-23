@@ -26,11 +26,6 @@ export default async function DatasetsPage() {
   const sum = (k: keyof DatasetRow) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
   return (
     <main className="repro-page ds-page">
-      <div className="repro-nav">
-        <a href="/lab">← back to the app</a>
-        <a href="/reproductions">paper reproductions</a>
-        <a href="/rationale">rationale</a>
-      </div>
       <PageTools kind="datasets" spec={rows} />
       <div className="repro-intro">
         <h1>Datasets</h1>

@@ -11,7 +11,7 @@ import type { Campaign, Funnel, HypothesisRow } from "../../../lib/campaign.ts";
 import { installAgentTools } from "../agent-tools.ts";
 import { Prompt } from "../prompt.tsx";
 import { AgentToolsMenu } from "../../_agent/AgentToolsMenu.tsx";
-import LoginButton from "../../lab/login-button.tsx";
+import { SiteHeader } from "../../_ui/site-header.tsx";
 import { useCustomDataState } from "../../lab/custom-data-panel.tsx";
 import { LoaderCircle, Lock, Play } from "lucide-react";
 import { Button } from "../../_ui/button";
@@ -119,16 +119,10 @@ export default function CampaignPage() {
 
   return (
     <>
-      <header>
-        <h1><a href="/campaign" className="camp-home">Hypothesis campaigns</a></h1>
-        <span className="sub">cbio-lab as the referee for AI-generated hypotheses</span>
-        <span className="spacer" />
-        <a href="/lab" className="camp-nav">analysis app</a>
-        <a href="/rationale" className="camp-nav">why this exists</a>
-        <LoginButton />
+      <SiteHeader page="hypothesis campaigns — cbio-lab as the referee for AI-generated hypotheses" current="campaigns">
         <AgentToolsMenu page="campaign" tools={TOOL_LIST} webmcp={webmcp}
           intro="Your AI assistant — Claude in the Chrome sidebar — writes, checks and registers this campaign's hypotheses with these tools, and can lock and run it once you agree. The engine checks everything it submits." />
-      </header>
+      </SiteHeader>
       <main className="camp">
         <section className="camp-q">
           <div className="camp-eyebrow">Research question · {c.study}</div>

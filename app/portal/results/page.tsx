@@ -17,7 +17,8 @@ import { Pencil } from "lucide-react";
 import CohortPills from "../../lab/pills.tsx";
 import { usePublicEnv } from "../../_env/public-env-context.tsx";
 import { fmtInt } from "../../../lib/chart/format.ts";
-import { PortalHeader, PortalSummary } from "../portal-chrome.tsx";
+import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
+import { SiteHeader } from "../../_ui/site-header.tsx";
 import { RESULTS_MAX_GENES, readResultsTarget, studiesProblem } from "../query-editor.tsx";
 import { QueryFlow } from "../../_home/query-flow.tsx";
 import { checkGeneQuery } from "../../../lib/gene-query.ts";
@@ -47,7 +48,7 @@ export default function ResultsPage() {
   const page = usePageDoc(fresh, linked);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const [editing, setEditing] = useState(false);
-  const shell = (body: React.ReactNode) => <><PortalHeader page="query results" /><main className="analysis-main">{body}</main></>;
+  const shell = (body: React.ReactNode) => <><SiteHeader page="query results" /><main className="analysis-main">{body}</main></>;
   // a query that is not one yet, or cannot be read, opens the homepage's flow at the step it needs
   const flow = (note?: string | null) => shell(<>
     {note && <div className="error">{note}</div>}
@@ -89,7 +90,7 @@ export default function ResultsPage() {
     {editing && <QueryFlow initial={target} className="mb-4" />}
     {page.note && <p className="note">{page.note}</p>}
     {!ready
-      ? <><div className="skeleton mb-4 h-10" /><div className="card viewcard viewloading" aria-busy="true"><div className="skeleton skeleton-view" /></div></>
+      ? <PortalLoading />
       : <PortalTabs doc={page.doc!} tabs={fresh!.tabs} titles={fresh!.titles} open={page.open} onOpen={page.openTab} onDoc={page.update}
           catalog={{ attrs: known!.attrs, profiles, profileCatalog, loading: false }}
           onCounts={(c) => setCounts((o) => o || c)} />}

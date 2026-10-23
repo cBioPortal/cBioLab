@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { marked } from "marked";
 import MermaidBlock from "./mermaid-block.tsx";
 import { PageTools } from "../_agent/PageTools.tsx";
+import { SiteHeader } from "../_ui/site-header.tsx";
 
 export const metadata = { title: "Rationale — cbio-lab" };
 
@@ -23,19 +24,17 @@ export default function RationalePage() {
   // parts alternates: [markdown, mermaidSource, markdown, mermaidSource, ...]
 
   return (
-    <main className="rationale-doc">
-      <div className="rationale-nav">
-        <a href="/lab">← back to the app</a>
-        <span className="spacer" />
-        <PageTools kind="rationale" />
-      </div>
-      {parts.map((part, i) =>
-        i % 2 === 1
-          ? <MermaidBlock key={i} source={part} />
-          : part.trim()
-            ? <div key={i} dangerouslySetInnerHTML={{ __html: marked.parse(part) as string }} />
-            : null
-      )}
-    </main>
+    <>
+      <SiteHeader page="rationale — why this exists" current="rationale"><PageTools kind="rationale" /></SiteHeader>
+      <main className="rationale-doc">
+        {parts.map((part, i) =>
+          i % 2 === 1
+            ? <MermaidBlock key={i} source={part} />
+            : part.trim()
+              ? <div key={i} dangerouslySetInnerHTML={{ __html: marked.parse(part) as string }} />
+              : null
+        )}
+      </main>
+    </>
   );
 }

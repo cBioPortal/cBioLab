@@ -9,7 +9,8 @@ import type { AnalysisDoc, View } from "../../../lib/types";
 import { PortalTabs } from "../PortalTabs";
 import { useStudyKnown, expressionProfile, type StudyKnown } from "../study-known";
 import { arrange, decodeDoc, usePageDoc, type PageLayout } from "../page-doc";
-import { PortalHeader, PortalSummary } from "../portal-chrome.tsx";
+import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
+import { SiteHeader } from "../../_ui/site-header.tsx";
 import { fmtInt } from "../../../lib/chart/format.ts";
 
 const CLINICAL_SHOWN = 8;
@@ -42,7 +43,7 @@ export default function ComparisonPage() {
   const fresh = useMemo(() => linked && known && names.length >= 2 && names.length <= 6 ? comparisonLayout(linked, study, known) : null, [linked, known, study, names.length]);
   const page = usePageDoc(fresh, linked);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
-  const shell = (body: React.ReactNode) => <><PortalHeader page="group comparison" /><main className="analysis-main">{body}</main></>;
+  const shell = (body: React.ReactNode) => <><SiteHeader page="group comparison" /><main className="analysis-main">{body}</main></>;
   if (!linked || !study) return shell(<p className="note">This page compares the cohorts of an analysis document passed as <code>?doc=</code> (the lab&apos;s own link encoding); none was given.</p>);
   if (names.length < 2 || names.length > 6) return shell(<p className="note">a comparison page compares 2 to 6 cohorts; this analysis has {names.length}</p>);
   if (error) return shell(<div className="error">{error}</div>);
@@ -53,7 +54,7 @@ export default function ComparisonPage() {
       groups={names} counts={counts} left={fresh?.left || []} />
     {page.note && <p className="note">{page.note}</p>}
     {!ready
-      ? <><div className="skeleton mb-4 h-10" /><div className="card viewcard viewloading" aria-busy="true"><div className="skeleton skeleton-view" /></div></>
+      ? <PortalLoading />
       : <PortalTabs doc={page.doc!} tabs={fresh!.tabs} titles={fresh!.titles} open={page.open} onOpen={page.openTab} onDoc={page.update}
           catalog={{ attrs: known!.attrs, profiles: known!.profiles, profileCatalog: known!.profileCatalog, loading: false }}
           onCounts={(c) => setCounts((o) => o || c)} />}

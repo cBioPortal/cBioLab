@@ -75,7 +75,6 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
     onDoc({ ...doc, views: views.map((v, j) => { const m = idx.indexOf(j); return m >= 0 ? mine[m] : v; }) });
   };
   const st = state[key];
-  const spinning = (k: string) => Object.entries(state).some(([x, s]) => (x === k || x.startsWith(k + " › ")) && s.loading);
   const chooser = tab && !sub ? tab.chooser : undefined;
   const chooseFrom = (o: string) => {
     const next = chooser!.apply(idx.map((i) => views[i]), o);
@@ -87,7 +86,7 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
         <TabsList variant="line" aria-label="results tabs" className={LINE_TABS}>
           {tabs.map((t) => (
             <TabsTrigger key={t.title} value={t.title} className={PAGE_TAB}>
-              {t.title}{spinning(t.title) && <span className="spinner" />}
+              {t.title}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -100,7 +99,7 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
                 <TabsList aria-label={tab.title + " tabs"} className={SEG_TABS}>
                   {tab.sub.map((t) => (
                     <TabsTrigger key={t.title} value={t.title} className={SEG_TAB}>
-                      {t.title}{spinning(tab.title + " › " + t.title) && <span className="spinner" />}
+                      {t.title}
                     </TabsTrigger>
                   ))}
                 </TabsList>
