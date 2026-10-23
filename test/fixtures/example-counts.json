@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-10-20",
+  "generated": "2026-10-23",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -146,6 +146,9 @@
     },
     "Logistic regression: does APC status predict MSI-high status?": {
       "all patients": 471
+    },
+    "Pan-cancer forest: TP53 mutation and survival in 30 cancer types": {
+      "all patients": 48179
     },
     "splitBy: one cohort, auto-split into an arm per receptor subtype": {
       "all patients": 1756

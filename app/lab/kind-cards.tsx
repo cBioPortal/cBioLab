@@ -93,6 +93,7 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   exclusivity: { label: "Mutual exclusivity (DISCOVER, burden-aware)", title: "Mutual exclusivity", genes: true, maxCohorts: 1, cohortInHeader: true },
   ctdna: { label: "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)", title: "ctDNA vs tissue", genes: true, maxCohorts: 3 },
   riskmodel: { label: "Risk model (elastic-net Cox, OncoCast-style)", title: "Risk model", maxCohorts: 1 },
+  forest: { label: "Pan-cancer forest (one exposure's HR per cancer type, random-effects pooled)", title: "Forest plot", maxCohorts: 6 },
   diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2, minCohorts: 2,
     why: (k) => !k.profiles.length ? "this study has no molecular profile to compare expression on" : null }
 };
@@ -200,6 +201,11 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     " on " + (spec.measure === "driver" ? "driver mutations" : "mutated genes") +
     (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") +
     (spec.strata ? ", stratified by " + spec.strata : "") + " · " + (spec.runs ?? 10) + " held-out splits" + (spec.validate ? ", validated on the held-out half" : "");
+  if (kind === "forest") {
+    const e = spec.exposure || {};
+    const what = e.source === "alteration" ? (e.oql || (e.genes || [e.gene]).join(" or ") + " mutated") : e.attribute ? e.attribute + (spec.threshold != null ? " ≥ " + spec.threshold : spec.exposed ? " = " + spec.exposed : "") : "no exposure chosen";
+    return what + " · " + (spec.endpoint || "OS") + " hazard ratio per " + (spec.strata || "CANCER_TYPE") + ", random-effects pooled";
+  }
   if (kind === "labs") {
     const an = spec.anchor || {};
     return (spec.test || "no test chosen") + " from first " + (an.eventType || "?") + (an.key ? " [" + an.key + "=" + an.value + "]" : "") +
@@ -519,6 +525,60 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
             label genes kept in ≥ <OptionSelect value={String(labelAbove)} disabled={busy} onValueChange={(v) => patch({ labelAbove: Number(v) === RISK_LABEL_ABOVE ? undefined : Number(v) })}>
               {!RISK_LABEL_STEPS.includes(labelAbove) && <option value={labelAbove}>{Math.round(labelAbove * 100)}%</option>}
               {RISK_LABEL_STEPS.map((t) => <option key={t} value={t}>{Math.round(t * 100)}%</option>)}
+            </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
+  if (spec.kind === "forest") {
+    const e = spec.exposure || { source: "alteration", gene: "" };
+    const isGene = e.source === "alteration";
+    const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
+    const strata = spec.strata || "CANCER_TYPE";
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">exposure</span>
+          <label className="tbfield" title="a gene's mutation (patients not profiled for it are left out), or a clinical attribute">
+            is <OptionSelect value={isGene ? "gene" : "attribute"} disabled={busy}
+              onValueChange={(v) => patch(v === "gene" ? { exposure: { source: "alteration", gene: "TP53" }, threshold: undefined, exposed: undefined } : { exposure: { source: "clinical", attribute: "TMB_NONSYNONYMOUS" }, threshold: 10, exposed: undefined })}>
+              <option value="gene">gene mutated</option><option value="attribute">attribute</option>
+            </OptionSelect>
+          </label>
+          {isGene
+            ? <span className="tbfield"><DraftInput value={e.gene || (e.genes || []).join(",")} disabled={busy} width="6rem" title="the gene whose mutation is the exposure"
+                onCommit={(t) => patch({ exposure: { source: "alteration", gene: t.trim().toUpperCase() } })} /></span>
+            : <>
+                <span className="tbfield"><DraftInput value={e.attribute || ""} disabled={busy} width="9rem" title="the clinical attribute"
+                  onCommit={(t) => patch({ exposure: { source: "clinical", attribute: t.trim() } })} /></span>
+                <label className="tbfield" title="a numeric attribute: patients at or above this are the exposed">
+                  ≥ <DraftInput value={spec.threshold != null ? String(spec.threshold) : ""} disabled={busy} width="4rem" placeholder="number"
+                    onCommit={(t) => patch(t.trim() ? { threshold: Number(t), exposed: undefined } : { threshold: undefined })} />
+                </label>
+                <label className="tbfield" title="a categorical attribute: the level counted as exposed">
+                  or = <DraftInput value={spec.exposed || ""} disabled={busy} width="6rem" placeholder="level"
+                    onCommit={(t) => patch(t.trim() ? { exposed: t.trim(), threshold: undefined } : { exposed: undefined })} />
+                </label>
+              </>}
+        </div>
+        <div className="tbz"><span className="tbl">rows</span>
+          <label className="tbfield" title="what one row is: a cancer type (or any categorical attribute), a study, or one of the view's cohorts">
+            per <OptionSelect value={strata} disabled={busy} onValueChange={(v) => patch({ strata: v === "CANCER_TYPE" ? undefined : v })}>
+              <option value="CANCER_TYPE">cancer type</option>
+              <option value="CANCER_TYPE_DETAILED">detailed cancer type</option>
+              <option value="study">study</option><option value="cohort">cohort</option>
+              {!cats.includes(strata) && !["study", "cohort", "CANCER_TYPE", "CANCER_TYPE_DETAILED"].includes(strata) && <option value={strata}>{strata}</option>}
+              {cats.filter((a) => a !== "CANCER_TYPE" && a !== "CANCER_TYPE_DETAILED").map((a) => <option key={a} value={a}>{a}</option>)}
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="a stratum with fewer patients than this (or fewer than minEvents deaths) is pooled into Other, or left out">
+            min <OptionSelect value={String(spec.minPatients ?? 30)} disabled={busy} onValueChange={(v) => patch({ minPatients: v === "30" ? undefined : Number(v) })}>
+              {[...new Set([10, 30, 50, 100, 200, spec.minPatients ?? 30])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n} patients</option>)}
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="the small strata: pooled into one Other row (each keeping its own baseline hazard), or left out and listed">
+            small <OptionSelect value={spec.small === "drop" ? "drop" : "pool"} disabled={busy} onValueChange={(v) => patch({ small: v === "drop" ? "drop" : undefined })}>
+              <option value="pool">pooled as Other</option><option value="drop">left out</option>
             </OptionSelect>
           </label>
         </div>
@@ -871,6 +931,7 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
 /** The view a fresh "add view" click starts from, built from what the study is known to have. */
 export function defaultKindView(kind: string, known: Known): Record<string, unknown> {
   if (kind === "cancertypes") return { kind, genes: known.genes.length ? known.genes.slice(0, 5) : ["TP53", "KRAS"] };
+  if (kind === "forest") return { kind, exposure: { source: "alteration", gene: known.genes[0] || "TP53" } };
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
     return { kind, test: "PSA", anchor: { eventType: tx ? tx.label : "Treatment" } };

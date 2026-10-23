@@ -24,6 +24,7 @@ import { exclusivitySvg } from "./exclusivity.ts";
 import { txendpointsSvg } from "./txendpoints.ts";
 import { predictiveSvg } from "./predictive.ts";
 import { cutpointSvg } from "./cutpoint.ts";
+import { metaForestSvg } from "./forest.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -85,6 +86,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   composition: {
     draw: (v, o) => v.composition && v.composition.groups.some((g) => g.n > 0) ? compositionSvg(v, o) : null,
     title: (v) => "Composition" + (v.composition ? " — " + v.composition.sourceName : "")
+  },
+  forest: {
+    draw: (v, o) => v.forest.rows.length ? metaForestSvg(v, o) : null,
+    title: (v) => "Forest plot" + (v.forest ? " — " + v.forest.exposedLabel + " by " + v.forest.strata + ", " + v.forest.endpoint : "")
   },
   correlates: {
     draw: (v, o) => v.correlates && v.correlates.tested > 0 ? correlatesSvg(v, o) : null,

@@ -21,7 +21,7 @@ export interface StudyAccess {
 type Need = "patients" | "timeline" | "alterations" | "local";
 const NEEDS: Record<string, Need> = {
   // their output is patients: columns, rows, or a model fitted on each patient
-  oncoprint: "patients", table: "patients", mutations: "patients", cox: "patients", logistic: "patients", riskmodel: "patients", predictive: "patients", cutpoint: "patients",
+  oncoprint: "patients", table: "patients", mutations: "patients", cox: "patients", logistic: "patients", riskmodel: "patients", predictive: "patients", cutpoint: "patients", forest: "patients",
   // patient views a peer may share by kind
   timeline: "timeline", alterations: "alterations",
   // aggregates every local participant computes and a remote peer does not serve yet

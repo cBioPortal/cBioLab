@@ -935,6 +935,44 @@ export function fisherZMeta(parts: { r: number | null; n: number }[]): Correlati
   };
 }
 
+export interface MetaEstimate { beta: number; se: number; ciLow: number; ciHigh: number; p: number }
+export interface RandomEffectsMeta {
+  fixed: MetaEstimate; random: MetaEstimate;
+  /** between-study variance (DerSimonian–Laird moment estimator, truncated at 0) */
+  tau2: number;
+  /** Cochran's Q, its degrees of freedom and upper-tail p; I² as a share (0–1) */
+  q: number; df: number; qP: number; i2: number;
+  /** each part's share of the random-effects weight */
+  weights: number[];
+}
+
+/**
+ * Inverse-variance meta-analysis of per-stratum estimates on the log scale (log HR, log OR):
+ * the fixed-effect estimate, and the DerSimonian–Laird random-effects one, whose weights
+ * 1/(se² + τ²) let the strata's true effects differ. Wald 95% intervals on the log scale; the
+ * caller exponentiates. Needs at least two parts with a positive, finite se.
+ */
+export function dersimonianLaird(parts: { beta: number; se: number }[]): RandomEffectsMeta {
+  const ok = parts.filter((x) => Number.isFinite(x.beta) && Number.isFinite(x.se) && x.se > 0);
+  if (ok.length < 2 || ok.length !== parts.length) throw new Error("a random-effects meta-analysis needs at least two estimates, each with a positive, finite standard error");
+  const w = ok.map((x) => 1 / (x.se * x.se));
+  const sw = w.reduce((a, b) => a + b, 0), sw2 = w.reduce((a, b) => a + b * b, 0);
+  const bFixed = ok.reduce((a, x, i) => a + w[i] * x.beta, 0) / sw;
+  const q = ok.reduce((a, x, i) => a + w[i] * (x.beta - bFixed) ** 2, 0);
+  const df = ok.length - 1;
+  const tau2 = Math.max(0, (q - df) / (sw - sw2 / sw));
+  const ws = ok.map((x) => 1 / (x.se * x.se + tau2));
+  const sws = ws.reduce((a, b) => a + b, 0);
+  const bRandom = ok.reduce((a, x, i) => a + ws[i] * x.beta, 0) / sws;
+  const est = (beta: number, se: number): MetaEstimate =>
+    ({ beta, se, ciLow: beta - Z_975 * se, ciHigh: beta + Z_975 * se, p: normalP(beta / se) });
+  return {
+    fixed: est(bFixed, Math.sqrt(1 / sw)), random: est(bRandom, Math.sqrt(1 / sws)),
+    tau2, q, df, qP: chiSquareP(q, df), i2: q > df ? (q - df) / q : 0,
+    weights: ws.map((x) => x / sws)
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Median/IQR and a rank-based test, from a value HISTOGRAM alone — (value, count)
 // pairs are the complete, lossless distribution for a single-study cohort (nothing was
