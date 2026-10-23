@@ -1,0 +1,359 @@
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "all patients": {
+      "count": 48179,
+      "text": "all patients in the study",
+      "studies": [
+        "msk_impact_50k_2026"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "forest",
+      "cohorts": [
+        "all patients"
+      ],
+      "forest": {
+        "exposure": "TP53 mutation status",
+        "exposedLabel": "TP53 mutated",
+        "endpoint": "OS",
+        "strata": "CANCER_TYPE",
+        "covariates": [],
+        "rows": [
+          {
+            "label": "Non-Small Cell Lung Cancer",
+            "n": 6100,
+            "events": 2721,
+            "exposed": 3349,
+            "exposedEvents": 1647,
+            "beta": 0.36357731603738136,
+            "se": 0.039262836821375366,
+            "hr": 1.438466069102339,
+            "ciLow": 1.3319227433346783,
+            "ciHigh": 1.5535320215181594,
+            "p": 2.0426418555127666e-20,
+            "weight": 0.03920262198774657
+          },
+          {
+            "label": "Breast Cancer",
+            "n": 5177,
+            "events": 1756,
+            "exposed": 2178,
+            "exposedEvents": 920,
+            "beta": 0.6902533332799854,
+            "se": 0.04795177005291861,
+            "hr": 1.9942206717199686,
+            "ciLow": 1.8153342144924631,
+            "ciHigh": 2.1907349378236236,
+            "p": 5.583326742103068e-47,
+            "weight": 0.038962422865527195
+          },
+          {
+            "label": "Colorectal Cancer",
+            "n": 4581,
+            "events": 1490,
+            "exposed": 3398,
+            "exposedEvents": 1140,
+            "beta": 0.14562254982643497,
+            "se": 0.06111492394174943,
+            "hr": 1.1567594865704771,
+            "ciLow": 1.0261762339521532,
+            "ciHigh": 1.3039597541811556,
+            "p": 0.017183122844980508,
+            "weight": 0.03851534159617274
+          },
+          {
+            "label": "Prostate Cancer",
+            "n": 2607,
+            "events": 714,
+            "exposed": 730,
+            "exposedEvents": 317,
+            "beta": 0.9144626287506722,
+            "se": 0.07549567764587208,
+            "hr": 2.4954339170981394,
+            "ciLow": 2.1522069834530217,
+            "ciHigh": 2.893397560030587,
+            "p": 9.037679706388555e-34,
+            "weight": 0.03791992365256588
+          },
+          {
+            "label": "Pancreatic Cancer",
+            "n": 2437,
+            "events": 1443,
+            "exposed": 1684,
+            "exposedEvents": 1072,
+            "beta": 0.6197069180303343,
+            "se": 0.060840238242038686,
+            "hr": 1.8583833033847807,
+            "ciLow": 1.6494835555213765,
+            "ciHigh": 2.093739274174033,
+            "p": 2.2944840381907805e-24,
+            "weight": 0.0385256567260666
+          },
+          {
+            "label": "Endometrial Cancer",
+            "n": 2170,
+            "events": 580,
+            "exposed": 1000,
+            "exposedEvents": 394,
+            "beta": 1.0585768505642836,
+            "se": 0.08906737314942043,
+            "hr": 2.8822661735991737,
+            "ciLow": 2.4205819996900724,
+            "ciHigh": 3.432008622941795,
+            "p": 1.4142358829704257e-32,
+            "weight": 0.03726500148212853
+          },
+          {
+            "label": "Ovarian Cancer",
+            "n": 1903,
+            "events": 634,
+            "exposed": 1473,
+            "exposedEvents": 521,
+            "beta": 0.3730697030629234,
+            "se": 0.10413800676656422,
+            "hr": 1.4521855580864549,
+            "ciLow": 1.1840762803746703,
+            "ciHigh": 1.7810025672058725,
+            "p": 0.00034038051466398015,
+            "weight": 0.036444390694349765
+          },
+          {
+            "label": "Soft Tissue Sarcoma",
+            "n": 1871,
+            "events": 687,
+            "exposed": 419,
+            "exposedEvents": 175,
+            "beta": 0.3561303548110261,
+            "se": 0.08772616609564136,
+            "hr": 1.427793655905768,
+            "ciLow": 1.2022445028280229,
+            "ciHigh": 1.6956573467787965,
+            "p": 0.00004916354566515798,
+            "weight": 0.03733345822639026
+          },
+          {
+            "label": "Glioma",
+            "n": 1801,
+            "events": 944,
+            "exposed": 676,
+            "exposedEvents": 338,
+            "beta": -0.1546451408827191,
+            "se": 0.06802236717190452,
+            "hr": 0.8567191381459378,
+            "ciLow": 0.749786686667532,
+            "ciHigh": 0.9789019926823161,
+            "p": 0.02299935011166531,
+            "weight": 0.03824269137325659
+          },
+          {
+            "label": "Bladder Cancer",
+            "n": 1780,
+            "events": 525,
+            "exposed": 890,
+            "exposedEvents": 290,
+            "beta": 0.3188960090832397,
+            "se": 0.08790968692163965,
+            "hr": 1.375608266703034,
+            "ciLow": 1.1578863011844491,
+            "ciHigh": 1.6342693591642083,
+            "p": 0.00028613315409919363,
+            "weight": 0.03732413768388631
+          },
+          {
+            "label": "Melanoma",
+            "n": 1519,
+            "events": 533,
+            "exposed": 313,
+            "exposedEvents": 96,
+            "beta": -0.2539122821430805,
+            "se": 0.11276841497198939,
+            "hr": 0.775759847053319,
+            "ciLow": 0.621925906897574,
+            "ciHigh": 0.967644752575488,
+            "p": 0.024345923871667927,
+            "weight": 0.035935629063069525
+          },
+          {
+            "label": "Esophagogastric Cancer",
+            "n": 1512,
+            "events": 750,
+            "exposed": 1076,
+            "exposedEvents": 541,
+            "beta": 0.05844478342046986,
+            "se": 0.08151371612342567,
+            "hr": 1.0601864442092683,
+            "ciLow": 0.9036445756520477,
+            "ciHigh": 1.243846670217707,
+            "p": 0.4733782678550631,
+            "weight": 0.0376400558304606
+          },
+          {
+            "label": "Hepatobiliary Cancer",
+            "n": 1214,
+            "events": 739,
+            "exposed": 401,
+            "exposedEvents": 256,
+            "beta": 0.34642774212553135,
+            "se": 0.07754658655942237,
+            "hr": 1.414007316975658,
+            "ciLow": 1.214629661943243,
+            "ciHigh": 1.6461121896709674,
+            "p": 0.000007919450990096,
+            "weight": 0.03782649588344218
+          },
+          {
+            "label": "Cancer of Unknown Primary",
+            "n": 1172,
+            "events": 685,
+            "exposed": 602,
+            "exposedEvents": 376,
+            "beta": 0.2502729095476478,
+            "se": 0.07691931190240768,
+            "hr": 1.2843758873045914,
+            "ciLow": 1.1046337460657665,
+            "ciHigh": 1.4933650413675155,
+            "p": 0.0011390967016544121,
+            "weight": 0.037855287607828594
+          },
+          {
+            "label": "Renal Cell Carcinoma",
+            "n": 945,
+            "events": 313,
+            "exposed": 100,
+            "exposedEvents": 47,
+            "beta": 0.45987635713853164,
+            "se": 0.1584561996122483,
+            "hr": 1.5838781376620112,
+            "ciLow": 1.1610304302734333,
+            "ciHigh": 2.160727134751211,
+            "p": 0.0037051624242804095,
+            "weight": 0.032895797435589236
+          },
+          {
+            "label": "Thyroid Cancer",
+            "n": 736,
+            "events": 233,
+            "exposed": 122,
+            "exposedEvents": 76,
+            "beta": 1.4020475291346959,
+            "se": 0.14121858966977638,
+            "hr": 4.063511613189036,
+            "ciLow": 3.0810306863578134,
+            "ciHigh": 5.359286651585311,
+            "p": 3.138450062386882e-23,
+            "weight": 0.03409821117661216
+          },
+          {
+            "label": "Germ Cell Tumor",
+            "n": 557,
+            "events": 114,
+            "exposed": 65,
+            "exposedEvents": 33,
+            "beta": 1.4587654521726032,
+            "se": 0.20745923976348135,
+            "hr": 4.300646895389118,
+            "ciLow": 2.8638097361299635,
+            "ciHigh": 6.45837727467685,
+            "p": 2.0421329035157684e-12,
+            "weight": 0.029308315714585424
+          },
+          {
+            "label": "Head and Neck Cancer",
+            "n": 535,
+            "events": 318,
+            "exposed": 263,
+            "exposedEvents": 168,
+            "beta": 0.47828674436443186,
+            "se": 0.11300353430038591,
+            "hr": 1.6133080240489779,
+            "ciLow": 1.2927915686770903,
+            "ciHigh": 2.013288795752448,
+            "p": 0.000023111441304479575,
+            "weight": 0.03592140932514691
+          },
+          {
+            "label": "Bone Cancer",
+            "n": 460,
+            "events": 175,
+            "exposed": 90,
+            "exposedEvents": 46,
+            "beta": 0.7186471408686105,
+            "se": 0.172936585192702,
+            "hr": 2.0516557311079326,
+            "ciLow": 1.4618425524733525,
+            "ciHigh": 2.879442270897198,
+            "p": 0.00003245017453338904,
+            "weight": 0.031852375230101856
+          },
+          {
+            "label": "Gastrointestinal Stromal Tumor",
+            "n": 452,
+            "events": 82,
+            "exposed": 20,
+            "exposedEvents": 6,
+            "beta": 0.48685160039660885,
+            "se": 0.424235614896253,
+            "hr": 1.6271851178342733,
+            "ciLow": 0.7084789536768905,
+            "ciHigh": 3.737205451142963,
+            "p": 0.251134889528606,
+            "weight": 0.01599060287361155
+          },
+          {
+            "…": "10 more",
+            "sha256": "da267582bff571ee"
+          }
+        ],
+        "left": [
+          {
+            "label": "CNS Cancer",
+            "n": 125,
+            "events": 17,
+            "reason": "no event among the exposed"
+          }
+        ],
+        "fixed": {
+          "beta": 0.4291387623978546,
+          "se": 0.016817146868705755,
+          "hr": 1.5359341495163585,
+          "ciLow": 1.4861334694741366,
+          "ciHigh": 1.587403661990936,
+          "p": 1.2468390377864348e-143
+        },
+        "random": {
+          "beta": 0.48735107985919407,
+          "se": 0.06941809173082336,
+          "hr": 1.6279980663911089,
+          "ciLow": 1.4209051813630573,
+          "ciHigh": 1.8652741498420842,
+          "p": 2.2104450631127374e-12
+        },
+        "tau2": 0.12138060207124625,
+        "q": 424.05302307338434,
+        "qDf": 29,
+        "qP": 9.756190227420332e-72,
+        "i2": 0.9316123257657299,
+        "n": 43375,
+        "events": 16953,
+        "notProfiled": 0,
+        "missing": 4135
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_impact_50k_2026",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "Hazard ratio of OS for TP53 mutated (exposed) against the rest, fit by Cox regression (Efron ties) within each CANCER_TYPE, univariate. 43,375 patients and 16,953 events had a time, the exposure and a CANCER_TYPE; 30 rows were estimated. Panel-aware: a patient not profiled for the gene is left out, never counted as unaltered. 4,135 patients lacked the endpoint, the stratum or a covariate and were left out. 669 patients whose samples carry different values of CANCER_TYPE were left out: they belong to no one stratum. “Other (34 strata)” pools 34 strata (each under 30 patients or 10 events, or past the 30 largest), fit with a baseline hazard of its own per stratum. Not estimated: CNS Cancer (no event among the exposed). Pooled by inverse variance: fixed effect, and DerSimonian–Laird random effects (τ² 0.121, I² 93%, Cochran's Q 424.1 on 29 df, p 9.8e-72). A high I² says the strata disagree beyond chance: the pooled estimate is then an average over different effects, not one effect. Association, not cause: the exposure travels with stage, treatment and other prognostic factors not adjusted for. Proportional hazards within each row is assumed, not checked."
+    }
+  ]
+}

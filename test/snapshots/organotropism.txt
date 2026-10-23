@@ -1,0 +1,39 @@
+Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- NSCLC: 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)
+
+Metastatic organotropism (7,809 patients; sites from timeline Diagnosis events' TUMOR_SITE; OncoKB-driver mutations; CMH stratified by CANCER_TYPE): 6 genes × 10 sites, 60 cells tested, 32 at q<0.05.
+  Sites (patients with a metastasis there / evaluable): Lung 7181/7425, Lymph Nodes 5387/7425, Other 4653/7425, Bone 3756/7425, CNS/Brain 2758/7425, Pleura 2372/7425, Liver 2286/7425, Adrenal Glands 1334/7425, Intra-Abdominal 777/7425, Reproductive Organs 455/7425
+  Lymph Nodes × TP53: altered 3038/5387 (56.4%) with the site vs 801/2038 (39.3%) without, MH OR 2.00, p=2.9e-39 q=1.7e-37
+  CNS/Brain × EGFR: altered 775/2758 (28.1%) with the site vs 879/4667 (18.8%) without, MH OR 1.68, p=2.4e-20 q=7.2e-19
+  Bone × EGFR: altered 971/3756 (25.9%) with the site vs 683/3669 (18.6%) without, MH OR 1.52, p=8.2e-14 q=1.6e-12
+  Adrenal Glands × SMARCA4: altered 94/1334 (7.0%) with the site vs 186/6091 (3.1%) without, MH OR 2.40, p=7.3e-12 q=1.1e-10
+  CNS/Brain × TP53: altered 1567/2758 (56.8%) with the site vs 2272/4667 (48.7%) without, MH OR 1.39, p=1.5e-11 q=1.8e-10
+  Other × TP53: altered 2547/4653 (54.7%) with the site vs 1292/2772 (46.6%) without, MH OR 1.38, p=4.2e-11 q=4.2e-10
+  Liver × EGFR: altered 617/2286 (27.0%) with the site vs 1037/5139 (20.2%) without, MH OR 1.47, p=7.7e-11 q=6.6e-10
+  Adrenal Glands × STK11: altered 223/1334 (16.7%) with the site vs 657/6091 (10.8%) without, MH OR 1.66, p=1.7e-9 q=1.3e-8
+  Liver × TP53: altered 1304/2286 (57.0%) with the site vs 2535/5139 (49.3%) without, MH OR 1.35, p=2.4e-9 q=1.6e-8
+  Adrenal Glands × TP53: altered 788/1334 (59.1%) with the site vs 3051/6091 (50.1%) without, MH OR 1.44, p=3.5e-9 q=2.1e-8
+  Pleura × KRAS: altered 567/2372 (23.9%) with the site vs 1527/5053 (30.2%) without, MH OR 0.73, p=2.0e-8 q=1.1e-7
+  Pleura × EGFR: altered 615/2372 (25.9%) with the site vs 1039/5053 (20.6%) without, MH OR 1.35, p=2.6e-7 q=1.3e-6
+  Bone × SMARCA4: altered 184/3756 (4.9%) with the site vs 96/3669 (2.6%) without, MH OR 1.92, p=3.5e-7 q=1.6e-6
+  Liver × KRAS: altered 557/2286 (24.4%) with the site vs 1537/5139 (29.9%) without, MH OR 0.75, p=4.0e-7 q=1.7e-6
+  Lymph Nodes × KEAP1: altered 471/5387 (8.7%) with the site vs 107/2038 (5.3%) without, MH OR 1.73, p=6.9e-7 q=2.8e-6
+  Bone × TP53: altered 2043/3756 (54.4%) with the site vs 1796/3669 (49.0%) without, MH OR 1.24, p=3.5e-6 q=1.3e-5
+  Pleura × TP53: altered 1319/2372 (55.6%) with the site vs 2520/5053 (49.9%) without, MH OR 1.26, p=4.4e-6 q=1.5e-5
+  Adrenal Glands × KEAP1: altered 143/1334 (10.7%) with the site vs 435/6091 (7.1%) without, MH OR 1.56, p=1.3e-5 q=4.3e-5
+  CNS/Brain × KEAP1: altered 261/2758 (9.5%) with the site vs 317/4667 (6.8%) without, MH OR 1.43, p=4.0e-5 q=0.0001
+  CNS/Brain × SMARCA4: altered 137/2758 (5.0%) with the site vs 143/4667 (3.1%) without, MH OR 1.65, p=4.2e-5 q=0.0001
+  Lymph Nodes × EGFR: altered 1138/5387 (21.1%) with the site vs 516/2038 (25.3%) without, MH OR 0.79, p=0.0001 q=0.0003
+  Pleura × STK11: altered 233/2372 (9.8%) with the site vs 647/5053 (12.8%) without, MH OR 0.74, p=0.0002 q=0.0007
+  Lymph Nodes × SMARCA4: altered 229/5387 (4.3%) with the site vs 51/2038 (2.5%) without, MH OR 1.73, p=0.0005 q=0.0014
+  CNS/Brain × STK11: altered 373/2758 (13.5%) with the site vs 507/4667 (10.9%) without, MH OR 1.28, p=0.0007 q=0.0018
+  Bone × STK11: altered 492/3756 (13.1%) with the site vs 388/3669 (10.6%) without, MH OR 1.27, p=0.0009 q=0.0021
+  Bone × KEAP1: altered 330/3756 (8.8%) with the site vs 248/3669 (6.8%) without, MH OR 1.33, p=0.0013 q=0.0030
+  Intra-Abdominal × TP53: altered 439/777 (56.5%) with the site vs 3400/6648 (51.1%) without, MH OR 1.23, p=0.0074 q=0.0165
+  Other × KEAP1: altered 390/4653 (8.4%) with the site vs 188/2772 (6.8%) without, MH OR 1.26, p=0.0141 q=0.0303
+  Intra-Abdominal × SMARCA4: altered 42/777 (5.4%) with the site vs 238/6648 (3.6%) without, MH OR 1.54, p=0.0157 q=0.0326
+  Bone × KRAS: altered 1015/3756 (27.0%) with the site vs 1079/3669 (29.4%) without, MH OR 0.89, p=0.0216 q=0.0431
+  Cumulative incidence of CNS/Brain by EGFR (death competing): 12 mo EGFR altered 14.2% [12.4–16.1] vs EGFR not altered 12.8% [11.9–13.7]; 24 mo EGFR altered 20.7% [18.5–23.0] vs EGFR not altered 17.7% [16.6–18.8]; 60 mo EGFR altered 32.0% [29.1–34.9] vs EGFR not altered 22.7% [21.5–24.0]; Gray's test p=0.0005
+  CAVEAT (tell the user): Sites are the values of TUMOR_SITE on Diagnosis timeline events, at any date: a patient with any site recorded is evaluable for every site, and has a site when an event names it. The timeline's tumour sites include the primary tumour's own organ, so the column for the organ a cancer type starts in mostly records primaries. Per site and gene, the patients evaluable for the site and profiled for the gene (a mutation panel listing it, or whole-exome; a patient not profiled is in neither group, never wild-type) are split by metastasis there and by a mutation the OncoKB store (v7.5) calls oncogenic or likely oncogenic in the gene called on a covering panel, in any of their samples. The 2×2 tables are stratified by CANCER_TYPE per patient (“Multiple” when samples disagree, a stratum of its own; 2 strata), and tested by the Cochran–Mantel–Haenszel test (continuity-corrected) with the Mantel–Haenszel common odds ratio — so a gene is compared with metastasis WITHIN cancer types, and a cancer type that both carries the gene and spreads to the site does not make the association by itself. A cell is tested with at least 5 altered patients, 5 with the site and 5 without; Benjamini–Hochberg q over the 60 cells tested. The colour is log2 of the odds ratio. A site is only recorded where imaging, biopsy or the source's own abstraction found it, so detection follows practice (who was scanned, how often, which sites are biopsied); patients sequenced from a metastasis are more likely to have that site recorded. Associations are not adjusted for stage, time followed, treatment or tumour mutation burden. The lower panel: cumulative incidence of the first CNS/Brain event after the timeline's day 0 for patients profiled for EGFR, altered against not, death (OS_STATUS) competing, Aalen–Johansen with delta-method 95% intervals; patients with the site at or before day 0 are excluded rather than counted as free of it (EGFR altered 411, EGFR not altered 941), as are those without follow-up. Censoring at OS_MONTHS on the timeline's clock; 0 patients of 6,457 have the event after the last follow-up (refused above 5%). Gray's test by permutation (2000 shuffles, seeded). 

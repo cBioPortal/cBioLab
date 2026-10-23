@@ -1,0 +1,22 @@
+Analysis over msk_impact_2017 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- NSCLC: 1,567 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)
+
+Mutual exclusivity (DISCOVER background over 1,680 samples and 410 genes; any alteration; fit converged in 3 rounds) in NSCLC:
+  KRAS/EGFR: both 19 of 1680 profiled, 169.98 expected; DISCOVER exclusivity q=9.5e-57, co-occurrence q=1.0000; Fisher q=5.7e-47, log2 OR -3.69
+  EGFR/STK11: both 17 of 1680 profiled, 107.25 expected; DISCOVER exclusivity q=8.0e-30, co-occurrence q=1.0000; Fisher q=1.8e-20, log2 OR -2.78
+  EGFR/KEAP1: both 15 of 1680 profiled, 98.47 expected; DISCOVER exclusivity q=6.3e-28, co-occurrence q=1.0000; Fisher q=4.0e-19, log2 OR -2.80
+  STK11/KEAP1: both 159 of 1680 profiled, 66.24 expected; DISCOVER exclusivity q=1.0000, co-occurrence q=6.9e-25; Fisher q=9.1e-75, log2 OR 4.10
+  KRAS/TP53: both 188 of 1680 profiled, 316.93 expected; DISCOVER exclusivity q=4.7e-20, co-occurrence q=1.0000; Fisher q=4.2e-15, log2 OR -1.26
+  STK11/TP53: both 125 of 1680 profiled, 194.74 expected; DISCOVER exclusivity q=4.3e-9, co-occurrence q=1.0000; Fisher q=7.5e-5, log2 OR -0.77
+  KRAS/BRAF: both 15 of 1680 profiled, 41.9 expected; DISCOVER exclusivity q=1.8e-6, co-occurrence q=1.0000; Fisher q=0.0039, log2 OR -1.18
+  EGFR/BRAF: both 14 of 1680 profiled, 39.93 expected; DISCOVER exclusivity q=2.1e-6, co-occurrence q=1.0000; Fisher q=0.0044, log2 OR -1.18
+  KEAP1/TP53: both 140 of 1680 profiled, 178.11 expected; DISCOVER exclusivity q=0.0010, co-occurrence q=1.0000; Fisher q=0.7851, log2 OR -0.07
+  BRAF/STK11: both 14 of 1680 profiled, 27.24 expected; DISCOVER exclusivity q=0.0053, co-occurrence q=1.0000; Fisher q=0.6203, log2 OR -0.31
+  KRAS/STK11: both 141 of 1680 profiled, 112.78 expected; DISCOVER exclusivity q=1.0000, co-occurrence q=0.0196; Fisher q=2.1e-17, log2 OR 1.69
+  BRAF/TP53: both 58 of 1680 profiled, 70.26 expected; DISCOVER exclusivity q=0.0999, co-occurrence q=1.0000; Fisher q=0.6155, log2 OR 0.20
+  BRAF/KEAP1: both 18 of 1680 profiled, 25.12 expected; DISCOVER exclusivity q=0.1108, co-occurrence q=1.0000; Fisher q=0.4875, log2 OR 0.32
+  EGFR/TP53: both 294 of 1680 profiled, 299.85 expected; DISCOVER exclusivity q=0.4461, co-occurrence q=1.0000; Fisher q=1.8e-7, log2 OR 0.88
+  KRAS/KEAP1: both 107 of 1680 profiled, 103.52 expected; DISCOVER exclusivity q=0.7722, co-occurrence q=1.0000; Fisher q=6.6e-7, log2 OR 1.05
+  CAVEAT (tell the user): Within “NSCLC”, over its 1,680 samples with a gene panel (every sample of each patient; a sample without a panel record is left out, never read as wild-type), counting any alteration (mutation, amplification or deep deletion, structural variant). DISCOVER's background gives each sample and gene a probability of alteration, σ(a_sample + b_gene), fitted so that every sample's expected number of altered genes is its observed burden and every gene's expected number of altered samples its observed count — over the whole altered-gene matrix (410 genes, each sample's own panels: a gene off a sample's panel has no probability there); the fit matched every margin to within 0.01% in 3 rounds. For a pair, the number of samples altered in both under independence given those probabilities is Poisson-binomial with p_i = p_iA·p_iB, over the samples profiled for both; exclusivity is its lower tail at the observed count, co-occurrence its upper tail, each Benjamini–Hochberg across the 15 pairs, all exact. Beside it, the plain two-sided Fisher test on the same samples, which assumes every tumour is equally likely to carry each alteration — heavily altered tumours then manufacture co-occurrence and lightly altered ones exclusivity: here 9 pairs are exclusive at DISCOVER q < 0.05 against 7 by Fisher. Exclusivity is a pattern, not a mechanism: synthetic lethality, redundant pathway hits, and subtypes with different drivers (the confounder stratifying removes, when the strata are the right ones) all produce it.

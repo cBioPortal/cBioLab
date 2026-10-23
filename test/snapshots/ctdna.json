@@ -1,0 +1,437 @@
+{
+  "study": "nsclc_ctdx_msk_2022",
+  "cohorts": {
+    "all patients": {
+      "count": 1127,
+      "text": "all patients in the study",
+      "studies": [
+        "nsclc_ctdx_msk_2022"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "ctdna",
+      "cohorts": [
+        "all patients"
+      ],
+      "ctdna": {
+        "attribute": "SAMPLE_CLASS",
+        "plasma": [
+          "cfDNA",
+          "ctDNA"
+        ],
+        "tissue": [
+          "Tumor"
+        ],
+        "plasmaPanels": [],
+        "withinDays": null,
+        "measure": "any",
+        "panels": [
+          {
+            "cohort": "all patients",
+            "plasmaPatients": 1119,
+            "tissuePatients": 690,
+            "patients": 682,
+            "plasmaSamples": 1158,
+            "tissueSamples": 945,
+            "detected": 759,
+            "detectedLow": 0.650344270459499,
+            "detectedHigh": 0.705004204488215,
+            "genes": [
+              {
+                "gene": "EGFR",
+                "pairs": 682,
+                "both": 151,
+                "tissueOnly": 84,
+                "plasmaOnly": 7,
+                "neither": 440,
+                "ppa": 0.6425531914893617,
+                "ppaLow": 0.5794381844454329,
+                "ppaHigh": 0.7010826276900307,
+                "concordance": 0.8665689149560117
+              },
+              {
+                "gene": "KRAS",
+                "pairs": 682,
+                "both": 119,
+                "tissueOnly": 66,
+                "plasmaOnly": 14,
+                "neither": 483,
+                "ppa": 0.6432432432432432,
+                "ppaLow": 0.5719432697099277,
+                "ppaHigh": 0.7087154390872955,
+                "concordance": 0.8826979472140762
+              },
+              {
+                "gene": "TP53",
+                "pairs": 682,
+                "both": 260,
+                "tissueOnly": 121,
+                "plasmaOnly": 33,
+                "neither": 268,
+                "ppa": 0.6824146981627297,
+                "ppaLow": 0.6340465914989983,
+                "ppaHigh": 0.7271411049252663,
+                "concordance": 0.7741935483870968
+              },
+              {
+                "gene": "STK11",
+                "pairs": 682,
+                "both": 28,
+                "tissueOnly": 65,
+                "plasmaOnly": 7,
+                "neither": 582,
+                "ppa": 0.3010752688172043,
+                "ppaLow": 0.21726302757387256,
+                "ppaHigh": 0.40066920464800065,
+                "concordance": 0.8944281524926686
+              },
+              {
+                "gene": "KEAP1",
+                "pairs": 682,
+                "both": 28,
+                "tissueOnly": 62,
+                "plasmaOnly": 5,
+                "neither": 587,
+                "ppa": 0.3111111111111111,
+                "ppaLow": 0.22485854647009124,
+                "ppaHigh": 0.41282824540976554,
+                "concordance": 0.9017595307917888
+              },
+              {
+                "gene": "PIK3CA",
+                "pairs": 682,
+                "both": 14,
+                "tissueOnly": 30,
+                "plasmaOnly": 9,
+                "neither": 629,
+                "ppa": 0.3181818181818182,
+                "ppaLow": 0.19999307710853423,
+                "ppaHigh": 0.4655689606218224,
+                "concordance": 0.9428152492668622
+              },
+              {
+                "gene": "BRAF",
+                "pairs": 682,
+                "both": 15,
+                "tissueOnly": 21,
+                "plasmaOnly": 9,
+                "neither": 637,
+                "ppa": 0.4166666666666667,
+                "ppaLow": 0.2714056205144606,
+                "ppaHigh": 0.5779974842512834,
+                "concordance": 0.9560117302052786
+              },
+              {
+                "gene": "MET",
+                "pairs": 682,
+                "both": 25,
+                "tissueOnly": 62,
+                "plasmaOnly": 6,
+                "neither": 589,
+                "ppa": 0.28735632183908044,
+                "ppaLow": 0.2028572763917612,
+                "ppaHigh": 0.38983970932010603,
+                "concordance": 0.9002932551319648
+              },
+              {
+                "gene": "ERBB2",
+                "pairs": 682,
+                "both": 16,
+                "tissueOnly": 32,
+                "plasmaOnly": 13,
+                "neither": 621,
+                "ppa": 0.3333333333333333,
+                "ppaLow": 0.21676780694818565,
+                "ppaHigh": 0.4745989029405201,
+                "concordance": 0.9340175953079178
+              },
+              {
+                "gene": "ALK",
+                "pairs": 682,
+                "both": 24,
+                "tissueOnly": 38,
+                "plasmaOnly": 5,
+                "neither": 615,
+                "ppa": 0.3870967741935484,
+                "ppaLow": 0.27584645167113864,
+                "ppaHigh": 0.5115215646098165,
+                "concordance": 0.9369501466275659
+              }
+            ],
+            "survival": {
+              "curves": [
+                {
+                  "label": "ctDNA detected",
+                  "points": [
+                    {
+                      "t": 0,
+                      "s": 1
+                    },
+                    {
+                      "t": 0.26,
+                      "s": 0.9987
+                    },
+                    {
+                      "t": 0.49,
+                      "s": 0.9973
+                    },
+                    {
+                      "t": 0.72,
+                      "s": 0.996
+                    },
+                    {
+                      "t": 0.79,
+                      "s": 0.9946
+                    },
+                    {
+                      "t": 0.89,
+                      "s": 0.9932
+                    },
+                    {
+                      "t": 0.95,
+                      "s": 0.989
+                    },
+                    {
+                      "t": 1.05,
+                      "s": 0.9876
+                    },
+                    {
+                      "t": 1.12,
+                      "s": 0.9862
+                    },
+                    {
+                      "t": 1.15,
+                      "s": 0.9848
+                    },
+                    {
+                      "t": 1.25,
+                      "s": 0.9833
+                    },
+                    {
+                      "t": 1.28,
+                      "s": 0.9805
+                    },
+                    {
+                      "t": 1.31,
+                      "s": 0.979
+                    },
+                    {
+                      "t": 1.35,
+                      "s": 0.9776
+                    },
+                    {
+                      "t": 1.38,
+                      "s": 0.9747
+                    },
+                    {
+                      "t": 1.48,
+                      "s": 0.9718
+                    },
+                    {
+                      "t": 1.51,
+                      "s": 0.9704
+                    },
+                    {
+                      "t": 1.54,
+                      "s": 0.9689
+                    },
+                    {
+                      "t": 1.58,
+                      "s": 0.9675
+                    },
+                    {
+                      "t": 1.61,
+                      "s": 0.9617
+                    },
+                    {
+                      "…": "344 more",
+                      "sha256": "7f8fb06e17003515"
+                    }
+                  ],
+                  "median": 21.75,
+                  "n": 759,
+                  "events": 459,
+                  "atRisk": [
+                    759,
+                    706,
+                    639,
+                    598,
+                    567,
+                    540,
+                    516,
+                    499,
+                    482,
+                    460,
+                    441,
+                    426,
+                    406,
+                    386,
+                    375,
+                    363,
+                    351,
+                    337,
+                    327,
+                    308,
+                    {
+                      "…": "162 more",
+                      "sha256": "7b8f060d222d71a7"
+                    }
+                  ]
+                },
+                {
+                  "label": "not detected",
+                  "points": [
+                    {
+                      "t": 0,
+                      "s": 1
+                    },
+                    {
+                      "t": 1.02,
+                      "s": 0.9971
+                    },
+                    {
+                      "t": 1.61,
+                      "s": 0.9941
+                    },
+                    {
+                      "t": 1.74,
+                      "s": 0.9911
+                    },
+                    {
+                      "t": 1.84,
+                      "s": 0.9851
+                    },
+                    {
+                      "t": 2.37,
+                      "s": 0.982
+                    },
+                    {
+                      "t": 2.56,
+                      "s": 0.9788
+                    },
+                    {
+                      "t": 2.63,
+                      "s": 0.9757
+                    },
+                    {
+                      "t": 2.89,
+                      "s": 0.9694
+                    },
+                    {
+                      "t": 3.61,
+                      "s": 0.9662
+                    },
+                    {
+                      "t": 3.94,
+                      "s": 0.963
+                    },
+                    {
+                      "t": 4.14,
+                      "s": 0.9598
+                    },
+                    {
+                      "t": 4.24,
+                      "s": 0.9565
+                    },
+                    {
+                      "t": 4.27,
+                      "s": 0.9533
+                    },
+                    {
+                      "t": 4.34,
+                      "s": 0.9501
+                    },
+                    {
+                      "t": 4.4,
+                      "s": 0.9469
+                    },
+                    {
+                      "t": 5.39,
+                      "s": 0.9436
+                    },
+                    {
+                      "t": 5.65,
+                      "s": 0.9404
+                    },
+                    {
+                      "t": 6.27,
+                      "s": 0.9371
+                    },
+                    {
+                      "t": 6.47,
+                      "s": 0.9338
+                    },
+                    {
+                      "…": "126 more",
+                      "sha256": "daec6bcc54f8756e"
+                    }
+                  ],
+                  "median": 41.46,
+                  "n": 360,
+                  "events": 154,
+                  "atRisk": [
+                    360,
+                    347,
+                    324,
+                    307,
+                    299,
+                    294,
+                    288,
+                    279,
+                    277,
+                    271,
+                    266,
+                    255,
+                    244,
+                    237,
+                    234,
+                    224,
+                    219,
+                    211,
+                    204,
+                    198,
+                    {
+                      "…": "135 more",
+                      "sha256": "923ebe10daaf79c0"
+                    }
+                  ]
+                }
+              ],
+              "logrank": {
+                "chi2": 49.3324,
+                "p": 2.1606230341780607e-12,
+                "df": 1,
+                "observed": [
+                  458,
+                  154
+                ],
+                "expected": [
+                  373.8,
+                  238.2
+                ],
+                "variance": 143.8416,
+                "strata": 1
+              },
+              "missing": 0
+            }
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "nsclc_ctdx_msk_2022",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Plasma is SAMPLE_CLASS = cfDNA/ctDNA, tissue SAMPLE_CLASS = Tumor. all patients: 1,119 patients with plasma, 690 patients with tissue, 682 patients with both (1,158 plasma and 945 tissue samples); ctDNA detected in 759 of the plasma patients (67.8%). Plasma and tissue are paired by patient whenever they were drawn, not by date — the tumour may have changed between them. Per gene, counting only patients whose plasma AND tissue panels both cover it, any alteration (mutation, amplification or deep deletion, structural variant) in both, tissue only, plasma only, or neither; a patient with several samples of a kind is altered there if any is. Positive percent agreement is both ÷ altered in tissue (tissue the reference), with a 95% Wilson interval; overall concordance is (both + neither) ÷ pairs. Plasma-only calls include clonal haematopoiesis (TP53, DNMT3A, TET2, PPM1D…) when the assay does not subtract white-cell DNA, and tissue-only calls a tumour shedding too little DNA — both are biology of the assay, not error. ctDNA detected means any alteration (mutation, amplification or deep deletion, structural variant) called in some plasma sample, over every gene the plasma panel covers. Survival is OS_MONTHS / OS_STATUS as each study records them, from its own origin, which need not be the plasma draw; when the draw comes after that origin the comparison carries immortal-time bias. "
+    }
+  ]
+}

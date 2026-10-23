@@ -1,0 +1,210 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "NSCLC": {
+      "count": 7809,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "predictive",
+      "cohorts": [
+        "NSCLC"
+      ],
+      "predictive": {
+        "exposure": "Treatment [SUBTYPE=Immuno]",
+        "endpoint": "OS",
+        "measure": "any",
+        "n": 7809,
+        "exposed": 2666,
+        "events": 3975,
+        "notProfiled": 0,
+        "noCovariate": 0,
+        "covariates": [],
+        "minMutated": 5,
+        "strata": 1,
+        "genes": [
+          {
+            "gene": "STK11",
+            "exposed": 2666,
+            "unexposed": 5143,
+            "mutatedExposed": 472,
+            "mutatedUnexposed": 541,
+            "events": 3975,
+            "inExposed": {
+              "hr": 1.4820313471654858,
+              "ciLow": 1.322740932103988,
+              "ciHigh": 1.6605042307774234,
+              "p": 1.1916395352806596e-11
+            },
+            "inUnexposed": {
+              "hr": 1.2724109690194296,
+              "ciLow": 1.116655461500673,
+              "ciHigh": 1.4498918689791305,
+              "p": 0.00029900593368829424
+            },
+            "interaction": {
+              "hr": 1.1647426682493767,
+              "ciLow": 0.9795605089403415,
+              "ciHigh": 1.3849328049251732,
+              "p": 0.08431057609152337
+            },
+            "q": 0.10445866432895423
+          },
+          {
+            "gene": "KEAP1",
+            "exposed": 2666,
+            "unexposed": 5143,
+            "mutatedExposed": 521,
+            "mutatedUnexposed": 513,
+            "events": 3975,
+            "inExposed": {
+              "hr": 1.4072060640636472,
+              "ciLow": 1.2588128398325853,
+              "ciHigh": 1.5730923963254617,
+              "p": 1.8760175792195355e-9
+            },
+            "inUnexposed": {
+              "hr": 1.664279331691298,
+              "ciLow": 1.4671912889429146,
+              "ciHigh": 1.887842243045516,
+              "p": 2.354694183903863e-15
+            },
+            "interaction": {
+              "hr": 0.8455347832948261,
+              "ciLow": 0.7146422606297429,
+              "ciHigh": 1.0004013324532934,
+              "p": 0.05054908571383067
+            },
+            "q": 0.10109817142766135
+          },
+          {
+            "gene": "KRAS",
+            "exposed": 2666,
+            "unexposed": 5143,
+            "mutatedExposed": 981,
+            "mutatedUnexposed": 1213,
+            "events": 3975,
+            "inExposed": {
+              "hr": 0.9935757248478896,
+              "ciLow": 0.9029878475892461,
+              "ciHigh": 1.0932513916356341,
+              "p": 0.8948799557870332
+            },
+            "inUnexposed": {
+              "hr": 0.8882556779636579,
+              "ciLow": 0.8019785528235925,
+              "ciHigh": 0.9838145255341132,
+              "p": 0.023027856546192008
+            },
+            "interaction": {
+              "hr": 1.1185695171976484,
+              "ciLow": 0.9725180844499045,
+              "ciHigh": 1.2865547539010633,
+              "p": 0.11650634939425245
+            },
+            "q": 0.11650634939425246
+          },
+          {
+            "gene": "TP53",
+            "exposed": 2666,
+            "unexposed": 5143,
+            "mutatedExposed": 1602,
+            "mutatedUnexposed": 2418,
+            "events": 3975,
+            "inExposed": {
+              "hr": 1.0185714990508756,
+              "ciLow": 0.9276379554053747,
+              "ciHigh": 1.1184189830022309,
+              "p": 0.6997434246731516
+            },
+            "inUnexposed": {
+              "hr": 1.7216934258193264,
+              "ciLow": 1.5807139619663184,
+              "ciHigh": 1.875246454344059,
+              "p": 1.1658492193607049e-35
+            },
+            "interaction": {
+              "hr": 0.5916102621849268,
+              "ciLow": 0.5212350412928293,
+              "ciHigh": 0.6714872842286264,
+              "p": 4.534511929615143e-16
+            },
+            "q": 2.7207071577690857e-15
+          },
+          {
+            "gene": "EGFR",
+            "exposed": 2666,
+            "unexposed": 5143,
+            "mutatedExposed": 283,
+            "mutatedUnexposed": 1610,
+            "events": 3975,
+            "inExposed": {
+              "hr": 1.0401381840698867,
+              "ciLow": 0.9046242821108679,
+              "ciHigh": 1.1959522459818395,
+              "p": 0.5805637346628816
+            },
+            "inUnexposed": {
+              "hr": 0.898867486118003,
+              "ciLow": 0.8198417998883546,
+              "ciHigh": 0.9855105676608903,
+              "p": 0.02315772463858911
+            },
+            "interaction": {
+              "hr": 1.1571652108165273,
+              "ciLow": 0.9790004329181217,
+              "ciHigh": 1.3677535577106816,
+              "p": 0.08704888694079518
+            },
+            "q": 0.10445866432895423
+          },
+          {
+            "gene": "SMARCA4",
+            "exposed": 2666,
+            "unexposed": 5143,
+            "mutatedExposed": 283,
+            "mutatedUnexposed": 297,
+            "events": 3975,
+            "inExposed": {
+              "hr": 1.1354091434403244,
+              "ciLow": 0.9815259817569745,
+              "ciHigh": 1.3134180316859765,
+              "p": 0.08744673412535048
+            },
+            "inUnexposed": {
+              "hr": 1.8750772474436972,
+              "ciLow": 1.6057614645493874,
+              "ciHigh": 2.1895622491275044,
+              "p": 1.9173405288682856e-15
+            },
+            "interaction": {
+              "hr": 0.6055265962979581,
+              "ciLow": 0.48951552033507806,
+              "ciHigh": 0.7490313250399219,
+              "p": 0.0000037823926865095855
+            },
+            "q": 0.000011347178059528756
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "For each gene, a Cox model of OS (Efron ties) on the gene (any mutation), exposure to Treatment [SUBTYPE=Immuno] (any such timeline event) and their product. The gene's hazard ratio among the exposed and among the unexposed are the same model's two contrasts (the interaction coded both ways), so they share its estimates; the interaction HR is their ratio, and its p asks whether the gene predicts benefit rather than merely prognosis. q is Benjamini–Hochberg over the 6 genes fitted. Each gene is fitted over the patients whose panel covers it: a patient not profiled for a gene is left out of that gene's fit, never counted as wild-type. BIASES: exposure is defined from the whole record, after the clock's start — a patient must survive long enough to be treated, so the exposed group is credited with time before their treatment (immortal-time bias), and treatment was not randomised but chosen for patients by their condition (confounding by indication). Both distort the exposure's own effect; the interaction is less exposed to them but not immune, and an interaction found here is a hypothesis for a randomised or emulated-trial design, not evidence of benefit. Left out: 0 patients with no mutation panel on record. Strongest interaction: TP53 (p 4.5e-16, q 2.7e-15). Computed from per-patient rows inside each patient-level study."
+    }
+  ]
+}

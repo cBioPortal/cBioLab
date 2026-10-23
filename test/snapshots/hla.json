@@ -1,0 +1,359 @@
+{
+  "study": "skcm_dfci_2015",
+  "cohorts": {
+    "melanoma on checkpoint blockade": {
+      "count": 212,
+      "text": "all patients in the study — across 3 studies",
+      "studies": [
+        "skcm_dfci_2015",
+        "skcm_mskcc_2014",
+        "mel_ucla_2016"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "hla",
+      "cohorts": [
+        "melanoma on checkpoint blockade"
+      ],
+      "hla": {
+        "resolution": 2,
+        "endpoint": "OS",
+        "covariates": [],
+        "panels": [
+          {
+            "cohort": "melanoma on checkpoint blockade",
+            "patients": 212,
+            "anyTyped": 212,
+            "typed": 212,
+            "homozygous": [
+              165,
+              36,
+              7,
+              4
+            ],
+            "loci": [
+              {
+                "locus": "A",
+                "typed": 212,
+                "homozygous": 27
+              },
+              {
+                "locus": "B",
+                "typed": 212,
+                "homozygous": 13
+              },
+              {
+                "locus": "C",
+                "typed": 212,
+                "homozygous": 22
+              }
+            ],
+            "coarser": 0,
+            "lohEvaluated": 0,
+            "loh": 0,
+            "byHomozygosity": {
+              "curves": [
+                {
+                  "label": "homozygous at ≥1 locus",
+                  "points": [
+                    {
+                      "t": 0,
+                      "s": 1
+                    },
+                    {
+                      "t": 1.5,
+                      "s": 0.9787
+                    },
+                    {
+                      "t": 1.8,
+                      "s": 0.9574
+                    },
+                    {
+                      "t": 2.8,
+                      "s": 0.9362
+                    },
+                    {
+                      "t": 2.866666667,
+                      "s": 0.9149
+                    },
+                    {
+                      "t": 3.3,
+                      "s": 0.8936
+                    },
+                    {
+                      "t": 3.4,
+                      "s": 0.8723
+                    },
+                    {
+                      "t": 3.766666667,
+                      "s": 0.8511
+                    },
+                    {
+                      "t": 4.633333333,
+                      "s": 0.8298
+                    },
+                    {
+                      "t": 4.833333333,
+                      "s": 0.8085
+                    },
+                    {
+                      "t": 4.9,
+                      "s": 0.7872
+                    },
+                    {
+                      "t": 5.066666667,
+                      "s": 0.766
+                    },
+                    {
+                      "t": 5.1,
+                      "s": 0.7447
+                    },
+                    {
+                      "t": 6.1,
+                      "s": 0.7234
+                    },
+                    {
+                      "t": 6.180822,
+                      "s": 0.7021
+                    },
+                    {
+                      "t": 7.033333333,
+                      "s": 0.6596
+                    },
+                    {
+                      "t": 7.466666667,
+                      "s": 0.6383
+                    },
+                    {
+                      "t": 8.566666667,
+                      "s": 0.617
+                    },
+                    {
+                      "t": 8.6,
+                      "s": 0.5957
+                    },
+                    {
+                      "t": 8.8,
+                      "s": 0.5745
+                    },
+                    {
+                      "…": "12 more",
+                      "sha256": "2d5da6d2cf50d444"
+                    }
+                  ],
+                  "median": 12.13151,
+                  "n": 47,
+                  "events": 32,
+                  "atRisk": [
+                    47,
+                    47,
+                    45,
+                    43,
+                    40,
+                    37,
+                    35,
+                    33,
+                    30,
+                    27,
+                    27,
+                    24,
+                    23,
+                    21,
+                    21,
+                    20,
+                    18,
+                    18,
+                    18,
+                    17,
+                    {
+                      "…": "53 more",
+                      "sha256": "306528a48f3ec966"
+                    }
+                  ]
+                },
+                {
+                  "label": "heterozygous at all",
+                  "points": [
+                    {
+                      "t": 0,
+                      "s": 1
+                    },
+                    {
+                      "t": 1.133333333,
+                      "s": 0.9939
+                    },
+                    {
+                      "t": 1.233333333,
+                      "s": 0.9878
+                    },
+                    {
+                      "t": 1.266666667,
+                      "s": 0.9817
+                    },
+                    {
+                      "t": 1.6666666669999999,
+                      "s": 0.9756
+                    },
+                    {
+                      "t": 2.166666667,
+                      "s": 0.9695
+                    },
+                    {
+                      "t": 2.233333333,
+                      "s": 0.9633
+                    },
+                    {
+                      "t": 2.333333333,
+                      "s": 0.9572
+                    },
+                    {
+                      "t": 2.5,
+                      "s": 0.9511
+                    },
+                    {
+                      "t": 2.566666667,
+                      "s": 0.9449
+                    },
+                    {
+                      "t": 2.633333333,
+                      "s": 0.9388
+                    },
+                    {
+                      "t": 2.7,
+                      "s": 0.9265
+                    },
+                    {
+                      "t": 2.766666667,
+                      "s": 0.9204
+                    },
+                    {
+                      "t": 2.9666666669999997,
+                      "s": 0.9143
+                    },
+                    {
+                      "t": 3,
+                      "s": 0.9081
+                    },
+                    {
+                      "t": 3.3,
+                      "s": 0.902
+                    },
+                    {
+                      "t": 3.333333333,
+                      "s": 0.8958
+                    },
+                    {
+                      "t": 3.4666666669999997,
+                      "s": 0.8896
+                    },
+                    {
+                      "t": 3.5333333330000003,
+                      "s": 0.8834
+                    },
+                    {
+                      "t": 3.6,
+                      "s": 0.8773
+                    },
+                    {
+                      "…": "75 more",
+                      "sha256": "788f9f94725dbb94"
+                    }
+                  ],
+                  "median": 21.73333333,
+                  "n": 164,
+                  "events": 103,
+                  "atRisk": [
+                    164,
+                    164,
+                    159,
+                    149,
+                    141,
+                    133,
+                    126,
+                    119,
+                    115,
+                    111,
+                    104,
+                    101,
+                    99,
+                    97,
+                    94,
+                    88,
+                    86,
+                    85,
+                    83,
+                    80,
+                    {
+                      "…": "75 more",
+                      "sha256": "a7b734920b09db45"
+                    }
+                  ]
+                }
+              ],
+              "logrank": {
+                "chi2": 0.9614,
+                "p": 0.32683744172010465,
+                "df": 1,
+                "observed": [
+                  32,
+                  102
+                ],
+                "expected": [
+                  27.5,
+                  106.5
+                ],
+                "variance": 21.4399,
+                "strata": 3
+              },
+              "hr": {
+                "hr": 1.2214354639797707,
+                "ciLow": 0.8179634673288572,
+                "ciHigh": 1.8239257036007288,
+                "p": 0.3281950803456205,
+                "n": 211,
+                "events": 135
+              },
+              "adjusted": null
+            },
+            "byLoh": null,
+            "byLohWhy": "no patient here has an HLA LOH call with the endpoint",
+            "noOutcome": 1,
+            "noCovariate": 0
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "skcm_dfci_2015",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "skcm_mskcc_2014",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "mel_ucla_2016",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "studies": [
+        "skcm_dfci_2015",
+        "skcm_mskcc_2014",
+        "mel_ucla_2016"
+      ],
+      "caveat": "A locus is homozygous when its two alleles match at the protein level (2 fields, e.g. A*02:01); homozygosity is counted over patients typed at all three class I loci (HLA-A, -B, -C). melanoma on checkpoint blockade: 212 patients fully typed of 212 patients, 22.2% homozygous at ≥1 locus; HLA LOH in 0 patients of 0 with a call (—). HLA LOH is any of HLA_A1_LOH/HLA_A2_LOH/HLA_B1_LOH/HLA_B2_LOH/HLA_C1_LOH/HLA_C2_LOH/HLA_LOH = Loss/Yes/LOH/True in any of the patient's samples; a patient with no call in any sample is left out of that split, and a homozygous locus cannot show LOH (LOHHLA calls only heterozygous loci), so the LOH split is not independent of the genotype. OS is as each study records it, from its own origin, which is a checkpoint-blockade start only in a study of treated patients that measures from it (the melanoma immunotherapy studies do; MSK-IMPACT measures from diagnosis or sequencing). Chowell et al. report worse survival with homozygosity in patients treated with checkpoint blockade, so in a cohort not restricted to them this reads prognosis, not response. Hazard ratios are Cox (Efron ties), exposed against not, stratified by study, with the log-rank test stratified the same way; no covariates: the HR is unadjusted, and tumour mutational burden and cancer type are known to confound it. HLA supertypes and evolutionary divergence (HED) are not computed. Pooled across 3 studies whose typing methods and resolutions differ. Computed from per-patient rows inside each patient-level study."
+    }
+  ]
+}

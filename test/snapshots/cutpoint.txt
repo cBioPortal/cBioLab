@@ -1,0 +1,18 @@
+Analysis over tmb_mskcc_2018 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- all patients: 1,661 patients — all patients in the study
+
+Cut-point of TMB_NONSYNONYMOUS on OS (maximally selected log-rank, 73 candidate cuts between the 10th and 90th percentiles; 1,661 patients, 832 events):
+  best cut TMB_NONSYNONYMOUS > 14.4190189078: high n=322, 100 events, median 47.0mo; low n=1339, 732 events, median 15.0mo; HR 0.45 (95% CI 0.36-0.55)
+  corrected p=0.0010 (1000 permutations, seed 1); naive log-rank p=9.5e-15, which ignores the search
+  per CANCER_TYPE:
+    Non-Small Cell Lung Cancer: n=350, cut 18.5956742547, high 44, HR 0.33, corrected p=0.0010, naive p=2.7e-5
+    Melanoma: n=320, cut 9.78719697615, high 144, HR 0.47, corrected p=0.0010, naive p=5.5e-5
+    Bladder Cancer: n=215, cut 14.6998676147, high 51, HR 0.54, corrected p=0.1209, naive p=0.0181
+    Renal Cell Carcinoma: n=151, cut 1.1091553006, high 133, HR 0.54, corrected p=0.4406, naive p=0.0750
+    Head and Neck Cancer: n=139, cut 8.80847727853, high 29, HR 0.38, corrected p=0.0280, naive p=0.0050
+    Esophagogastric Cancer: n=126, cut 9.98239770538, high 18, HR 0.51, corrected p=0.4765, naive p=0.1108
+    Glioma: n=117, cut 2.93615909284, high 60, HR 1.37, corrected p=0.6204, naive p=0.1385
+    Colorectal Cancer: n=110, cut 11.091553006, high 39, HR 0.26, corrected p=0.0040, naive p=0.0004
+  CAVEAT (tell the user): The cut was chosen from these patients to separate their OS as much as possible, so the split is optimistic in-sample: its naive log-rank p (9.5e-15) ignores the search and overstates the evidence, and the cut needs validation in an independent cohort before it is used. Scanned: 73 candidate cuts — the distinct values of TMB_NONSYNONYMOUS leaving between 10% and 90% of patients at or below them (at most 100, evenly spaced) — by the maximally selected standardized log-rank statistic (Lausen & Schumacher; R maxstat). The corrected p is from 1000 permutations of the marker over the patients (seed 1): the share whose own best cut does as well. High is TMB_NONSYNONYMOUS > 14.42 (19.4% of patients). TMB_NONSYNONYMOUS is the patient's value, or for a sample attribute the value of the patient's first sample by sample id; 0 patients with a survival time and no numeric value are left out. The status '1:…' is an event, anything else censored; times from each study's own baseline. Per CANCER_TYPE: the largest 8 values with at least 100 patients each get their own scan and permutation test (same seed); 3 other values (133 patients) are not scanned. Each stratum's cut is as optimistic as the overall one. Computed from per-patient rows inside each patient-level study.

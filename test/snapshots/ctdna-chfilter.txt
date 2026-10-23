@@ -1,0 +1,25 @@
+Analysis over msk_access_2021 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- all patients: 617 patients — all patients in the study
+
+ctDNA vs tissue (plasma SAMPLE_CLASS = cfDNA/ctDNA or panel ACCESS129, tissue Tumor; any alteration; both panels cover the gene):
+  all patients (449 patients with both; ctDNA detected in 453 of 617 with plasma, 73% [95% CI 70%–77%]):
+    TP53: both 168, tissue-only 57, plasma-only 14, neither 210 of 449; PPA 75% [69%–80%], concordance 84%
+    EGFR: both 81, tissue-only 28, plasma-only 5, neither 335 of 449; PPA 74% [65%–82%], concordance 93%
+    KRAS: both 63, tissue-only 35, plasma-only 5, neither 346 of 449; PPA 64% [54%–73%], concordance 91%
+    CDKN2A: both 15, tissue-only 82, plasma-only 3, neither 349 of 449; PPA 15% [10%–24%], concordance 81%
+    TERT: both 24, tissue-only 41, plasma-only 1, neither 383 of 449; PPA 37% [26%–49%], concordance 91%
+    ARID1A: both 26, tissue-only 25, plasma-only 9, neither 389 of 449; PPA 51% [38%–64%], concordance 92%
+    KEAP1: both 32, tissue-only 16, plasma-only 4, neither 397 of 449; PPA 67% [53%–78%], concordance 96%
+    PIK3CA: both 25, tissue-only 19, plasma-only 7, neither 398 of 449; PPA 57% [42%–70%], concordance 94%
+    SMAD4: both 19, tissue-only 25, plasma-only 4, neither 401 of 449; PPA 43% [30%–58%], concordance 94%
+    AR: both 19, tissue-only 17, plasma-only 11, neither 402 of 449; PPA 53% [37%–68%], concordance 94%
+    RB1: both 22, tissue-only 17, plasma-only 8, neither 402 of 449; PPA 56% [41%–71%], concordance 94%
+    ATM: both 22, tissue-only 8, plasma-only 16, neither 403 of 449; PPA 73% [56%–86%], concordance 95%
+    STK11: both 29, tissue-only 15, plasma-only 2, neither 403 of 449; PPA 66% [51%–78%], concordance 96%
+    SMARCA4: both 9, tissue-only 30, plasma-only 2, neither 408 of 449; PPA 23% [13%–38%], concordance 93%
+    APC: both 20, tissue-only 11, plasma-only 8, neither 410 of 449; PPA 65% [47%–79%], concordance 96%
+    OS: ctDNA detected n=338, 171 deaths, median 31.6mo; not detected n=107, 25 deaths, median not reached; log-rank p=0.0003
+    CH filter: removed 83 of 2024 plasma mutation calls in 51 patients (41 by gene, 44 by the matched normal): SF3B1 14, TP53 14, DNMT3A 11, GNAS 8, IDH2 4, ATM 3, BRAF 3, RB1 3, U2AF1 3, AR 2, IDH1 2, TSC2 2, ASXL1 1, CREBBP 1, EGFR 1, FGFR1 1, FGFR2 1, KDM6A 1, MET 1, MSH3 1, MYCN 1, NF1 1, NTRK1 1, NTRK3 1, PTCH1 1, SMARCA4 1; unfiltered: ctDNA detected 457 (74%), OS log-rank p=0.0004; plasma-only unfiltered TP53 15, EGFR 6, KRAS 5, CDKN2A 3, TERT 1, ARID1A 9, KEAP1 4, PIK3CA 7, SMAD4 4, AR 12, RB1 10, ATM 17, STK11 2, SMARCA4 2, APC 8
+  CAVEAT (tell the user): Plasma is SAMPLE_CLASS = cfDNA/ctDNA or a sample on ACCESS129, tissue SAMPLE_CLASS = Tumor. all patients: 617 patients with plasma, 449 patients with tissue, 449 patients with both (601 plasma and 646 tissue samples); ctDNA detected in 453 of the plasma patients (73.4%). Plasma and tissue are paired by patient whenever they were drawn, not by date — the tumour may have changed between them. Per gene, counting only patients whose plasma AND tissue panels both cover it, any alteration (mutation, amplification or deep deletion, structural variant) in both, tissue only, plasma only, or neither; a patient with several samples of a kind is altered there if any is. Positive percent agreement is both ÷ altered in tissue (tissue the reference), with a 95% Wilson interval; overall concordance is (both + neither) ÷ pairs. The genes are the 15 most altered in the paired patients, not chosen in advance. Clonal-haematopoiesis filter: plasma mutation calls in DNMT3A, TET2, ASXL1, PPM1D, JAK2, SF3B1, SRSF2, U2AF1, CBL, GNB1, GNAS, IDH2, or seen in the matched normal (white-cell) sample — at least 2 alternate reads there, at an allele fraction at least 0.3 × the plasma's are left out of every count below (copy-number and structural calls are kept; tissue calls are never filtered). all patients — 83 plasma mutation calls of 2,024 removed (41 by gene, 44 by the normal), in 51 patients; ctDNA detected 453 (73.4%) against 457 (74.1%) unfiltered. The gene rule also removes a tumour's own calls in those genes (GNAS, IDH2, SF3B1 and others can be tumour drivers); the allele-fraction ratio keeps calls whose normal reads are tumour DNA in the white-cell sample (far below the plasma's fraction), and a CH clone at very low fraction in blood can still pass; TP53, ATM and CHEK2 are not on the default list because they are tumour drivers as often as CH genes (Razavi et al. 2019; Bolton et al. 2020). Tissue-only calls remain those of a tumour shedding too little DNA. ctDNA detected means any alteration (mutation, amplification or deep deletion, structural variant) called in some plasma sample, over every gene the plasma panel covers. Survival is OS_MONTHS / OS_STATUS as each study records them, from its own origin, which need not be the plasma draw; when the draw comes after that origin the comparison carries immortal-time bias. 

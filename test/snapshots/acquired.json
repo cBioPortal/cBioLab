@@ -1,0 +1,189 @@
+{
+  "study": "lung_msk_pdx",
+  "cohorts": {
+    "all patients": {
+      "count": 172,
+      "text": "all patients in the study",
+      "studies": [
+        "lung_msk_pdx"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "acquired",
+      "cohorts": [
+        "all patients"
+      ],
+      "acquired": {
+        "anchoredTo": "Treatment [SUBTYPE=Systemic therapy]",
+        "preWindowDays": null,
+        "minGapDays": 30,
+        "sampleEvents": [
+          "Sample acquisition",
+          "Sequencing",
+          "Specimen"
+        ],
+        "sampleKey": "SAMPLE_ID",
+        "measure": "driver",
+        "scan": {
+          "top": 12,
+          "minPost": 3
+        },
+        "panels": [
+          {
+            "cohort": "all patients",
+            "anchored": 142,
+            "dated": 142,
+            "withPre": 67,
+            "withPost": 107,
+            "patients": 33,
+            "preDays": 27,
+            "postDays": 279,
+            "gapDays": {
+              "q1": 154,
+              "median": 301,
+              "q3": 514
+            },
+            "genes": [
+              {
+                "gene": "CDKN2B",
+                "pairs": 33,
+                "shared": 2,
+                "lost": 1,
+                "acquired": 8,
+                "neither": 22,
+                "p": 0.03906250000000003,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "MYC",
+                "pairs": 33,
+                "shared": 1,
+                "lost": 0,
+                "acquired": 4,
+                "neither": 28,
+                "p": 0.125,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "CARD11",
+                "pairs": 33,
+                "shared": 0,
+                "lost": 0,
+                "acquired": 4,
+                "neither": 29,
+                "p": 0.125,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "DNMT3B",
+                "pairs": 33,
+                "shared": 0,
+                "lost": 0,
+                "acquired": 4,
+                "neither": 29,
+                "p": 0.125,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "NKX3-1",
+                "pairs": 33,
+                "shared": 0,
+                "lost": 0,
+                "acquired": 4,
+                "neither": 29,
+                "p": 0.125,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "NTRK1",
+                "pairs": 33,
+                "shared": 0,
+                "lost": 0,
+                "acquired": 4,
+                "neither": 29,
+                "p": 0.125,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "RAC1",
+                "pairs": 33,
+                "shared": 0,
+                "lost": 0,
+                "acquired": 4,
+                "neither": 29,
+                "p": 0.125,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "KEAP1",
+                "pairs": 33,
+                "shared": 0,
+                "lost": 1,
+                "acquired": 5,
+                "neither": 27,
+                "p": 0.21875000000000017,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "ETV1",
+                "pairs": 33,
+                "shared": 1,
+                "lost": 0,
+                "acquired": 3,
+                "neither": 29,
+                "p": 0.25000000000000006,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "NKX2-1",
+                "pairs": 33,
+                "shared": 1,
+                "lost": 0,
+                "acquired": 3,
+                "neither": 29,
+                "p": 0.25000000000000006,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "DDR2",
+                "pairs": 33,
+                "shared": 0,
+                "lost": 0,
+                "acquired": 3,
+                "neither": 30,
+                "p": 0.25000000000000006,
+                "q": 0.5000000000000001
+              },
+              {
+                "gene": "INHBA",
+                "pairs": 31,
+                "shared": 0,
+                "lost": 0,
+                "acquired": 3,
+                "neither": 28,
+                "p": 0.25000000000000006,
+                "q": 0.5000000000000001
+              }
+            ],
+            "tested": 30
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "lung_msk_pdx",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Patients with a sample dated on or before their first Treatment [SUBTYPE=Systemic therapy] and another at least 30 days after it; each side is one sample — the last before and the first after — dated by its first Sample acquisition/Sequencing/Specimen timeline event (attribute SAMPLE_ID). Funnel: all patients — 142 started, 67 with a sample before, 107 with one after, 33 patients with both (median 27 days before and 279 after; samples a median 301 days apart, IQR 154–514). Per gene, counting only patients whose before- AND after-sample panels both cover it: an OncoKB oncogenic alteration (v7.5) after but not before (acquired), before but not after (lost), on both (shared). The exact McNemar test asks whether acquired and lost differ; q is Benjamini–Hochberg across the genes tested in each cohort — every gene altered after treatment in at least 3 patients (all patients: 30 genes), the 12 smallest p drawn. These are few patients, and a second biopsy is clinically indicated — typically taken at progression — so they are a selected group, and \"acquired\" means seen after and not before, not caused by the treatment: a subclone the first biopsy missed, a different lesion, or a lower-purity sample under-calling one side reads the same. Which treatment ran between the samples beyond the anchor is not considered."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+Analysis over tmb_mskcc_2018 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- TMB < 10: 1,201 patients — TMB_NONSYNONYMOUS lt 10 (any sample)
+- TMB ≥ 10: 460 patients — TMB_NONSYNONYMOUS gte 10 (any sample)
+
+Restricted mean survival time, OS:
+  from the start, tau=24 months:
+    TMB < 10: n=1,201, RMST 14.5 mo (13.9–15)
+    TMB ≥ 10: n=460, RMST 17.7 mo (16.9–18.6); vs TMB < 10 difference +3.3 mo (2.3 to 4.2) p = 1.1e-10, ratio 1.23 (1.15–1.30)
+  from the 6-month landmark, tau=24 months:
+    TMB < 10: n=758, RMST 16 mo (15.3–16.7)
+    TMB ≥ 10: n=321, RMST 19.6 mo (18.7–20.5); vs TMB < 10 difference +3.6 mo (2.5 to 4.7) p = 4.1e-10, ratio 1.23 (1.15–1.31)
+  from the 12-month landmark, tau=24 months:
+    TMB < 10: n=503, RMST 17.4 mo (16.5–18.2)
+    TMB ≥ 10: n=241, RMST 20.6 mo (19.6–21.6); vs TMB < 10 difference +3.2 mo (1.9 to 4.6) p = 1e-6, ratio 1.19 (1.11–1.27)
+  CAVEAT (tell the user): Restricted mean survival time: the area under each cohort's Kaplan–Meier curve from 0 to τ — the mean months lived within the first τ — with τ = 24 months, as set. Its standard error is the Greenwood-type variance of that area (Klein & Moeschberger; R survRM2); differences and ratios against TMB < 10 use Wald intervals (the ratio on the log scale) and two-sided normal p. Unlike a hazard ratio, RMST needs no proportional hazards, so it stays interpretable when curves cross or separate late, as on immunotherapy. Endpoint OS from the study's day 0. Left out: 0 without follow-up. A landmark keeps only the patients alive and still followed at it and restarts their clock there, so each later panel answers “for those who got this far” and is free of the guarantee-time bias of grouping by what happens after the start; its patients are fewer, and its τ is counted from the landmark. Records are pooled across a cohort's studies without stratification. The cohorts are not randomised, so a difference is an association. Each site sends only (entry, time, event) counts.

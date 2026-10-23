@@ -1,0 +1,304 @@
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "all patients": {
+      "count": 48179,
+      "text": "all patients in the study",
+      "studies": [
+        "msk_impact_50k_2026"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "actionability",
+      "cohorts": [
+        "all patients"
+      ],
+      "actionability": {
+        "pin": "v7.5",
+        "levels": [
+          "Level 1",
+          "Level 2",
+          "Level 3A",
+          "Level 3B",
+          "Level 4",
+          "No level"
+        ],
+        "groupBy": "CANCER_TYPE",
+        "top": 8,
+        "pairBy": {
+          "attribute": "SAMPLE_TYPE",
+          "a": [
+            "Primary"
+          ],
+          "b": [
+            "Metastasis"
+          ]
+        },
+        "panels": [
+          {
+            "cohort": "all patients",
+            "patients": 48179,
+            "sequenced": 48179,
+            "levels": [
+              27154,
+              1527,
+              3244,
+              0,
+              3061,
+              13193
+            ],
+            "resistance": [
+              9698,
+              603
+            ],
+            "groups": [
+              {
+                "label": "Non-Small Cell Lung Cancer",
+                "sequenced": 6409,
+                "levels": [
+                  4474,
+                  228,
+                  363,
+                  0,
+                  467,
+                  877
+                ],
+                "resistance": [
+                  2177,
+                  189
+                ]
+              },
+              {
+                "label": "Breast Cancer",
+                "sequenced": 5724,
+                "levels": [
+                  3648,
+                  35,
+                  229,
+                  0,
+                  269,
+                  1543
+                ],
+                "resistance": [
+                  59,
+                  12
+                ]
+              },
+              {
+                "label": "Colorectal Cancer",
+                "sequenced": 4890,
+                "levels": [
+                  3233,
+                  191,
+                  198,
+                  0,
+                  98,
+                  1170
+                ],
+                "resistance": [
+                  2312,
+                  26
+                ]
+              },
+              {
+                "label": "Prostate Cancer",
+                "sequenced": 2834,
+                "levels": [
+                  1065,
+                  41,
+                  63,
+                  0,
+                  115,
+                  1550
+                ],
+                "resistance": [
+                  22,
+                  5
+                ]
+              },
+              {
+                "label": "Pancreatic Cancer",
+                "sequenced": 2677,
+                "levels": [
+                  2335,
+                  22,
+                  20,
+                  0,
+                  69,
+                  231
+                ],
+                "resistance": [
+                  2224,
+                  1
+                ]
+              },
+              {
+                "label": "Endometrial Cancer",
+                "sequenced": 2325,
+                "levels": [
+                  1888,
+                  33,
+                  208,
+                  0,
+                  35,
+                  161
+                ],
+                "resistance": [
+                  509,
+                  6
+                ]
+              },
+              {
+                "label": "Soft Tissue Sarcoma",
+                "sequenced": 2065,
+                "levels": [
+                  390,
+                  46,
+                  413,
+                  0,
+                  175,
+                  1041
+                ],
+                "resistance": [
+                  55,
+                  14
+                ]
+              },
+              {
+                "label": "Ovarian Cancer",
+                "sequenced": 2035,
+                "levels": [
+                  857,
+                  42,
+                  267,
+                  0,
+                  130,
+                  739
+                ],
+                "resistance": [
+                  193,
+                  8
+                ]
+              },
+              {
+                "label": "Other (58)",
+                "sequenced": 19220,
+                "levels": [
+                  9264,
+                  889,
+                  1483,
+                  0,
+                  1703,
+                  5881
+                ],
+                "resistance": [
+                  2147,
+                  342
+                ]
+              }
+            ],
+            "pooled": [
+              "Glioma",
+              "Bladder Cancer",
+              "Melanoma",
+              "Esophagogastric Cancer",
+              "Cancer of Unknown Primary",
+              "Hepatobiliary Cancer",
+              "Renal Cell Carcinoma",
+              "Thyroid Cancer",
+              "Multiple (samples disagree)",
+              "Germ Cell Tumor",
+              "Head and Neck Cancer",
+              "Gastrointestinal Stromal Tumor",
+              "Bone Cancer",
+              "Skin Cancer, Non-Melanoma",
+              "Small Cell Lung Cancer",
+              "Mesothelioma",
+              "Salivary Gland Cancer",
+              "Uterine Sarcoma",
+              "Cervical Cancer",
+              "Peripheral Nervous System",
+              {
+                "…": "38 more",
+                "sha256": "f545457fb6c59765"
+              }
+            ],
+            "concordance": {
+              "pairs": 2278,
+              "table": [
+                [
+                  1108,
+                  13,
+                  26,
+                  0,
+                  26,
+                  82
+                ],
+                [
+                  18,
+                  32,
+                  1,
+                  0,
+                  3,
+                  6
+                ],
+                [
+                  32,
+                  6,
+                  84,
+                  0,
+                  5,
+                  18
+                ],
+                [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                [
+                  35,
+                  3,
+                  14,
+                  0,
+                  85,
+                  34
+                ],
+                [
+                  173,
+                  11,
+                  40,
+                  0,
+                  35,
+                  388
+                ]
+              ],
+              "discordant": 581
+            }
+          }
+        ],
+        "storeTypes": [
+          "MUTATION",
+          "CNA"
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_impact_50k_2026",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Each patient's highest OncoKB therapeutic level (v7.5, the pinned store) over the alterations in any of their samples sequenced for mutations — called mutations and high-level copy-number calls; the store holds no level for structural variants at this pin, so a fusion is never counted — and, separately, whether any alteration carries a resistance level (R1, R2). The level is the store's highest for the alteration in ANY cancer type, not in the patient's own: an alteration actionable only elsewhere (PTEN or PIK3CA, level 1 with capivasertib in breast cancer, in any other cancer) counts here, so these shares are an upper bound on what is actionable for these patients. Denominator: patients with at least one sample sequenced for mutations — “all patients”: 48,179 of 48,179. Panel-aware in the only way a level can be: a gene their panel did not cover is unknown, not \"no actionable alteration\" — No level means none was found on the genes sequenced. Groups are CANCER_TYPE per patient (Multiple (samples disagree) when their samples disagree); the 8 largest are drawn and the rest pooled into Other (“all patients”: 58 groups). Concordance: patients with a sequenced sample whose SAMPLE_TYPE is Primary and one whose is Metastasis (matched case-insensitively), the highest level over each side's samples compared — “all patients”: 2,278 patients, 25.5% discordant. A level present on one side only can be a real difference between the tumours, or a gene one side's panel did not cover. "
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+Analysis over msk_impact_50k_2026 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- all patients: 48,179 patients — all patients in the study
+
+Forest plot: OS hazard ratio for TP53 mutated by CANCER_TYPE (n=43,375, 16,953 events):
+  Non-Small Cell Lung Cancer (n=6,100, 2721 events, 3349 exposed): HR 1.44 (95% CI 1.33-1.55) p=2.0e-20, weight 3.9%
+  Breast Cancer (n=5,177, 1756 events, 2178 exposed): HR 1.99 (95% CI 1.82-2.19) p=5.6e-47, weight 3.9%
+  Colorectal Cancer (n=4,581, 1490 events, 3398 exposed): HR 1.16 (95% CI 1.03-1.30) p=0.0172, weight 3.9%
+  Prostate Cancer (n=2,607, 714 events, 730 exposed): HR 2.50 (95% CI 2.15-2.89) p=9.0e-34, weight 3.8%
+  Pancreatic Cancer (n=2,437, 1443 events, 1684 exposed): HR 1.86 (95% CI 1.65-2.09) p=2.3e-24, weight 3.9%
+  Endometrial Cancer (n=2,170, 580 events, 1000 exposed): HR 2.88 (95% CI 2.42-3.43) p=1.4e-32, weight 3.7%
+  Ovarian Cancer (n=1,903, 634 events, 1473 exposed): HR 1.45 (95% CI 1.18-1.78) p=0.0003, weight 3.6%
+  Soft Tissue Sarcoma (n=1,871, 687 events, 419 exposed): HR 1.43 (95% CI 1.20-1.70) p=4.9e-5, weight 3.7%
+  Glioma (n=1,801, 944 events, 676 exposed): HR 0.86 (95% CI 0.75-0.98) p=0.0230, weight 3.8%
+  Bladder Cancer (n=1,780, 525 events, 890 exposed): HR 1.38 (95% CI 1.16-1.63) p=0.0003, weight 3.7%
+  Melanoma (n=1,519, 533 events, 313 exposed): HR 0.78 (95% CI 0.62-0.97) p=0.0243, weight 3.6%
+  Esophagogastric Cancer (n=1,512, 750 events, 1076 exposed): HR 1.06 (95% CI 0.90-1.24) p=0.4734, weight 3.8%
+  Hepatobiliary Cancer (n=1,214, 739 events, 401 exposed): HR 1.41 (95% CI 1.21-1.65) p=7.9e-6, weight 3.8%
+  Cancer of Unknown Primary (n=1,172, 685 events, 602 exposed): HR 1.28 (95% CI 1.10-1.49) p=0.0011, weight 3.8%
+  Renal Cell Carcinoma (n=945, 313 events, 100 exposed): HR 1.58 (95% CI 1.16-2.16) p=0.0037, weight 3.3%
+  Thyroid Cancer (n=736, 233 events, 122 exposed): HR 4.06 (95% CI 3.08-5.36) p=3.1e-23, weight 3.4%
+  Germ Cell Tumor (n=557, 114 events, 65 exposed): HR 4.30 (95% CI 2.86-6.46) p=2.0e-12, weight 2.9%
+  Head and Neck Cancer (n=535, 318 events, 263 exposed): HR 1.61 (95% CI 1.29-2.01) p=2.3e-5, weight 3.6%
+  Bone Cancer (n=460, 175 events, 90 exposed): HR 2.05 (95% CI 1.46-2.88) p=3.2e-5, weight 3.2%
+  Gastrointestinal Stromal Tumor (n=452, 82 events, 20 exposed): HR 1.63 (95% CI 0.71-3.74) p=0.2511, weight 1.6%
+  Small Cell Lung Cancer (n=372, 242 events, 336 exposed): HR 1.01 (95% CI 0.66-1.55) p=0.9600, weight 2.8%
+  Skin Cancer, Non-Melanoma (n=361, 117 events, 184 exposed): HR 1.56 (95% CI 1.08-2.26) p=0.0183, weight 3.1%
+  Mesothelioma (n=343, 218 events, 38 exposed): HR 1.63 (95% CI 1.09-2.42) p=0.0171, weight 3.0%
+  Salivary Gland Cancer (n=311, 153 events, 79 exposed): HR 1.16 (95% CI 0.81-1.66) p=0.4081, weight 3.1%
+  Uterine Sarcoma (n=302, 143 events, 125 exposed): HR 1.32 (95% CI 0.95-1.83) p=0.0992, weight 3.2%
+  Cervical Cancer (n=283, 103 events, 45 exposed): HR 1.16 (95% CI 0.70-1.91) p=0.5585, weight 2.6%
+  Appendiceal Cancer (n=243, 88 events, 84 exposed): HR 2.13 (95% CI 1.40-3.25) p=0.0004, weight 2.9%
+  Gastrointestinal Neuroendocrine Tumor (n=176, 73 events, 40 exposed): HR 7.65 (95% CI 4.57-12.79) p=9.0e-15, weight 2.5%
+  Small Bowel Cancer (n=130, 59 events, 71 exposed): HR 0.95 (95% CI 0.57-1.60) p=0.8593, weight 2.5%
+  Other (34 strata) (n=1,200, 304 events, 222 exposed): HR 1.95 (95% CI 1.46-2.61) p=5.6e-6, weight 3.4%
+  pooled, random effects (DerSimonian–Laird): HR 1.63 (95% CI 1.42-1.87) p=2.2e-12
+  pooled, fixed effect: HR 1.54 (95% CI 1.49-1.59) p=1.2e-143
+  heterogeneity: tau²=0.121, I²=93%, Q=424.1 on 29 df, p=9.8e-72
+  not estimated: CNS Cancer (no event among the exposed)
+  CAVEAT (tell the user): Hazard ratio of OS for TP53 mutated (exposed) against the rest, fit by Cox regression (Efron ties) within each CANCER_TYPE, univariate. 43,375 patients and 16,953 events had a time, the exposure and a CANCER_TYPE; 30 rows were estimated. Panel-aware: a patient not profiled for the gene is left out, never counted as unaltered. 4,135 patients lacked the endpoint, the stratum or a covariate and were left out. 669 patients whose samples carry different values of CANCER_TYPE were left out: they belong to no one stratum. “Other (34 strata)” pools 34 strata (each under 30 patients or 10 events, or past the 30 largest), fit with a baseline hazard of its own per stratum. Not estimated: CNS Cancer (no event among the exposed). Pooled by inverse variance: fixed effect, and DerSimonian–Laird random effects (τ² 0.121, I² 93%, Cochran's Q 424.1 on 29 df, p 9.8e-72). A high I² says the strata disagree beyond chance: the pooled estimate is then an average over different effects, not one effect. Association, not cause: the exposure travels with stage, treatment and other prognostic factors not adjusted for. Proportional hazards within each row is assumed, not checked.

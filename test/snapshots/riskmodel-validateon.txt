@@ -1,0 +1,60 @@
+Analysis over msk_impact_2017 + msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- NSCLC (MSK-IMPACT 2017): 1,567 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)
+- NSCLC (MSK-CHORD): 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample) — in msk_chord_2024
+
+Risk model (elastic-net Cox, 10 held-out splits, alpha 0.5, seed 1; 1,440 patients, 468 events, 93 candidate genes):
+  held-out C-index 0.613 (IQR 0.578–0.621)
+  risk score on OncoCast's 0–10 scale (0 and 10 the lowest and highest held-out score; raw -0.310 to 1.060)
+  risk groups (held-out scores, equal quantiles):
+    Low risk (score 0–2.3): n=493, 118 events, median 26.6mo, 12-month 79%, 36-month n/a
+    Intermediate risk (score 2.3–3.5): n=449, 145 events, median 20.6mo, 12-month 68%, 36-month n/a, HR vs lowest 1.52 (95% CI 1.19–1.94, 0.0008)
+    High risk (score 3.5–10): n=471, 198 events, median 15.0mo, 12-month 58%, 36-month 31%, HR vs lowest 2.21 (95% CI 1.76–2.78, 1.0e-11)
+  log-rank p=2.5e-11
+  risk score alone: HR 1.36 per SD (95% CI 1.26–1.48, 9.3e-15)
+  genes kept most often: KEAP1 100% HR 1.47, STK11 90% HR 1.19, TP53 90% HR 1.18, EGFR 80% HR 0.87, IKZF1 40% HR 1.32, KMT2D 40% HR 1.16, NTRK1 40% HR 1.14, JAK3 30% HR 0.83, SMARCA4 30% HR 1.02, PBRM1 20% HR 1.11, MED12 20% HR 0.94, PIK3CA 20% HR 0.95, POLE 20% HR 0.97, KDR 10% HR 1.17, ATR 10% HR 1.09
+  27 patients were never held out, so have no score
+  external validation on NSCLC (MSK-CHORD) (msk_chord_2024; 7809 patients scored, 0 not covered by the model's genes): C-index 0.607 (95% bootstrap CI 0.597–0.616), log-rank p=8.1e-73
+    Low risk: n=2790, 1093 events, median 66.4mo
+    Intermediate risk: n=3237, 1782 events, median 33.3mo, HR vs lowest 1.63 (95% CI 1.51–1.76)
+    High risk: n=1782, 1100 events, median 20.7mo, HR vs lowest 2.12 (95% CI 1.95–2.31)
+  CAVEAT (tell the user): Association, not cause: a gene's weight is its link to OS with the other candidates held fixed, in this cohort. Without strata, a gene that marks a cancer type carries that type's prognosis; on a cohort of several cancer types, stratify by CANCER_TYPE. Each patient is scored only by models that did not train on them. The group cuts are equal quantiles of the score, chosen without the outcome. Genes outside the panels every patient was sequenced on are not candidates, so a patient is never counted as wild-type for a gene they were not tested for. The C-index ignores delayed entry. Seeded (seed 1): the same document gives the same model. External validation on “NSCLC (MSK-CHORD)” (msk_chord_2024): each patient scored with the ensemble's mean coefficients (every gene's coefficient averaged over all 10 runs, zero where a run dropped it) and cut at the training thresholds; 0 patients on panels missing one of the model's 21 weighted genes are left out rather than scored as wild-type. Harrell's C-index (within strata) with a seeded bootstrap interval (200 resamples). The two studies' baselines, panels and vocabularies are not harmonized, and a patient enrolled in both under different identifiers cannot be removed. 
+  METHOD:
+    - One row per patient [NSCLC (MSK-IMPACT 2017) · msk_impact_2017] (1,567 → 1,440 rows): The riskmodel:rows query above: each patient's survival time and event, the panels their samples were sequenced on for mutations, the genes mutated in them, and their half of the engine's fixed held-out split. Patient-level: the rows never leave this server's engine, and no identifier is returned.
+    - Patients, candidate genes and covariates: A gene is a candidate only if every patient's panels cover it, so no patient is counted as wild-type for a gene they were never tested for, and only if at least 30 patients have it mutated.
+        genes covered for every patient: 341
+        candidates: 93
+        left out: no mutation panel on record: 0
+    - Elastic-net Cox, 10 random splits: Each run holds out a random 33% of the patients; on the rest, the penalty is chosen from a path of 25 by 3-fold cross-validated partial likelihood (Verweij & van Houwelingen), and the model at that penalty scores the held-out patients. Genes are scaled to unit variance before fitting; Breslow ties. A patient's risk score is the mean of the scores they got while held out (OncoCast's ensemble, Martin et al.).
+        l1 share of the penalty (alpha): 0.5
+        runs: 10
+        seed: 1
+        test-set C-index, median (IQR): 0.613 (0.578–0.621)
+        never held out, so unscored: 27
+    - Risk groups, their survival and hazard ratios: Cuts at equal quantiles of the held-out scores, each moved to the nearer edge of any run of tied scores so equal scores share a group — no outcome is used to place them. Each group is drawn as a Kaplan–Meier curve and read at 12 and 36 months; the groups are compared with a log-rank test, and a Cox model of the outcome on the group indicators gives each group's hazard ratio against the lowest (Newton–Raphson, full information matrix, 95% Wald intervals). A second Cox model on the standardised score alone gives the hazard ratio per standard deviation. The score is also shown on OncoCast's 0–10 scale, (score − min) / (max − min) × 10, min and max the lowest and highest held-out score; the scale is linear, so it moves no patient between groups and changes no number above.
+        0 on the 0–10 scale (raw score): -0.3101
+        10 on the 0–10 scale (raw score): 1.0602
+        Low risk: 493 patients, 118 events, median 26.6 months
+        Intermediate risk: 449 patients, 145 events, median 20.6 months, HR 1.52
+        High risk: 471 patients, 198 events, median 15.0 months, HR 2.21
+    lib/coxnet.ts's path is checked against scikit-survival's CoxnetSurvivalAnalysis, its delayed-entry, stratified fits (with standard errors) against statsmodels' PHReg and its C-index against lifelines, by test/coxnet-golden.test.ts (fixtures from python/golden/coxnet.py).
+  METHOD:
+    - One row per patient [NSCLC (MSK-IMPACT 2017) · msk_impact_2017] (1,567 → 1,440 rows): The riskmodel:rows query above: each patient's survival time and event, the panels their samples were sequenced on for mutations, the genes mutated in them, and their half of the engine's fixed held-out split. Patient-level: the rows never leave this server's engine, and no identifier is returned.
+    - Patients, candidate genes and covariates: A gene is a candidate only if every patient's panels cover it, so no patient is counted as wild-type for a gene they were never tested for, and only if at least 30 patients have it mutated.
+        genes covered for every patient: 341
+        candidates: 93
+        left out: no mutation panel on record: 0
+    - Elastic-net Cox, 10 random splits: Each run holds out a random 33% of the patients; on the rest, the penalty is chosen from a path of 25 by 3-fold cross-validated partial likelihood (Verweij & van Houwelingen), and the model at that penalty scores the held-out patients. Genes are scaled to unit variance before fitting; Breslow ties. A patient's risk score is the mean of the scores they got while held out (OncoCast's ensemble, Martin et al.).
+        l1 share of the penalty (alpha): 0.5
+        runs: 10
+        seed: 1
+        test-set C-index, median (IQR): 0.613 (0.578–0.621)
+        never held out, so unscored: 27
+    - Risk groups, their survival and hazard ratios: Cuts at equal quantiles of the held-out scores, each moved to the nearer edge of any run of tied scores so equal scores share a group — no outcome is used to place them. Each group is drawn as a Kaplan–Meier curve and read at 12 and 36 months; the groups are compared with a log-rank test, and a Cox model of the outcome on the group indicators gives each group's hazard ratio against the lowest (Newton–Raphson, full information matrix, 95% Wald intervals). A second Cox model on the standardised score alone gives the hazard ratio per standard deviation. The score is also shown on OncoCast's 0–10 scale, (score − min) / (max − min) × 10, min and max the lowest and highest held-out score; the scale is linear, so it moves no patient between groups and changes no number above.
+        0 on the 0–10 scale (raw score): -0.3101
+        10 on the 0–10 scale (raw score): 1.0602
+        Low risk: 493 patients, 118 events, median 26.6 months
+        Intermediate risk: 449 patients, 145 events, median 20.6 months, HR 1.52
+        High risk: 471 patients, 198 events, median 15.0 months, HR 2.21
+    lib/coxnet.ts's path is checked against scikit-survival's CoxnetSurvivalAnalysis, its delayed-entry, stratified fits (with standard errors) against statsmodels' PHReg and its C-index against lifelines, by test/coxnet-golden.test.ts (fixtures from python/golden/coxnet.py).
