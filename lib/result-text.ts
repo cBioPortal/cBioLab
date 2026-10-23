@@ -257,6 +257,15 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
             (g.concordance != null ? `, ${Math.round(100 * g.concordance)}% concordant` : "") +
             (g.aOnly + g.bOnly ? `, McNemar q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +
         caveatOf(v) + noteOf(v));
+    } else if (v.kind === "acquired") {
+      const ar = v.acquired;
+      out.push(`Acquired under therapy: last sample on or before the first ${ar.anchoredTo} against the first at least ${ar.minGapDays} days after (${ar.measure === "driver" ? "OncoKB oncogenic" : "any alteration"}; both samples' panels cover the gene):\n` +
+        ar.panels.map((pn) => `  ${pn.cohort} (${pn.anchored.toLocaleString()} started, ${pn.withPre.toLocaleString()} with a sample before, ${pn.withPost.toLocaleString()} after, ${pn.patients.toLocaleString()} with both` +
+          (pn.gapDays ? `; samples a median ${pn.gapDays.median} days apart` : "") +
+          (pn.tested != null ? `; ${pn.tested.toLocaleString()} genes tested, the ${pn.genes.length} smallest p listed` : "") + `):\n` +
+          pn.genes.map((g) => `    ${g.gene}: acquired ${g.acquired}, lost ${g.lost}, shared ${g.shared}, neither ${g.neither} of ${g.pairs} pairs` +
+            (g.acquired + g.lost ? `, McNemar p=${pFmt(g.p)} q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +
+        caveatOf(v) + noteOf(v));
     } else if (v.kind === "clonality") {
       const cr = v.clonality;
       out.push(`Clonality (FACETS; ${cr.measure === "driver" ? "driver mutation calls" : "all mutation calls"}${cr.qc ? ", QC-passing samples" : ""}):\n` +

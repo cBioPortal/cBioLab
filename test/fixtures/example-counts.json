@@ -204,6 +204,9 @@
     "Before and after treatment, pooled across studies that label it differently": {
       "before and after treatment": 481
     },
+    "Acquired under therapy: the sample before a treatment against the sample after it": {
+      "all patients": 172
+    },
     "Clonality, LOH and genome doubling from FACETS": {
       "Colorectal": 4993,
       "Breast": 5803

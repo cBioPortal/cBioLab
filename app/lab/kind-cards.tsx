@@ -82,6 +82,8 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
     why: (k) => k.events.length ? null : "this study records no timeline events to estimate the incidence of" },
   clonality: { label: "Clonality (FACETS)", title: "Clonality", genes: true, maxCohorts: 3 },
   paired: { label: "Paired samples (primary vs metastasis, before vs after)", title: "Paired samples", genes: true, maxCohorts: 3 },
+  acquired: { label: "Acquired under therapy (samples before vs after a treatment start)", title: "Acquired under therapy", genes: true, maxCohorts: 3,
+    why: (k) => k.events.some((e) => /treat|therap|drug|medicat/i.test(e.canonical)) ? null : "this study records no treatment timeline events to anchor on" },
   riskmodel: { label: "Risk model (elastic-net Cox, OncoCast-style)", title: "Risk model", maxCohorts: 1 },
   diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2, minCohorts: 2,
     why: (k) => !k.profiles.length ? "this study has no molecular profile to compare expression on" : null }
@@ -208,6 +210,11 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     const sides = v.paired ? v.paired.labels.a + " vs " + v.paired.labels.b
       : pb.studies ? "sides set per study" : pb.attribute + ": " + j(pb.a) + " vs " + j(pb.b);
     return sides + (spec.measure === "any" ? ", any alteration" : ", drivers") + (spec.genes && spec.genes.length ? "" : ", every gene scanned");
+  }
+  if (kind === "acquired") {
+    const an = spec.anchor || { eventType: "Treatment" };
+    return "last sample before the first " + (an.eventType || "?") + (an.key ? " [" + an.key + "=" + an.value + "]" : "") + " vs the first ≥" + (spec.minGapDays ?? 30) + " days after" +
+      (spec.measure === "driver" ? ", oncogenic only" : ", any alteration") + (spec.genes && spec.genes.length ? "" : ", every gene scanned");
   }
   if (kind === "diffexpr") return (spec.profileType || "no profile") + (v.diffexpr ? (v.diffexpr.log2 ? ", log2(v+1)" : "") + " · volcano and GSEA" : "");
   if (kind === "pathways") return (spec.measure === "any" ? "any alteration" : "OncoKB drivers") + ", Sanchez-Vega et al. 2018";
@@ -626,6 +633,49 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       </div>
     );
   }
+  if (spec.kind === "acquired") {
+    const an = spec.anchor || { eventType: "Treatment" };
+    const types = c.events.map((x) => x.label);
+    const scanning = !(spec.genes && spec.genes.length);
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">clock</span>
+          <label className="tbfield" title="the treatment start: each patient's first event of this type">
+            first <OptionSelect value={an.eventType || ""} disabled={busy} onValueChange={(v) => patch({ anchor: { ...an, eventType: v } })}>
+              {!types.includes(an.eventType) && <option value={an.eventType || ""}>{an.eventType || "choose…"}</option>}
+              {types.map((t) => <option key={t} value={t}>{t}</option>)}
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="only anchor events with this attribute (e.g. SUBTYPE or AGENT); empty for any">
+            where <DraftInput value={an.key || ""} disabled={busy} width="6rem" placeholder="attribute"
+              onCommit={(t) => patch({ anchor: { eventType: an.eventType, ...(t.trim() ? { key: t.trim(), value: an.value || "" } : {}) } })} />
+          </label>
+          <label className="tbfield" title="the value that attribute must take (e.g. Hormone)">
+            = <DraftInput value={an.value || ""} disabled={busy} width="6rem" placeholder="value"
+              onCommit={(t) => patch({ anchor: { ...an, value: t } })} />
+          </label>
+          <label className="tbfield" title="the after-sample is the first at least this many days after the start">
+            after ≥ <OptionSelect value={String(spec.minGapDays ?? 30)} disabled={busy} onValueChange={(v) => patch({ minGapDays: Number(v) === 30 ? undefined : Number(v) })}>
+              {[...new Set([0, 30, 90, 180, 365, Number(spec.minGapDays ?? 30)])].sort((x, y) => x - y).map((d) => <option key={d} value={d}>{d} days</option>)}
+            </OptionSelect>
+          </label>
+        </div>
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="test the genes you chose, or scan every gene altered after treatment in at least minPost patients">
+            genes <OptionSelect value={scanning ? "scan" : "chosen"} disabled={busy}
+              onValueChange={(v) => patch(v === "scan" ? { genes: undefined } : { genes: PAIRED_DEFAULT_GENES, top: undefined })}>
+              <option value="chosen">chosen</option><option value="scan">scan all</option>
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="any alteration, or only those OncoKB calls oncogenic">
+            count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
+              <option value="any">any alteration</option><option value="driver">oncogenic only</option>
+            </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "pathways") return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
@@ -658,6 +708,10 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   }
   if (kind === "clonality") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : ["TP53", "KRAS", "APC", "PIK3CA", "SMAD4", "CDH1"] };
   if (kind === "paired") return { kind, genes: known.genes.length ? known.genes.slice(0, 8) : PAIRED_DEFAULT_GENES };
+  if (kind === "acquired") {
+    const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
+    return { kind, anchor: { eventType: tx ? tx.label : "Treatment" } };
+  }
   if (kind === "mutations") return { kind, gene: known.genes[0] || "TP53" };
   if (kind === "table") return { kind };
   if (kind === "timeline" || kind === "alterations") return { kind };
