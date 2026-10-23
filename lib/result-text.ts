@@ -128,6 +128,18 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         a.panels.map((pn) => [line(pn.cohort, pn), ...(pn.groups || []).map((g) => line("  " + g.label, g)),
           ...(pn.concordance ? [`    ${a.pairBy!.a.join("/")} vs ${a.pairBy!.b.join("/")} highest level, ${pn.concordance.pairs} patients with both: ${pn.concordance.discordant} discordant (${pct(pn.concordance.discordant, pn.concordance.pairs)}); rows ${a.pairBy!.a.join("/")}, columns ${a.pairBy!.b.join("/")} (1, 2, 3A, 3B, 4, none): ` +
             pn.concordance.table.map((r) => "[" + r.join(", ") + "]").join(" ")] : [])].join("\n")).join("\n") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "organotropism") {
+      const o = v.organotropism, pct = (k: number, n: number) => n ? (100 * k / n).toFixed(1) + "%" : "–";
+      const lab = new Map(o.sites.map((s) => [s.site, s.label]));
+      const sig = o.cells.filter((c) => c.q != null && c.q < 0.05).sort((a, b) => a.p! - b.p!);
+      out.push(`Metastatic organotropism (${o.patients.toLocaleString()} patients; sites from ${o.sourceLabel}; ${o.measure === "driver" ? "OncoKB-driver " : ""}${o.alteration}s; ` +
+        `${o.stratifyBy ? "CMH stratified by " + o.stratifyBy : "unstratified"}): ${o.genes.length} genes × ${o.sites.length} sites, ${o.tested} cells tested, ${o.significant} at q<0.05.\n` +
+        `  Sites (patients with a metastasis there / evaluable): ` + o.sites.map((s) => `${s.label} ${s.withSite}/${s.evaluable}`).join(", ") + "\n" +
+        sig.slice(0, 30).map((c) => `  ${lab.get(c.site) || c.site} × ${c.gene}: altered ${c.withAltered}/${c.withSite} (${pct(c.withAltered, c.withSite)}) with the site vs ${c.withoutAltered}/${c.without} (${pct(c.withoutAltered, c.without)}) without, ` +
+          `MH OR ${c.or == null ? "undefined" : c.or.toFixed(2)}, p=${pFmt(c.p!)} q=${pFmt(c.q!)}`).join("\n") +
+        (o.incidence ? `\n  Cumulative incidence of ${o.incidence.site} by ${o.incidence.gene} (death competing): ` +
+          o.incidence.horizons.map((h) => `${h.months} mo ` + h.cells.map((c) => `${c.cohort} ${(100 * c.f1).toFixed(1)}% [${(100 * c.lo).toFixed(1)}–${(100 * c.hi).toFixed(1)}]`).join(" vs ")).join("; ") +
+          (o.incidence.gray ? `; Gray's test p=${pFmt(o.incidence.gray.p)}` : "") : o.noIncidence ? `\n  No incidence panel: ${o.noIncidence}` : "") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "drivernegative") {
       const d = v.drivernegative, pct = (k: number, n: number) => n ? (100 * k / n).toFixed(1) + "%" : "–";
       out.push(`Driver-negative analysis (drivers: ${d.drivers.join(", ")}): of ${d.sequenced.toLocaleString()} patients sequenced, ` +

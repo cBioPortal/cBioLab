@@ -32,6 +32,7 @@ import { adjustedSvg } from "./adjusted.ts";
 import { instabilitySvg } from "./instability.ts";
 import { actionabilitySvg } from "./actionability.ts";
 import { drivernegativeSvg } from "./drivernegative.ts";
+import { organotropismSvg } from "./organotropism.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -109,6 +110,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   drivernegative: {
     draw: (v, o) => v.drivernegative.sequenced ? drivernegativeSvg(v, o) : null,
     title: (v) => "Driver-negative analysis" + (v.drivernegative ? " — " + v.drivernegative.alteration + ", driver-negative vs driver-positive" : "")
+  },
+  organotropism: {
+    draw: (v, o) => v.organotropism.sites.length && v.organotropism.genes.length ? organotropismSvg(v, o) : null,
+    title: (v) => "Organotropism" + (v.organotropism ? " — " + v.organotropism.genes.length + " genes × " + v.organotropism.sites.length + " sites, " + v.organotropism.source : "")
   },
   correlates: {
     draw: (v, o) => v.correlates && v.correlates.tested > 0 ? correlatesSvg(v, o) : null,

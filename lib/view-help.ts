@@ -175,6 +175,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "For each patient, finds the strongest evidence OncoKB lists for a drug that targets one of their tumour's genetic changes — Level 1 means an FDA-approved drug for that change, down to Level 4 for early biological evidence — and shows what share of patients reach each level, overall or per cancer type. The levels here are the best OncoKB gives the change in ANY cancer, so a change that is only actionable in another cancer still counts: read the bars as an upper bound. The table below compares, for patients sequenced twice, the level found in their primary tumour against their metastasis."
   },
+  organotropism: {
+    title: "What is this?",
+    text: "Asks, for each organ a cancer spread to — brain, liver, bone and the rest — whether patients whose tumour carries a change in a given gene spread there more or less often than patients whose tumour does not, comparing patients within the same cancer type. Red squares mean the gene's change goes with spread to that organ, blue that it goes with spreading there less; outlined squares are the ones unlikely to be chance after testing many pairs. Where the study dates each site, the curve below shows how quickly patients with and without one gene's change develop spread to one organ, counting deaths as a separate outcome. Sites are only known where scans or biopsies found them."
+  },
   drivernegative: {
     title: "What is this?",
     text: "Splits one group of patients — say, lung cancers — into those whose tumour carries one of the well-known, usually treatable cancer-driving changes (EGFR, KRAS, ALK and the rest of the list) and those whose tumour carries none, and then asks which other genes are changed more often in the second group. Those genes are candidates for what drives the tumours without a known driver. Patients whose test did not cover every gene on the list are kept apart, since we cannot tell whether they have a driver. The bar shows how big each group is; in the chart, genes to the right are more common without a known driver."

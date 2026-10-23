@@ -46,6 +46,7 @@ import { runAdjusted } from "./adjusted.ts";
 import { runInstability } from "./instability.ts";
 import { runActionability } from "./actionability.ts";
 import { runDrivernegative } from "./drivernegative.ts";
+import { runOrganotropism } from "./organotropism.ts";
 
 /**
  * A runner that lets a throw stand for its error: an error is reported as the view's, with its
@@ -107,6 +108,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   instability: drawn(runInstability),
   actionability: drawn(runActionability),
   drivernegative: drawn(runDrivernegative),
+  organotropism: drawn(runOrganotropism),
 };
 
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */

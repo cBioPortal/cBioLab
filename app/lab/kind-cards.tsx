@@ -101,6 +101,9 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   ctdna: { label: "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)", title: "ctDNA vs tissue", genes: true, maxCohorts: 3 },
   riskmodel: { label: "Risk model (elastic-net Cox, OncoCast-style)", title: "Risk model", maxCohorts: 1 },
   drivernegative: { label: "Driver-negative analysis (genes enriched without a canonical driver)", title: "Driver-negative analysis", maxCohorts: 1 },
+  organotropism: { label: "Metastatic organotropism (genes × metastatic sites, within cancer types)", title: "Metastatic organotropism", maxCohorts: 1, cohortInHeader: true,
+    why: (k) => k.attrs.some((a) => /^DMETS_DX_|^METASTATIC_SITE$/i.test(a.attribute)) || k.events.some((e) => /diagnosis/i.test(e.canonical)) ? null
+      : "this study records no metastatic sites (per-organ DMETS_DX_ flags, METASTATIC_SITE, or tumour sites on a Diagnosis timeline)" },
   actionability: { label: "Clinical actionability (OncoKB levels, primary vs metastasis)", title: "Clinical actionability", maxCohorts: 4 },
   adjusted: { label: "Adjusted enrichment (every gene, logistic on covariates)", title: "Adjusted enrichment", maxCohorts: 2, minCohorts: 2 },
   forest: { label: "Pan-cancer forest (one exposure's HR per cancer type, random-effects pooled)", title: "Forest plot", maxCohorts: 6 },
@@ -219,6 +222,9 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     (spec.validateOn ? ", scored on “" + spec.validateOn + "”" : "");
   if (kind === "drivernegative") return (spec.alteration === "sv" ? "structural variants" : spec.alteration === "cna" ? "copy-number alterations" : "mutations") +
     " without vs with a driver in " + (spec.drivers?.length ? spec.drivers.length + " genes" : "the NSCLC set") + ", per patient";
+  if (kind === "organotropism") return (spec.measure === "any" ? "" : "driver ") + (spec.alteration || "mutation") + "s in " +
+    (spec.genes?.length ? spec.genes.length + " genes" : "the " + (spec.top ?? 12) + " most altered genes") + " × metastatic sites from " + (spec.source && spec.source !== "auto" ? spec.source : "the study's site source") +
+    (spec.stratifyBy === null ? ", unstratified" : ", within " + (spec.stratifyBy || "CANCER_TYPE"));
   if (kind === "actionability") return "highest OncoKB level per patient, any cancer type" + (spec.groupBy ? " · by " + spec.groupBy : "") +
     (spec.pairBy === null ? "" : " · " + (spec.pairBy?.attribute || "SAMPLE_TYPE") + " concordance");
   if (kind === "adjusted") return "mutations in every gene mutated in ≥" + (100 * (spec.minShare ?? 0.05)).toFixed(0) + "% · adjusted for " + (spec.covariates?.length ? spec.covariates.join(", ") : "nothing");
@@ -559,6 +565,39 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
             label genes kept in ≥ <OptionSelect value={String(labelAbove)} disabled={busy} onValueChange={(v) => patch({ labelAbove: Number(v) === RISK_LABEL_ABOVE ? undefined : Number(v) })}>
               {!RISK_LABEL_STEPS.includes(labelAbove) && <option value={labelAbove}>{Math.round(labelAbove * 100)}%</option>}
               {RISK_LABEL_STEPS.map((t) => <option key={t} value={t}>{Math.round(t * 100)}%</option>)}
+            </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
+  if (spec.kind === "organotropism") {
+    const genes: string[] = Array.isArray(spec.genes) ? spec.genes : [];
+    const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
+    const strat = spec.stratifyBy === null ? "" : spec.stratifyBy || "CANCER_TYPE";
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="where the metastatic sites come from: per-organ DMETS_DX_ flags, tumour sites on the timeline, or the biopsy site of metastasis samples">
+            sites <OptionSelect value={spec.source || "auto"} disabled={busy} onValueChange={(v) => patch({ source: v === "auto" ? undefined : v })}>
+              <option value="auto">auto</option><option value="flags">per-organ flags</option><option value="timeline">timeline</option><option value="sample">biopsy site</option>
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="genes, comma-separated (at most 20); empty for the most altered">
+            genes <DraftInput value={genes.join(", ")} disabled={busy} width="14rem" placeholder={"top " + (spec.top ?? 12) + " altered"}
+              onCommit={(t) => { const l = t.split(/[,\s]+/).map((x) => x.trim().toUpperCase()).filter(Boolean); patch({ genes: l.length ? l : undefined }); }} />
+          </label>
+          <label className="tbfield" title="count every alteration, or only OncoKB drivers">
+            count <OptionSelect value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onValueChange={(v) => patch({ measure: v === "any" ? "any" : undefined })}>
+              <option value="driver">drivers</option><option value="any">any</option>
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="the covariate the 2×2 tables are stratified by (Cochran–Mantel–Haenszel)">
+            within <OptionSelect value={strat} disabled={busy} onValueChange={(v) => patch({ stratifyBy: v === "" ? null : v === "CANCER_TYPE" ? undefined : v })}>
+              <option value="">no strata</option>
+              {!cats.includes("CANCER_TYPE") && <option value="CANCER_TYPE">CANCER_TYPE</option>}
+              {strat && !cats.includes(strat) && strat !== "CANCER_TYPE" && <option value={strat}>{strat}</option>}
+              {cats.map((a) => <option key={a} value={a}>{a}</option>)}
             </OptionSelect>
           </label>
         </div>
@@ -1132,6 +1171,7 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "adjusted") return { kind };
   if (kind === "actionability") return { kind, groupBy: "CANCER_TYPE" };
   if (kind === "drivernegative") return { kind };
+  if (kind === "organotropism") return { kind };
   if (kind === "forest") return { kind, exposure: { source: "alteration", gene: known.genes[0] || "TP53" } };
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));

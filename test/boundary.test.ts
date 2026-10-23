@@ -440,6 +440,15 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "dnegAlteredSql": () => federation.dnegAlteredSql(cohortSql, "x", "db", "v7.5", ["EGFR", "KRAS"], "mutation", false),
     "dnegAlteredSql:sv-drivers": () => federation.dnegAlteredSql(cohortSql, "x", "db", "v7.5", ["EGFR"], "sv", true),
     "dnegProfiledSql": () => federation.dnegProfiledSql(cohortSql, "x", "db", "v7.5", ["EGFR", "KRAS"], "mutation"),
+    // organotropism: per-patient sites, panels and alterations stay in CTEs; the outer SELECTs count
+    "orgSourcesSql": () => federation.orgSourcesSql(cohortSql, "x", "db", { prefix: "DMETS_DX_", eventType: "Diagnosis", key: "TUMOR_SITE", attribute: "METASTATIC_SITE" }),
+    "orgSitesSql:flags": () => federation.orgSitesSql(cohortSql, "x", "db", { kind: "flags", prefix: "DMETS_DX_" }),
+    "orgSitesSql:timeline": () => federation.orgSitesSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }),
+    "orgSitesSql:sample": () => federation.orgSitesSql(cohortSql, "x", "db", { kind: "sample", attribute: "METASTATIC_SITE" }),
+    "orgOtherValuesSql": () => federation.orgOtherValuesSql(cohortSql, "x", "db", "METASTATIC_SITE"),
+    "orgTopGenesSql": () => federation.orgTopGenesSql(cohortSql, "x", "db", { alteration: "mutation", driverPin: "v7.5" }, 12),
+    "orgCountsSql": () => federation.orgCountsSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }, { genes: ["EGFR", "TP53"], alteration: "mutation", driverPin: null }, "CANCER_TYPE"),
+    "orgIncidenceSql": () => federation.orgIncidenceSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }, { genes: ["EGFR"], alteration: "mutation", driverPin: "v7.5" }, true, "CNS/Brain"),
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),
     // run only by PatientLevelResolver.viewRows: one row of values per patient, no identifier
     "cutpointRowsSql": () => federation.cutpointRowsSql(cohortSql, "x", "db", { attribute: "TMB_NONSYNONYMOUS", months: "OS_MONTHS", status: "OS_STATUS" }),

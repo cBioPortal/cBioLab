@@ -160,6 +160,12 @@
     "Driver-negative lung cancer: what is mutated when no canonical driver is": {
       "NSCLC": 7809
     },
+    "Metastatic organotropism: which mutations go with spread to which organ (MSK-MET)": {
+      "all patients": 25775
+    },
+    "Brain metastasis in lung cancer by EGFR, from dated tumour sites": {
+      "NSCLC": 7809
+    },
     "splitBy: one cohort, auto-split into an arm per receptor subtype": {
       "all patients": 1756
     },

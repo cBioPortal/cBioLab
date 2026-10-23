@@ -1,6 +1,7 @@
 // A Kaplan–Meier panel several figures draw: step curves, one per group, the number still at risk
 // under each tick, and a legend with each group's detail. Positioned at (0, y0) and `W` wide;
-// returns its drawing and height, so a figure stacks it with its own parts.
+// returns its drawing and height, so a figure stacks it with its own parts. `origin` is where the
+// curves start at time 0: 1 for survival, 0 for a cumulative incidence drawn on the same panel.
 import type { KmPoint } from "../types.ts";
 import { stepPath, r1 } from "../chart/marks.ts";
 import { plotHeight, type Pal } from "./common.ts";
@@ -18,7 +19,7 @@ export interface KmPanelCurve {
 }
 
 /** `shadeTo`: the area under each curve from 0 to that time is shaded (a restricted mean), with a rule at it */
-export function kmPanel(curves: KmPanelCurve[], o: { y0: number; W: number; p: Pal; xTitle: string; yTitle?: string; tMax?: number; title?: string; shadeTo?: number }):
+export function kmPanel(curves: KmPanelCurve[], o: { y0: number; W: number; p: Pal; xTitle: string; yTitle?: string; tMax?: number; title?: string; shadeTo?: number; origin?: number }):
   { svg: string; height: number } {
   const { y0, W, p } = o;
   const out: string[] = [];
@@ -50,7 +51,7 @@ export function kmPanel(curves: KmPanelCurve[], o: { y0: number; W: number; p: P
   }
   curves.forEach((c, i) => {
     const st = seriesStyle(i);
-    out.push(`<path d="${stepPath(c.points.filter((q) => q.t <= tMax), xs, ys, { t: 0, s: 1 }, tMax)}" fill="none" stroke="${st.color}" stroke-width="${SW.series}"` +
+    out.push(`<path d="${stepPath(c.points.filter((q) => q.t <= tMax), xs, ys, { t: 0, s: o.origin ?? 1 }, tMax)}" fill="none" stroke="${st.color}" stroke-width="${SW.series}"` +
       (st.dash ? ` stroke-dasharray="${st.dash}"` : "") + ` stroke-linejoin="round"/>`);
   });
   let y = T + PLOT + bottomAxisHeight(o.xTitle) + 10;
