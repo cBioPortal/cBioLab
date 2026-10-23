@@ -32,6 +32,23 @@ import { runTable } from "./table.ts";
 import { runMutations } from "./mutations.ts";
 import { runAlterations } from "./alterations.ts";
 import { runTimeline } from "./timeline.ts";
+import { runAcquired } from "./acquired.ts";
+import { runCtdna } from "./ctdna.ts";
+import { runExclusivity } from "./exclusivity.ts";
+import { runTxendpoints } from "./txendpoints.ts";
+import { runMultistate } from "./multistate.ts";
+import { runRmst } from "./rmst.ts";
+import { runPredictive } from "./predictive.ts";
+import { runCutpoint } from "./cutpoint.ts";
+import { runHla } from "./hla.ts";
+import { runForest } from "./forest.ts";
+import { runAdjusted } from "./adjusted.ts";
+import { runInstability } from "./instability.ts";
+import { runActionability } from "./actionability.ts";
+import { runDrivernegative } from "./drivernegative.ts";
+import { runOrganotropism } from "./organotropism.ts";
+import { runMolsubtype } from "./molsubtype.ts";
+import { runGermline } from "./germline.ts";
 
 /**
  * A runner that lets a throw stand for its error: an error is reported as the view's, with its
@@ -79,6 +96,23 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   mutations: drawn(runMutations),
   alterations: drawn(runAlterations),
   timeline: drawn(runTimeline),
+  acquired: drawn(runAcquired),
+  ctdna: drawn(runCtdna),
+  exclusivity: drawn(runExclusivity),
+  txendpoints: drawn(runTxendpoints),
+  multistate: drawn(runMultistate),
+  rmst: drawn(runRmst),
+  predictive: drawn(runPredictive),
+  cutpoint: drawn(runCutpoint),
+  hla: drawn(runHla),
+  forest: drawn(runForest),
+  adjusted: drawn(runAdjusted),
+  instability: drawn(runInstability),
+  actionability: drawn(runActionability),
+  drivernegative: drawn(runDrivernegative),
+  organotropism: drawn(runOrganotropism),
+  molsubtype: drawn(runMolsubtype),
+  germline: drawn(runGermline),
 };
 
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */

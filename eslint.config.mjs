@@ -17,7 +17,7 @@ import path from "node:path";
 // another. What two kinds need goes into a shared module, added here.
 const SHARED_VIEW_MODULES = {
   "lib/views": ["run", "shared", "rows", "covariates"],
-  "lib/figures": ["common", "volcano", "bars", "forest"],
+  "lib/figures": ["common", "volcano", "bars", "forest", "km"],
 };
 const kindBoundary = {
   meta: { type: "problem", schema: [] },

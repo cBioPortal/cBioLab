@@ -685,6 +685,8 @@ async function main() {
         })).toString("base64url"));
         await page.waitForSelector("canvas", { timeout: 300000 });
         await page.waitForTimeout(1500);
+        await page.locator("canvas").first().evaluate((el) => el.scrollIntoView({ block: "start" }));
+        await page.waitForTimeout(300);
         const box = await page.locator("canvas").first().boundingBox();
         const y = box.y + 40;
         await page.mouse.move(box.x + 400, y);
@@ -728,6 +730,9 @@ async function main() {
         })).toString("base64url"));
         await page.waitForSelector("canvas", { timeout: 300000 });
         await page.waitForTimeout(2500);
+        // the label gutter must be on screen for a hover to land: the add-view panel above it grows with every view kind
+        await page.locator("canvas").first().evaluate((el) => el.scrollIntoView({ block: "start" }));
+        await page.waitForTimeout(300);
         const box = await page.locator("canvas").first().boundingBox();
         // clinical rows (# Samples per Patient, Profiled for ...) sit above the genes, as in the
         // portal, so walk the gutter labels down (header 22px, rows 20 + 3px) to the merged row's

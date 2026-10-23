@@ -18,6 +18,23 @@ import { enrichmentSvg } from "./enrichment.ts";
 import { assaysSvg } from "./assays.ts";
 import { compositionSvg } from "./composition.ts";
 import { correlatesSvg } from "./correlates.ts";
+import { acquiredSvg } from "./acquired.ts";
+import { ctdnaSvg } from "./ctdna.ts";
+import { exclusivitySvg } from "./exclusivity.ts";
+import { txendpointsSvg } from "./txendpoints.ts";
+import { multistateSvg } from "./multistate.ts";
+import { rmstSvg } from "./rmst.ts";
+import { predictiveSvg } from "./predictive.ts";
+import { cutpointSvg } from "./cutpoint.ts";
+import { hlaSvg } from "./hla.ts";
+import { metaForestSvg } from "./forest.ts";
+import { adjustedSvg } from "./adjusted.ts";
+import { instabilitySvg } from "./instability.ts";
+import { actionabilitySvg } from "./actionability.ts";
+import { drivernegativeSvg } from "./drivernegative.ts";
+import { organotropismSvg } from "./organotropism.ts";
+import { molsubtypeSvg } from "./molsubtype.ts";
+import { germlineSvg } from "./germline.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -80,9 +97,77 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
     draw: (v, o) => v.composition && v.composition.groups.some((g) => g.n > 0) ? compositionSvg(v, o) : null,
     title: (v) => "Composition" + (v.composition ? " — " + v.composition.sourceName : "")
   },
+  forest: {
+    draw: (v, o) => v.forest.rows.length ? metaForestSvg(v, o) : null,
+    title: (v) => "Forest plot" + (v.forest ? " — " + v.forest.exposedLabel + " by " + v.forest.strata + ", " + v.forest.endpoint : "")
+  },
+  adjusted: {
+    draw: (v, o) => v.adjusted.rows.length ? adjustedSvg(v, o) : null,
+    title: (v) => "Adjusted enrichment" + (v.adjusted ? " — " + v.adjusted.groups.join(" vs ") + (v.adjusted.covariates.length ? ", adjusted for " + v.adjusted.covariates.join(", ") : "") : "")
+  },
+  actionability: {
+    draw: (v, o) => v.actionability.panels.some((pn) => pn.sequenced) ? actionabilitySvg(v, o) : null,
+    title: (v) => "Clinical actionability" + (v.actionability ? " — OncoKB " + v.actionability.pin + (v.actionability.groupBy ? " by " + v.actionability.groupBy : "") : "")
+  },
+  drivernegative: {
+    draw: (v, o) => v.drivernegative.sequenced ? drivernegativeSvg(v, o) : null,
+    title: (v) => "Driver-negative analysis" + (v.drivernegative ? " — " + v.drivernegative.alteration + ", driver-negative vs driver-positive" : "")
+  },
+  organotropism: {
+    draw: (v, o) => v.organotropism.sites.length && v.organotropism.genes.length ? organotropismSvg(v, o) : null,
+    title: (v) => "Organotropism" + (v.organotropism ? " — " + v.organotropism.genes.length + " genes × " + v.organotropism.sites.length + " sites, " + v.organotropism.source : "")
+  },
+  molsubtype: {
+    draw: (v, o) => v.molsubtype.panels.some((pn) => pn.classified) ? molsubtypeSvg(v, o) : null,
+    title: (v) => "Molecular subtypes" + (v.molsubtype ? " — " + v.molsubtype.classifier + (v.molsubtype.by ? " by " + v.molsubtype.by : "") : "")
+  },
+  germline: {
+    draw: (v, o) => v.germline.panels.some((pn) => pn.genes.some((g) => g.sequenced)) ? germlineSvg(v, o) : null,
+    title: (v) => "Germline carriers and second hits" + (v.germline ? " — " + v.germline.genes.length + " genes" : "")
+  },
   correlates: {
     draw: (v, o) => v.correlates && v.correlates.tested > 0 ? correlatesSvg(v, o) : null,
     title: (v) => "Co-expression" + (v.correlates ? " — " + v.correlates.gene + " against every gene" : "")
+  },
+  acquired: {
+    draw: (v, o) => v.acquired && v.acquired.panels.some((pn) => pn.patients && pn.genes.length) ? acquiredSvg(v, o) : null,
+    title: (v) => "Acquired under therapy" + (v.acquired ? " — samples before and after " + v.acquired.anchoredTo : "")
+  },
+  ctdna: {
+    draw: (v, o) => v.ctdna && v.ctdna.panels.some((pn) => pn.patients) ? ctdnaSvg(v, o) : null,
+    title: () => "ctDNA vs tissue"
+  },
+  exclusivity: {
+    draw: (v, o) => v.exclusivity && v.exclusivity.pairs.length ? exclusivitySvg(v, o) : null,
+    title: (v) => "Mutual exclusivity (DISCOVER)" + (v.exclusivity ? " — " + v.exclusivity.cohort : "")
+  },
+  hla: {
+    draw: (v, o) => v.hla.panels.some((pn) => pn.typed || pn.lohEvaluated) ? hlaSvg(v, o) : null,
+    title: (v) => "HLA class I genotype and " + (v.hla ? v.hla.endpoint : "OS")
+  },
+  cutpoint: {
+    draw: (v, o) => v.cutpoint.candidates.length ? cutpointSvg(v, o) : null,
+    title: (v) => "Cut-point" + (v.cutpoint ? " — " + v.cutpoint.attribute + " on " + v.cutpoint.endpoint : "")
+  },
+  predictive: {
+    draw: (v, o) => v.predictive.genes.length ? predictiveSvg(v, o) : null,
+    title: (v) => "Predictive biomarkers" + (v.predictive ? " — gene × " + v.predictive.exposure : "")
+  },
+  rmst: {
+    draw: (v, o) => v.rmst.panels.some((pn) => pn.curves.some((c) => c.n)) ? rmstSvg(v, o) : null,
+    title: (v) => "Restricted mean survival time" + (v.rmst ? " — " + v.rmst.endpointLabel : "")
+  },
+  multistate: {
+    draw: (v, o) => v.multistate.cohorts.some((c) => c.n) ? multistateSvg(v, o) : null,
+    title: () => "Multistate model — progression and death"
+  },
+  txendpoints: {
+    draw: (v, o) => v.txendpoints.curves.some((c) => c.n) ? txendpointsSvg(v, o) : null,
+    title: (v) => "Treatment endpoints" + (v.txendpoints ? " — " + v.txendpoints.endpointLabel + " from " + v.txendpoints.anchoredTo : "")
+  },
+  instability: {
+    draw: (v, o) => v.instability && v.instability.panels.some((pn) => pn.score.some((n) => n > 0)) ? instabilitySvg(v, o) : null,
+    title: () => "Genomic instability — aneuploidy score and FGA"
   },
 };
 

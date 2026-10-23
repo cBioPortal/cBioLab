@@ -6,7 +6,7 @@ import { isPatientLevel, type EndpointColumns } from "../federation.ts";
 import { validateAxis, type AxisKind } from "../plot.ts";
 import { coxMethod, type CoxTrace } from "../method.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
-import { overLimit, studyCatalogs } from "./shared.ts";
+import { overLimit, studyCatalogs, ATTR_NAME } from "./shared.ts";
 import { buildCoxColumns, notProfiledNote } from "./covariates.ts";
 import { resolveProfileAxis } from "../plot-profile.ts";
 
@@ -25,9 +25,9 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
   let endpointColumns: EndpointColumns | undefined;
   if (cx.monthsAttribute != null || cx.statusAttribute != null) {
     const monthsAttr = String(cx.monthsAttribute || "").trim(), statusAttr = String(cx.statusAttribute || "").trim();
-    if (!/^[A-Za-z0-9_]{1,64}$/.test(monthsAttr) || !/^[A-Za-z0-9_]{1,64}$/.test(statusAttr)) {
+    if (!ATTR_NAME.test(monthsAttr) || !ATTR_NAME.test(statusAttr)) {
       return untimed({ kind: "cox", endpoint,
-        error: "monthsAttribute and statusAttribute must both be given as valid attribute names (letters, digits, underscore, ≤64 chars): got '" +
+        error: "monthsAttribute and statusAttribute must both be given as valid attribute names (a study attribute, or an uploaded column as custom:<dataset>/<COLUMN>): got '" +
           monthsAttr.slice(0, 40) + "'/'" + statusAttr.slice(0, 40) + "'" });
     }
     endpointColumns = { months: monthsAttr, status: statusAttr };

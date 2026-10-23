@@ -121,7 +121,75 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
   },
   riskmodel: {
     title: "What is this?",
-    text: "A model that predicts survival from which genes are mutated in each patient, in the style of the OncoCast package. It is trained many times, each time on two thirds of the patients and tested on the other third, so every patient's risk score comes from a model that never saw them. Patients are then split into low, intermediate and high risk, and their survival curves are drawn. The list shows the genes the model relied on most, with a hazard ratio above 1 meaning higher risk. Tick \"validate\" to train on one half of the patients and grade the model on the other half, which it never saw."
+    text: "A model that predicts survival from which genes are mutated in each patient, in the style of the OncoCast package. It is trained many times, each time on two thirds of the patients and tested on the other third, so every patient's risk score comes from a model that never saw them. Patients are then split into low, intermediate and high risk, and their survival curves are drawn. The list shows the genes the model relied on most, with a hazard ratio above 1 meaning higher risk. Tick \"validate\" to train on one half of the patients and grade the model on the other half, which it never saw, or name another group of patients under \"validate on\" to grade it there — for example patients from a different study — with the same risk-group boundaries."
+  },
+  acquired: {
+    title: "What is this?",
+    text: "For patients who had a tumour sample tested before a treatment started and another one afterwards, shows gene by gene how many had a change only in the later sample (acquired, to the right) or only in the earlier one (lost, to the left). Genes that keep turning up only after treatment can point to how tumours resist it. It cannot say the treatment caused the change: second biopsies are usually taken when the cancer grows again, and a change can simply have been missed the first time."
+  },
+  ctdna: {
+    title: "What is this?",
+    text: "Tumours shed DNA into the blood, and a blood test (a \"liquid biopsy\") can read it. For patients who had both a blood sample and a tumour tissue sample tested, this shows gene by gene how often a change was found in both, only in the tissue, or only in the blood — and how often the blood test caught what the tissue showed. Below, it shows how many patients had tumour DNA detected in their blood at all, and whether those patients lived shorter or longer than those without it. With the clonal-haematopoiesis filter on, changes that probably come from ageing blood cells rather than the tumour — in genes such as DNMT3A and TET2, or also found in the patient's white blood cells — are left out first, and the figure says how many were removed and what the numbers were without the filter."
+  },
+  exclusivity: {
+    title: "What is this?",
+    text: "Asks, for each pair of genes, whether tumours carry changes in both more or less often than chance — \"mutually exclusive\" genes are rarely changed together, which can mean either change alone is enough to drive the cancer. Its sense of \"chance\" accounts for how many changes each tumour has overall: a tumour with hundreds of changes is expected to share genes with many others, so it does not make two genes look linked just because they both turn up in heavily altered tumours. Beside it is the simpler test that ignores this, to show the difference."
+  },
+  hla: {
+    title: "What is this?",
+    text: "HLA class I molecules (HLA-A, -B and -C) show pieces of a tumour's proteins to the immune system. Everyone inherits two copies of each; a person who inherited two identical copies at a gene (homozygous) shows a narrower range of pieces, and a tumour can also lose one copy (HLA loss of heterozygosity) to hide. This shows how common each is in a cohort, and whether patients homozygous at any of the three genes, or whose tumour lost a copy, lived shorter or longer. In patients treated with immunotherapy, homozygosity has been linked to worse survival; in a cohort not limited to them the comparison describes prognosis, not response to treatment."
+  },
+  cutpoint: {
+    title: "What is this?",
+    text: "Looks for the value of a measurement — such as tumour mutational burden — that best splits patients into a group that did better and a group that did worse. It tries every reasonable dividing line (from the lowest tenth of patients to the highest) and draws how strongly each one separates survival; the dot marks the best. Because trying many lines and keeping the best always finds something, the view also reshuffles the measurement among the patients a thousand times to see how good a 'best line' chance alone produces, and reports how surprising the real best line is once that search is accounted for. A line found this way needs checking in other patients before anyone relies on it."
+  },
+  predictive: {
+    title: "What is this?",
+    text: "Asks, gene by gene, whether a mutation changes how patients do on a particular treatment — not just whether it marks a better or worse outlook in general. For each gene it compares patients with and without the mutation twice: among those who received the treatment (upper marker) and among those who did not (lower marker). A gene whose markers sit far apart — say, much worse with the mutation only among the treated — may predict who benefits from that treatment; the right-hand column tests that difference. Treatment here was not assigned at random, and patients had to live long enough to receive it, so a finding is a lead to test properly, not proof."
+  },
+  rmst: {
+    title: "What is this?",
+    text: "Answers “how many months, on average, did patients in each group live within the first τ months?” — the shaded area under each survival curve up to τ. The difference between two groups is the months gained or lost in that window, which reads plainly even when the curves cross or only separate late (as with immunotherapy), where a single hazard ratio can mislead. τ is where every group still has at least ten patients followed, unless it is set. Landmark panels ask the same question again among the patients still alive and followed at 6 or 12 months, restarting the clock there. The groups were not randomised, so a difference is a clue, not proof."
+  },
+  multistate: {
+    title: "What is this?",
+    text: "Follows each patient through three states — alive without progression, alive after their cancer was first recorded as growing, and dead — from the start of their record (in MSK-CHORD, their first tumour sequencing). The coloured bands show, month by month, what share of each group is in each state; the lines below show how fast patients move along each of the three paths (progressing, dying without progressing, dying after progressing), and the table gives each path's rate and how much faster or slower each group moves along it than the first. Splitting death into 'after progression' and 'without it' shows where a group's worse survival comes from. Progression is read from radiology reports by a model, so it is only seen in patients who were scanned; the groups were not randomised, so a difference is a clue, not proof."
+  },
+  txendpoints: {
+    title: "What is this?",
+    text: "Starts each patient's clock on the day a treatment began — for example their first immunotherapy — and follows them to an outcome that real-world studies use in place of a trial's: when they moved on to their next treatment (time to next treatment), when they stopped this one (time on treatment), or when their cancer was recorded as growing (real-world progression-free survival). Death counts as the outcome too, and patients still followed without it are counted up to their last visit. Each group's curve shows the share not yet there at each month, with the number still followed below. The groups were not randomised to the treatment, so a gap between curves is a clue, not proof that a gene or a group changes how well the treatment works."
+  },
+  forest: {
+    title: "What is this?",
+    text: "Asks whether one thing — a gene being mutated, a high tumour mutation burden — goes with shorter or longer survival, separately in each cancer type, and then combines those answers. Each row is one cancer type: its square is the hazard ratio (right of the dashed line at 1 means patients with the change died sooner; left means they lived longer) and its line how sure we can be. The diamonds at the bottom combine the rows into one overall estimate. When the rows disagree a lot (a high I²), the overall estimate is an average of different effects, so read the rows. This shows an association, not a cause."
+  },
+  adjusted: {
+    title: "What is this?",
+    text: "Compares how often each commonly mutated gene is mutated in two groups of patients — say, colorectal cancers diagnosed before and after age 50 — after taking into account other things that differ between the groups and also change mutation rates, such as how many mutations a tumour carries overall. Each dot is a gene: right of centre means more often mutated in the first group, left in the second, and higher means more certain. The table shows each gene's raw difference beside the adjusted one, so you can see which differences were explained away. A difference here is a clue, not proof of a cause."
+  },
+  instability: {
+    title: "What is this?",
+    text: "Cancer cells often gain or lose whole chromosome arms, and how much of a tumour's genome is out of balance is a measure of how unstable it is. For each group of tumours, this shows how many chromosome arms are typically gained or lost (the \"aneuploidy score\") and what share of the genome is altered, then which arms are gained (red) or lost (blue) most often — patterns that differ by cancer type, such as chromosome 20q gained and 18q lost in colorectal cancer."
+  },
+  actionability: {
+    title: "What is this?",
+    text: "For each patient, finds the strongest evidence OncoKB lists for a drug that targets one of their tumour's genetic changes — Level 1 means an FDA-approved drug for that change, down to Level 4 for early biological evidence — and shows what share of patients reach each level, overall or per cancer type. The levels here are the best OncoKB gives the change in ANY cancer, so a change that is only actionable in another cancer still counts: read the bars as an upper bound. The table below compares, for patients sequenced twice, the level found in their primary tumour against their metastasis."
+  },
+  germline: {
+    title: "What is this?",
+    text: "Some people are born with a faulty copy of a cancer gene such as BRCA2 in every cell. For each such gene this counts those patients (carriers) among everyone whose tumour was sequenced for it, and asks whether their tumour knocked out the remaining good copy — a second hit — by a further mutation or by deleting the gene, compared with how often the same gene is hit in patients born without a faulty copy. The commonest second hit, losing the good copy outright (loss of heterozygosity), needs data this view does not read, so the second-hit share is a minimum. Optionally the curves compare survival of carriers and non-carriers for one gene."
+  },
+  molsubtype: {
+    title: "What is this?",
+    text: "Sorts each patient's endometrial cancer into the four molecular groups doctors now use alongside the microscope: POLE-ultramutated (a tumour with a broken DNA-copying enzyme, which does very well), mismatch-repair deficient (a tumour that cannot fix certain DNA errors, read here from its MSI test), p53-abnormal (the group that does worst), and no specific molecular profile. The groups are assigned in that order, as the WHO guideline does. Patients whose test could not tell — no MSI result, or a gene panel that missed POLE or TP53 — are counted as not classifiable rather than guessed. The bars show each group's share, overall and by the attribute you pick; the curves show survival in each group."
+  },
+  organotropism: {
+    title: "What is this?",
+    text: "Asks, for each organ a cancer spread to — brain, liver, bone and the rest — whether patients whose tumour carries a change in a given gene spread there more or less often than patients whose tumour does not, comparing patients within the same cancer type. Red squares mean the gene's change goes with spread to that organ, blue that it goes with spreading there less; outlined squares are the ones unlikely to be chance after testing many pairs. Where the study dates each site, the curve below shows how quickly patients with and without one gene's change develop spread to one organ, counting deaths as a separate outcome. Sites are only known where scans or biopsies found them."
+  },
+  drivernegative: {
+    title: "What is this?",
+    text: "Splits one group of patients — say, lung cancers — into those whose tumour carries one of the well-known, usually treatable cancer-driving changes (EGFR, KRAS, ALK and the rest of the list) and those whose tumour carries none, and then asks which other genes are changed more often in the second group. Those genes are candidates for what drives the tumours without a known driver. Patients whose test did not cover every gene on the list are kept apart, since we cannot tell whether they have a driver. The bar shows how big each group is; in the chart, genes to the right are more common without a known driver."
   },
   labs: {
     title: "What is this?",

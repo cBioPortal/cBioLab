@@ -16,6 +16,7 @@ import type { ViewRun } from "./run.ts";
 import { overLimit, refuse } from "./shared.ts";
 import { RISK_LABEL_ABOVE, RISK_FIGURE_GENES, riskGroupNames } from "../figures/riskmodel.ts";
 import { tableAttributesSql } from "../clinical-table.ts";
+import { riskExternal } from "./riskmodel-validate.ts";
 import { buildTable1, table1DefaultCandidates, TABLE1_MAX_ATTRIBUTES, TABLE1_MAX_GENES, type Table1Patient } from "./riskmodel-table1.ts";
 
 const RISK_MAX_RUNS = 100;
@@ -43,13 +44,13 @@ export interface RiskFitSpec {
 }
 
 /**
- * The view's settings that decide only how its groups are cut, drawn and described (Table 1), never the model: the one
+ * The view's settings that decide only how its groups are cut, drawn and described (Table 1, the external validation), never the model: the one
  * list a setting must be on to be left out of the fit's cache key. Everything else in the view —
  * including any setting added later — is in the key, so a setting nobody thought about costs at
  * worst a needless refit, never a fit served for a different model. A setting goes here only if
  * riskFitSpec does not read it (test/riskmodel-groups.test.ts checks each one).
  */
-export const RISK_PRESENTATION_KEYS = ["groups", "cuts", "labelAbove", "note", "cohorts", "describe"] as const;
+export const RISK_PRESENTATION_KEYS = ["groups", "cuts", "labelAbove", "note", "cohorts", "describe", "validateOn"] as const;
 
 /** The view without its presentation settings, keys sorted: the part of the fit's key the view gives. */
 export function riskModelView(view: RiskmodelView): RiskmodelView {
@@ -149,7 +150,7 @@ export function keepRiskRows(rows: Record<string, unknown>[], s: Pick<RiskFitSpe
 
 /** Fetch the cohort's rows and fit the ensemble. Throws RiskRefusal when the data cannot support a model. */
 /** the resolver a fit reads through: a patient-level participant (viewRows) with view aggregates (viewMeta) */
-type RiskResolver = PatientLevelCapable & ViewAggregateCapable;
+export type RiskResolver = PatientLevelCapable & ViewAggregateCapable;
 
 export async function fitRiskmodel(r: RiskResolver, args: RiskFitArgs): Promise<RiskFit> {
   const s = riskFitSpec(args.view, args.compile.oncokbPin);
@@ -214,7 +215,7 @@ export async function fitRiskmodel(r: RiskResolver, args: RiskFitArgs): Promise<
  * The fit's two queries — and Table 1's, which are the same with its attributes added — through the
  * patient-level resolver alone (test/boundary.test.ts sweeps their SQL).
  */
-function riskViewRows(r: RiskResolver, args: RiskFitArgs, table1?: { describe: string[] }) {
+export function riskViewRows(r: RiskResolver, args: RiskFitArgs, table1?: { describe: string[] }) {
   const s = riskFitSpec(args.view, args.compile.oncokbPin);
   return Promise.all([
     r.viewRows(table1 ? "riskmodel:table1" : "riskmodel:rows", args.def, (c, st, d) => riskmodelRowsSql(c, st, d, { endpoint: s.endpoint, columns: s.columns ?? undefined, strata: s.strata,
@@ -449,6 +450,17 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
     const e = overLimit("Table 1", TABLE1_MAX_ATTRIBUTES, (describe.attributes || []).length) || overLimit("Table 1", TABLE1_MAX_GENES, (describe.genes || []).length);
     if (e) return refuse("riskmodel", ctx, e.replace("at most " + TABLE1_MAX_ATTRIBUTES, "at most " + TABLE1_MAX_ATTRIBUTES + ((describe.attributes || []).length > TABLE1_MAX_ATTRIBUTES ? " attributes" : " genes")));
   }
+  const validateOn = view.validateOn == null ? null : String(view.validateOn);
+  let vStudy: string | null = null;
+  if (validateOn != null) {
+    if (!Object.hasOwn(cohorts, validateOn)) return refuse("riskmodel", ctx, "validateOn names a cohort of this document; “" + validateOn.slice(0, 60) + "” is not one (it has " + Object.keys(cohorts).map((c) => "“" + c + "”").join(", ") + ")");
+    if (validateOn === name) return refuse("riskmodel", ctx, "validateOn must name a different cohort from the one the model is fitted on");
+    if (cohorts[validateOn].studies.length !== 1) return refuse("riskmodel", ctx, "a validation cohort is scored within one study; “" + validateOn + "” spans " + cohorts[validateOn].studies.length);
+    vStudy = cohorts[validateOn].studies[0];
+    const rv = ctx.resolvers[vStudy];
+    if (!rv || !isPatientLevel(rv) || !hasViewAggregates(rv)) return refuse("riskmodel", ctx, vStudy + " answers in aggregate only; scoring “" + validateOn + "” needs each patient's rows, which only a patient-level participant returns");
+    if (covNames.length) return refuse("riskmodel", ctx, "validateOn scores the genes alone; a model with covariates cannot be carried to another cohort yet — drop the covariates or validateOn");
+  }
   if (cohorts[name].count * runs > RISK_WORK_LIMIT)
     return refuse("riskmodel", ctx, "a risk model fits at most " + RISK_WORK_LIMIT.toLocaleString("en-US") + " patients × runs in one request; “" + name + "” has " +
       cohorts[name].count.toLocaleString("en-US") + " patients, so at most " + Math.max(1, Math.floor(RISK_WORK_LIMIT / Math.max(1, cohorts[name].count))) + " runs (or narrow the cohort)");
@@ -472,6 +484,18 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
     }
   }
 
+  let ext: Awaited<ReturnType<typeof riskExternal>> | null = null;
+  if (validateOn != null && vStudy) {
+    const rv = ctx.resolvers[vStudy] as typeof r;
+    const vp = await ctx.studyProfiles(vStudy);
+    try { ext = await riskExternal(rv, { ...args, study: vStudy, def: doc.cohorts[validateOn], compile: { oncokbPin: ctx.pin, profiles: vp.profiles, gaProfiles: vp.gaProfiles } }, validateOn, fit, g, seed); }
+    catch (e) {
+      if (!(e instanceof RiskRefusal)) throw e;
+      return { ...refuse("riskmodel", ctx, e.message), queries: [...fit.queries.map((q) => ({ study, ...q })), ...e.queries.map((q) => ({ study: vStudy!, ...q }))] };
+    }
+    ext.external.cohortPatients = cohorts[validateOn].count;
+  }
+
   const cs = [...fit.cIndexRuns].filter((c) => Number.isFinite(c)).sort((x, y) => x - y);
   const pct = (f: number) => cs.length ? cs[Math.min(cs.length - 1, Math.round(f * (cs.length - 1)))] : NaN;
   const result: RiskmodelResult = {
@@ -486,9 +510,10 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
     cIndex: { median: pct(0.5), q1: pct(0.25), q3: pct(0.75), values: fit.cIndexRuns },
     features: fit.features, groups: g.groups, logrank: g.logrank, refit: g.refit, histogram: g.histogram, scale: g.scale, percentiles: g.percentiles, labelAbove, cutsChosen,
     ...(t1 ? { table1: t1.table } : {}),
+    ...(ext ? { external: ext.external } : {}),
   };
   return {
-    kind: "riskmodel", cohorts: vNames, riskmodel: result, queries: [...fit.queries, ...(t1 ? t1.queries : [])].map((q) => ({ study, ...q })),
+    kind: "riskmodel", cohorts: vNames, riskmodel: result, queries: [...[...fit.queries, ...(t1 ? t1.queries : [])].map((q) => ({ study, ...q })), ...(ext ? ext.queries.map((q) => ({ study: vStudy!, ...q })) : [])],
     method: riskmodelMethod({ study, cohort: name, cohortPatients: cohorts[name].count, rowsReturned: fit.rowsReturned, r: result,
       lambdas: RISK_LAMBDAS, folds: RISK_FOLDS, testShare: RISK_TEST_SHARE, table1Histograms: t1 ? t1.histograms : [] }),
     participation: ctx.participationFor([study], true),
@@ -505,6 +530,11 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
       (g.groupsMade < asked ? "Asked for " + asked + " groups, made " + g.groupsMade + ": the scores take only " + g.distinct + " distinct values, and patients with the same score stay in the same group. " : "") +
       (g.distinct < 20 && g.groupsMade === asked ? "The scores take only " + g.distinct + " distinct values, so the groups can be unequal in size: patients with the same score stay together. " : "") +
       (t1 ? "Table 1 describes the patients the curves draw; its rows marked “in the model” (the model's genes and covariates) and “outcome” differ between the groups by construction, so they get no q-value and are left out of the correction. " : "") +
-      "The C-index ignores delayed entry. Seeded (seed " + seed + "): the same document gives the same model.",
+      "The C-index ignores delayed entry. Seeded (seed " + seed + "): the same document gives the same model." +
+      (ext ? " External validation on “" + validateOn + "” (" + vStudy + "): each patient scored with the ensemble's mean coefficients (every gene's coefficient averaged over all " + runs +
+        " runs, zero where a run dropped it) and cut at the training thresholds; " + ext.external.notCovered + " patients on panels missing one of the model's " + ext.external.modelGenes +
+        " weighted genes are left out rather than scored as wild-type. Harrell's C-index (within strata) with a seeded bootstrap interval (" + ext.external.bootstrap + " resamples). " +
+        (vStudy === study ? "Both cohorts are in " + study + ": a patient in both is not removed from the validation, so overlap flatters it. " :
+          "The two studies' baselines, panels and vocabularies are not harmonized, and a patient enrolled in both under different identifiers cannot be removed. ") : ""),
   };
 }

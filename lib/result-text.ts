@@ -5,6 +5,9 @@
 import { isDrawn, type AnalysisDoc, type AnalysisResult, type ViewResult, type AssaysEntity, type CorrelatesGene } from "./types.ts";
 import { lollipopSummaryText } from "./lollipop-svg.ts";
 import { riskSpan } from "./figures/riskmodel.ts";
+import { txMedianText } from "./figures/txendpoints.ts";
+import { MS_TRANSITIONS, msRateText } from "./figures/multistate.ts";
+import { rmstText, rmstDiffText, rmstRatioText } from "./figures/rmst.ts";
 
 /** a timeline's events listed in text (MCP); the figure draws every one */
 const TIMELINE_TEXT_EVENTS = 400;
@@ -99,6 +102,71 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
             `  ${c.label}${c.reference ? " vs " + c.reference : ""}: HR ${c.hr.toFixed(2)} ` +
             `(95% CI ${c.ciLow.toFixed(2)}-${c.ciHigh.toFixed(2)}) p=${pFmt(c.p)}`).join("\n") +
           caveatOf(v));
+    } else if (v.kind === "forest") {
+      const f = v.forest, hr = (x: { hr: number; ciLow: number; ciHigh: number; p: number }) =>
+        `HR ${x.hr.toFixed(2)} (95% CI ${x.ciLow.toFixed(2)}-${x.ciHigh.toFixed(2)}) p=${pFmt(x.p)}`;
+      out.push(`Forest plot: ${f.endpoint} hazard ratio for ${f.exposedLabel} by ${f.strata}` + (f.covariates.length ? `, adjusted for ${f.covariates.join(", ")}` : "") +
+        ` (n=${f.n.toLocaleString()}, ${f.events.toLocaleString()} events):\n` +
+        f.rows.map((r) => `  ${r.label} (n=${r.n.toLocaleString()}, ${r.events} events, ${r.exposed} exposed): ${hr(r)}${f.random ? `, weight ${(100 * r.weight).toFixed(1)}%` : ""}`).join("\n") +
+        (f.random && f.fixed ? `\n  pooled, random effects (DerSimonian–Laird): ${hr(f.random)}\n  pooled, fixed effect: ${hr(f.fixed)}` +
+          `\n  heterogeneity: tau²=${f.tau2.toFixed(3)}, I²=${(100 * f.i2).toFixed(0)}%, Q=${f.q.toFixed(1)} on ${f.qDf} df, p=${pFmt(f.qP)}` : "") +
+        (f.left.length ? `\n  not estimated: ` + f.left.map((l) => `${l.label} (${l.reason})`).join("; ") : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "adjusted") {
+      const a = v.adjusted, pct = (x: number, n: number) => n ? (100 * x / n).toFixed(1) + "%" : "–";
+      out.push(`Adjusted enrichment: ${a.groups[0]} vs ${a.groups[1]}, mutation${a.measure === "driver" ? " (OncoKB drivers)" : ""} per gene by logistic regression` +
+        (a.covariates.length ? ` adjusted for ${a.covariates.join(", ")}` : " (no covariates)") + `; ${a.rows.length} genes fit, ${a.significant} at q<0.05:\n` +
+        a.rows.slice(0, 30).map((g) => `  ${g.gene}: ${a.groups[0]} ${g.altered[0]}/${g.profiled[0]} (${pct(g.altered[0], g.profiled[0])}), ${a.groups[1]} ${g.altered[1]}/${g.profiled[1]} (${pct(g.altered[1], g.profiled[1])}); ` +
+          `raw OR ${g.rawOr == null ? "undefined" : g.rawOr.toFixed(2)} (Fisher p=${pFmt(g.fisherP)}); adjusted OR ${g.or.toFixed(2)} (95% CI ${g.ciLow.toFixed(2)}-${g.ciHigh.toFixed(2)}) p=${pFmt(g.p)} q=${pFmt(g.q)}`).join("\n") +
+        (a.rows.length > 30 ? `\n  … ${a.rows.length - 30} more genes fit` : "") +
+        (a.failed.length ? `\n  not fit: ` + a.failed.map((f) => `${f.gene} (${f.reason})`).join("; ") : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "actionability") {
+      const a = v.actionability, pct = (k: number, d: number) => d ? (100 * k / d).toFixed(1) + "%" : "–";
+      const line = (label: string, g: { sequenced: number; levels: number[]; resistance: number[] }) =>
+        `  ${label} (${g.sequenced.toLocaleString()} sequenced): ` + a.levels.map((l, i) => `${l} ${g.levels[i]} (${pct(g.levels[i], g.sequenced)})`).join(", ") +
+        `; resistance R1 ${g.resistance[0]}, R2 ${g.resistance[1]}`;
+      out.push(`Clinical actionability (highest OncoKB level per patient, ${a.pin}, any cancer type${a.groupBy ? `, by ${a.groupBy}` : ""}):\n` +
+        a.panels.map((pn) => [line(pn.cohort, pn), ...(pn.groups || []).map((g) => line("  " + g.label, g)),
+          ...(pn.concordance ? [`    ${a.pairBy!.a.join("/")} vs ${a.pairBy!.b.join("/")} highest level, ${pn.concordance.pairs} patients with both: ${pn.concordance.discordant} discordant (${pct(pn.concordance.discordant, pn.concordance.pairs)}); rows ${a.pairBy!.a.join("/")}, columns ${a.pairBy!.b.join("/")} (1, 2, 3A, 3B, 4, none): ` +
+            pn.concordance.table.map((r) => "[" + r.join(", ") + "]").join(" ")] : [])].join("\n")).join("\n") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "germline") {
+      const gm = v.germline, pct = (k: number, n: number) => n ? (100 * k / n).toFixed(1) + "%" : "–";
+      out.push(`Germline carriers and somatic second hits (${gm.chosen || gm.genes.length + " genes"}; LOH ${gm.loh}):\n` +
+        gm.panels.map((pn) => `  ${pn.cohort} (${pn.patients.toLocaleString()} patients):\n` + pn.genes.map((g) =>
+          `    ${g.gene}: ${g.carriers}/${g.sequenced} sequenced carry a germline call (${pct(g.carriers, g.sequenced)})${g.outsidePanel ? `, ${g.outsidePanel} more off their panel` : ""}; ` +
+          `second hit in carriers ${g.carrierEither}/${g.carriers} (${pct(g.carrierEither, g.carriers)}: ${g.carrierSomatic} somatic mutation, ${g.carrierDeletion}/${g.carrierCnaProfiled} deep deletion) vs non-carriers ${g.noncarrierEither}/${g.noncarriers} (${pct(g.noncarrierEither, g.noncarriers)})` +
+          (g.p != null ? `, Fisher p=${pFmt(g.p)} q=${pFmt(g.q!)}` : "")).join("\n")).join("\n") +
+        (gm.survival || []).map((s) => `\n  OS by ${s.gene} carrier status, ${s.cohort}: ` + s.curves.map((c) => `${c.group} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : c.median.toFixed(1) + " mo"}`).join("; ") +
+          (s.logrank ? `; log-rank p=${pFmt(s.logrank.p)}` : s.noTest ? "; " + s.noTest : "")).join("") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "molsubtype") {
+      const m = v.molsubtype, pct = (k: number, n: number) => n ? (100 * k / n).toFixed(1) + "%" : "–";
+      const line = (label: string, c: { counts: number[]; classified: number; notClassifiable: number }) =>
+        `  ${label} (${c.classified.toLocaleString()} classified, ${c.notClassifiable.toLocaleString()} not classifiable): ` + m.subtypes.map((s, i) => `${s} ${c.counts[i]} (${pct(c.counts[i], c.classified)})`).join(", ");
+      out.push(`Molecular subtypes — ${m.classifierLabel}; MSI by ${m.msi}; p53 abnormal = ${m.p53}:\n` +
+        m.panels.map((pn) => [line(pn.cohort, pn), ...(pn.groups || []).map((g) => line("  " + g.label, g)),
+          ...(pn.byTest ? [`    by ${m.by}: chi-squared ${pn.byTest.chi2.toFixed(1)} (${pn.byTest.df} df), p=${pFmt(pn.byTest.p)}`] : [])].join("\n")).join("\n") +
+        (m.cohortTest ? `\n  Between cohorts: chi-squared ${m.cohortTest.chi2.toFixed(1)} (${m.cohortTest.df} df), p=${pFmt(m.cohortTest.p)}` : "") +
+        (m.survival || []).map((s) => `\n  OS by subtype, ${s.cohort}: ` + s.curves.map((c) => `${c.subtype} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : c.median.toFixed(1) + " mo"}`).join("; ") +
+          (s.logrank ? `; log-rank chi-squared ${s.logrank.chi2.toFixed(1)} (${s.logrank.df} df), p=${pFmt(s.logrank.p)}` : s.noTest ? "; " + s.noTest : "")).join("") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "organotropism") {
+      const o = v.organotropism, pct = (k: number, n: number) => n ? (100 * k / n).toFixed(1) + "%" : "–";
+      const lab = new Map(o.sites.map((s) => [s.site, s.label]));
+      const sig = o.cells.filter((c) => c.q != null && c.q < 0.05).sort((a, b) => a.p! - b.p!);
+      out.push(`Metastatic organotropism (${o.patients.toLocaleString()} patients; sites from ${o.sourceLabel}; ${o.measure === "driver" ? "OncoKB-driver " : ""}${o.alteration}s; ` +
+        `${o.stratifyBy ? "CMH stratified by " + o.stratifyBy : "unstratified"}): ${o.genes.length} genes × ${o.sites.length} sites, ${o.tested} cells tested, ${o.significant} at q<0.05.\n` +
+        `  Sites (patients with a metastasis there / evaluable): ` + o.sites.map((s) => `${s.label} ${s.withSite}/${s.evaluable}`).join(", ") + "\n" +
+        sig.slice(0, 30).map((c) => `  ${lab.get(c.site) || c.site} × ${c.gene}: altered ${c.withAltered}/${c.withSite} (${pct(c.withAltered, c.withSite)}) with the site vs ${c.withoutAltered}/${c.without} (${pct(c.withoutAltered, c.without)}) without, ` +
+          `MH OR ${c.or == null ? "undefined" : c.or.toFixed(2)}, p=${pFmt(c.p!)} q=${pFmt(c.q!)}`).join("\n") +
+        (o.incidence ? `\n  Cumulative incidence of ${o.incidence.site} by ${o.incidence.gene} (death competing): ` +
+          o.incidence.horizons.map((h) => `${h.months} mo ` + h.cells.map((c) => `${c.cohort} ${(100 * c.f1).toFixed(1)}% [${(100 * c.lo).toFixed(1)}–${(100 * c.hi).toFixed(1)}]`).join(" vs ")).join("; ") +
+          (o.incidence.gray ? `; Gray's test p=${pFmt(o.incidence.gray.p)}` : "") : o.noIncidence ? `\n  No incidence panel: ${o.noIncidence}` : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "drivernegative") {
+      const d = v.drivernegative, pct = (k: number, n: number) => n ? (100 * k / n).toFixed(1) + "%" : "–";
+      out.push(`Driver-negative analysis (drivers: ${d.drivers.join(", ")}): of ${d.sequenced.toLocaleString()} patients sequenced, ` +
+        `${d.positive.toLocaleString()} driver-positive (${pct(d.positive, d.sequenced)}), ${d.negative.toLocaleString()} driver-negative (${pct(d.negative, d.sequenced)}), ` +
+        `${d.unprofiled.toLocaleString()} not fully profiled (in neither group).\n` +
+        `  ${d.alteration} frequency, driver-negative vs driver-positive, Fisher + BH over ${d.tested} genes, ${d.significant} at q<0.05:\n` +
+        d.rows.slice(0, 30).map((g) => `  ${g.gene}: ${g.altered[0]}/${g.profiled[0]} (${pct(g.altered[0], g.profiled[0])}) vs ${g.altered[1]}/${g.profiled[1]} (${pct(g.altered[1], g.profiled[1])}), ` +
+          `log2 ratio ${g.log2Ratio == null ? "undefined" : g.log2Ratio.toFixed(2)}, p=${pFmt(g.p)} q=${pFmt(g.q)}`).join("\n") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "logistic") {
       out.push(`Logistic regression (n=${v.logistic.n.toLocaleString()}, ${v.logistic.events.toLocaleString()} with the outcome):\n` +
         v.logistic.coefficients.map((c) =>
@@ -257,6 +325,47 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
             (g.concordance != null ? `, ${Math.round(100 * g.concordance)}% concordant` : "") +
             (g.aOnly + g.bOnly ? `, McNemar q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +
         caveatOf(v) + noteOf(v));
+    } else if (v.kind === "acquired") {
+      const ar = v.acquired;
+      out.push(`Acquired under therapy: last sample on or before the first ${ar.anchoredTo} against the first at least ${ar.minGapDays} days after (${ar.measure === "driver" ? "OncoKB oncogenic" : "any alteration"}; both samples' panels cover the gene):\n` +
+        ar.panels.map((pn) => `  ${pn.cohort} (${pn.anchored.toLocaleString()} started, ${pn.withPre.toLocaleString()} with a sample before, ${pn.withPost.toLocaleString()} after, ${pn.patients.toLocaleString()} with both` +
+          (pn.gapDays ? `; samples a median ${pn.gapDays.median} days apart` : "") +
+          (pn.tested != null ? `; ${pn.tested.toLocaleString()} genes tested, the ${pn.genes.length} smallest p listed` : "") + `):\n` +
+          pn.genes.map((g) => `    ${g.gene}: acquired ${g.acquired}, lost ${g.lost}, shared ${g.shared}, neither ${g.neither} of ${g.pairs} pairs` +
+            (g.acquired + g.lost ? `, McNemar p=${pFmt(g.p)} q=${pFmt(g.q)}` : "")).join("\n")).join("\n") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "ctdna") {
+      const cr = v.ctdna, pc = (x: number | null) => x == null ? "—" : (100 * x).toFixed(0) + "%";
+      out.push(`ctDNA vs tissue (plasma ${cr.attribute} = ${cr.plasma.join("/")}${cr.plasmaPanels.length ? " or panel " + cr.plasmaPanels.join("/") : ""}, tissue ${cr.tissue.join("/")}; ` +
+        `${cr.measure === "driver" ? "OncoKB oncogenic" : "any alteration"}${cr.withinDays != null ? `; samples within ${cr.withinDays} days` : ""}; both panels cover the gene):\n` +
+        cr.panels.map((pn) => `  ${pn.cohort} (${pn.patients.toLocaleString()} patients with both; ctDNA detected in ${pn.detected.toLocaleString()} of ${pn.plasmaPatients.toLocaleString()} with plasma, ` +
+          `${pc(pn.plasmaPatients ? pn.detected / pn.plasmaPatients : null)} [95% CI ${pc(pn.detectedLow)}–${pc(pn.detectedHigh)}]):\n` +
+          pn.genes.map((g) => `    ${g.gene}: both ${g.both}, tissue-only ${g.tissueOnly}, plasma-only ${g.plasmaOnly}, neither ${g.neither} of ${g.pairs}; ` +
+            `PPA ${pc(g.ppa)}${g.ppa != null ? ` [${pc(g.ppaLow)}–${pc(g.ppaHigh)}]` : ""}, concordance ${pc(g.concordance)}`).join("\n") +
+          (pn.survival ? `\n    OS: ` + pn.survival.curves.map((c) => `${c.label} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : c.median.toFixed(1) + "mo"}`).join("; ") +
+            (pn.survival.logrank ? `; log-rank p=${pFmt(pn.survival.logrank.p)}` : "") : pn.survivalWhy ? `\n    OS by ctDNA not drawn: ${pn.survivalWhy}` : "") +
+          (pn.ch ? `\n    CH filter: removed ${pn.ch.removed} of ${pn.ch.calls} plasma mutation calls in ${pn.ch.patients} patients (${pn.ch.byGene} by gene, ${pn.ch.byNormal} by the matched normal)` +
+            (pn.ch.genes.length ? ": " + pn.ch.genes.map((g) => `${g.gene} ${g.calls}`).join(", ") : "") +
+            `; unfiltered: ctDNA detected ${pn.ch.before.detected.toLocaleString()} (${pc(pn.plasmaPatients ? pn.ch.before.detected / pn.plasmaPatients : null)})` +
+            (pn.ch.before.survival && pn.ch.before.survival.p != null ? `, OS log-rank p=${pFmt(pn.ch.before.survival.p)}` : "") +
+            `; plasma-only unfiltered ` + pn.ch.before.genes.map((g) => `${g.gene} ${g.plasmaOnly}`).join(", ") : "")).join("\n") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "exclusivity") {
+      const ex = v.exclusivity;
+      out.push(`Mutual exclusivity (DISCOVER background over ${ex.samples.toLocaleString()} samples and ${ex.matrixGenes} genes${ex.stratifyBy ? `, within ${ex.strata.length} ${ex.stratifyBy} strata` : ""}; ` +
+        `${ex.measure === "driver" ? "OncoKB oncogenic" : "any alteration"}; fit ${ex.converged ? "converged" : "NOT converged"} in ${ex.iterations} rounds) in ${ex.cohort}:\n` +
+        ex.pairs.map((x) => `  ${x.a}/${x.b}: both ${x.both} of ${x.profiled} profiled, ${x.expected} expected; DISCOVER exclusivity q=${pFmt(x.qExclusive)}, co-occurrence q=${pFmt(x.qCooccur)}` +
+          `${x.exact ? "" : " (normal approx.)"}; Fisher q=${pFmt(x.fisherQ)}${x.log2Odds != null ? `, log2 OR ${x.log2Odds.toFixed(2)}` : ""}`).join("\n") +
+        (ex.unassessable.length ? `\n  not assessable: ${ex.unassessable.join(", ")}` : "") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "instability") {
+      const ir = v.instability, f = (s: { median: number | null; q1: number | null; q3: number | null }) => s.median == null ? "—" : `${s.median} [${s.q1}–${s.q3}]`;
+      out.push(`Genomic instability (hg19 segments, threshold ±${ir.threshold}, arm called past ${Math.round(ir.armShare * 100)}% of its length; ${ir.arms.length} arms):\n` +
+        ir.panels.map((pn) => `  ${pn.cohort}: ${pn.score.reduce((s, x) => s + x, 0).toLocaleString()} samples scored; aneuploidy score median [IQR] ${f(pn.scoreSpread)}, FGA ${f(pn.fgaSpread)}%\n` +
+          `    most often gained: ${[...pn.arms].filter((a) => a.measured).sort((a, b) => b.gain / b.measured - a.gain / a.measured).slice(0, 5).map((a) => `${a.arm} ${Math.round(100 * a.gain / a.measured)}%`).join(", ")}\n` +
+          `    most often lost: ${[...pn.arms].filter((a) => a.measured).sort((a, b) => b.loss / b.measured - a.loss / a.measured).slice(0, 5).map((a) => `${a.arm} ${Math.round(100 * a.loss / a.measured)}%`).join(", ")}`).join("\n") +
+        (ir.test ? `\n  ${ir.test.name}: aneuploidy score p=${pFmt(ir.test.scoreP)}, FGA p=${pFmt(ir.test.fgaP)}` : "") +
+        caveatOf(v) + noteOf(v));
     } else if (v.kind === "clonality") {
       const cr = v.clonality;
       out.push(`Clonality (FACETS; ${cr.measure === "driver" ? "driver mutation calls" : "all mutation calls"}${cr.qc ? ", QC-passing samples" : ""}):\n` +
@@ -290,7 +399,67 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         (m.refit ? `\n  risk score alone: HR ${m.refit.hr.toFixed(2)} per SD (95% CI ${m.refit.ciLow.toFixed(2)}–${m.refit.ciHigh.toFixed(2)}, ${pFmt(m.refit.p)})` : "") +
         "\n  genes kept most often: " + m.features.slice(0, 15).map((f) => `${f.gene} ${Math.round(f.selected * 100)}% HR ${f.hr.toFixed(2)}`).join(", ") +
         (m.neverHeldOut ? `\n  ${m.neverHeldOut} patients were never held out, so have no score` : "") +
+        (m.external ? `\n  external validation on ${m.external.cohort} (${m.external.study}; ${m.external.n} patients scored, ${m.external.notCovered} not covered by the model's genes): ` +
+          `C-index ${m.external.cIndex.toFixed(3)} (95% bootstrap CI ${m.external.cIndexLo.toFixed(3)}–${m.external.cIndexHi.toFixed(3)})` +
+          (m.external.logrank ? `, log-rank p=${pFmt(m.external.logrank.p)}` : "") + "\n" +
+          m.external.groups.map((g) => `    ${g.name}: n=${g.curve.n}, ${g.curve.events} events, median ${g.curve.median == null ? "not reached" : g.curve.median.toFixed(1) + "mo"}` +
+            (g.hr != null ? `, HR vs lowest ${g.hr.toFixed(2)} (95% CI ${g.ciLow!.toFixed(2)}–${g.ciHigh!.toFixed(2)})` : "")).join("\n") : "") +
         caveatOf(v) + methodOf(v) + noteOf(v));
+    } else if (v.kind === "cutpoint") {
+      const m = v.cutpoint;
+      const side = (s: { n: number; events: number; median: number | null }) => `n=${s.n}, ${s.events} events, median ${s.median == null ? "not reached" : s.median.toFixed(1) + "mo"}`;
+      out.push(`Cut-point of ${m.attribute} on ${m.endpoint} (maximally selected log-rank, ${m.candidates.length} candidate cuts between the 10th and 90th percentiles; ${m.n.toLocaleString()} patients, ${m.events.toLocaleString()} events):\n` +
+        `  best cut ${m.attribute} > ${m.cut}: high ${side(m.high)}; low ${side(m.low)}` + (m.hr ? `; HR ${m.hr.hr.toFixed(2)} (95% CI ${m.hr.ciLow.toFixed(2)}-${m.hr.ciHigh.toFixed(2)})` : "") + "\n" +
+        `  corrected p=${pFmt(m.permP)} (${m.permutations} permutations, seed ${m.seed}); naive log-rank p=${pFmt(m.naiveP)}, which ignores the search` +
+        (m.strata ? "\n  per " + m.strata.attribute + ":\n" + m.strata.rows.map((s) => `    ${s.stratum}: n=${s.n}, cut ${s.cut}, high ${s.high.n}, ` +
+          (s.hr ? `HR ${s.hr.hr.toFixed(2)}, ` : "") + `corrected p=${pFmt(s.permP)}, naive p=${pFmt(s.naiveP)}`).join("\n") : "") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "hla") {
+      const m = v.hla, pc = (a: number, b: number) => b ? (100 * a / b).toFixed(1) + "%" : "—";
+      const hr = (h: { hr: number; ciLow: number; ciHigh: number; p: number; n: number } | null) => h ? `HR ${h.hr.toFixed(2)} (95% CI ${h.ciLow.toFixed(2)}-${h.ciHigh.toFixed(2)}, p=${pFmt(h.p)}, n=${h.n})` : "n/a";
+      const split = (name: string, s: (typeof m.panels)[number]["byLoh"], why?: string) => s
+        ? `\n    ${m.endpoint} by ${name}: ` + s.curves.map((c) => `${c.label} n=${c.n}, ${c.events} events, median ${c.median == null ? "not reached" : c.median.toFixed(1) + "mo"}`).join("; ") +
+          (s.logrank ? `; log-rank p=${pFmt(s.logrank.p)}` : "") + `; ${hr(s.hr)}` + (m.covariates.length ? `; adjusted for ${m.covariates.join(", ")} ${hr(s.adjusted)}` : "")
+        : `\n    ${m.endpoint} by ${name} not drawn: ${why || "no data"}`;
+      out.push(`HLA class I genotype (alleles compared at ${m.resolution === "full" ? "full" : m.resolution + "-field"} resolution) and HLA LOH:\n` +
+        m.panels.map((pn) => `  ${pn.cohort} (${pn.typed.toLocaleString()} of ${pn.patients.toLocaleString()} patients typed at A, B and C): homozygous at 0 loci ${pc(pn.homozygous[0], pn.typed)}, ` +
+          `1 ${pc(pn.homozygous[1], pn.typed)}, 2+ ${pc(pn.homozygous[2] + pn.homozygous[3], pn.typed)}; ` + pn.loci.map((l) => `HLA-${l.locus} ${pc(l.homozygous, l.typed)}`).join(", ") +
+          `; HLA LOH ${pn.loh.toLocaleString()} of ${pn.lohEvaluated.toLocaleString()} with a call (${pc(pn.loh, pn.lohEvaluated)})` +
+          split("homozygosity (≥1 locus vs none)", pn.byHomozygosity, pn.byHomozygosityWhy) + split("HLA LOH", pn.byLoh, pn.byLohWhy)).join("\n") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "predictive") {
+      const m = v.predictive;
+      const eff = (e: { hr: number; ciLow: number; ciHigh: number; p: number } | null) => e ? `HR ${e.hr.toFixed(2)} (95% CI ${e.ciLow.toFixed(2)}-${e.ciHigh.toFixed(2)}, ${pFmt(e.p)})` : "n/a";
+      out.push(`Predictive biomarkers: gene x ${m.exposure} on ${m.endpoint} (Cox per gene; ${m.n.toLocaleString()} patients, ${m.exposed.toLocaleString()} exposed, ${m.events.toLocaleString()} events` +
+        (m.covariates.length ? `; adjusted for ${m.covariates.join(", ")}` : "") + `):\n` +
+        m.genes.map((g) => `  ${g.gene}: mutated ${g.mutatedExposed}/${g.exposed} exposed, ${g.mutatedUnexposed}/${g.unexposed} unexposed; ` +
+          (g.interaction ? `among exposed ${eff(g.inExposed)}; among unexposed ${eff(g.inUnexposed)}; interaction ${eff(g.interaction)}, q=${pFmt(g.q!)}` : `not fitted: ${g.skipped}`)).join("\n") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "rmst") {
+      const r = v.rmst;
+      out.push(`Restricted mean survival time, ${r.endpointLabel}:\n` +
+        r.panels.map((pn) => `  ${pn.landmark ? `from the ${pn.landmark}-month landmark` : "from the start"}, tau=${pn.tau} months${pn.tauSet ? "" : " (default: every cohort >= 10 at risk)"}:\n` +
+          pn.curves.map((c) => `    ${c.cohort}: n=${c.n.toLocaleString()}, RMST ${rmstText(c)}` +
+            ((x) => x ? `; vs ${x.vs} difference ${rmstDiffText(x)}, ratio ${rmstRatioText(x)}` : "")(pn.comparisons.find((x) => x.cohort === c.cohort))).join("\n")).join("\n") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "multistate") {
+      const m = v.multistate;
+      out.push(`Multistate (illness-death) model, months from ${m.origin}:\n` +
+        m.cohorts.map((c) => `  ${c.cohort}: n=${c.n.toLocaleString()} (${c.prevalent.toLocaleString()} progressed by day 0); ` +
+          c.rates.map((r) => `${MS_TRANSITIONS[r.key]} ${r.events} events, ${msRateText(r)} per 100 person-months`).join("; ") +
+          `\n    in each state (not progressed / progressed / dead): ` +
+          c.atHorizon.map((h) => `${h.months} mo ` + (h.p0 == null ? "n/a" : `${(100 * h.p0).toFixed(0)}% / ${(100 * h.p1!).toFixed(0)}% / ${(100 * h.p2!).toFixed(0)}%`)).join(", ")).join("\n") +
+        m.cox.map((x) => `\n  ${MS_TRANSITIONS[x.key]}: ` + (x.noFit ? `no hazard ratio (${x.noFit})` :
+          x.rows.map((r) => `${r.cohort} vs ${m.reference} HR ${r.hr.toFixed(2)} (95% CI ${r.lo.toFixed(2)}-${r.hi.toFixed(2)}, ${pFmt(r.p)})`).join("; "))).join("") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "txendpoints") {
+      const t = v.txendpoints;
+      out.push(`Treatment endpoint: ${t.endpointLabel} from ${t.anchoredTo} (Kaplan-Meier):\n` +
+        t.curves.map((c) => `  ${c.cohort}: n=${c.n.toLocaleString()}, ${c.events} events, ${txMedianText(c)}; ` +
+          `${c.anchored} of ${c.cohortPatients} anchored; left out ${c.excluded.noAnchor} without the anchor, ${c.excluded.noFollowup} without follow-up` +
+          (t.endpoint === "tot" ? `, ${c.excluded.noStop} without a stop date` : "")).join("\n") +
+        (t.logrank ? `\n  log-rank chi2=${t.logrank.chi2.toFixed(2)} (${t.logrank.df} df), p=${pFmt(t.logrank.p)}` : t.noTest ? `\n  ${t.noTest}` : "") +
+        caveatOf(v) + noteOf(v));
     } else if (v.kind === "labs") {
       const lb = v.labs;
       out.push(`Lab course: ${lb.test} % change from baseline, weeks from ${lb.anchoredTo}:\n` +

@@ -543,6 +543,314 @@ export interface LogisticResult {
   excludedRemote?: { study: string; patients: number }[];
 }
 /**
+ * Pan-cancer forest: one exposure's hazard ratio within each stratum of the cohort (a cancer type,
+ * a study, or a cohort), each from its own Cox fit, pooled by a DerSimonian–Laird random-effects
+ * meta-analysis (and the fixed-effect estimate beside it). Fit from per-patient rows within each
+ * local study, the same boundary as `cox`.
+ */
+export interface ForestView {
+  note?: string;
+  kind: "forest"; cohorts?: string[];
+  /** the exposure, as a plot axis: a gene's alteration (not profiled is left out, never unaltered), a numeric or categorical attribute */
+  exposure: PlotAxis;
+  /** a categorical exposure's level counted as exposed (default for an alteration axis: any alteration) */
+  exposed?: string;
+  /** a numeric exposure: exposed when the value is at least this */
+  threshold?: number;
+  /** endpoint prefix (default OS), and the cox view's escape hatch for other column names */
+  endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
+  /** what a row is: a categorical attribute (default CANCER_TYPE), "study", or "cohort" (the view's cohorts) */
+  strata?: string;
+  /** adjust each stratum's fit for these (default none) */
+  covariates?: CoxCovariate[];
+  /** a stratum with fewer patients or events than these is pooled into "Other" (defaults 30 and 10) */
+  minPatients?: number; minEvents?: number;
+  /** at most this many strata are drawn, the largest; the rest pool into "Other" (default 30) */
+  maxStrata?: number;
+  /** what happens to the small strata: pooled into one "Other" row (default) or left out, listed */
+  small?: "pool" | "drop";
+}
+export interface ForestRow {
+  label: string; n: number; events: number; exposed: number; exposedEvents: number;
+  beta: number; se: number; hr: number; ciLow: number; ciHigh: number; p: number;
+  /** the row's share of the random-effects weight */
+  weight: number;
+  /** an "Other" row: the strata it pools */
+  pooled?: string[];
+}
+export interface ForestPooled { hr: number; ciLow: number; ciHigh: number; p: number; beta: number; se: number }
+export interface ForestResult {
+  exposure: string; exposedLabel: string; endpoint: string; strata: string; covariates: string[];
+  rows: ForestRow[];
+  /** strata that are not rows, and why */
+  left: { label: string; n: number; events: number; reason: string }[];
+  /** pooled estimates; null with fewer than two rows */
+  fixed: ForestPooled | null; random: ForestPooled | null;
+  tau2: number; q: number; qDf: number; qP: number; i2: number;
+  /** patients with a time, the exposure and the stratum (and every covariate) */
+  n: number; events: number;
+  notProfiled: number; missing: number;
+  excludedRemote?: { study: string; patients: number }[];
+}
+/**
+ * Covariate-adjusted alteration enrichment between two cohorts: for every gene mutated in at least
+ * a minimum share of the patients profiled for it, a logistic regression of altered on cohort and
+ * covariates, reported as the adjusted odds ratio for the first cohort beside the raw one. Fit from
+ * per-patient rows inside each local study (patient-level participants only).
+ */
+export interface AdjustedView {
+  note?: string;
+  kind: "adjusted"; cohorts?: string[];
+  /** clinical attributes adjusted for (default none): a number as recorded, a category against its commonest value */
+  covariates?: string[];
+  /** count every called mutation (default), or only OncoKB drivers */
+  measure?: "any" | "driver";
+  /** genes tested: mutated in at least this share of the patients profiled for them, both cohorts together (default 0.05) */
+  minShare?: number;
+  /** and in at least this many patients (default 10) */
+  minAltered?: number;
+  /** genes named on the volcano (default 12) */
+  label?: number;
+}
+export interface AdjustedGene {
+  gene: string;
+  /** per cohort, in the view's order: patients altered, and patients profiled for the gene with every covariate */
+  altered: [number, number]; profiled: [number, number];
+  /** unadjusted odds ratio (null with an empty cell) and its two-sided Fisher p */
+  rawOr: number | null; fisherP: number;
+  /** the cohort term's adjusted odds ratio, Wald 95% CI and p; q is Benjamini–Hochberg over the genes fit */
+  or: number; ciLow: number; ciHigh: number; p: number; q: number;
+  /** a covariate category that would separate was merged into its reference for this gene */
+  merged?: boolean;
+}
+export interface AdjustedResult {
+  groups: [string, string]; covariates: string[]; measure: "any" | "driver"; minShare: number; minAltered: number;
+  /** per cohort: patients with a mutation panel, and of those with every covariate (the ones fit) */
+  patients: { cohort: string; withPanel: number; used: number }[];
+  /** genes fit, by adjusted p */
+  rows: AdjustedGene[];
+  /** genes that passed the share threshold but could not be fit, and why */
+  failed: { gene: string; reason: string }[];
+  significant: number;
+  labels: string[];
+  excludedRemote?: { study: string; patients: number }[];
+}
+/**
+ * Clinical actionability from the version-pinned OncoKB store: each sequenced patient's highest
+ * sensitive therapeutic level (1, 2, 3A, 3B, 4) and any resistance level (R1, R2) over their
+ * alterations, as shares per cohort (optionally per group of an attribute), and for patients with
+ * a sample on each side of `pairBy` the concordance of their highest level between the two. Counts only.
+ */
+export interface ActionabilityView {
+  note?: string;
+  kind: "actionability"; cohorts?: string[];
+  /** split each cohort by a categorical attribute (e.g. CANCER_TYPE); default none */
+  groupBy?: string;
+  /** with groupBy, the largest groups drawn (default 8); the rest are pooled into a disclosed "Other" */
+  top?: number;
+  /** the two sides compared for concordance (default SAMPLE_TYPE Primary against Metastasis); null turns it off */
+  pairBy?: { attribute: string; a: string[]; b: string[] } | null;
+}
+/** patients per highest level: [1, 2, 3A, 3B, 4, none], and with a resistance level [R1, R2] */
+export interface ActionLevels { sequenced: number; levels: number[]; resistance: number[] }
+export interface ActionabilityPanel extends ActionLevels {
+  cohort: string;
+  /** the cohort's patients, sequenced or not */
+  patients: number;
+  groups?: (ActionLevels & { label: string })[];
+  /** groups past `top`, pooled into the last group */
+  pooled?: string[];
+  /** patients with a sequenced sample on each side: table[a][b] over the six highest levels, and how many differ */
+  concordance?: { pairs: number; table: number[][]; discordant: number };
+}
+export interface ActionabilityResult {
+  pin: string; levels: string[]; groupBy: string | null; top: number;
+  pairBy: { attribute: string; a: string[]; b: string[] } | null;
+  panels: ActionabilityPanel[];
+  /** the alteration types the store has levels for at this pin */
+  storeTypes: string[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Driver-negative analysis: one cohort split into patients with an OncoKB driver in a canonical
+ * driver list, patients with none who were profiled for every listed gene, and those not fully
+ * profiled (neither); then every other gene's alteration frequency compared between the first two.
+ * Counts only.
+ */
+export interface DrivernegativeView {
+  note?: string;
+  kind: "drivernegative"; cohorts?: string[];
+  /** the canonical drivers (default the NSCLC set: EGFR, KRAS, ALK, ROS1, BRAF, MET, RET, ERBB2, NTRK1–3) */
+  drivers?: string[];
+  /** what is compared between the groups (default mutation; sv counts either fusion partner) */
+  alteration?: "mutation" | "sv" | "cna";
+  /** count every alteration (default), or only OncoKB drivers */
+  measure?: "any" | "driver";
+  /** genes altered in fewer patients than this, both groups together, are not tested (default 5) */
+  minAltered?: number;
+  /** genes named on the volcano (default 12) */
+  label?: number;
+}
+export interface DrivernegativeGene {
+  gene: string; cytoband?: string;
+  /** [driver-negative, driver-positive] patients altered, and profiled for the gene */
+  altered: [number, number]; profiled: [number, number];
+  log2Ratio: number | null; p: number; q: number;
+}
+export interface DrivernegativeResult {
+  drivers: string[]; alteration: string; measure: "any" | "driver"; minAltered: number;
+  /** the cohort's patients, those sequenced for mutations, and the three groups of those */
+  patients: number; sequenced: number; positive: number; negative: number; unprofiled: number;
+  tested: number; untested: number; significant: number;
+  /** the most significant genes (≤300) */
+  rows: DrivernegativeGene[];
+  labels: string[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Metastatic organotropism: for each organ a cohort's patients metastasised to and each gene,
+ * whether the gene's alteration goes with metastasis there, stratified by cancer type
+ * (Cochran–Mantel–Haenszel); with dated sites on the timeline, the cumulative incidence of
+ * metastasis to one site by one gene's status, death competing. Counts only.
+ */
+export interface OrganotropismView {
+  note?: string;
+  kind: "organotropism"; cohorts?: string[];
+  /** where the sites come from (default auto: per-organ flags, else the timeline, else a biopsy-site attribute) */
+  source?: "auto" | "flags" | "timeline" | "sample";
+  /** flags: the per-organ Yes/No attributes' prefix (default DMETS_DX_, MSK-MET's) */
+  flagPrefix?: string;
+  /** timeline: the event type and key whose value names a site (default Diagnosis / TUMOR_SITE) */
+  timeline?: { eventType?: string; key?: string };
+  /** sample: the biopsy-site attribute of metastasis samples (default METASTATIC_SITE), mapped to organs by our disclosed rules */
+  siteAttribute?: string;
+  /** only these sites (labels as the result names them); default every site with enough patients */
+  sites?: string[];
+  /** the genes (at most 20); default the `top` most altered in the cohort */
+  genes?: string[];
+  /** how many most-altered genes when `genes` is not given (default 12, at most 20) */
+  top?: number;
+  /** what counts as altered (default mutation) and whether only OncoKB drivers count (default driver) */
+  alteration?: "mutation" | "cna" | "amp" | "homdel" | "sv";
+  measure?: "any" | "driver";
+  /** the stratifying covariate (default CANCER_TYPE); null for none */
+  stratifyBy?: string | null;
+  /** a cell is tested only with at least this many altered patients and this many with the site (default 5) */
+  minPatients?: number;
+  /** timeline source: the cumulative-incidence panel's site and gene (default the grid's most significant cell); null for none */
+  incidence?: { site?: string; gene?: string } | null;
+}
+export interface OrganotropismSite { site: string; label: string; evaluable: number; withSite: number }
+export interface OrganotropismCell {
+  site: string; gene: string;
+  /** patients evaluable for the site and profiled for the gene, pooled over strata: with the site (and of them altered), without it (and altered) */
+  withSite: number; withAltered: number; without: number; withoutAltered: number;
+  /** Mantel–Haenszel common odds ratio over the strata, its log2, CMH chi-squared p and BH q; null when not tested */
+  or: number | null; log2Or: number | null; p: number | null; q: number | null; strata: number;
+}
+export interface OrganotropismIncidence {
+  site: string; gene: string;
+  curves: IncidenceCurve[];
+  horizons: { months: number; cells: { cohort: string; f1: number; lo: number; hi: number; atRisk: number }[] }[];
+  gray?: import("./stats.ts").GrayTest;
+  /** patients whose first site event came after their last follow-up (the clock check) */
+  late: number; records: number;
+}
+export interface OrganotropismResult {
+  source: "flags" | "timeline" | "sample"; sourceLabel: string;
+  alteration: string; measure: "any" | "driver"; stratifyBy: string | null; minPatients: number;
+  patients: number;
+  sites: OrganotropismSite[];
+  genes: { gene: string; altered?: number }[];
+  /** every (site, gene) cell, tested or not */
+  cells: OrganotropismCell[];
+  tested: number; significant: number;
+  /** sample source: the biopsy-site values counted as "Other", with their patients */
+  otherValues?: { value: string; patients: number }[];
+  incidence?: OrganotropismIncidence;
+  /** why there is no incidence panel */
+  noIncidence?: string;
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * A published molecular classifier applied per patient as derived subtypes — the endometrial
+ * classification (TCGA 2013 / ProMisE / WHO 2020): POLE-ultramutated, else MMR-deficient (MSI-high),
+ * else p53-abnormal, else no specific molecular profile, with "not classifiable" where an input is
+ * missing. Per cohort: subtype shares, subtype by an attribute, and OS by subtype. Counts only.
+ */
+export interface MolsubtypeView {
+  note?: string;
+  kind: "molsubtype"; cohorts?: string[];
+  /** the classifier (only "endometrial" so far) */
+  classifier?: "endometrial";
+  /** the MSI call: a categorical attribute's MSI-high and stable values, or a numeric score's cut-offs (default MSI_TYPE Instable / Stable, else MSI_SCORE ≥ 10 / < 3) */
+  msi?: { attribute?: string; high?: string[]; stable?: string[]; threshold?: number; stableBelow?: number };
+  /** an abnormal p53: an OncoKB-driver TP53 mutation (default) or any protein-changing TP53 mutation */
+  p53?: "driver" | "nonsynonymous";
+  /** a patient attribute to cross the subtypes with (e.g. ANCESTRY_LABEL, STAGE_HIGHEST_RECORDED) */
+  by?: string;
+  /** groups of `by` drawn (largest first; default 8), the rest pooled into a named Other */
+  top?: number;
+  /** draw OS by subtype (default true) */
+  survival?: boolean;
+}
+export interface MolsubtypeCounts { counts: number[]; classified: number; notClassifiable: number; why: Record<string, number> }
+export interface MolsubtypePanel extends MolsubtypeCounts {
+  cohort: string; patients: number;
+  groups?: (MolsubtypeCounts & { label: string })[];
+  /** cohort's classified patients by group: chi-squared over group × subtype */
+  byTest?: import("./stats.ts").ChiSquareTest;
+  pooled?: string[];
+}
+export interface MolsubtypeResult {
+  classifier: string; classifierLabel: string;
+  /** the subtypes in hierarchy order */
+  subtypes: string[];
+  msi: string; p53: string; poleHotspots: string[];
+  by: string | null;
+  panels: MolsubtypePanel[];
+  /** classified patients' subtype shares between cohorts (two or more) */
+  cohortTest?: import("./stats.ts").ChiSquareTest;
+  /** OS by subtype, per cohort (classified patients with OS_MONTHS) */
+  survival?: { cohort: string; curves: (Omit<KmCurve, "cohort"> & { subtype: string })[]; logrank: LogRankK | null; noTest?: string }[];
+  noSurvival?: string;
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Germline carriers and their somatic second hits: per gene, the patients with a germline call,
+ * their share of the patients sequenced for the gene, and how often the tumour carries a second,
+ * somatic hit in the same gene, against the somatic rate in non-carriers; optionally OS by carrier
+ * status for one gene. Patient-level counts only.
+ */
+export interface GermlineView {
+  note?: string;
+  kind: "germline"; cohorts?: string[];
+  /** the genes (at most 60); default every gene with at least minCarriers carriers in a cohort */
+  genes?: string[];
+  minCarriers?: number;
+  /** draw OS for one gene's carriers against non-carriers */
+  survival?: { gene: string };
+}
+export interface GermlineCounts {
+  /** patients sequenced for the gene (a mutation panel listing it, or WES), carriers among them, and carriers whose panel does not list it (left out) */
+  sequenced: number; carriers: number; outsidePanel: number;
+  carrierSomatic: number; carrierCnaProfiled: number; carrierDeletion: number; carrierEither: number;
+  noncarriers: number; noncarrierSomatic: number; noncarrierCnaProfiled: number; noncarrierDeletion: number; noncarrierEither: number;
+}
+export interface GermlineGene extends GermlineCounts {
+  gene: string;
+  /** Fisher's exact test of carriers' second-hit rate against non-carriers' somatic rate, and BH q */
+  p: number | null; q: number | null;
+}
+export interface GermlineResult {
+  genes: string[]; minCarriers: number; chosen?: string;
+  panels: { cohort: string; patients: number; genes: GermlineGene[] }[];
+  survival?: { cohort: string; gene: string; curves: (Omit<KmCurve, "cohort"> & { group: string })[]; logrank: LogRankK | null; noTest?: string }[];
+  /** what was done about loss of heterozygosity */
+  loh: string;
+  excluded?: { study: string; reason: string }[];
+}
+/**
  * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
  * what the axes are, exactly as it does in the portal, rather than being asked for.
  */
@@ -894,6 +1202,205 @@ export interface PairedResult {
   excluded?: { study: string; reason: string }[];
 }
 /**
+ * Alterations acquired under therapy: patients with a dated sample on or before a treatment start
+ * and another after it, per gene, altered after but not before (acquired), before but not after
+ * (lost), on both (shared) or neither — among patients whose two samples' panels both cover the gene.
+ */
+export interface AcquiredView {
+  note?: string;
+  kind: "acquired"; cohorts?: string[];
+  /** the treatment start: the FIRST event of this type, with key = value when given (default Treatment, any) */
+  anchor?: { eventType: string; key?: string; value?: string };
+  /** the genes to test (at most 30); omitted or empty scans every gene altered in at least `minPost` after-samples */
+  genes?: string[];
+  /** a scan: the fewest patients altered after treatment for a gene to be tested (default 3) */
+  minPost?: number;
+  /** a scan: how many genes to draw, most significant first (default 20, at most 40) */
+  top?: number;
+  /** the before-sample is the last on or before the start, at most this many days before it (default: any) */
+  preWindowDays?: number;
+  /** the after-sample is the first at least this many days after the start (default 30) */
+  minGapDays?: number;
+  /** the timeline event types that date a sample (default Sample acquisition, Sequencing, Specimen) and the attribute naming it (default SAMPLE_ID) */
+  sampleEvents?: string[]; sampleKey?: string;
+  /** any alteration (default) or OncoKB oncogenic only */
+  measure?: "driver" | "any";
+}
+/** what the clonal-haematopoiesis filter removed from a cohort's plasma calls, and the headline numbers without it */
+export interface CtdnaChPanel {
+  /** plasma mutation calls, those with matched-normal counts loaded, removed by gene / by the normal / by either, and the patients with a removed call */
+  calls: number; withNormal: number; byGene: number; byNormal: number; removed: number; patients: number;
+  /** per gene, the calls and patients removed */
+  genes: { gene: string; calls: number; patients: number; byGene: number; byNormal: number }[];
+  /** without the filter */
+  before: {
+    detected: number; detectedLow: number | null; detectedHigh: number | null;
+    genes: { gene: string; both: number; plasmaOnly: number; ppa: number | null }[];
+    survival: { curves: { label: string; n: number; events: number; median: number | null }[]; p: number | null } | null;
+  };
+}
+export interface AcquiredGene {
+  gene: string;
+  /** patients whose before- and after-sample both cover the gene */
+  pairs: number; acquired: number; lost: number; shared: number; neither: number;
+  /** exact McNemar p on acquired vs lost, and BH q across the genes tested in this cohort */
+  p: number; q: number;
+}
+export interface AcquiredPanel {
+  cohort: string;
+  /** the funnel: anchored, with a dated sample, with one before, with one after, with both */
+  anchored: number; dated: number; withPre: number; withPost: number; patients: number;
+  /** among the pairs: median days from the before-sample to the start, from the start to the after-sample, and the pairs' spacing (quartiles) */
+  preDays: number | null; postDays: number | null; gapDays: { q1: number; median: number; q3: number } | null;
+  genes: AcquiredGene[];
+  /** a scan: the genes tested (altered after in at least minPost patients), which q is taken across */
+  tested?: number;
+}
+export interface AcquiredResult {
+  anchoredTo: string;
+  preWindowDays: number | null; minGapDays: number;
+  sampleEvents: string[]; sampleKey: string;
+  measure: "driver" | "any";
+  scan?: { top: number; minPost: number };
+  panels: AcquiredPanel[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * ctDNA against tissue: patients with a plasma (cfDNA) sample and a tissue sample, per gene covered
+ * by both, altered in both, tissue only, plasma only or neither; plasma's positive percent
+ * agreement with tissue as the reference; the share of plasma patients with any alteration
+ * detected; and overall survival by ctDNA detected or not.
+ */
+export interface CtdnaView {
+  note?: string;
+  kind: "ctdna"; cohorts?: string[];
+  /** the genes (at most 30); omitted, the `top` (default 15, at most 30) most altered in the paired patients */
+  genes?: string[]; top?: number;
+  /** the sample attribute classing samples (default SAMPLE_CLASS) and its plasma (default cfDNA, ctDNA) and tissue (default Tumor) values */
+  attribute?: string; plasma?: string[]; tissue?: string[];
+  /** samples on these panels count as plasma whatever the attribute says (e.g. ["ACCESS129"]) */
+  plasmaPanels?: string[];
+  /** keep only samples the timeline dates within this many days of a sample of the other kind (default: no dates needed) */
+  withinDays?: number;
+  sampleEvents?: string[]; sampleKey?: string;
+  /** any alteration (default) or OncoKB oncogenic only */
+  measure?: "driver" | "any";
+  /**
+   * leave out plasma mutation calls likely from clonal haematopoiesis: true for the defaults, or
+   * `genes` (default the canonical CH genes; [] for none) and `normal` (default true: calls whose
+   * matched white-cell sample has at least `normalMinAlt`, default 2, alternate reads at an allele
+   * fraction at least `normalMinRatio`, default 0.3, of the plasma's)
+   */
+  chFilter?: boolean | { genes?: string[]; normal?: boolean; normalMinAlt?: number; normalMinRatio?: number };
+}
+export interface CtdnaGene {
+  gene: string;
+  /** patients whose plasma and tissue samples both cover the gene */
+  pairs: number; both: number; tissueOnly: number; plasmaOnly: number; neither: number;
+  /** positive percent agreement: both ÷ altered in tissue, with its 95% Wilson interval (null when tissue has none) */
+  ppa: number | null; ppaLow: number | null; ppaHigh: number | null;
+  /** (both + neither) ÷ pairs */
+  concordance: number | null;
+}
+export interface CtdnaPanel {
+  cohort: string;
+  /** patients with a plasma sample, a tissue sample, both; samples of each kind among those with both */
+  plasmaPatients: number; tissuePatients: number; patients: number; plasmaSamples: number; tissueSamples: number;
+  /** with withinDays: before the date rule, patients with plasma and tissue; and the classed samples the timeline dated */
+  undated?: { plasmaPatients: number; tissuePatients: number; datedSamples: number };
+  /** of the plasma patients, those with any (driver) alteration called in plasma, with a 95% Wilson interval */
+  detected: number; detectedLow: number | null; detectedHigh: number | null;
+  genes: CtdnaGene[];
+  /** overall survival of the plasma patients by ctDNA detected or not; null with why when not drawn */
+  survival: { curves: (Omit<KmCurve, "cohort"> & { label: string })[]; logrank: LogRank | null; missing: number } | null;
+  survivalWhy?: string;
+  /** with chFilter */
+  ch?: CtdnaChPanel;
+}
+export interface CtdnaResult {
+  attribute: string; plasma: string[]; tissue: string[]; plasmaPanels: string[];
+  withinDays: number | null;
+  measure: "driver" | "any";
+  /** present when the genes were chosen as the most altered */
+  top?: number;
+  panels: CtdnaPanel[];
+  excluded?: { study: string; reason: string }[];
+  /** with chFilter: the rule applied */
+  chFilter?: { genes: string[]; normalMinAlt: number | null; normalMinRatio: number };
+}
+/**
+ * Mutual exclusivity and co-occurrence against each tumour's own alteration burden (DISCOVER,
+ * Canisius et al. 2016): per sample and gene a background probability fitted from the sample and
+ * gene marginals of the whole altered-gene matrix, so that heavily altered tumours are expected to
+ * share alterations; each pair's co-altered count tested against its Poisson-binomial null.
+ */
+export interface ExclusivityView {
+  note?: string;
+  kind: "exclusivity"; cohorts?: string[];
+  /** 2 to 20 genes */
+  genes: string[];
+  /** estimate the background within each value of this sample attribute (e.g. CANCER_TYPE) */
+  stratifyBy?: string;
+  /** any alteration (default) or OncoKB oncogenic only */
+  measure?: "driver" | "any";
+}
+export interface ExclusivityPair {
+  a: string; b: string;
+  /** samples profiled for both genes, those altered in both, and the background's expected number */
+  profiled: number; both: number; expected: number;
+  /** DISCOVER: lower tail (exclusivity) and upper tail (co-occurrence), BH q in each direction */
+  pExclusive: number; qExclusive: number; pCooccur: number; qCooccur: number;
+  /** false when the tails came from the refined normal approximation, not the exact distribution */
+  exact: boolean;
+  /** the plain two-sided Fisher test on the same samples' 2×2, BH across the pairs */
+  onlyA: number; onlyB: number; neither: number; fisherP: number; fisherQ: number; log2Odds: number | null;
+}
+export interface ExclusivityResult {
+  cohort: string; genes: string[];
+  stratifyBy: string | null; strata: { name: string; samples: number }[];
+  measure: "driver" | "any";
+  /** samples with a panel, the genes in the background matrix, and how the fit ended */
+  samples: number; matrixGenes: number; iterations: number; converged: boolean; maxResidual: number;
+  pairs: ExclusivityPair[];
+  /** pairs no sample was profiled for both genes of */
+  unassessable: string[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
+ * Genomic instability from copy-number segments (hg19): per sample, the fraction of the genome
+ * altered and arm-level gains and losses, whose count is the aneuploidy score (Taylor et al. 2018);
+ * per cohort their distributions, a rank test between cohorts, and each arm's gain/loss frequency.
+ */
+export interface InstabilityView {
+  note?: string;
+  kind: "instability"; cohorts?: string[];
+  /** |log2 segment mean| at or past which a segment is gained or lost (default 0.2) */
+  threshold?: number;
+  /** an arm is called when more than this share of its length is past the threshold (default 0.5) */
+  armShare?: number;
+  /** score chromosome X too (default false: its log ratio mostly records sex) */
+  includeX?: boolean;
+}
+export interface InstabilitySpread { p5: number | null; q1: number | null; median: number | null; q3: number | null; p95: number | null; mean: number | null }
+export interface InstabilityPanel {
+  cohort: string;
+  /** the cohort's samples, those with segments, and those with every scored arm measured */
+  samples: number; segmented: number; allArms: number;
+  /** samples by aneuploidy score (index = arms altered), and by FGA in 1-point bins (index = percent) */
+  score: number[]; fga: number[];
+  scoreSpread: InstabilitySpread; fgaSpread: InstabilitySpread;
+  /** per arm (in `arms` order): the samples that measured it, and those gaining or losing it */
+  arms: { arm: string; measured: number; gain: number; loss: number }[];
+}
+export interface InstabilityResult {
+  build: "hg19"; threshold: number; armShare: number; includeX: boolean;
+  arms: string[];
+  panels: InstabilityPanel[];
+  /** two cohorts: Mann–Whitney; more: Kruskal–Wallis — on the aneuploidy score and on FGA */
+  test: { name: "Mann–Whitney U" | "Kruskal–Wallis"; scoreP: number; fgaP: number } | null;
+  excluded?: { study: string; reason: string }[];
+}
+/**
  * Clonality from FACETS allele-specific copy number: for each gene, whether the cohort's
  * mutation calls are clonal or subclonal, how often the mutated locus has lost its other allele,
  * and their cancer-cell fractions; per cohort, whole-genome doubling, purity and ploidy. Only
@@ -1013,6 +1520,28 @@ export interface RiskmodelView {
    *  computes it; a list left out is the default (the study's leading attributes; the genes the
    *  model kept most often) */
   describe?: { attributes?: string[]; genes?: string[] };
+  /** external validation: another cohort of the document, scored with the fitted ensemble's mean
+   *  coefficients and cut at the training risk-group thresholds */
+  validateOn?: string;
+}
+
+/** A risk model scored on another cohort it never saw (RiskmodelView.validateOn). */
+export interface RiskExternal {
+  cohort: string; study: string;
+  /** patients scored, their events, and those left out with why */
+  n: number; events: number;
+  cohortPatients: number; rowsReturned: number;
+  notProfiled: number; noStratum: number; noAnchor: number; anchorAfterStart: number; noFollowUp: number;
+  /** patients whose panels do not cover every gene the model weighs: never scored as wild-type */
+  notCovered: number;
+  /** the model's genes with a non-zero ensemble coefficient, which every scored patient's panels cover */
+  modelGenes: number;
+  /** Harrell's C-index of the score (within strata), with a seeded bootstrap 95% interval */
+  cIndex: number; cIndexLo: number; cIndexHi: number; bootstrap: number;
+  /** the training thresholds (raw scores) the groups are cut at */
+  cuts: number[];
+  groups: { name: string; curve: Omit<KmCurve, "cohort">; hr: number | null; ciLow: number | null; ciHigh: number | null; p: number | null }[];
+  logrank: LogRankK | null;
 }
 
 /** Why a Table 1 row differs between the risk groups by construction, or is the model's stratum. */
@@ -1105,6 +1634,282 @@ export interface RiskmodelResult {
   percentiles: number[];
   /** with `describe`: Table 1, the groups' makeup */
   table1?: RiskTable1;
+  /** with `validateOn`: the model scored on that cohort */
+  external?: RiskExternal;
+}
+
+export interface TxendpointsView {
+  note?: string;
+  kind: "txendpoints"; cohorts?: string[];
+  /** the clock's start: a treatment record (event type, key = value), its first occurrence unless LAST */
+  anchor: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** ttnt time to next treatment (default), tot time on treatment, rwpfs real-world progression-free survival */
+  endpoint?: "ttnt" | "tot" | "rwpfs";
+  /** treatment lines (lib/treatment-lines.ts): days without therapy that start a new line (default 90), and which records form lines */
+  lineGap?: number; lineClasses?: "systemic" | "all" | string[];
+  /** rwpfs: the progression event (default event type Diagnosis, key PROGRESSION, values Y / Yes), and an optional probability floor */
+  progression?: { eventType?: string; key?: string; values?: string[]; probabilityKey?: string; minProbability?: number };
+  /** tot: a living patient whose stop lies within this many days of the last follow-up is censored as still on treatment (default 30) */
+  ongoingDays?: number;
+  /** administrative censoring, months */
+  cutoffMonths?: number;
+}
+export interface TxendpointsCurve extends Omit<KmCurve, "cohort"> {
+  cohort: string;
+  /** the median's 95% interval (Greenwood, log scale), null where the band never reaches 0.5 */
+  medianLo: number | null; medianHi: number | null;
+  /** the cohort's patients, those anchored, and those left out with why */
+  cohortPatients: number; anchored: number;
+  excluded: { noAnchor: number; noFollowup: number; noStop: number };
+  /** patients whose timeline runs past their last follow-up (the clock check) */
+  late: number;
+}
+export interface TxendpointsResult {
+  endpoint: "ttnt" | "tot" | "rwpfs"; endpointLabel: string; anchoredTo: string;
+  lineGap: number; lineClasses: string;
+  progression?: { eventType: string; key: string; values: string[]; probabilityKey?: string; minProbability?: number };
+  ongoingDays?: number; cutoffMonths?: number;
+  curves: TxendpointsCurve[];
+  /** k-group log-rank over the cohorts, stratified by study where several answer */
+  logrank: LogRankK | null;
+  /** why there is no test */
+  noTest?: string;
+  excludedStudies?: { study: string; reason: string }[];
+}
+
+export interface MultistateView {
+  note?: string;
+  kind: "multistate"; cohorts?: string[];
+  /** the progression event (default event type Diagnosis, key PROGRESSION, values Y / Yes), and an optional probability floor */
+  progression?: { eventType?: string; key?: string; values?: string[]; probabilityKey?: string; minProbability?: number };
+  /** patients with a progression on or before day 0: start in the progression state (include, default) or are left out (exclude) */
+  prevalent?: "include" | "exclude";
+  /** months at which the state occupation is tabled (default [12, 24, 60]) */
+  horizons?: number[];
+  /** administrative censoring, months */
+  cutoffMonths?: number;
+}
+/** a transition of the illness–death model: 01 start → progression, 02 start → death, 12 progression → death */
+export type MultistateTransitionKey = "01" | "02" | "12";
+export interface MultistateRate {
+  key: MultistateTransitionKey; events: number; personMonths: number;
+  /** events per 100 person-months in the state left, with its 95% interval (log scale, Poisson) */
+  rate: number; lo: number | null; hi: number | null;
+}
+export interface MultistateCohort {
+  cohort: string;
+  /** the cohort's patients; those in the model (n), and of them those starting in the progression state */
+  cohortPatients: number; n: number; prevalent: number;
+  excluded: { noFollowup: number; prevalent: number };
+  /** in the model: patients with no record of the progression key at all, a progression only on or after the end of follow-up, a Sequencing event on day 0, a timeline past follow-up */
+  notAssessed: number; afterEnd: number; seq0: number; late: number;
+  /** censored in the start and in the progression state */
+  censored: { start: number; progression: number };
+  rates: MultistateRate[];
+  /** Aalen–Johansen state occupation: p0 alive without progression, p1 alive after progression, p2 dead */
+  occupation: { t: number; p0: number; p1: number; p2: number }[];
+  /** Nelson–Aalen cumulative hazard per transition, with its 95% interval (log scale) */
+  cumhaz: Record<MultistateTransitionKey, { t: number; h: number; lo: number; hi: number }[]>;
+  /** curves are drawn to here: the last time at least 10 of the cohort's patients are still followed */
+  drawnTo: number;
+  /** occupation at each horizon, with the number still followed; null past drawnTo */
+  atHorizon: { months: number; p0: number | null; p1: number | null; p2: number | null; atRisk: number }[];
+}
+export interface MultistateCox {
+  key: MultistateTransitionKey;
+  /** each cohort's hazard ratio against the first (a Cox model per transition, stratified by study) */
+  rows: { cohort: string; hr: number; lo: number; hi: number; p: number }[];
+  n: number; events: number;
+  /** why it was not fitted */
+  noFit?: string;
+}
+export interface MultistateResult {
+  progression: { eventType: string; key: string; values: string[]; probabilityKey?: string; minProbability?: number };
+  prevalent: "include" | "exclude"; horizons: number[]; cutoffMonths?: number;
+  /** the figures' time axis end: the latest cohort's drawnTo */
+  tMax: number;
+  /** "first sequencing" when day 0 is a Sequencing event for most patients, else "the timeline's day 0" */
+  origin: string;
+  cohorts: MultistateCohort[];
+  /** reference cohort for the hazard ratios */
+  reference: string;
+  cox: MultistateCox[];
+  excludedStudies?: { study: string; reason: string }[];
+}
+
+export interface RmstView {
+  note?: string;
+  kind: "rmst"; cohorts?: string[];
+  /** the endpoint (default OS), its <endpoint>_MONTHS/_STATUS columns or monthsAttribute/statusAttribute */
+  endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
+  /** start the clock at a treatment record instead of day 0 (overall survival from it; txendpoints' anchor and clock check) */
+  anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** the restriction time, months; default the largest time at which every cohort still has 10 at risk */
+  tau?: number;
+  /** landmarks, months: each keeps the patients still followed then and restarts the clock there (default [0]) */
+  landmarkMonths?: number[];
+}
+export interface RmstCurve extends Omit<KmCurve, "cohort"> {
+  cohort: string;
+  /** restricted mean survival time to tau, its standard error and 95% interval, months */
+  rmst: number; se: number; lo: number; hi: number;
+  /** the number at risk just before tau */
+  atRiskTau: number;
+  /** patients dropped at the landmark: died or censored before it */
+  beforeLandmark: number;
+}
+export interface RmstComparison {
+  cohort: string; vs: string;
+  /** RMST difference (cohort − vs) and ratio (cohort / vs), each with a 95% interval and a two-sided p */
+  diff: number; diffLo: number; diffHi: number; diffP: number;
+  ratio: number; ratioLo: number; ratioHi: number; ratioP: number;
+}
+export interface RmstPanel {
+  landmark: number; tau: number;
+  /** whether tau was set in the view or is the default (every cohort ≥ 10 at risk) */
+  tauSet: boolean;
+  curves: RmstCurve[];
+  comparisons: RmstComparison[];
+}
+export interface RmstResult {
+  endpointLabel: string; anchoredTo?: string;
+  panels: RmstPanel[];
+  /** per cohort: its patients, and those without follow-up (or without the anchor) */
+  cohorts: { cohort: string; cohortPatients: number; n: number; noFollowup: number; noAnchor: number }[];
+  excludedStudies?: { study: string; reason: string }[];
+}
+
+export interface PredictiveView {
+  note?: string;
+  kind: "predictive"; cohorts?: string[];
+  /** the exposure: patients with a timeline event of this type (and key = value) are exposed, the rest unexposed */
+  exposure: { eventType: string; key?: string; value?: string };
+  /** the candidate biomarkers (at most 20); each is fitted alone, over the patients profiled for it */
+  genes: string[];
+  endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
+  /** "any" mutation (default) or OncoKB drivers only */
+  measure?: "any" | "driver";
+  /** clinical attributes adjusted for (at most 6): numbers as they are, categories as indicators against the commonest level */
+  covariates?: string[];
+  /** a gene is fitted only with at least this many mutated patients in each exposure group (default 5) */
+  minMutated?: number;
+}
+export interface PredictiveEffect { hr: number; ciLow: number; ciHigh: number; p: number }
+export interface PredictiveGene {
+  gene: string;
+  /** patients profiled for the gene (and with every covariate), by exposure, and those of them mutated */
+  exposed: number; unexposed: number; mutatedExposed: number; mutatedUnexposed: number; events: number;
+  /** the gene's hazard ratio among the exposed and among the unexposed, and their ratio (the interaction); null when not fitted */
+  inExposed: PredictiveEffect | null; inUnexposed: PredictiveEffect | null; interaction: PredictiveEffect | null;
+  /** Benjamini–Hochberg over the fitted genes' interaction p */
+  q: number | null;
+  /** why the gene was not fitted */
+  skipped?: string;
+}
+export interface PredictiveResult {
+  exposure: string; endpoint: string; measure: "any" | "driver";
+  /** patients with a survival time and every covariate, and how many of them are exposed */
+  n: number; exposed: number; events: number;
+  /** patients left out: no mutation panel on record, a covariate missing */
+  notProfiled: number; noCovariate: number;
+  covariates: string[]; minMutated: number;
+  /** the fits' baseline hazard is stratified by these (cohort and study, when several) */
+  strata: number;
+  genes: PredictiveGene[];
+}
+
+export interface CutpointView {
+  note?: string;
+  kind: "cutpoint"; cohorts?: string[];
+  /** the numeric marker (default TMB_NONSYNONYMOUS): the patient's value, or a sample attribute's value on the patient's first sample */
+  attribute?: string;
+  endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
+  /** permutations of the marker for the corrected p (default 1000, 100 to 5000), and their seed (default 1) */
+  permutations?: number; seed?: number;
+  /** a categorical attribute: a cut-point per stratum (its largest values, at most 8, each with at least minStratum patients) */
+  stratifyBy?: string; minStratum?: number;
+}
+export interface CutpointScan {
+  /** patients with a survival time and a marker value, and their events */
+  n: number; events: number;
+  /** the chosen cut: high is marker > cut */
+  cut: number;
+  /** the share of patients at or below it */
+  lowShare: number;
+  /** the maximally selected standardized log-rank statistic (z², chi-squared scale) at the cut, and its permutation-corrected p */
+  maxStat: number; permP: number;
+  /** the ordinary log-rank test of the two groups at the cut, as if the cut had been fixed in advance */
+  naiveChi2: number; naiveP: number;
+  /** the 95th percentile of the permutation distribution of the maximum: the statistic a cut must pass to be significant at 0.05 */
+  critical95: number;
+  /** high against low, Cox */
+  hr: { hr: number; ciLow: number; ciHigh: number; p: number } | null;
+  low: { n: number; events: number; median: number | null }; high: { n: number; events: number; median: number | null };
+  /** candidate cuts scanned and the statistic at each */
+  candidates: { cut: number; stat: number }[];
+}
+export interface CutpointResult extends CutpointScan {
+  attribute: string; endpoint: string; permutations: number; seed: number;
+  /** cohort patients with a survival time but no marker value */
+  noValue: number;
+  curves: { low: Omit<KmCurve, "cohort">; high: Omit<KmCurve, "cohort"> };
+  strata?: {
+    attribute: string; minStratum: number;
+    rows: ({ stratum: string } & Omit<CutpointScan, "candidates">)[];
+    /** strata not scanned: too small, past the eighth, or no value */
+    omitted: { values: number; patients: number };
+  };
+}
+
+/**
+ * HLA class I genotype and HLA loss of heterozygosity against outcome (Chowell et al. 2018;
+ * McGranahan et al. 2017): per cohort, the share of fully typed patients homozygous at 0, 1 or
+ * 2+ of HLA-A, -B and -C, the share with HLA LOH in a tumour sample, and overall survival by
+ * homozygous-at-any-locus against fully heterozygous and by HLA LOH against none.
+ */
+export interface HlaView {
+  note?: string;
+  kind: "hla"; cohorts?: string[];
+  /** fields of the allele name compared: 1 (allele group, A*02), 2 (protein, A*02:01; default) or "full" */
+  resolution?: 1 | 2 | "full";
+  /** per locus, the attributes holding its two alleles ([first, second]) or one holding both ("A*02:01/A*24:02"); default: the layouts MSK-IMPACT and the melanoma/NSCLC immunotherapy studies use */
+  alleles?: { A?: string[]; B?: string[]; C?: string[] };
+  /** sample attributes calling HLA LOH (default HLA_A1_LOH … HLA_C2_LOH, HLA_LOH) and the values that mean loss (default Loss, Yes, LOH, True) */
+  lohAttributes?: string[]; lohValues?: string[];
+  endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
+  /** clinical attributes the adjusted Cox fit adds (at most 4; numbers as they are, categories against the commonest) */
+  covariates?: string[];
+}
+export interface HlaHr { hr: number; ciLow: number; ciHigh: number; p: number; n: number; events: number }
+export interface HlaSplit {
+  /** the two groups' OS curves (exposed first), the log-rank test (stratified by study when pooled) and Cox HRs of exposed against not */
+  curves: (Omit<KmCurve, "cohort"> & { label: string })[];
+  logrank: LogRank | null;
+  hr: HlaHr | null;
+  /** with covariates: the HR adjusted for them, on the patients with every covariate */
+  adjusted: HlaHr | null;
+}
+export interface HlaPanel {
+  cohort: string;
+  /** cohort patients, patients with any class I allele recorded, and those typed at all three loci */
+  patients: number; anyTyped: number; typed: number;
+  /** fully typed patients homozygous at 0, 1, 2 and 3 loci */
+  homozygous: [number, number, number, number];
+  /** per locus (A, B, C): patients typed there and homozygous there */
+  loci: { locus: "A" | "B" | "C"; typed: number; homozygous: number }[];
+  /** typed at fewer allele-name fields than the resolution asks (compared at what they have) */
+  coarser: number;
+  /** patients with an HLA LOH call in some sample, and those with a loss */
+  lohEvaluated: number; loh: number;
+  /** OS by homozygous at ≥ 1 locus vs none, and by HLA LOH vs none; null with why when not drawn */
+  byHomozygosity: HlaSplit | null; byHomozygosityWhy?: string;
+  byLoh: HlaSplit | null; byLohWhy?: string;
+  /** patients without the endpoint, and (with covariates) without a covariate, left out of the fits */
+  noOutcome: number; noCovariate: number;
+}
+export interface HlaResult {
+  resolution: 1 | 2 | "full"; endpoint: string; covariates: string[];
+  panels: HlaPanel[];
 }
 
 export interface LabsView {
@@ -1531,8 +2336,8 @@ import type { PlotAxis, PlotData } from "./plot.ts";
 import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView | ActionabilityView | DrivernegativeView | OrganotropismView | MolsubtypeView | GermlineView
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | MultistateView | RmstView | PredictiveView | CutpointView | HlaView | InstabilityView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
 export type ViewKind = View["kind"];
@@ -1877,6 +2682,27 @@ export interface ViewResultFields {
   logistic: {
     logistic?: LogisticResult;
   };
+  forest: {
+    forest?: ForestResult;
+  };
+  adjusted: {
+    adjusted?: AdjustedResult;
+  };
+  actionability: {
+    actionability?: ActionabilityResult;
+  };
+  drivernegative: {
+    drivernegative?: DrivernegativeResult;
+  };
+  organotropism: {
+    organotropism?: OrganotropismResult;
+  };
+  molsubtype: {
+    molsubtype?: MolsubtypeResult;
+  };
+  germline: {
+    germline?: GermlineResult;
+  };
   course: {
     course?: CourseSeries[];
     /** bin width and window actually used, in months */
@@ -1937,6 +2763,18 @@ export interface ViewResultFields {
   paired: {
     paired?: PairedResult;
   };
+  acquired: {
+    acquired?: AcquiredResult;
+  };
+  ctdna: {
+    ctdna?: CtdnaResult;
+  };
+  exclusivity: {
+    exclusivity?: ExclusivityResult;
+  };
+  instability: {
+    instability?: InstabilityResult;
+  };
   clonality: {
     clonality?: ClonalityResult;
   };
@@ -1945,6 +2783,24 @@ export interface ViewResultFields {
   };
   labs: {
     labs?: LabsResult;
+  };
+  txendpoints: {
+    txendpoints?: TxendpointsResult;
+  };
+  multistate: {
+    multistate?: MultistateResult;
+  };
+  rmst: {
+    rmst?: RmstResult;
+  };
+  predictive: {
+    predictive?: PredictiveResult;
+  };
+  hla: {
+    hla?: HlaResult;
+  };
+  cutpoint: {
+    cutpoint?: CutpointResult;
   };
   riskmodel: {
     riskmodel?: RiskmodelResult;
@@ -1985,13 +2841,13 @@ export interface ViewResultFields {
  * nor waits for cohorts). The oncoprint has none: it carries its figure or its spec, by request.
  */
 export interface ViewResultMain {
-  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; course: "course"; sequence: "sequence";
+  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; adjusted: "adjusted"; actionability: "actionability"; drivernegative: "drivernegative"; organotropism: "organotropism"; molsubtype: "molsubtype"; germline: "germline"; course: "course"; sequence: "sequence";
   hotspots: "hotspots"; plot: "plot"; coexpression: "coexpression"; clinical: "clinical"; cooccurrence: "pairs";
   oncoprint: never; attrition: "attrition"; genome: "genome"; pathways: "pathways"; diffexpr: "diffexpr";
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
   cancertypes: "cancertypes"; overlap: "overlap"; enrichment: "enrichment"; assays: "assays";
   composition: "composition"; correlates: "correlates"; table: "table"; timeline: "timeline";
-  mutations: "mutations"; alterations: "alterations";
+  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity"; txendpoints: "txendpoints"; multistate: "multistate"; rmst: "rmst"; predictive: "predictive"; cutpoint: "cutpoint"; hla: "hla"; instability: "instability";
 }
 /** a result that was drawn: no error, not waiting, and its main field present */
 type Drawn<K extends ViewKind> = { error?: undefined; empty?: undefined } & ViewResultFields[K]

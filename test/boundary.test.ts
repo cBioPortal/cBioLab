@@ -290,6 +290,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   const LAB = { eventType: "Lab_Test", testKey: "TEST", test: "PSA", resultKey: "RESULT" };
   const LAB_ANCHOR = { eventType: "Treatment", key: "SUBTYPE", value: "Hormone", occurrence: "FIRST" as const };
   const LAB_OPTS = { baselineDays: 90, fromDays: -84, toDays: 364, binDays: 28 };
+  const ACQ = { anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Hormone" }, sampleEvents: ["Sample acquisition", "Sequencing"], sampleKey: "SAMPLE_ID", preWindowDays: null, minGapDays: 30 };
+  const CTD = { attribute: "SAMPLE_CLASS", plasma: ["cfDNA", "ctDNA"], tissue: ["Tumor"], plasmaPanels: [] as string[], withinDays: null as number | null, sampleEvents: ["Sequencing"], sampleKey: "SAMPLE_ID" };
   const BUILDERS: Record<string, () => string> = {
     // Plots: an axis selects (id, value) per case, but every builder here groups the id away.
   // If one ever projected a case id, this suite is what would stop it reaching a peer.
@@ -379,6 +381,26 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "pairedCountsSql:scan": () => federation.pairedCountsSql(cohortSql, "x", "db", null, { attribute: "IMPACT_PRE_POST", a: ["PRE-TX"], b: ["POST-TX"] }, "v7.5", "driver"),
     "pairedCountsSql:scan:any": () => federation.pairedCountsSql(cohortSql, "x", "db", null, { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }, null, "any"),
     "pairedPatientsSql": () => federation.pairedPatientsSql(cohortSql, "x", "db", { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }),
+    // acquired: `pick`/`ps` hold each patient's before and after sample; the outer SELECTs count them per gene or along the funnel
+    "acquiredCountsSql": () => federation.acquiredCountsSql(cohortSql, "x", "db", ["TP53", "ESR1"], ACQ, "v7.5", "driver"),
+    "acquiredCountsSql:scan-any": () => federation.acquiredCountsSql(cohortSql, "x", "db", null, { ...ACQ, preWindowDays: 365 }, null, "any"),
+    "acquiredFunnelSql": () => federation.acquiredFunnelSql(cohortSql, "x", "db", ACQ),
+    // ctdna: `classed`/`sides`/`ps` hold samples by kind; the outer SELECTs count them per gene, along the funnel, or per (detected, months, dead)
+    "ctdnaCountsSql": () => federation.ctdnaCountsSql(cohortSql, "x", "db", ["EGFR"], CTD, "v7.5", "driver"),
+    "ctdnaCountsSql:dated-panels": () => federation.ctdnaCountsSql(cohortSql, "x", "db", null, { ...CTD, plasmaPanels: ["ACCESS129"], withinDays: 90 }, null, "any"),
+    "ctdnaFunnelSql": () => federation.ctdnaFunnelSql(cohortSql, "x", "db", CTD, "v7.5", "driver"),
+    // exclusivity: `sp`/`altc`/`per` hold samples; the outer SELECTs count them per (panel signature, stratum, burden, mask) or per gene
+    "exclusivityGroupsSql": () => federation.exclusivityGroupsSql(cohortSql, "x", "db", ["KRAS", "EGFR"], "CANCER_TYPE", "v7.5", "driver"),
+    "exclusivityGroupsSql:any": () => federation.exclusivityGroupsSql(cohortSql, "x", "db", ["KRAS", "EGFR", "TP53"], null, null, "any"),
+    "exclusivityColumnsSql": () => federation.exclusivityColumnsSql(cohortSql, "x", "db", null, null, "any"),
+    "exclusivityCoverageSql": () => federation.exclusivityCoverageSql(cohortSql, "x", "db"),
+    // instability: `parts`/`arms`/`calls`/`per` hold samples' segments and calls; the outer SELECTs are histograms and per-arm counts
+    "instabilityScoresSql": () => federation.instabilityScoresSql(cohortSql, "x", "db", { threshold: 0.2, armShare: 0.5, includeX: false }),
+    "instabilityArmsSql": () => federation.instabilityArmsSql(cohortSql, "x", "db", { threshold: 0.3, armShare: 0.8, includeX: true }),
+    "ctdnaCountsSql:ch": () => federation.ctdnaCountsSql(cohortSql, "x", "db", ["EGFR"], { ...CTD, ch: { genes: ["DNMT3A", "TET2"], normalMinAlt: 2, normalMinRatio: 0.3 } }, "v7.5", "driver"),
+    "ctdnaFunnelSql:ch-genes-only": () => federation.ctdnaFunnelSql(cohortSql, "x", "db", { ...CTD, ch: { genes: ["DNMT3A"], normalMinAlt: null, normalMinRatio: 0.3 } }, null, "any"),
+    "ctdnaChRemovedSql": () => federation.ctdnaChRemovedSql(cohortSql, "x", "db", { ...CTD, ch: { genes: ["DNMT3A"], normalMinAlt: 2, normalMinRatio: 0.3 } }),
+    "ctdnaSurvivalSql": () => federation.ctdnaSurvivalSql(cohortSql, "x", "db", { ...CTD, withinDays: 30 }, null, "any"),
     "sampleAttributeValuesSql": () => federation.sampleAttributeValuesSql(cohortSql, "x", "db", "SAMPLE_TYPE"),
     // clonality: `calls` is per (gene, sample); only per-gene counts and CCF bins leave
     "clonalityGenesSql": () => federation.clonalityGenesSql(cohortSql, "x", "db", ["TP53"], "v7.5", "driver", true),
@@ -389,6 +411,14 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // incidence: `per`/`cls` are per patient; the outer SELECT groups them into (kind, entry, t, cause) tallies
     "incidenceCountsSql": () => federation.incidenceCountsSql(cohortSql, "x", "db", { eventType: "Diagnosis", attrs: [{ key: "TUMOR_SITE", value: "CNS/Brain" }] }, null),
     "incidenceCountsSql:anchored": () => federation.incidenceCountsSql(cohortSql, "x", "db", { eventType: "Status" }, { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" }),
+    // txendpoints: `per`/`cls` are per patient; the outer SELECT groups them into (kind, entry, t, ev) tallies
+    "txEndpointCountsSql:ttnt": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "ttnt", anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Immuno" }, lines: { gap: 90 } }),
+    "txEndpointCountsSql:tot": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "tot", anchor: { eventType: "Treatment", key: "AGENT", value: "PEMBROLIZUMAB", occurrence: "LAST" }, lines: { gap: 60, classes: "all" }, ongoingDays: 30 }),
+    "txEndpointCountsSql:rwpfs": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "rwpfs", anchor: { eventType: "Treatment" }, lines: { gap: 90 },
+      progression: { eventType: "Diagnosis", key: "PROGRESSION", values: ["Y", "Yes"], probabilityKey: "NLP_PROGRESSION_PROBABILITY", minProbability: 0.8 } }),
+    "txEndpointCountsSql:os": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "os", anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Immuno" }, lines: { gap: 90 } }),
+    // multistate: `per`/`cls` are per patient; the outer SELECT groups them into (prevalent, tp, te, dead, flags) tallies
+    "multistateCountsSql": () => federation.multistateCountsSql(cohortSql, "x", "db", { eventType: "Diagnosis", key: "PROGRESSION", values: ["Y", "Yes"], probabilityKey: "NLP_PROGRESSION_PROBABILITY", minProbability: 0.8 }),
     // labs: per-patient % changes stay inside; the course and best-response queries return histograms
     "labCourseSql": () => federation.labCourseSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS),
     "labBestSql": () => federation.labBestSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 50),
@@ -397,7 +427,45 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // run only by PatientLevelResolver.viewRows: one row per patient, values only
     "riskmodelRowsSql": () => federation.riskmodelRowsSql(cohortSql, "x", "db", { endpoint: "OS", strata: "CANCER_TYPE", driverPin: "v7",
       covariates: ["AGE", "STAGE"], anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Immuno" } }),
+    // run only by PatientLevelResolver.viewRows: one row per patient, panels, genes and covariate values only
+    "adjustedRowsSql": () => federation.adjustedRowsSql(cohortSql, "x", "db", { covariates: ["MSI_TYPE", "TMB_NONSYNONYMOUS"], driverPin: "v7.5" }),
+    "adjustedRowsSql:no-covariates": () => federation.adjustedRowsSql(cohortSql, "x", "db", { covariates: [] }),
+    // actionability: per-sample and per-patient levels stay in CTEs; patients are counted per level
+    "actionLevelsSql": () => federation.actionLevelsSql(cohortSql, "x", "db", "v7.5", "CANCER_TYPE"),
+    "actionLevelsSql:ungrouped": () => federation.actionLevelsSql(cohortSql, "x", "db", "v7.5", null),
+    "actionConcordanceSql": () => federation.actionConcordanceSql(cohortSql, "x", "db", "v7.5", { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }),
+    "actionStoreTypesSql": () => federation.actionStoreTypesSql("x", "db", "v7.5"),
+    // drivernegative: per-patient groups stay in CTEs; patients are counted per group and gene
+    "dnegGroupsSql": () => federation.dnegGroupsSql(cohortSql, "x", "db", "v7.5", ["EGFR", "KRAS", "ALK"]),
+    "dnegAlteredSql": () => federation.dnegAlteredSql(cohortSql, "x", "db", "v7.5", ["EGFR", "KRAS"], "mutation", false),
+    "dnegAlteredSql:sv-drivers": () => federation.dnegAlteredSql(cohortSql, "x", "db", "v7.5", ["EGFR"], "sv", true),
+    "dnegProfiledSql": () => federation.dnegProfiledSql(cohortSql, "x", "db", "v7.5", ["EGFR", "KRAS"], "mutation"),
+    // organotropism: per-patient sites, panels and alterations stay in CTEs; the outer SELECTs count
+    "orgSourcesSql": () => federation.orgSourcesSql(cohortSql, "x", "db", { prefix: "DMETS_DX_", eventType: "Diagnosis", key: "TUMOR_SITE", attribute: "METASTATIC_SITE" }),
+    "orgSitesSql:flags": () => federation.orgSitesSql(cohortSql, "x", "db", { kind: "flags", prefix: "DMETS_DX_" }),
+    "orgSitesSql:timeline": () => federation.orgSitesSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }),
+    "orgSitesSql:sample": () => federation.orgSitesSql(cohortSql, "x", "db", { kind: "sample", attribute: "METASTATIC_SITE" }),
+    "orgOtherValuesSql": () => federation.orgOtherValuesSql(cohortSql, "x", "db", "METASTATIC_SITE"),
+    "orgTopGenesSql": () => federation.orgTopGenesSql(cohortSql, "x", "db", { alteration: "mutation", driverPin: "v7.5" }, 12),
+    "orgCountsSql": () => federation.orgCountsSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }, { genes: ["EGFR", "TP53"], alteration: "mutation", driverPin: null }, "CANCER_TYPE"),
+    // molsubtype: each patient's class stays in CTEs; patients are counted per class, group and survival time
+    "molCountsSql": () => federation.molCountsSql(cohortSql, "x", "db", { poleHotspots: ["P286R", "V411L"], msi: { attribute: "MSI_TYPE", high: ["Instable"], stable: ["Stable"] }, p53Pin: "v7.5", by: "ANCESTRY_LABEL" }),
+    "molCountsSql:score": () => federation.molCountsSql(cohortSql, "x", "db", { poleHotspots: ["P286R"], msi: { attribute: "MSI_SCORE", threshold: 10, stableBelow: 3 }, p53Pin: null, by: null }),
+    "molSurvivalSql": () => federation.molSurvivalSql(cohortSql, "x", "db", { poleHotspots: ["P286R"], msi: { attribute: "MSI_TYPE", high: ["Instable"], stable: ["Stable"] }, p53Pin: "v7.5", by: null }),
+    "molMsiAttributesSql": () => federation.molMsiAttributesSql(cohortSql, "x", "db"),
+    // germline: carriers, somatic hits and panels stay in CTEs; patients are counted per gene and combination
+    "germCarriersSql": () => federation.germCarriersSql(cohortSql, "x", "db"),
+    "germCountsSql": () => federation.germCountsSql(cohortSql, "x", "db", ["BRCA1", "BRCA2"]),
+    "germSurvivalSql": () => federation.germSurvivalSql(cohortSql, "x", "db", "BRCA2"),
+    "orgIncidenceSql": () => federation.orgIncidenceSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }, { genes: ["EGFR"], alteration: "mutation", driverPin: "v7.5" }, true, "CNS/Brain"),
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),
+    // run only by PatientLevelResolver.viewRows: one row of values per patient, no identifier
+    "cutpointRowsSql": () => federation.cutpointRowsSql(cohortSql, "x", "db", { attribute: "TMB_NONSYNONYMOUS", months: "OS_MONTHS", status: "OS_STATUS" }),
+    // run only by PatientLevelResolver.viewRows: one row of genotype, LOH, endpoint and covariate values per patient, no identifier
+    "hlaRowsSql": () => federation.hlaRowsSql(cohortSql, "x", "db", { loci: ["A", "B", "C"].map((l) => ({ first: ["HLA-" + l + "1"], second: ["HLA-" + l + "2"], pair: ["HLA_" + l] })),
+      fields: 2, lohAttributes: ["HLA_A1_LOH"], lohValues: ["Loss"], months: "OS_MONTHS", status: "OS_STATUS", covariates: ["TMB_SCORE", "CANCER_TYPE"] }),
+    "hlaAttributesSql": () => federation.hlaAttributesSql(cohortSql, "x", "db"),
+    "cutpointRowsSql:stratified": () => federation.cutpointRowsSql(cohortSql, "x", "db", { attribute: "TMB_NONSYNONYMOUS", months: "OS_MONTHS", status: "OS_STATUS", stratum: "CANCER_TYPE" }),
     "labTestsSql": () => federation.labTestsSql(cohortSql, "x", "db", "Lab_Test", "TEST"),
     // cancertypes: `alt`/`per`/`covered` hold samples; the outer SELECT counts them per group
     "cancerTypesSql": () => federation.cancerTypesSql(cohortSql, "x", "db", ["KRAS", "NRAS"], "CANCER_TYPE", "v7.5", "driver"),

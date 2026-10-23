@@ -18,14 +18,21 @@ import { parseExamplesUrl } from "../../lib/site.ts";
 import type { CohortDef } from "../../lib/types.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import CohortPills from "./pills";
+import { isNewKind } from "../../lib/new-in-lab.ts";
+import { NewMark } from "./new-mark.tsx";
 
 /** a tag filter: an outline chip, filled while it is the one shown */
 const TAG = "group rounded-pill px-2.5 text-sm font-normal aria-pressed:border-link aria-pressed:bg-link aria-pressed:text-card aria-pressed:hover:bg-link/90 aria-pressed:hover:text-card";
+/** the views and topics lists: links flowing down columns, the chosen one in bold */
+const FACET_COLS = "mt-1 columns-[11rem] gap-x-6";
+const FACET_ITEM = "items-baseline text-sm font-normal aria-pressed:font-semibold aria-pressed:text-foreground aria-pressed:underline";
 const TAG_N = "text-muted-foreground group-aria-pressed:text-card/80";
 const FEATURES = new Map(EXAMPLES.map(e => [e, exampleFeatures(e)]));
 const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
 const VIEWS = [...new Set([...FEATURES.values()].flatMap(f => f.views))].sort(byName);
 const TOPICS = [...new Set([...FEATURES.values()].flatMap(f => f.topics))].sort(byName);
+/** chips (a view kind, or a topic) under which at least one example draws a NEW view */
+const HAS_NEW = new Set([...FEATURES.values()].filter(f => f.views.some(isNewKind)).flatMap(f => [...f.views.filter(isNewKind), ...f.topics]));
 const has = (ex: DslExample, t: string) => { const f = FEATURES.get(ex)!; return f.views.includes(t) || f.topics.includes(t); };
 
 const hostOf = (url: string) => { try { return new URL(url).host; } catch { return url; } };
@@ -85,12 +92,14 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
   useEffect(() => () => onQuery(latest.current), [onQuery]);
   const searched = EXAMPLES.filter(e => matchesSearch(e, draft));
   const shown = tag === "all" ? searched : searched.filter(e => has(e, tag));
-  const chip = (t: string) => {
+  const item = (t: string) => {
     const n = searched.filter(e => has(e, t)).length;
     return (
-      <Button key={t} variant="outline" size="xs" className={cn(TAG, n === 0 && "opacity-50")} aria-pressed={tag === t} onClick={() => onTag(tag === t ? "all" : t)}>
-        {t} <span className={TAG_N}>{n}</span>
-      </Button>
+      <div key={t} className="break-inside-avoid py-0.5">
+        <Button variant="link" size="inline" className={cn(FACET_ITEM, n === 0 && "opacity-50")} aria-pressed={tag === t} onClick={() => onTag(tag === t ? "all" : t)}>
+          <span className="inline-block first-letter:uppercase">{t}</span> <span className="text-muted-foreground">{n}</span>{HAS_NEW.has(t) && <NewMark />}
+        </Button>
+      </div>
     );
   };
 
@@ -132,8 +141,8 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
             all <span className={TAG_N}>{searched.length}</span>
           </Button>
         </div>
-        <div className="extags exfacet"><span className="exfacet-l">views</span>{VIEWS.map(chip)}</div>
-        <div className="extags exfacet"><span className="exfacet-l">topics</span>{TOPICS.map(chip)}</div>
+        <div className="exfacet"><div className="exfacet-l">views</div><div className={FACET_COLS}>{VIEWS.map(item)}</div></div>
+        <div className="exfacet"><div className="exfacet-l">topics</div><div className={FACET_COLS}>{TOPICS.map(item)}</div></div>
       </div>
 
       {shown.length === 0 && (
@@ -152,7 +161,7 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
           const { views, topics } = FEATURES.get(ex)!;
           return (
             <div className="card excard" key={ex.title}>
-              <h3>{ex.title}</h3>
+              <h3>{ex.title}{views.some(isNewKind) && <NewMark />}</h3>
               <div className="extags small">
                 {views.map(k => <span key={k} className="vkind" title="a view this example draws">{k}</span>)}
                 {topics.map(t => <span key={t} className="extag is-static">{t}</span>)}

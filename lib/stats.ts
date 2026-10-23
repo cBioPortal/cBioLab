@@ -96,6 +96,37 @@ export function kaplanMeier(data: SurvRecord[]): Omit<KmCurve, "cohort"> {
 }
 
 /**
+ * The Kaplan–Meier median with its 95% interval, read off the pointwise band of S(t) — Greenwood
+ * variance on the log scale (R survfit's default conf.type "log"): the lower end is the first time
+ * the band's lower edge reaches 0.5, the upper end the first time its upper edge does. Null where a
+ * curve never gets there. Same risk sets as kaplanMeier, delayed entry included.
+ */
+export function kmMedianCi(data: SurvRecord[]): { median: number | null; lo: number | null; hi: number | null } {
+  const clean = data.filter(d => Number.isFinite(d.t) && d.t >= 0).filter(observable).sort((x, y) => x.t - y.t);
+  const atRiskAt = riskSweep(clean);
+  let s = 1, v = 0, i = 0;
+  let median: number | null = null, lo: number | null = null, hi: number | null = null;
+  while (i < clean.length) {
+    const t = clean[i].t;
+    let d = 0;
+    while (i < clean.length && clean[i].t === t) { if (clean[i].event) d++; i++; }
+    const n = atRiskAt(t);
+    if (d > 0 && n > 0) {
+      s *= 1 - d / n;
+      v += n > d ? d / (n * (n - d)) : Infinity;
+      if (median === null && s <= 0.5) median = t;
+      // where S reaches 0 the log-scale band is undefined (R reports NA), so it sets no end
+      const half = Z_975 * Math.sqrt(v);
+      if (s > 0 && Number.isFinite(half)) {
+        if (lo === null && s * Math.exp(-half) <= 0.5) lo = t;
+        if (hi === null && s * Math.exp(half) <= 0.5) hi = t;
+      }
+    }
+  }
+  return { median, lo, hi };
+}
+
+/**
  * Administrative censoring at a fixed month: anyone still under observation past `cutoff`
  * is treated as censored AT the cutoff rather than dropped. Dropping would bias the risk set
  * (their at-risk time up to the cutoff is real and must still count); this only removes what
@@ -140,7 +171,8 @@ export function survivalAxis(curves: { points: { t: number }[] }[], opts?: { cut
 // when several subjects fail at once.
 // ---------------------------------------------------------------------------
 
-export interface CoxRow { t: number; event: number; x: number[]; stratum?: string }
+/** `entry`: delayed entry — the row is at risk only at times after it (counting-process (entry, t]); the caller passes rows with t > entry */
+export interface CoxRow { t: number; event: number; x: number[]; stratum?: string; entry?: number }
 export interface CoxFit {
   beta: number[]; se: number[]; hr: number[]; ciLow: number[]; ciHigh: number[]; p: number[];
   loglik: number; n: number; events: number; iterations: number;
@@ -205,6 +237,9 @@ function coxScore(rows: CoxRow[], beta: number[]): { ll: number; grad: number[];
     // risk set for time t is everyone with t' >= t, which is exactly what's been folded in
     // by the time the sweep reaches t, since the sweep goes from large t to small t.
     let cumExp = 0; const cumX = zeros(p), cumXX = zerosMat(p);
+    // with delayed entry, a row leaves the risk set once the sweep reaches its entry (latest entries first)
+    const late = srows.filter((r) => r.entry != null && r.entry > -Infinity).sort((a, b) => b.entry! - a.entry!);
+    let li = 0;
     let i = sorted.length - 1;
     while (i >= 0) {
       const t = sorted[i].t;
@@ -223,6 +258,12 @@ function coxScore(rows: CoxRow[], beta: number[]): { ll: number; grad: number[];
           for (let a = 0; a < p; a++) { tieX[a] += eb * row.x[a]; eventX[a] += row.x[a]; }
           for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) tieXX[a][b] += eb * row.x[a] * row.x[b];
         }
+      }
+      while (li < late.length && late[li].entry! >= t) {
+        const row = late[li++], eb = Math.exp(dot(beta, row.x));
+        cumExp -= eb;
+        for (let a = 0; a < p; a++) cumX[a] -= eb * row.x[a];
+        for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) cumXX[a][b] -= eb * row.x[a] * row.x[b];
       }
       if (dCount > 0) {
         ll += dot(beta, eventX);
@@ -904,6 +945,44 @@ export function fisherZMeta(parts: { r: number | null; n: number }[]): Correlati
   };
 }
 
+export interface MetaEstimate { beta: number; se: number; ciLow: number; ciHigh: number; p: number }
+export interface RandomEffectsMeta {
+  fixed: MetaEstimate; random: MetaEstimate;
+  /** between-study variance (DerSimonian–Laird moment estimator, truncated at 0) */
+  tau2: number;
+  /** Cochran's Q, its degrees of freedom and upper-tail p; I² as a share (0–1) */
+  q: number; df: number; qP: number; i2: number;
+  /** each part's share of the random-effects weight */
+  weights: number[];
+}
+
+/**
+ * Inverse-variance meta-analysis of per-stratum estimates on the log scale (log HR, log OR):
+ * the fixed-effect estimate, and the DerSimonian–Laird random-effects one, whose weights
+ * 1/(se² + τ²) let the strata's true effects differ. Wald 95% intervals on the log scale; the
+ * caller exponentiates. Needs at least two parts with a positive, finite se.
+ */
+export function dersimonianLaird(parts: { beta: number; se: number }[]): RandomEffectsMeta {
+  const ok = parts.filter((x) => Number.isFinite(x.beta) && Number.isFinite(x.se) && x.se > 0);
+  if (ok.length < 2 || ok.length !== parts.length) throw new Error("a random-effects meta-analysis needs at least two estimates, each with a positive, finite standard error");
+  const w = ok.map((x) => 1 / (x.se * x.se));
+  const sw = w.reduce((a, b) => a + b, 0), sw2 = w.reduce((a, b) => a + b * b, 0);
+  const bFixed = ok.reduce((a, x, i) => a + w[i] * x.beta, 0) / sw;
+  const q = ok.reduce((a, x, i) => a + w[i] * (x.beta - bFixed) ** 2, 0);
+  const df = ok.length - 1;
+  const tau2 = Math.max(0, (q - df) / (sw - sw2 / sw));
+  const ws = ok.map((x) => 1 / (x.se * x.se + tau2));
+  const sws = ws.reduce((a, b) => a + b, 0);
+  const bRandom = ok.reduce((a, x, i) => a + ws[i] * x.beta, 0) / sws;
+  const est = (beta: number, se: number): MetaEstimate =>
+    ({ beta, se, ciLow: beta - Z_975 * se, ciHigh: beta + Z_975 * se, p: normalP(beta / se) });
+  return {
+    fixed: est(bFixed, Math.sqrt(1 / sw)), random: est(bRandom, Math.sqrt(1 / sws)),
+    tau2, q, df, qP: chiSquareP(q, df), i2: q > df ? (q - df) / q : 0,
+    weights: ws.map((x) => x / sws)
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Median/IQR and a rank-based test, from a value HISTOGRAM alone — (value, count)
 // pairs are the complete, lossless distribution for a single-study cohort (nothing was
@@ -1160,6 +1239,54 @@ export function mcnemarExact(b: number, c: number): number {
   return Math.min(1, 2 * tail);
 }
 
+/** Wilson score interval for k successes in n trials at 95%; null for n = 0. */
+export function wilsonInterval(k: number, n: number): { low: number; high: number } | null {
+  if (!(n > 0)) return null;
+  const z2 = Z_975 * Z_975, ph = k / n, den = 1 + z2 / n;
+  const mid = (ph + z2 / (2 * n)) / den, half = (Z_975 / den) * Math.sqrt(ph * (1 - ph) / n + z2 / (4 * n * n));
+  return { low: Math.max(0, mid - half), high: Math.min(1, mid + half) };
+}
+
+/**
+ * Both tails of a Poisson-binomial count X = Σ Bernoulli(p) at x: P(X ≤ x) and P(X ≥ x), the
+ * trials given as groups of `n` alike. Exact (dynamic programming over the counts 0…x+1, the
+ * last state holding "more than x", so each tail is a sum of positive terms and keeps its
+ * precision) while trials × (x + 2) ≤ `maxWork`; past that, the refined normal approximation
+ * (Volkova 1996: the normal with a skewness correction and continuity correction), flagged.
+ */
+export function poissonBinomialTails(groups: { n: number; p: number }[], x: number, maxWork = 5e6):
+  { lower: number; upper: number; mean: number; exact: boolean } {
+  const gs = groups.filter((g) => g.n > 0 && g.p > 0);
+  const mean = gs.reduce((s, g) => s + g.n * g.p, 0);
+  const trials = gs.reduce((s, g) => s + g.n, 0);
+  if (x < 0) return { lower: 0, upper: 1, mean, exact: true };
+  if (trials * (x + 2) <= maxWork) {
+    const K = x + 1;
+    let d = new Float64Array(K + 1), e = new Float64Array(K + 1);
+    d[0] = 1;
+    for (const g of gs) {
+      const p = Math.min(1, g.p), q = 1 - p;
+      for (let t = 0; t < g.n; t++) {
+        e[0] = d[0] * q;
+        for (let k = 1; k < K; k++) e[k] = d[k] * q + d[k - 1] * p;
+        e[K] = d[K] + d[K - 1] * p;
+        [d, e] = [e, d];
+      }
+    }
+    let lower = 0;
+    for (let k = 0; k <= x; k++) lower += d[k];
+    return { lower: Math.min(1, lower), upper: Math.min(1, d[x] + d[K]), mean, exact: true };
+  }
+  const v = gs.reduce((s, g) => s + g.n * g.p * (1 - g.p), 0);
+  if (!(v > 0)) return { lower: x >= mean ? 1 : 0, upper: x <= mean ? 1 : 0, mean, exact: false };
+  const sd = Math.sqrt(v), gamma = gs.reduce((s, g) => s + g.n * g.p * (1 - g.p) * (1 - 2 * g.p), 0) / (sd * sd * sd);
+  const phi = (z: number) => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
+  const corr = (z: number) => gamma * (1 - z * z) * phi(z) / 6;
+  const zl = (x + 0.5 - mean) / sd, zu = (x - 0.5 - mean) / sd;
+  const clamp = (y: number) => Math.min(1, Math.max(0, y));
+  return { lower: clamp(erfc(-zl / Math.SQRT2) / 2 + corr(zl)), upper: clamp(erfc(zu / Math.SQRT2) / 2 - corr(zu)), mean, exact: false };
+}
+
 // ---------------------------------------------------------------------------
 // Competing risks: cumulative incidence (Aalen–Johansen) and Gray's test
 
@@ -1288,4 +1415,130 @@ export function grayPermutationTest(groups: CrRecord[][], permutations = 2000, s
     if (grayStatistic(order, t, cause, perm, entryOrder, entry, K) >= observed - 1e-12) beyond++;
   }
   return { statistic: observed, p: (beyond + 1) / (permutations + 1), permutations, groups: K };
+}
+
+// ---------------------------------------------------------------------------
+// Illness–death model: start → progression → death, and start → death, on one clock (Markov,
+// clock-forward: every transition's hazard is a function of time since the origin).
+
+/** One patient's path, months from the origin. */
+export interface IllnessDeathRecord {
+  /** already in the middle state (progressed) at time 0 */
+  prevalent: boolean;
+  /** the move into the middle state, strictly before `te`; null when none was observed (or prevalent) */
+  tp: number | null;
+  /** the end of follow-up: death when `dead`, else censoring */
+  te: number; dead: boolean;
+}
+export type IllnessDeathTransition = "01" | "02" | "12";
+export interface IllnessDeathFit {
+  n: number; prevalent: number;
+  /** events per transition, and censorings in the start (c0) and middle (c1) states */
+  events: Record<IllnessDeathTransition, number> & { c0: number; c1: number };
+  /** person-time spent in the start state and in the middle state */
+  personTime: { s0: number; s1: number };
+  /** Aalen–Johansen state occupation after each event time (p0 start, p1 middle, p2 dead); first point t = 0 */
+  occupation: { t: number; p0: number; p1: number; p2: number }[];
+  /** Nelson–Aalen cumulative hazard per transition at its event times, with the Aalen variance; first point t = 0 */
+  cumhaz: Record<IllnessDeathTransition, { t: number; h: number; v: number }[]>;
+}
+
+const lowerBound = (a: number[], x: number) => { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] < x) lo = m + 1; else hi = m; } return lo; };
+
+/**
+ * Nelson–Aalen and Aalen–Johansen for the illness–death model. At each event time t the start state's
+ * risk set is everyone not prevalent still in it (exit time ≥ t), the middle state's those who entered
+ * it before t and have not left (entry < t ≤ exit); a move into the middle state at t leaves the start
+ * state at t and is at risk of death only after it. The cumulative hazard of a transition rises by
+ * d/n; the occupation probabilities follow the product of (I + dA) from the initial distribution
+ * (the prevalent share starts in the middle state): p0 ← p0 (1 − (d01 + d02)/n0), p1 ← p1 (1 − d12/n1)
+ * + p0 d01/n0, p2 = 1 − p0 − p1.
+ */
+export function illnessDeath(recs: IllnessDeathRecord[]): IllnessDeathFit {
+  const n = recs.length;
+  const exit0: number[] = [], in1: number[] = [], out1: number[] = [];
+  const ev = new Map<number, [number, number, number]>();
+  const bump = (t: number, k: 0 | 1 | 2) => { const e = ev.get(t) || [0, 0, 0]; e[k]++; ev.set(t, e); };
+  const events = { "01": 0, "02": 0, "12": 0, c0: 0, c1: 0 };
+  let s0 = 0, s1 = 0, prevalent = 0;
+  for (const r of recs) {
+    if (r.prevalent) prevalent++;
+    else {
+      const x = r.tp ?? r.te;
+      exit0.push(x); s0 += x;
+      if (r.tp != null) { events["01"]++; bump(x, 0); }
+      else if (r.dead) { events["02"]++; bump(x, 1); }
+      else events.c0++;
+    }
+    if (r.prevalent || r.tp != null) {
+      const a = r.prevalent ? 0 : r.tp!;
+      in1.push(a); out1.push(r.te); s1 += r.te - a;
+      if (r.dead) { events["12"]++; bump(r.te, 2); } else events.c1++;
+    }
+  }
+  exit0.sort((a, b) => a - b); in1.sort((a, b) => a - b); out1.sort((a, b) => a - b);
+  const times = [...ev.keys()].sort((a, b) => a - b);
+  let p0 = n ? (n - prevalent) / n : 0, p1 = n ? prevalent / n : 0;
+  const occupation = [{ t: 0, p0, p1, p2: 0 }];
+  const H = [0, 0, 0], V = [0, 0, 0];
+  const cumhaz: IllnessDeathFit["cumhaz"] = { "01": [{ t: 0, h: 0, v: 0 }], "02": [{ t: 0, h: 0, v: 0 }], "12": [{ t: 0, h: 0, v: 0 }] };
+  const keys: IllnessDeathTransition[] = ["01", "02", "12"];
+  for (const t of times) {
+    const [d01, d02, d12] = ev.get(t)!;
+    const n0 = exit0.length - lowerBound(exit0, t);
+    const n1 = lowerBound(in1, t) - lowerBound(out1, t);
+    const a01 = n0 > 0 ? d01 / n0 : 0, a02 = n0 > 0 ? d02 / n0 : 0, a12 = n1 > 0 ? d12 / n1 : 0;
+    [[d01, n0], [d02, n0], [d12, n1]].forEach(([d, r], k) => {
+      if (d > 0 && r > 0) { H[k] += d / r; V[k] += d / (r * r); cumhaz[keys[k]].push({ t, h: H[k], v: V[k] }); }
+    });
+    const q0 = p0 * (1 - a01 - a02), q1 = p1 * (1 - a12) + p0 * a01;
+    p0 = q0; p1 = q1;
+    occupation.push({ t, p0, p1, p2: Math.max(0, 1 - p0 - p1) });
+  }
+  return { n, prevalent, events, personTime: { s0, s1 }, occupation, cumhaz };
+}
+
+// ---------------------------------------------------------------------------
+// Restricted mean survival time
+
+export interface Rmst { tau: number; rmst: number; se: number; lo: number; hi: number; n: number; events: number }
+
+/**
+ * The area under the Kaplan–Meier curve from 0 to `tau`, with the Greenwood-type standard error of
+ * that area (Klein & Moeschberger 4.5; R survRM2's rmst1): Var = Σ over event times t_j ≤ tau of
+ * A_j² d_j / (n_j (n_j − d_j)), A_j the area under the curve from t_j to tau, a term 0 where
+ * n_j = d_j. Same risk sets as kaplanMeier, delayed entry included. 95% interval on the mean's scale.
+ */
+export function rmst(data: SurvRecord[], tau: number): Rmst {
+  const clean = data.filter(d => Number.isFinite(d.t) && d.t >= 0).filter(observable).sort((x, y) => x.t - y.t);
+  const atRiskAt = riskSweep(clean);
+  const steps: { t: number; s: number; d: number; n: number }[] = [];
+  let s = 1, i = 0, events = 0;
+  while (i < clean.length && clean[i].t <= tau) {
+    const t = clean[i].t;
+    let d = 0;
+    while (i < clean.length && clean[i].t === t) { if (clean[i].event) d++; i++; }
+    const n = atRiskAt(t);
+    if (d > 0 && n > 0) { s *= 1 - d / n; steps.push({ t, s, d, n }); events += d; }
+  }
+  // the area after each event time, accumulated from tau backwards
+  let after = 0, v = 0;
+  for (let k = steps.length - 1; k >= 0; k--) {
+    const next = k + 1 < steps.length ? steps[k + 1].t : tau;
+    after += (next - steps[k].t) * steps[k].s;
+    const { d, n } = steps[k];
+    if (n > d) v += after * after * d / (n * (n - d));
+  }
+  const area = after + (steps.length ? steps[0].t : tau);
+  const se = Math.sqrt(v);
+  return { tau, rmst: area, se, lo: area - Z_975 * se, hi: area + Z_975 * se, n: clean.length, events };
+}
+
+/** The number at risk just before `t` (entered before it, not yet left), for each of `times`. */
+export function atRiskAtTimes(data: SurvRecord[], times: number[]): number[] {
+  const clean = data.filter(observable).sort((x, y) => x.t - y.t);
+  const order = times.map((t, k) => [t, k] as const).sort((a, b) => a[0] - b[0]);
+  const sweep = riskSweep(clean), out = new Array<number>(times.length).fill(0);
+  for (const [t, k] of order) out[k] = sweep(t);
+  return out;
 }

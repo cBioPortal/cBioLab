@@ -34,11 +34,16 @@ import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort, SavedWorkspace } from "./use-saved.ts";
 import type { ExploreResult } from "../../lib/types.ts";
 import type { ViewCtx } from "./view-cards.tsx";
+import { isNewKind } from "../../lib/new-in-lab.ts";
+import { NewMark } from "./new-mark.tsx";
 
 /** A view kind already in the document: filled with the accent colour, so "on" cannot be mistaken
  *  for a chip still loading (a pale pulsing fill). */
 const VIEW_ON = "aria-pressed:bg-primary aria-pressed:text-primary-foreground hover:aria-pressed:bg-primary/90 " +
   "hover:aria-pressed:text-primary-foreground dark:aria-pressed:bg-primary dark:hover:aria-pressed:bg-primary/90";
+
+/** A kind not yet in the document: a grey fill, so each pill reads apart from its neighbours on the white card. */
+const ADD_PILL = "border-transparent bg-border text-foreground hover:bg-border/70";
 
 /** What the Analysis tab's sections read from the page and the actions they can take; the page builds one per render. */
 export interface AnalysisCtx {
@@ -448,7 +453,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
               if (present) return (
                 <Button key={kind} variant="outline" size="xs" className={cn(CHIP, VIEW_ON)} aria-pressed disabled={busy}
                   title={"remove the " + label.toLowerCase() + " view" + (present > 1 ? "s (" + present + ")" : "")}
-                  onClick={() => removeViews((v) => v.kind === kind)}>{label}{present > 1 && " ×" + present}<X /></Button>
+                  onClick={() => removeViews((v) => v.kind === kind)}>{label}{isNewKind(kind) && <NewMark />}{present > 1 && " ×" + present}<X /></Button>
               );
               const full = (doc.views || []).length >= 6;
               // with no cohorts yet there is no study to ask about: the view's cohorts decide later
@@ -458,10 +463,10 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
                 : waiting ? "loading this study's catalog — a moment"
                 : (known && why ? why() : null);
               return (
-                <Button key={kind} variant="outline" size="xs" className={cn(CHIP, waiting && "chip-wave disabled:opacity-100")} aria-pressed={false}
+                <Button key={kind} variant="outline" size="xs" className={cn(CHIP, ADD_PILL, waiting && "chip-wave disabled:opacity-100")} aria-pressed={false}
                   aria-busy={waiting || undefined} disabled={!!blocked}
                   title={blocked || ("add a " + label.toLowerCase() + " view, then choose its cohorts")}
-                  onClick={() => addView(kind)}><Plus />{label}</Button>
+                  onClick={() => addView(kind)}><Plus />{label}{isNewKind(kind) && <NewMark />}</Button>
               );
             })}
           </div>

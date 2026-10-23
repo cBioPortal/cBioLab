@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-10-20",
+  "generated": "2026-10-23",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1893,
@@ -147,6 +147,34 @@
     "Logistic regression: does APC status predict MSI-high status?": {
       "all patients": 471
     },
+    "Pan-cancer forest: TP53 mutation and survival in 30 cancer types": {
+      "all patients": 48179
+    },
+    "Adjusted enrichment: early-onset colorectal cancer, adjusted for MSI and TMB": {
+      "Early-onset CRC": 1699,
+      "Average-onset CRC": 3149
+    },
+    "Clinical actionability: OncoKB levels across 50,000 tumours, and primary against metastasis": {
+      "all patients": 48179
+    },
+    "Driver-negative lung cancer: what is mutated when no canonical driver is": {
+      "NSCLC": 7809
+    },
+    "Metastatic organotropism: which mutations go with spread to which organ (MSK-MET)": {
+      "all patients": 25775
+    },
+    "Brain metastasis in lung cancer by EGFR, from dated tumour sites": {
+      "NSCLC": 7809
+    },
+    "Endometrial cancer molecular subtypes by genetic ancestry (POLE, MMRd, p53abn, NSMP)": {
+      "Endometrial": 2373
+    },
+    "The endometrial classifier against TCGA's own molecular subtypes": {
+      "UCEC": 529
+    },
+    "Germline carriers in metastatic prostate cancer, and their tumours' second hits": {
+      "mCRPC": 429
+    },
     "splitBy: one cohort, auto-split into an arm per receptor subtype": {
       "all patients": 1756
     },
@@ -204,6 +232,23 @@
     "Before and after treatment, pooled across studies that label it differently": {
       "before and after treatment": 481
     },
+    "Acquired under therapy: the sample before a treatment against the sample after it": {
+      "all patients": 172
+    },
+    "ctDNA against tissue: what a blood test sees of the tumour, and what detecting it says": {
+      "all patients": 1127
+    },
+    "Mutual exclusivity that accounts for each tumour's burden (DISCOVER)": {
+      "NSCLC": 1567
+    },
+    "Genomic instability by cancer type: aneuploidy score, FGA and arm-level changes": {
+      "Colorectal": 4993,
+      "Breast": 5803,
+      "Pancreatic": 2729
+    },
+    "ctDNA with clonal haematopoiesis filtered out: MSK-ACCESS plasma against tissue": {
+      "all patients": 617
+    },
     "Clonality, LOH and genome doubling from FACETS": {
       "Colorectal": 4993,
       "Breast": 5803
@@ -213,12 +258,40 @@
       "Breast": 5368,
       "Colorectal": 5543
     },
+    "Months of life gained on immunotherapy with a high tumour mutational burden, with landmarks": {
+      "TMB < 10": 1201,
+      "TMB ≥ 10": 460
+    },
+    "From progression to death in colorectal cancer, by stage": {
+      "Colorectal, stage 1-3": 3171,
+      "Colorectal, stage 4": 2372
+    },
+    "Real-world PFS on immunotherapy in lung cancer, by KRAS status": {
+      "NSCLC, KRAS mutant": 2194,
+      "NSCLC, KRAS wild-type": 5540
+    },
+    "Which mutations change survival on immunotherapy in lung cancer?": {
+      "NSCLC": 7809
+    },
+    "A tumour mutational burden cut-point for survival on immunotherapy": {
+      "all patients": 1661
+    },
+    "HLA class I homozygosity and HLA loss in lung cancer, and survival": {
+      "NSCLC": 6633
+    },
+    "HLA class I homozygosity and survival on checkpoint blockade in melanoma": {
+      "melanoma on checkpoint blockade": 212
+    },
     "PSA response to hormone therapy, by TP53 status": {
       "Prostate, TP53 mutant": 849,
       "Prostate, TP53 wild-type": 2284
     },
     "A survival risk model from mutated genes in lung cancer": {
       "NSCLC": 7809
+    },
+    "A lung cancer risk model, validated on another study": {
+      "NSCLC (MSK-IMPACT 2017)": 1567,
+      "NSCLC (MSK-CHORD)": 7809
     },
     "Custom data: a curated biopsy site on every sample": {
       "all patients": 93,

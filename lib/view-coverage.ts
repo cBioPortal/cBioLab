@@ -21,13 +21,13 @@ export interface StudyAccess {
 type Need = "patients" | "timeline" | "alterations" | "local";
 const NEEDS: Record<string, Need> = {
   // their output is patients: columns, rows, or a model fitted on each patient
-  oncoprint: "patients", table: "patients", mutations: "patients", cox: "patients", logistic: "patients", riskmodel: "patients",
+  oncoprint: "patients", table: "patients", mutations: "patients", cox: "patients", logistic: "patients", riskmodel: "patients", predictive: "patients", cutpoint: "patients", hla: "patients", forest: "patients", adjusted: "patients",
   // patient views a peer may share by kind
   timeline: "timeline", alterations: "alterations",
   // aggregates every local participant computes and a remote peer does not serve yet
   genome: "local", pathways: "local", enrichment: "local", diffexpr: "local", paired: "local", clonality: "local",
   incidence: "local", labs: "local", cancertypes: "local", overlap: "local", assays: "local", composition: "local",
-  correlates: "local", plot: "local"
+  correlates: "local", plot: "local", acquired: "local", ctdna: "local", exclusivity: "local", txendpoints: "local", multistate: "local", rmst: "local", instability: "local", actionability: "local", drivernegative: "local", organotropism: "local", molsubtype: "local", germline: "local"
 };
 
 /** What `kind` needs of every study it draws (null: only counts, which every participant gives). */
