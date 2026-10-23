@@ -126,7 +126,7 @@ export async function runHla(view: HlaView, ctx: ViewRun): Promise<ViewResult> {
   if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) return refuse("hla", ctx, "endpoint is a name like OS or PFS");
   if (!!view.monthsAttribute !== !!view.statusAttribute) return refuse("hla", ctx, "monthsAttribute and statusAttribute go together");
   const months = view.monthsAttribute ? String(view.monthsAttribute) : endpoint + "_MONTHS", status = view.statusAttribute ? String(view.statusAttribute) : endpoint + "_STATUS";
-  for (const a of [months, status]) if (!/^[A-Za-z0-9_]{1,64}$/.test(a)) return refuse("hla", ctx, "“" + a.slice(0, 40) + "” is not an attribute name");
+  for (const a of [months, status]) if (!ATTR_NAME.test(a)) return refuse("hla", ctx, "“" + a.slice(0, 40) + "” is not an attribute name");
   const endpointLabel = view.monthsAttribute ? months + "/" + status : endpoint;
   const covariates = list(view.covariates, []);
   { const e = overLimit("an hla view", 4, covariates.length); if (e) return refuse("hla", ctx, e.replace("at most 4", "at most 4 covariates")); }

@@ -5,6 +5,7 @@ import { hasViewAggregates, type Resolver, type ViewAggregateCapable } from "../
 import { geneCytobandsSql } from "../federation-views.ts";
 import type { ViewRun } from "./run.ts";
 import type { StudyCatalog } from "../plot-profile.ts";
+import { VIEW_ATTR_RE } from "../custom-data-names.ts";
 
 /** 12 genes = 66 pairs; beyond this the multiplicity correction eats the signal */
 export const COOCCUR_GENE_LIMIT = 12;
@@ -18,8 +19,8 @@ export function overLimit(what: string, max: number, given: number): string | nu
     " rather than have the rest silently ignored" : null;
 }
 
-/** a clinical attribute name as a view may name it */
-export const ATTR_NAME = /^[A-Za-z0-9_.-]{1,64}$/;
+/** a clinical attribute name as a view may name it: a built-in one, or an uploaded column (`custom:<dataset>/<COLUMN>`, lib/custom-data-names.ts) */
+export const ATTR_NAME = VIEW_ATTR_RE;
 /** a molecular or generic-assay profile type, as a view names it */
 export const PROFILE_NAME = /^[A-Za-z0-9_.-]{1,96}$/;
 

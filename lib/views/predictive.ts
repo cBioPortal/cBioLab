@@ -8,7 +8,7 @@ import { riskmodelRowsSql, riskmodelPanelGenesSql } from "../federation-views.ts
 import { coxRegression, benjaminiHochberg, type CoxRow, type CoxFit } from "../stats.ts";
 import type { AxisKind } from "../plot.ts";
 import type { ViewRun } from "./run.ts";
-import { overLimit, refuse, plural } from "./shared.ts";
+import { overLimit, refuse, plural, ATTR_NAME } from "./shared.ts";
 import { buildCoxColumns } from "./covariates.ts";
 
 const PRED_MAX_GENES = 20, PRED_MAX_COVARIATES = 6;
@@ -49,7 +49,7 @@ export async function runPredictive(view: PredictiveView, ctx: ViewRun): Promise
   const endpoint = String(view.endpoint || "OS").toUpperCase().trim();
   if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) return refuse("predictive", ctx, "endpoint is a name like OS or PFS");
   if (!!view.monthsAttribute !== !!view.statusAttribute) return refuse("predictive", ctx, "monthsAttribute and statusAttribute go together");
-  for (const a of [view.monthsAttribute, view.statusAttribute]) if (a != null && !/^[A-Za-z0-9_]{1,64}$/.test(String(a))) return refuse("predictive", ctx, "“" + String(a).slice(0, 40) + "” is not an attribute name");
+  for (const a of [view.monthsAttribute, view.statusAttribute]) if (a != null && !ATTR_NAME.test(String(a))) return refuse("predictive", ctx, "“" + String(a).slice(0, 40) + "” is not an attribute name");
   const columns = view.monthsAttribute ? { months: String(view.monthsAttribute), status: String(view.statusAttribute) } : undefined;
   const endpointLabel = columns ? columns.months + "/" + columns.status : endpoint;
   const measure = view.measure === "driver" ? "driver" as const : "any" as const;

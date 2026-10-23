@@ -103,7 +103,7 @@ export async function runForest(view: ForestView, ctx: ViewRun): Promise<ViewRes
   let endpointColumns: EndpointColumns | undefined;
   if (view.monthsAttribute != null || view.statusAttribute != null) {
     const m = String(view.monthsAttribute || "").trim(), s = String(view.statusAttribute || "").trim();
-    if (!/^[A-Za-z0-9_]{1,64}$/.test(m) || !/^[A-Za-z0-9_]{1,64}$/.test(s)) return no("monthsAttribute and statusAttribute must both be given as attribute names (letters, digits, underscore, ≤64 chars)");
+    if (!ATTR_NAME.test(m) || !ATTR_NAME.test(s)) return no("monthsAttribute and statusAttribute must both be given as attribute names (a study attribute, or an uploaded column as custom:<dataset>/<COLUMN>)");
     endpointColumns = { months: m, status: s };
   }
   const endpointLabel = endpointColumns ? endpointColumns.months + "/" + endpointColumns.status : endpoint;

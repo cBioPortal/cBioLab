@@ -10,7 +10,7 @@ import { expandSurvivalCounts } from "../federation.ts";
 import { kaplanMeier, rmst, atRiskAtTimes, normalP, Z_975, type SurvRecord } from "../stats.ts";
 import { DEFAULT_LINE_GAP, TREATMENT_EVENT } from "../treatment-lines.ts";
 import type { ViewRun } from "./run.ts";
-import { overLimit, answering, refuse, plural } from "./shared.ts";
+import { overLimit, answering, refuse, plural, ATTR_NAME } from "./shared.ts";
 import { treatmentAnchor, noAnchorMessage, clockFailures, CLOCK_TOLERANCE, type TreatmentAnchor } from "../timeline-endpoints.ts";
 
 const RMST_COHORT_LIMIT = 6;
@@ -47,7 +47,7 @@ export async function runRmst(view: RmstView, ctx: ViewRun): Promise<ViewResult>
   const endpoint = String(view.endpoint || "OS").toUpperCase().trim();
   if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) return refuse("rmst", ctx, "bad endpoint '" + endpoint.slice(0, 40) + "'");
   if (!!view.monthsAttribute !== !!view.statusAttribute) return refuse("rmst", ctx, "monthsAttribute and statusAttribute go together");
-  for (const a of [view.monthsAttribute, view.statusAttribute]) if (a != null && !/^[A-Za-z0-9_]{1,64}$/.test(String(a))) return refuse("rmst", ctx, "“" + String(a).slice(0, 40) + "” is not an attribute name");
+  for (const a of [view.monthsAttribute, view.statusAttribute]) if (a != null && !ATTR_NAME.test(String(a))) return refuse("rmst", ctx, "“" + String(a).slice(0, 40) + "” is not an attribute name");
   const columns: EndpointColumns | undefined = view.monthsAttribute ? { months: String(view.monthsAttribute), status: String(view.statusAttribute) } : undefined;
   let anchor: TreatmentAnchor | null = null, anchoredTo: string | undefined;
   if (view.anchor != null) {

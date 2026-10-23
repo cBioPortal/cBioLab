@@ -5,7 +5,7 @@ import type { ViewResult, LogRank, LogRankK, SurvivalView } from "../types.ts";
 import { expandSurvivalCounts, type SurvivalCount, type EndpointColumns } from "../federation.ts";
 import { survivalMethod } from "../method.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
-import { askEachSite } from "./shared.ts";
+import { ATTR_NAME, askEachSite } from "./shared.ts";
 
 export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;
@@ -26,9 +26,9 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
   let columns: EndpointColumns | undefined;
   if (rawMonthsAttr != null || rawStatusAttr != null) {
     const monthsAttr = String(rawMonthsAttr || "").trim(), statusAttr = String(rawStatusAttr || "").trim();
-    if (!/^[A-Za-z0-9_]{1,64}$/.test(monthsAttr) || !/^[A-Za-z0-9_]{1,64}$/.test(statusAttr)) {
+    if (!ATTR_NAME.test(monthsAttr) || !ATTR_NAME.test(statusAttr)) {
       return untimed({ kind: "survival", endpoint,
-        error: "monthsAttribute and statusAttribute must both be given as valid attribute names (letters, digits, underscore, ≤64 chars): got '" +
+        error: "monthsAttribute and statusAttribute must both be given as valid attribute names (a study attribute, or an uploaded column as custom:<dataset>/<COLUMN>): got '" +
           monthsAttr.slice(0, 40) + "'/'" + statusAttr.slice(0, 40) + "'" });
     }
     columns = { months: monthsAttr, status: statusAttr };

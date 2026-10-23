@@ -72,7 +72,7 @@ export async function runAdjusted(view: AdjustedView, ctx: ViewRun): Promise<Vie
   if (vNames.length !== 2) return no("an adjusted view compares exactly two cohorts; this one draws " + vNames.length);
   const covariates = (Array.isArray(view.covariates) ? view.covariates : []).map((c) => String(c).trim());
   { const e = overLimit("an adjusted view", ADJUSTED_MAX_COVARIATES, covariates.length); if (e) return no(e.replace("at most " + ADJUSTED_MAX_COVARIATES, "at most " + ADJUSTED_MAX_COVARIATES + " covariates")); }
-  const bad = covariates.find((c) => !ATTR_NAME.test(c) && !/^custom:[A-Za-z0-9_.-]{1,64}\/[A-Za-z0-9_.-]{1,64}$/.test(c));
+  const bad = covariates.find((c) => !ATTR_NAME.test(c));
   if (bad != null) return no("covariate '" + bad.slice(0, 40) + "' is not an attribute name");
   if (new Set(covariates).size !== covariates.length) return no("a covariate is listed twice");
   const measure: "any" | "driver" = view.measure === "driver" ? "driver" : "any";

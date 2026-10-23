@@ -96,12 +96,12 @@ export async function runCutpoint(view: CutpointView, ctx: ViewRun): Promise<Vie
   if (vNames.length !== 1) return refuse("cutpoint", ctx, "a cut-point is found in one cohort; this view names " + vNames.length + " — choose one");
   const name = vNames[0];
   const attribute = String(view.attribute || "TMB_NONSYNONYMOUS").trim();
-  if (!ATTR_NAME.test(attribute) && !/^custom:[A-Za-z0-9_.-]{1,64}\/[A-Za-z0-9_.-]{1,64}$/.test(attribute)) return refuse("cutpoint", ctx, "“" + attribute.slice(0, 40) + "” is not a clinical attribute's name");
+  if (!ATTR_NAME.test(attribute)) return refuse("cutpoint", ctx, "“" + attribute.slice(0, 40) + "” is not a clinical attribute's name");
   const endpoint = String(view.endpoint || "OS").toUpperCase().trim();
   if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) return refuse("cutpoint", ctx, "endpoint is a name like OS or PFS");
   if (!!view.monthsAttribute !== !!view.statusAttribute) return refuse("cutpoint", ctx, "monthsAttribute and statusAttribute go together");
   const months = view.monthsAttribute ? String(view.monthsAttribute) : endpoint + "_MONTHS", status = view.statusAttribute ? String(view.statusAttribute) : endpoint + "_STATUS";
-  for (const a of [months, status]) if (!/^[A-Za-z0-9_]{1,64}$/.test(a)) return refuse("cutpoint", ctx, "“" + a.slice(0, 40) + "” is not an attribute name");
+  for (const a of [months, status]) if (!ATTR_NAME.test(a)) return refuse("cutpoint", ctx, "“" + a.slice(0, 40) + "” is not an attribute name");
   const endpointLabel = view.monthsAttribute ? months + "/" + status : endpoint;
   const permutations = view.permutations == null ? 1000 : Number(view.permutations);
   if (!(Number.isInteger(permutations) && permutations >= 100 && permutations <= 5000)) return refuse("cutpoint", ctx, "permutations is a whole number, 100 to 5000");

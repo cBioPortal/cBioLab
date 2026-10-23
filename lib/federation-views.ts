@@ -11,6 +11,7 @@ import { splitBucketSql } from "./cohort2.ts";
 import { casesCte, type CompositionSource } from "./composition.ts";
 import { finiteSql } from "./sql-number.ts";
 import { linesCtes, type LineSpec } from "./treatment-lines.ts";
+import { VIEW_ATTR_RE } from "./custom-data-names.ts";
 
 /** bare patient id for a *_unique_id column of this study */
 const pidOf = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
@@ -2146,7 +2147,7 @@ function orgSiteMapSql(expr: string): string {
   return "multiIf(" + ORG_SITE_MAP.map(([organ, re]) => "match(" + v + ", " + sq(re) + "), " + sq(organ)).join(", ") + ", 'Other')";
 }
 
-const orgAttr = (a: string) => { if (!/^[A-Za-z0-9_.-]{1,64}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'"); return a; };
+const orgAttr = (a: string) => { if (!VIEW_ATTR_RE.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'"); return a; };
 const ORG_YES = "('yes', 'y', 'true', '1')", ORG_NO = "('no', 'n', 'false', '0')";
 
 /**

@@ -19,6 +19,8 @@ export const CUSTOM_PREFIX = "custom:";
 
 /** A built-in attribute name, or a custom one. Every attribute-name check in the engine uses it. */
 export const ATTR_NAME_RE = /^(?:[A-Za-z0-9_]{1,64}|custom:[a-z0-9][a-z0-9-]{0,39}\/[A-Za-z0-9_]{1,64})$/;
+/** An attribute name a view setting may hold: ATTR_NAME_RE's two forms, a built-in name also taking "." and "-" (HLA-A1). */
+export const VIEW_ATTR_RE = /^(?:[A-Za-z0-9_.-]{1,64}|custom:[a-z0-9][a-z0-9-]{0,39}\/[A-Za-z0-9_]{1,64})$/;
 
 export const LIMITS = {
   datasets: 10,
