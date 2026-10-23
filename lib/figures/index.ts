@@ -27,6 +27,7 @@ import { cutpointSvg } from "./cutpoint.ts";
 import { metaForestSvg } from "./forest.ts";
 import { adjustedSvg } from "./adjusted.ts";
 import { instabilitySvg } from "./instability.ts";
+import { actionabilitySvg } from "./actionability.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -96,6 +97,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   adjusted: {
     draw: (v, o) => v.adjusted.rows.length ? adjustedSvg(v, o) : null,
     title: (v) => "Adjusted enrichment" + (v.adjusted ? " — " + v.adjusted.groups.join(" vs ") + (v.adjusted.covariates.length ? ", adjusted for " + v.adjusted.covariates.join(", ") : "") : "")
+  },
+  actionability: {
+    draw: (v, o) => v.actionability.panels.some((pn) => pn.sequenced) ? actionabilitySvg(v, o) : null,
+    title: (v) => "Clinical actionability" + (v.actionability ? " — OncoKB " + v.actionability.pin + (v.actionability.groupBy ? " by " + v.actionability.groupBy : "") : "")
   },
   correlates: {
     draw: (v, o) => v.correlates && v.correlates.tested > 0 ? correlatesSvg(v, o) : null,

@@ -41,6 +41,7 @@ import { runCutpoint } from "./cutpoint.ts";
 import { runForest } from "./forest.ts";
 import { runAdjusted } from "./adjusted.ts";
 import { runInstability } from "./instability.ts";
+import { runActionability } from "./actionability.ts";
 
 /**
  * A runner that lets a throw stand for its error: an error is reported as the view's, with its
@@ -97,6 +98,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   forest: drawn(runForest),
   adjusted: drawn(runAdjusted),
   instability: drawn(runInstability),
+  actionability: drawn(runActionability),
 };
 
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */

@@ -154,6 +154,9 @@
       "Early-onset CRC": 1699,
       "Average-onset CRC": 3149
     },
+    "Clinical actionability: OncoKB levels across 50,000 tumours, and primary against metastasis": {
+      "all patients": 48179
+    },
     "splitBy: one cohort, auto-split into an arm per receptor subtype": {
       "all patients": 1756
     },

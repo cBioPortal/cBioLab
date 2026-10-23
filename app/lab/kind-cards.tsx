@@ -94,6 +94,7 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   exclusivity: { label: "Mutual exclusivity (DISCOVER, burden-aware)", title: "Mutual exclusivity", genes: true, maxCohorts: 1, cohortInHeader: true },
   ctdna: { label: "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)", title: "ctDNA vs tissue", genes: true, maxCohorts: 3 },
   riskmodel: { label: "Risk model (elastic-net Cox, OncoCast-style)", title: "Risk model", maxCohorts: 1 },
+  actionability: { label: "Clinical actionability (OncoKB levels, primary vs metastasis)", title: "Clinical actionability", maxCohorts: 4 },
   adjusted: { label: "Adjusted enrichment (every gene, logistic on covariates)", title: "Adjusted enrichment", maxCohorts: 2, minCohorts: 2 },
   forest: { label: "Pan-cancer forest (one exposure's HR per cancer type, random-effects pooled)", title: "Forest plot", maxCohorts: 6 },
   diffexpr: { label: "Differential expression + GSEA", title: "Differential expression", maxCohorts: 2, minCohorts: 2,
@@ -209,6 +210,8 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") +
     (spec.strata ? ", stratified by " + spec.strata : "") + " · " + (spec.runs ?? 10) + " held-out splits" + (spec.validate ? ", validated on the held-out half" : "") +
     (spec.validateOn ? ", scored on “" + spec.validateOn + "”" : "");
+  if (kind === "actionability") return "highest OncoKB level per patient, any cancer type" + (spec.groupBy ? " · by " + spec.groupBy : "") +
+    (spec.pairBy === null ? "" : " · " + (spec.pairBy?.attribute || "SAMPLE_TYPE") + " concordance");
   if (kind === "adjusted") return "mutations in every gene mutated in ≥" + (100 * (spec.minShare ?? 0.05)).toFixed(0) + "% · adjusted for " + (spec.covariates?.length ? spec.covariates.join(", ") : "nothing");
   if (kind === "forest") {
     const e = spec.exposure || {};
@@ -536,6 +539,32 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
               {!RISK_LABEL_STEPS.includes(labelAbove) && <option value={labelAbove}>{Math.round(labelAbove * 100)}%</option>}
               {RISK_LABEL_STEPS.map((t) => <option key={t} value={t}>{Math.round(t * 100)}%</option>)}
             </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
+  if (spec.kind === "actionability") {
+    const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
+    const by = spec.groupBy || "";
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="split each cohort by a categorical attribute; the largest groups are drawn and the rest pooled into Other">
+            by <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ groupBy: v || undefined })}>
+              <option value="">cohort only</option>
+              <option value="CANCER_TYPE">cancer type</option>
+              {by && by !== "CANCER_TYPE" && !cats.includes(by) && <option value={by}>{by}</option>}
+              {cats.filter((a) => a !== "CANCER_TYPE").map((a) => <option key={a} value={a}>{a}</option>)}
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="how many of the largest groups are drawn">
+            top <OptionSelect value={String(spec.top ?? 8)} disabled={busy || !by} onValueChange={(v) => patch({ top: v === "8" ? undefined : Number(v) })}>
+              {[...new Set([4, 8, 12, 20, spec.top ?? 8])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
+            </OptionSelect>
+          </label>
+          <label className="chk" title="compare each patient's highest level between their primary and metastatic samples (SAMPLE_TYPE)">
+            <Checkbox checked={spec.pairBy !== null} disabled={busy} onCheckedChange={(on) => patch({ pairBy: on === true ? undefined : null })} /> primary vs metastasis
           </label>
         </div>
       </div>
@@ -984,6 +1013,7 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
 export function defaultKindView(kind: string, known: Known): Record<string, unknown> {
   if (kind === "cancertypes") return { kind, genes: known.genes.length ? known.genes.slice(0, 5) : ["TP53", "KRAS"] };
   if (kind === "adjusted") return { kind };
+  if (kind === "actionability") return { kind, groupBy: "CANCER_TYPE" };
   if (kind === "forest") return { kind, exposure: { source: "alteration", gene: known.genes[0] || "TP53" } };
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));

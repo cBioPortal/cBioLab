@@ -636,6 +636,42 @@ export interface AdjustedResult {
   excludedRemote?: { study: string; patients: number }[];
 }
 /**
+ * Clinical actionability from the version-pinned OncoKB store: each sequenced patient's highest
+ * sensitive therapeutic level (1, 2, 3A, 3B, 4) and any resistance level (R1, R2) over their
+ * alterations, as shares per cohort (optionally per group of an attribute), and for patients with
+ * a sample on each side of `pairBy` the concordance of their highest level between the two. Counts only.
+ */
+export interface ActionabilityView {
+  note?: string;
+  kind: "actionability"; cohorts?: string[];
+  /** split each cohort by a categorical attribute (e.g. CANCER_TYPE); default none */
+  groupBy?: string;
+  /** with groupBy, the largest groups drawn (default 8); the rest are pooled into a disclosed "Other" */
+  top?: number;
+  /** the two sides compared for concordance (default SAMPLE_TYPE Primary against Metastasis); null turns it off */
+  pairBy?: { attribute: string; a: string[]; b: string[] } | null;
+}
+/** patients per highest level: [1, 2, 3A, 3B, 4, none], and with a resistance level [R1, R2] */
+export interface ActionLevels { sequenced: number; levels: number[]; resistance: number[] }
+export interface ActionabilityPanel extends ActionLevels {
+  cohort: string;
+  /** the cohort's patients, sequenced or not */
+  patients: number;
+  groups?: (ActionLevels & { label: string })[];
+  /** groups past `top`, pooled into the last group */
+  pooled?: string[];
+  /** patients with a sequenced sample on each side: table[a][b] over the six highest levels, and how many differ */
+  concordance?: { pairs: number; table: number[][]; discordant: number };
+}
+export interface ActionabilityResult {
+  pin: string; levels: string[]; groupBy: string | null; top: number;
+  pairBy: { attribute: string; a: string[]; b: string[] } | null;
+  panels: ActionabilityPanel[];
+  /** the alteration types the store has levels for at this pin */
+  storeTypes: string[];
+  excluded?: { study: string; reason: string }[];
+}
+/**
  * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
  * what the axes are, exactly as it does in the portal, rather than being asked for.
  */
@@ -1944,7 +1980,7 @@ import type { PlotAxis, PlotData } from "./plot.ts";
 import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView | ActionabilityView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | PredictiveView | CutpointView | InstabilityView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
@@ -2296,6 +2332,9 @@ export interface ViewResultFields {
   adjusted: {
     adjusted?: AdjustedResult;
   };
+  actionability: {
+    actionability?: ActionabilityResult;
+  };
   course: {
     course?: CourseSeries[];
     /** bin width and window actually used, in months */
@@ -2425,7 +2464,7 @@ export interface ViewResultFields {
  * nor waits for cohorts). The oncoprint has none: it carries its figure or its spec, by request.
  */
 export interface ViewResultMain {
-  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; adjusted: "adjusted"; course: "course"; sequence: "sequence";
+  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; adjusted: "adjusted"; actionability: "actionability"; course: "course"; sequence: "sequence";
   hotspots: "hotspots"; plot: "plot"; coexpression: "coexpression"; clinical: "clinical"; cooccurrence: "pairs";
   oncoprint: never; attrition: "attrition"; genome: "genome"; pathways: "pathways"; diffexpr: "diffexpr";
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";

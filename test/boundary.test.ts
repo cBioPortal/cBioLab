@@ -424,6 +424,11 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // run only by PatientLevelResolver.viewRows: one row per patient, panels, genes and covariate values only
     "adjustedRowsSql": () => federation.adjustedRowsSql(cohortSql, "x", "db", { covariates: ["MSI_TYPE", "TMB_NONSYNONYMOUS"], driverPin: "v7.5" }),
     "adjustedRowsSql:no-covariates": () => federation.adjustedRowsSql(cohortSql, "x", "db", { covariates: [] }),
+    // actionability: per-sample and per-patient levels stay in CTEs; patients are counted per level
+    "actionLevelsSql": () => federation.actionLevelsSql(cohortSql, "x", "db", "v7.5", "CANCER_TYPE"),
+    "actionLevelsSql:ungrouped": () => federation.actionLevelsSql(cohortSql, "x", "db", "v7.5", null),
+    "actionConcordanceSql": () => federation.actionConcordanceSql(cohortSql, "x", "db", "v7.5", { attribute: "SAMPLE_TYPE", a: ["Primary"], b: ["Metastasis"] }),
+    "actionStoreTypesSql": () => federation.actionStoreTypesSql("x", "db", "v7.5"),
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),
     // run only by PatientLevelResolver.viewRows: one row of values per patient, no identifier
     "cutpointRowsSql": () => federation.cutpointRowsSql(cohortSql, "x", "db", { attribute: "TMB_NONSYNONYMOUS", months: "OS_MONTHS", status: "OS_STATUS" }),

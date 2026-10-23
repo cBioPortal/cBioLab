@@ -117,6 +117,15 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
           `raw OR ${g.rawOr == null ? "undefined" : g.rawOr.toFixed(2)} (Fisher p=${pFmt(g.fisherP)}); adjusted OR ${g.or.toFixed(2)} (95% CI ${g.ciLow.toFixed(2)}-${g.ciHigh.toFixed(2)}) p=${pFmt(g.p)} q=${pFmt(g.q)}`).join("\n") +
         (a.rows.length > 30 ? `\n  … ${a.rows.length - 30} more genes fit` : "") +
         (a.failed.length ? `\n  not fit: ` + a.failed.map((f) => `${f.gene} (${f.reason})`).join("; ") : "") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "actionability") {
+      const a = v.actionability, pct = (k: number, d: number) => d ? (100 * k / d).toFixed(1) + "%" : "–";
+      const line = (label: string, g: { sequenced: number; levels: number[]; resistance: number[] }) =>
+        `  ${label} (${g.sequenced.toLocaleString()} sequenced): ` + a.levels.map((l, i) => `${l} ${g.levels[i]} (${pct(g.levels[i], g.sequenced)})`).join(", ") +
+        `; resistance R1 ${g.resistance[0]}, R2 ${g.resistance[1]}`;
+      out.push(`Clinical actionability (highest OncoKB level per patient, ${a.pin}, any cancer type${a.groupBy ? `, by ${a.groupBy}` : ""}):\n` +
+        a.panels.map((pn) => [line(pn.cohort, pn), ...(pn.groups || []).map((g) => line("  " + g.label, g)),
+          ...(pn.concordance ? [`    ${a.pairBy!.a.join("/")} vs ${a.pairBy!.b.join("/")} highest level, ${pn.concordance.pairs} patients with both: ${pn.concordance.discordant} discordant (${pct(pn.concordance.discordant, pn.concordance.pairs)}); rows ${a.pairBy!.a.join("/")}, columns ${a.pairBy!.b.join("/")} (1, 2, 3A, 3B, 4, none): ` +
+            pn.concordance.table.map((r) => "[" + r.join(", ") + "]").join(" ")] : [])].join("\n")).join("\n") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "logistic") {
       out.push(`Logistic regression (n=${v.logistic.n.toLocaleString()}, ${v.logistic.events.toLocaleString()} with the outcome):\n` +
         v.logistic.coefficients.map((c) =>
