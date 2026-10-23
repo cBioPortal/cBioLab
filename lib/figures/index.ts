@@ -23,6 +23,7 @@ import { ctdnaSvg } from "./ctdna.ts";
 import { exclusivitySvg } from "./exclusivity.ts";
 import { txendpointsSvg } from "./txendpoints.ts";
 import { multistateSvg } from "./multistate.ts";
+import { rmstSvg } from "./rmst.ts";
 import { predictiveSvg } from "./predictive.ts";
 import { cutpointSvg } from "./cutpoint.ts";
 import { metaForestSvg } from "./forest.ts";
@@ -131,6 +132,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   predictive: {
     draw: (v, o) => v.predictive.genes.length ? predictiveSvg(v, o) : null,
     title: (v) => "Predictive biomarkers" + (v.predictive ? " — gene × " + v.predictive.exposure : "")
+  },
+  rmst: {
+    draw: (v, o) => v.rmst.panels.some((pn) => pn.curves.some((c) => c.n)) ? rmstSvg(v, o) : null,
+    title: (v) => "Restricted mean survival time" + (v.rmst ? " — " + v.rmst.endpointLabel : "")
   },
   multistate: {
     draw: (v, o) => v.multistate.cohorts.some((c) => c.n) ? multistateSvg(v, o) : null,

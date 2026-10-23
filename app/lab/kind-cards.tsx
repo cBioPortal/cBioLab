@@ -84,6 +84,8 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
     why: (k) => k.attrs.some((a) => a.kind === "num") ? null : "this study has no numeric clinical attribute to find a cut-point of" },
   predictive: { label: "Predictive biomarkers (gene × treatment interaction)", title: "Predictive biomarkers", genes: true, maxCohorts: 2,
     why: (k) => k.events.some((e) => /treat|therap|drug|medicat/i.test(e.canonical)) ? null : "this study records no treatment timeline events to define an exposure" },
+  rmst: { label: "Restricted mean OS time (RMST, landmarks)", title: "Restricted mean OS time", maxCohorts: 6,
+    why: (k) => k.attrs.some((a) => /_MONTHS$/i.test(a.attribute)) ? null : "this study has no <X>_MONTHS outcome column" },
   multistate: { label: "Multistate model (progression, then death)", title: "Multistate model", maxCohorts: 4,
     why: (k) => k.events.some((e) => /diagnos|progress/i.test(e.canonical)) ? null : "this study records no diagnosis or progression timeline events" },
   txendpoints: { label: "Treatment endpoints (TTNT, time on treatment, real-world PFS)", title: "Treatment endpoints", maxCohorts: 6,
@@ -240,6 +242,10 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     const ex = spec.exposure || {};
     return "gene × " + (ex.eventType || "?") + (ex.key ? " [" + ex.key + "=" + ex.value + "]" : "") + " on " + (spec.endpoint || "OS") +
       (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") + " · Cox per gene";
+  }
+  if (kind === "rmst") {
+    const lm = Array.isArray(spec.landmarkMonths) && spec.landmarkMonths.some((x: number) => x > 0) ? " · landmarks " + spec.landmarkMonths.join(", ") + " mo" : "";
+    return "area under the KM curve to " + (spec.tau != null ? "τ = " + spec.tau + " months" : "τ where every cohort has 10 at risk") + " · " + (spec.anchor?.eventType ? "OS from first " + spec.anchor.eventType + (spec.anchor.key ? " [" + spec.anchor.key + "=" + spec.anchor.value + "]" : "") : (spec.endpoint || "OS")) + lm;
   }
   if (kind === "multistate") {
     const pr = spec.progression || {};
@@ -767,6 +773,23 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
           <label className="tbfield" title="the value that attribute must take (e.g. Immuno)">
             = <DraftInput value={ex.value || ""} disabled={busy} width="7rem" placeholder="value"
               onCommit={(t) => patch({ exposure: { ...ex, value: t } })} />
+          </label>
+        </div>
+      </div>
+    );
+  }
+  if (spec.kind === "rmst") {
+    const lms = Array.isArray(spec.landmarkMonths) ? spec.landmarkMonths.join(", ") : "0";
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">restrict</span>
+          <label className="tbfield" title="months up to which the area under each curve is taken; empty for the largest time every cohort has 10 at risk">
+            τ <DraftInput value={spec.tau != null ? String(spec.tau) : ""} disabled={busy} width="4rem" placeholder="auto"
+              onCommit={(t) => patch({ tau: t.trim() && Number.isFinite(Number(t)) ? Number(t) : undefined })} />
+          </label>
+          <label className="tbfield" title="landmarks in months, comma-separated: each keeps the patients still followed then and restarts the clock">
+            landmarks <DraftInput value={lms} disabled={busy} width="6rem" placeholder="0, 6, 12"
+              onCommit={(t) => { const xs = t.split(/[ ,]+/).filter(Boolean).map(Number).filter((x) => Number.isFinite(x)); patch({ landmarkMonths: xs.length ? xs : [0] }); }} />
           </label>
         </div>
       </div>

@@ -2,7 +2,7 @@
 // them NEW. A kind the portal draws in some form (its Comparison, Plots, Mutations, Pathways or
 // patient-view tabs) is left out, even where this one goes further. Browser-safe.
 const NEW_KINDS = new Set([
-  "cox", "logistic", "riskmodel", "txendpoints", "multistate", "predictive", "cutpoint", "forest",
+  "cox", "logistic", "riskmodel", "txendpoints", "multistate", "rmst", "predictive", "cutpoint", "forest",
   "course", "sequence", "incidence", "labs", "attrition",
   "adjusted", "actionability", "drivernegative", "exclusivity",
   "paired", "acquired", "ctdna", "clonality", "genome", "instability", "composition",

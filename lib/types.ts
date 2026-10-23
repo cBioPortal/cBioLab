@@ -1570,6 +1570,48 @@ export interface MultistateResult {
   excludedStudies?: { study: string; reason: string }[];
 }
 
+export interface RmstView {
+  note?: string;
+  kind: "rmst"; cohorts?: string[];
+  /** the endpoint (default OS), its <endpoint>_MONTHS/_STATUS columns or monthsAttribute/statusAttribute */
+  endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
+  /** start the clock at a treatment record instead of day 0 (overall survival from it; txendpoints' anchor and clock check) */
+  anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
+  /** the restriction time, months; default the largest time at which every cohort still has 10 at risk */
+  tau?: number;
+  /** landmarks, months: each keeps the patients still followed then and restarts the clock there (default [0]) */
+  landmarkMonths?: number[];
+}
+export interface RmstCurve extends Omit<KmCurve, "cohort"> {
+  cohort: string;
+  /** restricted mean survival time to tau, its standard error and 95% interval, months */
+  rmst: number; se: number; lo: number; hi: number;
+  /** the number at risk just before tau */
+  atRiskTau: number;
+  /** patients dropped at the landmark: died or censored before it */
+  beforeLandmark: number;
+}
+export interface RmstComparison {
+  cohort: string; vs: string;
+  /** RMST difference (cohort − vs) and ratio (cohort / vs), each with a 95% interval and a two-sided p */
+  diff: number; diffLo: number; diffHi: number; diffP: number;
+  ratio: number; ratioLo: number; ratioHi: number; ratioP: number;
+}
+export interface RmstPanel {
+  landmark: number; tau: number;
+  /** whether tau was set in the view or is the default (every cohort ≥ 10 at risk) */
+  tauSet: boolean;
+  curves: RmstCurve[];
+  comparisons: RmstComparison[];
+}
+export interface RmstResult {
+  endpointLabel: string; anchoredTo?: string;
+  panels: RmstPanel[];
+  /** per cohort: its patients, and those without follow-up (or without the anchor) */
+  cohorts: { cohort: string; cohortPatients: number; n: number; noFollowup: number; noAnchor: number }[];
+  excludedStudies?: { study: string; reason: string }[];
+}
+
 export interface PredictiveView {
   note?: string;
   kind: "predictive"; cohorts?: string[];
@@ -2077,7 +2119,7 @@ import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
 export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView | ActionabilityView | DrivernegativeView
-  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | MultistateView | PredictiveView | CutpointView | InstabilityView
+  | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | MultistateView | RmstView | PredictiveView | CutpointView | InstabilityView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
 export type ViewKind = View["kind"];
@@ -2521,6 +2563,9 @@ export interface ViewResultFields {
   multistate: {
     multistate?: MultistateResult;
   };
+  rmst: {
+    rmst?: RmstResult;
+  };
   predictive: {
     predictive?: PredictiveResult;
   };
@@ -2572,7 +2617,7 @@ export interface ViewResultMain {
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
   cancertypes: "cancertypes"; overlap: "overlap"; enrichment: "enrichment"; assays: "assays";
   composition: "composition"; correlates: "correlates"; table: "table"; timeline: "timeline";
-  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity"; txendpoints: "txendpoints"; multistate: "multistate"; predictive: "predictive"; cutpoint: "cutpoint"; instability: "instability";
+  mutations: "mutations"; alterations: "alterations"; acquired: "acquired"; ctdna: "ctdna"; exclusivity: "exclusivity"; txendpoints: "txendpoints"; multistate: "multistate"; rmst: "rmst"; predictive: "predictive"; cutpoint: "cutpoint"; instability: "instability";
 }
 /** a result that was drawn: no error, not waiting, and its main field present */
 type Drawn<K extends ViewKind> = { error?: undefined; empty?: undefined } & ViewResultFields[K]

@@ -2,7 +2,7 @@
 // under each tick, and a legend with each group's detail. Positioned at (0, y0) and `W` wide;
 // returns its drawing and height, so a figure stacks it with its own parts.
 import type { KmPoint } from "../types.ts";
-import { stepPath } from "../chart/marks.ts";
+import { stepPath, r1 } from "../chart/marks.ts";
 import { plotHeight, type Pal } from "./common.ts";
 import {
   linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, legend, timeScale,
@@ -17,7 +17,8 @@ export interface KmPanelCurve {
   detail: string;
 }
 
-export function kmPanel(curves: KmPanelCurve[], o: { y0: number; W: number; p: Pal; xTitle: string; yTitle?: string; tMax?: number; title?: string }):
+/** `shadeTo`: the area under each curve from 0 to that time is shaded (a restricted mean), with a rule at it */
+export function kmPanel(curves: KmPanelCurve[], o: { y0: number; W: number; p: Pal; xTitle: string; yTitle?: string; tMax?: number; title?: string; shadeTo?: number }):
   { svg: string; height: number } {
   const { y0, W, p } = o;
   const out: string[] = [];
@@ -36,6 +37,17 @@ export function kmPanel(curves: KmPanelCurve[], o: { y0: number; W: number; p: P
   const xs = timeScale(0, tMax, L, W - R, { minGap: widest });
   out.push(axisLeft(ys, L, p, { title: yTitle, gridTo: W - R, fmt: yFmt }));
   out.push(axisBottom(xs, T + PLOT, p, { title: o.xTitle, minX: 0, maxX: W, fmt: (t) => fmtNum(t) }));
+  if (o.shadeTo != null) {
+    const tau = Math.min(o.shadeTo, tMax);
+    curves.forEach((c, i) => {
+      const line = stepPath(c.points.filter((q) => q.t <= tau), xs, ys, { t: 0, s: 1 }, tau);
+      out.push(`<path d="${line}V${r1(ys(0))}H${r1(xs(0))}Z" fill="${seriesStyle(i).color}" opacity="${r1(0.12 * seriesStyle(i).tint * 100) / 100}"/>`);
+    });
+    out.push(`<line x1="${r1(xs(tau))}" y1="${r1(T)}" x2="${r1(xs(tau))}" y2="${r1(T + PLOT)}" stroke="${p.muted}" stroke-width="${SW.line}" stroke-dasharray="4 3"/>`);
+    const tl = "τ = " + fmtNum(tau);
+    const tx = xs(tau) + 4 + textWidth(tl, FS.small) <= W - R ? xs(tau) + 4 : xs(tau) - 4 - textWidth(tl, FS.small);
+    out.push(label(tx, T + FS.small, tl, { size: FS.small, fill: p.muted }));
+  }
   curves.forEach((c, i) => {
     const st = seriesStyle(i);
     out.push(`<path d="${stepPath(c.points.filter((q) => q.t <= tMax), xs, ys, { t: 0, s: 1 }, tMax)}" fill="none" stroke="${st.color}" stroke-width="${SW.series}"` +

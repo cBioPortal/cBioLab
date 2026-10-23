@@ -7,6 +7,7 @@ import { lollipopSummaryText } from "./lollipop-svg.ts";
 import { riskSpan } from "./figures/riskmodel.ts";
 import { txMedianText } from "./figures/txendpoints.ts";
 import { MS_TRANSITIONS, msRateText } from "./figures/multistate.ts";
+import { rmstText, rmstDiffText, rmstRatioText } from "./figures/rmst.ts";
 
 /** a timeline's events listed in text (MCP); the figure draws every one */
 const TIMELINE_TEXT_EVENTS = 400;
@@ -384,6 +385,13 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         (m.covariates.length ? `; adjusted for ${m.covariates.join(", ")}` : "") + `):\n` +
         m.genes.map((g) => `  ${g.gene}: mutated ${g.mutatedExposed}/${g.exposed} exposed, ${g.mutatedUnexposed}/${g.unexposed} unexposed; ` +
           (g.interaction ? `among exposed ${eff(g.inExposed)}; among unexposed ${eff(g.inUnexposed)}; interaction ${eff(g.interaction)}, q=${pFmt(g.q!)}` : `not fitted: ${g.skipped}`)).join("\n") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "rmst") {
+      const r = v.rmst;
+      out.push(`Restricted mean survival time, ${r.endpointLabel}:\n` +
+        r.panels.map((pn) => `  ${pn.landmark ? `from the ${pn.landmark}-month landmark` : "from the start"}, tau=${pn.tau} months${pn.tauSet ? "" : " (default: every cohort >= 10 at risk)"}:\n` +
+          pn.curves.map((c) => `    ${c.cohort}: n=${c.n.toLocaleString()}, RMST ${rmstText(c)}` +
+            ((x) => x ? `; vs ${x.vs} difference ${rmstDiffText(x)}, ratio ${rmstRatioText(x)}` : "")(pn.comparisons.find((x) => x.cohort === c.cohort))).join("\n")).join("\n") +
         caveatOf(v) + noteOf(v));
     } else if (v.kind === "multistate") {
       const m = v.multistate;

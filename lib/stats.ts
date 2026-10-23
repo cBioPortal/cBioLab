@@ -1497,3 +1497,48 @@ export function illnessDeath(recs: IllnessDeathRecord[]): IllnessDeathFit {
   }
   return { n, prevalent, events, personTime: { s0, s1 }, occupation, cumhaz };
 }
+
+// ---------------------------------------------------------------------------
+// Restricted mean survival time
+
+export interface Rmst { tau: number; rmst: number; se: number; lo: number; hi: number; n: number; events: number }
+
+/**
+ * The area under the Kaplan–Meier curve from 0 to `tau`, with the Greenwood-type standard error of
+ * that area (Klein & Moeschberger 4.5; R survRM2's rmst1): Var = Σ over event times t_j ≤ tau of
+ * A_j² d_j / (n_j (n_j − d_j)), A_j the area under the curve from t_j to tau, a term 0 where
+ * n_j = d_j. Same risk sets as kaplanMeier, delayed entry included. 95% interval on the mean's scale.
+ */
+export function rmst(data: SurvRecord[], tau: number): Rmst {
+  const clean = data.filter(d => Number.isFinite(d.t) && d.t >= 0).filter(observable).sort((x, y) => x.t - y.t);
+  const atRiskAt = riskSweep(clean);
+  const steps: { t: number; s: number; d: number; n: number }[] = [];
+  let s = 1, i = 0, events = 0;
+  while (i < clean.length && clean[i].t <= tau) {
+    const t = clean[i].t;
+    let d = 0;
+    while (i < clean.length && clean[i].t === t) { if (clean[i].event) d++; i++; }
+    const n = atRiskAt(t);
+    if (d > 0 && n > 0) { s *= 1 - d / n; steps.push({ t, s, d, n }); events += d; }
+  }
+  // the area after each event time, accumulated from tau backwards
+  let after = 0, v = 0;
+  for (let k = steps.length - 1; k >= 0; k--) {
+    const next = k + 1 < steps.length ? steps[k + 1].t : tau;
+    after += (next - steps[k].t) * steps[k].s;
+    const { d, n } = steps[k];
+    if (n > d) v += after * after * d / (n * (n - d));
+  }
+  const area = after + (steps.length ? steps[0].t : tau);
+  const se = Math.sqrt(v);
+  return { tau, rmst: area, se, lo: area - Z_975 * se, hi: area + Z_975 * se, n: clean.length, events };
+}
+
+/** The number at risk just before `t` (entered before it, not yet left), for each of `times`. */
+export function atRiskAtTimes(data: SurvRecord[], times: number[]): number[] {
+  const clean = data.filter(observable).sort((x, y) => x.t - y.t);
+  const order = times.map((t, k) => [t, k] as const).sort((a, b) => a[0] - b[0]);
+  const sweep = riskSweep(clean), out = new Array<number>(times.length).fill(0);
+  for (const [t, k] of order) out[k] = sweep(t);
+  return out;
+}

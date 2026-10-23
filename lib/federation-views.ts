@@ -1461,7 +1461,7 @@ export const DAYS_PER_MONTH = 30.4375;
 export const CLOCK_SLACK_DAYS = 31;
 
 export interface TxEndpointOpts {
-  endpoint: "ttnt" | "tot" | "rwpfs";
+  endpoint: "ttnt" | "tot" | "rwpfs" | "os";
   /** the anchored treatment (event type, optional key = value; the first or last such record) */
   anchor: IncidenceAnchor;
   /** how records form lines (lib/treatment-lines.ts) */
@@ -1534,6 +1534,7 @@ function progressionCte(study: string, db: string, pr: ProgressionEvent): string
  *          starting on day `a`), or death; a living patient whose stop lies within `ongoingDays` of
  *          the last follow-up is censored there as still on it
  *   rwpfs  the first progression event after day `a`, or death
+ *   os     death alone (overall survival from the anchor; `lines` is not read)
  * Patients who cannot enter are counted under `kind`: 'nofollowup' (no OS, or follow-up ending at
  * or before the anchor) and, for tot, 'nostop' (an anchored record of the line without a stop
  * date). `late` flags patients with a timeline event more than CLOCK_SLACK_DAYS past their last
@@ -1555,7 +1556,10 @@ export function txEndpointCountsSql(cohortSql: string, study: string, db: string
     lastDayCte(study, db),
   ];
   let x: string;
-  if (o.endpoint === "rwpfs") {
+  if (o.endpoint === "os") {
+    ctes.push("x AS (SELECT pid, toInt64(0) AS d, 0 AS nostop FROM anch WHERE 0)");
+    x = "x";
+  } else if (o.endpoint === "rwpfs") {
     ctes.push(
       progressionCte(study, db, o.progression!),
       "x AS (SELECT prog.pid AS pid, min(prog.day) AS d, 0 AS nostop FROM prog INNER JOIN anch ON anch.pid = prog.pid WHERE prog.day > anch.a GROUP BY prog.pid)");

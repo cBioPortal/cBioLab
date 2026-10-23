@@ -33,3 +33,29 @@ export const CLOCK_TOLERANCE = 0.05;
 export function clockFailures(byStudy: Map<string, { late: number; anchored: number }>): [string, { late: number; anchored: number }][] {
   return [...byStudy].filter(([, x]) => x.anchored > 0 && x.late / x.anchored > CLOCK_TOLERANCE);
 }
+
+/** a treatment anchor as a view names it */
+export interface AnchorInput { eventType?: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" }
+export interface TreatmentAnchor { eventType: string; key?: string; value?: string; occurrence: "FIRST" | "LAST" }
+
+/**
+ * The anchor whose start begins a patient's clock — a timeline event (optionally with key = value),
+ * its first occurrence unless LAST — and its words ("first Treatment [SUBTYPE=Immuno]"); or why it
+ * cannot be one. `what` names the view in the refusal ("a treatment-endpoints view").
+ */
+export function treatmentAnchor(a0: AnchorInput | undefined, what: string): { anchor: TreatmentAnchor; anchoredTo: string } | { error: string } {
+  if (!a0 || typeof a0 !== "object" || !String(a0.eventType || "").trim())
+    return { error: what + " needs anchor: {eventType, key?, value?} — the treatment whose start begins the clock, e.g. {eventType: \"Treatment\", key: \"SUBTYPE\", value: \"Immuno\"}" };
+  if (!!a0.key !== (a0.value != null && a0.value !== "")) return { error: "anchor's key and value go together" };
+  const anchor = { eventType: String(a0.eventType).trim().slice(0, 120), ...(a0.key ? { key: String(a0.key).slice(0, 120), value: String(a0.value).slice(0, 200) } : {}),
+    occurrence: a0.occurrence === "LAST" ? "LAST" as const : "FIRST" as const };
+  const anchoredTo = (anchor.occurrence === "LAST" ? "last " : "first ") + anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "");
+  return { anchor, anchoredTo };
+}
+
+/** the refusal when no cohort patient has the anchor, listing the values its key takes (rows of labTestsSql) */
+export function noAnchorMessage(anchor: TreatmentAnchor, vNames: string[], vals: Record<string, unknown>[]): string {
+  return "no patient of " + (vNames.length === 1 ? "“" + vNames[0] + "”" : "these cohorts") + " has a " + anchor.eventType + " event" +
+    (anchor.key ? " with " + anchor.key + " = " + anchor.value : "") +
+    (vals.length ? ". " + anchor.key + " takes: " + vals.slice(0, 20).map((v) => String(v.test) + " (" + Number(v.patients).toLocaleString("en-US") + " patients)").join(", ") : "");
+}

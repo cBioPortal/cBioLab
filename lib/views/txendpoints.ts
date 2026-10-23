@@ -7,7 +7,7 @@ import { kaplanMeier, kmMedianCi, logRankK, applyCutoff, type SurvRecord } from 
 import { DEFAULT_LINE_GAP, TREATMENT_EVENT } from "../treatment-lines.ts";
 import type { ViewRun } from "./run.ts";
 import { overLimit, answering, refuse, plural } from "./shared.ts";
-import { progressionEvent, progressionError, progressionCondition, clockFailures, CLOCK_TOLERANCE } from "../timeline-endpoints.ts";
+import { progressionEvent, progressionError, progressionCondition, clockFailures, treatmentAnchor, noAnchorMessage, CLOCK_TOLERANCE } from "../timeline-endpoints.ts";
 
 const TX_COHORT_LIMIT = 6;
 /** below this many patients in a cohort the log-rank test is refused (the survival view's floor) */
@@ -22,13 +22,9 @@ export async function runTxendpoints(view: TxendpointsView, ctx: ViewRun): Promi
   { const e = overLimit("a treatment-endpoints view", TX_COHORT_LIMIT, vNames.length); if (e) return refuse("txendpoints", ctx, e.replace("at most " + TX_COHORT_LIMIT, "at most " + TX_COHORT_LIMIT + " cohorts")); }
   const endpoint = view.endpoint ?? "ttnt";
   if (!(endpoint in TX_ENDPOINT_LABELS)) return refuse("txendpoints", ctx, "endpoint is ttnt (time to next treatment), tot (time on treatment) or rwpfs (real-world PFS); got '" + String(endpoint).slice(0, 20) + "'");
-  const a0 = view.anchor;
-  if (!a0 || typeof a0 !== "object" || !String(a0.eventType || "").trim())
-    return refuse("txendpoints", ctx, "a treatment-endpoints view needs anchor: {eventType, key?, value?} — the treatment whose start begins the clock, e.g. {eventType: \"Treatment\", key: \"SUBTYPE\", value: \"Immuno\"}");
-  if (!!a0.key !== (a0.value != null && a0.value !== "")) return refuse("txendpoints", ctx, "anchor's key and value go together");
-  const anchor = { eventType: String(a0.eventType).trim().slice(0, 120), ...(a0.key ? { key: String(a0.key).slice(0, 120), value: String(a0.value).slice(0, 200) } : {}),
-    occurrence: a0.occurrence === "LAST" ? "LAST" as const : "FIRST" as const };
-  const anchoredTo = (anchor.occurrence === "LAST" ? "last " : "first ") + anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "");
+  const an = treatmentAnchor(view.anchor, "a treatment-endpoints view");
+  if ("error" in an) return refuse("txendpoints", ctx, an.error);
+  const { anchor, anchoredTo } = an;
   const lineGap = view.lineGap == null ? DEFAULT_LINE_GAP : Number(view.lineGap);
   if (!(Number.isInteger(lineGap) && lineGap >= 1 && lineGap <= 3650)) return refuse("txendpoints", ctx, "lineGap is a whole number of days, 1 to 3650");
   const lc = view.lineClasses;
@@ -91,9 +87,7 @@ export async function runTxendpoints(view: TxendpointsView, ctx: ViewRun): Promi
   if (!curves.some((c) => c.anchored)) {
     const first = Object.keys(ok)[0];
     const vals = anchor.key ? await ok[first].viewAggregate("txendpoints:anchor-values", doc.cohorts[vNames[0]], (c, s, d) => labTestsSql(c, s, d, anchor.eventType, anchor.key!)).catch(() => []) : [];
-    return refuse("txendpoints", ctx, "no patient of " + (vNames.length === 1 ? "“" + vNames[0] + "”" : "these cohorts") + " has a " + anchor.eventType + " event" +
-      (anchor.key ? " with " + anchor.key + " = " + anchor.value : "") +
-      (vals.length ? ". " + anchor.key + " takes: " + vals.slice(0, 20).map((v) => String(v.test) + " (" + Number(v.patients).toLocaleString("en-US") + " patients)").join(", ") : ""));
+    return refuse("txendpoints", ctx, noAnchorMessage(anchor, vNames, vals));
   }
   if (!curves.some((c) => c.n)) return refuse("txendpoints", ctx, "no anchored patient could enter the risk set: " + curves.map((c) =>
     c.cohort + " — " + c.excluded.noFollowup + " without follow-up after the anchor" + (endpoint === "tot" ? ", " + c.excluded.noStop + " without a stop date" : "")).join("; "));
