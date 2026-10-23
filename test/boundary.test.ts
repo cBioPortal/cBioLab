@@ -453,6 +453,10 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "molCountsSql:score": () => federation.molCountsSql(cohortSql, "x", "db", { poleHotspots: ["P286R"], msi: { attribute: "MSI_SCORE", threshold: 10, stableBelow: 3 }, p53Pin: null, by: null }),
     "molSurvivalSql": () => federation.molSurvivalSql(cohortSql, "x", "db", { poleHotspots: ["P286R"], msi: { attribute: "MSI_TYPE", high: ["Instable"], stable: ["Stable"] }, p53Pin: "v7.5", by: null }),
     "molMsiAttributesSql": () => federation.molMsiAttributesSql(cohortSql, "x", "db"),
+    // germline: carriers, somatic hits and panels stay in CTEs; patients are counted per gene and combination
+    "germCarriersSql": () => federation.germCarriersSql(cohortSql, "x", "db"),
+    "germCountsSql": () => federation.germCountsSql(cohortSql, "x", "db", ["BRCA1", "BRCA2"]),
+    "germSurvivalSql": () => federation.germSurvivalSql(cohortSql, "x", "db", "BRCA2"),
     "orgIncidenceSql": () => federation.orgIncidenceSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }, { genes: ["EGFR"], alteration: "mutation", driverPin: "v7.5" }, true, "CNS/Brain"),
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),
     // run only by PatientLevelResolver.viewRows: one row of values per patient, no identifier

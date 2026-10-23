@@ -104,6 +104,7 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   organotropism: { label: "Metastatic organotropism (genes × metastatic sites, within cancer types)", title: "Metastatic organotropism", maxCohorts: 1, cohortInHeader: true,
     why: (k) => k.attrs.some((a) => /^DMETS_DX_|^METASTATIC_SITE$/i.test(a.attribute)) || k.events.some((e) => /diagnosis/i.test(e.canonical)) ? null
       : "this study records no metastatic sites (per-organ DMETS_DX_ flags, METASTATIC_SITE, or tumour sites on a Diagnosis timeline)" },
+  germline: { label: "Germline carriers (and their somatic second hits)", title: "Germline carriers", maxCohorts: 4 },
   molsubtype: { label: "Molecular subtypes (endometrial POLE / MMRd / p53abn / NSMP)", title: "Molecular subtypes", maxCohorts: 6 },
   actionability: { label: "Clinical actionability (OncoKB levels, primary vs metastasis)", title: "Clinical actionability", maxCohorts: 4 },
   adjusted: { label: "Adjusted enrichment (every gene, logistic on covariates)", title: "Adjusted enrichment", maxCohorts: 2, minCohorts: 2 },
@@ -226,6 +227,8 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "organotropism") return (spec.measure === "any" ? "" : "driver ") + (spec.alteration || "mutation") + "s in " +
     (spec.genes?.length ? spec.genes.length + " genes" : "the " + (spec.top ?? 12) + " most altered genes") + " × metastatic sites from " + (spec.source && spec.source !== "auto" ? spec.source : "the study's site source") +
     (spec.stratifyBy === null ? ", unstratified" : ", within " + (spec.stratifyBy || "CANCER_TYPE"));
+  if (kind === "germline") return "germline carriers per patient sequenced, " + (spec.genes?.length ? spec.genes.length + " genes" : "every gene with ≥" + (spec.minCarriers ?? 3) + " carriers") +
+    " · somatic second hit vs non-carriers" + (spec.survival?.gene ? " · OS by " + spec.survival.gene + " carrier status" : "");
   if (kind === "molsubtype") return "endometrial molecular classification per patient (POLE, MMRd, p53abn, NSMP)" + (spec.by ? " · by " + spec.by : "") +
     (spec.survival === false ? "" : " · OS by subtype");
   if (kind === "actionability") return "highest OncoKB level per patient, any cancer type" + (spec.groupBy ? " · by " + spec.groupBy : "") +
@@ -569,6 +572,28 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
               {!RISK_LABEL_STEPS.includes(labelAbove) && <option value={labelAbove}>{Math.round(labelAbove * 100)}%</option>}
               {RISK_LABEL_STEPS.map((t) => <option key={t} value={t}>{Math.round(t * 100)}%</option>)}
             </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
+  if (spec.kind === "germline") {
+    const genes: string[] = Array.isArray(spec.genes) ? spec.genes : [];
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="genes, comma-separated (at most 60); empty for every gene with enough carriers">
+            genes <DraftInput value={genes.join(", ")} disabled={busy} width="14rem" placeholder={"≥ " + (spec.minCarriers ?? 3) + " carriers"}
+              onCommit={(t) => { const l = t.split(/[,\s]+/).map((x) => x.trim().toUpperCase()).filter(Boolean); patch({ genes: l.length ? l : undefined }); }} />
+          </label>
+          <label className="tbfield" title="the fewest carriers a gene needs to be listed when no genes are named">
+            min carriers <OptionSelect value={String(spec.minCarriers ?? 3)} disabled={busy} onValueChange={(v) => patch({ minCarriers: Number(v) === 3 ? undefined : Number(v) })}>
+              {[1, 2, 3, 5, 10, 20].map((k) => <option key={k} value={k}>{k}</option>)}
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="draw overall survival for one gene's carriers against non-carriers; empty for none">
+            OS by <DraftInput value={spec.survival?.gene || ""} disabled={busy} width="6rem" placeholder="gene"
+              onCommit={(t) => patch({ survival: t.trim() ? { gene: t.trim().toUpperCase() } : undefined })} />
           </label>
         </div>
       </div>
@@ -1201,6 +1226,7 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "drivernegative") return { kind };
   if (kind === "organotropism") return { kind };
   if (kind === "molsubtype") return { kind };
+  if (kind === "germline") return { kind };
   if (kind === "forest") return { kind, exposure: { source: "alteration", gene: known.genes[0] || "TP53" } };
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));

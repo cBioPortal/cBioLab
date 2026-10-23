@@ -175,6 +175,10 @@ export const VIEW_HELP: Record<string, ViewHelp> = {
     title: "What is this?",
     text: "For each patient, finds the strongest evidence OncoKB lists for a drug that targets one of their tumour's genetic changes — Level 1 means an FDA-approved drug for that change, down to Level 4 for early biological evidence — and shows what share of patients reach each level, overall or per cancer type. The levels here are the best OncoKB gives the change in ANY cancer, so a change that is only actionable in another cancer still counts: read the bars as an upper bound. The table below compares, for patients sequenced twice, the level found in their primary tumour against their metastasis."
   },
+  germline: {
+    title: "What is this?",
+    text: "Some people are born with a faulty copy of a cancer gene such as BRCA2 in every cell. For each such gene this counts those patients (carriers) among everyone whose tumour was sequenced for it, and asks whether their tumour knocked out the remaining good copy — a second hit — by a further mutation or by deleting the gene, compared with how often the same gene is hit in patients born without a faulty copy. The commonest second hit, losing the good copy outright (loss of heterozygosity), needs data this view does not read, so the second-hit share is a minimum. Optionally the curves compare survival of carriers and non-carriers for one gene."
+  },
   molsubtype: {
     title: "What is this?",
     text: "Sorts each patient's endometrial cancer into the four molecular groups doctors now use alongside the microscope: POLE-ultramutated (a tumour with a broken DNA-copying enzyme, which does very well), mismatch-repair deficient (a tumour that cannot fix certain DNA errors, read here from its MSI test), p53-abnormal (the group that does worst), and no specific molecular profile. The groups are assigned in that order, as the WHO guideline does. Patients whose test could not tell — no MSI result, or a gene panel that missed POLE or TP53 — are counted as not classifiable rather than guessed. The bars show each group's share, overall and by the attribute you pick; the curves show survival in each group."

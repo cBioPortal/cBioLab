@@ -172,6 +172,9 @@
     "The endometrial classifier against TCGA's own molecular subtypes": {
       "UCEC": 529
     },
+    "Germline carriers in metastatic prostate cancer, and their tumours' second hits": {
+      "mCRPC": 429
+    },
     "splitBy: one cohort, auto-split into an arm per receptor subtype": {
       "all patients": 1756
     },

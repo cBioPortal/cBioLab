@@ -34,6 +34,7 @@ import { actionabilitySvg } from "./actionability.ts";
 import { drivernegativeSvg } from "./drivernegative.ts";
 import { organotropismSvg } from "./organotropism.ts";
 import { molsubtypeSvg } from "./molsubtype.ts";
+import { germlineSvg } from "./germline.ts";
 
 /** a kind's figure, drawn only when its result has something to draw, and its one-line title */
 interface Figure<K extends ViewKind> { draw(v: DrawnResultOf<K>, o: SvgOpts): string | null; title(v: ViewResultOf<K>): string }
@@ -119,6 +120,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   molsubtype: {
     draw: (v, o) => v.molsubtype.panels.some((pn) => pn.classified) ? molsubtypeSvg(v, o) : null,
     title: (v) => "Molecular subtypes" + (v.molsubtype ? " — " + v.molsubtype.classifier + (v.molsubtype.by ? " by " + v.molsubtype.by : "") : "")
+  },
+  germline: {
+    draw: (v, o) => v.germline.panels.some((pn) => pn.genes.some((g) => g.sequenced)) ? germlineSvg(v, o) : null,
+    title: (v) => "Germline carriers and second hits" + (v.germline ? " — " + v.germline.genes.length + " genes" : "")
   },
   correlates: {
     draw: (v, o) => v.correlates && v.correlates.tested > 0 ? correlatesSvg(v, o) : null,

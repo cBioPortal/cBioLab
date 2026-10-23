@@ -48,6 +48,7 @@ import { runActionability } from "./actionability.ts";
 import { runDrivernegative } from "./drivernegative.ts";
 import { runOrganotropism } from "./organotropism.ts";
 import { runMolsubtype } from "./molsubtype.ts";
+import { runGermline } from "./germline.ts";
 
 /**
  * A runner that lets a throw stand for its error: an error is reported as the view's, with its
@@ -111,6 +112,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   drivernegative: drawn(runDrivernegative),
   organotropism: drawn(runOrganotropism),
   molsubtype: drawn(runMolsubtype),
+  germline: drawn(runGermline),
 };
 
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */

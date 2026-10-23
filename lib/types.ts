@@ -817,6 +817,40 @@ export interface MolsubtypeResult {
   excluded?: { study: string; reason: string }[];
 }
 /**
+ * Germline carriers and their somatic second hits: per gene, the patients with a germline call,
+ * their share of the patients sequenced for the gene, and how often the tumour carries a second,
+ * somatic hit in the same gene, against the somatic rate in non-carriers; optionally OS by carrier
+ * status for one gene. Patient-level counts only.
+ */
+export interface GermlineView {
+  note?: string;
+  kind: "germline"; cohorts?: string[];
+  /** the genes (at most 60); default every gene with at least minCarriers carriers in a cohort */
+  genes?: string[];
+  minCarriers?: number;
+  /** draw OS for one gene's carriers against non-carriers */
+  survival?: { gene: string };
+}
+export interface GermlineCounts {
+  /** patients sequenced for the gene (a mutation panel listing it, or WES), carriers among them, and carriers whose panel does not list it (left out) */
+  sequenced: number; carriers: number; outsidePanel: number;
+  carrierSomatic: number; carrierCnaProfiled: number; carrierDeletion: number; carrierEither: number;
+  noncarriers: number; noncarrierSomatic: number; noncarrierCnaProfiled: number; noncarrierDeletion: number; noncarrierEither: number;
+}
+export interface GermlineGene extends GermlineCounts {
+  gene: string;
+  /** Fisher's exact test of carriers' second-hit rate against non-carriers' somatic rate, and BH q */
+  p: number | null; q: number | null;
+}
+export interface GermlineResult {
+  genes: string[]; minCarriers: number; chosen?: string;
+  panels: { cohort: string; patients: number; genes: GermlineGene[] }[];
+  survival?: { cohort: string; gene: string; curves: (Omit<KmCurve, "cohort"> & { group: string })[]; logrank: LogRankK | null; noTest?: string }[];
+  /** what was done about loss of heterozygosity */
+  loh: string;
+  excluded?: { study: string; reason: string }[];
+}
+/**
  * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
  * what the axes are, exactly as it does in the portal, rather than being asked for.
  */
@@ -2302,7 +2336,7 @@ import type { PlotAxis, PlotData } from "./plot.ts";
 import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView | ActionabilityView | DrivernegativeView | OrganotropismView | MolsubtypeView
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView | ActionabilityView | DrivernegativeView | OrganotropismView | MolsubtypeView | GermlineView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | MultistateView | RmstView | PredictiveView | CutpointView | HlaView | InstabilityView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
@@ -2666,6 +2700,9 @@ export interface ViewResultFields {
   molsubtype: {
     molsubtype?: MolsubtypeResult;
   };
+  germline: {
+    germline?: GermlineResult;
+  };
   course: {
     course?: CourseSeries[];
     /** bin width and window actually used, in months */
@@ -2804,7 +2841,7 @@ export interface ViewResultFields {
  * nor waits for cohorts). The oncoprint has none: it carries its figure or its spec, by request.
  */
 export interface ViewResultMain {
-  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; adjusted: "adjusted"; actionability: "actionability"; drivernegative: "drivernegative"; organotropism: "organotropism"; molsubtype: "molsubtype"; course: "course"; sequence: "sequence";
+  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; adjusted: "adjusted"; actionability: "actionability"; drivernegative: "drivernegative"; organotropism: "organotropism"; molsubtype: "molsubtype"; germline: "germline"; course: "course"; sequence: "sequence";
   hotspots: "hotspots"; plot: "plot"; coexpression: "coexpression"; clinical: "clinical"; cooccurrence: "pairs";
   oncoprint: never; attrition: "attrition"; genome: "genome"; pathways: "pathways"; diffexpr: "diffexpr";
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
