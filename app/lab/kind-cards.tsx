@@ -84,6 +84,8 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
     why: (k) => k.attrs.some((a) => a.kind === "num") ? null : "this study has no numeric clinical attribute to find a cut-point of" },
   predictive: { label: "Predictive biomarkers (gene × treatment interaction)", title: "Predictive biomarkers", genes: true, maxCohorts: 2,
     why: (k) => k.events.some((e) => /treat|therap|drug|medicat/i.test(e.canonical)) ? null : "this study records no treatment timeline events to define an exposure" },
+  multistate: { label: "Multistate model (progression, then death)", title: "Multistate model", maxCohorts: 4,
+    why: (k) => k.events.some((e) => /diagnos|progress/i.test(e.canonical)) ? null : "this study records no diagnosis or progression timeline events" },
   txendpoints: { label: "Treatment endpoints (TTNT, time on treatment, real-world PFS)", title: "Treatment endpoints", maxCohorts: 6,
     why: (k) => k.events.some((e) => /treat|therap|drug|medicat/i.test(e.canonical)) ? null : "this study records no treatment timeline events" },
   clonality: { label: "Clonality (FACETS)", title: "Clonality", genes: true, maxCohorts: 3 },
@@ -238,6 +240,11 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
     const ex = spec.exposure || {};
     return "gene × " + (ex.eventType || "?") + (ex.key ? " [" + ex.key + "=" + ex.value + "]" : "") + " on " + (spec.endpoint || "OS") +
       (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") + " · Cox per gene";
+  }
+  if (kind === "multistate") {
+    const pr = spec.progression || {};
+    return "start → progression → death, months from day 0 · progression = " + (pr.eventType || "Diagnosis") + " " + (pr.key || "PROGRESSION") +
+      (spec.prevalent === "exclude" ? " · progressed by day 0 left out" : "");
   }
   if (kind === "txendpoints") {
     const an = spec.anchor || {};
@@ -765,6 +772,35 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
       </div>
     );
   }
+  if (spec.kind === "multistate") {
+    const pr = spec.progression || {};
+    const types = c.events.map((x) => x.label);
+    const et = pr.eventType || "Diagnosis";
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">progression</span>
+          <label className="tbfield" title="the timeline event that records progression">
+            event <OptionSelect value={et} disabled={busy} onValueChange={(v) => patch({ progression: { ...pr, eventType: v } })}>
+              {!types.includes(et) && <option value={et}>{et}</option>}
+              {types.map((t) => <option key={t} value={t}>{t}</option>)}
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="the event's attribute that says progression (values Y / Yes by default)">
+            key <DraftInput value={pr.key || "PROGRESSION"} disabled={busy} width="8rem" placeholder="PROGRESSION"
+              onCommit={(t) => patch({ progression: { ...pr, key: t.trim() || "PROGRESSION" } })} />
+          </label>
+        </div>
+        <div className="tbz"><span className="tbl">day 0</span>
+          <label className="tbfield" title="patients whose first progression is on or before day 0">
+            progressed by then <OptionSelect value={spec.prevalent === "exclude" ? "exclude" : "include"} disabled={busy} onValueChange={(v) => patch({ prevalent: v })}>
+              <option value="include">start progressed</option>
+              <option value="exclude">left out</option>
+            </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
   if (spec.kind === "txendpoints") {
     const an = spec.anchor || { eventType: "Treatment" };
     const types = c.events.map((x) => x.label);
@@ -1053,6 +1089,10 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "predictive") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));
     return { kind, exposure: { eventType: tx ? tx.label : "Treatment", key: "SUBTYPE", value: "Immuno" }, genes: known.genes.length ? known.genes.slice(0, 8) : ["STK11", "KEAP1", "KRAS", "TP53", "EGFR"] };
+  }
+  if (kind === "multistate") {
+    const dx = known.events.find((e) => /diagnos/i.test(e.canonical));
+    return { kind, progression: { eventType: dx ? dx.label : "Diagnosis", key: "PROGRESSION", values: ["Y", "Yes"] } };
   }
   if (kind === "txendpoints") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));

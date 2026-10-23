@@ -22,6 +22,7 @@ import { acquiredSvg } from "./acquired.ts";
 import { ctdnaSvg } from "./ctdna.ts";
 import { exclusivitySvg } from "./exclusivity.ts";
 import { txendpointsSvg } from "./txendpoints.ts";
+import { multistateSvg } from "./multistate.ts";
 import { predictiveSvg } from "./predictive.ts";
 import { cutpointSvg } from "./cutpoint.ts";
 import { metaForestSvg } from "./forest.ts";
@@ -130,6 +131,10 @@ const FIGURES: { [K in ViewKind]?: Figure<K> } = {
   predictive: {
     draw: (v, o) => v.predictive.genes.length ? predictiveSvg(v, o) : null,
     title: (v) => "Predictive biomarkers" + (v.predictive ? " — gene × " + v.predictive.exposure : "")
+  },
+  multistate: {
+    draw: (v, o) => v.multistate.cohorts.some((c) => c.n) ? multistateSvg(v, o) : null,
+    title: () => "Multistate model — progression and death"
   },
   txendpoints: {
     draw: (v, o) => v.txendpoints.curves.some((c) => c.n) ? txendpointsSvg(v, o) : null,

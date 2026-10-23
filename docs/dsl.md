@@ -296,6 +296,7 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | `incidence` | `event:{eventType, attrs?:[{key,value} ×≤3], label?}, anchor?:{eventType,key?,value?,occurrence?}, horizons?:[12,24,60], cohorts:[names] (≤6)` | **cumulative incidence with a competing risk**: time from the anchor (default the study's day 0) to the FIRST `event` after it, with death (`OS_STATUS`) as the competing event and `OS_MONTHS` as follow-up — Aalen–Johansen, with 95% intervals from its delta-method standard error (checked against R's cmprsk: estimates identical to five decimals, SEs within 3%). Not 1 − Kaplan–Meier, which censors the dead as if still at risk and overstates incidence wherever death is common; the view reports both at each of `horizons`, so the difference is on the page. Left truncation as in `survival`: a patient anchored before day 0 enters the risk set at day 0. Patients who cannot be at risk are counted by reason, never read as event-free: already had the event at or before the anchor, had it before observation began, no follow-up, no anchor event. Two or more cohorts: Gray's test (weight 1) by permutation of cohort labels over the pooled records — exact under the null, seeded, and computable from the (entry, time, cause) tallies each site sends, which are counts |
 | `cutpoint` | `attribute?:"TMB_NONSYNONYMOUS", endpoint?:"OS", monthsAttribute?/statusAttribute?, permutations?:1000 (100–5000), seed?:1, stratifyBy?:"<attribute>", minStratum?:100, cohorts:[one name]` | **a biomarker's best survival cut-point, corrected for the search** — **preview** (Samstein 2019, PMID 30643254; PMID 38949888): a numeric marker (the patient's value, or a sample attribute's on the patient's first sample by sample id) against the endpoint. Candidate cuts are the marker's distinct values leaving 10–90% of patients at or below them (at most 100, evenly spaced); at each, the maximally selected standardized log-rank statistic (Lausen & Schumacher; R maxstat's LogRank). The best cut is reported with its permutation-corrected p (`permutations` seeded shuffles of the marker; the share whose own best cut does as well) beside the naive log-rank p, the high-vs-low Cox HR, the statistic-against-cut curve (with the permutation 95% line) and Kaplan–Meier curves at the cut. `stratifyBy`: a scan per value of a categorical attribute (the largest 8 with ≥ `minStratum` patients; the rest counted), as a table. The cut is chosen in-sample and needs validation — the caveat says so. Patient-level studies only |
 | `predictive` | `exposure:{eventType,key?,value?}, genes:[≤20], endpoint?:"OS", monthsAttribute?/statusAttribute?, measure?:"any"|"driver", covariates?:["<attribute>" ×≤6], minMutated?:5, cohorts:[1–2 names]` | **predictive biomarkers, gene × treatment** — **preview** (PMIDs 29122777, 32913971, 39499893): the cohorts' patients pooled (baseline hazard stratified by cohort and study when several), `exposure` = any timeline event of that type (and key = value), the rest unexposed. Per gene, a Cox model (Efron) of the endpoint on gene + exposed + gene×exposed (+ `covariates`, coded as the `cox` view codes clinical axes), over the patients whose panel covers the gene — a patient not profiled for it is left out of that fit, never wild-type. Reported per gene: the mutated-vs-wild-type HR among the exposed and among the unexposed (the same model's two contrasts: the interaction coded both ways) and the interaction HR with its Wald p and a Benjamini–Hochberg q over the genes fitted; a gene with fewer than `minMutated` mutated patients in either group is listed, not fitted. Drawn as a two-marker forest. Exposure is defined from the whole record (immortal-time bias) and was not randomised (confounding by indication) — the caveat says so. Patient-level studies only |
+| `multistate` | `progression?:{eventType?:"Diagnosis", key?:"PROGRESSION", values?:["Y","Yes"], probabilityKey?, minProbability?}, prevalent?:"include"|"exclude", horizons?:[12,24,60], cutoffMonths?, cohorts:[names] (≤4)` | **a multistate (illness–death) model** (Rueda et al., Nature 2019, PMID 30867590) — **preview**: states start (the timeline's day 0 — first sequencing in MSK-CHORD; the view checks how many patients have a Sequencing event on day 0 and says what day 0 is), progression (the first `progression` event after day 0, as `txendpoints` reads it: values folded, an optional probability floor) and death (OS_STATUS / OS_MONTHS on the timeline's clock, with `txendpoints`' clock check). A patient with a progression on or before day 0 starts in the progression state (`prevalent:"exclude"` leaves them out); a progression on or after the end of follow-up is not counted. Markov (clock-forward): every hazard runs on time since day 0, progression → death with delayed entry at the progression. Per cohort: each transition's events, person-months and rate per 100 person-months (Poisson 95% interval), Nelson–Aalen cumulative hazards, Aalen–Johansen state occupation drawn as stacked areas (to where 10 patients remain followed) and tabled at `horizons`; per transition a Cox model (Efron; delayed entry for progression → death; a baseline per study) of each cohort against the first, no ratio for a cohort with under 5 events. Sites send (prevalent, progression time, end time, dead) counts only. Progression from radiology NLP is probabilistic and unseen in patients never imaged — the caption counts them |
 | `txendpoints` | `anchor:{eventType,key?,value?,occurrence?}, endpoint?:"ttnt"|"tot"|"rwpfs", lineGap?:90, lineClasses?:"systemic"|"all"|[classes], progression?:{eventType?:"Diagnosis", key?:"PROGRESSION", values?:["Y","Yes"], probabilityKey?, minProbability?}, ongoingDays?:30, cutoffMonths?, cohorts:[names] (≤6)` | **real-world treatment endpoints** (MSK-CHORD, Nature 2024; GENIE BPC) — **preview**: the clock starts at the anchored treatment record's start (first, or `occurrence:"LAST"`), and runs to `ttnt` the start of the next treatment LINE after the anchor's (lines as the `sequence` view builds them — `lineGap`, `lineClasses`), `tot` the latest stop of the anchored records in that line (a living patient stopping within `ongoingDays` of last follow-up is censored as still on it; a record without a stop date is left out and counted), or `rwpfs` the first `progression` event after it (values folded; an optional probability floor) — or death, an event for every endpoint; censored at last follow-up, `OS_MONTHS` × 30.4375 days on the timeline clock (checked per study: a study whose timeline runs more than 31 days past OS_MONTHS for over 5% of anchored patients is refused). Left truncation as in `survival`. Kaplan–Meier per cohort with the number at risk, medians with 95% intervals (Greenwood, log scale), and a k-group log-rank (stratified by study). Sites send (entry, time, event) counts only. Treated status is not randomised: the caption says so |
 | `riskmodel` | `cohorts:[one name], endpoint?, monthsAttribute?/statusAttribute?, measure?:"any"|"driver", minMutated?:30, strata?:"<attribute>", covariates?:["<attribute>" ×≤6], anchor?:{eventType,key?,value?,occurrence?}, validate?:false, alpha?:0.5, runs?:10 (≤100), groups?:3 (2-5) | cuts?:[quantiles ×1–4], seed?:1, labelAbove?:0.5, describe?:{attributes?:["<attribute>" ×≤20], genes?:["<symbol>" ×≤20]}, validateOn?:"<cohort>"` | **a survival risk model from mutated genes**, in the manner of OncoCast (Martin et al.): an elastic-net Cox model (glmnet's algorithm, checked against scikit-survival; Breslow ties; `alpha` the l1 share of the penalty) of one cohort's survival on every gene that the panels of EVERY patient cover — so no patient counts as wild-type for a gene never tested — and that is mutated in at least `minMutated` patients. Fitted `runs` times, each on a random two-thirds of the patients with the penalty chosen by 3-fold cross-validated partial likelihood, scoring the held-out third; a patient's risk score is the mean of their held-out scores, so no one is scored by a model trained on them (a patient never held out has no score and is counted). `covariates` are clinical attributes always in the model and never penalised (numbers as they are, categories as indicators against the commonest value, at most 10 values); a patient missing one is left out and counted. `anchor` starts each patient's clock at a timeline event, as the survival view does, with the delayed entry that implies (patients without the event, or whose event follows the study's day 0, are counted out). `validate` trains only on the discovery half of the engine's fixed split (the `split` leaf's halves) and reports everything below on the validation half, which no model saw, cut at the discovery half's quantiles. Reports the held-out C-index across runs (and on the validation half), each gene's share of runs kept and mean hazard ratio, the covariates' hazard ratios, Kaplan-Meier curves of `groups` risk groups cut at equal quantiles of the score (no outcome used; a cut moves to the nearer edge of a run of tied scores, so equal scores share a group, and groups merge when the scores cannot fill them) with a log-rank test — or, with `cuts` instead of `groups` (not both), cut at the quantiles it names, increasing, each strictly between 0 and 1, as OncoCast's `cuts` (e.g. `[0.8]`, the top fifth against the rest; tied scores still share a group, and the caveat says the cuts were chosen, since cuts placed by looking at the curves overstate the separation — confirm one on the validation half) — each group's 12- and 36-month survival and hazard ratio against the lowest (95% Wald interval), the hazard ratio per standard deviation of the score, and the score's histogram. The score is shown on OncoCast's 0–10 scale as well as raw: (score − min) / (max − min) × 10, min and max the lowest and highest held-out score the cuts are placed on (with `validate`, the discovery half's, so a validation patient can fall outside 0–10); the scale is linear, so it changes no group. The genes are also drawn as OncoCast's volcano — mean hazard ratio where kept (log scale) against the share of runs kept, sized by patients mutated — naming those kept in at least `labelAbove` of the runs (0–1; drawn in the browser, so changing it re-runs nothing). `strata` gives each value its own baseline hazard — use CANCER_TYPE on a mixed cohort, or a gene marking a type carries that type's prognosis. `describe` adds **Table 1**, each risk group's makeup, counted on the patients the curves draw (with `validate`, the validation half): a categorical attribute's patients per value and group (the patient's value, or their first sample's, case and whitespace folded; those whose samples disagree are counted), with a χ² test; a numeric one's median and IQR per group, with Kruskal–Wallis; a gene's mutated patients over those whose mutation panels cover it (`measure` decides what counts as mutated; patients whose panels do not are "not profiled", never unmutated), with a χ² test; Benjamini–Hochberg q-values across rows. Rows the groups differ in by construction are marked — the model's genes (kept in any run) and covariates "in the model", the endpoint's own columns "outcome" — and get a p-value but no q-value, staying out of the correction; the model's stratum is marked "stratum" and stays in, since the score has no stratum term. A list left out takes its default: `attributes`, the model's stratum and covariates then the study's attributes in priority order, survival columns left out, keeping the first 8 that have a value here, take more than one, and (categorical) at most 12 values — those passed over are listed with why; `genes`, the 15 the model kept in the most runs. A named attribute the study lacks, a categorical one with more than 100 values here, and a gene on none of the patients' panels and mutated in none are set aside by name. `describe: {}` is the defaults. One cohort in one patient-level study; at most 300,000 patients × runs per request (refused, naming the limit). Seeded: the same document gives the same model. `validateOn` (preview; PMIDs 37477937, 38488807): external validation on another cohort of the document (one patient-level study, any): its patients are scored with the ensemble's mean coefficients (each gene's coefficient averaged over every run, zero where a run dropped it), cut at the training risk-group thresholds, and reported with Harrell's C-index (within strata; seeded bootstrap 95% interval, 200 resamples), Kaplan–Meier curves by group, the log-rank test and each group's HR against the lowest — drawn below the model's figure. A validation patient whose panels miss a gene the model weighs is left out and counted, never scored as wild-type; a model with `covariates` is refused (they are not carried yet). The fit itself is unchanged, and the result without `validateOn` is identical |
 | `labs` | `test, anchor:{eventType,key?,value?,occurrence?}, eventType?:"Lab_Test", testKey?:"TEST", resultKey?:"RESULT", baselineDays?:90, fromWeeks?:-12, toWeeks?:52, binWeeks?:4, responseDrop?:50, cohorts:[names] (≤4)` | **a lab value's course from a treatment start**: each patient's `test` results (timeline events of `eventType` whose `testKey` names the test, value in `resultKey`) as % change from their own baseline — the last value in the `baselineDays` up to and including the anchor; a non-positive baseline is left out — per `binWeeks` bin from `fromWeeks` to `toWeeks`, drawn as median and interquartile band (from 2-point histograms, exact to within a point; a patient counts once per bin, at their mean; the baseline reading itself is not drawn). Best response is each patient's lowest value after the anchor; the share falling by at least `responseDrop`% is counted exactly (50 on PSA is PCWG3's PSA50), and two cohorts get a Fisher test on it. A **waterfall** of every patient's best change is drawn only from participants entitled to patient-level values (a method only PatientLevelResolver has, like a plot's points); an aggregate-only participant's patients stay in the histograms and the rate and are counted as withheld from the bars. With no evaluable patient, the refusal lists the tests the study records |
@@ -4374,7 +4375,66 @@ MSK-CHORD non-small cell lung cancer, KRAS-mutant against KRAS wild-type (profil
 }
 ```
 
-### Example 65: Which mutations change survival on immunotherapy in lung cancer?
+### Example 65: From progression to death in colorectal cancer, by stage
+
+MSK-CHORD colorectal cancer, highest recorded stage 1–3 against stage 4. Stage 4 patients progress over four times as fast (HR ≈ 4.4) and, once progressed, die about 1.7 times as fast; death without a recorded progression is rare in both. So the stage-4 survival gap comes mostly through faster progression, and partly through worse survival after it. About a third of each cohort had a progression recorded before their first sequencing and starts in the progression state; set prevalent to exclude to follow only patients not yet progressed.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Colorectal, stage 1-3": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ],
+          "per": "sample"
+        },
+        {
+          "kind": "clinical",
+          "attribute": "STAGE_HIGHEST_RECORDED",
+          "values": [
+            "Stage 1-3"
+          ]
+        }
+      ]
+    },
+    "Colorectal, stage 4": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ],
+          "per": "sample"
+        },
+        {
+          "kind": "clinical",
+          "attribute": "STAGE_HIGHEST_RECORDED",
+          "values": [
+            "Stage 4"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "multistate",
+      "cohorts": [
+        "Colorectal, stage 1-3",
+        "Colorectal, stage 4"
+      ]
+    }
+  ]
+}
+```
+
+### Example 66: Which mutations change survival on immunotherapy in lung cancer?
 
 MSK-CHORD non-small cell lung cancer, 7,809 patients, 2,666 with an immunotherapy record. STK11 and KEAP1 mutations are adverse among the treated (HR 1.48 and 1.41), as reported for checkpoint inhibitors; TP53 and SMARCA4 are strongly adverse only among the untreated (HR 1.72 and 1.88 against about 1.0 and 1.1 treated; interaction q < 1e-4) — in keeping with their link to tumour mutational burden, though immortal time and who gets treated can shape such contrasts too.
 
@@ -4419,7 +4479,7 @@ MSK-CHORD non-small cell lung cancer, 7,809 patients, 2,666 with an immunotherap
 }
 ```
 
-### Example 66: A tumour mutational burden cut-point for survival on immunotherapy
+### Example 67: A tumour mutational burden cut-point for survival on immunotherapy
 
 Samstein et al. 2019's 1,661 patients treated with checkpoint inhibitors (tmb_mskcc_2018). The best overall cut is TMB > 14.4 mutations/Mb: the top 19% survive markedly longer (HR 0.45, median 47 against 15 months), corrected p ≈ 0.001 against a naive 9.5e-15 that ignores the search. Per cancer type the best cut moves — 18.6 in NSCLC, 9.8 in melanoma, 11.1 in colorectal — and in renal cell carcinoma, oesophagogastric cancer and glioma no cut survives the correction, the paper's point that one threshold does not fit every histology. Every cut here is optimistic and would need validation in another cohort.
 
@@ -4444,7 +4504,7 @@ Samstein et al. 2019's 1,661 patients treated with checkpoint inhibitors (tmb_ms
 }
 ```
 
-### Example 67: PSA response to hormone therapy, by TP53 status
+### Example 68: PSA response to hormone therapy, by TP53 status
 
 Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a median of more than 95% within three months in both groups, but 93.0% of TP53 wild-type patients reach PSA50 against 85.8% of TP53-mutant ones (Fisher p = 1.4e-6), and the mutant group's upper quartile turns back upward within a year.
 
@@ -4505,7 +4565,7 @@ Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a med
 }
 ```
 
-### Example 68: A survival risk model from mutated genes in lung cancer
+### Example 69: A survival risk model from mutated genes in lung cancer
 
 Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 and TP53 as adverse and EGFR as favourable, as the literature does, and its risk thirds separate clearly; a held-out C-index near 0.61 says mutations alone predict survival only modestly. Five runs keep the example quick; OncoCast recommends fifty. Its Table 1 (`describe`) shows who is in each third: the high-risk third is more often male, a former or current smoker and at stage 4 than the low-risk third. KEAP1 and TP53 are marked “in the model” — the score is built from them, so their enrichment is by construction and gets no q-value — and ZFHX3, which not every panel covers, is counted over each group's patients whose panel does.
 
@@ -4551,7 +4611,7 @@ Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 a
 }
 ```
 
-### Example 69: A lung cancer risk model, validated on another study
+### Example 70: A lung cancer risk model, validated on another study
 
 Fitted on the 1,440 non-small cell lung cancer patients of MSK-IMPACT 2017 (ten runs; KEAP1, STK11 and TP53 adverse, EGFR favourable), scored on the 7,809 of MSK-CHORD. The C-index holds at 0.607 (95% CI 0.597–0.616) against 0.613 held out in training, and the training thresholds still separate the new cohort: median survival 66 months in the low-risk group against 33 and 21 months (HR 1.63 and 2.12, log-rank p ≈ 1e-72). Both studies are from MSK, so some patients may be in both under different identifiers; a study from another centre would be the stronger test.
 
@@ -4603,7 +4663,7 @@ Fitted on the 1,440 non-small cell lung cancer patients of MSK-IMPACT 2017 (ten 
 }
 ```
 
-### Example 70: Custom data: a curated biopsy site on every sample
+### Example 71: Custom data: a curated biopsy site on every sample
 
 luad_mskimpact_2021 is 93 EGFR-mutant lung adenocarcinomas with 186 primary and metastatic samples. The demo upload gives every sample a BIOPSY_SITE, grouped from the study's own SAMPLE_TYPE and free-text METASTATIC_SITE the way a reviewer would (scripts/gen-custom-demo.ts), standing in for a clinician-curated annotation. "CNS met" filters on it: 8 patients. Ordered by site, the oncoprint puts each patient's primary and metastases in their own groups. Fraction of the genome altered has a median of 0.47 in the 11 CNS samples and 0.36 in liver, against 0.21 in the 76 primaries. Split by site, TP53 is altered in 7 of 8 CNS-met patients (87.5%) against 65.6% of the patients with a primary sample. The split arms overlap, because a patient whose primary and metastasis were both sequenced belongs to both arms. With 8 to 61 patients per arm, these are illustrations, not findings.
 
@@ -4686,7 +4746,7 @@ Runs on custom data: `luad-biopsy-site` (LUAD biopsy site (demo), 186 samples, c
 }
 ```
 
-### Example 71: Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)
+### Example 72: Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)
 
 msk_spectrum_tme_2022 is 42 untreated high-grade serous ovarian cancers; 41 had scRNA-seq at several anatomical sites. scripts/gen-spectrum-sc-demo.py reads the public CELLxGENE cell annotations (cell states, per-cell pathway scores, per-cell 6p allele fraction) and summarises them per patient (solid sites pooled; ADX_ adnexal, NADX_ non-adnexal) and per cBioPortal sample (the scRNA-seq site of the same patient, 61 of 82 samples). Dysfunctional T/NK cells (TNK_DYSFUNC) have a median of 10.8% of T/NK cells in the 16 HRD-Dup tumours against 6.0% in the 14 FBI tumours, and naive/central-memory cells the reverse (7.5% against 11.1%), as in the paper's Fig. 4b. In adnexal cancer cells, JAK-STAT pathway activity has a median of 0.03 in HRD-Dup against -0.57 in FBI (Fig. 3e), and cancer-cell and T/NK-cell JAK-STAT correlate across patients (Spearman 0.74, Fig. 4e). Clonal 6p loss of heterozygosity (over 80% of cancer cells) is called in 4 patients, 3 of them HRD-Dup — the paper reports 4 of 41. By site, T cells are a median 43% of immune cells in the 22 adnexal samples against 54% in the 18 omental ones. These are summaries of public cell metadata, not the paper's statistical models.
 
@@ -4803,7 +4863,7 @@ Runs on custom data: `spectrum-sc-composition` (SPECTRUM scRNA: cell-type compos
 }
 ```
 
-### Example 72: Composition: T and NK cell states by mutational signature (MSK SPECTRUM)
+### Example 73: Composition: T and NK cell states by mutational signature (MSK SPECTRUM)
 
 The 36 SPECTRUM patients with a consensus signature other than Undetermined, split as the paper splits them. Dysfunctional CXCL13+ CD8 T cells are a mean 7.0% of T/NK cells in the 16 HRD-Dup patients against 4.9% in HRD-Del and 4.4% in FBI, and naive CD4 cells the reverse (15.2% against 19.6% and 20.1%) — the direction of the paper's Fig. 4b. The clearest single difference is cycling T/NK cells, higher in HRD-Dup (8.6% against 5.7%; Welch p = 0.003, q = 0.08 across the 30 comparisons); none reaches q < 0.05 at this size, which the matrix shows as no outlined dot. Per sample, from the study's cell-type fractions, T cells are 24% of HRD-Dup samples' cells against 32% of FBI's. The paper fits a binomial model on cell counts with site and sort as covariates; this view compares shares between groups and says so.
 
@@ -4883,7 +4943,7 @@ Runs on custom data: `spectrum-sc-composition` (SPECTRUM scRNA: cell-type compos
 }
 ```
 
-### Example 73: Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)
+### Example 74: Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)
 
 crc_hta11_htan_2021 is 52 patients with colorectal polyps (Chen et al., Cell 2021). The summary covers 55 of its 61 samples; its counts equal the study's own absolute_counts profile for all 670 sample and cell-type pairs it reports. Per sample, adenoma-specific cells (ASC) are 32.1% of the epithelium in the 30 conventional adenomas against 4.1% in the 20 serrated polyps (q = 2e-5), and serrated-specific cells (SSC) 1.5% against 19.7% (q = 0.003): the two paths to malignancy the paper describes. Stem cells (STM) differ little here (3.1% against 2.5%). The study's own fractions, over every cell type, give the same picture (ASC 29.9% against 3.7%). Cohorts are patients, so a patient with polyps of both types counts in both; 5 of the 52 have both.
 
@@ -4952,7 +5012,7 @@ Runs on custom data: `hta11-sc-p` (HTAN Vanderbilt colorectal polyp scRNA-seq (C
 }
 ```
 
-### Example 74: Cancer types summary: RAS genes across 50,000 tumours
+### Example 75: Cancer types summary: RAS genes across 50,000 tumours
 
 KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.
 
@@ -4981,7 +5041,7 @@ KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appen
 }
 ```
 
-### Example 75: Cohort overlap: how four groups share their patients
+### Example 76: Cohort overlap: how four groups share their patients
 
 TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.
 
@@ -5051,7 +5111,7 @@ TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD.
 }
 ```
 
-### Example 76: Alteration enrichment: what separates colorectal from pancreatic tumours
+### Example 77: Alteration enrichment: what separates colorectal from pancreatic tumours
 
 Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TCF7L2, PIK3CA, FBXW7 and SOX9 mark colorectal cancer; KRAS and CDKN2A mark pancreatic cancer.
 
@@ -5116,7 +5176,7 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
 }
 ```
 
-### Example 77: Mutational signatures: what UV light and tobacco leave behind
+### Example 78: Mutational signatures: what UV light and tobacco leave behind
 
 Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.
 
@@ -5162,7 +5222,7 @@ Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature 
 }
 ```
 
-### Example 78: Co-expression: the genes that rise and fall with ESR1
+### Example 79: Co-expression: the genes that rise and fall with ESR1
 
 TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.
 
@@ -5187,7 +5247,7 @@ TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up be
 }
 ```
 
-### Example 79: Clinical data: every pancreatic cancer sample, oldest patients first
+### Example 80: Clinical data: every pancreatic cancer sample, oldest patients first
 
 Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 
@@ -5224,7 +5284,7 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 }
 ```
 
-### Example 80: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
+### Example 81: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
 
 MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.
 
@@ -5277,7 +5337,7 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
 }
 ```
 
-### Example 81: A patient's mutations, copy-number alterations and structural variants
+### Example 82: A patient's mutations, copy-number alterations and structural variants
 
 MSK-CHORD prostate cancer patients, those with the most structural variants first; P-0024249's tables, mutations kept to OncoKB-oncogenic calls.
 
@@ -5325,7 +5385,7 @@ MSK-CHORD prostate cancer patients, those with the most structural variants firs
 }
 ```
 
-### Example 82: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
+### Example 83: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
 
 MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.
 

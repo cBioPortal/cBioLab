@@ -36,6 +36,7 @@ import { runAcquired } from "./acquired.ts";
 import { runCtdna } from "./ctdna.ts";
 import { runExclusivity } from "./exclusivity.ts";
 import { runTxendpoints } from "./txendpoints.ts";
+import { runMultistate } from "./multistate.ts";
 import { runPredictive } from "./predictive.ts";
 import { runCutpoint } from "./cutpoint.ts";
 import { runForest } from "./forest.ts";
@@ -94,6 +95,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   ctdna: drawn(runCtdna),
   exclusivity: drawn(runExclusivity),
   txendpoints: drawn(runTxendpoints),
+  multistate: drawn(runMultistate),
   predictive: drawn(runPredictive),
   cutpoint: drawn(runCutpoint),
   forest: drawn(runForest),

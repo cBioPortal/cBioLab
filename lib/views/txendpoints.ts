@@ -7,12 +7,11 @@ import { kaplanMeier, kmMedianCi, logRankK, applyCutoff, type SurvRecord } from 
 import { DEFAULT_LINE_GAP, TREATMENT_EVENT } from "../treatment-lines.ts";
 import type { ViewRun } from "./run.ts";
 import { overLimit, answering, refuse, plural } from "./shared.ts";
+import { progressionEvent, progressionError, progressionCondition, clockFailures, CLOCK_TOLERANCE } from "../timeline-endpoints.ts";
 
 const TX_COHORT_LIMIT = 6;
 /** below this many patients in a cohort the log-rank test is refused (the survival view's floor) */
 const TX_MIN_ARM_N = 10;
-/** a study whose timeline runs past OS follow-up for more than this share of anchored patients is refused */
-const TX_CLOCK_TOLERANCE = 0.05;
 
 const TX_ENDPOINT_LABELS = {
   ttnt: "time to next treatment", tot: "time on treatment", rwpfs: "real-world progression-free survival",
@@ -36,16 +35,8 @@ export async function runTxendpoints(view: TxendpointsView, ctx: ViewRun): Promi
   if (lc != null && lc !== "systemic" && lc !== "all" && !(Array.isArray(lc) && lc.length && lc.length <= 40 && lc.every((c) => typeof c === "string" && c.trim())))
     return refuse("txendpoints", ctx, "lineClasses is \"systemic\" (default), \"all\", or a list of up to 40 treatment classes");
   const lineClasses = lc ?? "systemic";
-  const pr0 = view.progression || {};
-  const progression = {
-    eventType: String(pr0.eventType || "Diagnosis").slice(0, 120), key: String(pr0.key || "PROGRESSION").slice(0, 120),
-    values: (pr0.values && pr0.values.length ? pr0.values : ["Y", "Yes"]).map((v) => String(v).slice(0, 80)),
-    ...(pr0.probabilityKey ? { probabilityKey: String(pr0.probabilityKey).slice(0, 120), minProbability: Number(pr0.minProbability) } : {}),
-  };
-  if (endpoint === "rwpfs") {
-    if (progression.values.length > 10) return refuse("txendpoints", ctx, "progression.values takes at most 10 values");
-    if (pr0.probabilityKey && !Number.isFinite(progression.minProbability)) return refuse("txendpoints", ctx, "progression.probabilityKey needs minProbability, the least probability counted as progression");
-  }
+  const progression = progressionEvent(view.progression);
+  if (endpoint === "rwpfs") { const e = progressionError(progression); if (e) return refuse("txendpoints", ctx, e); }
   const ongoingDays = view.ongoingDays == null ? 30 : Number(view.ongoingDays);
   if (!(Number.isInteger(ongoingDays) && ongoingDays >= 0 && ongoingDays <= 365)) return refuse("txendpoints", ctx, "ongoingDays is a whole number of days, 0 to 365");
   let cutoffMonths: number | undefined;
@@ -92,7 +83,7 @@ export async function runTxendpoints(view: TxendpointsView, ctx: ViewRun): Promi
     curves.push({ cohort: n, ...km, medianLo: ci.lo, medianHi: ci.hi, cohortPatients: cohortN, anchored, excluded: ex, late });
   }
   // the clock check: OS_MONTHS must be measured from the timeline's day 0, so that no event is recorded after the last follow-up
-  const badClock = [...lateBy].filter(([, x]) => x.anchored > 0 && x.late / x.anchored > TX_CLOCK_TOLERANCE);
+  const badClock = clockFailures(lateBy);
   if (badClock.length)
     return refuse("txendpoints", ctx, "the timeline and OS_MONTHS do not share a clock in " + badClock.map(([st, x]) => st + " (" + plural(x.late, "anchored patient") + " of " +
       x.anchored.toLocaleString("en-US") + " have timeline events more than " + CLOCK_SLACK_DAYS + " days after OS_MONTHS)").join(", ") +
@@ -126,8 +117,7 @@ export async function runTxendpoints(view: TxendpointsView, ctx: ViewRun): Promi
     : endpoint === "tot"
       ? "Time on treatment: from the start of the " + anchoredTo + " record to the latest stop date of the anchored records in the same line (" + linesWord + "), or death. A living patient whose stop is within " + ongoingDays +
         " days of their last follow-up is censored there as still on treatment. " + tot("noStop") + " anchored patients have an anchored record without a stop date and are left out: a missing stop cannot be told from an ongoing treatment. "
-      : "Real-world progression-free survival: from the start of the " + anchoredTo + " record to the first " + progression.eventType + " event after it with " + progression.key + " in " + progression.values.join(" / ") +
-        (progression.probabilityKey ? " and " + progression.probabilityKey + " ≥ " + progression.minProbability : "") + ", or death. Progression read from the record (in MSK-CHORD, from notes by NLP) is only as complete as that recording; events on the anchor's own day are not counted. ";
+      : "Real-world progression-free survival: from the start of the " + anchoredTo + " record to the first " + progression.eventType + " event after it with " + progressionCondition(progression) + ", or death. Progression read from the record (in MSK-CHORD, from notes by NLP) is only as complete as that recording; events on the anchor's own day are not counted. ";
   return {
     kind: "txendpoints", cohorts: vNames,
     txendpoints: { endpoint, endpointLabel: TX_ENDPOINT_LABELS[endpoint], anchoredTo, lineGap, lineClasses: Array.isArray(lineClasses) ? lineClasses.join(", ") : lineClasses,
@@ -138,7 +128,7 @@ export async function runTxendpoints(view: TxendpointsView, ctx: ViewRun): Promi
     caveat: endpointWords +
       "Censored at the last follow-up, which is OS_MONTHS × " + DAYS_PER_MONTH + " days on the timeline's clock; death is OS_STATUS 1:DECEASED. That OS_MONTHS counts from the timeline's day 0 was checked on these patients: " +
       lateTotal.toLocaleString("en-US") + " of " + anchTotal.toLocaleString("en-US") + " anchored patients " + (lateTotal === 1 ? "has" : "have") + " a timeline event more than " + CLOCK_SLACK_DAYS +
-      " days past it (a study above " + Math.round(TX_CLOCK_TOLERANCE * 100) + "% is refused). " +
+      " days past it (a study above " + Math.round(CLOCK_TOLERANCE * 100) + "% is refused). " +
       "Left truncation as in the survival view: a patient whose anchor falls before day 0 enters the risk set at day 0. Left out: " + tot("noAnchor") + " cohort patients with no " + anchoredTo.replace(/^(first|last) /, "") + " record, " +
       tot("noFollowup") + " with no follow-up after it" +
       (unobserved ? ", and " + unobserved.toLocaleString("en-US") + " anchored before day 0 whose endpoint also came before it, so were never at risk" : "") + ". " +

@@ -171,7 +171,8 @@ export function survivalAxis(curves: { points: { t: number }[] }[], opts?: { cut
 // when several subjects fail at once.
 // ---------------------------------------------------------------------------
 
-export interface CoxRow { t: number; event: number; x: number[]; stratum?: string }
+/** `entry`: delayed entry — the row is at risk only at times after it (counting-process (entry, t]); the caller passes rows with t > entry */
+export interface CoxRow { t: number; event: number; x: number[]; stratum?: string; entry?: number }
 export interface CoxFit {
   beta: number[]; se: number[]; hr: number[]; ciLow: number[]; ciHigh: number[]; p: number[];
   loglik: number; n: number; events: number; iterations: number;
@@ -236,6 +237,9 @@ function coxScore(rows: CoxRow[], beta: number[]): { ll: number; grad: number[];
     // risk set for time t is everyone with t' >= t, which is exactly what's been folded in
     // by the time the sweep reaches t, since the sweep goes from large t to small t.
     let cumExp = 0; const cumX = zeros(p), cumXX = zerosMat(p);
+    // with delayed entry, a row leaves the risk set once the sweep reaches its entry (latest entries first)
+    const late = srows.filter((r) => r.entry != null && r.entry > -Infinity).sort((a, b) => b.entry! - a.entry!);
+    let li = 0;
     let i = sorted.length - 1;
     while (i >= 0) {
       const t = sorted[i].t;
@@ -254,6 +258,12 @@ function coxScore(rows: CoxRow[], beta: number[]): { ll: number; grad: number[];
           for (let a = 0; a < p; a++) { tieX[a] += eb * row.x[a]; eventX[a] += row.x[a]; }
           for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) tieXX[a][b] += eb * row.x[a] * row.x[b];
         }
+      }
+      while (li < late.length && late[li].entry! >= t) {
+        const row = late[li++], eb = Math.exp(dot(beta, row.x));
+        cumExp -= eb;
+        for (let a = 0; a < p; a++) cumX[a] -= eb * row.x[a];
+        for (let a = 0; a < p; a++) for (let b = 0; b < p; b++) cumXX[a][b] -= eb * row.x[a] * row.x[b];
       }
       if (dCount > 0) {
         ll += dot(beta, eventX);
@@ -1405,4 +1415,85 @@ export function grayPermutationTest(groups: CrRecord[][], permutations = 2000, s
     if (grayStatistic(order, t, cause, perm, entryOrder, entry, K) >= observed - 1e-12) beyond++;
   }
   return { statistic: observed, p: (beyond + 1) / (permutations + 1), permutations, groups: K };
+}
+
+// ---------------------------------------------------------------------------
+// Illness–death model: start → progression → death, and start → death, on one clock (Markov,
+// clock-forward: every transition's hazard is a function of time since the origin).
+
+/** One patient's path, months from the origin. */
+export interface IllnessDeathRecord {
+  /** already in the middle state (progressed) at time 0 */
+  prevalent: boolean;
+  /** the move into the middle state, strictly before `te`; null when none was observed (or prevalent) */
+  tp: number | null;
+  /** the end of follow-up: death when `dead`, else censoring */
+  te: number; dead: boolean;
+}
+export type IllnessDeathTransition = "01" | "02" | "12";
+export interface IllnessDeathFit {
+  n: number; prevalent: number;
+  /** events per transition, and censorings in the start (c0) and middle (c1) states */
+  events: Record<IllnessDeathTransition, number> & { c0: number; c1: number };
+  /** person-time spent in the start state and in the middle state */
+  personTime: { s0: number; s1: number };
+  /** Aalen–Johansen state occupation after each event time (p0 start, p1 middle, p2 dead); first point t = 0 */
+  occupation: { t: number; p0: number; p1: number; p2: number }[];
+  /** Nelson–Aalen cumulative hazard per transition at its event times, with the Aalen variance; first point t = 0 */
+  cumhaz: Record<IllnessDeathTransition, { t: number; h: number; v: number }[]>;
+}
+
+const lowerBound = (a: number[], x: number) => { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] < x) lo = m + 1; else hi = m; } return lo; };
+
+/**
+ * Nelson–Aalen and Aalen–Johansen for the illness–death model. At each event time t the start state's
+ * risk set is everyone not prevalent still in it (exit time ≥ t), the middle state's those who entered
+ * it before t and have not left (entry < t ≤ exit); a move into the middle state at t leaves the start
+ * state at t and is at risk of death only after it. The cumulative hazard of a transition rises by
+ * d/n; the occupation probabilities follow the product of (I + dA) from the initial distribution
+ * (the prevalent share starts in the middle state): p0 ← p0 (1 − (d01 + d02)/n0), p1 ← p1 (1 − d12/n1)
+ * + p0 d01/n0, p2 = 1 − p0 − p1.
+ */
+export function illnessDeath(recs: IllnessDeathRecord[]): IllnessDeathFit {
+  const n = recs.length;
+  const exit0: number[] = [], in1: number[] = [], out1: number[] = [];
+  const ev = new Map<number, [number, number, number]>();
+  const bump = (t: number, k: 0 | 1 | 2) => { const e = ev.get(t) || [0, 0, 0]; e[k]++; ev.set(t, e); };
+  const events = { "01": 0, "02": 0, "12": 0, c0: 0, c1: 0 };
+  let s0 = 0, s1 = 0, prevalent = 0;
+  for (const r of recs) {
+    if (r.prevalent) prevalent++;
+    else {
+      const x = r.tp ?? r.te;
+      exit0.push(x); s0 += x;
+      if (r.tp != null) { events["01"]++; bump(x, 0); }
+      else if (r.dead) { events["02"]++; bump(x, 1); }
+      else events.c0++;
+    }
+    if (r.prevalent || r.tp != null) {
+      const a = r.prevalent ? 0 : r.tp!;
+      in1.push(a); out1.push(r.te); s1 += r.te - a;
+      if (r.dead) { events["12"]++; bump(r.te, 2); } else events.c1++;
+    }
+  }
+  exit0.sort((a, b) => a - b); in1.sort((a, b) => a - b); out1.sort((a, b) => a - b);
+  const times = [...ev.keys()].sort((a, b) => a - b);
+  let p0 = n ? (n - prevalent) / n : 0, p1 = n ? prevalent / n : 0;
+  const occupation = [{ t: 0, p0, p1, p2: 0 }];
+  const H = [0, 0, 0], V = [0, 0, 0];
+  const cumhaz: IllnessDeathFit["cumhaz"] = { "01": [{ t: 0, h: 0, v: 0 }], "02": [{ t: 0, h: 0, v: 0 }], "12": [{ t: 0, h: 0, v: 0 }] };
+  const keys: IllnessDeathTransition[] = ["01", "02", "12"];
+  for (const t of times) {
+    const [d01, d02, d12] = ev.get(t)!;
+    const n0 = exit0.length - lowerBound(exit0, t);
+    const n1 = lowerBound(in1, t) - lowerBound(out1, t);
+    const a01 = n0 > 0 ? d01 / n0 : 0, a02 = n0 > 0 ? d02 / n0 : 0, a12 = n1 > 0 ? d12 / n1 : 0;
+    [[d01, n0], [d02, n0], [d12, n1]].forEach(([d, r], k) => {
+      if (d > 0 && r > 0) { H[k] += d / r; V[k] += d / (r * r); cumhaz[keys[k]].push({ t, h: H[k], v: V[k] }); }
+    });
+    const q0 = p0 * (1 - a01 - a02), q1 = p1 * (1 - a12) + p0 * a01;
+    p0 = q0; p1 = q1;
+    occupation.push({ t, p0, p1, p2: Math.max(0, 1 - p0 - p1) });
+  }
+  return { n, prevalent, events, personTime: { s0, s1 }, occupation, cumhaz };
 }

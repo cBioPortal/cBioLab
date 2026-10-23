@@ -6,6 +6,7 @@ import { isDrawn, type AnalysisDoc, type AnalysisResult, type ViewResult, type A
 import { lollipopSummaryText } from "./lollipop-svg.ts";
 import { riskSpan } from "./figures/riskmodel.ts";
 import { txMedianText } from "./figures/txendpoints.ts";
+import { MS_TRANSITIONS, msRateText } from "./figures/multistate.ts";
 
 /** a timeline's events listed in text (MCP); the figure draws every one */
 const TIMELINE_TEXT_EVENTS = 400;
@@ -383,6 +384,16 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         (m.covariates.length ? `; adjusted for ${m.covariates.join(", ")}` : "") + `):\n` +
         m.genes.map((g) => `  ${g.gene}: mutated ${g.mutatedExposed}/${g.exposed} exposed, ${g.mutatedUnexposed}/${g.unexposed} unexposed; ` +
           (g.interaction ? `among exposed ${eff(g.inExposed)}; among unexposed ${eff(g.inUnexposed)}; interaction ${eff(g.interaction)}, q=${pFmt(g.q!)}` : `not fitted: ${g.skipped}`)).join("\n") +
+        caveatOf(v) + noteOf(v));
+    } else if (v.kind === "multistate") {
+      const m = v.multistate;
+      out.push(`Multistate (illness-death) model, months from ${m.origin}:\n` +
+        m.cohorts.map((c) => `  ${c.cohort}: n=${c.n.toLocaleString()} (${c.prevalent.toLocaleString()} progressed by day 0); ` +
+          c.rates.map((r) => `${MS_TRANSITIONS[r.key]} ${r.events} events, ${msRateText(r)} per 100 person-months`).join("; ") +
+          `\n    in each state (not progressed / progressed / dead): ` +
+          c.atHorizon.map((h) => `${h.months} mo ` + (h.p0 == null ? "n/a" : `${(100 * h.p0).toFixed(0)}% / ${(100 * h.p1!).toFixed(0)}% / ${(100 * h.p2!).toFixed(0)}%`)).join(", ")).join("\n") +
+        m.cox.map((x) => `\n  ${MS_TRANSITIONS[x.key]}: ` + (x.noFit ? `no hazard ratio (${x.noFit})` :
+          x.rows.map((r) => `${r.cohort} vs ${m.reference} HR ${r.hr.toFixed(2)} (95% CI ${r.lo.toFixed(2)}-${r.hi.toFixed(2)}, ${pFmt(r.p)})`).join("; "))).join("") +
         caveatOf(v) + noteOf(v));
     } else if (v.kind === "txendpoints") {
       const t = v.txendpoints;

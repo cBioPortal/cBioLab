@@ -8,6 +8,7 @@ export const PREVIEW_KINDS: Record<string, string> = {
   exclusivity: "no method record or golden test of the DISCOVER background fit against the R package yet",
   cutpoint: "no method record or golden test of the maximally selected log-rank scan against R maxstat yet",
   predictive: "no method record or golden test of the per-gene interaction fits yet",
+  multistate: "no method record or golden test of the Aalen–Johansen occupation, Nelson–Aalen hazards or the delayed-entry Cox fits yet (no interval on the occupation)",
   txendpoints: "no method record or golden test of the endpoint derivation (lines, stops, progression) or the median intervals yet",
   forest: "no method record or golden test of the per-stratum Cox fits and the DerSimonian–Laird pooling yet",
   adjusted: "no method record or golden test of the per-gene logistic fits yet",

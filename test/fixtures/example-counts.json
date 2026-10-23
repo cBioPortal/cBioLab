@@ -240,6 +240,10 @@
       "Breast": 5368,
       "Colorectal": 5543
     },
+    "From progression to death in colorectal cancer, by stage": {
+      "Colorectal, stage 1-3": 3171,
+      "Colorectal, stage 4": 2372
+    },
     "Real-world PFS on immunotherapy in lung cancer, by KRAS status": {
       "NSCLC, KRAS mutant": 2194,
       "NSCLC, KRAS wild-type": 5540

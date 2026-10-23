@@ -1467,9 +1467,59 @@ export interface TxEndpointOpts {
   /** how records form lines (lib/treatment-lines.ts) */
   lines: LineSpec;
   /** rwpfs: the progression event — its type, key and accepted values, and an optional probability floor */
-  progression?: { eventType: string; key: string; values: string[]; probabilityKey?: string; minProbability?: number };
+  progression?: ProgressionEvent;
   /** tot: a stop this many days or fewer before the last follow-up of a living patient counts as ongoing */
   ongoingDays?: number;
+}
+
+/** Timeline events of the study's cohort patients, aliased `alias` (the FROM … WHERE of a CTE). */
+function cohortEventsFrom(db: string, study: string, alias: string): string {
+  return "  FROM " + db + ".clinical_event " + alias + "\n" +
+    "  JOIN " + db + ".patient p ON p.internal_id = " + alias + ".patient_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND p.stable_id IN (SELECT pid FROM cohort)\n";
+}
+
+/** an event of `alias` carrying `key` (folded) with a value meeting `valueCond` */
+function eventHasKv(db: string, alias: string, key: string, valueCond: string): string {
+  return "    AND " + alias + ".clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE " +
+    foldedEqualsSql("key", key) + " AND " + valueCond + ")\n";
+}
+
+/** the progression event: its type, key and accepted values, and an optional probability floor */
+export interface ProgressionEvent { eventType: string; key: string; values: string[]; probabilityKey?: string; minProbability?: number }
+
+/** `os`: each cohort patient's OS_MONTHS (months) and whether OS_STATUS says deceased (dead) */
+function osCte(study: string, db: string): string {
+  const pid = pidOf("patient_unique_id", study);
+  return "os AS (\n" +
+    "  SELECT " + pid + " AS pid,\n" +
+    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
+    "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
+    "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
+    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid\n" +
+    ")";
+}
+
+/** `lastday`: each cohort patient's latest timeline day (a start or a stop) — the clock check's input */
+function lastDayCte(study: string, db: string): string {
+  return "lastday AS (\n" +
+    "  SELECT p.stable_id AS pid, max(greatest(ce.start_date, coalesce(ce.stop_date, ce.start_date))) AS d\n" + cohortEventsFrom(db, study, "ce") +
+    "  GROUP BY pid\n" +
+    ")";
+}
+
+/** `prog`: (pid, day) of every progression event of the cohort's patients */
+function progressionCte(study: string, db: string, pr: ProgressionEvent): string {
+  return "prog AS (\n" +
+    "  SELECT p.stable_id AS pid, ce.start_date AS day\n" + cohortEventsFrom(db, study, "ce") +
+    "    AND " + foldedEqualsSql("ce.event_type", pr.eventType) + "\n" +
+    eventHasKv(db, "ce", pr.key, foldedInSql("value", pr.values)) +
+    (pr.probabilityKey && pr.minProbability != null
+      ? eventHasKv(db, "ce", pr.probabilityKey, "toFloat64OrNull(value) >= " + Number(pr.minProbability)) : "") +
+    ")";
 }
 
 /**
@@ -1491,48 +1541,23 @@ export interface TxEndpointOpts {
  * anchored record is in no row; the caller counts them from the cohort's size.
  */
 export function txEndpointCountsSql(cohortSql: string, study: string, db: string, o: TxEndpointOpts): string {
-  const pid = pidOf("patient_unique_id", study);
   const pick = o.anchor.occurrence === "LAST" ? "max" : "min";
-  const evFrom = (alias: string) =>
-    "  FROM " + db + ".clinical_event " + alias + "\n" +
-    "  JOIN " + db + ".patient p ON p.internal_id = " + alias + ".patient_id\n" +
-    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND p.stable_id IN (SELECT pid FROM cohort)\n";
-  const hasKv = (alias: string, key: string, valueCond: string) =>
-    "    AND " + alias + ".clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE " +
-    foldedEqualsSql("key", key) + " AND " + valueCond + ")\n";
+  const evFrom = (alias: string) => cohortEventsFrom(db, study, alias);
+  const hasKv = (alias: string, key: string, valueCond: string) => eventHasKv(db, alias, key, valueCond);
   const ctes: string[] = [
-    "os AS (\n" +
-    "  SELECT " + pid + " AS pid,\n" +
-    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
-    "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
-    "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
-    "  GROUP BY pid\n" +
-    ")",
+    osCte(study, db),
     "arec AS (\n" +
     "  SELECT p.stable_id AS pid, ce.clinical_event_id AS eid, ce.start_date AS s, ce.stop_date AS e\n" + evFrom("ce") +
     "    AND " + foldedEqualsSql("ce.event_type", o.anchor.eventType) + "\n" +
     (o.anchor.key ? hasKv("ce", o.anchor.key, foldedEqualsSql("value", String(o.anchor.value ?? ""))) : "") +
     ")",
     "anch AS (SELECT pid, " + pick + "(s) AS a FROM arec GROUP BY pid)",
-    "lastday AS (\n" +
-    "  SELECT p.stable_id AS pid, max(greatest(ce.start_date, coalesce(ce.stop_date, ce.start_date))) AS d\n" + evFrom("ce") +
-    "  GROUP BY pid\n" +
-    ")",
+    lastDayCte(study, db),
   ];
   let x: string;
   if (o.endpoint === "rwpfs") {
-    const pr = o.progression!;
     ctes.push(
-      "prog AS (\n" +
-      "  SELECT p.stable_id AS pid, ce.start_date AS day\n" + evFrom("ce") +
-      "    AND " + foldedEqualsSql("ce.event_type", pr.eventType) + "\n" +
-      hasKv("ce", pr.key, foldedInSql("value", pr.values)) +
-      (pr.probabilityKey && pr.minProbability != null
-        ? hasKv("ce", pr.probabilityKey, "toFloat64OrNull(value) >= " + Number(pr.minProbability)) : "") +
-      ")",
+      progressionCte(study, db, o.progression!),
       "x AS (SELECT prog.pid AS pid, min(prog.day) AS d, 0 AS nostop FROM prog INNER JOIN anch ON anch.pid = prog.pid WHERE prog.day > anch.a GROUP BY prog.pid)");
     x = "x";
   } else {
@@ -1591,6 +1616,65 @@ export function txEndpointCountsSql(cohortSql: string, study: string, db: string
     "SELECT kind, if(kind = 'record', round(entry, 4), 0) AS entry, if(kind = 'record', round(tt, 4), 0) AS t,\n" +
     "       if(kind = 'record', ev, 0) AS ev, late, count() AS n\n" +
     "FROM cls GROUP BY kind, entry, t, ev, late ORDER BY t";
+}
+
+// ---------------------------------------------------------------------------
+// multistate: the illness–death model (start → progression → death) from the timeline's day 0
+
+/** the event type whose day-0 record says the timeline's clock starts at sequencing */
+export const SEQUENCING_EVENT = "Sequencing";
+
+/**
+ * Per cohort, counts of patient paths through the illness–death model on the timeline's clock, in
+ * months from day 0: `prevalent` (a progression event on or before day 0, so the patient starts in
+ * the progression state), `tp` the first progression after day 0 strictly before the end of
+ * follow-up (0 when none), `te` the end of follow-up — OS_MONTHS, the timeline's last follow-up
+ * day being OS_MONTHS × DAYS_PER_MONTH — and `dead` (OS_STATUS 1:…). Flags beside them, for the
+ * caveat: `afterend` a progression recorded only on or after the end of follow-up (not counted),
+ * `assessed` any record of the progression key at all (a patient never imaged cannot show
+ * progression), `seq0` a Sequencing event on day 0 (what day 0 is), and `late` a timeline event
+ * more than CLOCK_SLACK_DAYS past the end of follow-up (the clock check). 'nofollowup' patients
+ * (no OS, or OS_MONTHS ≤ 0) are counted apart. Every cohort patient is in exactly one row's n.
+ */
+export function multistateCountsSql(cohortSql: string, study: string, db: string, pr: ProgressionEvent): string {
+  return "WITH cohort AS (" + cohortSql + "),\n" + [
+    osCte(study, db),
+    lastDayCte(study, db),
+    progressionCte(study, db, pr),
+    "pp AS (SELECT pid, countIf(day <= 0) AS n_pre, countIf(day > 0) AS n_after, minIf(day, day > 0) AS first_after FROM prog GROUP BY pid)",
+    "assessed AS (\n" +
+    "  SELECT DISTINCT p.stable_id AS pid\n" + cohortEventsFrom(db, study, "ce") +
+    "    AND " + foldedEqualsSql("ce.event_type", pr.eventType) + "\n" +
+    eventHasKv(db, "ce", pr.key, "1") +
+    ")",
+    "seq0 AS (\n" +
+    "  SELECT DISTINCT p.stable_id AS pid\n" + cohortEventsFrom(db, study, "ce") +
+    "    AND " + foldedEqualsSql("ce.event_type", SEQUENCING_EVENT) + " AND ce.start_date = 0\n" +
+    ")",
+    "per AS (\n" +
+    "  SELECT os.months AS months, os.months IS NOT NULL AS has_os, os.dead AS dead,\n" +
+    "         pp.pid != '' AND pp.n_pre > 0 AS prevalent, pp.pid != '' AND pp.n_after > 0 AS has_after, toFloat64(pp.first_after) AS fa,\n" +
+    "         a.pid != '' AS assessed, s.pid != '' AS seq0, lastday.d AS ld\n" +
+    "  FROM (SELECT DISTINCT pid FROM cohort) c\n" +
+    "  LEFT JOIN os ON os.pid = c.pid\n" +
+    "  LEFT JOIN pp ON pp.pid = c.pid\n" +
+    "  LEFT JOIN assessed a ON a.pid = c.pid\n" +
+    "  LEFT JOIN seq0 s ON s.pid = c.pid\n" +
+    "  LEFT JOIN lastday ON lastday.pid = c.pid\n" +
+    ")",
+    "cls AS (\n" +
+    "  SELECT multiIf(NOT has_os OR months <= 0, 'nofollowup', 'record') AS kind,\n" +
+    "         NOT prevalent AND has_after AND fa < months * " + DAYS_PER_MONTH + " AS hit,\n" +
+    "         NOT prevalent AND has_after AND fa >= months * " + DAYS_PER_MONTH + " AS afterend,\n" +
+    "         if(hit, fa / " + DAYS_PER_MONTH + ", 0) AS tp, months AS te,\n" +
+    "         prevalent, dead, assessed, seq0, ld > months * " + DAYS_PER_MONTH + " + " + CLOCK_SLACK_DAYS + " AS late\n" +
+    "  FROM per\n" +
+    ")",
+  ].join(",\n") + "\n" +
+    "SELECT kind, if(kind = 'record', toUInt8(prevalent), 0) AS prevalent, if(kind = 'record', round(tp, 4), 0) AS tp,\n" +
+    "       if(kind = 'record', round(te, 4), 0) AS te, if(kind = 'record', toUInt8(dead), 0) AS dead,\n" +
+    "       toUInt8(afterend) AS afterend, toUInt8(assessed) AS assessed, toUInt8(seq0) AS seq0, toUInt8(late) AS late, count() AS n\n" +
+    "FROM cls GROUP BY kind, prevalent, tp, te, dead, afterend, assessed, seq0, late ORDER BY te";
 }
 
 // ---------------------------------------------------------------------------

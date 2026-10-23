@@ -413,6 +413,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "txEndpointCountsSql:tot": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "tot", anchor: { eventType: "Treatment", key: "AGENT", value: "PEMBROLIZUMAB", occurrence: "LAST" }, lines: { gap: 60, classes: "all" }, ongoingDays: 30 }),
     "txEndpointCountsSql:rwpfs": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "rwpfs", anchor: { eventType: "Treatment" }, lines: { gap: 90 },
       progression: { eventType: "Diagnosis", key: "PROGRESSION", values: ["Y", "Yes"], probabilityKey: "NLP_PROGRESSION_PROBABILITY", minProbability: 0.8 } }),
+    // multistate: `per`/`cls` are per patient; the outer SELECT groups them into (prevalent, tp, te, dead, flags) tallies
+    "multistateCountsSql": () => federation.multistateCountsSql(cohortSql, "x", "db", { eventType: "Diagnosis", key: "PROGRESSION", values: ["Y", "Yes"], probabilityKey: "NLP_PROGRESSION_PROBABILITY", minProbability: 0.8 }),
     // labs: per-patient % changes stay inside; the course and best-response queries return histograms
     "labCourseSql": () => federation.labCourseSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS),
     "labBestSql": () => federation.labBestSql(cohortSql, "x", "db", LAB, LAB_ANCHOR, LAB_OPTS, 50),
