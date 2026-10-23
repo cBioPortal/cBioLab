@@ -544,7 +544,7 @@ export function ctdnaSurvivalSql(cohortSql: string, study: string, db: string, o
     ctdnaSidesCtes(cohortSql, study, db, o) + ",\n" +
     ctdnaDetectedCte(study, db, pin, measure, chKeep(o, "s.side")) + ",\n" +
     "os AS (\n" +
-    "  SELECT " + pid + " AS pid, toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
+    "  SELECT " + pid + " AS pid, " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead, " + pid + " IN (SELECT pid FROM det) AS detected\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
@@ -1553,7 +1553,7 @@ function osCte(study: string, db: string): string {
   const pid = pidOf("patient_unique_id", study);
   return "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
+    "         " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
@@ -1577,7 +1577,7 @@ function progressionCte(study: string, db: string, pr: ProgressionEvent): string
     "    AND " + foldedEqualsSql("ce.event_type", pr.eventType) + "\n" +
     eventHasKv(db, "ce", pr.key, foldedInSql("value", pr.values)) +
     (pr.probabilityKey && pr.minProbability != null
-      ? eventHasKv(db, "ce", pr.probabilityKey, "toFloat64OrNull(value) >= " + Number(pr.minProbability)) : "") +
+      ? eventHasKv(db, "ce", pr.probabilityKey, finiteSql("value") + " >= " + Number(pr.minProbability)) : "") +
     ")";
 }
 
@@ -1759,7 +1759,7 @@ export function cutpointRowsSql(cohortSql: string, study: string, db: string,
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = " + sq(o.months) + ")) AS months,\n" +
+    "         " + finiteSql("anyIf(attribute_value, attribute_name = " + sq(o.months) + ")") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = " + sq(o.status) + ") AS status\n" +
     "  FROM " + clinicalTable(db, [o.months, o.status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN (" + sq(o.months) + ", " + sq(o.status) + ")\n" +
@@ -1768,7 +1768,7 @@ export function cutpointRowsSql(cohortSql: string, study: string, db: string,
     "),\n" +
     "val AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         toFloat64OrNull(argMinIf(attribute_value, sample_unique_id, attribute_name = " + sq(o.attribute) + ")) AS v" +
+    "         " + finiteSql("argMinIf(attribute_value, sample_unique_id, attribute_name = " + sq(o.attribute) + ")") + " AS v" +
     (o.stratum ? ",\n         argMinIf(trimBoth(attribute_value), sample_unique_id, attribute_name = " + sq(o.stratum) + ") AS s" : "") + "\n" +
     "  FROM " + clinicalTable(db, attrs) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name IN (" + attrs.map(sq).join(", ") + ") AND trimBoth(attribute_value) != ''\n" +
@@ -1843,7 +1843,7 @@ export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaR
     "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = " + sq(o.months) + ")) AS months,\n" +
+    "         " + finiteSql("anyIf(attribute_value, attribute_name = " + sq(o.months) + ")") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = " + sq(o.status) + ") AS status\n" +
     "  FROM " + clinicalTable(db, [o.months, o.status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN (" + sq(o.months) + ", " + sq(o.status) + ")\n" +
@@ -2371,8 +2371,8 @@ function molEndometrialCtes(cohortSql: string, study: string, db: string, o: Mol
   const hot = o.poleHotspots.map((h) => { if (!/^[A-Z][0-9]{1,5}[A-Z*]$/.test(h)) throw new Error("bad POLE hotspot '" + String(h).slice(0, 20) + "'"); return sq(h); }).join(", ");
   const v = clinicalValueFoldSql("attribute_value");
   const msiState = o.msi.threshold != null
-    ? "multiIf(toFloat64OrNull(trimBoth(attribute_value)) IS NULL OR toFloat64OrNull(trimBoth(attribute_value)) < 0, 0, toFloat64OrNull(trimBoth(attribute_value)) >= " + Number(o.msi.threshold) +
-      ", 2, toFloat64OrNull(trimBoth(attribute_value)) < " + Number(o.msi.stableBelow ?? o.msi.threshold) + ", 1, 0)"
+    ? "multiIf(" + finiteSql("trimBoth(attribute_value)") + " IS NULL OR " + finiteSql("trimBoth(attribute_value)") + " < 0, 0, " + finiteSql("trimBoth(attribute_value)") + " >= " + Number(o.msi.threshold) +
+      ", 2, " + finiteSql("trimBoth(attribute_value)") + " < " + Number(o.msi.stableBelow ?? o.msi.threshold) + ", 1, 0)"
     : "multiIf(" + v + " IN (" + (o.msi.high || []).map((x) => sq(x.trim().toLowerCase())).join(", ") + "), 2, " + v + " IN (" + (o.msi.stable || []).map((x) => sq(x.trim().toLowerCase())).join(", ") + "), 1, 0)";
   const by = o.by ? orgAttr(o.by) : null;
   return (
@@ -2434,7 +2434,7 @@ export function molSurvivalSql(cohortSql: string, study: string, db: string, o: 
   const pid = pidOf("patient_unique_id", study);
   return molEndometrialCtes(cohortSql, study, db, o) + ",\n" +
     "os AS (\n" +
-    "  SELECT " + pid + " AS pid, toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
+    "  SELECT " + pid + " AS pid, " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
@@ -2525,7 +2525,7 @@ export function germSurvivalSql(cohortSql: string, study: string, db: string, ge
   const pid = pidOf("patient_unique_id", study);
   return germCtes(cohortSql, study, db, [gene]) + ",\n" +
     "os AS (\n" +
-    "  SELECT " + pid + " AS pid, toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
+    "  SELECT " + pid + " AS pid, " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
