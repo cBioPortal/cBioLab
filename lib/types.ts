@@ -1281,6 +1281,28 @@ export interface RiskmodelView {
    *  computes it; a list left out is the default (the study's leading attributes; the genes the
    *  model kept most often) */
   describe?: { attributes?: string[]; genes?: string[] };
+  /** external validation: another cohort of the document, scored with the fitted ensemble's mean
+   *  coefficients and cut at the training risk-group thresholds */
+  validateOn?: string;
+}
+
+/** A risk model scored on another cohort it never saw (RiskmodelView.validateOn). */
+export interface RiskExternal {
+  cohort: string; study: string;
+  /** patients scored, their events, and those left out with why */
+  n: number; events: number;
+  cohortPatients: number; rowsReturned: number;
+  notProfiled: number; noStratum: number; noAnchor: number; anchorAfterStart: number; noFollowUp: number;
+  /** patients whose panels do not cover every gene the model weighs: never scored as wild-type */
+  notCovered: number;
+  /** the model's genes with a non-zero ensemble coefficient, which every scored patient's panels cover */
+  modelGenes: number;
+  /** Harrell's C-index of the score (within strata), with a seeded bootstrap 95% interval */
+  cIndex: number; cIndexLo: number; cIndexHi: number; bootstrap: number;
+  /** the training thresholds (raw scores) the groups are cut at */
+  cuts: number[];
+  groups: { name: string; curve: Omit<KmCurve, "cohort">; hr: number | null; ciLow: number | null; ciHigh: number | null; p: number | null }[];
+  logrank: LogRankK | null;
 }
 
 /** Why a Table 1 row differs between the risk groups by construction, or is the model's stratum. */
@@ -1373,6 +1395,8 @@ export interface RiskmodelResult {
   percentiles: number[];
   /** with `describe`: Table 1, the groups' makeup */
   table1?: RiskTable1;
+  /** with `validateOn`: the model scored on that cohort */
+  external?: RiskExternal;
 }
 
 export interface TxendpointsView {

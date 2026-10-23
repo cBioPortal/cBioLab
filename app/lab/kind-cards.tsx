@@ -161,6 +161,11 @@ function RiskModelSettings({ vi, spec, busy, patch }: { vi: number; spec: any; b
       <label className="chk" title="train only on the discovery half of the engine's fixed split, and report the groups, table and C-index on the validation half, which the model never saw">
         <Checkbox checked={!!spec.validate} disabled={busy} onCheckedChange={(on) => patch({ validate: (on === true) || undefined })} /> validate on held-out half
       </label>
+      <div className="setrow" title="another cohort of this analysis to score with the fitted model, cut at the training thresholds, with its C-index and curves (empty for none)">
+        <span className="meta">validate on</span>
+        <DraftInput value={spec.validateOn || ""} disabled={busy} width="10rem" placeholder="cohort name"
+          onCommit={(t) => patch({ validateOn: t.trim() || undefined })} />
+      </div>
     </GearMenu>
   );
 }
@@ -202,7 +207,8 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "riskmodel") return (spec.endpoint || "OS") + (spec.anchor?.eventType ? " from first " + spec.anchor.eventType + (spec.anchor.key ? " [" + spec.anchor.key + "=" + spec.anchor.value + "]" : "") : "") +
     " on " + (spec.measure === "driver" ? "driver mutations" : "mutated genes") +
     (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") +
-    (spec.strata ? ", stratified by " + spec.strata : "") + " · " + (spec.runs ?? 10) + " held-out splits" + (spec.validate ? ", validated on the held-out half" : "");
+    (spec.strata ? ", stratified by " + spec.strata : "") + " · " + (spec.runs ?? 10) + " held-out splits" + (spec.validate ? ", validated on the held-out half" : "") +
+    (spec.validateOn ? ", scored on “" + spec.validateOn + "”" : "");
   if (kind === "adjusted") return "mutations in every gene mutated in ≥" + (100 * (spec.minShare ?? 0.05)).toFixed(0) + "% · adjusted for " + (spec.covariates?.length ? spec.covariates.join(", ") : "nothing");
   if (kind === "forest") {
     const e = spec.exposure || {};

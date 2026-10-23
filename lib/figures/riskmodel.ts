@@ -12,6 +12,7 @@ import { lineSwatch } from "../chart/legend.ts";
 import { r1 } from "../chart/marks.ts";
 import { placeLabels, type LabelWant } from "../chart/place.ts";
 import { unplacedNote } from "./volcano.ts";
+import { kmPanel } from "./km.ts";
 
 /** a hazard ratio below 1 and above it take the shared series' blue and vermillion */
 const FAVOURABLE = SERIES[0], ADVERSE = SERIES[4];
@@ -308,6 +309,21 @@ export function riskmodelSvg(v: DrawnResultOf<"riskmodel">, o: SvgOpts): string 
     yy += 2 + bottomAxisHeight(gTitle);
   }
 
+  if (m.external) {
+    const e = m.external;
+    yy += 18;
+    const km = kmPanel(e.groups.map((g, i) => ({ name: g.name, points: g.curve.points, atRisk: g.curve.atRisk,
+      detail: "median " + (g.curve.median == null ? "not reached" : fmtMonths(g.curve.median)) + " · n = " + fmtInt(g.curve.n) + " · " + fmtInt(g.curve.events) + " events" +
+        (g.hr == null ? (i === 0 ? " · reference" : "") : " · HR " + fmtRatio(g.hr) + " [" + fmtRatio(g.ciLow!) + "–" + fmtRatio(g.ciHigh!) + "]") })),
+    { y0: yy, W, p, xTitle: timeTitle("Months", m.anchoredTo), yTitle: "Survival probability",
+      title: "External validation on “" + e.cohort + "” (" + e.study + "), cut at the training thresholds" });
+    out.push(km.svg);
+    yy += km.height;
+    const vs = ["C-index " + e.cIndex.toFixed(3) + " (95% bootstrap CI " + e.cIndexLo.toFixed(3) + "–" + e.cIndexHi.toFixed(3) + ", " + e.bootstrap + " resamples) on " + fmtInt(e.n) + " patients never trained on" +
+      (e.logrank ? " · log-rank χ² = " + fmtNum(e.logrank.chi2) + " (" + e.logrank.df + " df) · " + fmtP(e.logrank.p) : "")];
+    for (const s2 of vs) { const para = paragraph(s2, 8, yy - 2, W - 16, p.ink); out.push(para.svg); yy += para.height; }
+  }
+
   const left = [m.notProfiled ? fmtInt(m.notProfiled) + " with no mutation panel on record" : "", m.noStratum ? fmtInt(m.noStratum) + " with no " + m.strata : "",
     m.noCovariate ? fmtInt(m.noCovariate) + " missing a covariate" : "", m.noAnchor ? fmtInt(m.noAnchor) + " with no " + m.anchoredTo + " event" : "",
     m.anchorAfterStart ? fmtInt(m.anchorAfterStart) + " whose " + m.anchoredTo + " came after the study's day 0" : "",
@@ -323,6 +339,9 @@ export function riskmodelSvg(v: DrawnResultOf<"riskmodel">, o: SvgOpts): string 
     (left.length ? " Left out: " + left.join("; ") + "." : "") +
     (m.features.length > shown.length ? " " + (m.features.length - shown.length) + " more genes were kept in at least one run; they are in the result, not drawn." : "") +
     (m.table1 ? " " + table1Words(m.table1) : "") +
+    (m.external ? " Validation: " + fmtInt(m.external.n) + " of " + fmtInt(m.external.cohortPatients) + " patients of “" + m.external.cohort + "” scored; " +
+      fmtInt(m.external.notCovered) + " on panels missing one of the model's " + m.external.modelGenes + " weighted genes, " + fmtInt(m.external.notProfiled) + " with no panel" +
+      (m.external.noAnchor ? ", " + fmtInt(m.external.noAnchor) + " with no " + m.anchoredTo + " event" : "") + " left out." : "") +
     " " + (v.caveat || "");
   const cap = caption(text, W, yy + 4, p.muted);
   return frame(W, yy + 4 + cap.height + 8, out.join("") + cap.svg, p.bg, grown,

@@ -344,6 +344,11 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         (m.refit ? `\n  risk score alone: HR ${m.refit.hr.toFixed(2)} per SD (95% CI ${m.refit.ciLow.toFixed(2)}–${m.refit.ciHigh.toFixed(2)}, ${pFmt(m.refit.p)})` : "") +
         "\n  genes kept most often: " + m.features.slice(0, 15).map((f) => `${f.gene} ${Math.round(f.selected * 100)}% HR ${f.hr.toFixed(2)}`).join(", ") +
         (m.neverHeldOut ? `\n  ${m.neverHeldOut} patients were never held out, so have no score` : "") +
+        (m.external ? `\n  external validation on ${m.external.cohort} (${m.external.study}; ${m.external.n} patients scored, ${m.external.notCovered} not covered by the model's genes): ` +
+          `C-index ${m.external.cIndex.toFixed(3)} (95% bootstrap CI ${m.external.cIndexLo.toFixed(3)}–${m.external.cIndexHi.toFixed(3)})` +
+          (m.external.logrank ? `, log-rank p=${pFmt(m.external.logrank.p)}` : "") + "\n" +
+          m.external.groups.map((g) => `    ${g.name}: n=${g.curve.n}, ${g.curve.events} events, median ${g.curve.median == null ? "not reached" : g.curve.median.toFixed(1) + "mo"}` +
+            (g.hr != null ? `, HR vs lowest ${g.hr.toFixed(2)} (95% CI ${g.ciLow!.toFixed(2)}–${g.ciHigh!.toFixed(2)})` : "")).join("\n") : "") +
         caveatOf(v) + methodOf(v) + noteOf(v));
     } else if (v.kind === "cutpoint") {
       const m = v.cutpoint;

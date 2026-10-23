@@ -251,6 +251,10 @@
     "A survival risk model from mutated genes in lung cancer": {
       "NSCLC": 7809
     },
+    "A lung cancer risk model, validated on another study": {
+      "NSCLC (MSK-IMPACT 2017)": 1567,
+      "NSCLC (MSK-CHORD)": 7809
+    },
     "Custom data: a curated biopsy site on every sample": {
       "all patients": 93,
       "CNS met": 8
