@@ -8,7 +8,7 @@ import {
   COMPOSITION_MAX_PARTS, COMPOSITION_CASES_CAP, COMPOSITION_EPS, compositionCasesSql, partNames, validateSource, type CompositionSource
 } from "../../composition.ts";
 import type { ViewRun } from "../run.ts";
-import { overLimit, answering, refuse, PROFILE_NAME } from "../shared.ts";
+import { overLimit, answering, askEachSite, refuse, PROFILE_NAME } from "../shared.ts";
 import type { CompositionView, CompositionCell, CompositionResult } from "./types.ts";
 import { compositionMomentsSql, compositionEntitiesSql } from "./sql.ts";
 import { compositionMethod } from "./method.ts";
@@ -85,20 +85,22 @@ export async function runComposition(view: CompositionView, ctx: ViewRun): Promi
   const perSite: { cohort: string; study: string; n: number }[] = [];
   const sums = new Map<string, Sums>(vNames.map((n) => [n, { n: 0, sx: Array(k).fill(0), sxx: Array(k).fill(0), hx: 0, hxx: 0, incomplete: 0, invalid: 0 }]));
   const bars = new Map<string, { cases?: number[][]; why?: string }>();
+  const moments = await askEachSite(ctx, Object.fromEntries(holders.map((st) => [st, ok[st]])), async (name, _st, r) =>
+    (await r.viewAggregate("composition:moments:" + name, doc.cohorts[name], (c, s, d) => compositionMomentsSql(c, s, d, src)))[0] || {});
+  for (const { cohort: name, study: st, answer: r } of moments) {
+    const acc = sums.get(name)!;
+    const n = Number(r.n || 0);
+    acc.n += n; acc.hx += Number(r.hx || 0); acc.hxx += Number(r.hxx || 0);
+    acc.incomplete += Number(r.incomplete || 0); acc.invalid += Number(r.invalid || 0);
+    if (n) {
+      const sx = (r.sx as unknown as number[]).map(Number), sxx = (r.sxx as unknown as number[]).map(Number);
+      for (let j = 0; j < k; j++) { acc.sx[j] += sx[j]; acc.sxx[j] += sxx[j]; }
+    }
+    perSite.push({ cohort: name, study: st, n });
+  }
   await Promise.all(vNames.map(async (name) => {
     const sites = cohorts[name].studies.filter((st) => holders.includes(st));
     const def = doc.cohorts[name], acc = sums.get(name)!;
-    await Promise.all(sites.map(async (st) => {
-      const r = (await ok[st].viewAggregate("composition:moments:" + name, def, (c, s, d) => compositionMomentsSql(c, s, d, src)))[0] || {};
-      const n = Number(r.n || 0);
-      acc.n += n; acc.hx += Number(r.hx || 0); acc.hxx += Number(r.hxx || 0);
-      acc.incomplete += Number(r.incomplete || 0); acc.invalid += Number(r.invalid || 0);
-      if (n) {
-        const sx = (r.sx as unknown as number[]).map(Number), sxx = (r.sxx as unknown as number[]).map(Number);
-        for (let j = 0; j < k; j++) { acc.sx[j] += sx[j]; acc.sxx[j] += sxx[j]; }
-      }
-      perSite.push({ cohort: name, study: st, n });
-    }));
     const closed = sites.filter((st) => !isPatientLevel(ctx.resolvers[st]));
     if (closed.length) { bars.set(name, { why: closed.join(", ") + " may not show individual cases" }); return; }
     if (acc.n > COMPOSITION_CASES_CAP) { bars.set(name, { why: "more than " + COMPOSITION_CASES_CAP.toLocaleString("en-US") + " " + unit + ", too many to draw one bar each" }); return; }

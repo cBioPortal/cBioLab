@@ -17,12 +17,11 @@ export async function runOverlap(_view: OverlapView, ctx: ViewRun): Promise<View
   // per study, only the cohorts that reach it can hold its patients; their bits are mapped back
   const byMask = new Map<number, number>(), samplesByMask = new Map<number, number>();
   const perSite: { study: string; cohorts: string[]; patients: number }[] = [];
-  await Promise.all(Object.keys(ok).map(async (st) => {
-    const here = vNames.filter((n) => cohorts[n].studies.includes(st));
-    if (!here.length) return;
-    const rows = await ok[st].viewAggregateMany("overlap", here.map((n) => doc.cohorts[n]), overlapCountsSql);
+  const sites = Object.keys(ok).map((st) => ({ st, here: vNames.filter((n) => cohorts[n].studies.includes(st)) })).filter((x) => x.here.length);
+  const answers = await Promise.all(sites.map(({ st, here }) => ok[st].viewAggregateMany("overlap", here.map((n) => doc.cohorts[n]), overlapCountsSql)));
+  sites.forEach(({ st, here }, si) => {
     let patients = 0;
-    for (const r of rows) {
+    for (const r of answers[si]) {
       const local = Number(r.mask), n = Number(r.n);
       let global = 0;
       here.forEach((name, i) => { if (local & (1 << i)) global |= 1 << vNames.indexOf(name); });
@@ -31,7 +30,7 @@ export async function runOverlap(_view: OverlapView, ctx: ViewRun): Promise<View
       patients += n;
     }
     perSite.push({ study: st, cohorts: here, patients });
-  }));
+  });
   const intersections = [...byMask].filter(([m]) => m > 0)
     .map(([m, n]) => ({ members: vNames.filter((_, i) => m & (1 << i)), n, samples: samplesByMask.get(m) || 0 }))
     .sort((a, b) => b.n - a.n || a.members.length - b.members.length);

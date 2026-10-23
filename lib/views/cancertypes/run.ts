@@ -2,7 +2,7 @@
 import type { ViewResult } from "../../types.ts";
 import { geneSymbols } from "../../gene-tracks.ts";
 import type { ViewRun } from "../run.ts";
-import { overLimit, ATTR_NAME, answering, plural, refuse } from "../shared.ts";
+import { overLimit, ATTR_NAME, answering, askEachSite, plural, refuse } from "../shared.ts";
 import type { CancertypesView, CancertypesGroup, CancertypesPanel } from "./types.ts";
 import { cancerTypesSql, cancerTypeSamplesSql } from "./sql.ts";
 import { cancertypesMethod } from "./method.ts";
@@ -11,7 +11,7 @@ const zeroGroup = (key: string, label: string): CancertypesGroup =>
   ({ key, label, samples: 0, profiled: 0, altered: 0, mutation: 0, amp: 0, homdel: 0, sv: 0, multiple: 0 });
 
 export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promise<ViewResult> {
-  const { doc, cohorts, vNames, pin } = ctx;
+  const { doc, vNames, pin } = ctx;
   { const e = overLimit("a cancertypes view", 2, vNames.length); if (e) return refuse("cancertypes", ctx, e.replace("at most 2", "at most 2 cohorts")); }
   let genes: string[];
   try { genes = geneSymbols(view.genes || []); } catch (e) { return refuse("cancertypes", ctx, (e as Error).message); }
@@ -51,6 +51,10 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
     }
     return { groups: keep, ...(pooled ? { pooled } : {}) };
   };
+  const answers = await askEachSite(ctx, ok, (n, _st, r) => Promise.all([
+    r.viewAggregate("cancertypes:" + n, doc.cohorts[n], (c, s, d) => cancerTypesSql(c, s, d, genes, attribute, pin, measure, unit)),
+    r.viewAggregate("cancertypes:samples:" + n, doc.cohorts[n], (c, s, d) => cancerTypeSamplesSql(c, s, d, attribute, unit))
+  ]));
   for (const n of vNames) {
     // gene "*" is the genes together; every other key one gene
     const byGene = new Map<string, Map<string, CancertypesGroup>>();
@@ -60,12 +64,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
       let g = m.get(k); if (!g) { g = zeroGroup(k, label); m.set(k, g); } else if (!g.label && label) g.label = label;
       return g;
     };
-    await Promise.all(cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
-      const def = doc.cohorts[n];
-      const [rows, tot] = await Promise.all([
-        ok[st].viewAggregate("cancertypes:" + n, def, (c, s, d) => cancerTypesSql(c, s, d, genes, attribute, pin, measure, unit)),
-        ok[st].viewAggregate("cancertypes:samples:" + n, def, (c, s, d) => cancerTypeSamplesSql(c, s, d, attribute, unit))
-      ]);
+    for (const { study: st, answer: [rows, tot] } of answers.filter((a) => a.cohort === n)) {
       let profiled = 0;
       for (const r of rows) {
         if (r.grp === ALL_KEY) {
@@ -83,7 +82,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
         totals.set(String(r.grp), t);
       }
       perSite.push({ cohort: n, study: st, groups: rows.filter((r) => r.gene === "*").length, profiled });
-    }));
+    }
     // every group with units appears, profiled or not; each carries its totals
     for (const [k, t] of totals) get("*", k, t.label);
     for (const m of byGene.values()) for (const g of m.values()) {

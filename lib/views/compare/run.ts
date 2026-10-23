@@ -6,7 +6,7 @@ import { fisherExact, benjaminiHochberg, chiSquareTest } from "../../stats.ts";
 import type { ViewResult } from "../../types.ts";
 import { isPatientLevel, type GeneCounts } from "../../federation.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
-import { overLimit } from "../shared.ts";
+import { overLimit, askEachSite } from "../shared.ts";
 import type { CompareRow, CompareCell, CompareView } from "./types.ts";
 import { compareMethod } from "./method.ts";
 
@@ -44,25 +44,21 @@ export async function runCompare(view: DocView, c: ViewRun): Promise<ViewResult 
   const zeroByType = () => ({ mutation: { profiled: 0, altered: 0 }, cna: { profiled: 0, altered: 0 }, structuralVariant: { profiled: 0, altered: 0 } });
   const zeroCounts = (gene: string): GeneCounts => ({ gene, profiled: 0, altered: 0, driver: 0, byType: zeroByType() });
   const tally = new Map<string, GeneCounts>(); // "cohort|gene" -> summed counts
-  const perSite: { cohort: string; study: string; counts: GeneCounts[] }[] = [];
-  await Promise.all(vNames.flatMap((n) =>
-    cohorts[n].studies.map(async (st) => {
-      const counts = await resolvers[st].geneCounts(doc.cohorts[n], genes);
-      perSite.push({ cohort: n, study: st, counts });
-      for (const c of counts) {
-        const k = n + "|" + c.gene;
-        const cur = tally.get(k) || zeroCounts(c.gene);
-        cur.profiled += c.profiled; cur.altered += c.altered; cur.driver += c.driver;
-        // an older MCP peer may not send byType yet — treat it as absent, not a crash
-        for (const t of ALTERATION_TYPES) {
-          cur.byType[t].profiled += c.byType?.[t]?.profiled ?? 0;
-          cur.byType[t].altered += c.byType?.[t]?.altered ?? 0;
-        }
-        tally.set(k, cur);
-      }
-    })));
-  // arrival order is whichever study answered first; fix it so the method record is stable
+  const perSite = (await askEachSite(c, resolvers, (n, _st, r) => r.geneCounts(doc.cohorts[n], genes)))
+    .map(({ cohort, study, answer }) => ({ cohort, study, counts: answer }));
+  // in study order within each cohort, so the method record is stable
   perSite.sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.study < y.study ? -1 : 1));
+  for (const { cohort: n, counts } of perSite) for (const c of counts) {
+    const k = n + "|" + c.gene;
+    const cur = tally.get(k) || zeroCounts(c.gene);
+    cur.profiled += c.profiled; cur.altered += c.altered; cur.driver += c.driver;
+    // an older MCP peer may not send byType yet — treat it as absent, not a crash
+    for (const t of ALTERATION_TYPES) {
+      cur.byType[t].profiled += c.byType?.[t]?.profiled ?? 0;
+      cur.byType[t].altered += c.byType?.[t]?.altered ?? 0;
+    }
+    tally.set(k, cur);
+  }
   const aggOnly = vStudies.filter((st) => !isPatientLevel(resolvers[st]));
   const annSource = (await buildAnnotationIndex([], genes, vStudies.length === 1 ? vStudies[0] : vStudies)).source;
   const rows: CompareRow[] = genes.map((g) => {
