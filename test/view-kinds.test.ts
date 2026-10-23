@@ -90,7 +90,7 @@ function facts() {
       figureTitle: viewTitle({ kind, cohorts: ["A", "B"] } as never),
     };
   }
-  return out;
+  return { menuOrder: rich.opts.VIEW_KINDS.map((k) => k.kind), cardOrder: Object.keys(kindCards.KIND_CARDS), kinds: out };
 }
 
 test("what every view kind tells the page before data arrives", () => {

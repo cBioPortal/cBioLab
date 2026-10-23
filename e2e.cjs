@@ -1206,7 +1206,7 @@ async function main() {
     await ctx.close();
   }
 
-  // The risk model (lib/views/riskmodel.ts): the volcano's label threshold is applied in the browser
+  // The risk model (lib/views/riskmodel/run.ts): the volcano's label threshold is applied in the browser
   // (no request), and a cut is one request answered from the cached fit (lib/next-cache.ts
   // cachedRiskFit), not a refit; the caveat then says the cuts were chosen.
   {
@@ -1281,7 +1281,7 @@ async function main() {
     await ctx.close();
   }
 
-  // The risk model's Table 1 (app/lab/risk-table1-dialog.tsx on lib/views/riskmodel-table1.ts): the toolbar's
+  // The risk model's Table 1 (app/lab/risk-table1-dialog.tsx on lib/views/riskmodel/table1.ts): the toolbar's
   // button opens every group side by side, a header click marks a group's column; the model's own genes are marked and get
   // no q; a gene added in the dialog re-runs only the dialog's request, which covers the table while its
   // controls stay usable, and is counted over the patients whose panels cover it; "Add to document" writes
