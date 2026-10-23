@@ -1,0 +1,475 @@
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "Colorectal": {
+      "count": 4993,
+      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample)",
+      "studies": [
+        "msk_impact_50k_2026"
+      ]
+    },
+    "Breast": {
+      "count": 5803,
+      "text": "CANCER_TYPE in [Breast Cancer] (any sample)",
+      "studies": [
+        "msk_impact_50k_2026"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "genome",
+      "cohorts": [
+        "Colorectal",
+        "Breast"
+      ],
+      "genome": {
+        "build": "hg19",
+        "binMb": 2,
+        "threshold": 0.2,
+        "includeX": false,
+        "bins": [
+          {
+            "chrom": "1",
+            "start": 0
+          },
+          {
+            "chrom": "1",
+            "start": 2000000
+          },
+          {
+            "chrom": "1",
+            "start": 4000000
+          },
+          {
+            "chrom": "1",
+            "start": 6000000
+          },
+          {
+            "chrom": "1",
+            "start": 8000000
+          },
+          {
+            "chrom": "1",
+            "start": 10000000
+          },
+          {
+            "chrom": "1",
+            "start": 12000000
+          },
+          {
+            "chrom": "1",
+            "start": 14000000
+          },
+          {
+            "chrom": "1",
+            "start": 16000000
+          },
+          {
+            "chrom": "1",
+            "start": 18000000
+          },
+          {
+            "chrom": "1",
+            "start": 20000000
+          },
+          {
+            "chrom": "1",
+            "start": 22000000
+          },
+          {
+            "chrom": "1",
+            "start": 24000000
+          },
+          {
+            "chrom": "1",
+            "start": 26000000
+          },
+          {
+            "chrom": "1",
+            "start": 28000000
+          },
+          {
+            "chrom": "1",
+            "start": 30000000
+          },
+          {
+            "chrom": "1",
+            "start": 32000000
+          },
+          {
+            "chrom": "1",
+            "start": 34000000
+          },
+          {
+            "chrom": "1",
+            "start": 36000000
+          },
+          {
+            "chrom": "1",
+            "start": 38000000
+          },
+          {
+            "…": "1432 more",
+            "sha256": "11021b31f868c895"
+          }
+        ],
+        "series": [
+          {
+            "cohort": "Colorectal",
+            "samples": 5395,
+            "segmented": 5390,
+            "profiled": [
+              829,
+              5254,
+              5310,
+              5310,
+              5120,
+              5327,
+              5336,
+              5338,
+              5320,
+              5327,
+              5358,
+              5127,
+              5228,
+              5241,
+              5216,
+              5175,
+              5173,
+              5173,
+              5259,
+              5275,
+              {
+                "…": "1432 more",
+                "sha256": "c2218b32c5ea9c1e"
+              }
+            ],
+            "gain": [
+              18,
+              80,
+              72,
+              72,
+              58,
+              50,
+              52,
+              56,
+              54,
+              57,
+              58,
+              69,
+              59,
+              58,
+              22,
+              30,
+              31,
+              31,
+              78,
+              86,
+              {
+                "…": "1432 more",
+                "sha256": "9071064cfbef82a4"
+              }
+            ],
+            "loss": [
+              155,
+              1129,
+              1199,
+              1199,
+              1187,
+              1286,
+              1269,
+              1260,
+              1280,
+              1298,
+              1325,
+              1303,
+              1512,
+              1514,
+              1249,
+              1040,
+              1018,
+              1018,
+              903,
+              902,
+              {
+                "…": "1432 more",
+                "sha256": "05622f1b4e38b879"
+              }
+            ]
+          },
+          {
+            "cohort": "Breast",
+            "samples": 6907,
+            "segmented": 6906,
+            "profiled": [
+              703,
+              6686,
+              6753,
+              6753,
+              6271,
+              6713,
+              6748,
+              6763,
+              6744,
+              6747,
+              6807,
+              6463,
+              6624,
+              6639,
+              6587,
+              6659,
+              6668,
+              6668,
+              6565,
+              6587,
+              {
+                "…": "1432 more",
+                "sha256": "29fc7d02b1babbec"
+              }
+            ],
+            "gain": [
+              44,
+              182,
+              170,
+              170,
+              141,
+              132,
+              141,
+              161,
+              188,
+              186,
+              188,
+              177,
+              174,
+              175,
+              172,
+              217,
+              225,
+              225,
+              353,
+              365,
+              {
+                "…": "1432 more",
+                "sha256": "b24536dbd6cbad97"
+              }
+            ],
+            "loss": [
+              201,
+              1846,
+              1906,
+              1906,
+              1680,
+              1902,
+              1872,
+              1850,
+              1841,
+              1809,
+              1824,
+              1760,
+              2008,
+              2014,
+              1608,
+              1429,
+              1416,
+              1416,
+              1161,
+              1157,
+              {
+                "…": "1432 more",
+                "sha256": "d31a3cab65c7e604"
+              }
+            ]
+          }
+        ],
+        "test": {
+          "gainQ": [
+            0.00008545878862445828,
+            0.000009030934919032,
+            0.000007052613800163918,
+            0.000007052613800163918,
+            0.000006424362049596166,
+            0.000004690200061493557,
+            0.0000010266350704572462,
+            3.284080897211836e-8,
+            1.8154049214540513e-12,
+            2.3540693323143305e-11,
+            2.9957787840506274e-11,
+            2.1876619846395273e-7,
+            4.1811661928362945e-9,
+            1.7981085382803662e-9,
+            3.822800792218554e-23,
+            7.054747659995672e-27,
+            7.025354497705347e-28,
+            7.025354497705347e-28,
+            1.7450212124036932e-31,
+            2.2841786286715866e-30,
+            {
+              "…": "1432 more",
+              "sha256": "28986f17dabb26fb"
+            }
+          ],
+          "lossQ": [
+            0.000007013609127477512,
+            2.243524316793396e-14,
+            2.790086852777875e-12,
+            2.790086852777875e-12,
+            0.000014166292192959972,
+            3.08684191056184e-7,
+            0.0000011271795899166522,
+            0.0000036741504423566186,
+            0.00007628596613207397,
+            0.002904360074218777,
+            0.012386926935199553,
+            0.03344282841782284,
+            0.11136786598644766,
+            0.09922195566989905,
+            0.5770901208813335,
+            0.08021141405862506,
+            0.04465757638582967,
+            0.04465757638582967,
+            0.500573996127623,
+            0.5297453577870423,
+            {
+              "…": "1432 more",
+              "sha256": "693b40669105adf0"
+            }
+          ],
+          "significantGain": 1255,
+          "significantLoss": 1217
+        }
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_impact_50k_2026",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Share of each cohort's segmented SAMPLES (not patients: a patient with two segmented samples counts twice) gained (log2 segment mean ≥ 0.2) or lost (≤ −0.2) in each 2 Mb bin, hg19. Each bin's denominator is the samples whose segmentation covers it; a bin takes the value of the segment over its midpoint, so an event narrower than 2 Mb can be missed — use a smaller binMb to find it. 12,296 of 12,302 samples have segments. Thresholds on a log ratio are not purity- or ploidy-corrected: a low-purity tumour's real loss can sit inside ±0.2. Chromosome X is not drawn (includeX: true adds it). Per-bin two-sided Fisher tests, Benjamini–Hochberg across bins separately for gains and losses; adjacent bins are not independent, so read a run of significant bins as one region, not many findings.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count gained and lost samples per bin",
+            "detail": "The genome:coverage and genome:bins queries above. Per 2 Mb bin on hg19: the cohort's SAMPLES (a patient with two segmented samples counts twice) whose segmentation covers the bin's midpoint, and of those the ones gained (log2 segment mean ≥ 0.2) or lost (≤ −0.2) there. Counts only.",
+            "scope": "Colorectal · msk_impact_50k_2026",
+            "rowsIn": 4993
+          },
+          {
+            "kind": "fetch",
+            "title": "Count gained and lost samples per bin",
+            "detail": "The genome:coverage and genome:bins queries above. Per 2 Mb bin on hg19: the cohort's SAMPLES (a patient with two segmented samples counts twice) whose segmentation covers the bin's midpoint, and of those the ones gained (log2 segment mean ≥ 0.2) or lost (≤ −0.2) there. Counts only.",
+            "scope": "Breast · msk_impact_50k_2026",
+            "rowsIn": 5803
+          },
+          {
+            "kind": "transform",
+            "title": "Place the bins on one axis",
+            "detail": "Chromosomes 1–22 at hg19 lengths, 1,452 bins; counts add across studies (all on one build).",
+            "params": [
+              [
+                "Colorectal",
+                "5,390 of 5,395 samples segmented"
+              ],
+              [
+                "Breast",
+                "6,906 of 6,907 samples segmented"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Fisher's exact test per bin",
+            "detail": "Two-sided, on gained vs not (and separately lost vs not) among each cohort's covered samples, in every bin both cohorts cover."
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across bins",
+            "detail": "Separately for gains and losses. Adjacent bins are not independent: a run of significant bins is one region, not many findings."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "fisherExact",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
+        "check": {
+          "genome:1:0:gain_q": {
+            "v": 0.00008545878862445828
+          },
+          "genome:1:0:loss_q": {
+            "v": 0.000007013609127477512
+          },
+          "genome:1:1:gain_q": {
+            "v": 0.000009030934919032
+          },
+          "genome:1:1:loss_q": {
+            "v": 2.243524316793396e-14
+          },
+          "genome:1:2:gain_q": {
+            "v": 0.000007052613800163918
+          },
+          "genome:1:2:loss_q": {
+            "v": 2.790086852777875e-12
+          },
+          "genome:1:3:gain_q": {
+            "v": 0.000007052613800163918
+          },
+          "genome:1:3:loss_q": {
+            "v": 2.790086852777875e-12
+          },
+          "genome:1:4:gain_q": {
+            "v": 0.000006424362049596166
+          },
+          "genome:1:4:loss_q": {
+            "v": 0.000014166292192959972
+          },
+          "genome:1:5:gain_q": {
+            "v": 0.000004690200061493557
+          },
+          "genome:1:5:loss_q": {
+            "v": 3.08684191056184e-7
+          },
+          "genome:1:6:gain_q": {
+            "v": 0.0000010266350704572462
+          },
+          "genome:1:6:loss_q": {
+            "v": 0.0000011271795899166522
+          },
+          "genome:1:7:gain_q": {
+            "v": 3.284080897211836e-8
+          },
+          "genome:1:7:loss_q": {
+            "v": 0.0000036741504423566186
+          },
+          "genome:1:8:gain_q": {
+            "v": 1.8154049214540513e-12
+          },
+          "genome:1:8:loss_q": {
+            "v": 0.00007628596613207397
+          },
+          "genome:1:9:gain_q": {
+            "v": 2.3540693323143305e-11
+          },
+          "genome:1:9:loss_q": {
+            "v": 0.002904360074218777
+          },
+          "…": {
+            "more": 2752,
+            "sha256": "14aedf4afb06c134"
+          }
+        }
+      }
+    }
+  ]
+}

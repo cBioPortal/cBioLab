@@ -1,0 +1,32 @@
+Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- NSCLC: 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)
+- Breast: 5,368 patients — CANCER_TYPE in [Breast Cancer] (any sample)
+- Colorectal: 5,543 patients — CANCER_TYPE in [Colorectal Cancer] (any sample)
+
+Cumulative incidence of brain metastasis, death competing (Aalen-Johansen):
+  NSCLC: n=6,457, 1406 events, 1967 died first, 3084 censored; not at risk: 1352 already had it, 0 before observation, 0 no anchor, 0 no follow-up
+  Breast: n=4,723, 905 events, 956 died first, 2862 censored; not at risk: 645 already had it, 0 before observation, 0 no anchor, 0 no follow-up
+  Colorectal: n=5,439, 447 events, 1783 died first, 3209 censored; not at risk: 104 already had it, 0 before observation, 0 no anchor, 0 no follow-up
+  at 12 months: NSCLC 13.1% (95% CI 12.3-13.9; 1-KM would say 14.1%) | Breast 9.1% (95% CI 8.2-9.9; 1-KM would say 9.5%) | Colorectal 3.1% (95% CI 2.7-3.6; 1-KM would say 3.3%)
+  at 24 months: NSCLC 18.4% (95% CI 17.4-19.3; 1-KM would say 20.8%) | Breast 13.6% (95% CI 12.6-14.6; 1-KM would say 14.5%) | Colorectal 5.8% (95% CI 5.1-6.4; 1-KM would say 6.6%)
+  at 60 months: NSCLC 24.7% (95% CI 23.5-25.8; 1-KM would say 30.4%) | Breast 20.6% (95% CI 19.3-21.8; 1-KM would say 23.3%) | Colorectal 10.8% (95% CI 9.7-11.8; 1-KM would say 14.4%)
+  Gray's test: statistic 375.87, permutation p=0.0005 (2000 shuffles)
+  CAVEAT (tell the user): Cumulative incidence of the first brain metastasis after the study's day 0, with death (OS_STATUS) as a competing risk: Aalen–Johansen, 95% intervals from its delta-method standard error. It is not 1 − Kaplan–Meier: that treats the dead as still at risk of the event and overstates incidence whenever death is common — the table sets the two side by side. Excluded rather than counted as event-free: 2101 who already had it by day 0, 0 without follow-up. Gray's test (weight 1) by permutation of cohort labels, 2000 shuffles, seeded; exact under the null that the cohorts share one distribution, entry times included. An event recorded from notes or registries is only as complete as the recording.
+  METHOD:
+    - Classify and count each patient's outcome [NSCLC · msk_chord_2024]: The incidence query above. Per patient, months from the study's day 0 (days ÷ 30.4375, rounded to 4 decimals) to the first brain metastasis after it (cause 1), death without it (cause 2, from OS_STATUS), or last follow-up (censored, OS_MONTHS); then counted by (entry, months, cause). Counts only.
+    - Classify and count each patient's outcome [Breast · msk_chord_2024]: The incidence query above. Per patient, months from the study's day 0 (days ÷ 30.4375, rounded to 4 decimals) to the first brain metastasis after it (cause 1), death without it (cause 2, from OS_STATUS), or last follow-up (censored, OS_MONTHS); then counted by (entry, months, cause). Counts only.
+    - Classify and count each patient's outcome [Colorectal · msk_chord_2024]: The incidence query above. Per patient, months from the study's day 0 (days ÷ 30.4375, rounded to 4 decimals) to the first brain metastasis after it (cause 1), death without it (cause 2, from OS_STATUS), or last follow-up (censored, OS_MONTHS); then counted by (entry, months, cause). Counts only.
+    - Set aside patients who cannot enter the risk set: Named and counted rather than treated as event-free. A patient whose first event was recorded after their last follow-up is kept, as censored or dead at follow-up.
+        NSCLC: 1352 already had it by day 0 · 0 without follow-up
+        Breast: 645 already had it by day 0 · 0 without follow-up
+        Colorectal: 104 already had it by day 0 · 0 without follow-up
+    - Estimate cumulative incidence by Aalen–Johansen: Death is a competing risk: at each time F1 rises by S(t−)·d1/R, with S the all-cause Kaplan–Meier survival and R those at risk. Standard error by the delta method (Aalen 1978); 95% interval F1 ± 1.959964·SE, clamped to [0, 1]. At each horizon the curve's value there, beside 1 − Kaplan–Meier of the event alone, which counts the dead as still at risk and overstates incidence.
+        horizons (months): 12, 24, 60
+        NSCLC: 6,457 at risk · 1406 events · 1967 deaths first · 3084 censored
+        Breast: 4,723 at risk · 905 events · 956 deaths first · 2862 censored
+        Colorectal: 5,439 at risk · 447 events · 1783 deaths first · 3209 censored
+    - Gray-type test by permutation: Per cohort, observed cause-1 events minus those expected from the pooled subdistribution hazard, the subdistribution risk set being Y·(1 − F1)/S (Gray 1988, weight 1), summed as Σ (O − E)²/E over cohorts. This is not Gray's variance-standardised χ², so its p does not come from a χ² table: the cohort labels are shuffled across the pooled records 2,000 times by a generator seeded with 1, and p = (b + 1)/(m + 1). Exact under the null that every cohort's records, entry times included, come from one distribution.
+        statistic / p: 375.8722 / 0.000500
+    Cumulative incidence and its standard error match statsmodels 0.15.0 CumIncidenceRight to 1e-12, and with delayed entry lifelines' AalenJohansenFitter; the Gray-type statistic and permutation p match the script's port exactly (test/incidence-golden.test.ts).

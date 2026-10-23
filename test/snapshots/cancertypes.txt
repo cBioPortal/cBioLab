@@ -1,0 +1,44 @@
+Analysis over msk_impact_50k_2026 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- all patients: 48,179 patients — all patients in the study
+
+Cancer types summary: KRAS, NRAS, HRAS by CANCER_TYPE (any alteration; samples profiled for at least one gene):
+  all patients: 10,796 of 48,179 profiled samples altered
+    Pancreatic Cancer: 82.9% (2263/2729; mutation 2211, amp 3, deep del 0, SV 0, multiple 49)
+    Appendiceal Cancer: 60.6% (163/269; mutation 163, amp 0, deep del 0, SV 0, multiple 0)
+    Colorectal Cancer: 49.1% (2450/4993; mutation 2383, amp 48, deep del 4, SV 1, multiple 14)
+    Non-Small Cell Lung Cancer: 31.7% (2103/6633; mutation 1943, amp 71, deep del 20, SV 1, multiple 68)
+    Germ Cell Tumor: 31.4% (208/663; mutation 78, amp 114, deep del 0, SV 0, multiple 16)
+    Melanoma: 29.7% (506/1706; mutation 452, amp 17, deep del 4, SV 0, multiple 33)
+    Cancer of Unknown Primary: 25.7% (395/1535; mutation 348, amp 25, deep del 7, SV 1, multiple 14)
+    Endometrial Cancer: 24.0% (570/2373; mutation 541, amp 19, deep del 6, SV 0, multiple 4)
+    Thyroid Cancer: 21.4% (172/803; mutation 164, amp 2, deep del 1, SV 0, multiple 5)
+    Esophagogastric Cancer: 18.6% (311/1671; mutation 134, amp 169, deep del 3, SV 0, multiple 5)
+    Ovarian Cancer: 14.3% (297/2075; mutation 199, amp 75, deep del 13, SV 1, multiple 9)
+    Hepatobiliary Cancer: 14.1% (191/1353; mutation 173, amp 16, deep del 0, SV 0, multiple 2)
+    Cervical Cancer: 13.5% (44/326; mutation 40, amp 0, deep del 2, SV 0, multiple 2)
+    Bladder Cancer: 12.7% (259/2046; mutation 215, amp 27, deep del 13, SV 1, multiple 3)
+    Skin Cancer, Non-Melanoma: 9.3% (40/429; mutation 38, amp 0, deep del 2, SV 0, multiple 0)
+    Salivary Gland Cancer: 8.2% (29/352; mutation 24, amp 3, deep del 0, SV 0, multiple 2)
+    Head and Neck Cancer: 7.7% (47/610; mutation 39, amp 8, deep del 0, SV 0, multiple 0)
+    Small Cell Lung Cancer: 6.1% (27/442; mutation 17, amp 4, deep del 6, SV 0, multiple 0)
+    Soft Tissue Sarcoma: 4.8% (103/2128; mutation 63, amp 17, deep del 15, SV 1, multiple 7)
+    Uterine Sarcoma: 4.5% (15/337; mutation 7, amp 4, deep del 3, SV 0, multiple 1)
+    Peripheral Nervous System: 4.0% (13/324; mutation 10, amp 2, deep del 1, SV 0, multiple 0)
+    Glioma: 3.8% (77/2042; mutation 40, amp 21, deep del 11, SV 1, multiple 4)
+    Bone Cancer: 3.6% (18/506; mutation 8, amp 8, deep del 2, SV 0, multiple 0)
+    Breast Cancer: 3.4% (195/5803; mutation 80, amp 78, deep del 33, SV 1, multiple 3)
+    Prostate Cancer: 3.0% (86/2893; mutation 62, amp 11, deep del 12, SV 1, multiple 0)
+    Mesothelioma: 2.1% (8/382; mutation 5, amp 0, deep del 2, SV 0, multiple 1)
+    Gastrointestinal Stromal Tumor: 1.7% (9/520; mutation 2, amp 0, deep del 6, SV 0, multiple 1)
+    Renal Cell Carcinoma: 1.6% (18/1107; mutation 17, amp 0, deep del 0, SV 0, multiple 1)
+    38 smaller groups: 13.6% (250/1842; mutation 231, amp 8, deep del 8, SV 0, multiple 3)
+  CAVEAT (tell the user): Patients altered in at least one of 3 genes per CANCER_TYPE group, over the patients profiled for at least one of them (the union of their panels, as an oncoprint's merged row counts it). Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. A patient with more than one kind of alteration across the genes counts once, under "multiple". A patient counts in every group one of their samples falls in, profiled if any of those samples is, altered if any is. CANCER_TYPE is read per sample and folded on case and whitespace; samples with no value form their own group. Groups with fewer than 200 profiled patients are pooled into one bar rather than dropped. 
+  METHOD:
+    - Count patients per CANCER_TYPE group [all patients · msk_impact_50k_2026]: The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only, or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.
+        genes: KRAS, NRAS, HRAS
+        profiled patients: 48,892
+    - Pool the small groups [all patients]: 38 groups with fewer than 200 profiled patients drawn as one pooled bar; 28 drawn on their own.
+        profiled: 48,179
+        altered: 10,796

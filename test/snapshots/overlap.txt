@@ -1,0 +1,32 @@
+Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- TP53 mutant: 13,105 patients — OQL[TP53: MUT]
+- KRAS mutant: 7,115 patients — OQL[KRAS: MUT]
+- Immunotherapy: 3,341 patients — has Immuno treatment
+- NSCLC: 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)
+
+Cohort overlap (patients in exactly these cohorts and no other):
+  cohort sizes: TP53 mutant 13,105, KRAS mutant 7,115, Immunotherapy 3,341, NSCLC 7,809
+  TP53 mutant only: 5,314
+  TP53 mutant ∩ KRAS mutant only: 3,391
+  TP53 mutant ∩ NSCLC only: 2,043
+  NSCLC only: 1,887
+  KRAS mutant only: 1,381
+  TP53 mutant ∩ Immunotherapy ∩ NSCLC only: 1,167
+  KRAS mutant ∩ NSCLC only: 838
+  KRAS mutant ∩ Immunotherapy ∩ NSCLC only: 546
+  Immunotherapy ∩ NSCLC only: 518
+  TP53 mutant ∩ KRAS mutant ∩ Immunotherapy ∩ NSCLC: 435
+  TP53 mutant ∩ KRAS mutant ∩ NSCLC only: 375
+  TP53 mutant ∩ Immunotherapy only: 292
+  Immunotherapy only: 234
+  TP53 mutant ∩ KRAS mutant ∩ Immunotherapy only: 88
+  KRAS mutant ∩ Immunotherapy only: 61
+  18,570 patients in at least one cohort
+  CAVEAT (tell the user): Patients in exactly the marked cohorts and none of the others, for every combination that has any — computed inside each study's database, which returns one count per combination. 18,570 patients are in at least one of the 4 cohorts. 
+  METHOD:
+    - Count patients per combination of cohorts [msk_chord_2024]: The overlap query above: every patient in any of TP53 mutant, KRAS mutant, Immunotherapy, NSCLC gets a bitmask of the cohorts it is in, and the study returns one count per bitmask. Counts only.
+    - Add the counts across studies and name each combination: Each study's bits are mapped back to the view's cohort order; combinations add exactly, and a patient can only overlap within one study.
+        patients in any cohort: 18,570
+        combinations with patients: 15

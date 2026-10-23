@@ -1,0 +1,355 @@
+<!-- view 0 hotspots -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 1204" width="100%" role="img" aria-label="Mutations by protein position — KRAS, BRAF, PIK3CA, TP53" style="max-width:720px;height:auto;display:block;font-family:'IBM Plex Sans',system-ui,sans-serif"><title>Mutations by protein position — KRAS, BRAF, PIK3CA, TP53</title><rect width="720" height="1204" fill="#ffffff"/><text x="8" y="19" font-size="12" fill="#16232b" font-weight="600">KRAS</text><text x="50.1" y="19" font-size="10" fill="#5b6b76">2,424 mutations · 2,362 mutated patients</text><line x1="56" y1="192" x2="704" y2="192" stroke="#dde4e8" stroke-width="0.75"/><text x="50" y="195.5" font-size="10" fill="#5b6b76" text-anchor="end">0</text><line x1="56" y1="154.5" x2="704" y2="154.5" stroke="#dde4e8" stroke-width="0.75"/><text x="50" y="158" font-size="10" fill="#5b6b76" text-anchor="end">500</text><line x1="56" y1="117" x2="704" y2="117" stroke="#dde4e8" stroke-width="0.75"/><text x="50" y="120.5" font-size="10" fill="#5b6b76" text-anchor="end">1,000</text><line x1="56" y1="79.5" x2="704" y2="79.5" stroke="#dde4e8" stroke-width="0.75"/><text x="50" y="83" font-size="10" fill="#5b6b76" text-anchor="end">1,500</text><line x1="56" y1="42" x2="704" y2="42" stroke="#dde4e8" stroke-width="0.75"/><text x="50" y="45.5" font-size="10" fill="#5b6b76" text-anchor="end">2,000</text><line x1="56" y1="192" x2="56" y2="42" stroke="#5b6b76" stroke-width="1"/><text x="10.8" y="117" font-size="11" fill="#16232b" text-anchor="middle" transform="rotate(-90 10.8 117)"># KRAS Mutations</text><rect x="62" y="197" width="642" height="14" fill="#BABDB6"/><g><title>Ras (PF00071): 5–164</title><rect x="79.1" y="192" width="543" height="24" fill="#2dcf00"/><text x="350.6" y="207.5" font-size="10" fill="#16232b" text-anchor="middle">Ras</text></g><line x1="62" y1="220" x2="62" y2="223" stroke="#5b6b76" stroke-width="1"/><text x="59" y="236" font-size="10" fill="#5b6b76">0</text><line x1="130.3" y1="220" x2="130.3" y2="223" stroke="#5b6b76" stroke-width="1"/><text x="124.3" y="236" font-size="10" fill="#5b6b76">20</text><line x1="198.6" y1="220" x2="198.6" y2="223" stroke="#5b6b76" stroke-width="1"/><text x="192.6" y="236" font-size="10" fill="#5b6b76">40</text><line x1="266.9" y1="220" x2="266.9" y2="223" stroke="#5b6b76" stroke-width="1"/><text x="260.9" y="236" font-size="10" fill="#5b6b76">60</text><line x1="335.2" y1="220" x2="335.2" y2="223" stroke="#5b6b76" stroke-width="1"/><text x="329.2" y="236" font-size="10" fill="#5b6b76">80</text><line x1="403.5" y1="220" x2="403.5" y2="223" stroke="#5b6b76" stroke-width="1"/><text x="394.5" y="236" font-size="10" fill="#5b6b76">100</text><line x1="471.8" y1="220" x2="471.8" y2="223" stroke="#5b6b76" stroke-width="1"/><text x="462.8" y="236" font-size="10" fill="#5b6b76">120</text><line x1="540.1" y1="220" x2="540.1" y2="223" stroke="#5b6b76" stroke-width="1"/><text x="531.1" y="236" font-size="10" fill="#5b6b76">140</text><line x1="608.4" y1="220" x2="608.4" y2="223" stroke="#5b6b76" stroke-width="1"/><text x="599.4" y="236" font-size="10" fill="#5b6b76">160</text><line x1="704" y1="220" x2="704" y2="223" stroke="#5b6b76" stroke-width="1"/><text x="689.3" y="236" font-size="10" fill="#5b6b76">188aa</text><line x1="62" y1="220" x2="704" y2="220" stroke="#5b6b76" stroke-width="1"/><g><title>codon 10: 5 mutations
+G10dup 5</title><line x1="96.1" y1="192" x2="96.1" y2="191.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="96.1" cy="191.6" r="2.8" fill="#993404"/></g><g><title>codon 12: 1,583 mutations
+G12D 688
+G12V 487
+G12C 162
+G12S 109
+G12A 108
+G12R 26
+G12F 3</title><line x1="103" y1="192" x2="103" y2="73.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="103" cy="73.3" r="2.8" fill="#008000"/></g><g><title>codon 13: 446 mutations
+G13D 426
+G13C 20</title><line x1="106.4" y1="192" x2="106.4" y2="158.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="106.4" cy="158.6" r="2.8" fill="#008000"/></g><g><title>codon 14: 10 mutations
+V14I 10</title><line x1="109.8" y1="192" x2="109.8" y2="191.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="109.8" cy="191.3" r="2.8" fill="#008000"/></g><g><title>codon 33: 6 mutations
+D33E 6</title><line x1="174.7" y1="192" x2="174.7" y2="191.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="174.7" cy="191.6" r="2.8" fill="#008000"/></g><g><title>codon 57: 3 mutations
+D57N 3</title><line x1="256.6" y1="192" x2="256.6" y2="191.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="256.6" cy="191.8" r="2.8" fill="#53D400"/></g><g><title>codon 59: 13 mutations
+A59T 13</title><line x1="263.5" y1="192" x2="263.5" y2="191" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="263.5" cy="191" r="2.8" fill="#008000"/></g><g><title>codon 60: 18 mutations
+Q61K 18</title><line x1="266.9" y1="192" x2="266.9" y2="190.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="266.9" cy="190.6" r="2.8" fill="#008000"/></g><g><title>codon 61: 82 mutations
+Q61H 55
+Q61R 15
+Q61L 8
+Q61K 4</title><line x1="270.3" y1="192" x2="270.3" y2="185.9" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="270.3" cy="185.9" r="2.8" fill="#008000"/></g><g><title>codon 68: 3 mutations
+R68S 3</title><line x1="294.2" y1="192" x2="294.2" y2="191.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="294.2" cy="191.8" r="2.8" fill="#008000"/></g><g><title>codon 117: 26 mutations
+K117N 26</title><line x1="461.5" y1="192" x2="461.5" y2="190" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="461.5" cy="190" r="2.8" fill="#008000"/></g><g><title>codon 146: 176 mutations
+A146T 140
+A146V 27
+A146P 9</title><line x1="560.6" y1="192" x2="560.6" y2="178.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="560.6" cy="178.8" r="2.8" fill="#008000"/></g><text x="111.5" y="66.3" font-size="10" fill="#16232b" text-anchor="middle">G12D/V/C and 4 more</text><circle cx="67" cy="251.5" r="4" fill="#008000"/><text x="77" y="255" font-size="10" fill="#16232b">Missense</text><circle cx="139.89" cy="251.5" r="4" fill="#53D400"/><text x="149.9" y="255" font-size="10" fill="#16232b">Missense (VUS)</text><circle cx="240.51999999999998" cy="251.5" r="4" fill="#993404"/><text x="250.5" y="255" font-size="10" fill="#16232b">Inframe</text><text x="8" y="288" font-size="12" fill="#16232b" font-weight="600">BRAF</text><text x="49.3" y="288" font-size="10" fill="#5b6b76">658 mutations · 622 mutated patients</text><line x1="47" y1="461" x2="704" y2="461" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="464.5" font-size="10" fill="#5b6b76" text-anchor="end">0</text><line x1="47" y1="431" x2="704" y2="431" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="434.5" font-size="10" fill="#5b6b76" text-anchor="end">100</text><line x1="47" y1="401" x2="704" y2="401" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="404.5" font-size="10" fill="#5b6b76" text-anchor="end">200</text><line x1="47" y1="371" x2="704" y2="371" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="374.5" font-size="10" fill="#5b6b76" text-anchor="end">300</text><line x1="47" y1="341" x2="704" y2="341" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="344.5" font-size="10" fill="#5b6b76" text-anchor="end">400</text><line x1="47" y1="311" x2="704" y2="311" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="314.5" font-size="10" fill="#5b6b76" text-anchor="end">500</text><line x1="47" y1="461" x2="47" y2="311" stroke="#5b6b76" stroke-width="1"/><text x="10.8" y="386" font-size="11" fill="#16232b" text-anchor="middle" transform="rotate(-90 10.8 386)"># BRAF Mutations</text><rect x="53" y="466" width="651" height="14" fill="#BABDB6"/><g><title>RBD (PF02196): 156–227</title><rect x="185.6" y="461" width="60.3" height="24" fill="#2dcf00"/><text x="215.8" y="476.5" font-size="10" fill="#16232b" text-anchor="middle">RBD</text></g><g><title>C1_1 (PF00130): 235–280</title><rect x="252.7" y="461" width="38.2" height="24" fill="#ff5353"/><text x="271.8" y="476.5" font-size="10" fill="#16232b" text-anchor="middle">C1_1</text></g><g><title>Pkinase_Tyr (PF07714): 458–712</title><rect x="442.2" y="461" width="215.9" height="24" fill="#5b5bff"/><text x="550.2" y="476.5" font-size="10" fill="#ffffff" text-anchor="middle">Pkinase_Tyr</text></g><line x1="53" y1="489" x2="53" y2="492" stroke="#5b6b76" stroke-width="1"/><text x="50" y="505" font-size="10" fill="#5b6b76">0</text><line x1="138" y1="489" x2="138" y2="492" stroke="#5b6b76" stroke-width="1"/><text x="129" y="505" font-size="10" fill="#5b6b76">100</text><line x1="223" y1="489" x2="223" y2="492" stroke="#5b6b76" stroke-width="1"/><text x="214" y="505" font-size="10" fill="#5b6b76">200</text><line x1="308" y1="489" x2="308" y2="492" stroke="#5b6b76" stroke-width="1"/><text x="299" y="505" font-size="10" fill="#5b6b76">300</text><line x1="392.9" y1="489" x2="392.9" y2="492" stroke="#5b6b76" stroke-width="1"/><text x="383.9" y="505" font-size="10" fill="#5b6b76">400</text><line x1="477.9" y1="489" x2="477.9" y2="492" stroke="#5b6b76" stroke-width="1"/><text x="468.9" y="505" font-size="10" fill="#5b6b76">500</text><line x1="562.9" y1="489" x2="562.9" y2="492" stroke="#5b6b76" stroke-width="1"/><text x="553.9" y="505" font-size="10" fill="#5b6b76">600</text><line x1="647.9" y1="489" x2="647.9" y2="492" stroke="#5b6b76" stroke-width="1"/><text x="638.9" y="505" font-size="10" fill="#5b6b76">700</text><line x1="704" y1="489" x2="704" y2="492" stroke="#5b6b76" stroke-width="1"/><text x="689.3" y="505" font-size="10" fill="#5b6b76">766aa</text><line x1="53" y1="489" x2="704" y2="489" stroke="#5b6b76" stroke-width="1"/><g><title>codon 241: 4 mutations
+T241M 4</title><line x1="257.8" y1="461" x2="257.8" y2="459.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="257.8" cy="459.8" r="2.8" fill="#008000"/></g><g><title>codon 362: 5 mutations
+R362Q 5</title><line x1="360.7" y1="461" x2="360.7" y2="459.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="360.7" cy="459.5" r="2.8" fill="#53D400"/></g><g><title>codon 403: 19 mutations
+A404Cfs*9 10
+P403Lfs*8 9</title><line x1="395.5" y1="461" x2="395.5" y2="455.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="395.5" cy="455.3" r="2.8" fill="#708090"/></g><g><title>codon 466: 6 mutations
+G466E 3
+G466V 3</title><line x1="449" y1="461" x2="449" y2="459.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="449" cy="459.2" r="2.8" fill="#008000"/></g><g><title>codon 469: 14 mutations
+G469A 10
+G469R 4</title><line x1="451.6" y1="461" x2="451.6" y2="456.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="451.6" cy="456.8" r="2.8" fill="#008000"/></g><g><title>codon 581: 4 mutations
+N581S 4</title><line x1="546.8" y1="461" x2="546.8" y2="459.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="546.8" cy="459.8" r="2.8" fill="#008000"/></g><g><title>codon 594: 46 mutations
+D594G 38
+D594N 8</title><line x1="557.8" y1="461" x2="557.8" y2="447.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="557.8" cy="447.2" r="2.8" fill="#008000"/></g><g><title>codon 595: 4 mutations
+F595L 4</title><line x1="558.7" y1="461" x2="558.7" y2="459.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="558.7" cy="459.8" r="2.8" fill="#008000"/></g><g><title>codon 600: 438 mutations
+V600E 438</title><line x1="562.9" y1="461" x2="562.9" y2="329.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="562.9" cy="329.6" r="2.8" fill="#008000"/></g><g><title>codon 601: 4 mutations
+K601E 4</title><line x1="563.8" y1="461" x2="563.8" y2="459.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="563.8" cy="459.8" r="2.8" fill="#008000"/></g><g><title>codon 762: 3 mutations
+A762V 3</title><line x1="700.6" y1="461" x2="700.6" y2="460.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="700.6" cy="460.1" r="2.8" fill="#53D400"/></g><text x="562.9" y="322.6" font-size="10" fill="#16232b" text-anchor="middle">V600E</text><circle cx="58" cy="520.5" r="4" fill="#008000"/><text x="68" y="524" font-size="10" fill="#16232b">Missense</text><circle cx="130.89" cy="520.5" r="4" fill="#53D400"/><text x="140.9" y="524" font-size="10" fill="#16232b">Missense (VUS)</text><circle cx="231.51999999999998" cy="520.5" r="4" fill="#708090"/><text x="241.5" y="524" font-size="10" fill="#16232b">Truncating (VUS)</text><text x="8" y="557" font-size="12" fill="#16232b" font-weight="600">PIK3CA</text><text x="62.6" y="557" font-size="10" fill="#5b6b76">1,330 mutations · 1,147 mutated patients</text><line x1="47" y1="730" x2="704" y2="730" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="733.5" font-size="10" fill="#5b6b76" text-anchor="end">0</text><line x1="47" y1="680" x2="704" y2="680" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="683.5" font-size="10" fill="#5b6b76" text-anchor="end">100</text><line x1="47" y1="630" x2="704" y2="630" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="633.5" font-size="10" fill="#5b6b76" text-anchor="end">200</text><line x1="47" y1="580" x2="704" y2="580" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="583.5" font-size="10" fill="#5b6b76" text-anchor="end">300</text><line x1="47" y1="730" x2="47" y2="580" stroke="#5b6b76" stroke-width="1"/><text x="10.8" y="655" font-size="11" fill="#16232b" text-anchor="middle" transform="rotate(-90 10.8 655)"># PIK3CA Mutations</text><rect x="53" y="735" width="651" height="14" fill="#BABDB6"/><g><title>PI3K_p85B (PF02192): 32–108</title><rect x="72.5" y="730" width="46.3" height="24" fill="#2dcf00"/><text x="95.7" y="745.5" font-size="10" fill="#16232b" text-anchor="middle"><title>PI3K_p85B</title>PI3K_…</text></g><g><title>PI3K_rbd (PF00794): 174–291</title><rect x="159.1" y="730" width="71.3" height="24" fill="#ff5353"/><text x="194.7" y="745.5" font-size="10" fill="#16232b" text-anchor="middle">PI3K_rbd</text></g><g><title>PI3K_C2 (PF00792): 351–483</title><rect x="267" y="730" width="80.5" height="24" fill="#5b5bff"/><text x="307.2" y="745.5" font-size="10" fill="#ffffff" text-anchor="middle">PI3K_C2</text></g><g><title>PI3Ka (PF00613): 520–703</title><rect x="370" y="730" width="111.5" height="24" fill="#ebd61d"/><text x="425.7" y="745.5" font-size="10" fill="#16232b" text-anchor="middle">PI3Ka</text></g><g><title>PI3_PI4_kinase (PF00454): 798–1014</title><rect x="539.4" y="730" width="131.7" height="24" fill="#ba21e0"/><text x="605.3" y="745.5" font-size="10" fill="#ffffff" text-anchor="middle">PI3_PI4_kinase</text></g><line x1="53" y1="758" x2="53" y2="761" stroke="#5b6b76" stroke-width="1"/><text x="50" y="774" font-size="10" fill="#5b6b76">0</text><line x1="174.9" y1="758" x2="174.9" y2="761" stroke="#5b6b76" stroke-width="1"/><text x="165.9" y="774" font-size="10" fill="#5b6b76">200</text><line x1="296.8" y1="758" x2="296.8" y2="761" stroke="#5b6b76" stroke-width="1"/><text x="287.8" y="774" font-size="10" fill="#5b6b76">400</text><line x1="418.7" y1="758" x2="418.7" y2="761" stroke="#5b6b76" stroke-width="1"/><text x="409.7" y="774" font-size="10" fill="#5b6b76">600</text><line x1="540.6" y1="758" x2="540.6" y2="761" stroke="#5b6b76" stroke-width="1"/><text x="531.6" y="774" font-size="10" fill="#5b6b76">800</text><line x1="704" y1="758" x2="704" y2="761" stroke="#5b6b76" stroke-width="1"/><text x="680.6" y="774" font-size="10" fill="#5b6b76">1,068aa</text><line x1="53" y1="758" x2="704" y2="758" stroke="#5b6b76" stroke-width="1"/><g><title>codon 38: 23 mutations
+R38H 10
+R38C 8
+R38S 5</title><line x1="76.2" y1="730" x2="76.2" y2="718.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="76.2" cy="718.5" r="2.8" fill="#008000"/></g><g><title>codon 81: 9 mutations
+E81K 9</title><line x1="102.4" y1="730" x2="102.4" y2="725.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="102.4" cy="725.5" r="2.8" fill="#53D400"/></g><g><title>codon 83: 3 mutations
+F83K 3</title><line x1="103.6" y1="730" x2="103.6" y2="728.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="103.6" cy="728.5" r="2.8" fill="#53D400"/></g><g><title>codon 88: 47 mutations
+R88Q 47</title><line x1="106.6" y1="730" x2="106.6" y2="706.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="106.6" cy="706.5" r="2.8" fill="#008000"/></g><g><title>codon 93: 23 mutations
+R93W 16
+R93Q 7</title><line x1="109.7" y1="730" x2="109.7" y2="718.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="109.7" cy="718.5" r="2.8" fill="#008000"/></g><g><title>codon 106: 11 mutations
+G106V 11</title><line x1="117.6" y1="730" x2="117.6" y2="724.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="117.6" cy="724.5" r="2.8" fill="#008000"/></g><g><title>codon 108: 27 mutations
+R108H 24
+R108C 3</title><line x1="118.8" y1="730" x2="118.8" y2="716.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="118.8" cy="716.5" r="2.8" fill="#008000"/></g><g><title>codon 109: 14 mutations
+E110del 14</title><line x1="119.4" y1="730" x2="119.4" y2="723" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="119.4" cy="723" r="2.8" fill="#993404"/></g><g><title>codon 111: 17 mutations
+K111E 10
+K111N 7</title><line x1="120.7" y1="730" x2="120.7" y2="721.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="120.7" cy="721.5" r="2.8" fill="#008000"/></g><g><title>codon 118: 10 mutations
+G118D 10</title><line x1="124.9" y1="730" x2="124.9" y2="725" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="124.9" cy="725" r="2.8" fill="#008000"/></g><g><title>codon 227: 5 mutations
+T229Lfs*11 5</title><line x1="191.4" y1="730" x2="191.4" y2="727.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="191.4" cy="727.5" r="2.8" fill="#708090"/></g><g><title>codon 344: 15 mutations
+V344G 11
+V344M 4</title><line x1="262.7" y1="730" x2="262.7" y2="722.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="262.7" cy="722.5" r="2.8" fill="#008000"/></g><g><title>codon 345: 23 mutations
+N345K 20
+N345I 3</title><line x1="263.3" y1="730" x2="263.3" y2="718.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="263.3" cy="718.5" r="2.8" fill="#008000"/></g><g><title>codon 350: 5 mutations
+D350G 5</title><line x1="266.3" y1="730" x2="266.3" y2="727.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="266.3" cy="727.5" r="2.8" fill="#008000"/></g><g><title>codon 357: 5 mutations
+R357Q 5</title><line x1="270.6" y1="730" x2="270.6" y2="727.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="270.6" cy="727.5" r="2.8" fill="#008000"/></g><g><title>codon 364: 3 mutations
+G364R 3</title><line x1="274.9" y1="730" x2="274.9" y2="728.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="274.9" cy="728.5" r="2.8" fill="#008000"/></g><g><title>codon 365: 4 mutations
+E365K 4</title><line x1="275.5" y1="730" x2="275.5" y2="728" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="275.5" cy="728" r="2.8" fill="#008000"/></g><g><title>codon 378: 5 mutations
+C378R 5</title><line x1="283.4" y1="730" x2="283.4" y2="727.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="283.4" cy="727.5" r="2.8" fill="#008000"/></g><g><title>codon 418: 3 mutations
+E418K 3</title><line x1="307.8" y1="730" x2="307.8" y2="728.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="307.8" cy="728.5" r="2.8" fill="#008000"/></g><g><title>codon 420: 39 mutations
+C420R 39</title><line x1="309" y1="730" x2="309" y2="710.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="309" cy="710.5" r="2.8" fill="#008000"/></g><g><title>codon 453: 10 mutations
+E453K 10</title><line x1="329.1" y1="730" x2="329.1" y2="725" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="329.1" cy="725" r="2.8" fill="#008000"/></g><g><title>codon 542: 163 mutations
+E542K 159
+E542Q 4</title><line x1="383.4" y1="730" x2="383.4" y2="648.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="383.4" cy="648.5" r="2.8" fill="#008000"/></g><g><title>codon 545: 276 mutations
+E545K 253
+E545G 19
+E545D 4</title><line x1="385.2" y1="730" x2="385.2" y2="592" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="385.2" cy="592" r="2.8" fill="#008000"/></g><g><title>codon 546: 60 mutations
+Q546K 41
+Q546R 10
+Q546P 5
+Q546H 4</title><line x1="385.8" y1="730" x2="385.8" y2="700" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="385.8" cy="700" r="2.8" fill="#008000"/></g><g><title>codon 726: 12 mutations
+E726K 12</title><line x1="495.5" y1="730" x2="495.5" y2="724" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="495.5" cy="724" r="2.8" fill="#53D400"/></g><g><title>codon 808: 4 mutations
+R808W 4</title><line x1="545.5" y1="730" x2="545.5" y2="728" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="545.5" cy="728" r="2.8" fill="#53D400"/></g><g><title>codon 901: 4 mutations
+C901F 4</title><line x1="602.2" y1="730" x2="602.2" y2="728" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="602.2" cy="728" r="2.8" fill="#008000"/></g><g><title>codon 1004: 3 mutations
+M1004I 3</title><line x1="665" y1="730" x2="665" y2="728.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="665" cy="728.5" r="2.8" fill="#008000"/></g><g><title>codon 1007: 4 mutations
+G1007R 4</title><line x1="666.8" y1="730" x2="666.8" y2="728" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="666.8" cy="728" r="2.8" fill="#008000"/></g><g><title>codon 1021: 10 mutations
+Y1021C 10</title><line x1="675.4" y1="730" x2="675.4" y2="725" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="675.4" cy="725" r="2.8" fill="#53D400"/></g><g><title>codon 1023: 3 mutations
+R1023* 3</title><line x1="676.6" y1="730" x2="676.6" y2="728.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="676.6" cy="728.5" r="2.8" fill="#708090"/></g><g><title>codon 1025: 9 mutations
+T1025A 9</title><line x1="677.8" y1="730" x2="677.8" y2="725.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="677.8" cy="725.5" r="2.8" fill="#008000"/></g><g><title>codon 1043: 12 mutations
+M1043I 9
+M1043V 3</title><line x1="688.8" y1="730" x2="688.8" y2="724" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="688.8" cy="724" r="2.8" fill="#008000"/></g><g><title>codon 1044: 3 mutations
+N1044K 3</title><line x1="689.4" y1="730" x2="689.4" y2="728.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="689.4" cy="728.5" r="2.8" fill="#008000"/></g><g><title>codon 1047: 226 mutations
+H1047R 189
+H1047L 24
+H1047Y 13</title><line x1="691.2" y1="730" x2="691.2" y2="617" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="691.2" cy="617" r="2.8" fill="#008000"/></g><g><title>codon 1049: 6 mutations
+G1049R 6</title><line x1="692.4" y1="730" x2="692.4" y2="727" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="692.4" cy="727" r="2.8" fill="#008000"/></g><g><title>codon 1065: 3 mutations
+H1065Y 3</title><line x1="702.2" y1="730" x2="702.2" y2="728.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="702.2" cy="728.5" r="2.8" fill="#008000"/></g><text x="385.2" y="585" font-size="10" fill="#16232b" text-anchor="middle">E545K/G/D</text><circle cx="58" cy="789.5" r="4" fill="#008000"/><text x="68" y="793" font-size="10" fill="#16232b">Missense</text><circle cx="130.89" cy="789.5" r="4" fill="#53D400"/><text x="140.9" y="793" font-size="10" fill="#16232b">Missense (VUS)</text><circle cx="231.51999999999998" cy="789.5" r="4" fill="#708090"/><text x="241.5" y="793" font-size="10" fill="#16232b">Truncating (VUS)</text><circle cx="338.34999999999997" cy="789.5" r="4" fill="#993404"/><text x="348.3" y="793" font-size="10" fill="#16232b">Inframe</text><text x="8" y="826" font-size="12" fill="#16232b" font-weight="600">TP53</text><text x="47.3" y="826" font-size="10" fill="#5b6b76">4,441 mutations · 4,080 mutated patients</text><line x1="47" y1="999" x2="704" y2="999" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="1002.5" font-size="10" fill="#5b6b76" text-anchor="end">0</text><line x1="47" y1="969" x2="704" y2="969" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="972.5" font-size="10" fill="#5b6b76" text-anchor="end">100</text><line x1="47" y1="939" x2="704" y2="939" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="942.5" font-size="10" fill="#5b6b76" text-anchor="end">200</text><line x1="47" y1="909" x2="704" y2="909" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="912.5" font-size="10" fill="#5b6b76" text-anchor="end">300</text><line x1="47" y1="879" x2="704" y2="879" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="882.5" font-size="10" fill="#5b6b76" text-anchor="end">400</text><line x1="47" y1="849" x2="704" y2="849" stroke="#dde4e8" stroke-width="0.75"/><text x="41" y="852.5" font-size="10" fill="#5b6b76" text-anchor="end">500</text><line x1="47" y1="999" x2="47" y2="849" stroke="#5b6b76" stroke-width="1"/><text x="10.8" y="924" font-size="11" fill="#16232b" text-anchor="middle" transform="rotate(-90 10.8 924)"># TP53 Mutations</text><rect x="53" y="1004" width="651" height="14" fill="#BABDB6"/><g><title>P53_TAD (PF08563): 6–29</title><rect x="62.9" y="999" width="38.1" height="24" fill="#2dcf00"/><text x="82" y="1014.5" font-size="10" fill="#16232b" text-anchor="middle"><title>P53_TAD</title>P53_…</text></g><g><title>P53 (PF00870): 95–288</title><rect x="210.4" y="999" width="319.7" height="24" fill="#ff5353"/><text x="370.2" y="1014.5" font-size="10" fill="#16232b" text-anchor="middle">P53</text></g><g><title>P53_tetramer (PF07710): 318–358</title><rect x="579.8" y="999" width="66.3" height="24" fill="#5b5bff"/><text x="612.9" y="1014.5" font-size="10" fill="#ffffff" text-anchor="middle"><title>P53_tetramer</title>P53_tetra…</text></g><line x1="53" y1="1027" x2="53" y2="1030" stroke="#5b6b76" stroke-width="1"/><text x="50" y="1043" font-size="10" fill="#5b6b76">0</text><line x1="135.8" y1="1027" x2="135.8" y2="1030" stroke="#5b6b76" stroke-width="1"/><text x="129.8" y="1043" font-size="10" fill="#5b6b76">50</text><line x1="218.6" y1="1027" x2="218.6" y2="1030" stroke="#5b6b76" stroke-width="1"/><text x="209.6" y="1043" font-size="10" fill="#5b6b76">100</text><line x1="301.5" y1="1027" x2="301.5" y2="1030" stroke="#5b6b76" stroke-width="1"/><text x="292.5" y="1043" font-size="10" fill="#5b6b76">150</text><line x1="384.3" y1="1027" x2="384.3" y2="1030" stroke="#5b6b76" stroke-width="1"/><text x="375.3" y="1043" font-size="10" fill="#5b6b76">200</text><line x1="467.1" y1="1027" x2="467.1" y2="1030" stroke="#5b6b76" stroke-width="1"/><text x="458.1" y="1043" font-size="10" fill="#5b6b76">250</text><line x1="549.9" y1="1027" x2="549.9" y2="1030" stroke="#5b6b76" stroke-width="1"/><text x="540.9" y="1043" font-size="10" fill="#5b6b76">300</text><line x1="632.8" y1="1027" x2="632.8" y2="1030" stroke="#5b6b76" stroke-width="1"/><text x="623.8" y="1043" font-size="10" fill="#5b6b76">350</text><line x1="704" y1="1027" x2="704" y2="1030" stroke="#5b6b76" stroke-width="1"/><text x="689.3" y="1043" font-size="10" fill="#5b6b76">393aa</text><line x1="53" y1="1027" x2="704" y2="1027" stroke="#5b6b76" stroke-width="1"/><g><title>codon 10: 10 mutations
+X10_splice 10</title><line x1="69.6" y1="999" x2="69.6" y2="996" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="69.6" cy="996" r="2.8" fill="#e5802b"/></g><g><title>codon 32: 4 mutations
+X32_splice 4</title><line x1="106" y1="999" x2="106" y2="997.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="106" cy="997.8" r="2.8" fill="#e5802b"/></g><g><title>codon 33: 9 mutations
+X33_splice 9</title><line x1="107.7" y1="999" x2="107.7" y2="996.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="107.7" cy="996.3" r="2.8" fill="#e5802b"/></g><g><title>codon 34: 6 mutations
+P36Afs*7 6</title><line x1="109.3" y1="999" x2="109.3" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="109.3" cy="997.2" r="2.8" fill="#000000"/></g><g><title>codon 38: 8 mutations
+Q38* 5
+Q38Kfs*6 3</title><line x1="115.9" y1="999" x2="115.9" y2="996.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="115.9" cy="996.6" r="2.8" fill="#000000"/></g><g><title>codon 51: 4 mutations
+E51* 4</title><line x1="137.5" y1="999" x2="137.5" y2="997.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="137.5" cy="997.8" r="2.8" fill="#000000"/></g><g><title>codon 52: 4 mutations
+Q52* 4</title><line x1="139.1" y1="999" x2="139.1" y2="997.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="139.1" cy="997.8" r="2.8" fill="#000000"/></g><g><title>codon 53: 12 mutations
+W53* 12</title><line x1="140.8" y1="999" x2="140.8" y2="995.4" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="140.8" cy="995.4" r="2.8" fill="#000000"/></g><g><title>codon 72: 27 mutations
+V73Rfs*76 14
+V73Wfs*50 13</title><line x1="172.3" y1="999" x2="172.3" y2="990.9" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="172.3" cy="990.9" r="2.8" fill="#000000"/></g><g><title>codon 75: 6 mutations
+A76Cfs*73 3
+P75Lfs*48 3</title><line x1="177.2" y1="999" x2="177.2" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="177.2" cy="997.2" r="2.8" fill="#000000"/></g><g><title>codon 89: 16 mutations
+S90Pfs*33 10
+S90Lfs*59 6</title><line x1="200.4" y1="999" x2="200.4" y2="994.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="200.4" cy="994.2" r="2.8" fill="#000000"/></g><g><title>codon 91: 12 mutations
+W91* 12</title><line x1="203.7" y1="999" x2="203.7" y2="995.4" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="203.7" cy="995.4" r="2.8" fill="#000000"/></g><g><title>codon 104: 6 mutations
+Q104* 6</title><line x1="225.3" y1="999" x2="225.3" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="225.3" cy="997.2" r="2.8" fill="#000000"/></g><g><title>codon 105: 9 mutations
+G105V 6
+G105C 3</title><line x1="226.9" y1="999" x2="226.9" y2="996.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="226.9" cy="996.3" r="2.8" fill="#008000"/></g><g><title>codon 109: 3 mutations
+F109S 3</title><line x1="233.6" y1="999" x2="233.6" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="233.6" cy="998.1" r="2.8" fill="#008000"/></g><g><title>codon 110: 11 mutations
+R110L 7
+R110P 4</title><line x1="235.2" y1="999" x2="235.2" y2="995.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="235.2" cy="995.7" r="2.8" fill="#008000"/></g><g><title>codon 111: 6 mutations
+L111P 3
+L111Q 3</title><line x1="236.9" y1="999" x2="236.9" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="236.9" cy="997.2" r="2.8" fill="#008000"/></g><g><title>codon 113: 3 mutations
+F113C 3</title><line x1="240.2" y1="999" x2="240.2" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="240.2" cy="998.1" r="2.8" fill="#008000"/></g><g><title>codon 114: 3 mutations
+H115Afs*34 3</title><line x1="241.8" y1="999" x2="241.8" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="241.8" cy="998.1" r="2.8" fill="#000000"/></g><g><title>codon 122: 8 mutations
+V122Dfs*26 8</title><line x1="255.1" y1="999" x2="255.1" y2="996.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="255.1" cy="996.6" r="2.8" fill="#000000"/></g><g><title>codon 124: 3 mutations
+C124Wfs*25 3</title><line x1="258.4" y1="999" x2="258.4" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="258.4" cy="998.1" r="2.8" fill="#000000"/></g><g><title>codon 125: 27 mutations
+X125_splice 16
+T125M 11</title><line x1="260.1" y1="999" x2="260.1" y2="990.9" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="260.1" cy="990.9" r="2.8" fill="#e5802b"/></g><g><title>codon 126: 49 mutations
+X126_splice 34
+Y126C 6
+Y126H 5
+Y126* 4</title><line x1="261.7" y1="999" x2="261.7" y2="984.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="261.7" cy="984.3" r="2.8" fill="#e5802b"/></g><g><title>codon 127: 10 mutations
+S127F 7
+S127P 3</title><line x1="263.4" y1="999" x2="263.4" y2="996" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="263.4" cy="996" r="2.8" fill="#008000"/></g><g><title>codon 130: 11 mutations
+L130F 4
+L130V 4
+L130Sfs*40 3</title><line x1="268.3" y1="999" x2="268.3" y2="995.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="268.3" cy="995.7" r="2.8" fill="#008000"/></g><g><title>codon 131: 5 mutations
+N131del 5</title><line x1="270" y1="999" x2="270" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="270" cy="997.5" r="2.8" fill="#993404"/></g><g><title>codon 132: 27 mutations
+K132R 13
+K132N 11
+K132E 3</title><line x1="271.7" y1="999" x2="271.7" y2="990.9" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="271.7" cy="990.9" r="2.8" fill="#008000"/></g><g><title>codon 133: 4 mutations
+M133T 4</title><line x1="273.3" y1="999" x2="273.3" y2="997.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="273.3" cy="997.8" r="2.8" fill="#008000"/></g><g><title>codon 134: 5 mutations
+F134L 5</title><line x1="275" y1="999" x2="275" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="275" cy="997.5" r="2.8" fill="#008000"/></g><g><title>codon 135: 30 mutations
+C135F 14
+C135Y 13
+C135R 3</title><line x1="276.6" y1="999" x2="276.6" y2="990" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="276.6" cy="990" r="2.8" fill="#008000"/></g><g><title>codon 136: 8 mutations
+Q136* 8</title><line x1="278.3" y1="999" x2="278.3" y2="996.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="278.3" cy="996.6" r="2.8" fill="#000000"/></g><g><title>codon 138: 7 mutations
+A138V 7</title><line x1="281.6" y1="999" x2="281.6" y2="996.9" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="281.6" cy="996.9" r="2.8" fill="#008000"/></g><g><title>codon 141: 19 mutations
+C141Y 11
+C141R 5
+C141W 3</title><line x1="286.6" y1="999" x2="286.6" y2="993.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="286.6" cy="993.3" r="2.8" fill="#008000"/></g><g><title>codon 143: 9 mutations
+V143M 9</title><line x1="289.9" y1="999" x2="289.9" y2="996.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="289.9" cy="996.3" r="2.8" fill="#008000"/></g><g><title>codon 144: 5 mutations
+Q144* 5</title><line x1="291.5" y1="999" x2="291.5" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="291.5" cy="997.5" r="2.8" fill="#000000"/></g><g><title>codon 146: 20 mutations
+W146* 20</title><line x1="294.8" y1="999" x2="294.8" y2="993" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="294.8" cy="993" r="2.8" fill="#000000"/></g><g><title>codon 151: 30 mutations
+P151S 17
+P151T 6
+P151H 4
+P151R 3</title><line x1="303.1" y1="999" x2="303.1" y2="990" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="303.1" cy="990" r="2.8" fill="#008000"/></g><g><title>codon 152: 48 mutations
+P152L 25
+P153Afs*28 9
+P152Afs*14 8
+P152Rfs*18 6</title><line x1="304.8" y1="999" x2="304.8" y2="984.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="304.8" cy="984.6" r="2.8" fill="#008000"/></g><g><title>codon 154: 5 mutations
+G154V 5</title><line x1="308.1" y1="999" x2="308.1" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="308.1" cy="997.5" r="2.8" fill="#008000"/></g><g><title>codon 156: 3 mutations
+R156P 3</title><line x1="311.4" y1="999" x2="311.4" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="311.4" cy="998.1" r="2.8" fill="#008000"/></g><g><title>codon 157: 8 mutations
+V157F 5
+V157I 3</title><line x1="313.1" y1="999" x2="313.1" y2="996.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="313.1" cy="996.6" r="2.8" fill="#008000"/></g><g><title>codon 158: 38 mutations
+R158H 30
+R158C 5
+R158L 3</title><line x1="314.7" y1="999" x2="314.7" y2="987.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="314.7" cy="987.6" r="2.8" fill="#008000"/></g><g><title>codon 159: 15 mutations
+A159V 8
+A159P 7</title><line x1="316.4" y1="999" x2="316.4" y2="994.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="316.4" cy="994.5" r="2.8" fill="#008000"/></g><g><title>codon 161: 19 mutations
+A161T 16
+A161D 3</title><line x1="319.7" y1="999" x2="319.7" y2="993.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="319.7" cy="993.3" r="2.8" fill="#008000"/></g><g><title>codon 163: 11 mutations
+Y163C 11</title><line x1="323" y1="999" x2="323" y2="995.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="323" cy="995.7" r="2.8" fill="#008000"/></g><g><title>codon 165: 6 mutations
+Q165* 6</title><line x1="326.3" y1="999" x2="326.3" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="326.3" cy="997.2" r="2.8" fill="#000000"/></g><g><title>codon 166: 4 mutations
+S166* 4</title><line x1="328" y1="999" x2="328" y2="997.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="328" cy="997.8" r="2.8" fill="#000000"/></g><g><title>codon 167: 6 mutations
+Q167* 6</title><line x1="329.6" y1="999" x2="329.6" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="329.6" cy="997.2" r="2.8" fill="#000000"/></g><g><title>codon 168: 5 mutations
+H168R 5</title><line x1="331.3" y1="999" x2="331.3" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="331.3" cy="997.5" r="2.8" fill="#008000"/></g><g><title>codon 170: 3 mutations
+T170M 3</title><line x1="334.6" y1="999" x2="334.6" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="334.6" cy="998.1" r="2.8" fill="#008000"/></g><g><title>codon 171: 3 mutations
+E171* 3</title><line x1="336.3" y1="999" x2="336.3" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="336.3" cy="998.1" r="2.8" fill="#000000"/></g><g><title>codon 172: 5 mutations
+V172F 5</title><line x1="337.9" y1="999" x2="337.9" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="337.9" cy="997.5" r="2.8" fill="#008000"/></g><g><title>codon 173: 40 mutations
+V173M 20
+V173L 17
+V173A 3</title><line x1="339.6" y1="999" x2="339.6" y2="987" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="339.6" cy="987" r="2.8" fill="#008000"/></g><g><title>codon 175: 403 mutations
+R175H 391
+R175C 9
+R175L 3</title><line x1="342.9" y1="999" x2="342.9" y2="878.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="342.9" cy="878.1" r="2.8" fill="#008000"/></g><g><title>codon 176: 58 mutations
+C176F 24
+C176Y 20
+C176S 7
+C176R 4
+C176* 3</title><line x1="344.5" y1="999" x2="344.5" y2="981.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="344.5" cy="981.6" r="2.8" fill="#008000"/></g><g><title>codon 177: 9 mutations
+P177_C182del 9</title><line x1="346.2" y1="999" x2="346.2" y2="996.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="346.2" cy="996.3" r="2.8" fill="#993404"/></g><g><title>codon 178: 12 mutations
+H178Tfs*69 5
+H178P 4
+H178Pfs*3 3</title><line x1="347.9" y1="999" x2="347.9" y2="995.4" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="347.9" cy="995.4" r="2.8" fill="#000000"/></g><g><title>codon 179: 45 mutations
+H179Y 19
+H179R 12
+H179Q 7
+H179L 4
+H179D 3</title><line x1="349.5" y1="999" x2="349.5" y2="985.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="349.5" cy="985.5" r="2.8" fill="#008000"/></g><g><title>codon 181: 20 mutations
+R181H 11
+R181C 9</title><line x1="352.8" y1="999" x2="352.8" y2="993" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="352.8" cy="993" r="2.8" fill="#008000"/></g><g><title>codon 183: 3 mutations
+S183* 3</title><line x1="356.1" y1="999" x2="356.1" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="356.1" cy="998.1" r="2.8" fill="#000000"/></g><g><title>codon 187: 36 mutations
+X187_splice 36</title><line x1="362.8" y1="999" x2="362.8" y2="988.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="362.8" cy="988.2" r="2.8" fill="#e5802b"/></g><g><title>codon 190: 23 mutations
+P190L 13
+P190T 7
+P190Lfs*57 3</title><line x1="367.7" y1="999" x2="367.7" y2="992.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="367.7" cy="992.1" r="2.8" fill="#008000"/></g><g><title>codon 191: 5 mutations
+P191del 5</title><line x1="369.4" y1="999" x2="369.4" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="369.4" cy="997.5" r="2.8" fill="#993404"/></g><g><title>codon 192: 8 mutations
+Q192* 8</title><line x1="371" y1="999" x2="371" y2="996.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="371" cy="996.6" r="2.8" fill="#000000"/></g><g><title>codon 193: 26 mutations
+H193R 14
+H193Y 6
+H193L 3
+H193N 3</title><line x1="372.7" y1="999" x2="372.7" y2="991.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="372.7" cy="991.2" r="2.8" fill="#008000"/></g><g><title>codon 194: 16 mutations
+L194R 6
+L194F 4
+L194H 3
+L194P 3</title><line x1="374.4" y1="999" x2="374.4" y2="994.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="374.4" cy="994.2" r="2.8" fill="#008000"/></g><g><title>codon 195: 23 mutations
+I195T 13
+I195F 4
+I195N 3
+I195S 3</title><line x1="376" y1="999" x2="376" y2="992.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="376" cy="992.1" r="2.8" fill="#008000"/></g><g><title>codon 196: 111 mutations
+R196* 107
+R196Q 4</title><line x1="377.7" y1="999" x2="377.7" y2="965.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="377.7" cy="965.7" r="2.8" fill="#000000"/></g><g><title>codon 197: 12 mutations
+V197M 12</title><line x1="379.3" y1="999" x2="379.3" y2="995.4" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="379.3" cy="995.4" r="2.8" fill="#008000"/></g><g><title>codon 198: 5 mutations
+E198* 5</title><line x1="381" y1="999" x2="381" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="381" cy="997.5" r="2.8" fill="#000000"/></g><g><title>codon 199: 5 mutations
+G199V 5</title><line x1="382.6" y1="999" x2="382.6" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="382.6" cy="997.5" r="2.8" fill="#008000"/></g><g><title>codon 204: 6 mutations
+E204* 6</title><line x1="390.9" y1="999" x2="390.9" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="390.9" cy="997.2" r="2.8" fill="#000000"/></g><g><title>codon 205: 15 mutations
+Y205C 7
+Y205H 5
+Y205D 3</title><line x1="392.6" y1="999" x2="392.6" y2="994.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="392.6" cy="994.5" r="2.8" fill="#008000"/></g><g><title>codon 209: 13 mutations
+R209Kfs*6 13</title><line x1="399.2" y1="999" x2="399.2" y2="995.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="399.2" cy="995.1" r="2.8" fill="#000000"/></g><g><title>codon 211: 6 mutations
+T211I 6</title><line x1="402.5" y1="999" x2="402.5" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="402.5" cy="997.2" r="2.8" fill="#008000"/></g><g><title>codon 212: 5 mutations
+F212Sfs*3 5</title><line x1="404.2" y1="999" x2="404.2" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="404.2" cy="997.5" r="2.8" fill="#000000"/></g><g><title>codon 213: 160 mutations
+R213* 141
+R213Q 10
+R213L 9</title><line x1="405.8" y1="999" x2="405.8" y2="951" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="405.8" cy="951" r="2.8" fill="#000000"/></g><g><title>codon 214: 11 mutations
+H214R 6
+H214Qfs*7 5</title><line x1="407.5" y1="999" x2="407.5" y2="995.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="407.5" cy="995.7" r="2.8" fill="#008000"/></g><g><title>codon 215: 12 mutations
+S215G 5
+S215N 4
+S215R 3</title><line x1="409.1" y1="999" x2="409.1" y2="995.4" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="409.1" cy="995.4" r="2.8" fill="#008000"/></g><g><title>codon 216: 15 mutations
+V216M 10
+V216L 5</title><line x1="410.8" y1="999" x2="410.8" y2="994.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="410.8" cy="994.5" r="2.8" fill="#008000"/></g><g><title>codon 220: 35 mutations
+Y220C 35</title><line x1="417.4" y1="999" x2="417.4" y2="988.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="417.4" cy="988.5" r="2.8" fill="#008000"/></g><g><title>codon 222: 3 mutations
+P222L 3</title><line x1="420.7" y1="999" x2="420.7" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="420.7" cy="998.1" r="2.8" fill="#008000"/></g><g><title>codon 224: 33 mutations
+X224_splice 24
+E224D 5
+E224* 4</title><line x1="424.1" y1="999" x2="424.1" y2="989.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="424.1" cy="989.1" r="2.8" fill="#e5802b"/></g><g><title>codon 225: 21 mutations
+X225_splice 21</title><line x1="425.7" y1="999" x2="425.7" y2="992.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="425.7" cy="992.7" r="2.8" fill="#e5802b"/></g><g><title>codon 227: 3 mutations
+D228* 3</title><line x1="429" y1="999" x2="429" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="429" cy="998.1" r="2.8" fill="#000000"/></g><g><title>codon 229: 5 mutations
+C229Yfs*10 5</title><line x1="432.3" y1="999" x2="432.3" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="432.3" cy="997.5" r="2.8" fill="#000000"/></g><g><title>codon 234: 26 mutations
+Y234C 17
+Y234H 5
+Y234* 4</title><line x1="440.6" y1="999" x2="440.6" y2="991.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="440.6" cy="991.2" r="2.8" fill="#008000"/></g><g><title>codon 236: 15 mutations
+Y236C 10
+Y236N 5</title><line x1="443.9" y1="999" x2="443.9" y2="994.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="443.9" cy="994.5" r="2.8" fill="#008000"/></g><g><title>codon 237: 22 mutations
+M237I 22</title><line x1="445.6" y1="999" x2="445.6" y2="992.4" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="445.6" cy="992.4" r="2.8" fill="#008000"/></g><g><title>codon 238: 16 mutations
+C238Y 16</title><line x1="447.2" y1="999" x2="447.2" y2="994.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="447.2" cy="994.2" r="2.8" fill="#008000"/></g><g><title>codon 239: 10 mutations
+N239D 7
+N239S 3</title><line x1="448.9" y1="999" x2="448.9" y2="996" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="448.9" cy="996" r="2.8" fill="#008000"/></g><g><title>codon 241: 26 mutations
+S241F 8
+C242Afs*5 7
+S241Y 5
+S241C 3
+S241P 3</title><line x1="452.2" y1="999" x2="452.2" y2="991.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="452.2" cy="991.2" r="2.8" fill="#008000"/></g><g><title>codon 242: 28 mutations
+C242Y 12
+C242F 10
+C242S 6</title><line x1="453.9" y1="999" x2="453.9" y2="990.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="453.9" cy="990.6" r="2.8" fill="#008000"/></g><g><title>codon 244: 20 mutations
+G244D 10
+G244S 6
+G244C 4</title><line x1="457.2" y1="999" x2="457.2" y2="993" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="457.2" cy="993" r="2.8" fill="#008000"/></g><g><title>codon 245: 144 mutations
+G245S 119
+G245D 13
+G245V 7
+G245C 5</title><line x1="458.8" y1="999" x2="458.8" y2="955.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="458.8" cy="955.8" r="2.8" fill="#008000"/></g><g><title>codon 246: 4 mutations
+M246V 4</title><line x1="460.5" y1="999" x2="460.5" y2="997.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="460.5" cy="997.8" r="2.8" fill="#008000"/></g><g><title>codon 248: 334 mutations
+R248Q 183
+R248W 146
+R248L 5</title><line x1="463.8" y1="999" x2="463.8" y2="898.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="463.8" cy="898.8" r="2.8" fill="#008000"/></g><g><title>codon 249: 17 mutations
+R249W 6
+R249S 5
+R249G 3
+R249M 3</title><line x1="465.5" y1="999" x2="465.5" y2="993.9" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="465.5" cy="993.9" r="2.8" fill="#008000"/></g><g><title>codon 250: 12 mutations
+P250L 12</title><line x1="467.1" y1="999" x2="467.1" y2="995.4" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="467.1" cy="995.4" r="2.8" fill="#008000"/></g><g><title>codon 253: 3 mutations
+T253Nfs*11 3</title><line x1="472.1" y1="999" x2="472.1" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="472.1" cy="998.1" r="2.8" fill="#000000"/></g><g><title>codon 254: 6 mutations
+I254N 3
+I254T 3</title><line x1="473.7" y1="999" x2="473.7" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="473.7" cy="997.2" r="2.8" fill="#008000"/></g><g><title>codon 255: 13 mutations
+I255T 7
+I255del 6</title><line x1="475.4" y1="999" x2="475.4" y2="995.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="475.4" cy="995.1" r="2.8" fill="#008000"/></g><g><title>codon 257: 10 mutations
+L257P 7
+L257R 3</title><line x1="478.7" y1="999" x2="478.7" y2="996" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="478.7" cy="996" r="2.8" fill="#008000"/></g><g><title>codon 258: 28 mutations
+E258K 11
+E258* 7
+E258G 7
+E258D 3</title><line x1="480.4" y1="999" x2="480.4" y2="990.6" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="480.4" cy="990.6" r="2.8" fill="#008000"/></g><g><title>codon 259: 7 mutations
+D259Y 7</title><line x1="482" y1="999" x2="482" y2="996.9" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="482" cy="996.9" r="2.8" fill="#008000"/></g><g><title>codon 261: 26 mutations
+X261_splice 26</title><line x1="485.3" y1="999" x2="485.3" y2="991.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="485.3" cy="991.2" r="2.8" fill="#e5802b"/></g><g><title>codon 262: 6 mutations
+G262V 6</title><line x1="487" y1="999" x2="487" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="487" cy="997.2" r="2.8" fill="#008000"/></g><g><title>codon 264: 5 mutations
+L265del 5</title><line x1="490.3" y1="999" x2="490.3" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="490.3" cy="997.5" r="2.8" fill="#993404"/></g><g><title>codon 265: 5 mutations
+L265P 5</title><line x1="492" y1="999" x2="492" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="492" cy="997.5" r="2.8" fill="#008000"/></g><g><title>codon 266: 43 mutations
+G266E 22
+G266R 10
+G266* 6
+G266V 5</title><line x1="493.6" y1="999" x2="493.6" y2="986.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="493.6" cy="986.1" r="2.8" fill="#008000"/></g><g><title>codon 267: 13 mutations
+R267W 9
+R267Q 4</title><line x1="495.3" y1="999" x2="495.3" y2="995.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="495.3" cy="995.1" r="2.8" fill="#008000"/></g><g><title>codon 270: 14 mutations
+F270L 9
+F270C 5</title><line x1="500.3" y1="999" x2="500.3" y2="994.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="500.3" cy="994.8" r="2.8" fill="#008000"/></g><g><title>codon 271: 10 mutations
+E271* 6
+E271K 4</title><line x1="501.9" y1="999" x2="501.9" y2="996" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="501.9" cy="996" r="2.8" fill="#000000"/></g><g><title>codon 272: 17 mutations
+V272M 9
+V272L 5
+V272E 3</title><line x1="503.6" y1="999" x2="503.6" y2="993.9" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="503.6" cy="993.9" r="2.8" fill="#008000"/></g><g><title>codon 273: 371 mutations
+R273C 182
+R273H 179
+R273L 7
+R273P 3</title><line x1="505.2" y1="999" x2="505.2" y2="887.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="505.2" cy="887.7" r="2.8" fill="#008000"/></g><g><title>codon 274: 10 mutations
+V274A 6
+V274F 4</title><line x1="506.9" y1="999" x2="506.9" y2="996" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="506.9" cy="996" r="2.8" fill="#008000"/></g><g><title>codon 275: 12 mutations
+C275F 7
+C275Y 5</title><line x1="508.5" y1="999" x2="508.5" y2="995.4" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="508.5" cy="995.4" r="2.8" fill="#008000"/></g><g><title>codon 277: 4 mutations
+C277F 4</title><line x1="511.8" y1="999" x2="511.8" y2="997.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="511.8" cy="997.8" r="2.8" fill="#008000"/></g><g><title>codon 278: 31 mutations
+P278S 9
+P278L 6
+P278R 5
+P278T 5
+P278A 3
+P278H 3</title><line x1="513.5" y1="999" x2="513.5" y2="989.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="513.5" cy="989.7" r="2.8" fill="#008000"/></g><g><title>codon 280: 11 mutations
+R280K 5
+R280* 3
+R280G 3</title><line x1="516.8" y1="999" x2="516.8" y2="995.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="516.8" cy="995.7" r="2.8" fill="#008000"/></g><g><title>codon 281: 10 mutations
+D281G 5
+D281N 5</title><line x1="518.5" y1="999" x2="518.5" y2="996" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="518.5" cy="996" r="2.8" fill="#008000"/></g><g><title>codon 282: 219 mutations
+R282W 219</title><line x1="520.1" y1="999" x2="520.1" y2="933.3" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="520.1" cy="933.3" r="2.8" fill="#008000"/></g><g><title>codon 285: 11 mutations
+E285K 11</title><line x1="525.1" y1="999" x2="525.1" y2="995.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="525.1" cy="995.7" r="2.8" fill="#008000"/></g><g><title>codon 286: 22 mutations
+E286K 19
+E286G 3</title><line x1="526.8" y1="999" x2="526.8" y2="992.4" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="526.8" cy="992.4" r="2.8" fill="#008000"/></g><g><title>codon 290: 3 mutations
+R290H 3</title><line x1="533.4" y1="999" x2="533.4" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="533.4" cy="998.1" r="2.8" fill="#53D400"/></g><g><title>codon 294: 10 mutations
+E294* 7
+E294Sfs*51 3</title><line x1="540" y1="999" x2="540" y2="996" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="540" cy="996" r="2.8" fill="#000000"/></g><g><title>codon 298: 6 mutations
+E298* 6</title><line x1="546.6" y1="999" x2="546.6" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="546.6" cy="997.2" r="2.8" fill="#000000"/></g><g><title>codon 301: 10 mutations
+P301Qfs*44 7
+G302Rfs*4 3</title><line x1="551.6" y1="999" x2="551.6" y2="996" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="551.6" cy="996" r="2.8" fill="#000000"/></g><g><title>codon 306: 76 mutations
+R306* 76</title><line x1="559.9" y1="999" x2="559.9" y2="976.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="559.9" cy="976.2" r="2.8" fill="#000000"/></g><g><title>codon 307: 27 mutations
+X307_splice 27</title><line x1="561.5" y1="999" x2="561.5" y2="990.9" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="561.5" cy="990.9" r="2.8" fill="#e5802b"/></g><g><title>codon 317: 6 mutations
+Q317* 6</title><line x1="578.1" y1="999" x2="578.1" y2="997.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="578.1" cy="997.2" r="2.8" fill="#000000"/></g><g><title>codon 321: 4 mutations
+K321Nfs*24 4</title><line x1="584.7" y1="999" x2="584.7" y2="997.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="584.7" cy="997.8" r="2.8" fill="#000000"/></g><g><title>codon 327: 3 mutations
+Y327* 3</title><line x1="594.7" y1="999" x2="594.7" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="594.7" cy="998.1" r="2.8" fill="#000000"/></g><g><title>codon 331: 26 mutations
+X331_splice 23
+Q331* 3</title><line x1="601.3" y1="999" x2="601.3" y2="991.2" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="601.3" cy="991.2" r="2.8" fill="#e5802b"/></g><g><title>codon 332: 14 mutations
+X332_splice 14</title><line x1="603" y1="999" x2="603" y2="994.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="603" cy="994.8" r="2.8" fill="#e5802b"/></g><g><title>codon 337: 14 mutations
+R337C 14</title><line x1="611.2" y1="999" x2="611.2" y2="994.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="611.2" cy="994.8" r="2.8" fill="#008000"/></g><g><title>codon 339: 4 mutations
+E339* 4</title><line x1="614.5" y1="999" x2="614.5" y2="997.8" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="614.5" cy="997.8" r="2.8" fill="#000000"/></g><g><title>codon 342: 93 mutations
+R342* 90
+R342Efs*3 3</title><line x1="619.5" y1="999" x2="619.5" y2="971.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="619.5" cy="971.1" r="2.8" fill="#000000"/></g><g><title>codon 349: 3 mutations
+E349* 3</title><line x1="631.1" y1="999" x2="631.1" y2="998.1" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="631.1" cy="998.1" r="2.8" fill="#000000"/></g><g><title>codon 373: 5 mutations
+K373Rfs*49 5</title><line x1="670.9" y1="999" x2="670.9" y2="997.5" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="670.9" cy="997.5" r="2.8" fill="#000000"/></g><g><title>codon 382: 21 mutations
+K382Nfs*40 21</title><line x1="685.8" y1="999" x2="685.8" y2="992.7" stroke="#BABDB6" stroke-width="1"/><circle class="lollipop-head" cx="685.8" cy="992.7" r="2.8" fill="#000000"/></g><text x="342.9" y="871.1" font-size="10" fill="#16232b" text-anchor="middle">R175H/C/L</text><circle cx="58" cy="1058.5" r="4" fill="#008000"/><text x="68" y="1062" font-size="10" fill="#16232b">Missense</text><circle cx="130.89" cy="1058.5" r="4" fill="#53D400"/><text x="140.9" y="1062" font-size="10" fill="#16232b">Missense (VUS)</text><circle cx="231.51999999999998" cy="1058.5" r="4" fill="#000000"/><text x="241.5" y="1062" font-size="10" fill="#16232b">Truncating</text><circle cx="310.61" cy="1058.5" r="4" fill="#993404"/><text x="320.6" y="1062" font-size="10" fill="#16232b">Inframe</text><circle cx="377.76" cy="1058.5" r="4" fill="#e5802b"/><text x="387.8" y="1062" font-size="10" fill="#16232b">Splice</text><text x="8" y="1086" font-size="10" fill="#5b6b76">Mutations in “CRC” by protein position, as cBioPortal's mutation tab draws them: one stem per codon (the stored protein start position), its height the</text><text x="8" y="1100" font-size="10" fill="#5b6b76">number of distinct patient + protein change pairs there. Colour is the codon's dominant mutation type, putative drivers before VUS (driver = OncoKB</text><text x="8" y="1114" font-size="10" fill="#5b6b76">oncogenic, pinned; the portal also counts hotspots and custom annotations). VUS and germline mutations are included, as they are by default on the portal. A</text><text x="8" y="1128" font-size="10" fill="#5b6b76">suppression floor of 3 patients per change was applied BY EACH SITE before returning anything, withholding 1,112 mutations. KRAS: somatic mutation</text><text x="8" y="1142" font-size="10" fill="#5b6b76">frequency 42.5%; mutation rows missense 2,365 driver / 3 VUS, inframe 5 driver / 0 VUS. BRAF: somatic mutation frequency 11.2%; mutation rows</text><text x="8" y="1156" font-size="10" fill="#5b6b76">missense 520 driver / 8 VUS, truncating 0 driver / 19 VUS. PIK3CA: somatic mutation frequency 20.5%; mutation rows missense 1,036 driver / 41 VUS,</text><text x="8" y="1170" font-size="10" fill="#5b6b76">truncating 0 driver / 8 VUS, inframe 14 driver / 0 VUS. TP53: somatic mutation frequency 73.2%; mutation rows missense 2,628 driver / 26 VUS, truncating</text><text x="8" y="1184" font-size="10" fill="#5b6b76">796 driver / 0 VUS, inframe 30 driver / 0 VUS, splice 244 driver / 0 VUS.</text></svg>

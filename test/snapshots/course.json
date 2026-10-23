@@ -1,0 +1,782 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "TP53 mut": {
+      "count": 13105,
+      "text": "OQL[TP53: MUT]",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    },
+    "TP53 wt": {
+      "count": 11594,
+      "text": "NOT OQL[TP53:] AND profiled for TP53 MUTATION",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "course",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
+      "studies": [
+        "msk_chord_2024"
+      ],
+      "course": [
+        {
+          "cohort": "TP53 mut",
+          "eventType": "Treatment",
+          "variants": [
+            "Treatment"
+          ],
+          "isInterval": true,
+          "points": [
+            {
+              "t": -12,
+              "atRisk": 2411,
+              "n": 0,
+              "pct": 0
+            },
+            {
+              "t": -9,
+              "atRisk": 2757,
+              "n": 0,
+              "pct": 0
+            },
+            {
+              "t": -6,
+              "atRisk": 3527,
+              "n": 0,
+              "pct": 0
+            },
+            {
+              "t": -3,
+              "atRisk": 12392,
+              "n": 0,
+              "pct": 0
+            },
+            {
+              "t": 0,
+              "atRisk": 12738,
+              "n": 12738,
+              "pct": 100
+            },
+            {
+              "t": 3,
+              "atRisk": 12222,
+              "n": 9368,
+              "pct": 76.6
+            },
+            {
+              "t": 6,
+              "atRisk": 11605,
+              "n": 7122,
+              "pct": 61.4
+            },
+            {
+              "t": 9,
+              "atRisk": 10910,
+              "n": 5792,
+              "pct": 53.1
+            },
+            {
+              "t": 12,
+              "atRisk": 10100,
+              "n": 5149,
+              "pct": 51
+            },
+            {
+              "t": 15,
+              "atRisk": 9355,
+              "n": 4587,
+              "pct": 49
+            },
+            {
+              "t": 18,
+              "atRisk": 8656,
+              "n": 4071,
+              "pct": 47
+            },
+            {
+              "t": 21,
+              "atRisk": 7990,
+              "n": 3676,
+              "pct": 46
+            },
+            {
+              "t": 24,
+              "atRisk": 7392,
+              "n": 3365,
+              "pct": 45.5
+            },
+            {
+              "t": 27,
+              "atRisk": 6811,
+              "n": 3025,
+              "pct": 44.4
+            },
+            {
+              "t": 30,
+              "atRisk": 6283,
+              "n": 2720,
+              "pct": 43.3
+            },
+            {
+              "t": 33,
+              "atRisk": 5832,
+              "n": 2490,
+              "pct": 42.7
+            },
+            {
+              "t": 36,
+              "atRisk": 5364,
+              "n": 2263,
+              "pct": 42.2
+            },
+            {
+              "t": 39,
+              "atRisk": 5018,
+              "n": 2137,
+              "pct": 42.6
+            },
+            {
+              "t": 42,
+              "atRisk": 4686,
+              "n": 1947,
+              "pct": 41.5
+            },
+            {
+              "t": 45,
+              "atRisk": 4343,
+              "n": 1813,
+              "pct": 41.7
+            },
+            {
+              "…": "5 more",
+              "sha256": "f2706579d3f82710"
+            }
+          ]
+        },
+        {
+          "cohort": "TP53 mut",
+          "eventType": "Surgery",
+          "variants": [
+            "Surgery"
+          ],
+          "isInterval": false,
+          "points": [
+            {
+              "t": -12,
+              "atRisk": 2411,
+              "n": 42,
+              "pct": 1.7
+            },
+            {
+              "t": -9,
+              "atRisk": 2757,
+              "n": 78,
+              "pct": 2.8
+            },
+            {
+              "t": -6,
+              "atRisk": 3527,
+              "n": 115,
+              "pct": 3.3
+            },
+            {
+              "t": -3,
+              "atRisk": 12392,
+              "n": 3857,
+              "pct": 31.1
+            },
+            {
+              "t": 0,
+              "atRisk": 12738,
+              "n": 3725,
+              "pct": 29.2
+            },
+            {
+              "t": 3,
+              "atRisk": 12222,
+              "n": 2473,
+              "pct": 20.2
+            },
+            {
+              "t": 6,
+              "atRisk": 11605,
+              "n": 1933,
+              "pct": 16.7
+            },
+            {
+              "t": 9,
+              "atRisk": 10910,
+              "n": 1672,
+              "pct": 15.3
+            },
+            {
+              "t": 12,
+              "atRisk": 10100,
+              "n": 1384,
+              "pct": 13.7
+            },
+            {
+              "t": 15,
+              "atRisk": 9355,
+              "n": 1128,
+              "pct": 12.1
+            },
+            {
+              "t": 18,
+              "atRisk": 8656,
+              "n": 1070,
+              "pct": 12.4
+            },
+            {
+              "t": 21,
+              "atRisk": 7990,
+              "n": 871,
+              "pct": 10.9
+            },
+            {
+              "t": 24,
+              "atRisk": 7392,
+              "n": 824,
+              "pct": 11.1
+            },
+            {
+              "t": 27,
+              "atRisk": 6811,
+              "n": 703,
+              "pct": 10.3
+            },
+            {
+              "t": 30,
+              "atRisk": 6283,
+              "n": 614,
+              "pct": 9.8
+            },
+            {
+              "t": 33,
+              "atRisk": 5832,
+              "n": 573,
+              "pct": 9.8
+            },
+            {
+              "t": 36,
+              "atRisk": 5364,
+              "n": 483,
+              "pct": 9
+            },
+            {
+              "t": 39,
+              "atRisk": 5018,
+              "n": 430,
+              "pct": 8.6
+            },
+            {
+              "t": 42,
+              "atRisk": 4686,
+              "n": 459,
+              "pct": 9.8
+            },
+            {
+              "t": 45,
+              "atRisk": 4343,
+              "n": 399,
+              "pct": 9.2
+            },
+            {
+              "…": "5 more",
+              "sha256": "e8c841d738387602"
+            }
+          ]
+        },
+        {
+          "cohort": "TP53 wt",
+          "eventType": "Treatment",
+          "variants": [
+            "Treatment"
+          ],
+          "isInterval": true,
+          "points": [
+            {
+              "t": -12,
+              "atRisk": 2781,
+              "n": 0,
+              "pct": 0
+            },
+            {
+              "t": -9,
+              "atRisk": 3088,
+              "n": 0,
+              "pct": 0
+            },
+            {
+              "t": -6,
+              "atRisk": 4019,
+              "n": 0,
+              "pct": 0
+            },
+            {
+              "t": -3,
+              "atRisk": 10608,
+              "n": 0,
+              "pct": 0
+            },
+            {
+              "t": 0,
+              "atRisk": 11044,
+              "n": 11044,
+              "pct": 100
+            },
+            {
+              "t": 3,
+              "atRisk": 10727,
+              "n": 7609,
+              "pct": 70.9
+            },
+            {
+              "t": 6,
+              "atRisk": 10417,
+              "n": 6317,
+              "pct": 60.6
+            },
+            {
+              "t": 9,
+              "atRisk": 10054,
+              "n": 5596,
+              "pct": 55.7
+            },
+            {
+              "t": 12,
+              "atRisk": 9629,
+              "n": 5149,
+              "pct": 53.5
+            },
+            {
+              "t": 15,
+              "atRisk": 9230,
+              "n": 4811,
+              "pct": 52.1
+            },
+            {
+              "t": 18,
+              "atRisk": 8779,
+              "n": 4481,
+              "pct": 51
+            },
+            {
+              "t": 21,
+              "atRisk": 8393,
+              "n": 4251,
+              "pct": 50.6
+            },
+            {
+              "t": 24,
+              "atRisk": 8010,
+              "n": 3965,
+              "pct": 49.5
+            },
+            {
+              "t": 27,
+              "atRisk": 7602,
+              "n": 3765,
+              "pct": 49.5
+            },
+            {
+              "t": 30,
+              "atRisk": 7245,
+              "n": 3528,
+              "pct": 48.7
+            },
+            {
+              "t": 33,
+              "atRisk": 6904,
+              "n": 3353,
+              "pct": 48.6
+            },
+            {
+              "t": 36,
+              "atRisk": 6568,
+              "n": 3150,
+              "pct": 48
+            },
+            {
+              "t": 39,
+              "atRisk": 6287,
+              "n": 3030,
+              "pct": 48.2
+            },
+            {
+              "t": 42,
+              "atRisk": 5995,
+              "n": 2894,
+              "pct": 48.3
+            },
+            {
+              "t": 45,
+              "atRisk": 5696,
+              "n": 2754,
+              "pct": 48.3
+            },
+            {
+              "…": "5 more",
+              "sha256": "c19851a088b9d5c8"
+            }
+          ]
+        },
+        {
+          "cohort": "TP53 wt",
+          "eventType": "Surgery",
+          "variants": [
+            "Surgery"
+          ],
+          "isInterval": false,
+          "points": [
+            {
+              "t": -12,
+              "atRisk": 2781,
+              "n": 105,
+              "pct": 3.8
+            },
+            {
+              "t": -9,
+              "atRisk": 3088,
+              "n": 112,
+              "pct": 3.6
+            },
+            {
+              "t": -6,
+              "atRisk": 4019,
+              "n": 219,
+              "pct": 5.4
+            },
+            {
+              "t": -3,
+              "atRisk": 10608,
+              "n": 3584,
+              "pct": 33.8
+            },
+            {
+              "t": 0,
+              "atRisk": 11044,
+              "n": 3439,
+              "pct": 31.1
+            },
+            {
+              "t": 3,
+              "atRisk": 10727,
+              "n": 1695,
+              "pct": 15.8
+            },
+            {
+              "t": 6,
+              "atRisk": 10417,
+              "n": 1127,
+              "pct": 10.8
+            },
+            {
+              "t": 9,
+              "atRisk": 10054,
+              "n": 978,
+              "pct": 9.7
+            },
+            {
+              "t": 12,
+              "atRisk": 9629,
+              "n": 837,
+              "pct": 8.7
+            },
+            {
+              "t": 15,
+              "atRisk": 9230,
+              "n": 711,
+              "pct": 7.7
+            },
+            {
+              "t": 18,
+              "atRisk": 8779,
+              "n": 629,
+              "pct": 7.2
+            },
+            {
+              "t": 21,
+              "atRisk": 8393,
+              "n": 637,
+              "pct": 7.6
+            },
+            {
+              "t": 24,
+              "atRisk": 8010,
+              "n": 615,
+              "pct": 7.7
+            },
+            {
+              "t": 27,
+              "atRisk": 7602,
+              "n": 487,
+              "pct": 6.4
+            },
+            {
+              "t": 30,
+              "atRisk": 7245,
+              "n": 467,
+              "pct": 6.4
+            },
+            {
+              "t": 33,
+              "atRisk": 6904,
+              "n": 451,
+              "pct": 6.5
+            },
+            {
+              "t": 36,
+              "atRisk": 6568,
+              "n": 440,
+              "pct": 6.7
+            },
+            {
+              "t": 39,
+              "atRisk": 6287,
+              "n": 372,
+              "pct": 5.9
+            },
+            {
+              "t": 42,
+              "atRisk": 5995,
+              "n": 363,
+              "pct": 6.1
+            },
+            {
+              "t": 45,
+              "atRisk": 5696,
+              "n": 368,
+              "pct": 6.5
+            },
+            {
+              "…": "5 more",
+              "sha256": "8b83331b53b62db9"
+            }
+          ]
+        }
+      ],
+      "courseAxis": {
+        "binMonths": 3,
+        "from": -12,
+        "to": 60
+      },
+      "eventOptions": [
+        {
+          "canonical": "sample acquisition",
+          "label": "Sample acquisition",
+          "patients": 13105,
+          "perPatient": 1,
+          "hasDurations": false
+        },
+        {
+          "canonical": "sequencing",
+          "label": "Sequencing",
+          "patients": 13105,
+          "perPatient": 1,
+          "hasDurations": false
+        },
+        {
+          "canonical": "diagnosis",
+          "label": "Diagnosis",
+          "patients": 13104,
+          "perPatient": 60.8,
+          "hasDurations": false
+        },
+        {
+          "canonical": "treatment",
+          "label": "Treatment",
+          "patients": 12738,
+          "perPatient": 7.7,
+          "hasDurations": true
+        },
+        {
+          "canonical": "surgery",
+          "label": "Surgery",
+          "patients": 11249,
+          "perPatient": 3.5,
+          "hasDurations": false
+        },
+        {
+          "canonical": "lab_test",
+          "label": "Lab_Test",
+          "patients": 8996,
+          "perPatient": 24.8,
+          "hasDurations": false
+        },
+        {
+          "canonical": "pathology",
+          "label": "Pathology",
+          "patients": 6687,
+          "perPatient": 1.3,
+          "hasDurations": false
+        }
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Aligned on first Treatment — time 0 is that event, so every patient is lined up on the same clinical landmark. Patients with no such event are absent from every bin. THE DENOMINATOR IS NOT THE WHOLE COHORT: each bin is over the patients still under observation in it, from their first recorded event to their last contact (the later of their last recorded event and their OS follow-up where the study declares one). Without that, a curve would fall simply because follow-up ran out. Follow-up ending at the last recorded event biases the tail upward — by construction a patient has an event on their last observed day. Bins are half-open [t, t+3mo). The figure stops each line where fewer than 10 patients remain observable; the numbers past that point are in the result but not drawn. Event types carrying real durations are drawn as a state the patient is IN during the bin; the rest as an event that HAPPENED in it. That is read off the data, not the event's name.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count patients per time bin",
+            "detail": "The timelineSpan and eventCourse queries above. Per 3-month bin: the cohort's patients observable in it, and of those the ones in each event's state (or with the event in it). Counts only.",
+            "scope": "TP53 mut · msk_chord_2024",
+            "rowsIn": 13105
+          },
+          {
+            "kind": "fetch",
+            "title": "Count patients per time bin",
+            "detail": "The timelineSpan and eventCourse queries above. Per 3-month bin: the cohort's patients observable in it, and of those the ones in each event's state (or with the event in it). Counts only.",
+            "scope": "TP53 wt · msk_chord_2024",
+            "rowsIn": 11594
+          },
+          {
+            "kind": "transform",
+            "title": "Match event types",
+            "detail": "Event types, keys and values match ignoring case and surrounding whitespace; nothing else is merged.",
+            "params": [
+              [
+                "Treatment",
+                "has durations: a state the patient is in during a bin"
+              ],
+              [
+                "Surgery",
+                "no durations: an event that happened in a bin"
+              ]
+            ]
+          },
+          {
+            "kind": "transform",
+            "title": "Align on first Treatment",
+            "detail": "Day 0 is each patient's first Treatment; a patient without one is in no bin. A patient is observable from their first recorded event to their last contact — the later of their last recorded event and their OS follow-up (OS_MONTHS × 30.4375 days, assuming it starts at the timeline's day 0).",
+            "params": [
+              [
+                "TP53 mut",
+                "13,105 in the cohort → 12,738 with the anchor event → 12,738 observable in the window"
+              ],
+              [
+                "TP53 wt",
+                "11,594 in the cohort → 11,044 with the anchor event → 11,044 observable in the window"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Share per bin",
+            "detail": "For each bin from month -12 to 63 (half-open [t, t+3)): patients in the state ÷ patients observable, as a percentage. The figure stops each line where fewer than 10 patients remain observable."
+          }
+        ],
+        "implementation": {
+          "functions": [],
+          "file": "lib/views/course.ts",
+          "commit": null
+        },
+        "check": {
+          "course:TP53 mut:Treatment:-4:pct": {
+            "v": 0,
+            "abs": 0.050000001
+          },
+          "course:TP53 mut:Treatment:-4:at_risk": {
+            "v": 2411,
+            "abs": 0
+          },
+          "course:TP53 mut:Treatment:-3:pct": {
+            "v": 0,
+            "abs": 0.050000001
+          },
+          "course:TP53 mut:Treatment:-3:at_risk": {
+            "v": 2757,
+            "abs": 0
+          },
+          "course:TP53 mut:Treatment:-2:pct": {
+            "v": 0,
+            "abs": 0.050000001
+          },
+          "course:TP53 mut:Treatment:-2:at_risk": {
+            "v": 3527,
+            "abs": 0
+          },
+          "course:TP53 mut:Treatment:-1:pct": {
+            "v": 0,
+            "abs": 0.050000001
+          },
+          "course:TP53 mut:Treatment:-1:at_risk": {
+            "v": 12392,
+            "abs": 0
+          },
+          "course:TP53 mut:Treatment:0:pct": {
+            "v": 100,
+            "abs": 0.050000001
+          },
+          "course:TP53 mut:Treatment:0:at_risk": {
+            "v": 12738,
+            "abs": 0
+          },
+          "course:TP53 mut:Treatment:1:pct": {
+            "v": 76.6,
+            "abs": 0.050000001
+          },
+          "course:TP53 mut:Treatment:1:at_risk": {
+            "v": 12222,
+            "abs": 0
+          },
+          "course:TP53 mut:Treatment:2:pct": {
+            "v": 61.4,
+            "abs": 0.050000001
+          },
+          "course:TP53 mut:Treatment:2:at_risk": {
+            "v": 11605,
+            "abs": 0
+          },
+          "course:TP53 mut:Treatment:3:pct": {
+            "v": 53.1,
+            "abs": 0.050000001
+          },
+          "course:TP53 mut:Treatment:3:at_risk": {
+            "v": 10910,
+            "abs": 0
+          },
+          "course:TP53 mut:Treatment:4:pct": {
+            "v": 51,
+            "abs": 0.050000001
+          },
+          "course:TP53 mut:Treatment:4:at_risk": {
+            "v": 10100,
+            "abs": 0
+          },
+          "course:TP53 mut:Treatment:5:pct": {
+            "v": 49,
+            "abs": 0.050000001
+          },
+          "course:TP53 mut:Treatment:5:at_risk": {
+            "v": 9355,
+            "abs": 0
+          },
+          "…": {
+            "more": 180,
+            "sha256": "504ee14ebe1d1b66"
+          }
+        }
+      }
+    }
+  ]
+}

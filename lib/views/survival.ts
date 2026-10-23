@@ -5,6 +5,7 @@ import type { ViewResult, LogRank, LogRankK, SurvivalView } from "../types.ts";
 import { expandSurvivalCounts, type SurvivalCount, type EndpointColumns } from "../federation.ts";
 import { survivalMethod } from "../method.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "./run.ts";
+import { askEachSite } from "./shared.ts";
 
 export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;
@@ -60,10 +61,8 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
     : null;
   const perSite = new Map<string, Map<string, SurvivalCount[]>>(); // cohort -> study -> triples
   for (const n of vNames) perSite.set(n, new Map());
-  await Promise.all(vNames.flatMap((n) =>
-    cohorts[n].studies.map(async (st) => {
-      perSite.get(n)!.set(st, await resolvers[st].survivalCounts(doc.cohorts[n], endpoint, anchor, columns));
-    })));
+  for (const { cohort: n, study: st, answer } of await askEachSite(c, resolvers, (n, _st, r) => r.survivalCounts(doc.cohorts[n], endpoint, anchor, columns)))
+    perSite.get(n)!.set(st, answer);
   // An EMPTY COHORT also yields no rows, and must not be reported as a
   // missing endpoint — that sends the reader (or a model) off to conclude the
   // study lacks OS when it does not. Separate the two causes before blaming

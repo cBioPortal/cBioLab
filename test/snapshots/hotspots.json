@@ -1,0 +1,2279 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "CRC": {
+      "count": 5543,
+      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "hotspots",
+      "cohorts": [
+        "CRC"
+      ],
+      "hotspots": [
+        {
+          "gene": "KRAS",
+          "mutated": 2362,
+          "mutations": 2424,
+          "positions": [
+            {
+              "pos": 10,
+              "n": 5,
+              "color": "#993404",
+              "impact": "inframe",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "G10dup",
+                  "n": 5,
+                  "rows": 5,
+                  "driver": true,
+                  "impact": "inframe"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "In_Frame_Ins",
+                  "driver": true,
+                  "rows": 5
+                }
+              ]
+            },
+            {
+              "pos": 12,
+              "n": 1583,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "G12D",
+                  "n": 688,
+                  "rows": 689,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "G12V",
+                  "n": 487,
+                  "rows": 488,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "G12C",
+                  "n": 162,
+                  "rows": 162,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "G12S",
+                  "n": 109,
+                  "rows": 109,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "G12A",
+                  "n": 108,
+                  "rows": 108,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "G12R",
+                  "n": 26,
+                  "rows": 26,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "G12F",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 1585
+                }
+              ]
+            },
+            {
+              "pos": 13,
+              "n": 446,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "G13D",
+                  "n": 426,
+                  "rows": 426,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "G13C",
+                  "n": 20,
+                  "rows": 20,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 446
+                }
+              ]
+            },
+            {
+              "pos": 14,
+              "n": 10,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "V14I",
+                  "n": 10,
+                  "rows": 10,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 10
+                }
+              ]
+            },
+            {
+              "pos": 33,
+              "n": 6,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "D33E",
+                  "n": 6,
+                  "rows": 6,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 6
+                }
+              ]
+            },
+            {
+              "pos": 57,
+              "n": 3,
+              "color": "#53D400",
+              "impact": "missense",
+              "driver": false,
+              "changes": [
+                {
+                  "change": "D57N",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": false,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": false,
+                  "rows": 3
+                }
+              ]
+            },
+            {
+              "pos": 59,
+              "n": 13,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "A59T",
+                  "n": 13,
+                  "rows": 13,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 13
+                }
+              ]
+            },
+            {
+              "pos": 60,
+              "n": 18,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "Q61K",
+                  "n": 18,
+                  "rows": 18,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 18
+                }
+              ]
+            },
+            {
+              "pos": 61,
+              "n": 82,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "Q61H",
+                  "n": 55,
+                  "rows": 55,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "Q61R",
+                  "n": 15,
+                  "rows": 15,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "Q61L",
+                  "n": 8,
+                  "rows": 8,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "Q61K",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 82
+                }
+              ]
+            },
+            {
+              "pos": 68,
+              "n": 3,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "R68S",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 3
+                }
+              ]
+            },
+            {
+              "pos": 117,
+              "n": 26,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "K117N",
+                  "n": 26,
+                  "rows": 26,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 26
+                }
+              ]
+            },
+            {
+              "pos": 146,
+              "n": 176,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "A146T",
+                  "n": 140,
+                  "rows": 140,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "A146V",
+                  "n": 27,
+                  "rows": 27,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "A146P",
+                  "n": 9,
+                  "rows": 9,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 176
+                }
+              ]
+            }
+          ],
+          "domains": [
+            {
+              "accession": "PF00071",
+              "name": "Ras",
+              "start": 5,
+              "end": 164,
+              "color": "#2dcf00"
+            }
+          ],
+          "topChanges": [
+            {
+              "change": "G12D",
+              "pos": 12,
+              "n": 688,
+              "pct": 29.1
+            },
+            {
+              "change": "G12V",
+              "pos": 12,
+              "n": 487,
+              "pct": 20.6
+            },
+            {
+              "change": "G13D",
+              "pos": 13,
+              "n": 426,
+              "pct": 18
+            },
+            {
+              "change": "G12C",
+              "pos": 12,
+              "n": 162,
+              "pct": 6.9
+            },
+            {
+              "change": "A146T",
+              "pos": 146,
+              "n": 140,
+              "pct": 5.9
+            },
+            {
+              "change": "G12S",
+              "pos": 12,
+              "n": 109,
+              "pct": 4.6
+            },
+            {
+              "change": "G12A",
+              "pos": 12,
+              "n": 108,
+              "pct": 4.6
+            },
+            {
+              "change": "Q61H",
+              "pos": 61,
+              "n": 55,
+              "pct": 2.3
+            },
+            {
+              "change": "A146V",
+              "pos": 146,
+              "n": 27,
+              "pct": 1.1
+            },
+            {
+              "change": "G12R",
+              "pos": 12,
+              "n": 26,
+              "pct": 1.1
+            }
+          ],
+          "proteinLength": 188,
+          "lengthSource": "genome-nexus",
+          "transcript": "ENST00000311936",
+          "unpositioned": 0,
+          "withheld": 53,
+          "label": {
+            "pos": 12,
+            "text": "G12D/V/C and 4 more"
+          },
+          "somaticSamples": 2371,
+          "cohortSamples": 5584,
+          "tally": {
+            "missense": {
+              "driver": 2365,
+              "vus": 3
+            },
+            "truncating": {
+              "driver": 0,
+              "vus": 0
+            },
+            "inframe": {
+              "driver": 5,
+              "vus": 0
+            },
+            "splice": {
+              "driver": 0,
+              "vus": 0
+            },
+            "fusion": {
+              "driver": 0,
+              "vus": 0
+            },
+            "other": {
+              "driver": 0,
+              "vus": 0
+            }
+          },
+          "ids": {
+            "refseq": "NM_004985",
+            "ccds": "CCDS8702",
+            "uniprotAccession": "P01116",
+            "uniprotName": "RASK_HUMAN",
+            "ensembl": "ENST00000311936.3"
+          }
+        },
+        {
+          "gene": "BRAF",
+          "mutated": 622,
+          "mutations": 658,
+          "positions": [
+            {
+              "pos": 241,
+              "n": 4,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "T241M",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 4
+                }
+              ]
+            },
+            {
+              "pos": 362,
+              "n": 5,
+              "color": "#53D400",
+              "impact": "missense",
+              "driver": false,
+              "changes": [
+                {
+                  "change": "R362Q",
+                  "n": 5,
+                  "rows": 5,
+                  "driver": false,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": false,
+                  "rows": 5
+                }
+              ]
+            },
+            {
+              "pos": 403,
+              "n": 19,
+              "color": "#708090",
+              "impact": "truncating",
+              "driver": false,
+              "changes": [
+                {
+                  "change": "A404Cfs*9",
+                  "n": 10,
+                  "rows": 10,
+                  "driver": false,
+                  "impact": "truncating"
+                },
+                {
+                  "change": "P403Lfs*8",
+                  "n": 9,
+                  "rows": 9,
+                  "driver": false,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Frame_Shift_Del",
+                  "driver": false,
+                  "rows": 9
+                },
+                {
+                  "mtype": "Frame_Shift_Ins",
+                  "driver": false,
+                  "rows": 10
+                }
+              ]
+            },
+            {
+              "pos": 466,
+              "n": 6,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "G466E",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "G466V",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 6
+                }
+              ]
+            },
+            {
+              "pos": 469,
+              "n": 14,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "G469A",
+                  "n": 10,
+                  "rows": 10,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "G469R",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 14
+                }
+              ]
+            },
+            {
+              "pos": 581,
+              "n": 4,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "N581S",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 4
+                }
+              ]
+            },
+            {
+              "pos": 594,
+              "n": 46,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "D594G",
+                  "n": 38,
+                  "rows": 38,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "D594N",
+                  "n": 8,
+                  "rows": 8,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 46
+                }
+              ]
+            },
+            {
+              "pos": 595,
+              "n": 4,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "F595L",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 4
+                }
+              ]
+            },
+            {
+              "pos": 600,
+              "n": 438,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "V600E",
+                  "n": 438,
+                  "rows": 438,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 438
+                }
+              ]
+            },
+            {
+              "pos": 601,
+              "n": 4,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "K601E",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 4
+                }
+              ]
+            },
+            {
+              "pos": 762,
+              "n": 3,
+              "color": "#53D400",
+              "impact": "missense",
+              "driver": false,
+              "changes": [
+                {
+                  "change": "A762V",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": false,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": false,
+                  "rows": 3
+                }
+              ]
+            }
+          ],
+          "domains": [
+            {
+              "accession": "PF02196",
+              "name": "RBD",
+              "start": 156,
+              "end": 227,
+              "color": "#2dcf00"
+            },
+            {
+              "accession": "PF00130",
+              "name": "C1_1",
+              "start": 235,
+              "end": 280,
+              "color": "#ff5353"
+            },
+            {
+              "accession": "PF07714",
+              "name": "Pkinase_Tyr",
+              "start": 458,
+              "end": 712,
+              "color": "#5b5bff"
+            }
+          ],
+          "topChanges": [
+            {
+              "change": "V600E",
+              "pos": 600,
+              "n": 438,
+              "pct": 70.4
+            },
+            {
+              "change": "D594G",
+              "pos": 594,
+              "n": 38,
+              "pct": 6.1
+            },
+            {
+              "change": "G469A",
+              "pos": 469,
+              "n": 10,
+              "pct": 1.6
+            },
+            {
+              "change": "A404Cfs*9",
+              "pos": 403,
+              "n": 10,
+              "pct": 1.6
+            },
+            {
+              "change": "P403Lfs*8",
+              "pos": 403,
+              "n": 9,
+              "pct": 1.4
+            },
+            {
+              "change": "D594N",
+              "pos": 594,
+              "n": 8,
+              "pct": 1.3
+            },
+            {
+              "change": "R362Q",
+              "pos": 362,
+              "n": 5,
+              "pct": 0.8
+            },
+            {
+              "change": "K601E",
+              "pos": 601,
+              "n": 4,
+              "pct": 0.6
+            },
+            {
+              "change": "G469R",
+              "pos": 469,
+              "n": 4,
+              "pct": 0.6
+            },
+            {
+              "change": "F595L",
+              "pos": 595,
+              "n": 4,
+              "pct": 0.6
+            }
+          ],
+          "proteinLength": 766,
+          "lengthSource": "genome-nexus",
+          "transcript": "ENST00000288602",
+          "unpositioned": 0,
+          "withheld": 111,
+          "label": {
+            "pos": 600,
+            "text": "V600E"
+          },
+          "somaticSamples": 623,
+          "cohortSamples": 5584,
+          "tally": {
+            "missense": {
+              "driver": 520,
+              "vus": 8
+            },
+            "truncating": {
+              "driver": 0,
+              "vus": 19
+            },
+            "inframe": {
+              "driver": 0,
+              "vus": 0
+            },
+            "splice": {
+              "driver": 0,
+              "vus": 0
+            },
+            "fusion": {
+              "driver": 0,
+              "vus": 0
+            },
+            "other": {
+              "driver": 0,
+              "vus": 0
+            }
+          },
+          "ids": {
+            "refseq": "NM_004333",
+            "ccds": "CCDS5863",
+            "uniprotAccession": "P15056",
+            "uniprotName": "BRAF_HUMAN",
+            "ensembl": "ENST00000288602.6"
+          }
+        },
+        {
+          "gene": "PIK3CA",
+          "mutated": 1147,
+          "mutations": 1330,
+          "positions": [
+            {
+              "pos": 38,
+              "n": 23,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "R38H",
+                  "n": 10,
+                  "rows": 10,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "R38C",
+                  "n": 8,
+                  "rows": 8,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "R38S",
+                  "n": 5,
+                  "rows": 5,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 23
+                }
+              ]
+            },
+            {
+              "pos": 81,
+              "n": 9,
+              "color": "#53D400",
+              "impact": "missense",
+              "driver": false,
+              "changes": [
+                {
+                  "change": "E81K",
+                  "n": 9,
+                  "rows": 9,
+                  "driver": false,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": false,
+                  "rows": 9
+                }
+              ]
+            },
+            {
+              "pos": 83,
+              "n": 3,
+              "color": "#53D400",
+              "impact": "missense",
+              "driver": false,
+              "changes": [
+                {
+                  "change": "F83K",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": false,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": false,
+                  "rows": 3
+                }
+              ]
+            },
+            {
+              "pos": 88,
+              "n": 47,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "R88Q",
+                  "n": 47,
+                  "rows": 47,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 47
+                }
+              ]
+            },
+            {
+              "pos": 93,
+              "n": 23,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "R93W",
+                  "n": 16,
+                  "rows": 16,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "R93Q",
+                  "n": 7,
+                  "rows": 7,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 23
+                }
+              ]
+            },
+            {
+              "pos": 106,
+              "n": 11,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "G106V",
+                  "n": 11,
+                  "rows": 11,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 11
+                }
+              ]
+            },
+            {
+              "pos": 108,
+              "n": 27,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "R108H",
+                  "n": 24,
+                  "rows": 24,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "R108C",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": false,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": false,
+                  "rows": 3
+                },
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 24
+                }
+              ]
+            },
+            {
+              "pos": 109,
+              "n": 14,
+              "color": "#993404",
+              "impact": "inframe",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "E110del",
+                  "n": 14,
+                  "rows": 14,
+                  "driver": true,
+                  "impact": "inframe"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "In_Frame_Del",
+                  "driver": true,
+                  "rows": 14
+                }
+              ]
+            },
+            {
+              "pos": 111,
+              "n": 17,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "K111E",
+                  "n": 10,
+                  "rows": 10,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "K111N",
+                  "n": 7,
+                  "rows": 7,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 17
+                }
+              ]
+            },
+            {
+              "pos": 118,
+              "n": 10,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "G118D",
+                  "n": 10,
+                  "rows": 10,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 10
+                }
+              ]
+            },
+            {
+              "pos": 227,
+              "n": 5,
+              "color": "#708090",
+              "impact": "truncating",
+              "driver": false,
+              "changes": [
+                {
+                  "change": "T229Lfs*11",
+                  "n": 5,
+                  "rows": 5,
+                  "driver": false,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Frame_Shift_Del",
+                  "driver": false,
+                  "rows": 5
+                }
+              ]
+            },
+            {
+              "pos": 344,
+              "n": 15,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "V344G",
+                  "n": 11,
+                  "rows": 11,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "V344M",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 15
+                }
+              ]
+            },
+            {
+              "pos": 345,
+              "n": 23,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "N345K",
+                  "n": 20,
+                  "rows": 20,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "N345I",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 23
+                }
+              ]
+            },
+            {
+              "pos": 350,
+              "n": 5,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "D350G",
+                  "n": 5,
+                  "rows": 5,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 5
+                }
+              ]
+            },
+            {
+              "pos": 357,
+              "n": 5,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "R357Q",
+                  "n": 5,
+                  "rows": 5,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 5
+                }
+              ]
+            },
+            {
+              "pos": 364,
+              "n": 3,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "G364R",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 3
+                }
+              ]
+            },
+            {
+              "pos": 365,
+              "n": 4,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "E365K",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 4
+                }
+              ]
+            },
+            {
+              "pos": 378,
+              "n": 5,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "C378R",
+                  "n": 5,
+                  "rows": 5,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 5
+                }
+              ]
+            },
+            {
+              "pos": 418,
+              "n": 3,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "E418K",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 3
+                }
+              ]
+            },
+            {
+              "pos": 420,
+              "n": 39,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "C420R",
+                  "n": 39,
+                  "rows": 39,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 39
+                }
+              ]
+            },
+            {
+              "…": "17 more",
+              "sha256": "9a8135c6776c47e4"
+            }
+          ],
+          "domains": [
+            {
+              "accession": "PF02192",
+              "name": "PI3K_p85B",
+              "start": 32,
+              "end": 108,
+              "color": "#2dcf00"
+            },
+            {
+              "accession": "PF00794",
+              "name": "PI3K_rbd",
+              "start": 174,
+              "end": 291,
+              "color": "#ff5353"
+            },
+            {
+              "accession": "PF00792",
+              "name": "PI3K_C2",
+              "start": 351,
+              "end": 483,
+              "color": "#5b5bff"
+            },
+            {
+              "accession": "PF00613",
+              "name": "PI3Ka",
+              "start": 520,
+              "end": 703,
+              "color": "#ebd61d"
+            },
+            {
+              "accession": "PF00454",
+              "name": "PI3_PI4_kinase",
+              "start": 798,
+              "end": 1014,
+              "color": "#ba21e0"
+            }
+          ],
+          "topChanges": [
+            {
+              "change": "E545K",
+              "pos": 545,
+              "n": 253,
+              "pct": 22.1
+            },
+            {
+              "change": "H1047R",
+              "pos": 1047,
+              "n": 189,
+              "pct": 16.5
+            },
+            {
+              "change": "E542K",
+              "pos": 542,
+              "n": 159,
+              "pct": 13.9
+            },
+            {
+              "change": "R88Q",
+              "pos": 88,
+              "n": 47,
+              "pct": 4.1
+            },
+            {
+              "change": "Q546K",
+              "pos": 546,
+              "n": 41,
+              "pct": 3.6
+            },
+            {
+              "change": "C420R",
+              "pos": 420,
+              "n": 39,
+              "pct": 3.4
+            },
+            {
+              "change": "H1047L",
+              "pos": 1047,
+              "n": 24,
+              "pct": 2.1
+            },
+            {
+              "change": "R108H",
+              "pos": 108,
+              "n": 24,
+              "pct": 2.1
+            },
+            {
+              "change": "N345K",
+              "pos": 345,
+              "n": 20,
+              "pct": 1.7
+            },
+            {
+              "change": "E545G",
+              "pos": 545,
+              "n": 19,
+              "pct": 1.7
+            }
+          ],
+          "proteinLength": 1068,
+          "lengthSource": "genome-nexus",
+          "transcript": "ENST00000263967",
+          "unpositioned": 0,
+          "withheld": 231,
+          "label": {
+            "pos": 545,
+            "text": "E545K/G/D"
+          },
+          "somaticSamples": 1147,
+          "cohortSamples": 5584,
+          "tally": {
+            "missense": {
+              "driver": 1036,
+              "vus": 41
+            },
+            "truncating": {
+              "driver": 0,
+              "vus": 8
+            },
+            "inframe": {
+              "driver": 14,
+              "vus": 0
+            },
+            "splice": {
+              "driver": 0,
+              "vus": 0
+            },
+            "fusion": {
+              "driver": 0,
+              "vus": 0
+            },
+            "other": {
+              "driver": 0,
+              "vus": 0
+            }
+          },
+          "ids": {
+            "refseq": "NM_006218",
+            "ccds": "CCDS43171",
+            "uniprotAccession": "P42336",
+            "uniprotName": "PK3CA_HUMAN",
+            "ensembl": "ENST00000263967.3"
+          }
+        },
+        {
+          "gene": "TP53",
+          "mutated": 4080,
+          "mutations": 4441,
+          "positions": [
+            {
+              "pos": 10,
+              "n": 10,
+              "color": "#e5802b",
+              "impact": "splice",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "X10_splice",
+                  "n": 10,
+                  "rows": 10,
+                  "driver": true,
+                  "impact": "splice"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Splice_Site",
+                  "driver": true,
+                  "rows": 10
+                }
+              ]
+            },
+            {
+              "pos": 32,
+              "n": 4,
+              "color": "#e5802b",
+              "impact": "splice",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "X32_splice",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "splice"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Splice_Site",
+                  "driver": true,
+                  "rows": 4
+                }
+              ]
+            },
+            {
+              "pos": 33,
+              "n": 9,
+              "color": "#e5802b",
+              "impact": "splice",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "X33_splice",
+                  "n": 9,
+                  "rows": 9,
+                  "driver": true,
+                  "impact": "splice"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Splice_Site",
+                  "driver": true,
+                  "rows": 9
+                }
+              ]
+            },
+            {
+              "pos": 34,
+              "n": 6,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "P36Afs*7",
+                  "n": 6,
+                  "rows": 6,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Frame_Shift_Ins",
+                  "driver": true,
+                  "rows": 6
+                }
+              ]
+            },
+            {
+              "pos": 38,
+              "n": 8,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "Q38*",
+                  "n": 5,
+                  "rows": 5,
+                  "driver": true,
+                  "impact": "truncating"
+                },
+                {
+                  "change": "Q38Kfs*6",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Nonsense_Mutation",
+                  "driver": true,
+                  "rows": 5
+                },
+                {
+                  "mtype": "Frame_Shift_Del",
+                  "driver": true,
+                  "rows": 3
+                }
+              ]
+            },
+            {
+              "pos": 51,
+              "n": 4,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "E51*",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Nonsense_Mutation",
+                  "driver": true,
+                  "rows": 4
+                }
+              ]
+            },
+            {
+              "pos": 52,
+              "n": 4,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "Q52*",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Nonsense_Mutation",
+                  "driver": true,
+                  "rows": 4
+                }
+              ]
+            },
+            {
+              "pos": 53,
+              "n": 12,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "W53*",
+                  "n": 12,
+                  "rows": 12,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Nonsense_Mutation",
+                  "driver": true,
+                  "rows": 12
+                }
+              ]
+            },
+            {
+              "pos": 72,
+              "n": 27,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "V73Rfs*76",
+                  "n": 14,
+                  "rows": 14,
+                  "driver": true,
+                  "impact": "truncating"
+                },
+                {
+                  "change": "V73Wfs*50",
+                  "n": 13,
+                  "rows": 13,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Frame_Shift_Del",
+                  "driver": true,
+                  "rows": 13
+                },
+                {
+                  "mtype": "Frame_Shift_Ins",
+                  "driver": true,
+                  "rows": 14
+                }
+              ]
+            },
+            {
+              "pos": 75,
+              "n": 6,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "A76Cfs*73",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "truncating"
+                },
+                {
+                  "change": "P75Lfs*48",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Frame_Shift_Ins",
+                  "driver": true,
+                  "rows": 3
+                },
+                {
+                  "mtype": "Frame_Shift_Del",
+                  "driver": true,
+                  "rows": 3
+                }
+              ]
+            },
+            {
+              "pos": 89,
+              "n": 16,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "S90Pfs*33",
+                  "n": 10,
+                  "rows": 10,
+                  "driver": true,
+                  "impact": "truncating"
+                },
+                {
+                  "change": "S90Lfs*59",
+                  "n": 6,
+                  "rows": 6,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Frame_Shift_Del",
+                  "driver": true,
+                  "rows": 10
+                },
+                {
+                  "mtype": "Frame_Shift_Ins",
+                  "driver": true,
+                  "rows": 6
+                }
+              ]
+            },
+            {
+              "pos": 91,
+              "n": 12,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "W91*",
+                  "n": 12,
+                  "rows": 12,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Nonsense_Mutation",
+                  "driver": true,
+                  "rows": 12
+                }
+              ]
+            },
+            {
+              "pos": 104,
+              "n": 6,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "Q104*",
+                  "n": 6,
+                  "rows": 6,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Nonsense_Mutation",
+                  "driver": true,
+                  "rows": 6
+                }
+              ]
+            },
+            {
+              "pos": 105,
+              "n": 9,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "G105V",
+                  "n": 6,
+                  "rows": 6,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "G105C",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 9
+                }
+              ]
+            },
+            {
+              "pos": 109,
+              "n": 3,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "F109S",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 3
+                }
+              ]
+            },
+            {
+              "pos": 110,
+              "n": 11,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "R110L",
+                  "n": 7,
+                  "rows": 7,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "R110P",
+                  "n": 4,
+                  "rows": 4,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 11
+                }
+              ]
+            },
+            {
+              "pos": 111,
+              "n": 6,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "L111P",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                },
+                {
+                  "change": "L111Q",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 6
+                }
+              ]
+            },
+            {
+              "pos": 113,
+              "n": 3,
+              "color": "#008000",
+              "impact": "missense",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "F113C",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "missense"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Missense_Mutation",
+                  "driver": true,
+                  "rows": 3
+                }
+              ]
+            },
+            {
+              "pos": 114,
+              "n": 3,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "H115Afs*34",
+                  "n": 3,
+                  "rows": 3,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Frame_Shift_Ins",
+                  "driver": true,
+                  "rows": 3
+                }
+              ]
+            },
+            {
+              "pos": 122,
+              "n": 8,
+              "color": "#000000",
+              "impact": "truncating",
+              "driver": true,
+              "changes": [
+                {
+                  "change": "V122Dfs*26",
+                  "n": 8,
+                  "rows": 8,
+                  "driver": true,
+                  "impact": "truncating"
+                }
+              ],
+              "types": [
+                {
+                  "mtype": "Frame_Shift_Del",
+                  "driver": true,
+                  "rows": 8
+                }
+              ]
+            },
+            {
+              "…": "121 more",
+              "sha256": "7f03d7086ff7ec0c"
+            }
+          ],
+          "domains": [
+            {
+              "accession": "PF08563",
+              "name": "P53_TAD",
+              "start": 6,
+              "end": 29,
+              "color": "#2dcf00"
+            },
+            {
+              "accession": "PF00870",
+              "name": "P53",
+              "start": 95,
+              "end": 288,
+              "color": "#ff5353"
+            },
+            {
+              "accession": "PF07710",
+              "name": "P53_tetramer",
+              "start": 318,
+              "end": 358,
+              "color": "#5b5bff"
+            }
+          ],
+          "topChanges": [
+            {
+              "change": "R175H",
+              "pos": 175,
+              "n": 391,
+              "pct": 9.6
+            },
+            {
+              "change": "R282W",
+              "pos": 282,
+              "n": 219,
+              "pct": 5.4
+            },
+            {
+              "change": "R248Q",
+              "pos": 248,
+              "n": 183,
+              "pct": 4.5
+            },
+            {
+              "change": "R273C",
+              "pos": 273,
+              "n": 182,
+              "pct": 4.5
+            },
+            {
+              "change": "R273H",
+              "pos": 273,
+              "n": 179,
+              "pct": 4.4
+            },
+            {
+              "change": "R248W",
+              "pos": 248,
+              "n": 146,
+              "pct": 3.6
+            },
+            {
+              "change": "R213*",
+              "pos": 213,
+              "n": 141,
+              "pct": 3.5
+            },
+            {
+              "change": "G245S",
+              "pos": 245,
+              "n": 119,
+              "pct": 2.9
+            },
+            {
+              "change": "R196*",
+              "pos": 196,
+              "n": 107,
+              "pct": 2.6
+            },
+            {
+              "change": "R342*",
+              "pos": 342,
+              "n": 90,
+              "pct": 2.2
+            }
+          ],
+          "proteinLength": 393,
+          "lengthSource": "genome-nexus",
+          "transcript": "ENST00000269305",
+          "unpositioned": 0,
+          "withheld": 717,
+          "label": {
+            "pos": 175,
+            "text": "R175H/C/L"
+          },
+          "somaticSamples": 4088,
+          "cohortSamples": 5584,
+          "tally": {
+            "missense": {
+              "driver": 2628,
+              "vus": 26
+            },
+            "truncating": {
+              "driver": 796,
+              "vus": 0
+            },
+            "inframe": {
+              "driver": 30,
+              "vus": 0
+            },
+            "splice": {
+              "driver": 244,
+              "vus": 0
+            },
+            "fusion": {
+              "driver": 0,
+              "vus": 0
+            },
+            "other": {
+              "driver": 0,
+              "vus": 0
+            }
+          },
+          "ids": {
+            "refseq": "NM_000546",
+            "ccds": "CCDS11118",
+            "uniprotAccession": "P04637",
+            "uniprotName": "P53_HUMAN",
+            "ensembl": "ENST00000269305.4"
+          }
+        }
+      ],
+      "studies": [
+        "msk_chord_2024"
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "Mutations in “CRC” by protein position, as cBioPortal's mutation tab draws them: one stem per codon (the stored protein start position), its height the number of distinct patient + protein change pairs there. Colour is the codon's dominant mutation type, putative drivers before VUS (driver = OncoKB oncogenic, pinned; the portal also counts hotspots and custom annotations). VUS and germline mutations are included, as they are by default on the portal. A suppression floor of 3 patients per change was applied BY EACH SITE before returning anything, withholding 1,112 mutations."
+    }
+  ]
+}

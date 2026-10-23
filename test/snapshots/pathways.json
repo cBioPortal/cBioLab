@@ -1,0 +1,1557 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Colorectal": {
+      "count": 5543,
+      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    },
+    "Pancreatic": {
+      "count": 3109,
+      "text": "CANCER_TYPE in [Pancreatic Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "pathways",
+      "cohorts": [
+        "Colorectal",
+        "Pancreatic"
+      ],
+      "annotation": "OncoKB v7.5",
+      "pathways": {
+        "measure": "driver",
+        "rows": [
+          {
+            "name": "RTK-RAS",
+            "source": "Sanchez-Vega 2018",
+            "genes": 85,
+            "profiledGenes": 47,
+            "cells": [
+              {
+                "cohort": "Colorectal",
+                "profiled": 5543,
+                "altered": 3738,
+                "pct": 67.4
+              },
+              {
+                "cohort": "Pancreatic",
+                "profiled": 3109,
+                "altered": 2600,
+                "pct": 83.6
+              }
+            ],
+            "p": 6.382707592331983e-63,
+            "top": [
+              {
+                "gene": "KRAS",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 2395,
+                    "pct": 43.2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 2517,
+                    "pct": 81
+                  }
+                ],
+                "q": 7.736787074641247e-267
+              },
+              {
+                "gene": "BRAF",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 547,
+                    "pct": 9.9
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 35,
+                    "pct": 1.1
+                  }
+                ],
+                "q": 7.371186914678062e-68
+              },
+              {
+                "gene": "ERBB2",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 291,
+                    "pct": 5.2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 36,
+                    "pct": 1.2
+                  }
+                ],
+                "q": 2.4107184931598108e-24
+              },
+              {
+                "gene": "NRAS",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 189,
+                    "pct": 3.4
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 14,
+                    "pct": 0.5
+                  }
+                ],
+                "q": 1.6486842887630062e-21
+              },
+              {
+                "gene": "FGFR1",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 136,
+                    "pct": 2.5
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 53,
+                    "pct": 1.7
+                  }
+                ],
+                "q": 0.03664470704728582
+              },
+              {
+                "gene": "ERBB3",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 130,
+                    "pct": 2.3
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 28,
+                    "pct": 0.9
+                  }
+                ],
+                "q": 0.0000015378844163248904
+              }
+            ],
+            "otherAltered": 32,
+            "notProfiled": [
+              "GRB2",
+              "CBLB",
+              "CBLC",
+              "INSRR",
+              "SOS2",
+              "SHC1",
+              "SHC2",
+              "SHC3",
+              "SHC4",
+              "RASGRP1",
+              "RASGRP2",
+              "RASGRP3",
+              "RASGRP4",
+              "RAPGEF1",
+              "RAPGEF2",
+              "RASGRF1",
+              "RASGRF2",
+              "FNTA",
+              "FNTB",
+              "RCE1",
+              {
+                "…": "18 more",
+                "sha256": "143af5862385bf8b"
+              }
+            ],
+            "q": 1.2765415184663967e-62
+          },
+          {
+            "name": "PI3K",
+            "source": "Sanchez-Vega 2018",
+            "genes": 29,
+            "profiledGenes": 19,
+            "cells": [
+              {
+                "cohort": "Colorectal",
+                "profiled": 5543,
+                "altered": 1754,
+                "pct": 31.6
+              },
+              {
+                "cohort": "Pancreatic",
+                "profiled": 3109,
+                "altered": 312,
+                "pct": 10
+              }
+            ],
+            "p": 5.785174993259107e-125,
+            "top": [
+              {
+                "gene": "PIK3CA",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 1043,
+                    "pct": 18.8
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 62,
+                    "pct": 2
+                  }
+                ],
+                "q": 1.04249777901422e-139
+              },
+              {
+                "gene": "PTEN",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 375,
+                    "pct": 6.8
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 45,
+                    "pct": 1.4
+                  }
+                ],
+                "q": 2.9810488644959413e-32
+              },
+              {
+                "gene": "PIK3R1",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 238,
+                    "pct": 4.3
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 10,
+                    "pct": 0.3
+                  }
+                ],
+                "q": 2.8567255872660437e-33
+              },
+              {
+                "gene": "AKT2",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 37,
+                    "pct": 0.7
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 98,
+                    "pct": 3.2
+                  }
+                ],
+                "q": 2.7373073153379354e-17
+              },
+              {
+                "gene": "STK11",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 42,
+                    "pct": 0.8
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 58,
+                    "pct": 1.9
+                  }
+                ],
+                "q": 0.0000194231893011098
+              },
+              {
+                "gene": "AKT1",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 81,
+                    "pct": 1.5
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 8,
+                    "pct": 0.3
+                  }
+                ],
+                "q": 2.9547956089816697e-8
+              }
+            ],
+            "otherAltered": 12,
+            "notProfiled": [
+              "EIF4EBP1",
+              "AKT1S1",
+              "DEPDC5",
+              "DEPTOR",
+              "MLST8",
+              "NPRL2",
+              "NPRL3",
+              "PDK1",
+              "RPS6",
+              "RPS6KB1"
+            ],
+            "q": 1.4462937483147768e-124
+          },
+          {
+            "name": "TP53",
+            "source": "Sanchez-Vega 2018",
+            "genes": 6,
+            "profiledGenes": 5,
+            "cells": [
+              {
+                "cohort": "Colorectal",
+                "profiled": 5543,
+                "altered": 4268,
+                "pct": 77
+              },
+              {
+                "cohort": "Pancreatic",
+                "profiled": 3109,
+                "altered": 2129,
+                "pct": 68.5
+              }
+            ],
+            "p": 8.772026952886191e-18,
+            "top": [
+              {
+                "gene": "TP53",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 4064,
+                    "pct": 73.3
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 2068,
+                    "pct": 66.5
+                  }
+                ],
+                "q": 1.3568235161012179e-10
+              },
+              {
+                "gene": "ATM",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 287,
+                    "pct": 5.2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 56,
+                    "pct": 1.8
+                  }
+                ],
+                "q": 1.9565231030894814e-15
+              },
+              {
+                "gene": "MDM2",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 7,
+                    "pct": 0.1
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 33,
+                    "pct": 1.1
+                  }
+                ],
+                "q": 5.98899893763258e-9
+              },
+              {
+                "gene": "CHEK2",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 42,
+                    "pct": 0.8
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 6,
+                    "pct": 0.2
+                  }
+                ],
+                "q": 0.0008755336584046769
+              },
+              {
+                "gene": "MDM4",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 2,
+                    "pct": 0
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 5,
+                    "pct": 0.2
+                  }
+                ],
+                "q": 0.15497444419975082
+              }
+            ],
+            "otherAltered": 0,
+            "notProfiled": [
+              "RPS6KA3"
+            ],
+            "q": 1.2531467075551702e-17
+          },
+          {
+            "name": "Cell cycle",
+            "source": "Sanchez-Vega 2018",
+            "genes": 15,
+            "profiledGenes": 13,
+            "cells": [
+              {
+                "cohort": "Colorectal",
+                "profiled": 5543,
+                "altered": 489,
+                "pct": 8.8
+              },
+              {
+                "cohort": "Pancreatic",
+                "profiled": 3109,
+                "altered": 1216,
+                "pct": 39.1
+              }
+            ],
+            "p": 5.19604894684864e-245,
+            "top": [
+              {
+                "gene": "CDKN2A",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 113,
+                    "pct": 2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 1020,
+                    "pct": 32.8
+                  }
+                ],
+                "q": 0
+              },
+              {
+                "gene": "CDKN2B",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 56,
+                    "pct": 1
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 422,
+                    "pct": 13.6
+                  }
+                ],
+                "q": 2.854976940729066e-131
+              },
+              {
+                "gene": "RB1",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 74,
+                    "pct": 1.3
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 77,
+                    "pct": 2.5
+                  }
+                ],
+                "q": 0.00033381445051732216
+              },
+              {
+                "gene": "CCND2",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 124,
+                    "pct": 2.2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 18,
+                    "pct": 0.6
+                  }
+                ],
+                "q": 1.6606086001959881e-9
+              },
+              {
+                "gene": "CCNE1",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 33,
+                    "pct": 0.6
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 60,
+                    "pct": 1.9
+                  }
+                ],
+                "q": 7.053667557890331e-8
+              },
+              {
+                "gene": "CDK6",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 10,
+                    "pct": 0.2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 41,
+                    "pct": 1.3
+                  }
+                ],
+                "q": 3.600284835141912e-10
+              }
+            ],
+            "otherAltered": 6,
+            "notProfiled": [
+              "CDK2",
+              "E2F1"
+            ],
+            "q": 2.59802447342432e-244
+          },
+          {
+            "name": "MYC",
+            "source": "Sanchez-Vega 2018",
+            "genes": 13,
+            "profiledGenes": 5,
+            "cells": [
+              {
+                "cohort": "Colorectal",
+                "profiled": 5543,
+                "altered": 451,
+                "pct": 8.1
+              },
+              {
+                "cohort": "Pancreatic",
+                "profiled": 3109,
+                "altered": 156,
+                "pct": 5
+              }
+            ],
+            "p": 2.905584066517031e-8,
+            "top": [
+              {
+                "gene": "MYC",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 265,
+                    "pct": 4.8
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 120,
+                    "pct": 3.9
+                  }
+                ],
+                "q": 0.07900457825400134
+              },
+              {
+                "gene": "MGA",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5350,
+                    "altered": 153,
+                    "pct": 2.9
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3076,
+                    "altered": 22,
+                    "pct": 0.7
+                  }
+                ],
+                "q": 4.50739167394809e-12
+              },
+              {
+                "gene": "MAX",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 22,
+                    "pct": 0.4
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 6,
+                    "pct": 0.2
+                  }
+                ],
+                "q": 0.1690748582290846
+              },
+              {
+                "gene": "MYCL",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 16,
+                    "pct": 0.3
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 8,
+                    "pct": 0.3
+                  }
+                ],
+                "q": 1
+              },
+              {
+                "gene": "MYCN",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 4,
+                    "pct": 0.1
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 2,
+                    "pct": 0.1
+                  }
+                ],
+                "q": 1
+              }
+            ],
+            "otherAltered": 0,
+            "notProfiled": [
+              "MLX",
+              "MLXIP",
+              "MLXIPL",
+              "MNT",
+              "MXD1",
+              "MXD3",
+              "MXD4",
+              "MXI1"
+            ],
+            "q": 3.6319800831462886e-8
+          },
+          {
+            "name": "WNT",
+            "source": "Sanchez-Vega 2018",
+            "genes": 68,
+            "profiledGenes": 12,
+            "cells": [
+              {
+                "cohort": "Colorectal",
+                "profiled": 5543,
+                "altered": 4536,
+                "pct": 81.8
+              },
+              {
+                "cohort": "Pancreatic",
+                "profiled": 3109,
+                "altered": 243,
+                "pct": 7.8
+              }
+            ],
+            "p": 0,
+            "top": [
+              {
+                "gene": "APC",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 4050,
+                    "pct": 73.1
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 30,
+                    "pct": 1
+                  }
+                ],
+                "q": 0
+              },
+              {
+                "gene": "TCF7L2",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5350,
+                    "altered": 650,
+                    "pct": 12.1
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3076,
+                    "altered": 5,
+                    "pct": 0.2
+                  }
+                ],
+                "q": 4.49559446623935e-124
+              },
+              {
+                "gene": "AMER1",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 335,
+                    "pct": 6
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 27,
+                    "pct": 0.9
+                  }
+                ],
+                "q": 9.312200902062702e-37
+              },
+              {
+                "gene": "RNF43",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 284,
+                    "pct": 5.1
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 124,
+                    "pct": 4
+                  }
+                ],
+                "q": 0.029839748389764775
+              },
+              {
+                "gene": "AXIN2",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 212,
+                    "pct": 3.8
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 17,
+                    "pct": 0.5
+                  }
+                ],
+                "q": 2.5792956149222336e-23
+              },
+              {
+                "gene": "ZNRF3",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 1798,
+                    "altered": 68,
+                    "pct": 3.8
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 1100,
+                    "altered": 3,
+                    "pct": 0.3
+                  }
+                ],
+                "q": 1.1129560807818555e-10
+              }
+            ],
+            "otherAltered": 4,
+            "notProfiled": [
+              "CHD8",
+              "LEF1",
+              "LGR4",
+              "LRP5",
+              "NDP",
+              "PORCN",
+              "RSPO1",
+              "SFRP1",
+              "SFRP2",
+              "SFRP4",
+              "SFRP5",
+              "SOST",
+              "TCF7L1",
+              "TLE1",
+              "TLE2",
+              "TLE3",
+              "TLE4",
+              "WIF1",
+              "DVL1",
+              "DVL2",
+              {
+                "…": "36 more",
+                "sha256": "e206ba224e3aee31"
+              }
+            ],
+            "q": 0
+          },
+          {
+            "name": "NOTCH",
+            "source": "Sanchez-Vega 2018",
+            "genes": 71,
+            "profiledGenes": 14,
+            "cells": [
+              {
+                "cohort": "Colorectal",
+                "profiled": 5543,
+                "altered": 1215,
+                "pct": 21.9
+              },
+              {
+                "cohort": "Pancreatic",
+                "profiled": 3109,
+                "altered": 108,
+                "pct": 3.5
+              }
+            ],
+            "p": 2.6198371106471583e-139,
+            "top": [
+              {
+                "gene": "FBXW7",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 750,
+                    "pct": 13.5
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 31,
+                    "pct": 1
+                  }
+                ],
+                "q": 6.244824193465761e-110
+              },
+              {
+                "gene": "CREBBP",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 166,
+                    "pct": 3
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 17,
+                    "pct": 0.5
+                  }
+                ],
+                "q": 6.610313665059981e-16
+              },
+              {
+                "gene": "NCOR1",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 149,
+                    "pct": 2.7
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 5,
+                    "pct": 0.2
+                  }
+                ],
+                "q": 3.7305309601101838e-22
+              },
+              {
+                "gene": "NOTCH3",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 128,
+                    "pct": 2.3
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 7,
+                    "pct": 0.2
+                  }
+                ],
+                "q": 1.7266539203953907e-16
+              },
+              {
+                "gene": "EP300",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 122,
+                    "pct": 2.2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 12,
+                    "pct": 0.4
+                  }
+                ],
+                "q": 2.9399368751270945e-12
+              },
+              {
+                "gene": "SPEN",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 98,
+                    "pct": 1.8
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 5,
+                    "pct": 0.2
+                  }
+                ],
+                "q": 3.9508492708599596e-13
+              }
+            ],
+            "otherAltered": 4,
+            "notProfiled": [
+              "ARRDC1",
+              "CNTN6",
+              "HES1",
+              "HES2",
+              "HES3",
+              "HES4",
+              "HES5",
+              "HEY1",
+              "HEY2",
+              "HEYL",
+              "KAT2B",
+              "NOV",
+              "NRARP",
+              "PSEN2",
+              "LFNG",
+              "ITCH",
+              "NCSTN",
+              "JAG1",
+              "APH1A",
+              "FHL1",
+              {
+                "…": "37 more",
+                "sha256": "d68e27faa10564d1"
+              }
+            ],
+            "q": 8.732790368823861e-139
+          },
+          {
+            "name": "Hippo",
+            "source": "Sanchez-Vega 2018",
+            "genes": 38,
+            "profiledGenes": 6,
+            "cells": [
+              {
+                "cohort": "Colorectal",
+                "profiled": 5543,
+                "altered": 260,
+                "pct": 4.7
+              },
+              {
+                "cohort": "Pancreatic",
+                "profiled": 3109,
+                "altered": 40,
+                "pct": 1.3
+              }
+            ],
+            "p": 6.015225330934694e-19,
+            "top": [
+              {
+                "gene": "FAT1",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 177,
+                    "pct": 3.2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 16,
+                    "pct": 0.5
+                  }
+                ],
+                "q": 2.37601062548213e-18
+              },
+              {
+                "gene": "LATS1",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 49,
+                    "pct": 0.9
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 10,
+                    "pct": 0.3
+                  }
+                ],
+                "q": 0.0033279240530356964
+              },
+              {
+                "gene": "LATS2",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 34,
+                    "pct": 0.6
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 5,
+                    "pct": 0.2
+                  }
+                ],
+                "q": 0.0041179603472771
+              },
+              {
+                "gene": "NF2",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 9,
+                    "pct": 0.2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 9,
+                    "pct": 0.3
+                  }
+                ],
+                "q": 0.3109147064391383
+              },
+              {
+                "gene": "YAP1",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 10,
+                    "pct": 0.2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 1,
+                    "pct": 0
+                  }
+                ],
+                "q": 0.15986587736599803
+              }
+            ],
+            "otherAltered": 0,
+            "notProfiled": [
+              "STK4",
+              "STK3",
+              "SAV1",
+              "MOB1A",
+              "MOB1B",
+              "TEAD1",
+              "TEAD2",
+              "TEAD3",
+              "TEAD4",
+              "PTPN14",
+              "WWC1",
+              "TAOK1",
+              "TAOK2",
+              "TAOK3",
+              "CRB1",
+              "CRB2",
+              "CRB3",
+              "LLGL1",
+              "LLGL2",
+              "HMCN1",
+              {
+                "…": "12 more",
+                "sha256": "fbb5c6a2c9e6c94a"
+              }
+            ],
+            "q": 1.0025375551557823e-18
+          },
+          {
+            "name": "TGF-β",
+            "source": "Sanchez-Vega 2018",
+            "genes": 7,
+            "profiledGenes": 5,
+            "cells": [
+              {
+                "cohort": "Colorectal",
+                "profiled": 5543,
+                "altered": 1194,
+                "pct": 21.5
+              },
+              {
+                "cohort": "Pancreatic",
+                "profiled": 3109,
+                "altered": 732,
+                "pct": 23.5
+              }
+            ],
+            "p": 0.03335684499535692,
+            "top": [
+              {
+                "gene": "SMAD4",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 859,
+                    "pct": 15.5
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 655,
+                    "pct": 21.1
+                  }
+                ],
+                "q": 3.7270880898502765e-10
+              },
+              {
+                "gene": "SMAD2",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 225,
+                    "pct": 4.1
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 11,
+                    "pct": 0.4
+                  }
+                ],
+                "q": 4.060527821165915e-30
+              },
+              {
+                "gene": "SMAD3",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 180,
+                    "pct": 3.2
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 31,
+                    "pct": 1
+                  }
+                ],
+                "q": 2.6199648767682504e-11
+              },
+              {
+                "gene": "TGFBR1",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 48,
+                    "pct": 0.9
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 42,
+                    "pct": 1.4
+                  }
+                ],
+                "q": 0.05793031858365166
+              },
+              {
+                "gene": "TGFBR2",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 22,
+                    "pct": 0.4
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 22,
+                    "pct": 0.7
+                  }
+                ],
+                "q": 0.0908517357789052
+              }
+            ],
+            "otherAltered": 0,
+            "notProfiled": [
+              "ACVR2A",
+              "ACVR1B"
+            ],
+            "q": 0.037063161105952126
+          },
+          {
+            "name": "NRF2",
+            "source": "Sanchez-Vega 2018",
+            "genes": 3,
+            "profiledGenes": 3,
+            "cells": [
+              {
+                "cohort": "Colorectal",
+                "profiled": 5543,
+                "altered": 54,
+                "pct": 1
+              },
+              {
+                "cohort": "Pancreatic",
+                "profiled": 3109,
+                "altered": 24,
+                "pct": 0.8
+              }
+            ],
+            "p": 0.4067674356699012,
+            "top": [
+              {
+                "gene": "KEAP1",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 33,
+                    "pct": 0.6
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 19,
+                    "pct": 0.6
+                  }
+                ],
+                "q": 1
+              },
+              {
+                "gene": "CUL3",
+                "role": "TSG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 20,
+                    "pct": 0.4
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 1,
+                    "pct": 0
+                  }
+                ],
+                "q": 0.004058675700131532
+              },
+              {
+                "gene": "NFE2L2",
+                "role": "OG",
+                "cells": [
+                  {
+                    "cohort": "Colorectal",
+                    "profiled": 5543,
+                    "altered": 1,
+                    "pct": 0
+                  },
+                  {
+                    "cohort": "Pancreatic",
+                    "profiled": 3109,
+                    "altered": 4,
+                    "pct": 0.1
+                  }
+                ],
+                "q": 0.0908517357789052
+              }
+            ],
+            "otherAltered": 0,
+            "notProfiled": [],
+            "q": 0.4067674356699012
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Share of patients with an OncoKB driver (v7.5) in at least one member gene — drivers only, as Sanchez-Vega et al. counted curated oncogenic events. A pathway's denominator is the patients profiled for at least one of its genes, so a panel that covers few members makes a pathway look rarer than a genome-wide assay would; each member gene's own % is over the patients profiled for THAT gene. 206 member-gene slots were on no participating panel and are listed as not profiled rather than counted as unaltered. Pathway membership is the paper's Table S3; a gene's pathway role (oncogene / tumour suppressor) is not used in the count. Two-sided Fisher tests; q is Benjamini–Hochberg across the pathways drawn, and separately across every member gene tested.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count patients altered per pathway and per gene",
+            "detail": "The geneCounts and pathways:sets queries above. Per pathway: patients profiled for at least one member gene (the denominator) and of those, patients with an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5) in at least one member. Per member gene: the same over the patients profiled for that gene. Counts only.",
+            "scope": "Colorectal · msk_chord_2024",
+            "rowsIn": 5543,
+            "params": [
+              [
+                "pathways / sets",
+                "RTK-RAS (85), PI3K (29), TP53 (6), Cell cycle (15), MYC (13), WNT (68), NOTCH (71), Hippo (38), TGF-β (7), NRF2 (3)"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count patients altered per pathway and per gene",
+            "detail": "The geneCounts and pathways:sets queries above. Per pathway: patients profiled for at least one member gene (the denominator) and of those, patients with an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5) in at least one member. Per member gene: the same over the patients profiled for that gene. Counts only.",
+            "scope": "Pancreatic · msk_chord_2024",
+            "rowsIn": 3109,
+            "params": [
+              [
+                "pathways / sets",
+                "RTK-RAS (85), PI3K (29), TP53 (6), Cell cycle (15), MYC (13), WNT (68), NOTCH (71), Hippo (38), TGF-β (7), NRF2 (3)"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Fisher's exact test per pathway and per member gene",
+            "detail": "Two-sided, altered vs not among the profiled, between the two cohorts."
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg",
+            "detail": "Across the pathways drawn, and separately across every member gene tested, each gene once even when it sits in two pathways."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "fisherExact",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
+        "check": {
+          "pathways:pathway:RTK-RAS:p": {
+            "v": 6.382707592331983e-63
+          },
+          "pathways:pathway:RTK-RAS:q": {
+            "v": 1.2765415184663967e-62
+          },
+          "pathways:pathway:PI3K:p": {
+            "v": 5.785174993259107e-125
+          },
+          "pathways:pathway:PI3K:q": {
+            "v": 1.4462937483147768e-124
+          },
+          "pathways:pathway:TP53:p": {
+            "v": 8.772026952886191e-18
+          },
+          "pathways:pathway:TP53:q": {
+            "v": 1.2531467075551702e-17
+          },
+          "pathways:pathway:Cell cycle:p": {
+            "v": 5.19604894684864e-245
+          },
+          "pathways:pathway:Cell cycle:q": {
+            "v": 2.59802447342432e-244
+          },
+          "pathways:pathway:MYC:p": {
+            "v": 2.905584066517031e-8
+          },
+          "pathways:pathway:MYC:q": {
+            "v": 3.6319800831462886e-8
+          },
+          "pathways:pathway:WNT:p": {
+            "v": 0
+          },
+          "pathways:pathway:WNT:q": {
+            "v": 0
+          },
+          "pathways:pathway:NOTCH:p": {
+            "v": 2.6198371106471583e-139
+          },
+          "pathways:pathway:NOTCH:q": {
+            "v": 8.732790368823861e-139
+          },
+          "pathways:pathway:Hippo:p": {
+            "v": 6.015225330934694e-19
+          },
+          "pathways:pathway:Hippo:q": {
+            "v": 1.0025375551557823e-18
+          },
+          "pathways:pathway:TGF-β:p": {
+            "v": 0.03335684499535692
+          },
+          "pathways:pathway:TGF-β:q": {
+            "v": 0.037063161105952126
+          },
+          "pathways:pathway:NRF2:p": {
+            "v": 0.4067674356699012
+          },
+          "pathways:pathway:NRF2:q": {
+            "v": 0.4067674356699012
+          },
+          "…": {
+            "more": 53,
+            "sha256": "dcbde1c378cc0869"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- Colorectal: 5,543 patients — CANCER_TYPE in [Colorectal Cancer] (any sample)
+
+KRAS mutations: 1,378 of 2,426 rows kept by the query; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	sample	proteinChange	annotation	vaf	mutCount
+  Colorectal	P-0044990-T01-IM6	G12D	Oncogenic · Level 1	0.928	9
+  Colorectal	P-0074217-T02-IM7	G12C	Oncogenic · Level 1	0.922	3
+  Colorectal	P-0066632-T01-IM7	G12D	Oncogenic · Level 1	0.896	7
+  Colorectal	P-0011108-T01-IM5	G12D	Oncogenic · Level 1	0.888	9
+  Colorectal	P-0046395-T01-IM6	G13D	Oncogenic · Level 1	0.814	10
+  Colorectal	P-0018448-T01-IM6	G12D	Oncogenic · Level 1	0.799	16
+  Colorectal	P-0055331-T01-IM6	G12A	Oncogenic · Level 1	0.796	9
+  Colorectal	P-0057020-T01-IM6	G12C	Oncogenic · Level 1	0.792	7
+  Colorectal	P-0012877-T01-IM5	G12D	Oncogenic · Level 1	0.791	10
+  Colorectal	P-0005029-T01-IM5	G13D	Oncogenic · Level 1	0.786	3
+  Colorectal	P-0015210-T01-IM6	G12D	Oncogenic · Level 1	0.775	5
+  Colorectal	P-0000739-T01-IM3	G12C	Oncogenic · Level 1	0.768	7
+  Colorectal	P-0078660-T01-IM7	G12C	Oncogenic · Level 1	0.763	13
+  Colorectal	P-0007990-T01-IM5	G12S	Oncogenic · Level 1	0.759	7
+  Colorectal	P-0050517-T01-IM6	G12V	Oncogenic · Level 1	0.751	10
+  Colorectal	P-0039168-T01-IM6	G12S	Oncogenic · Level 1	0.744	4
+  Colorectal	P-0041600-T01-IM6	G12V	Oncogenic · Level 1	0.741	6
+  Colorectal	P-0046742-T01-IM6	G13D	Oncogenic · Level 1	0.724	7
+  Colorectal	P-0008735-T01-IM5	G12C	Oncogenic · Level 1	0.723	10
+  Colorectal	P-0089247-T01-IM7	G12V	Oncogenic · Level 1	0.722	8
+  Colorectal	P-0057012-T01-IM6	G12V	Oncogenic · Level 1	0.72	9
+  Colorectal	P-0012653-T01-IM5	G13D	Oncogenic · Level 1	0.718	4
+  Colorectal	P-0042211-T01-IM6	G12D	Oncogenic · Level 1	0.718	8
+  Colorectal	P-0087879-T01-IM7	G13D	Oncogenic · Level 1	0.718	8
+  Colorectal	P-0077659-T01-IM7	G12R	Oncogenic · Level 1	0.716	38
+  … 1,353 more rows
+  CAVEAT (tell the user): Every KRAS mutation call in the cohort's samples, one row per call; uncalled mutations are left out, as the portal leaves them out. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level for the gene). Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. Showing 1,378 of 2,426 mutations: rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2. Sorted by Allele Freq (T) (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
+  METHOD:
+    - Count the KRAS mutation calls per cohort and study, and those the query keeps: The mutations:counts query above: every called KRAS mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded and the OncoKB v7.5 call for its protein change; allele frequency = variant / (variant + reference) reads. The query keeps rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2.
+        Colorectal · msk_chord_2024: 1,378 of 2,426
+    - Sort them together and take one page: The mutations:rows query above: the KRAS mutation calls of every cohort and study combined in one query, kept to rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2, sorted by Allele Freq (T) descending, missing last, then sample, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset.
+    A listing: no statistic is computed, so there is no script — the queries are the numbers.

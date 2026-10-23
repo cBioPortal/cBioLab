@@ -1,0 +1,431 @@
+{
+  "study": "egc_msk_2017",
+  "cohorts": {
+    "before and after treatment": {
+      "count": 481,
+      "text": "all patients in the study — across 5 studies",
+      "studies": [
+        "egc_msk_2017",
+        "breast_alpelisib_2020",
+        "egc_trap_ccr_msk_2023",
+        "blca_cornell_2016",
+        "brca_dldccc_2022"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "paired",
+      "cohorts": [
+        "before and after treatment"
+      ],
+      "paired": {
+        "pairBy": {
+          "attribute": "IMPACT_PRE_POST",
+          "a": [
+            "PRE-TX"
+          ],
+          "b": [
+            "POST-TX"
+          ]
+        },
+        "perStudy": {
+          "egc_msk_2017": {
+            "attribute": "IMPACT_PRE_POST",
+            "a": [
+              "PRE-TX"
+            ],
+            "b": [
+              "POST-TX"
+            ]
+          },
+          "breast_alpelisib_2020": {
+            "attribute": "SAMPLE_COLLECTION_TIMEPOINT",
+            "a": [
+              "pre-treatment"
+            ],
+            "b": [
+              "post-treatment"
+            ]
+          },
+          "egc_trap_ccr_msk_2023": {
+            "attribute": "PRE_OR_POST_TREATMENT",
+            "a": [
+              "Pre"
+            ],
+            "b": [
+              "Post"
+            ]
+          },
+          "blca_cornell_2016": {
+            "attribute": "SPECIMEN_COLLECTION_PRE_OR_POST_CHEMO",
+            "a": [
+              "pre-chemotherapy"
+            ],
+            "b": [
+              "post-chemotherapy"
+            ]
+          },
+          "brca_dldccc_2022": {
+            "attribute": "TREATMENT_STATUS",
+            "a": [
+              "Pre-Treatment"
+            ],
+            "b": [
+              "Post-Treatment"
+            ]
+          }
+        },
+        "labels": {
+          "a": "before",
+          "b": "after"
+        },
+        "scan": {
+          "top": 12
+        },
+        "measure": "driver",
+        "panels": [
+          {
+            "cohort": "before and after treatment",
+            "patients": 111,
+            "aSamples": 148,
+            "bSamples": 130,
+            "genes": [
+              {
+                "gene": "CCND1",
+                "pairs": 95,
+                "both": 8,
+                "aOnly": 10,
+                "bOnly": 1,
+                "neither": 76,
+                "concordance": 0.421,
+                "p": 0.011718749999999981,
+                "q": 1
+              },
+              {
+                "gene": "MYC",
+                "pairs": 111,
+                "both": 5,
+                "aOnly": 10,
+                "bOnly": 2,
+                "neither": 94,
+                "concordance": 0.294,
+                "p": 0.03857421875000008,
+                "q": 1
+              },
+              {
+                "gene": "ERBB3",
+                "pairs": 40,
+                "both": 0,
+                "aOnly": 5,
+                "bOnly": 0,
+                "neither": 35,
+                "concordance": 0,
+                "p": 0.0625,
+                "q": 1
+              },
+              {
+                "gene": "MTAP",
+                "pairs": 26,
+                "both": 2,
+                "aOnly": 5,
+                "bOnly": 0,
+                "neither": 19,
+                "concordance": 0.286,
+                "p": 0.0625,
+                "q": 1
+              },
+              {
+                "gene": "TP53",
+                "pairs": 111,
+                "both": 52,
+                "aOnly": 10,
+                "bOnly": 3,
+                "neither": 46,
+                "concordance": 0.8,
+                "p": 0.09228515625000008,
+                "q": 1
+              },
+              {
+                "gene": "CDH1",
+                "pairs": 39,
+                "both": 2,
+                "aOnly": 4,
+                "bOnly": 0,
+                "neither": 33,
+                "concordance": 0.333,
+                "p": 0.125,
+                "q": 1
+              },
+              {
+                "gene": "FOXP1",
+                "pairs": 41,
+                "both": 0,
+                "aOnly": 0,
+                "bOnly": 4,
+                "neither": 37,
+                "concordance": 0,
+                "p": 0.125,
+                "q": 1
+              },
+              {
+                "gene": "FGFR1",
+                "pairs": 85,
+                "both": 3,
+                "aOnly": 6,
+                "bOnly": 1,
+                "neither": 75,
+                "concordance": 0.3,
+                "p": 0.12500000000000006,
+                "q": 1
+              },
+              {
+                "gene": "RSPO2",
+                "pairs": 32,
+                "both": 1,
+                "aOnly": 6,
+                "bOnly": 1,
+                "neither": 24,
+                "concordance": 0.125,
+                "p": 0.12500000000000006,
+                "q": 1
+              },
+              {
+                "gene": "LMNA",
+                "pairs": 42,
+                "both": 1,
+                "aOnly": 5,
+                "bOnly": 1,
+                "neither": 35,
+                "concordance": 0.143,
+                "p": 0.21875000000000017,
+                "q": 1
+              },
+              {
+                "gene": "BAALC",
+                "pairs": 42,
+                "both": 1,
+                "aOnly": 8,
+                "bOnly": 3,
+                "neither": 30,
+                "concordance": 0.083,
+                "p": 0.2265625000000001,
+                "q": 1
+              },
+              {
+                "gene": "UBR5",
+                "pairs": 42,
+                "both": 1,
+                "aOnly": 8,
+                "bOnly": 3,
+                "neither": 30,
+                "concordance": 0.083,
+                "p": 0.2265625000000001,
+                "q": 1
+              }
+            ],
+            "tested": 278
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "egc_msk_2017",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "breast_alpelisib_2020",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "egc_trap_ccr_msk_2023",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "blca_cornell_2016",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "brca_dldccc_2022",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "studies": [
+        "egc_msk_2017",
+        "breast_alpelisib_2020",
+        "egc_trap_ccr_msk_2023",
+        "blca_cornell_2016",
+        "brca_dldccc_2022"
+      ],
+      "caveat": "Within patients with samples on both sides, before and after (egc_msk_2017: IMPACT_PRE_POST PRE-TX vs POST-TX; breast_alpelisib_2020: SAMPLE_COLLECTION_TIMEPOINT pre-treatment vs post-treatment; egc_trap_ccr_msk_2023: PRE_OR_POST_TREATMENT Pre vs Post; blca_cornell_2016: SPECIMEN_COLLECTION_PRE_OR_POST_CHEMO pre-chemotherapy vs post-chemotherapy; brca_dldccc_2022: TREATMENT_STATUS Pre-Treatment vs Post-Treatment; before and after treatment: 111 patients), per gene, among those profiled for it on BOTH sides by each side's own panels: an OncoKB driver (v7.5) on both sides, on the before side only, or the after side only; a patient with several samples on a side counts as altered there if any is. Concordance is both ÷ altered anywhere. The exact McNemar test asks whether discordance runs one way; q is Benjamini–Hochberg across the genes of each cohort. Genes were not chosen in advance: every gene with a driver in some paired patient was tested (before and after treatment: 278 genes with a discordant patient), q is taken across all of them, and the 12 most one-sided are drawn — at these sizes, read the counts, not only the q. Sides are as each study labels its samples; after-only means seen on that side and not the other, which is not proof it arose or vanished in between — a subclone one biopsy missed, or a lower-purity sample (common after treatment) under-calling its side, reads the same; and patients sampled twice are a selected group, typically with longer or harder disease courses. Counts are summed across 5 studies.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count each gene's state in paired samples",
+            "detail": "The paired:patients and paired:genes queries above. Patients with both a SPECIMEN_COLLECTION_PRE_OR_POST_CHEMO = pre-chemotherapy sample (before) and a SPECIMEN_COLLECTION_PRE_OR_POST_CHEMO = post-chemotherapy sample (after); per gene — every gene altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) in some such patient, among those profiled for it on both sides by each side's own panels: altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) on both sides, on the before side only, or the after side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
+            "scope": "before and after treatment · blca_cornell_2016",
+            "rowsIn": 32
+          },
+          {
+            "kind": "fetch",
+            "title": "Count each gene's state in paired samples",
+            "detail": "The paired:patients and paired:genes queries above. Patients with both a TREATMENT_STATUS = Pre-Treatment sample (before) and a TREATMENT_STATUS = Post-Treatment sample (after); per gene — every gene altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) in some such patient, among those profiled for it on both sides by each side's own panels: altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) on both sides, on the before side only, or the after side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
+            "scope": "before and after treatment · brca_dldccc_2022",
+            "rowsIn": 59
+          },
+          {
+            "kind": "fetch",
+            "title": "Count each gene's state in paired samples",
+            "detail": "The paired:patients and paired:genes queries above. Patients with both a SAMPLE_COLLECTION_TIMEPOINT = pre-treatment sample (before) and a SAMPLE_COLLECTION_TIMEPOINT = post-treatment sample (after); per gene — every gene altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) in some such patient, among those profiled for it on both sides by each side's own panels: altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) on both sides, on the before side only, or the after side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
+            "scope": "before and after treatment · breast_alpelisib_2020",
+            "rowsIn": 51
+          },
+          {
+            "kind": "fetch",
+            "title": "Count each gene's state in paired samples",
+            "detail": "The paired:patients and paired:genes queries above. Patients with both a IMPACT_PRE_POST = PRE-TX sample (before) and a IMPACT_PRE_POST = POST-TX sample (after); per gene — every gene altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) in some such patient, among those profiled for it on both sides by each side's own panels: altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) on both sides, on the before side only, or the after side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
+            "scope": "before and after treatment · egc_msk_2017",
+            "rowsIn": 305
+          },
+          {
+            "kind": "fetch",
+            "title": "Count each gene's state in paired samples",
+            "detail": "The paired:patients and paired:genes queries above. Patients with both a PRE_OR_POST_TREATMENT = Pre sample (before) and a PRE_OR_POST_TREATMENT = Post sample (after); per gene — every gene altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) in some such patient, among those profiled for it on both sides by each side's own panels: altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) on both sides, on the before side only, or the after side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
+            "scope": "before and after treatment · egc_trap_ccr_msk_2023",
+            "rowsIn": 34
+          },
+          {
+            "kind": "transform",
+            "title": "Add each cohort's counts across its studies",
+            "detail": "The counts add exactly."
+          },
+          {
+            "kind": "statistic",
+            "title": "Exact McNemar test per gene",
+            "detail": "Only the discordant patients carry information about direction: of the before-only and after-only patients, each is a fair coin under the null, so p is twice the smaller binomial tail (capped at 1). Concordance is both ÷ altered anywhere.",
+            "params": [
+              [
+                "before and after treatment",
+                "111 patients with both kinds of sample"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across genes, per cohort",
+            "detail": "q-values over the genes with at least one discordant patient, separately for each cohort. In a scan that is every such gene, not only the ones drawn."
+          },
+          {
+            "kind": "transform",
+            "title": "Draw the 12 most one-sided genes",
+            "detail": "Of the genes with a discordant patient, ordered by McNemar p, then by the size of the imbalance between before-only and after-only patients, then by the number of discordant patients, then by name; the first 12 are drawn and reported.",
+            "params": [
+              [
+                "before and after treatment",
+                "278 genes tested"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "mcnemarExact",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "The exact McNemar test matches statsmodels 0.15.0 mcnemar(exact=True) and Benjamini–Hochberg multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
+        "check": {
+          "paired:before and after treatment:CCND1:p": {
+            "v": 0.011718749999999981
+          },
+          "paired:before and after treatment:CCND1:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:MYC:p": {
+            "v": 0.03857421875000008
+          },
+          "paired:before and after treatment:MYC:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:ERBB3:p": {
+            "v": 0.0625
+          },
+          "paired:before and after treatment:ERBB3:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:MTAP:p": {
+            "v": 0.0625
+          },
+          "paired:before and after treatment:MTAP:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:TP53:p": {
+            "v": 0.09228515625000008
+          },
+          "paired:before and after treatment:TP53:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:CDH1:p": {
+            "v": 0.125
+          },
+          "paired:before and after treatment:CDH1:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:FOXP1:p": {
+            "v": 0.125
+          },
+          "paired:before and after treatment:FOXP1:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:FGFR1:p": {
+            "v": 0.12500000000000006
+          },
+          "paired:before and after treatment:FGFR1:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:RSPO2:p": {
+            "v": 0.12500000000000006
+          },
+          "paired:before and after treatment:RSPO2:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:LMNA:p": {
+            "v": 0.21875000000000017
+          },
+          "paired:before and after treatment:LMNA:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:BAALC:p": {
+            "v": 0.2265625000000001
+          },
+          "paired:before and after treatment:BAALC:q": {
+            "v": 1
+          },
+          "paired:before and after treatment:UBR5:p": {
+            "v": 0.2265625000000001
+          },
+          "paired:before and after treatment:UBR5:q": {
+            "v": 1
+          }
+        }
+      }
+    }
+  ]
+}

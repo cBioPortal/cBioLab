@@ -1,0 +1,1474 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "TP53 mut": {
+      "count": 25555,
+      "text": "OQL[TP53: MUT] — across 2 studies",
+      "studies": [
+        "msk_chord_2024",
+        "msk_met_2021"
+      ]
+    },
+    "TP53 wt": {
+      "count": 24627,
+      "text": "NOT OQL[TP53:] AND profiled for TP53 MUTATION — across 2 studies",
+      "studies": [
+        "msk_chord_2024",
+        "msk_met_2021"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "compare",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
+      "annotation": "OncoKB v7.5 (pinned)",
+      "rows": [
+        {
+          "gene": "APC",
+          "cells": [
+            {
+              "cohort": "TP53 mut",
+              "profiled": 25555,
+              "any": 6084,
+              "driver": 5524,
+              "anyPct": 23.8,
+              "driverPct": 21.6,
+              "byType": {
+                "mutation": {
+                  "profiled": 25555,
+                  "altered": 5974
+                },
+                "cna": {
+                  "profiled": 25555,
+                  "altered": 104
+                },
+                "structuralVariant": {
+                  "profiled": 25555,
+                  "altered": 85
+                }
+              }
+            },
+            {
+              "cohort": "TP53 wt",
+              "profiled": 24627,
+              "any": 2478,
+              "driver": 2040,
+              "anyPct": 10.1,
+              "driverPct": 8.3,
+              "byType": {
+                "mutation": {
+                  "profiled": 24627,
+                  "altered": 2383
+                },
+                "cna": {
+                  "profiled": 24627,
+                  "altered": 84
+                },
+                "structuralVariant": {
+                  "profiled": 24627,
+                  "altered": 48
+                }
+              }
+            }
+          ],
+          "pAny": 0,
+          "pDriver": 0,
+          "qAny": 0,
+          "qDriver": 0
+        },
+        {
+          "gene": "KRAS",
+          "cells": [
+            {
+              "cohort": "TP53 mut",
+              "profiled": 25555,
+              "any": 7678,
+              "driver": 7622,
+              "anyPct": 30,
+              "driverPct": 29.8,
+              "byType": {
+                "mutation": {
+                  "profiled": 25555,
+                  "altered": 7315
+                },
+                "cna": {
+                  "profiled": 25555,
+                  "altered": 508
+                },
+                "structuralVariant": {
+                  "profiled": 25555,
+                  "altered": 6
+                }
+              }
+            },
+            {
+              "cohort": "TP53 wt",
+              "profiled": 24627,
+              "any": 5345,
+              "driver": 5299,
+              "anyPct": 21.7,
+              "driverPct": 21.5,
+              "byType": {
+                "mutation": {
+                  "profiled": 24627,
+                  "altered": 5181
+                },
+                "cna": {
+                  "profiled": 24627,
+                  "altered": 231
+                },
+                "structuralVariant": {
+                  "profiled": 24627,
+                  "altered": 2
+                }
+              }
+            }
+          ],
+          "pAny": 3.683367002397097e-101,
+          "pDriver": 6.541257727317714e-101,
+          "qAny": 9.208417505992743e-101,
+          "qDriver": 1.6353144318294285e-100
+        },
+        {
+          "gene": "CDKN2A",
+          "cells": [
+            {
+              "cohort": "TP53 mut",
+              "profiled": 25555,
+              "any": 3978,
+              "driver": 3590,
+              "anyPct": 15.6,
+              "driverPct": 14,
+              "byType": {
+                "mutation": {
+                  "profiled": 25555,
+                  "altered": 2150
+                },
+                "cna": {
+                  "profiled": 25555,
+                  "altered": 1774
+                },
+                "structuralVariant": {
+                  "profiled": 25555,
+                  "altered": 83
+                }
+              }
+            },
+            {
+              "cohort": "TP53 wt",
+              "profiled": 24627,
+              "any": 2401,
+              "driver": 2207,
+              "anyPct": 9.7,
+              "driverPct": 9,
+              "byType": {
+                "mutation": {
+                  "profiled": 24627,
+                  "altered": 578
+                },
+                "cna": {
+                  "profiled": 24627,
+                  "altered": 1759
+                },
+                "structuralVariant": {
+                  "profiled": 24627,
+                  "altered": 87
+                }
+              }
+            }
+          ],
+          "pAny": 6.348835417681368e-86,
+          "pDriver": 1.1581233622946001e-71,
+          "qAny": 1.058139236280228e-85,
+          "qDriver": 1.9302056038243335e-71
+        },
+        {
+          "gene": "PIK3CA",
+          "cells": [
+            {
+              "cohort": "TP53 mut",
+              "profiled": 25555,
+              "any": 3347,
+              "driver": 3009,
+              "anyPct": 13.1,
+              "driverPct": 11.8,
+              "byType": {
+                "mutation": {
+                  "profiled": 25555,
+                  "altered": 3077
+                },
+                "cna": {
+                  "profiled": 25555,
+                  "altered": 354
+                },
+                "structuralVariant": {
+                  "profiled": 25555,
+                  "altered": 12
+                }
+              }
+            },
+            {
+              "cohort": "TP53 wt",
+              "profiled": 24627,
+              "any": 4218,
+              "driver": 3951,
+              "anyPct": 17.1,
+              "driverPct": 16,
+              "byType": {
+                "mutation": {
+                  "profiled": 24627,
+                  "altered": 4168
+                },
+                "cna": {
+                  "profiled": 24627,
+                  "altered": 76
+                },
+                "structuralVariant": {
+                  "profiled": 24627,
+                  "altered": 4
+                }
+              }
+            }
+          ],
+          "pAny": 1.6718354038852575e-36,
+          "pDriver": 1.616742625373624e-43,
+          "qAny": 2.0897942548565717e-36,
+          "qDriver": 2.02092828171703e-43
+        },
+        {
+          "gene": "EGFR",
+          "cells": [
+            {
+              "cohort": "TP53 mut",
+              "profiled": 25555,
+              "any": 2595,
+              "driver": 2151,
+              "anyPct": 10.2,
+              "driverPct": 8.4,
+              "byType": {
+                "mutation": {
+                  "profiled": 25555,
+                  "altered": 2084
+                },
+                "cna": {
+                  "profiled": 25555,
+                  "altered": 897
+                },
+                "structuralVariant": {
+                  "profiled": 25555,
+                  "altered": 66
+                }
+              }
+            },
+            {
+              "cohort": "TP53 wt",
+              "profiled": 24627,
+              "any": 1805,
+              "driver": 1442,
+              "anyPct": 7.3,
+              "driverPct": 5.9,
+              "byType": {
+                "mutation": {
+                  "profiled": 24627,
+                  "altered": 1667
+                },
+                "cna": {
+                  "profiled": 24627,
+                  "altered": 215
+                },
+                "structuralVariant": {
+                  "profiled": 24627,
+                  "altered": 35
+                }
+              }
+            }
+          ],
+          "pAny": 3.4918653939355507e-29,
+          "pDriver": 6.284452802067991e-29,
+          "qAny": 3.4918653939355507e-29,
+          "qDriver": 6.284452802067991e-29
+        }
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "msk_met_2021",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "studies": [
+        "msk_chord_2024",
+        "msk_met_2021"
+      ],
+      "note": "cross-study comparison (msk_chord_2024, msk_met_2021): denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count profiled and altered patients per gene",
+            "detail": "The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.",
+            "scope": "TP53 mut · msk_chord_2024",
+            "rowsIn": 13105,
+            "params": [
+              [
+                "genes",
+                "5"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count profiled and altered patients per gene",
+            "detail": "The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.",
+            "scope": "TP53 mut · msk_met_2021",
+            "rowsIn": 12450,
+            "params": [
+              [
+                "genes",
+                "5"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count profiled and altered patients per gene",
+            "detail": "The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.",
+            "scope": "TP53 wt · msk_chord_2024",
+            "rowsIn": 11594,
+            "params": [
+              [
+                "genes",
+                "5"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count profiled and altered patients per gene",
+            "detail": "The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.",
+            "scope": "TP53 wt · msk_met_2021",
+            "rowsIn": 13033,
+            "params": [
+              [
+                "genes",
+                "5"
+              ]
+            ]
+          },
+          {
+            "kind": "transform",
+            "title": "Sum each cohort's counts across its studies",
+            "detail": "Profiled, altered and driver counts are added study by study, so the denominator stays panel-aware. The test that follows is on the pooled counts, not stratified by study."
+          },
+          {
+            "kind": "statistic",
+            "title": "Fisher's exact test per gene",
+            "detail": "Two-sided, on the 2×2 table of altered vs not altered (profiled − altered) in each cohort — once for any alteration and once for drivers only.",
+            "params": [
+              [
+                "genes tested",
+                "5"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across genes",
+            "detail": "q-values over the 5 genes tested here, separately for the any-alteration and driver-only families."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "fisherExact",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg matches statsmodels 0.15.0 multipletests(method=\"fdr_bh\"), to a relative 1e-6 (test/tables-golden.test.ts).",
+        "check": {
+          "compare:APC:p_any": {
+            "v": 0
+          },
+          "compare:APC:p_driver": {
+            "v": 0
+          },
+          "compare:APC:q_any": {
+            "v": 0
+          },
+          "compare:APC:q_driver": {
+            "v": 0
+          },
+          "compare:KRAS:p_any": {
+            "v": 3.683367002397097e-101
+          },
+          "compare:KRAS:p_driver": {
+            "v": 6.541257727317714e-101
+          },
+          "compare:KRAS:q_any": {
+            "v": 9.208417505992743e-101
+          },
+          "compare:KRAS:q_driver": {
+            "v": 1.6353144318294285e-100
+          },
+          "compare:CDKN2A:p_any": {
+            "v": 6.348835417681368e-86
+          },
+          "compare:CDKN2A:p_driver": {
+            "v": 1.1581233622946001e-71
+          },
+          "compare:CDKN2A:q_any": {
+            "v": 1.058139236280228e-85
+          },
+          "compare:CDKN2A:q_driver": {
+            "v": 1.9302056038243335e-71
+          },
+          "compare:PIK3CA:p_any": {
+            "v": 1.6718354038852575e-36
+          },
+          "compare:PIK3CA:p_driver": {
+            "v": 1.616742625373624e-43
+          },
+          "compare:PIK3CA:q_any": {
+            "v": 2.0897942548565717e-36
+          },
+          "compare:PIK3CA:q_driver": {
+            "v": 2.02092828171703e-43
+          },
+          "compare:EGFR:p_any": {
+            "v": 3.4918653939355507e-29
+          },
+          "compare:EGFR:p_driver": {
+            "v": 6.284452802067991e-29
+          },
+          "compare:EGFR:q_any": {
+            "v": 3.4918653939355507e-29
+          },
+          "compare:EGFR:q_driver": {
+            "v": 6.284452802067991e-29
+          },
+          "compare:KRAS:TP53 mut:profiled": {
+            "v": 25555,
+            "abs": 0
+          },
+          "compare:KRAS:TP53 mut:altered": {
+            "v": 7678,
+            "abs": 0
+          },
+          "compare:KRAS:TP53 mut:driver": {
+            "v": 7622,
+            "abs": 0
+          },
+          "compare:PIK3CA:TP53 mut:profiled": {
+            "v": 25555,
+            "abs": 0
+          },
+          "compare:PIK3CA:TP53 mut:altered": {
+            "v": 3347,
+            "abs": 0
+          },
+          "compare:PIK3CA:TP53 mut:driver": {
+            "v": 3009,
+            "abs": 0
+          },
+          "compare:APC:TP53 mut:profiled": {
+            "v": 25555,
+            "abs": 0
+          },
+          "compare:APC:TP53 mut:altered": {
+            "v": 6084,
+            "abs": 0
+          },
+          "compare:APC:TP53 mut:driver": {
+            "v": 5524,
+            "abs": 0
+          },
+          "compare:EGFR:TP53 mut:profiled": {
+            "v": 25555,
+            "abs": 0
+          },
+          "compare:EGFR:TP53 mut:altered": {
+            "v": 2595,
+            "abs": 0
+          },
+          "compare:EGFR:TP53 mut:driver": {
+            "v": 2151,
+            "abs": 0
+          },
+          "compare:CDKN2A:TP53 mut:profiled": {
+            "v": 25555,
+            "abs": 0
+          },
+          "compare:CDKN2A:TP53 mut:altered": {
+            "v": 3978,
+            "abs": 0
+          },
+          "compare:CDKN2A:TP53 mut:driver": {
+            "v": 3590,
+            "abs": 0
+          },
+          "compare:KRAS:TP53 wt:profiled": {
+            "v": 24627,
+            "abs": 0
+          },
+          "compare:KRAS:TP53 wt:altered": {
+            "v": 5345,
+            "abs": 0
+          },
+          "compare:KRAS:TP53 wt:driver": {
+            "v": 5299,
+            "abs": 0
+          },
+          "compare:PIK3CA:TP53 wt:profiled": {
+            "v": 24627,
+            "abs": 0
+          },
+          "compare:PIK3CA:TP53 wt:altered": {
+            "v": 4218,
+            "abs": 0
+          },
+          "compare:PIK3CA:TP53 wt:driver": {
+            "v": 3951,
+            "abs": 0
+          },
+          "compare:APC:TP53 wt:profiled": {
+            "v": 24627,
+            "abs": 0
+          },
+          "compare:APC:TP53 wt:altered": {
+            "v": 2478,
+            "abs": 0
+          },
+          "compare:APC:TP53 wt:driver": {
+            "v": 2040,
+            "abs": 0
+          },
+          "compare:EGFR:TP53 wt:profiled": {
+            "v": 24627,
+            "abs": 0
+          },
+          "compare:EGFR:TP53 wt:altered": {
+            "v": 1805,
+            "abs": 0
+          },
+          "compare:EGFR:TP53 wt:driver": {
+            "v": 1442,
+            "abs": 0
+          },
+          "compare:CDKN2A:TP53 wt:profiled": {
+            "v": 24627,
+            "abs": 0
+          },
+          "compare:CDKN2A:TP53 wt:altered": {
+            "v": 2401,
+            "abs": 0
+          },
+          "compare:CDKN2A:TP53 wt:driver": {
+            "v": 2207,
+            "abs": 0
+          }
+        }
+      }
+    },
+    {
+      "kind": "survival",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
+      "curves": [
+        {
+          "cohort": "TP53 mut",
+          "points": [
+            {
+              "t": 0,
+              "s": 1
+            },
+            {
+              "t": 0,
+              "s": 0.9982
+            },
+            {
+              "t": 0.03,
+              "s": 0.9981
+            },
+            {
+              "t": 0.032876676,
+              "s": 0.9967
+            },
+            {
+              "t": 0.065753353,
+              "s": 0.9966
+            },
+            {
+              "t": 0.07,
+              "s": 0.9966
+            },
+            {
+              "t": 0.098630029,
+              "s": 0.9965
+            },
+            {
+              "t": 0.13,
+              "s": 0.9964
+            },
+            {
+              "t": 0.131506705,
+              "s": 0.9962
+            },
+            {
+              "t": 0.16,
+              "s": 0.996
+            },
+            {
+              "t": 0.164383381,
+              "s": 0.9957
+            },
+            {
+              "t": 0.197260058,
+              "s": 0.9956
+            },
+            {
+              "t": 0.2,
+              "s": 0.9953
+            },
+            {
+              "t": 0.23,
+              "s": 0.995
+            },
+            {
+              "t": 0.230136734,
+              "s": 0.9947
+            },
+            {
+              "t": 0.26,
+              "s": 0.9944
+            },
+            {
+              "t": 0.26301341,
+              "s": 0.9942
+            },
+            {
+              "t": 0.295890087,
+              "s": 0.9939
+            },
+            {
+              "t": 0.3,
+              "s": 0.9935
+            },
+            {
+              "t": 0.328766763,
+              "s": 0.993
+            },
+            {
+              "…": "2979 more",
+              "sha256": "ffc2d62afcd76b56"
+            }
+          ],
+          "median": 30.64106231,
+          "n": 25498,
+          "events": 12607,
+          "atRisk": [
+            25498,
+            24109,
+            23357,
+            22638,
+            21884,
+            21187,
+            20497,
+            19853,
+            19250,
+            18633,
+            17978,
+            17317,
+            16492,
+            15797,
+            15094,
+            14401,
+            13713,
+            13063,
+            12486,
+            11916,
+            {
+              "…": "99 more",
+              "sha256": "65e42ce7c5247805"
+            }
+          ],
+          "missing": 57
+        },
+        {
+          "cohort": "TP53 wt",
+          "points": [
+            {
+              "t": 0,
+              "s": 1
+            },
+            {
+              "t": 0,
+              "s": 0.9989
+            },
+            {
+              "t": 0.03,
+              "s": 0.9988
+            },
+            {
+              "t": 0.032876676,
+              "s": 0.9982
+            },
+            {
+              "t": 0.065753353,
+              "s": 0.998
+            },
+            {
+              "t": 0.07,
+              "s": 0.9978
+            },
+            {
+              "t": 0.098630029,
+              "s": 0.9977
+            },
+            {
+              "t": 0.1,
+              "s": 0.9976
+            },
+            {
+              "t": 0.13,
+              "s": 0.9975
+            },
+            {
+              "t": 0.131506705,
+              "s": 0.9974
+            },
+            {
+              "t": 0.16,
+              "s": 0.9973
+            },
+            {
+              "t": 0.164383381,
+              "s": 0.9973
+            },
+            {
+              "t": 0.197260058,
+              "s": 0.9972
+            },
+            {
+              "t": 0.2,
+              "s": 0.9971
+            },
+            {
+              "t": 0.23,
+              "s": 0.9969
+            },
+            {
+              "t": 0.230136734,
+              "s": 0.9968
+            },
+            {
+              "t": 0.26,
+              "s": 0.9967
+            },
+            {
+              "t": 0.26301341,
+              "s": 0.9966
+            },
+            {
+              "t": 0.295890087,
+              "s": 0.9964
+            },
+            {
+              "t": 0.3,
+              "s": 0.9961
+            },
+            {
+              "…": "3051 more",
+              "sha256": "28815bef7a1dd109"
+            }
+          ],
+          "median": 68.44924006,
+          "n": 24570,
+          "events": 8585,
+          "atRisk": [
+            24570,
+            23454,
+            22965,
+            22473,
+            22046,
+            21636,
+            21221,
+            20770,
+            20340,
+            19860,
+            19420,
+            18945,
+            18285,
+            17677,
+            17144,
+            16580,
+            16020,
+            15453,
+            14997,
+            14522,
+            {
+              "…": "96 more",
+              "sha256": "c627134ccc1ae86f"
+            }
+          ],
+          "missing": 57
+        }
+      ],
+      "endpoint": "OS",
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "msk_met_2021",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "logrank": {
+        "chi2": 1594.0863,
+        "p": 0,
+        "df": 1,
+        "observed": [
+          12607,
+          8585
+        ],
+        "expected": [
+          9723.3,
+          11468.7
+        ],
+        "variance": 5216.6577,
+        "strata": 2
+      },
+      "logrankPooled": {
+        "chi2": 1554.7258,
+        "p": 0,
+        "df": 1,
+        "observed": [
+          12607,
+          8585
+        ],
+        "expected": [
+          9754.9,
+          11437.1
+        ],
+        "variance": 5232.0787,
+        "strata": 1
+      },
+      "caveat": "OS from each study's own baseline (left truncation applies; baselines are NOT harmonized across studies) Status '0:...' treated as censored. The log-rank test is STRATIFIED by study (2 strata contributed events): each study is compared only against itself, so a difference in case mix between studies cannot masquerade as a difference between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer. Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count patients by time and status",
+            "detail": "The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.",
+            "scope": "TP53 mut · msk_chord_2024",
+            "rowsIn": 13105,
+            "rowsOut": 13105,
+            "params": [
+              [
+                "count rows",
+                "4,156"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count patients by time and status",
+            "detail": "The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. 57 cohort patients had no OS_MONTHS value.",
+            "scope": "TP53 mut · msk_met_2021",
+            "rowsIn": 12450,
+            "rowsOut": 12393,
+            "params": [
+              [
+                "count rows",
+                "3,164"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count patients by time and status",
+            "detail": "The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.",
+            "scope": "TP53 wt · msk_chord_2024",
+            "rowsIn": 11594,
+            "rowsOut": 11594,
+            "params": [
+              [
+                "count rows",
+                "4,433"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count patients by time and status",
+            "detail": "The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. 57 cohort patients had no OS_MONTHS value.",
+            "scope": "TP53 wt · msk_met_2021",
+            "rowsIn": 13033,
+            "rowsOut": 12976,
+            "params": [
+              [
+                "count rows",
+                "3,444"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Estimate survival by Kaplan–Meier",
+            "detail": "The product-limit estimator, one curve per cohort, pooled over its studies. The median is the first time the curve is at or below 0.5.",
+            "params": [
+              [
+                "TP53 mut",
+                "25,498 patients, 12,607 events, median 30.6 months"
+              ],
+              [
+                "TP53 wt",
+                "24,570 patients, 8,585 events, median 68.4 months"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Two-group log-rank test, stratified by study",
+            "detail": "At each event time, every cohort's observed events against its share of the risk set, with the hypergeometric variance; χ² on 1 df. Each study is its own stratum — compared only against itself — and the strata are summed, so a difference in case mix between studies cannot pass for a difference between cohorts.",
+            "params": [
+              [
+                "χ² / df / p",
+                "1594.0863 / 1 / <1e-300"
+              ],
+              [
+                "strata with events",
+                "2"
+              ],
+              [
+                "pooled, for contrast",
+                "χ² 1554.7258, p <1e-300"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "kaplanMeier",
+            "logRank"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).",
+        "check": {
+          "km:TP53 mut:n": {
+            "v": 25498,
+            "abs": 0
+          },
+          "km:TP53 mut:events": {
+            "v": 12607,
+            "abs": 0
+          },
+          "km:TP53 mut:median": {
+            "v": 30.64106231,
+            "abs": 1e-9
+          },
+          "km:TP53 wt:n": {
+            "v": 24570,
+            "abs": 0
+          },
+          "km:TP53 wt:events": {
+            "v": 8585,
+            "abs": 0
+          },
+          "km:TP53 wt:median": {
+            "v": 68.44924006,
+            "abs": 1e-9
+          },
+          "logrank:chi2": {
+            "v": 1594.0863,
+            "abs": 0.00005
+          },
+          "logrank:p": {
+            "v": 0,
+            "rel": 0.00001,
+            "abs": 1e-300
+          },
+          "logrank:pooled:chi2": {
+            "v": 1554.7258,
+            "abs": 0.00005
+          },
+          "logrank:pooled:p": {
+            "v": 0,
+            "rel": 0.00001,
+            "abs": 1e-300
+          }
+        }
+      }
+    },
+    {
+      "kind": "clinical",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
+      "clinical": [
+        {
+          "attribute": "FRACTION_GENOME_ALTERED",
+          "per": "sample",
+          "kind": "num",
+          "q": 0,
+          "cells": [
+            {
+              "cohort": "TP53 mut",
+              "n": 25537,
+              "mean": 0.224,
+              "sd": 0.198,
+              "min": 0,
+              "max": 1,
+              "median": null,
+              "q1": null,
+              "q3": null,
+              "histogramTruncated": false
+            },
+            {
+              "cohort": "TP53 wt",
+              "n": 24565,
+              "mean": 0.147,
+              "sd": 0.168,
+              "min": 0,
+              "max": 1,
+              "median": null,
+              "q1": null,
+              "q3": null,
+              "histogramTruncated": false
+            }
+          ],
+          "test": "Welch t",
+          "statistic": 47.039,
+          "df": 49327.99,
+          "p": 0
+        },
+        {
+          "attribute": "TMB_NONSYNONYMOUS",
+          "per": "sample",
+          "kind": "num",
+          "q": 1.5375667797084092e-40,
+          "cells": [
+            {
+              "cohort": "TP53 mut",
+              "n": 25622,
+              "mean": 8.693,
+              "sd": 20.068,
+              "min": 0,
+              "max": 654.576457903,
+              "median": null,
+              "q1": null,
+              "q3": null,
+              "histogramTruncated": false
+            },
+            {
+              "cohort": "TP53 wt",
+              "n": 24649,
+              "mean": 6.555,
+              "sd": 15.678,
+              "min": 0,
+              "max": 549.94798841,
+              "median": null,
+              "q1": null,
+              "q3": null,
+              "histogramTruncated": false
+            }
+          ],
+          "test": "Welch t",
+          "statistic": 13.3429,
+          "df": 48254.11,
+          "p": 1.5375667797084092e-40
+        },
+        {
+          "attribute": "CURRENT_AGE_DEID",
+          "per": "patient",
+          "kind": "cat",
+          "cells": [],
+          "skipped": "not declared by msk_met_2021"
+        }
+      ],
+      "studies": [
+        "msk_chord_2024",
+        "msk_met_2021"
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "msk_met_2021",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary; numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across the 2 tested attributes. Counts are pooled across 2 studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Describe each attribute",
+            "detail": "The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies). Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database.",
+            "scope": "TP53 mut · msk_chord_2024",
+            "rowsIn": 13105
+          },
+          {
+            "kind": "fetch",
+            "title": "Describe each attribute",
+            "detail": "The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies). Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database.",
+            "scope": "TP53 mut · msk_met_2021",
+            "rowsIn": 12450
+          },
+          {
+            "kind": "fetch",
+            "title": "Describe each attribute",
+            "detail": "The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies). Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database.",
+            "scope": "TP53 wt · msk_chord_2024",
+            "rowsIn": 11594
+          },
+          {
+            "kind": "fetch",
+            "title": "Describe each attribute",
+            "detail": "The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies). Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database.",
+            "scope": "TP53 wt · msk_met_2021",
+            "rowsIn": 13033
+          },
+          {
+            "kind": "transform",
+            "title": "Add each cohort's counts and moments across its studies",
+            "detail": "Value counts, n, Σx and Σx² add exactly. Vocabularies are not harmonized: the same value spelled differently in two studies stays two values. Medians and rank tests need each study's full distribution in one place, so they are not computed for a view that spans studies."
+          },
+          {
+            "kind": "transform",
+            "title": "Set aside attributes that cannot be tested",
+            "detail": "Each is named with its reason rather than dropped.",
+            "params": [
+              [
+                "CURRENT_AGE_DEID",
+                "not declared by msk_met_2021"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Welch's t-test for each numeric attribute",
+            "detail": "Unequal-variance t from each cohort's n, mean and variance, with Welch–Satterthwaite degrees of freedom; two-sided. Mean and variance are from the summed moments: variance = (Σx² − (Σx)²/n) / (n − 1).",
+            "params": [
+              [
+                "TMB_NONSYNONYMOUS",
+                "t 13.3429 on 48254.11 df · p 1.54e-40"
+              ],
+              [
+                "FRACTION_GENOME_ALTERED",
+                "t 47.039 on 49327.99 df · p <1e-300"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across attributes",
+            "detail": "q-values over the 2 tested attributes, from the χ² and Welch p-values together."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "welchT",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "χ² matches scipy 1.18.1 chi2_contingency; Welch's t scipy ttest_ind(equal_var=False) and Welch's ANOVA statsmodels 0.15.0 anova_generic from the same moments; Mann–Whitney, Kruskal–Wallis and quantiles scipy/numpy on the expanded distribution; Benjamini–Hochberg statsmodels multipletests — all to a relative 1e-6 (test/tables-golden.test.ts, test/moments-golden.test.ts).",
+        "check": {
+          "clinical:TMB_NONSYNONYMOUS:p": {
+            "v": 1.5375667797084092e-40
+          },
+          "clinical:TMB_NONSYNONYMOUS:q": {
+            "v": 1.5375667797084092e-40
+          },
+          "clinical:FRACTION_GENOME_ALTERED:p": {
+            "v": 0
+          },
+          "clinical:FRACTION_GENOME_ALTERED:q": {
+            "v": 0
+          }
+        }
+      }
+    },
+    {
+      "kind": "cooccurrence",
+      "cohorts": [
+        "TP53 mut"
+      ],
+      "pairs": [
+        {
+          "a": "KRAS",
+          "b": "APC",
+          "both": 2253,
+          "onlyA": 5425,
+          "onlyB": 3831,
+          "neither": 14046,
+          "profiled": 25555,
+          "log2Odds": 0.607,
+          "p": 3.781531181941494e-41,
+          "q": 4.7769702136632874e-36,
+          "tendency": "co-occurrence",
+          "pStratified": 7.961617022772145e-37,
+          "oddsRatioMH": 1.4795,
+          "strata": 2
+        },
+        {
+          "a": "KRAS",
+          "b": "PIK3CA",
+          "both": 724,
+          "onlyA": 6954,
+          "onlyB": 2623,
+          "neither": 15254,
+          "profiled": 25555,
+          "log2Odds": -0.724,
+          "p": 1.5284208764989049e-31,
+          "q": 1.8986041405298755e-29,
+          "tendency": "mutual exclusivity",
+          "pStratified": 6.328680468432918e-30,
+          "oddsRatioMH": 0.6056,
+          "strata": 2
+        },
+        {
+          "a": "PIK3CA",
+          "b": "APC",
+          "both": 929,
+          "onlyA": 2418,
+          "onlyB": 5155,
+          "neither": 17053,
+          "profiled": 25555,
+          "log2Odds": 0.346,
+          "p": 1.4753311744155665e-8,
+          "q": 1.404008613205968e-8,
+          "tendency": "co-occurrence",
+          "pStratified": 7.02004306602984e-9,
+          "oddsRatioMH": 1.2751,
+          "strata": 2
+        },
+        {
+          "a": "TP53",
+          "b": "KRAS",
+          "both": 7678,
+          "onlyA": 17877,
+          "onlyB": 0,
+          "neither": 0,
+          "profiled": 25555,
+          "log2Odds": -1.219,
+          "p": 0.9999999999708962,
+          "q": 1,
+          "tendency": "mutual exclusivity",
+          "pStratified": 1,
+          "oddsRatioMH": null,
+          "strata": 0
+        },
+        {
+          "a": "TP53",
+          "b": "PIK3CA",
+          "both": 3347,
+          "onlyA": 22208,
+          "onlyB": 0,
+          "neither": 0,
+          "profiled": 25555,
+          "log2Odds": -2.73,
+          "p": 1,
+          "q": 1,
+          "tendency": "mutual exclusivity",
+          "pStratified": 1,
+          "oddsRatioMH": null,
+          "strata": 0
+        },
+        {
+          "a": "TP53",
+          "b": "APC",
+          "both": 6084,
+          "onlyA": 19471,
+          "onlyB": 0,
+          "neither": 0,
+          "profiled": 25555,
+          "log2Odds": -1.678,
+          "p": 1,
+          "q": 1,
+          "tendency": "mutual exclusivity",
+          "pStratified": 1,
+          "oddsRatioMH": null,
+          "strata": 0
+        }
+      ],
+      "studies": [
+        "msk_chord_2024",
+        "msk_met_2021"
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "msk_met_2021",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "Pairwise co-occurrence within “TP53 mut” (the first cohort in this view; co-occurrence describes one cohort, not a contrast). Denominators are the patients profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on patients whose panel could not have detected it. With 2 studies the reported test is STRATIFIED by study (Cochran–Mantel–Haenszel): each study contributes a 2×2 and the coordinator combines them, so a pair cannot be manufactured by differing case mix between sites. The pooled Fisher p is shown alongside. q-values are Benjamini–Hochberg across the 6 assessable pairs. Every site returns four counts per pair and nothing else.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count each gene pair's 2×2 table",
+            "detail": "The pairCounts query above. Of the patients with a sample on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.",
+            "scope": "TP53 mut · msk_chord_2024",
+            "rowsIn": 13105,
+            "params": [
+              [
+                "pairs",
+                "6"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count each gene pair's 2×2 table",
+            "detail": "The pairCounts query above. Of the patients with a sample on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.",
+            "scope": "TP53 mut · msk_met_2021",
+            "rowsIn": 12450,
+            "params": [
+              [
+                "pairs",
+                "6"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Log₂ odds ratio per pair",
+            "detail": "log₂((both · neither) / (only first · only second)) on the counts summed across studies, with 0.5 added to every cell when any cell is 0. The direction reported (co-occurrence vs mutual exclusivity) follows the Mantel–Haenszel odds ratio below."
+          },
+          {
+            "kind": "statistic",
+            "title": "Cochran–Mantel–Haenszel test, stratified by study",
+            "detail": "Each study's 2×2 is a stratum (one with an empty margin says nothing and is dropped); the test of a common odds ratio of 1, with the 0.5 continuity correction applied when |Σa − ΣE[a]| ≥ 0.5 (as R's mantelhaen.test), on 1 df. This p is the one corrected and ranked; the two-sided Fisher p on the pooled counts is reported alongside."
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across pairs",
+            "detail": "q-values over the 6 assessable pairs, from the stratified p-values."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "fisherExact",
+            "cochranMantelHaenszel",
+            "log2OddsRatio",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Fisher's exact test matches scipy 1.18.1 fisher_exact, the CMH test and Mantel–Haenszel odds ratio statsmodels 0.15.0 StratifiedTable and Benjamini–Hochberg statsmodels 0.15.0 multipletests(method=\"fdr_bh\"), to a relative 1e-6 (test/tables-golden.test.ts).",
+        "check": {
+          "cooccurrence:KRAS/APC:p": {
+            "v": 3.781531181941494e-41
+          },
+          "cooccurrence:KRAS/APC:q": {
+            "v": 4.7769702136632874e-36
+          },
+          "cooccurrence:KRAS/APC:p_cmh": {
+            "v": 7.961617022772145e-37
+          },
+          "cooccurrence:KRAS/PIK3CA:p": {
+            "v": 1.5284208764989049e-31
+          },
+          "cooccurrence:KRAS/PIK3CA:q": {
+            "v": 1.8986041405298755e-29
+          },
+          "cooccurrence:KRAS/PIK3CA:p_cmh": {
+            "v": 6.328680468432918e-30
+          },
+          "cooccurrence:PIK3CA/APC:p": {
+            "v": 1.4753311744155665e-8
+          },
+          "cooccurrence:PIK3CA/APC:q": {
+            "v": 1.404008613205968e-8
+          },
+          "cooccurrence:PIK3CA/APC:p_cmh": {
+            "v": 7.02004306602984e-9
+          },
+          "cooccurrence:TP53/KRAS:p": {
+            "v": 0.9999999999708962
+          },
+          "cooccurrence:TP53/KRAS:q": {
+            "v": 1
+          },
+          "cooccurrence:TP53/KRAS:p_cmh": {
+            "v": 1
+          },
+          "cooccurrence:TP53/PIK3CA:p": {
+            "v": 1
+          },
+          "cooccurrence:TP53/PIK3CA:q": {
+            "v": 1
+          },
+          "cooccurrence:TP53/PIK3CA:p_cmh": {
+            "v": 1
+          },
+          "cooccurrence:TP53/APC:p": {
+            "v": 1
+          },
+          "cooccurrence:TP53/APC:q": {
+            "v": 1
+          },
+          "cooccurrence:TP53/APC:p_cmh": {
+            "v": 1
+          }
+        }
+      }
+    }
+  ]
+}

@@ -226,10 +226,19 @@ export function directConnections(): ChConn[] {
   return connections().filter((c) => c.id !== peer?.id);
 }
 
+/** One statement as the database would receive it: its text, and the tables that ride along with it. */
+export interface ChStatement { conn: ChConn; format: string; query: string; externals: { name: string; structure: string; blob: Blob }[] }
+/**
+ * Answers statements instead of the database, or watches them on their way to it (`send`, which
+ * takes extra ClickHouse settings for that statement, e.g. "max_threads=1"). Only
+ * test/view-snapshots.test.ts sets one: it records the warehouse's answers, then replays them.
+ */
+export type ChTransport = (st: ChStatement, send: (settings?: string) => Promise<string>) => Promise<string>;
+let transport: ChTransport | null = null;
+export function setChTransport(t: ChTransport | null): void { transport = t; }
+
 async function post(sql: string, conn: ChConn, format: string): Promise<string> {
   assertNotLoopbackDirect(sql, conn);
-  if (!conn.url || !conn.user || !conn.password || !conn.db)
-    throw new Error("ClickHouse instance '" + conn.id + "' is missing configuration (url/password/db)");
   const ctx = ctxStore.getStore();
   const query = sql + "\nFORMAT " + format;
   // uploaded custom data and stored id sets ride along only with a statement that names them
@@ -237,10 +246,17 @@ async function post(sql: string, conn: ChConn, format: string): Promise<string> 
   const externals = [...externalsFor(query),
     ...[...customExternalsFor(query, conn.id), ...idSetExternalsFor(query, conn.id)]
       .map((e) => ({ name: e.name, structure: e.structure, blob: new Blob([e.data]) }))];
+  if (transport) return transport({ conn, format, query, externals }, (settings) => postToDatabase(conn, query, externals, ctx, settings));
+  return postToDatabase(conn, query, externals, ctx);
+}
+
+async function postToDatabase(conn: ChConn, query: string, externals: ChStatement["externals"], ctx: ChCtx | undefined, settings?: string): Promise<string> {
+  if (!conn.url || !conn.user || !conn.password || !conn.db)
+    throw new Error("ClickHouse instance '" + conn.id + "' is missing configuration (url/password/db)");
   // Tell ClickHouse to stop a query whose client has gone away. Without it an abandoned
   // request keeps its share of the database until it finishes, which is most of what an
   // abandoned request costs.
-  const url = conn.url.replace(/\/+$/, "") + "/?cancel_http_readonly_queries_on_client_close=1";
+  const url = conn.url.replace(/\/+$/, "") + "/?cancel_http_readonly_queries_on_client_close=1" + (settings ? "&" + settings : "");
   const send = async (): Promise<string> => {
     const auth = "Basic " + Buffer.from(conn.user + ":" + conn.password).toString("base64");
     let init: RequestInit;

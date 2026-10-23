@@ -1,0 +1,23 @@
+Analysis over brca_tcga_pan_can_atlas_2018 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- BRCA: 1,066 patients — profiled for MUTATION
+
+Co-expression (Pearson r, computed from six per-site sums so the pooled value is exact):
+  ERBB2/GRB7: r=0.871 (n=1,064) p=<1e-300 q=<1e-300
+  ESR1/MKI67: r=-0.233 (n=1,064) p=1.2e-14 q=6.2e-14
+  ESR1/PGR: r=0.226 (n=1,064) p=8.0e-14 q=2.7e-13
+  PGR/MKI67: r=-0.184 (n=1,064) p=1.5e-9 q=3.8e-9
+  GRB7/ESR1: r=-0.172 (n=1,064) p=1.6e-8 q=3.1e-8
+  ERBB2/ESR1: r=-0.165 (n=1,064) p=6.0e-8 q=1.0e-7
+  ERBB2/PGR: r=-0.127 (n=1,064) p=3.2e-5 q=4.6e-5
+  GRB7/PGR: r=-0.118 (n=1,064) p=0.0001 q=0.0001
+  GRB7/MKI67: r=0.046 (n=1,064) p=0.1367 q=0.1426
+  ERBB2/MKI67: r=0.045 (n=1,064) p=0.1426 q=0.1426
+  Pearson correlation on “rna_seq_v2_mrna_median_Zscores” within “BRCA”, over the patients with BOTH values (values averaged per patient, matching the heatmap convention). Each site reports six sums — n, Σx, Σy, Σxy, Σx², Σy² — and nothing else; those sums are additive, so the pooled correlation is EXACT rather than an approximation of a centralized one. q-values are Benjamini–Hochberg across the 10 pairs with a defined correlation.
+  METHOD:
+    - Sum each gene pair's values [BRCA · brca_tcga_pan_can_atlas_2018]: The pairMoments query above, on “rna_seq_v2_mrna_median_Zscores”. Per pair, over the patients with a value for both genes (a patient with several samples contributes their average): n, Σx, Σy, Σxy, Σx² and Σy² — six sums, no individual value.
+        pairs: 10
+    - Pearson correlation per pair: r = (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); t = r√((n − 2)/(1 − r²)), two-sided p on n − 2 df. Undefined for n < 3 or a constant series.
+    - Benjamini–Hochberg across pairs: q-values over the 10 pairs with a defined correlation, from the Pearson p-values.
+    Pearson's r and p from the six sums match scipy 1.18.1 pearsonr on the underlying values, to a relative 1e-6 (test/moments-golden.test.ts).

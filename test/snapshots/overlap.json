@@ -1,0 +1,237 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "TP53 mutant": {
+      "count": 13105,
+      "text": "OQL[TP53: MUT]",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    },
+    "KRAS mutant": {
+      "count": 7115,
+      "text": "OQL[KRAS: MUT]",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    },
+    "Immunotherapy": {
+      "count": 3341,
+      "text": "has Immuno treatment",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    },
+    "NSCLC": {
+      "count": 7809,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "overlap",
+      "cohorts": [
+        "TP53 mutant",
+        "KRAS mutant",
+        "Immunotherapy",
+        "NSCLC"
+      ],
+      "overlap": {
+        "sets": [
+          {
+            "name": "TP53 mutant",
+            "size": 13105,
+            "samples": 13172
+          },
+          {
+            "name": "KRAS mutant",
+            "size": 7115,
+            "samples": 7161
+          },
+          {
+            "name": "Immunotherapy",
+            "size": 3341,
+            "samples": 3372
+          },
+          {
+            "name": "NSCLC",
+            "size": 7809,
+            "samples": 7876
+          }
+        ],
+        "intersections": [
+          {
+            "members": [
+              "TP53 mutant"
+            ],
+            "n": 5314,
+            "samples": 5320
+          },
+          {
+            "members": [
+              "TP53 mutant",
+              "KRAS mutant"
+            ],
+            "n": 3391,
+            "samples": 3402
+          },
+          {
+            "members": [
+              "TP53 mutant",
+              "NSCLC"
+            ],
+            "n": 2043,
+            "samples": 2055
+          },
+          {
+            "members": [
+              "NSCLC"
+            ],
+            "n": 1887,
+            "samples": 1897
+          },
+          {
+            "members": [
+              "KRAS mutant"
+            ],
+            "n": 1381,
+            "samples": 1381
+          },
+          {
+            "members": [
+              "TP53 mutant",
+              "Immunotherapy",
+              "NSCLC"
+            ],
+            "n": 1167,
+            "samples": 1176
+          },
+          {
+            "members": [
+              "KRAS mutant",
+              "NSCLC"
+            ],
+            "n": 838,
+            "samples": 842
+          },
+          {
+            "members": [
+              "KRAS mutant",
+              "Immunotherapy",
+              "NSCLC"
+            ],
+            "n": 546,
+            "samples": 548
+          },
+          {
+            "members": [
+              "Immunotherapy",
+              "NSCLC"
+            ],
+            "n": 518,
+            "samples": 523
+          },
+          {
+            "members": [
+              "TP53 mutant",
+              "KRAS mutant",
+              "Immunotherapy",
+              "NSCLC"
+            ],
+            "n": 435,
+            "samples": 444
+          },
+          {
+            "members": [
+              "TP53 mutant",
+              "KRAS mutant",
+              "NSCLC"
+            ],
+            "n": 375,
+            "samples": 391
+          },
+          {
+            "members": [
+              "TP53 mutant",
+              "Immunotherapy"
+            ],
+            "n": 292,
+            "samples": 293
+          },
+          {
+            "members": [
+              "Immunotherapy"
+            ],
+            "n": 234,
+            "samples": 235
+          },
+          {
+            "members": [
+              "TP53 mutant",
+              "KRAS mutant",
+              "Immunotherapy"
+            ],
+            "n": 88,
+            "samples": 91
+          },
+          {
+            "members": [
+              "KRAS mutant",
+              "Immunotherapy"
+            ],
+            "n": 61,
+            "samples": 62
+          }
+        ],
+        "union": 18570
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Patients in exactly the marked cohorts and none of the others, for every combination that has any — computed inside each study's database, which returns one count per combination. 18,570 patients are in at least one of the 4 cohorts. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count patients per combination of cohorts",
+            "detail": "The overlap query above: every patient in any of TP53 mutant, KRAS mutant, Immunotherapy, NSCLC gets a bitmask of the cohorts it is in, and the study returns one count per bitmask. Counts only.",
+            "scope": "msk_chord_2024",
+            "rowsOut": 18570
+          },
+          {
+            "kind": "transform",
+            "title": "Add the counts across studies and name each combination",
+            "detail": "Each study's bits are mapped back to the view's cohort order; combinations add exactly, and a patient can only overlap within one study.",
+            "params": [
+              [
+                "patients in any cohort",
+                "18,570"
+              ],
+              [
+                "combinations with patients",
+                "15"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [],
+          "file": "lib/views/overlap.ts",
+          "commit": null
+        }
+      }
+    }
+  ]
+}

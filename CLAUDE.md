@@ -695,6 +695,16 @@ they can't tell you:
   `check:splitby-perf`) are stages of `scripts/gate.sh` of their own, and the boundary suite is in
   `npm test`.
   `npm run report:coverage` — the unit suites' coverage (CI shows it on the reports job).
+  **Every view kind's output is pinned** by `test/view-snapshots.test.ts` (in `npm test`, no
+  database): one gallery example per kind runs through the whole engine against warehouse answers
+  recorded in `test/snapshots/answers/`, and its compiled SQL and queries, computed result, figure
+  and results text are compared with `test/snapshots/<kind>.{sql,json,svg,txt}`. A diff there is a
+  change to review, not noise: `UPDATE_SNAPSHOTS=1` accepts output changes, and a changed query
+  needs `RECORD_SNAPSHOTS=1` with `.env.local` (public warehouse only; the answers hold public
+  studies' patient-level rows). A new view kind adds its case there. Each case also runs with its
+  answers delivered in reverse, and must not change: a runner combines what it asked for after
+  every answer is in, in the view's order (`askEachSite` in `lib/views/shared.ts`), never inside
+  the callback as each one lands.
   Secrets come from `.env.local` at runtime; never hardcode them anywhere, including tests.
 - Lint: `npm run lint` (~2 min, the gate's first stage) — see "Code standards" above for what it
   holds code to. While iterating, `npx eslint <files you touched>` is enough.

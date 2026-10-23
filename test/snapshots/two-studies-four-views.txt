@@ -1,0 +1,87 @@
+Analysis over msk_chord_2024 + msk_met_2021 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- TP53 mut: 25,555 patients — OQL[TP53: MUT] — across 2 studies
+- TP53 wt: 24,627 patients — NOT OQL[TP53:] AND profiled for TP53 MUTATION — across 2 studies
+
+Compare (driver%/any%, panel-aware denominators; annotation OncoKB v7.5 (pinned)):
+  APC: TP53 mut 21.6%/23.8% | TP53 wt 8.3%/10.1%  p=0.0e+0
+  KRAS: TP53 mut 29.8%/30% | TP53 wt 21.5%/21.7%  p=3.7e-101
+  CDKN2A: TP53 mut 14%/15.6% | TP53 wt 9%/9.7%  p=6.3e-86
+  PIK3CA: TP53 mut 11.8%/13.1% | TP53 wt 16%/17.1%  p=1.7e-36
+  EGFR: TP53 mut 8.4%/10.2% | TP53 wt 5.9%/7.3%  p=3.5e-29
+  cross-study comparison (msk_chord_2024, msk_met_2021): denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic
+  METHOD:
+    - Count profiled and altered patients per gene [TP53 mut · msk_chord_2024]: The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.
+        genes: 5
+    - Count profiled and altered patients per gene [TP53 mut · msk_met_2021]: The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.
+        genes: 5
+    - Count profiled and altered patients per gene [TP53 wt · msk_chord_2024]: The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.
+        genes: 5
+    - Count profiled and altered patients per gene [TP53 wt · msk_met_2021]: The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.
+        genes: 5
+    - Sum each cohort's counts across its studies: Profiled, altered and driver counts are added study by study, so the denominator stays panel-aware. The test that follows is on the pooled counts, not stratified by study.
+    - Fisher's exact test per gene: Two-sided, on the 2×2 table of altered vs not altered (profiled − altered) in each cohort — once for any alteration and once for drivers only.
+        genes tested: 5
+    - Benjamini–Hochberg across genes: q-values over the 5 genes tested here, separately for the any-alteration and driver-only families.
+    Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg matches statsmodels 0.15.0 multipletests(method="fdr_bh"), to a relative 1e-6 (test/tables-golden.test.ts).
+
+Survival (KM, OS):
+  TP53 mut: median 30.6mo (n=25498, 12607 events, 57 missing OS)
+  TP53 wt: median 68.4mo (n=24570, 8585 events, 57 missing OS)
+  log-rank p=<1e-300 (stratified by study)
+CAVEAT (tell the user): OS from each study's own baseline (left truncation applies; baselines are NOT harmonized across studies) Status '0:...' treated as censored. The log-rank test is STRATIFIED by study (2 strata contributed events): each study is compared only against itself, so a difference in case mix between studies cannot masquerade as a difference between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer. Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary.
+  METHOD:
+    - Count patients by time and status [TP53 mut · msk_chord_2024] (13,105 → 13,105 rows): The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.
+        count rows: 4,156
+    - Count patients by time and status [TP53 mut · msk_met_2021] (12,450 → 12,393 rows): The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. 57 cohort patients had no OS_MONTHS value.
+        count rows: 3,164
+    - Count patients by time and status [TP53 wt · msk_chord_2024] (11,594 → 11,594 rows): The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.
+        count rows: 4,433
+    - Count patients by time and status [TP53 wt · msk_met_2021] (13,033 → 12,976 rows): The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. 57 cohort patients had no OS_MONTHS value.
+        count rows: 3,444
+    - Estimate survival by Kaplan–Meier: The product-limit estimator, one curve per cohort, pooled over its studies. The median is the first time the curve is at or below 0.5.
+        TP53 mut: 25,498 patients, 12,607 events, median 30.6 months
+        TP53 wt: 24,570 patients, 8,585 events, median 68.4 months
+    - Two-group log-rank test, stratified by study: At each event time, every cohort's observed events against its share of the risk set, with the hypergeometric variance; χ² on 1 df. Each study is its own stratum — compared only against itself — and the strata are summed, so a difference in case mix between studies cannot pass for a difference between cohorts.
+        χ² / df / p: 1594.0863 / 1 / <1e-300
+        strata with events: 2
+        pooled, for contrast: χ² 1554.7258, p <1e-300
+    Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).
+
+Clinical comparison across cohorts:
+  FRACTION_GENOME_ALTERED [sample, num]: TP53 mut mean 0.22 sd 0.20 (n=25,537) | TP53 wt mean 0.15 sd 0.17 (n=24,565)  Welch t p=<1e-300 q=<1e-300
+  TMB_NONSYNONYMOUS [sample, num]: TP53 mut mean 8.69 sd 20.07 (n=25,622) | TP53 wt mean 6.55 sd 15.68 (n=24,649)  Welch t p=1.5e-40 q=1.5e-40
+  CURRENT_AGE_DEID [patient, cat]:   SKIPPED: not declared by msk_met_2021
+  Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary; numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across the 2 tested attributes. Counts are pooled across 2 studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged.
+  METHOD:
+    - Describe each attribute [TP53 mut · msk_chord_2024]: The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies). Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database.
+    - Describe each attribute [TP53 mut · msk_met_2021]: The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies). Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database.
+    - Describe each attribute [TP53 wt · msk_chord_2024]: The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies). Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database.
+    - Describe each attribute [TP53 wt · msk_met_2021]: The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies). Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database.
+    - Add each cohort's counts and moments across its studies: Value counts, n, Σx and Σx² add exactly. Vocabularies are not harmonized: the same value spelled differently in two studies stays two values. Medians and rank tests need each study's full distribution in one place, so they are not computed for a view that spans studies.
+    - Set aside attributes that cannot be tested: Each is named with its reason rather than dropped.
+        CURRENT_AGE_DEID: not declared by msk_met_2021
+    - Welch's t-test for each numeric attribute: Unequal-variance t from each cohort's n, mean and variance, with Welch–Satterthwaite degrees of freedom; two-sided. Mean and variance are from the summed moments: variance = (Σx² − (Σx)²/n) / (n − 1).
+        TMB_NONSYNONYMOUS: t 13.3429 on 48254.11 df · p 1.54e-40
+        FRACTION_GENOME_ALTERED: t 47.039 on 49327.99 df · p <1e-300
+    - Benjamini–Hochberg across attributes: q-values over the 2 tested attributes, from the χ² and Welch p-values together.
+    χ² matches scipy 1.18.1 chi2_contingency; Welch's t scipy ttest_ind(equal_var=False) and Welch's ANOVA statsmodels 0.15.0 anova_generic from the same moments; Mann–Whitney, Kruskal–Wallis and quantiles scipy/numpy on the expanded distribution; Benjamini–Hochberg statsmodels multipletests — all to a relative 1e-6 (test/tables-golden.test.ts, test/moments-golden.test.ts).
+
+Co-occurrence (2x2 per pair, among patients profiled for BOTH genes):
+  KRAS/APC: both 2,253, KRAS only 5,425, APC only 3,831, neither 14,046 (of 25,555 profiled)  log2OR=0.61 (co-occur)  p=3.8e-41 q=4.8e-36  stratified p=8.0e-37
+  KRAS/PIK3CA: both 724, KRAS only 6,954, PIK3CA only 2,623, neither 15,254 (of 25,555 profiled)  log2OR=-0.72 (mutually exclusive)  p=1.5e-31 q=1.9e-29  stratified p=6.3e-30
+  PIK3CA/APC: both 929, PIK3CA only 2,418, APC only 5,155, neither 17,053 (of 25,555 profiled)  log2OR=0.35 (co-occur)  p=1.5e-8 q=1.4e-8  stratified p=7.0e-9
+  TP53/KRAS: both 7,678, TP53 only 17,877, KRAS only 0, neither 0 (of 25,555 profiled)  log2OR=-1.22 (mutually exclusive)  p=1.0000 q=1.0000  stratified p=1.0000
+  TP53/PIK3CA: both 3,347, TP53 only 22,208, PIK3CA only 0, neither 0 (of 25,555 profiled)  log2OR=-2.73 (mutually exclusive)  p=1.0000 q=1.0000  stratified p=1.0000
+  TP53/APC: both 6,084, TP53 only 19,471, APC only 0, neither 0 (of 25,555 profiled)  log2OR=-1.68 (mutually exclusive)  p=1.0000 q=1.0000  stratified p=1.0000
+  Pairwise co-occurrence within “TP53 mut” (the first cohort in this view; co-occurrence describes one cohort, not a contrast). Denominators are the patients profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on patients whose panel could not have detected it. With 2 studies the reported test is STRATIFIED by study (Cochran–Mantel–Haenszel): each study contributes a 2×2 and the coordinator combines them, so a pair cannot be manufactured by differing case mix between sites. The pooled Fisher p is shown alongside. q-values are Benjamini–Hochberg across the 6 assessable pairs. Every site returns four counts per pair and nothing else.
+  METHOD:
+    - Count each gene pair's 2×2 table [TP53 mut · msk_chord_2024]: The pairCounts query above. Of the patients with a sample on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.
+        pairs: 6
+    - Count each gene pair's 2×2 table [TP53 mut · msk_met_2021]: The pairCounts query above. Of the patients with a sample on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.
+        pairs: 6
+    - Log₂ odds ratio per pair: log₂((both · neither) / (only first · only second)) on the counts summed across studies, with 0.5 added to every cell when any cell is 0. The direction reported (co-occurrence vs mutual exclusivity) follows the Mantel–Haenszel odds ratio below.
+    - Cochran–Mantel–Haenszel test, stratified by study: Each study's 2×2 is a stratum (one with an empty margin says nothing and is dropped); the test of a common odds ratio of 1, with the 0.5 continuity correction applied when |Σa − ΣE[a]| ≥ 0.5 (as R's mantelhaen.test), on 1 df. This p is the one corrected and ranked; the two-sided Fisher p on the pooled counts is reported alongside.
+    - Benjamini–Hochberg across pairs: q-values over the 6 assessable pairs, from the stratified p-values.
+    Fisher's exact test matches scipy 1.18.1 fisher_exact, the CMH test and Mantel–Haenszel odds ratio statsmodels 0.15.0 StratifiedTable and Benjamini–Hochberg statsmodels 0.15.0 multipletests(method="fdr_bh"), to a relative 1e-6 (test/tables-golden.test.ts).

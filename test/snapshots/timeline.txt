@@ -1,0 +1,290 @@
+Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- Breast: 5,368 patients — CANCER_TYPE in [Breast Cancer] (any sample)
+
+Patient timeline — patients to choose from: 5,368; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	patient	source	samples	events	span	types
+  Breast	P-0014149	this portal (primary)	1	925	6137	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0007146	this portal (primary)	1	800	5211	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0015681	this portal (primary)	1	717	6495	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0041672	this portal (primary)	1	708	4675	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0047755	this portal (primary)	1	694	5302	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0016734	this portal (primary)	1	677	6765	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0057382	this portal (primary)	1	663	7893	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0003958	this portal (primary)	1	655	6883	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0010993	this portal (primary)	1	652	6492	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0011420	this portal (primary)	1	646	7755	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0015568	this portal (primary)	1	642	9729	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0018146	this portal (primary)	1	638	9583	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0008398	this portal (primary)	1	635	3452	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0029771	this portal (primary)	1	632	4634	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0001990	this portal (primary)	1	621	4828	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0007045	this portal (primary)	1	612	3923	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0013915	this portal (primary)	1	609	7004	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0001939	this portal (primary)	1	574	6298	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0025567	this portal (primary)	1	573	5364	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0002531	this portal (primary)	1	571	6504	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0062207	this portal (primary)	1	569	5832	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0022066	this portal (primary)	1	565	3851	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0020130	this portal (primary)	1	561	6233	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0004381	this portal (primary)	1	555	8571	Diagnosis, Lab_Test, Sample acquisition, Sequencing, Surgery, Treatment
+  Breast	P-0020707	this portal (primary)	1	555	11415	Diagnosis, Lab_Test, Pathology, Sample acquisition, Sequencing, Surgery, Treatment
+  … 5,343 more rows
+P-0000012 (msk_chord_2024): 172 events, days from diagnosis; samples: P-0000012-T02-IM3 (Primary), P-0000012-T03-IM3 (Metastasis)
+  day -9641: Diagnosis — SUBTYPE=Primary, CLINICAL_GROUP=99, SUMMARY=N/A, PATH_GROUP=99, SOURCE=Tumor Registry, DX_DESCRIPTION=INFILTRATING DUCT CARCINOMA | BREAST, NOS (M8500/3 | C509), STAGE_CDM_DERIVED=Stage 1-3
+  day -5453: Sample acquisition — SEQ_DATE=48, SAMPLE_ID=P-0000012-T02-IM3
+  day -5437–-5369: Treatment — SUBTYPE=Chemo, AGENT=CYCLOPHOSPHAMIDE, RX_INVESTIGATIVE=N, FLAG_OROTOPICAL=0
+  day -5437–-5326: Treatment — SUBTYPE=Chemo, AGENT=FLUOROURACIL, RX_INVESTIGATIVE=N, FLAG_OROTOPICAL=0
+  day -5437–-5327: Treatment — SUBTYPE=Chemo, AGENT=METHOTREXATE, RX_INVESTIGATIVE=N, FLAG_OROTOPICAL=0
+  day -5437: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.8
+  day -5307: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=21
+  day -5307: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.9
+  day -5178: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=16
+  day -5178: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.4
+  day -4999: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=17
+  day -4999: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.5
+  day -4849: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=14
+  day -4849: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.4
+  day -4684: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=14
+  day -4684: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.7
+  day -4530: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=17
+  day -4530: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.2
+  day -4362: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=13
+  day -4362: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.3
+  day -3946: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=14
+  day -3946: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.8
+  day -3603: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=15
+  day -3603: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=2.2
+  day -3382: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=14
+  day -3382: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.9
+  day -3165: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=12
+  day -3165: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=2.2
+  day -2990: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=12
+  day -2990: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.9
+  day -2717: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=13
+  day -2717: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=2.1
+  day -2634: Surgery — SUBTYPE=PROCEDURE
+  day -2507: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=9
+  day -2507: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=2
+  day -2221: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=8
+  day -2221: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=1.8
+  day -1891: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=9
+  day -1891: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=2.4
+  day -1408: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=11
+  day -1408: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=2.2
+  day -695: Surgery — SUBTYPE=PROCEDURE
+  day -685: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=10
+  day -685: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=2.9
+  day -323: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=15
+  day -323: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=3.2
+  day -255: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.037178118, PROCEDURE_TYPE=MR, PROGRESSION=N
+  day -255: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.0010828, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=MR
+  day -253: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.38813508, PROCEDURE_TYPE=MR, PROGRESSION=Indeterminate
+  day -253: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.0004522, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=MR
+  day -83: Lab_Test — TEST=CA_15-3, LR_UNIT_MEASURE=Units/ml, RESULT=13
+  day -83: Lab_Test — TEST=CEA, LR_UNIT_MEASURE=ng/ml, RESULT=4.6
+  day -68: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.284787, PROCEDURE_TYPE=PET, PROGRESSION=Indeterminate
+  day -68: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.99975103, ABDOMEN=FALSE, HAS_CANCER=Y, PROCEDURE_TYPE=PET
+  day -68: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=PET, TUMOR_SITE=Lymph Nodes, CHEST=0, OTHER=1, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day -42: Diagnosis — SUBTYPE=Primary, CLINICAL_GROUP=3B, SUMMARY=Distant, AJCC=IIIB, PATH_GROUP=99, SOURCE=Tumor Registry, DX_DESCRIPTION=ADENOCARCINOMA, NOS | LUNG, NOS (M8140/3 | C349), STAGE_CDM_DERIVED=Stage 1-3
+  day 0: Sequencing — SAMPLE_ID=P-0000012-T03-IM3
+  day 0: Sample acquisition — SEQ_DATE=0, SAMPLE_ID=P-0000012-T03-IM3
+  day 0: Surgery — SUBTYPE=SAMPLE
+  day 10: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.90068585, PROCEDURE_TYPE=CT, PROGRESSION=Y
+  day 10: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.8226569, PROCEDURE_TYPE=PET, PROGRESSION=Y
+  day 10: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.3279463, PROCEDURE_TYPE=MR, PROGRESSION=Indeterminate
+  day 10: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.9997148, ABDOMEN=FALSE, HAS_CANCER=Y, PROCEDURE_TYPE=PET
+  day 10: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=FALSE, HEAD=TRUE, NLP_HAS_CANCER_PROBABILITY=0.0003389, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=MR
+  day 10: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.99968517, ABDOMEN=FALSE, HAS_CANCER=Y, PROCEDURE_TYPE=CT
+  day 10: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Lymph Nodes, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 10: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=PET, TUMOR_SITE=Lymph Nodes, CHEST=0, OTHER=1, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 10: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Other, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 33–40: Treatment — SUBTYPE=Chemo, AGENT=CISPLATIN, RX_INVESTIGATIVE=N, FLAG_OROTOPICAL=0
+  day 33–65: Treatment — SUBTYPE=Chemo, AGENT=ETOPOSIDE, RX_INVESTIGATIVE=N, FLAG_OROTOPICAL=0
+  day 33: Treatment — SUBTYPE=Radiation Therapy
+  day 48: Sequencing — SAMPLE_ID=P-0000012-T02-IM3
+  day 61–68: Treatment — SUBTYPE=Chemo, AGENT=CARBOPLATIN, RX_INVESTIGATIVE=N, FLAG_OROTOPICAL=0
+  day 149: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.18018433, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 149: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.6276817, ABDOMEN=FALSE, HAS_CANCER=Indeterminate, PROCEDURE_TYPE=CT
+  day 149: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Lymph Nodes, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 159: Diagnosis — SUBTYPE=Performance Status, ECOG=0
+  day 251: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.17210542, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 251: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.04371244, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=CT
+  day 281: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.8392186, PROCEDURE_TYPE=PET, PROGRESSION=Y
+  day 281: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.99964726, ABDOMEN=FALSE, HAS_CANCER=Y, PROCEDURE_TYPE=PET
+  day 281: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=PET, TUMOR_SITE=Intra-Abdominal, CHEST=0, OTHER=1, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 281: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=PET, TUMOR_SITE=Lymph Nodes, CHEST=0, OTHER=1, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 289: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.2349452, PROCEDURE_TYPE=PET, PROGRESSION=Indeterminate
+  day 289: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.18626133, PROCEDURE_TYPE=PET, PROGRESSION=N
+  day 289: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.1163108, ABDOMEN=TRUE, HAS_CANCER=N, PROCEDURE_TYPE=PET
+  day 289: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.3926556, ABDOMEN=FALSE, HAS_CANCER=Indeterminate, PROCEDURE_TYPE=PET
+  day 289: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=PET, TUMOR_SITE=Lymph Nodes, CHEST=0, OTHER=0, HEAD=0, ABDOMEN=1, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 289: Surgery — SUBTYPE=SAMPLE
+  day 297: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.043223906, PROCEDURE_TYPE=MR, PROGRESSION=N
+  day 297: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=FALSE, HEAD=TRUE, NLP_HAS_CANCER_PROBABILITY=0.0004539, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=MR
+  day 306: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.00981985, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 306: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.99856204, ABDOMEN=TRUE, HAS_CANCER=Y, PROCEDURE_TYPE=CT
+  day 306: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Intra-Abdominal, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=1, SOURCE=Radiology Reports (NLP), PELVIS=1
+  day 306: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Other, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=1, SOURCE=Radiology Reports (NLP), PELVIS=1
+  day 320: Treatment — SUBTYPE=Investigational, AGENT=INVESTIGATIONAL, RX_INVESTIGATIVE=Y, FLAG_OROTOPICAL=0
+  day 320: Treatment — SUBTYPE=Investigational, AGENT=INVESTIGATIONAL, RX_INVESTIGATIVE=Y, FLAG_OROTOPICAL=0
+  day 334: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.18738739, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 334: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=FALSE, HEAD=TRUE, NLP_HAS_CANCER_PROBABILITY=0.001281, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=CT
+  day 335: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.1852476, PROCEDURE_TYPE=MR, PROGRESSION=N
+  day 335: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=FALSE, HEAD=TRUE, NLP_HAS_CANCER_PROBABILITY=0.00104094, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=MR
+  day 367: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.002592743, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 367: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.97957146, ABDOMEN=TRUE, HAS_CANCER=Y, PROCEDURE_TYPE=CT
+  day 367: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Lymph Nodes, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=1, SOURCE=Radiology Reports (NLP), PELVIS=1
+  day 409: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.2979155, PROCEDURE_TYPE=CT, PROGRESSION=Indeterminate
+  day 409: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.9997031, ABDOMEN=TRUE, HAS_CANCER=Y, PROCEDURE_TYPE=CT
+  day 409: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Lymph Nodes, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=1, SOURCE=Radiology Reports (NLP), PELVIS=1
+  day 499: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.001804908, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 499: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.05136776, ABDOMEN=TRUE, HAS_CANCER=N, PROCEDURE_TYPE=CT
+  day 502: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.01994526, PROCEDURE_TYPE=PET, PROGRESSION=N
+  day 502: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.970199, ABDOMEN=FALSE, HAS_CANCER=Y, PROCEDURE_TYPE=PET
+  day 502: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=PET, TUMOR_SITE=Lymph Nodes, CHEST=0, OTHER=1, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 587: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.13669538, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 587: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.09822476, PROCEDURE_TYPE=PET, PROGRESSION=N
+  day 587: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.0006456, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=PET
+  day 587: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.0010181, ABDOMEN=TRUE, HAS_CANCER=N, PROCEDURE_TYPE=CT
+  day 691: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.001298996, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 691: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.00719047, ABDOMEN=TRUE, HAS_CANCER=N, PROCEDURE_TYPE=CT
+  day 803: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.002349537, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 803: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.033495385, PROCEDURE_TYPE=PET, PROGRESSION=N
+  day 803: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.0007946, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=PET
+  day 803: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.927494, ABDOMEN=TRUE, HAS_CANCER=Y, PROCEDURE_TYPE=CT
+  day 980: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.001755151, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 980: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.3707743, ABDOMEN=TRUE, HAS_CANCER=Indeterminate, PROCEDURE_TYPE=CT
+  day 1136: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.07828353, PROCEDURE_TYPE=PET, PROGRESSION=N
+  day 1136: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.002298566, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 1136: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.21760744, ABDOMEN=TRUE, HAS_CANCER=Indeterminate, PROCEDURE_TYPE=CT
+  day 1136: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.0052873, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=PET
+  day 1317: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.034641445, PROCEDURE_TYPE=PET, PROGRESSION=N
+  day 1317: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.0012883, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=PET
+  day 1498: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.008373962, PROCEDURE_TYPE=PET, PROGRESSION=N
+  day 1498: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=FALSE, HEAD=TRUE, NLP_HAS_CANCER_PROBABILITY=0.00069153, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=PET
+  day 1681: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.028722772, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 1681: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.91513604, ABDOMEN=TRUE, HAS_CANCER=Y, PROCEDURE_TYPE=CT
+  day 1681: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Lung, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=1, SOURCE=Radiology Reports (NLP), PELVIS=1
+  day 1688: Surgery — SUBTYPE=SAMPLE
+  day 1700: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.42995712, PROCEDURE_TYPE=MR, PROGRESSION=Indeterminate
+  day 1700: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=FALSE, HEAD=TRUE, NLP_HAS_CANCER_PROBABILITY=0.0015915, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=MR
+  day 1702: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.002305086, PROCEDURE_TYPE=PET, PROGRESSION=N
+  day 1702: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=FALSE, HEAD=TRUE, NLP_HAS_CANCER_PROBABILITY=0.99966264, ABDOMEN=FALSE, HAS_CANCER=Y, PROCEDURE_TYPE=PET
+  day 1702: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=PET, TUMOR_SITE=Lung, CHEST=0, OTHER=0, HEAD=1, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 1721: Treatment — SUBTYPE=Radiation Therapy
+  day 1734–1814: Treatment — SUBTYPE=Immuno, AGENT=NIVOLUMAB, RX_INVESTIGATIVE=N, FLAG_OROTOPICAL=0
+  day 1862: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.12809414, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 1862: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.1993236, ABDOMEN=TRUE, HAS_CANCER=N, PROCEDURE_TYPE=CT
+  day 1974: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.0156624, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 1974: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.9815399, ABDOMEN=FALSE, HAS_CANCER=Y, PROCEDURE_TYPE=CT
+  day 1974: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Lung, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 2086: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.002995548, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 2086: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.0402322, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=CT
+  day 2269: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.088399045, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 2269: Diagnosis — SUBTYPE=HasCancer, PELVIS=TRUE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.99789196, ABDOMEN=TRUE, HAS_CANCER=Y, PROCEDURE_TYPE=CT
+  day 2269: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Lung, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=1, SOURCE=Radiology Reports (NLP), PELVIS=1
+  day 2444: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.111479566, PROCEDURE_TYPE=MR, PROGRESSION=N
+  day 2444: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=FALSE, HEAD=TRUE, NLP_HAS_CANCER_PROBABILITY=0.0043055, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=MR
+  day 2445: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.001614616, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 2445: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.99383426, ABDOMEN=FALSE, HAS_CANCER=Y, PROCEDURE_TYPE=CT
+  day 2627: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.001661092, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 2627: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.20430684, ABDOMEN=FALSE, HAS_CANCER=Indeterminate, PROCEDURE_TYPE=CT
+  day 2809: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.003464612, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 2809: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.9919733, ABDOMEN=FALSE, HAS_CANCER=Y, PROCEDURE_TYPE=CT
+  day 2809: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=CT, TUMOR_SITE=Lung, CHEST=1, OTHER=0, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  day 2998: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.004493397, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 2998: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.0110871, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=CT
+  day 3216: Surgery — SUBTYPE=PROCEDURE
+  day 3366: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.021393053, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 3366: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=TRUE, OTHER=FALSE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.0114738, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=CT
+  day 3367: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.17969903, PROCEDURE_TYPE=CT, PROGRESSION=N
+  day 3367: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.00155187, ABDOMEN=FALSE, HAS_CANCER=N, PROCEDURE_TYPE=CT
+  day 3377: Diagnosis — SUBTYPE=Progression, NLP_PROGRESSION_PROBABILITY=0.17046168, PROCEDURE_TYPE=MR, PROGRESSION=N
+  day 3377: Diagnosis — SUBTYPE=HasCancer, PELVIS=FALSE, CHEST=FALSE, OTHER=TRUE, HEAD=FALSE, NLP_HAS_CANCER_PROBABILITY=0.4474247, ABDOMEN=FALSE, HAS_CANCER=Indeterminate, PROCEDURE_TYPE=MR
+  day 3377: Diagnosis — SUBTYPE=Tumor Sites, SOURCE_SPECIFIC=MR, TUMOR_SITE=Other, CHEST=0, OTHER=1, HEAD=0, ABDOMEN=0, SOURCE=Radiology Reports (NLP), PELVIS=0
+  CAVEAT (tell the user): The list is one row per patient of each cohort; event counts and days come from the study's timeline, in days from diagnosis as the study records them. 5,368 patients. Sorted by Events (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
+  METHOD:
+    - Count the patients per cohort and study: The timeline:counts query above: every patient of each cohort, with their sample count and, from the study's timeline, the number of events, the first and last event day (a range counted to its stop) and the event types — a patient with no timeline is listed with none.
+        Breast · msk_chord_2024: 5,368
+    - Sort them together and take one page: The timeline:rows query above: the patients of every cohort and study combined in one query, sorted by Events descending with missing values last, then patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset.
+    - Read P-0000012's timeline: The timeline:events and timeline:samples queries above: every clinical event recorded for P-0000012 in msk_chord_2024 with all its attributes, and the patient's samples with their SAMPLE_TYPE. Events are drawn as stored, in days from diagnosis; tracks group them by event type (case-folded) and nest them by attribute as cBioPortal's patient view does.
+        events: 172
+        samples: 2
+    A listing and one patient's record: no statistic is computed, so there is no script — the queries are the numbers.
+
+Patient alterations — patients to choose from: 5,368; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	patient	source	samples	mutations	cna	sv
+  Breast	P-0000012	this portal (primary)	2	31	3	0
+  Breast	P-0000015	this portal (primary)	1	7	11	0
+  Breast	P-0000041	this portal (primary)	1	10	0	0
+  Breast	P-0000057	this portal (primary)	1	5	0	0
+  Breast	P-0000058	this portal (primary)	1	1	7	1
+  Breast	P-0000066	this portal (primary)	1	4	5	0
+  Breast	P-0000077	this portal (primary)	1	2	8	0
+  Breast	P-0000081	this portal (primary)	1	6	0	0
+  Breast	P-0000093	this portal (primary)	1	2	8	0
+  Breast	P-0000098	this portal (primary)	1	1	0	0
+  Breast	P-0000102	this portal (primary)	1	4	2	0
+  Breast	P-0000104	this portal (primary)	1	5	5	0
+  Breast	P-0000106	this portal (primary)	1	4	7	0
+  Breast	P-0000107	this portal (primary)	1	4	0	0
+  Breast	P-0000120	this portal (primary)	1	6	2	0
+  Breast	P-0000125	this portal (primary)	1	4	0	0
+  Breast	P-0000126	this portal (primary)	1	5	7	0
+  Breast	P-0000129	this portal (primary)	1	1	6	0
+  Breast	P-0000131	this portal (primary)	1	2	5	0
+  Breast	P-0000138	this portal (primary)	1	33	1	0
+  Breast	P-0000152	this portal (primary)	1	1	5	0
+  Breast	P-0000155	this portal (primary)	1	6	0	0
+  Breast	P-0000158	this portal (primary)	1	2	5	0
+  Breast	P-0000167	this portal (primary)	1	4	1	0
+  Breast	P-0000175	this portal (primary)	1	2	0	0
+  … 5,343 more rows
+P-0000012 (msk_chord_2024); samples: P-0000012-T02-IM3 (Primary), P-0000012-T03-IM3 (Metastasis)
+Mutations: 31 rows; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	samples	gene	proteinChange	annotation	mutationType	copy	freq	vaf
+  Breast	P-0000012-T03-IM3	ATRX	K983*	Likely Oncogenic	Nonsense_Mutation		3.3	0.198
+  Breast	P-0000012-T03-IM3	BLM	A363fs	Likely Oncogenic	Frame_Shift_Del		1.4	0.128
+  Breast	P-0000012-T03-IM3	FBXW7	G61*	Likely Oncogenic · Level 3A	Nonsense_Mutation		4.5	0.228
+  Breast	P-0000012-T03-IM3	FBXW7	X413_splice	Likely Oncogenic · Level 3A	Splice_Site		4.5	0.255
+  Breast	P-0000012-T03-IM3	MAP3K1	E302*	Likely Oncogenic	Nonsense_Mutation		3.1	0.174
+  Breast	P-0000012-T03-IM3	MAP3K1	X696_splice	Likely Oncogenic	Splice_Site		3.1	0.201
+  Breast	P-0000012-T03-IM3	PTPRD	E915*	Likely Oncogenic	Nonsense_Mutation		4.3	0.176
+  Breast	P-0000012-T03-IM3	PTPRD	P1338T	Unknown	Missense_Mutation		4.3	0.298
+  Breast	P-0000012-T03-IM3	PTPRT	G969V	Unknown	Missense_Mutation		4.8	0.142
+  Breast	P-0000012-T03-IM3	PTPRT	X1053_splice	Likely Oncogenic	Splice_Site		4.8	0.051
+  Breast	P-0000012-T03-IM3	SMARCA4	E1211*	Likely Oncogenic · Level 3A	Nonsense_Mutation		4.3	0.208
+  Breast	P-0000012-T02-IM3	TP53	T256P	Likely Oncogenic	Missense_Mutation		52.4	0.502
+  Breast	P-0000012-T03-IM3	TP53	P67Qfs*56	Likely Oncogenic	Frame_Shift_Del		52.4	0.402
+  Breast	P-0000012-T03-IM3	ATR	R2431M	Unknown	Missense_Mutation		2.7	0.174
+  Breast	P-0000012-T03-IM3	AXIN2	I375M	Unknown	Missense_Mutation		2.1	0.137
+  Breast	P-0000012-T03-IM3	BRIP1	D393V	Unknown	Missense_Mutation		1.4	0.146
+  Breast	P-0000012-T03-IM3	CCNE1	A47V	Unknown	Missense_Mutation		0.5	0.149
+  Breast	P-0000012-T03-IM3	CREBBP	M2161I	Unknown	Missense_Mutation		3.4	0.248
+  Breast	P-0000012-T03-IM3	DOT1L	W305C	Unknown	Missense_Mutation		2.3	0.158
+  Breast	P-0000012-T03-IM3	FLT4	S293R	Unknown	Missense_Mutation		2.8	0.179
+  Breast	P-0000012-T03-IM3	HGF	W547Cfs*35	Unknown	Frame_Shift_Del		2.2	0.141
+  Breast	P-0000012-T03-IM3	KDM5A	N212I	Unknown	Missense_Mutation		1.8	0.216
+  Breast	P-0000012-T03-IM3	KMT2C	K3105N	Unknown	Missense_Mutation		6.5	0.179
+  Breast	P-0000012-T03-IM3	NSD1	V1780F	Unknown	Missense_Mutation		2.1	0.194
+  Breast	P-0000012-T03-IM3	PDGFRA	L465M	Unknown	Missense_Mutation		2.1	0.204
+  … 6 more rows
+Copy Number Alterations: 3 rows; the first 3, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	samples	gene	cna	annotation	cytoband	freq
+  Breast	P-0000012-T03-IM3	CDK4	AMP	Oncogenic · Level 4	12q14.1	1.6
+  Breast	P-0000012-T02-IM3	MCL1	AMP	Oncogenic	1q21.2	1.5
+  Breast	P-0000012-T02-IM3	RIT1	AMP	Unknown	1q22	0.7
+Structural Variants: 0 rows; the first 0, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	samples	gene1	gene2	class	eventInfo	breakpointType	connectionType
+  CAVEAT (tell the user): P-0000012 — Mutations: 31 rows; Copy Number Alterations: 3 rows; Structural Variants: 0 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 5,368 patients. Sorted with patients who have any alteration first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
+  METHOD:
+    - Count the patients per cohort and study: The alterations:counts query above: every patient of each cohort, with their sample count and how many rows each of the three tables lists for them (a mutation, a gene's deep copy-number call, a structural variant — each counted once however many samples carry it).
+        Breast · msk_chord_2024: 5,368
+    - Sort them together and take one page: The alterations:rows query above: the patients of every cohort and study combined in one query, sorted patients with any alteration first, then by patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset.
+    - Read P-0000012's three tables: The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Mutations: every called mutation of the patient's samples (uncalled calls left out), one row per variant with the samples carrying it, the highest allele frequency among them (variant / (variant + reference) reads) with that sample's reads, and the gene's deep copy-number calls in the patient (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event (both genes and breakpoints, class, event info), the highest read counts among its samples. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.
+        Mutations: 31 rows
+        Copy Number Alterations: 3 rows
+        Structural Variants: 0 rows
+    A listing: no statistic is computed, so there is no script — the queries are the numbers.

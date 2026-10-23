@@ -1,0 +1,34 @@
+Analysis over msk_impact_50k_2026 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- Colorectal: 4,993 patients — CANCER_TYPE in [Colorectal Cancer] (any sample)
+- Breast: 5,803 patients — CANCER_TYPE in [Breast Cancer] (any sample)
+
+Clonality (FACETS; driver mutation calls, QC-passing samples):
+  Colorectal: WGD 35.6% of 4,912 samples
+    TP53: 3839 calls, 88% clonal (3160 clonal, 420 subclonal, 255 indeterminate), LOH 77%, q=0.5947
+    KRAS: 2145 calls, 84% clonal (1508 clonal, 290 subclonal, 346 indeterminate), LOH 21%, q=0.2252
+    APC: 5344 calls, 81% clonal (3889 clonal, 897 subclonal, 554 indeterminate), LOH 34%, q=0.5947
+    PIK3CA: 1018 calls, 68% clonal (634 clonal, 302 subclonal, 82 indeterminate), LOH 12%, q=3.1e-23
+    SMAD4: 673 calls, 75% clonal (494 clonal, 164 subclonal, 15 indeterminate), LOH 79%, q=0.0140
+    CDH1: 62 calls, 71% clonal (42 clonal, 17 subclonal, 3 indeterminate), LOH 16%, q=0.0099
+    GATA3: 42 calls, 70% clonal (28 clonal, 12 subclonal, 2 indeterminate), LOH 7%, q=0.3279
+  Breast: WGD 34.8% of 6,204 samples
+    TP53: 2672 calls, 89% clonal (2188 clonal, 278 subclonal, 195 indeterminate), LOH 89%, q=0.5947
+    KRAS: 59 calls, 75% clonal (40 clonal, 13 subclonal, 6 indeterminate), LOH 17%, q=0.2252
+    APC: 39 calls, 77% clonal (27 clonal, 8 subclonal, 4 indeterminate), LOH 44%, q=0.5947
+    PIK3CA: 2350 calls, 84% clonal (1793 clonal, 334 subclonal, 221 indeterminate), LOH 13%, q=3.1e-23
+    SMAD4: 79 calls, 60% clonal (46 clonal, 31 subclonal, 2 indeterminate), LOH 92%, q=0.0140
+    CDH1: 773 calls, 87% clonal (639 clonal, 96 subclonal, 36 indeterminate), LOH 95%, q=0.0099
+    GATA3: 847 calls, 79% clonal (566 clonal, 152 subclonal, 123 indeterminate), LOH 8%, q=0.3279
+  WGD difference: Fisher p=0.3789
+  CAVEAT (tell the user): FACETS allele-specific copy number: each OncoKB driver (v7.5) mutation call — one mutation in one sample — is clonal, subclonal or indeterminate as FACETS called it from its cancer-cell fraction; uncalled calls have an estimate but no call. LOH at the locus is a minor copy number of 0 where one was estimated. Only samples whose FACETS_QC is Pass are used (Colorectal: 4,912 pass, 451 fail; Breast: 6,204 pass, 671 fail); qc: false uses every sample. Whole-genome doubling, purity and ploidy are FACETS's own per-sample calls. Clonality is only as good as the purity estimate behind it: a low-purity sample's clonal mutation can be called subclonal, and a panel's handful of mutations per sample makes each estimate coarse. Two cohorts: Fisher on clonal against subclonal calls per gene (BH across genes) and on WGD.
+  METHOD:
+    - Count FACETS's calls per gene [Colorectal · msk_impact_50k_2026]: The clonality:summary, clonality:purity-ploidy and clonality:genes queries above. Per gene, each an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5) in one sample is one call, which FACETS labels clonal, subclonal or indeterminate from its cancer-cell fraction (or leaves uncalled); loss of heterozygosity is a minor copy number of 0 where one was estimated. Per sample: whole-genome doubling, purity and ploidy as FACETS called them. Counts only.
+    - Count FACETS's calls per gene [Breast · msk_impact_50k_2026]: The clonality:summary, clonality:purity-ploidy and clonality:genes queries above. Per gene, each an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5) in one sample is one call, which FACETS labels clonal, subclonal or indeterminate from its cancer-cell fraction (or leaves uncalled); loss of heterozygosity is a minor copy number of 0 where one was estimated. Per sample: whole-genome doubling, purity and ploidy as FACETS called them. Counts only.
+    - Keep samples that pass FACETS QC: Only samples whose FACETS_QC is Pass (matched ignoring case) contribute calls, WGD, purity and ploidy.
+        Colorectal: 4,912 pass, 451 fail, of 5,379 samples with allele-specific copy number
+        Breast: 6,204 pass, 671 fail, of 6,703 samples with allele-specific copy number
+    - Fisher's exact test per gene, and on WGD: Two-sided, on clonal against subclonal calls between the two cohorts, for each gene with at least one such call in both; indeterminate and uncalled calls do not enter. And on whole-genome doubled against not, per sample.
+    - Benjamini–Hochberg across genes: q-values over the genes tested.
+    Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).

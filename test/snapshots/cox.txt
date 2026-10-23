@@ -1,0 +1,22 @@
+Analysis over crc_apc_impact_2020 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- all patients: 471 patients — all patients in the study
+
+Cox regression (OS, n=471, 311 events):
+  TP53/KRAS/PIK3CA (any) mutation status: Mutated vs Not mutated: HR 0.72 (95% CI 0.47-1.10) p=0.1309
+  CAVEAT (tell the user): Cox proportional-hazards regression (Efron ties) on 471 patients, 311 events, 1 term. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank.
+  METHOD:
+    - Fetch one row per patient [crc_apc_impact_2020] (471 → 471 rows): The coxRows:OS query above. Patients with a OS_MONTHS value and a value for every covariate are kept. Event: OS_STATUS starting with “1” (e.g. “1:DECEASED”); any other value, including a missing one, is censored. Every cohort patient had a row.
+    - Code the covariates: Each numeric covariate is one term. Each categorical covariate becomes one 0/1 term per level, measured against a reference level that gets no term.
+        TP53/KRAS/PIK3CA (any) mutation status: Mutated: 1 if c0 = “Mutated”, else 0 · 440 of 471 patients · reference “Not mutated”: the fixed default for a mutated-vs-not axis
+    - Fit a Cox proportional-hazards model: Maximum partial likelihood with Efron's method for tied event times, by Newton–Raphson with step-halving.
+        patients / events: 471 / 311
+        terms: 1
+        baseline hazard: one, shared by every patient
+        standard errors: from the observed information at the estimate
+        95% interval: exp(β ± 1.959964·SE), Wald
+        p-value: Wald χ² on 1 df, (β/SE)²
+        fit: converged in 5 iterations
+        log partial likelihood: -1635.6078
+    Matches lifelines 0.30.3 CoxPHFitter (Efron ties) to a relative 1e-6 on coefficients, SEs, p-values and intervals (test/regression-golden.test.ts).

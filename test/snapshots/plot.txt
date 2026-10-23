@@ -1,0 +1,23 @@
+Analysis over brca_tcga_pan_can_atlas_2018 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- all samples: 1,084 patients — all patients in the study
+
+Plot (box): ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM) by ERBB2: Putative copy-number alterations from GISTIC — 1,068 samples.
+  Shallow deletion: median -0.66 (IQR -0.95–-0.41, whiskers -1.77–0.35, n=260)
+  Diploid: median -0.12 (IQR -0.42–0.15, whiskers -1.27–1.01, n=480)
+  Gain: median 0.16 (IQR -0.23–0.41, whiskers -1.20–1.38, n=206)
+  Amplification: median 2.33 (IQR 1.45–2.81, whiskers -0.60–3.72, n=122)
+  Values are drawn as individual points.
+  1,068 of 1,084 samples have a value on both axes (14 have no ERBB2: Putative copy-number alterations from GISTIC; 2 have no ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)); only those are drawn. Point layers — outliers: not drawn, at or under 10,000 cases there is no density for them to stand out of.
+
+Plot (box): FRACTION_GENOME_ALTERED by TP53 mutation type — 1,068 samples.
+  Not mutated: median 0.19 (IQR 0.10–0.35, whiskers 0.00–0.71, n=706)
+  Missense: median 0.38 (IQR 0.26–0.52, whiskers 0.00–0.91, n=209)
+  Truncating: median 0.47 (IQR 0.30–0.62, whiskers 0.00–0.95, n=102)
+  Splice: median 0.47 (IQR 0.24–0.54, whiskers 0.00–0.83, n=24)
+  Not profiled: median 0.11 (IQR 0.01–0.17, whiskers 0.00–0.41, n=18)
+  Inframe: median 0.27 (IQR 0.25–0.48, whiskers 0.25–0.56, n=5)
+  Multiple: median 0.63 (IQR 0.46–0.65, whiskers 0.18–0.65, n=4)
+  Values are drawn as individual points.
+  1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: not drawn, at or under 10,000 cases there is no density for them to stand out of.

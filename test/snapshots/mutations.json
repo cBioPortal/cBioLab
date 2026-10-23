@@ -1,0 +1,709 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Colorectal": {
+      "count": 5543,
+      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "mutations",
+      "cohorts": [
+        "Colorectal"
+      ],
+      "mutations": {
+        "gene": "KRAS",
+        "columns": [
+          {
+            "id": "sample",
+            "name": "Sample ID",
+            "numeric": false
+          },
+          {
+            "id": "cancerType",
+            "name": "Cancer Type Detailed",
+            "numeric": false
+          },
+          {
+            "id": "proteinChange",
+            "name": "Protein Change",
+            "numeric": false
+          },
+          {
+            "id": "annotation",
+            "name": "Annotation (OncoKB)",
+            "numeric": false
+          },
+          {
+            "id": "mutationType",
+            "name": "Mutation Type",
+            "numeric": false
+          },
+          {
+            "id": "alteration",
+            "name": "Alteration",
+            "numeric": false
+          },
+          {
+            "id": "variantType",
+            "name": "Variant Type",
+            "numeric": false
+          },
+          {
+            "id": "vaf",
+            "name": "Allele Freq (T)",
+            "numeric": true
+          },
+          {
+            "id": "altCount",
+            "name": "Variant Reads",
+            "numeric": true
+          },
+          {
+            "id": "refCount",
+            "name": "Ref Reads",
+            "numeric": true
+          },
+          {
+            "id": "mutCount",
+            "name": "# Mut in Sample",
+            "numeric": true
+          },
+          {
+            "id": "chr",
+            "name": "Chromosome",
+            "numeric": false
+          },
+          {
+            "id": "start",
+            "name": "Start Pos",
+            "numeric": true
+          },
+          {
+            "id": "end",
+            "name": "End Pos",
+            "numeric": true
+          },
+          {
+            "id": "ref",
+            "name": "Ref",
+            "numeric": false
+          },
+          {
+            "id": "var",
+            "name": "Var",
+            "numeric": false
+          },
+          {
+            "id": "status",
+            "name": "MS",
+            "numeric": false
+          }
+        ],
+        "shown": [
+          "sample",
+          "proteinChange",
+          "annotation",
+          "vaf",
+          "mutCount"
+        ],
+        "defaults": [
+          "sample",
+          "cancerType",
+          "proteinChange",
+          "annotation",
+          "mutationType",
+          "mutCount"
+        ],
+        "query": {
+          "columns": [
+            "sample",
+            "proteinChange",
+            "annotation",
+            "vaf",
+            "mutCount"
+          ],
+          "filters": {
+            "proteinChange": {
+              "op": "regex",
+              "value": "^G1[23]"
+            },
+            "vaf": {
+              "min": 0.2
+            }
+          },
+          "sort": {
+            "column": "vaf",
+            "desc": true
+          }
+        },
+        "rows": [
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0044990",
+            "sample": "P-0044990-T01-IM6",
+            "values": [
+              "P-0044990-T01-IM6",
+              "Colon Adenocarcinoma",
+              "G12D",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.928,
+              257,
+              20,
+              9,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0074217",
+            "sample": "P-0074217-T02-IM7",
+            "values": [
+              "P-0074217-T02-IM7",
+              "Large Cell Neuroendocrine Carcinoma",
+              "G12C",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.922,
+              665,
+              56,
+              3,
+              "12",
+              25398285,
+              25398285,
+              "C",
+              "A",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0066632",
+            "sample": "P-0066632-T01-IM7",
+            "values": [
+              "P-0066632-T01-IM7",
+              "Colon Adenocarcinoma",
+              "G12D",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.896,
+              121,
+              14,
+              7,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0011108",
+            "sample": "P-0011108-T01-IM5",
+            "values": [
+              "P-0011108-T01-IM5",
+              "Colon Adenocarcinoma",
+              "G12D",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.888,
+              772,
+              97,
+              9,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0046395",
+            "sample": "P-0046395-T01-IM6",
+            "values": [
+              "P-0046395-T01-IM6",
+              "Colorectal Adenocarcinoma",
+              "G13D",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.814,
+              415,
+              95,
+              10,
+              "12",
+              25398281,
+              25398281,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0018448",
+            "sample": "P-0018448-T01-IM6",
+            "values": [
+              "P-0018448-T01-IM6",
+              "Colon Adenocarcinoma",
+              "G12D",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.799,
+              860,
+              217,
+              16,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0055331",
+            "sample": "P-0055331-T01-IM6",
+            "values": [
+              "P-0055331-T01-IM6",
+              "Colon Adenocarcinoma",
+              "G12A",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.796,
+              266,
+              68,
+              9,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "G",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0057020",
+            "sample": "P-0057020-T01-IM6",
+            "values": [
+              "P-0057020-T01-IM6",
+              "Colorectal Adenocarcinoma",
+              "G12C",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.792,
+              179,
+              47,
+              7,
+              "12",
+              25398285,
+              25398285,
+              "C",
+              "A",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0012877",
+            "sample": "P-0012877-T01-IM5",
+            "values": [
+              "P-0012877-T01-IM5",
+              "Colon Adenocarcinoma",
+              "G12D",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.791,
+              457,
+              121,
+              10,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0005029",
+            "sample": "P-0005029-T01-IM5",
+            "values": [
+              "P-0005029-T01-IM5",
+              "Rectal Adenocarcinoma",
+              "G13D",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.786,
+              434,
+              118,
+              3,
+              "12",
+              25398281,
+              25398281,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0015210",
+            "sample": "P-0015210-T01-IM6",
+            "values": [
+              "P-0015210-T01-IM6",
+              "Colon Adenocarcinoma",
+              "G12D",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.775,
+              856,
+              248,
+              5,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0000739",
+            "sample": "P-0000739-T01-IM3",
+            "values": [
+              "P-0000739-T01-IM3",
+              "Colon Adenocarcinoma",
+              "G12C",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.768,
+              540,
+              163,
+              7,
+              "12",
+              25398285,
+              25398285,
+              "C",
+              "A",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0078660",
+            "sample": "P-0078660-T01-IM7",
+            "values": [
+              "P-0078660-T01-IM7",
+              "Colorectal Adenocarcinoma",
+              "G12C",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.763,
+              161,
+              50,
+              13,
+              "12",
+              25398285,
+              25398285,
+              "C",
+              "A",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0007990",
+            "sample": "P-0007990-T01-IM5",
+            "values": [
+              "P-0007990-T01-IM5",
+              "Colon Adenocarcinoma",
+              "G12S",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.759,
+              1216,
+              386,
+              7,
+              "12",
+              25398285,
+              25398285,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0050517",
+            "sample": "P-0050517-T01-IM6",
+            "values": [
+              "P-0050517-T01-IM6",
+              "Colon Adenocarcinoma",
+              "G12V",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.751,
+              175,
+              58,
+              10,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "A",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0039168",
+            "sample": "P-0039168-T01-IM6",
+            "values": [
+              "P-0039168-T01-IM6",
+              "Mucinous Adenocarcinoma of the Colon and Rectum",
+              "G12S",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.744,
+              886,
+              305,
+              4,
+              "12",
+              25398285,
+              25398285,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0041600",
+            "sample": "P-0041600-T01-IM6",
+            "values": [
+              "P-0041600-T01-IM6",
+              "Colorectal Adenocarcinoma",
+              "G12V",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.741,
+              304,
+              106,
+              6,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "A",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0046742",
+            "sample": "P-0046742-T01-IM6",
+            "values": [
+              "P-0046742-T01-IM6",
+              "Colon Adenocarcinoma",
+              "G13D",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.724,
+              184,
+              70,
+              7,
+              "12",
+              25398281,
+              25398281,
+              "C",
+              "T",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0008735",
+            "sample": "P-0008735-T01-IM5",
+            "values": [
+              "P-0008735-T01-IM5",
+              "Colon Adenocarcinoma",
+              "G12C",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.723,
+              748,
+              286,
+              10,
+              "12",
+              25398285,
+              25398285,
+              "C",
+              "A",
+              "SOMATIC"
+            ]
+          },
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0089247",
+            "sample": "P-0089247-T01-IM7",
+            "values": [
+              "P-0089247-T01-IM7",
+              "Colon Adenocarcinoma",
+              "G12V",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.722,
+              255,
+              98,
+              8,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "A",
+              "SOMATIC"
+            ]
+          },
+          {
+            "…": "5 more",
+            "sha256": "a704ba8fc2fb562f"
+          }
+        ],
+        "offset": 0,
+        "pageSize": 25,
+        "lists": [
+          {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "total": 1378,
+            "all": 2426
+          }
+        ],
+        "total": 1378,
+        "all": 2426,
+        "oncokbPin": "v7.5"
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "Every KRAS mutation call in the cohort's samples, one row per call; uncalled mutations are left out, as the portal leaves them out. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level for the gene). Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. Showing 1,378 of 2,426 mutations: rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2. Sorted by Allele Freq (T) (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the KRAS mutation calls per cohort and study, and those the query keeps",
+            "detail": "The mutations:counts query above: every called KRAS mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded and the OncoKB v7.5 call for its protein change; allele frequency = variant / (variant + reference) reads. The query keeps rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2.",
+            "params": [
+              [
+                "Colorectal · msk_chord_2024",
+                "1,378 of 2,426"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Sort them together and take one page",
+            "detail": "The mutations:rows query above: the KRAS mutation calls of every cohort and study combined in one query, kept to rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2, sorted by Allele Freq (T) descending, missing last, then sample, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "mutationRowSource",
+            "pageSql",
+            "countsSql"
+          ],
+          "file": "lib/mutation-table.ts, lib/table-query.ts",
+          "commit": null
+        },
+        "verification": "A listing: no statistic is computed, so there is no script — the queries are the numbers."
+      }
+    }
+  ]
+}

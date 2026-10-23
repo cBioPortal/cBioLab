@@ -1,0 +1,256 @@
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "BRCA": {
+      "count": 1066,
+      "text": "profiled for MUTATION",
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "coexpression",
+      "cohorts": [
+        "BRCA"
+      ],
+      "coexpression": [
+        {
+          "a": "ERBB2",
+          "b": "GRB7",
+          "r": 0.8713,
+          "n": 1064,
+          "p": 0,
+          "q": 0
+        },
+        {
+          "a": "ESR1",
+          "b": "MKI67",
+          "r": -0.2334,
+          "n": 1064,
+          "p": 1.2418853229945448e-14,
+          "q": 6.209426614972723e-14
+        },
+        {
+          "a": "ESR1",
+          "b": "PGR",
+          "r": 0.2263,
+          "n": 1064,
+          "p": 8.025146361684293e-14,
+          "q": 2.6750487872280976e-13
+        },
+        {
+          "a": "PGR",
+          "b": "MKI67",
+          "r": -0.1839,
+          "n": 1064,
+          "p": 1.5183862366308729e-9,
+          "q": 3.7959655915771825e-9
+        },
+        {
+          "a": "GRB7",
+          "b": "ESR1",
+          "r": -0.1723,
+          "n": 1064,
+          "p": 1.560101548391098e-8,
+          "q": 3.120203096782196e-8
+        },
+        {
+          "a": "ERBB2",
+          "b": "ESR1",
+          "r": -0.1651,
+          "n": 1064,
+          "p": 6.030449902721193e-8,
+          "q": 1.0050749837868655e-7
+        },
+        {
+          "a": "ERBB2",
+          "b": "PGR",
+          "r": -0.127,
+          "n": 1064,
+          "p": 0.00003249163546036962,
+          "q": 0.00004641662208624231
+        },
+        {
+          "a": "GRB7",
+          "b": "PGR",
+          "r": -0.1185,
+          "n": 1064,
+          "p": 0.0001071034933253945,
+          "q": 0.00013387936665674313
+        },
+        {
+          "a": "GRB7",
+          "b": "MKI67",
+          "r": 0.0457,
+          "n": 1064,
+          "p": 0.13671251169317,
+          "q": 0.1425531010179386
+        },
+        {
+          "a": "ERBB2",
+          "b": "MKI67",
+          "r": 0.045,
+          "n": 1064,
+          "p": 0.1425531010179386,
+          "q": 0.1425531010179386
+        }
+      ],
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018"
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "note": "Pearson correlation on “rna_seq_v2_mrna_median_Zscores” within “BRCA”, over the patients with BOTH values (values averaged per patient, matching the heatmap convention). Each site reports six sums — n, Σx, Σy, Σxy, Σx², Σy² — and nothing else; those sums are additive, so the pooled correlation is EXACT rather than an approximation of a centralized one. q-values are Benjamini–Hochberg across the 10 pairs with a defined correlation.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Sum each gene pair's values",
+            "detail": "The pairMoments query above, on “rna_seq_v2_mrna_median_Zscores”. Per pair, over the patients with a value for both genes (a patient with several samples contributes their average): n, Σx, Σy, Σxy, Σx² and Σy² — six sums, no individual value.",
+            "scope": "BRCA · brca_tcga_pan_can_atlas_2018",
+            "rowsIn": 1066,
+            "params": [
+              [
+                "pairs",
+                "10"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Pearson correlation per pair",
+            "detail": "r = (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); t = r√((n − 2)/(1 − r²)), two-sided p on n − 2 df. Undefined for n < 3 or a constant series."
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across pairs",
+            "detail": "q-values over the 10 pairs with a defined correlation, from the Pearson p-values."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "pearsonFromMoments",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Pearson's r and p from the six sums match scipy 1.18.1 pearsonr on the underlying values, to a relative 1e-6 (test/moments-golden.test.ts).",
+        "check": {
+          "coexpression:ERBB2/GRB7:r": {
+            "v": 0.8713,
+            "abs": 0.000050000001000000005
+          },
+          "coexpression:ERBB2/GRB7:p": {
+            "v": 0
+          },
+          "coexpression:ERBB2/GRB7:q": {
+            "v": 0
+          },
+          "coexpression:ESR1/MKI67:r": {
+            "v": -0.2334,
+            "abs": 0.000050000001000000005
+          },
+          "coexpression:ESR1/MKI67:p": {
+            "v": 1.2418853229945448e-14
+          },
+          "coexpression:ESR1/MKI67:q": {
+            "v": 6.209426614972723e-14
+          },
+          "coexpression:ESR1/PGR:r": {
+            "v": 0.2263,
+            "abs": 0.000050000001000000005
+          },
+          "coexpression:ESR1/PGR:p": {
+            "v": 8.025146361684293e-14
+          },
+          "coexpression:ESR1/PGR:q": {
+            "v": 2.6750487872280976e-13
+          },
+          "coexpression:PGR/MKI67:r": {
+            "v": -0.1839,
+            "abs": 0.000050000001000000005
+          },
+          "coexpression:PGR/MKI67:p": {
+            "v": 1.5183862366308729e-9
+          },
+          "coexpression:PGR/MKI67:q": {
+            "v": 3.7959655915771825e-9
+          },
+          "coexpression:GRB7/ESR1:r": {
+            "v": -0.1723,
+            "abs": 0.000050000001000000005
+          },
+          "coexpression:GRB7/ESR1:p": {
+            "v": 1.560101548391098e-8
+          },
+          "coexpression:GRB7/ESR1:q": {
+            "v": 3.120203096782196e-8
+          },
+          "coexpression:ERBB2/ESR1:r": {
+            "v": -0.1651,
+            "abs": 0.000050000001000000005
+          },
+          "coexpression:ERBB2/ESR1:p": {
+            "v": 6.030449902721193e-8
+          },
+          "coexpression:ERBB2/ESR1:q": {
+            "v": 1.0050749837868655e-7
+          },
+          "coexpression:ERBB2/PGR:r": {
+            "v": -0.127,
+            "abs": 0.000050000001000000005
+          },
+          "coexpression:ERBB2/PGR:p": {
+            "v": 0.00003249163546036962
+          },
+          "coexpression:ERBB2/PGR:q": {
+            "v": 0.00004641662208624231
+          },
+          "coexpression:GRB7/PGR:r": {
+            "v": -0.1185,
+            "abs": 0.000050000001000000005
+          },
+          "coexpression:GRB7/PGR:p": {
+            "v": 0.0001071034933253945
+          },
+          "coexpression:GRB7/PGR:q": {
+            "v": 0.00013387936665674313
+          },
+          "coexpression:GRB7/MKI67:r": {
+            "v": 0.0457,
+            "abs": 0.000050000001000000005
+          },
+          "coexpression:GRB7/MKI67:p": {
+            "v": 0.13671251169317
+          },
+          "coexpression:GRB7/MKI67:q": {
+            "v": 0.1425531010179386
+          },
+          "coexpression:ERBB2/MKI67:r": {
+            "v": 0.045,
+            "abs": 0.000050000001000000005
+          },
+          "coexpression:ERBB2/MKI67:p": {
+            "v": 0.1425531010179386
+          },
+          "coexpression:ERBB2/MKI67:q": {
+            "v": 0.1425531010179386
+          }
+        }
+      }
+    }
+  ]
+}

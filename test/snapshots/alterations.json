@@ -1,0 +1,1003 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Prostate": {
+      "count": 3211,
+      "text": "CANCER_TYPE in [Prostate Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "alterations",
+      "cohorts": [
+        "Prostate"
+      ],
+      "alterations": {
+        "columns": [
+          {
+            "id": "patient",
+            "name": "Patient ID",
+            "numeric": false
+          },
+          {
+            "id": "source",
+            "name": "Source",
+            "numeric": false
+          },
+          {
+            "id": "samples",
+            "name": "Samples",
+            "numeric": true
+          },
+          {
+            "id": "mutations",
+            "name": "Mutations",
+            "numeric": true
+          },
+          {
+            "id": "cna",
+            "name": "CNAs",
+            "numeric": true
+          },
+          {
+            "id": "sv",
+            "name": "Structural Variants",
+            "numeric": true
+          }
+        ],
+        "shown": [
+          "patient",
+          "source",
+          "samples",
+          "mutations",
+          "cna",
+          "sv"
+        ],
+        "defaults": [
+          "patient",
+          "source",
+          "samples",
+          "mutations",
+          "cna",
+          "sv"
+        ],
+        "query": {
+          "sort": {
+            "column": "sv",
+            "desc": true
+          }
+        },
+        "rows": [
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0030872",
+            "sample": "",
+            "values": [
+              "P-0030872",
+              "this portal (primary)",
+              1,
+              4,
+              0,
+              5
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0000631",
+            "sample": "",
+            "values": [
+              "P-0000631",
+              "this portal (primary)",
+              1,
+              3,
+              4,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0013729",
+            "sample": "",
+            "values": [
+              "P-0013729",
+              "this portal (primary)",
+              1,
+              0,
+              7,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0017262",
+            "sample": "",
+            "values": [
+              "P-0017262",
+              "this portal (primary)",
+              1,
+              2,
+              1,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0020078",
+            "sample": "",
+            "values": [
+              "P-0020078",
+              "this portal (primary)",
+              1,
+              5,
+              7,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0025988",
+            "sample": "",
+            "values": [
+              "P-0025988",
+              "this portal (primary)",
+              1,
+              5,
+              0,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0030109",
+            "sample": "",
+            "values": [
+              "P-0030109",
+              "this portal (primary)",
+              1,
+              2,
+              0,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0037022",
+            "sample": "",
+            "values": [
+              "P-0037022",
+              "this portal (primary)",
+              1,
+              3,
+              0,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0038349",
+            "sample": "",
+            "values": [
+              "P-0038349",
+              "this portal (primary)",
+              1,
+              3,
+              0,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0043336",
+            "sample": "",
+            "values": [
+              "P-0043336",
+              "this portal (primary)",
+              1,
+              26,
+              0,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0046943",
+            "sample": "",
+            "values": [
+              "P-0046943",
+              "this portal (primary)",
+              1,
+              2,
+              0,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0049524",
+            "sample": "",
+            "values": [
+              "P-0049524",
+              "this portal (primary)",
+              1,
+              2,
+              0,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0069200",
+            "sample": "",
+            "values": [
+              "P-0069200",
+              "this portal (primary)",
+              1,
+              9,
+              0,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0081157",
+            "sample": "",
+            "values": [
+              "P-0081157",
+              "this portal (primary)",
+              1,
+              3,
+              4,
+              4
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0003511",
+            "sample": "",
+            "values": [
+              "P-0003511",
+              "this portal (primary)",
+              1,
+              3,
+              4,
+              3
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0004946",
+            "sample": "",
+            "values": [
+              "P-0004946",
+              "this portal (primary)",
+              2,
+              7,
+              0,
+              3
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0006689",
+            "sample": "",
+            "values": [
+              "P-0006689",
+              "this portal (primary)",
+              1,
+              0,
+              0,
+              3
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0008960",
+            "sample": "",
+            "values": [
+              "P-0008960",
+              "this portal (primary)",
+              1,
+              0,
+              3,
+              3
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0012605",
+            "sample": "",
+            "values": [
+              "P-0012605",
+              "this portal (primary)",
+              1,
+              2,
+              0,
+              3
+            ]
+          },
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "patient": "P-0017882",
+            "sample": "",
+            "values": [
+              "P-0017882",
+              "this portal (primary)",
+              1,
+              3,
+              9,
+              3
+            ]
+          },
+          {
+            "…": "5 more",
+            "sha256": "5a1562f61b57960e"
+          }
+        ],
+        "offset": 0,
+        "pageSize": 25,
+        "lists": [
+          {
+            "cohort": "Prostate",
+            "study": "msk_chord_2024",
+            "total": 3211,
+            "all": 3211
+          }
+        ],
+        "total": 3211,
+        "all": 3211,
+        "patient": {
+          "study": "msk_chord_2024",
+          "id": "P-0024249",
+          "samples": [
+            {
+              "id": "P-0024249-T01-IM6",
+              "type": "Primary"
+            },
+            {
+              "id": "P-0024249-T02-IM7",
+              "type": "Primary"
+            }
+          ]
+        },
+        "position": {
+          "index": 21,
+          "prev": {
+            "study": "msk_chord_2024",
+            "id": "P-0019663"
+          },
+          "next": {
+            "study": "msk_chord_2024",
+            "id": "P-0024679"
+          }
+        },
+        "tables": {
+          "mutations": {
+            "columns": [
+              {
+                "id": "samples",
+                "name": "Samples",
+                "numeric": false
+              },
+              {
+                "id": "gene",
+                "name": "Gene",
+                "numeric": false
+              },
+              {
+                "id": "proteinChange",
+                "name": "Protein Change",
+                "numeric": false
+              },
+              {
+                "id": "annotation",
+                "name": "Annotation (OncoKB)",
+                "numeric": false
+              },
+              {
+                "id": "mutationType",
+                "name": "Mutation Type",
+                "numeric": false
+              },
+              {
+                "id": "copy",
+                "name": "Copy #",
+                "numeric": false
+              },
+              {
+                "id": "freq",
+                "name": "Cohort %",
+                "numeric": true
+              },
+              {
+                "id": "vaf",
+                "name": "Allele Freq",
+                "numeric": true
+              },
+              {
+                "id": "altCount",
+                "name": "Variant Reads",
+                "numeric": true
+              },
+              {
+                "id": "refCount",
+                "name": "Ref Reads",
+                "numeric": true
+              },
+              {
+                "id": "variantType",
+                "name": "Variant Type",
+                "numeric": false
+              },
+              {
+                "id": "chr",
+                "name": "Chromosome",
+                "numeric": false
+              },
+              {
+                "id": "start",
+                "name": "Start Pos",
+                "numeric": true
+              },
+              {
+                "id": "end",
+                "name": "End Pos",
+                "numeric": true
+              },
+              {
+                "id": "ref",
+                "name": "Ref",
+                "numeric": false
+              },
+              {
+                "id": "var",
+                "name": "Var",
+                "numeric": false
+              },
+              {
+                "id": "status",
+                "name": "MS",
+                "numeric": false
+              }
+            ],
+            "shown": [
+              "samples",
+              "gene",
+              "proteinChange",
+              "annotation",
+              "mutationType",
+              "copy",
+              "freq",
+              "vaf"
+            ],
+            "defaults": [
+              "samples",
+              "gene",
+              "proteinChange",
+              "annotation",
+              "mutationType",
+              "copy",
+              "freq",
+              "vaf"
+            ],
+            "query": {
+              "filters": {
+                "annotation": {
+                  "op": "contains",
+                  "value": "Oncogenic"
+                }
+              }
+            },
+            "rows": [
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "patient": "P-0024249",
+                "sample": "P-0024249-T02-IM7",
+                "values": [
+                  "P-0024249-T02-IM7",
+                  "KRAS",
+                  "G12V",
+                  "Oncogenic · Level 1",
+                  "Missense_Mutation",
+                  "",
+                  28.5,
+                  0.076,
+                  42,
+                  512,
+                  "SNP",
+                  "12",
+                  25398284,
+                  25398284,
+                  "C",
+                  "A",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "patient": "P-0024249",
+                "sample": "P-0024249-T01-IM6",
+                "values": [
+                  "P-0024249-T01-IM6",
+                  "PTEN",
+                  "G127V",
+                  "Likely Oncogenic · Level 1",
+                  "Missense_Mutation",
+                  "",
+                  4.8,
+                  0.619,
+                  262,
+                  161,
+                  "SNP",
+                  "10",
+                  89692896,
+                  89692896,
+                  "G",
+                  "T",
+                  "SOMATIC"
+                ]
+              },
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "patient": "P-0024249",
+                "sample": "P-0024249-T01-IM6",
+                "values": [
+                  "P-0024249-T01-IM6",
+                  "TP53",
+                  "P151R",
+                  "Likely Oncogenic",
+                  "Missense_Mutation",
+                  "",
+                  52.4,
+                  0.761,
+                  761,
+                  239,
+                  "SNP",
+                  "17",
+                  7578478,
+                  7578478,
+                  "G",
+                  "C",
+                  "SOMATIC"
+                ]
+              }
+            ],
+            "offset": 0,
+            "pageSize": 25,
+            "lists": [
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "total": 3,
+                "all": 7
+              }
+            ],
+            "total": 3,
+            "all": 7
+          },
+          "cna": {
+            "columns": [
+              {
+                "id": "samples",
+                "name": "Samples",
+                "numeric": false
+              },
+              {
+                "id": "gene",
+                "name": "Gene",
+                "numeric": false
+              },
+              {
+                "id": "cna",
+                "name": "CNA",
+                "numeric": false
+              },
+              {
+                "id": "annotation",
+                "name": "Annotation (OncoKB)",
+                "numeric": false
+              },
+              {
+                "id": "cytoband",
+                "name": "Cytoband",
+                "numeric": false
+              },
+              {
+                "id": "freq",
+                "name": "Cohort %",
+                "numeric": true
+              }
+            ],
+            "shown": [
+              "samples",
+              "gene",
+              "cna",
+              "annotation",
+              "cytoband",
+              "freq"
+            ],
+            "defaults": [
+              "samples",
+              "gene",
+              "cna",
+              "annotation",
+              "cytoband",
+              "freq"
+            ],
+            "query": {},
+            "rows": [
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "patient": "P-0024249",
+                "sample": "P-0024249-T01-IM6",
+                "values": [
+                  "P-0024249-T01-IM6",
+                  "MAP3K1",
+                  "HOMDEL",
+                  "Likely Oncogenic",
+                  "5q11.2",
+                  0.3
+                ]
+              },
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "patient": "P-0024249",
+                "sample": "P-0024249-T01-IM6",
+                "values": [
+                  "P-0024249-T01-IM6",
+                  "RAD51B",
+                  "HOMDEL",
+                  "Likely Oncogenic · Level 1",
+                  "14q24.1",
+                  0.1
+                ]
+              },
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "patient": "P-0024249",
+                "sample": "P-0024249-T01-IM6",
+                "values": [
+                  "P-0024249-T01-IM6",
+                  "PLK2",
+                  "HOMDEL",
+                  "Unknown",
+                  "5q11.2",
+                  0.2
+                ]
+              }
+            ],
+            "offset": 0,
+            "pageSize": 25,
+            "lists": [
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "total": 3,
+                "all": 3
+              }
+            ],
+            "total": 3,
+            "all": 3
+          },
+          "sv": {
+            "columns": [
+              {
+                "id": "samples",
+                "name": "Samples",
+                "numeric": false
+              },
+              {
+                "id": "gene1",
+                "name": "Gene 1",
+                "numeric": false
+              },
+              {
+                "id": "gene2",
+                "name": "Gene 2",
+                "numeric": false
+              },
+              {
+                "id": "class",
+                "name": "Variant Class",
+                "numeric": false
+              },
+              {
+                "id": "eventInfo",
+                "name": "Event Info",
+                "numeric": false
+              },
+              {
+                "id": "breakpointType",
+                "name": "Breakpoint Type",
+                "numeric": false
+              },
+              {
+                "id": "connectionType",
+                "name": "Connection Type",
+                "numeric": false
+              },
+              {
+                "id": "frame",
+                "name": "Effect on Frame",
+                "numeric": false
+              },
+              {
+                "id": "site1",
+                "name": "Site 1 Description",
+                "numeric": false
+              },
+              {
+                "id": "site2",
+                "name": "Site 2 Description",
+                "numeric": false
+              },
+              {
+                "id": "pos1",
+                "name": "Site 1 Position",
+                "numeric": false
+              },
+              {
+                "id": "pos2",
+                "name": "Site 2 Position",
+                "numeric": false
+              },
+              {
+                "id": "length",
+                "name": "Length",
+                "numeric": true
+              },
+              {
+                "id": "tumorVariantCount",
+                "name": "Tumor Variant Count",
+                "numeric": true
+              },
+              {
+                "id": "tumorReadCount",
+                "name": "Tumor Read Count",
+                "numeric": true
+              },
+              {
+                "id": "dnaSupport",
+                "name": "DNA Support",
+                "numeric": false
+              },
+              {
+                "id": "rnaSupport",
+                "name": "RNA Support",
+                "numeric": false
+              },
+              {
+                "id": "status",
+                "name": "Status",
+                "numeric": false
+              },
+              {
+                "id": "svAnnotation",
+                "name": "Study Annotation",
+                "numeric": false
+              },
+              {
+                "id": "comments",
+                "name": "Comments",
+                "numeric": false
+              }
+            ],
+            "shown": [
+              "samples",
+              "gene1",
+              "gene2",
+              "class",
+              "eventInfo",
+              "breakpointType",
+              "connectionType"
+            ],
+            "defaults": [
+              "samples",
+              "gene1",
+              "gene2",
+              "class",
+              "eventInfo",
+              "breakpointType",
+              "connectionType"
+            ],
+            "query": {},
+            "rows": [
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "patient": "P-0024249",
+                "sample": "P-0024249-T01-IM6",
+                "values": [
+                  "P-0024249-T01-IM6",
+                  "IRS2",
+                  "CHMP1A",
+                  "TRANSLOCATION",
+                  "Protein Fusion: mid-exon  {IRS2:CHMP1A}",
+                  "IMPPRECISE",
+                  "3to5",
+                  "NA",
+                  "Intron of CHMP1A(-):1Kb before exon 2",
+                  "Exon 1 of IRS2(-)",
+                  "16:89721445",
+                  "13:110437384",
+                  0,
+                  10,
+                  0,
+                  "NA",
+                  "NA",
+                  "SOMATIC",
+                  "IRS2 (NM_003749) - CHMP1A (NM_002768) rearrangement: t(13;16)(q34;q24.3)(chr13:g.110437384::chr16:g.89721445)",
+                  "NA"
+                ]
+              },
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "patient": "P-0024249",
+                "sample": "P-0024249-T01-IM6",
+                "values": [
+                  "P-0024249-T01-IM6",
+                  "TCF7L2",
+                  "",
+                  "DELETION",
+                  "TCF7L2-intragenic",
+                  "PRECISE",
+                  "3to5",
+                  "NA",
+                  "Intron of TCF7L2(+):23bp after exon 12",
+                  "IGR: 296Kb before HABP2(+)",
+                  "10:114917851",
+                  "10:115014274",
+                  96423,
+                  23,
+                  4714,
+                  "NA",
+                  "NA",
+                  "SOMATIC",
+                  "TCF7L2 (NM_001146274) rearrangement: c.1318+23_chr10:g.115014274del",
+                  "NA"
+                ]
+              },
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "patient": "P-0024249",
+                "sample": "P-0024249-T01-IM6",
+                "values": [
+                  "P-0024249-T01-IM6",
+                  "TMPRSS2",
+                  "ERG",
+                  "DELETION",
+                  "Protein Fusion: out of frame  {TMPRSS2:ERG}",
+                  "IMPPRECISE",
+                  "3to5",
+                  "NA",
+                  "Intron of ERG(-):57Kb after exon 3",
+                  "Intron of TMPRSS2(-):608bp before exon 2",
+                  "21:39890681",
+                  "21:42870724",
+                  2980043,
+                  105,
+                  41084,
+                  "NA",
+                  "NA",
+                  "SOMATIC",
+                  "TMPRSS2 (NM_001135099) - ERG (NM_004449) fusion ( TMPRSS2 exon 1 fused to ERG exons 4 -11): c.56-608:TMPRSS2_c.39+56905:ERGdel",
+                  "NA"
+                ]
+              }
+            ],
+            "offset": 0,
+            "pageSize": 25,
+            "lists": [
+              {
+                "cohort": "Prostate",
+                "study": "msk_chord_2024",
+                "total": 3,
+                "all": 3
+              }
+            ],
+            "total": 3,
+            "all": 3
+          }
+        },
+        "oncokbPin": "v7.5"
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "P-0024249 — Mutations: 3 of 7 rows (rows Annotation (OncoKB) contains “Oncogenic”); Copy Number Alterations: 3 rows; Structural Variants: 3 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 3,211 patients. Sorted by Structural Variants (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the patients per cohort and study",
+            "detail": "The alterations:counts query above: every patient of each cohort, with their sample count and how many rows each of the three tables lists for them (a mutation, a gene's deep copy-number call, a structural variant — each counted once however many samples carry it).",
+            "params": [
+              [
+                "Prostate · msk_chord_2024",
+                "3,211"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Sort them together and take one page",
+            "detail": "The alterations:rows query above: the patients of every cohort and study combined in one query, sorted by Structural Variants descending with missing values last, then patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset."
+          },
+          {
+            "kind": "fetch",
+            "title": "Read P-0024249's three tables",
+            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Mutations: every called mutation of the patient's samples (uncalled calls left out), one row per variant with the samples carrying it, the highest allele frequency among them (variant / (variant + reference) reads) with that sample's reads, and the gene's deep copy-number calls in the patient (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event (both genes and breakpoints, class, event info), the highest read counts among its samples. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
+            "params": [
+              [
+                "Mutations",
+                "3 of 7 rows (kept: rows Annotation (OncoKB) contains “Oncogenic”)"
+              ],
+              [
+                "Copy Number Alterations",
+                "3 rows"
+              ],
+              [
+                "Structural Variants",
+                "3 rows"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "runAlterations",
+            "alterationPatientRowSource",
+            "patientMutationsSource",
+            "patientCnaSource",
+            "patientSvSource",
+            "pageSql",
+            "countsSql",
+            "rankSql"
+          ],
+          "file": "lib/views/alterations.ts, lib/patient-alterations.ts, lib/table-query.ts",
+          "commit": null
+        },
+        "verification": "A listing: no statistic is computed, so there is no script — the queries are the numbers."
+      }
+    }
+  ]
+}

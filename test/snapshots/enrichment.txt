@@ -1,0 +1,59 @@
+Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- Colorectal, MSS: 4,957 patients — CANCER_TYPE in [Colorectal Cancer] (any sample) AND NOT MSI_TYPE in [Instable] (any sample)
+- Pancreatic, MSS: 3,095 patients — CANCER_TYPE in [Pancreatic Cancer] (any sample) AND NOT MSI_TYPE in [Instable] (any sample)
+
+Alteration enrichment (mutation; two-sided Fisher's exact test, BH q over 494 genes; 316 at q<0.05):
+  APC: Colorectal, MSS 76.5% (3815/4986) | Pancreatic, MSS 1.4% (45/3117), log2 ratio 5.73, q=<1e-300, enriched in Colorectal, MSS
+  KRAS: Colorectal, MSS 43.7% (2178/4986) | Pancreatic, MSS 80.8% (2518/3117), log2 ratio -0.89, q=3.8e-248, enriched in Pancreatic, MSS
+  CDKN2A: Colorectal, MSS 1% (52/4986) | Pancreatic, MSS 20.2% (629/3117), log2 ratio -4.27, q=8.2e-209, enriched in Pancreatic, MSS
+  TCF7L2: Colorectal, MSS 11.4% (547/4806) | Pancreatic, MSS 0.1% (3/3083), log2 ratio 6.87, q=1.7e-115, enriched in Colorectal, MSS
+  PIK3CA: Colorectal, MSS 17.6% (876/4986) | Pancreatic, MSS 2.3% (71/3117), log2 ratio 2.95, q=1.9e-115, enriched in Colorectal, MSS
+  FBXW7: Colorectal, MSS 12.7% (635/4986) | Pancreatic, MSS 1.1% (34/3117), log2 ratio 3.55, q=1.4e-95, enriched in Colorectal, MSS
+  SOX9: Colorectal, MSS 9.4% (470/4986) | Pancreatic, MSS 0.8% (25/3117), log2 ratio 3.55, q=1.7e-69, enriched in Colorectal, MSS
+  BRAF: Colorectal, MSS 7.5% (373/4986) | Pancreatic, MSS 1.3% (41/3117), log2 ratio 2.51, q=4.2e-39, enriched in Colorectal, MSS
+  AMER1: Colorectal, MSS 5.6% (281/4986) | Pancreatic, MSS 0.8% (26/3117), log2 ratio 2.76, q=3.1e-32, enriched in Colorectal, MSS
+  SMAD2: Colorectal, MSS 4.2% (211/4986) | Pancreatic, MSS 0.4% (12/3117), log2 ratio 3.46, q=1.3e-29, enriched in Colorectal, MSS
+  MEN1: Colorectal, MSS 0.5% (25/4986) | Pancreatic, MSS 4.1% (128/3117), log2 ratio -3.03, q=3.0e-29, enriched in Pancreatic, MSS
+  TP53: Colorectal, MSS 78% (3890/4986) | Pancreatic, MSS 66.6% (2077/3117), log2 ratio 0.23, q=1.2e-27, enriched in Colorectal, MSS
+  CTNNB1: Colorectal, MSS 5.4% (269/4986) | Pancreatic, MSS 1.1% (34/3117), log2 ratio 2.31, q=2.1e-25, enriched in Colorectal, MSS
+  NRAS: Colorectal, MSS 3.9% (196/4986) | Pancreatic, MSS 0.5% (16/3117), log2 ratio 2.94, q=8.8e-24, enriched in Colorectal, MSS
+  PIK3R1: Colorectal, MSS 3.6% (178/4986) | Pancreatic, MSS 0.4% (12/3117), log2 ratio 3.21, q=2.0e-23, enriched in Colorectal, MSS
+  PTPRT: Colorectal, MSS 6.3% (315/4986) | Pancreatic, MSS 1.9% (58/3117), log2 ratio 1.76, q=2.1e-21, enriched in Colorectal, MSS
+  PTPRS: Colorectal, MSS 5.2% (261/4986) | Pancreatic, MSS 1.6% (49/3117), log2 ratio 1.74, q=2.3e-17, enriched in Colorectal, MSS
+  EPHA3: Colorectal, MSS 3.5% (176/4986) | Pancreatic, MSS 0.8% (24/3117), log2 ratio 2.20, q=1.2e-15, enriched in Colorectal, MSS
+  CARD11: Colorectal, MSS 3.3% (166/4986) | Pancreatic, MSS 0.7% (22/3117), log2 ratio 2.24, q=5.6e-15, enriched in Colorectal, MSS
+  GRIN2A: Colorectal, MSS 3.8% (188/4986) | Pancreatic, MSS 1% (30/3117), log2 ratio 1.97, q=1.3e-14, enriched in Colorectal, MSS
+  ASXL1: Colorectal, MSS 2.6% (128/4986) | Pancreatic, MSS 0.4% (13/3117), log2 ratio 2.62, q=7.7e-14, enriched in Colorectal, MSS
+  MTOR: Colorectal, MSS 3% (150/4986) | Pancreatic, MSS 0.6% (20/3117), log2 ratio 2.23, q=1.5e-13, enriched in Colorectal, MSS
+  PLCG2: Colorectal, MSS 2.6% (123/4806) | Pancreatic, MSS 0.4% (13/3083), log2 ratio 2.60, q=2.2e-13, enriched in Colorectal, MSS
+  KDR: Colorectal, MSS 3% (148/4986) | Pancreatic, MSS 0.6% (20/3117), log2 ratio 2.21, q=3.3e-13, enriched in Colorectal, MSS
+  ERBB2: Colorectal, MSS 3.1% (155/4986) | Pancreatic, MSS 0.7% (23/3117), log2 ratio 2.07, q=6.2e-13, enriched in Colorectal, MSS
+  NF1: Colorectal, MSS 3.3% (166/4986) | Pancreatic, MSS 0.9% (27/3117), log2 ratio 1.94, q=1.0e-12, enriched in Colorectal, MSS
+  EPHA5: Colorectal, MSS 3.6% (181/4986) | Pancreatic, MSS 1% (32/3117), log2 ratio 1.82, q=1.0e-12, enriched in Colorectal, MSS
+  PIK3CG: Colorectal, MSS 3.1% (156/4986) | Pancreatic, MSS 0.8% (25/3117), log2 ratio 1.96, q=3.3e-12, enriched in Colorectal, MSS
+  ERBB3: Colorectal, MSS 3.2% (162/4986) | Pancreatic, MSS 0.9% (27/3117), log2 ratio 1.91, q=3.3e-12, enriched in Colorectal, MSS
+  PDGFRA: Colorectal, MSS 2.2% (110/4986) | Pancreatic, MSS 0.4% (11/3117), log2 ratio 2.64, q=4.1e-12, enriched in Colorectal, MSS
+  PTEN: Colorectal, MSS 3.9% (192/4986) | Pancreatic, MSS 1.2% (38/3117), log2 ratio 1.66, q=5.0e-12, enriched in Colorectal, MSS
+  AR: Colorectal, MSS 2.8% (140/4986) | Pancreatic, MSS 0.7% (22/3117), log2 ratio 1.99, q=3.5e-11, enriched in Colorectal, MSS
+  ALK: Colorectal, MSS 3.1% (153/4986) | Pancreatic, MSS 0.9% (27/3117), log2 ratio 1.82, q=8.1e-11, enriched in Colorectal, MSS
+  ZFHX3: Colorectal, MSS 3.8% (182/4806) | Pancreatic, MSS 1.3% (41/3083), log2 ratio 1.51, q=2.7e-10, enriched in Colorectal, MSS
+  PIK3C2G: Colorectal, MSS 2.4% (122/4986) | Pancreatic, MSS 0.6% (19/3117), log2 ratio 2.01, q=8.8e-10, enriched in Colorectal, MSS
+  AXIN2: Colorectal, MSS 2.8% (141/4986) | Pancreatic, MSS 0.8% (26/3117), log2 ratio 1.76, q=1.3e-9, enriched in Colorectal, MSS
+  EPHA7: Colorectal, MSS 2.5% (118/4806) | Pancreatic, MSS 0.6% (19/3083), log2 ratio 1.99, q=1.6e-9, enriched in Colorectal, MSS
+  B2M: Colorectal, MSS 1.5% (76/4986) | Pancreatic, MSS 0.2% (6/3117), log2 ratio 2.99, q=1.8e-9, enriched in Colorectal, MSS
+  SOX17: Colorectal, MSS 2% (101/4986) | Pancreatic, MSS 0.4% (13/3117), log2 ratio 2.28, q=1.9e-9, enriched in Colorectal, MSS
+  KDM6A: Colorectal, MSS 1.5% (74/4986) | Pancreatic, MSS 3.7% (116/3117), log2 ratio -1.33, q=2.5e-9, enriched in Pancreatic, MSS
+  … 454 more genes tested
+  CAVEAT (tell the user): Every gene's mutation frequency in each cohort, counted in SAMPLES over the samples profiled for that gene (a panel that lists it, or whole-exome; a sample altered off-panel counts as measured), uncalled mutations excluded as the portal excludes them. 494 genes tested with a two-sided Fisher's exact test; q is Benjamini–Hochberg across all of them. 8 altered genes were not tested: fewer than 5 altered samples across the cohorts, or not profiled in one of them. The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. 
+  METHOD:
+    - Count altered and profiled samples per gene [Colorectal, MSS · msk_chord_2024]: The enrichment queries above: per gene, samples with a mutation; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.
+        whole-exome samples: 0
+    - Count altered and profiled samples per gene [Pancreatic, MSS · msk_chord_2024]: The enrichment queries above: per gene, samples with a mutation; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.
+        whole-exome samples: 0
+    - Profiled = panel samples + whole-exome samples, summed across studies: A sample altered in a gene its panel does not list still counts as measured. Genes with fewer than 5 altered samples across the cohorts, or not profiled in one of them, are not tested.
+        tested: 494
+        not tested: 8
+    - Fisher's exact test per gene, then Benjamini–Hochberg: A two-sided Fisher's exact test on altered vs not among the profiled, per gene; q across every gene tested.
+    Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).

@@ -1,0 +1,140 @@
+{
+  "study": "crc_apc_impact_2020",
+  "cohorts": {
+    "all patients": {
+      "count": 471,
+      "text": "all patients in the study",
+      "studies": [
+        "crc_apc_impact_2020"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "logistic",
+      "cohorts": [
+        "all patients"
+      ],
+      "logistic": {
+        "coefficients": [
+          {
+            "label": "APC mutation status: Mutated",
+            "reference": "Not mutated",
+            "level": "Mutated",
+            "axisIndex": 0,
+            "beta": -1.264274030987992,
+            "se": 0.4053957847207888,
+            "or": 0.28244426751592355,
+            "ciLow": 0.12760251879097487,
+            "ciHigh": 0.6251817362891188,
+            "p": 0.001817022203426293
+          }
+        ],
+        "n": 470,
+        "events": 27,
+        "outcomeOther": [
+          "Do not report",
+          "Indeterminate",
+          "Stable"
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "crc_apc_impact_2020",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Logistic regression on 470 patients, 27 with MSI_TYPE = Instable (1 term). Every other observed value of MSI_TYPE (Do not report, Indeterminate, Stable) was treated as “not event.” 1 patient from patient-level participants lacked the outcome or a covariate and were excluded. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Fetch one row per patient",
+            "detail": "The logisticRows query above. Patients with a value for MSI_TYPE and for every covariate are kept. 1 cohort patient had no row.",
+            "scope": "crc_apc_impact_2020",
+            "rowsIn": 471,
+            "rowsOut": 470
+          },
+          {
+            "kind": "transform",
+            "title": "Code the outcome",
+            "detail": "1 if MSI_TYPE = “Instable”, else 0 — every other observed value (Do not report, Indeterminate, Stable) counts as not the event."
+          },
+          {
+            "kind": "transform",
+            "title": "Code the covariates",
+            "detail": "Each numeric covariate is one term. Each categorical covariate becomes one 0/1 term per level, measured against a reference level that gets no term.",
+            "params": [
+              [
+                "APC mutation status: Mutated",
+                "1 if c0 = “Mutated”, else 0 · 325 of 470 patients · reference “Not mutated”: the fixed default for a mutated-vs-not axis"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Fit a logistic regression",
+            "detail": "Maximum likelihood for a binomial GLM with a logit link and an intercept, by Newton–Raphson with step-halving.",
+            "params": [
+              [
+                "patients / events",
+                "470 / 27"
+              ],
+              [
+                "terms",
+                "1 plus an intercept (not drawn)"
+              ],
+              [
+                "standard errors",
+                "from the Fisher information at the estimate"
+              ],
+              [
+                "95% interval",
+                "exp(β ± 1.959964·SE), Wald"
+              ],
+              [
+                "p-value",
+                "Wald χ² on 1 df, (β/SE)²"
+              ],
+              [
+                "fit",
+                "converged in 8 iterations"
+              ],
+              [
+                "log likelihood",
+                "-98.4061"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "logisticRegression"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Matches statsmodels 0.15.0 Logit to a relative 1e-6 on coefficients, SEs, p-values and intervals (test/regression-golden.test.ts).",
+        "check": {
+          "logistic:APC mutation status: Mutated:beta": {
+            "v": -1.264274030987992
+          },
+          "logistic:APC mutation status: Mutated:se": {
+            "v": 0.4053957847207888
+          },
+          "logistic:APC mutation status: Mutated:p": {
+            "v": 0.001817022203426293,
+            "rel": 0.00001,
+            "abs": 1e-14
+          }
+        }
+      }
+    }
+  ]
+}

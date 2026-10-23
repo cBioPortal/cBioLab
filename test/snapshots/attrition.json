@@ -1,0 +1,154 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "LUAD KRAS G12C, immunotherapy": {
+      "count": 279,
+      "text": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample) AND OQL[KRAS: G12C] AND has Immuno treatment AND followupMonths ≥ 6 months",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    },
+    "LUAD KRAS wild-type": {
+      "count": 3976,
+      "text": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample) AND NOT OQL[KRAS]",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "attrition",
+      "cohorts": [
+        "LUAD KRAS G12C, immunotherapy",
+        "LUAD KRAS wild-type"
+      ],
+      "attrition": [
+        {
+          "cohort": "LUAD KRAS G12C, immunotherapy",
+          "base": 24950,
+          "steps": [
+            {
+              "label": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample)",
+              "n": 5957,
+              "excluded": 18993,
+              "pctOfBase": 23.9
+            },
+            {
+              "label": "OQL[KRAS: G12C]",
+              "n": 793,
+              "excluded": 5164,
+              "pctOfBase": 3.2
+            },
+            {
+              "label": "has Immuno treatment",
+              "n": 357,
+              "excluded": 436,
+              "pctOfBase": 1.4
+            },
+            {
+              "label": "followupMonths ≥ 6 months",
+              "n": 279,
+              "excluded": 78,
+              "pctOfBase": 1.1
+            }
+          ],
+          "studies": [
+            "msk_chord_2024"
+          ]
+        },
+        {
+          "cohort": "LUAD KRAS wild-type",
+          "base": 24950,
+          "steps": [
+            {
+              "label": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample)",
+              "n": 5957,
+              "excluded": 18993,
+              "pctOfBase": 23.9
+            },
+            {
+              "label": "NOT OQL[KRAS]",
+              "n": 3976,
+              "excluded": 1981,
+              "pctOfBase": 15.9
+            }
+          ],
+          "studies": [
+            "msk_chord_2024"
+          ]
+        }
+      ],
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Each step counts the patients left after ANDing that clause onto every clause above it, in the order the cohort lists them. The order changes the path, never the final count: reorder the clauses to see a different attrition sequence. Each view further drops patients who lack its own data (survival without follow-up, genes never profiled), and says how many in its own caption.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the cohort clause by clause",
+            "detail": "One attrition query per step above, per study: the patients left after ANDing that clause onto every clause before it, in the order the cohort lists them, summed across msk_chord_2024. Nothing is computed from these counts beyond the differences between steps.",
+            "scope": "LUAD KRAS G12C, immunotherapy",
+            "params": [
+              [
+                "every patient",
+                "24,950"
+              ],
+              [
+                "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample)",
+                "5,957 (−18,993)"
+              ],
+              [
+                "OQL[KRAS: G12C]",
+                "793 (−5,164)"
+              ],
+              [
+                "has Immuno treatment",
+                "357 (−436)"
+              ],
+              [
+                "followupMonths ≥ 6 months",
+                "279 (−78)"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count the cohort clause by clause",
+            "detail": "One attrition query per step above, per study: the patients left after ANDing that clause onto every clause before it, in the order the cohort lists them, summed across msk_chord_2024. Nothing is computed from these counts beyond the differences between steps.",
+            "scope": "LUAD KRAS wild-type",
+            "params": [
+              [
+                "every patient",
+                "24,950"
+              ],
+              [
+                "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample)",
+                "5,957 (−18,993)"
+              ],
+              [
+                "NOT OQL[KRAS]",
+                "3,976 (−1,981)"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [],
+          "file": "lib/views/attrition.ts",
+          "commit": null
+        }
+      }
+    }
+  ]
+}

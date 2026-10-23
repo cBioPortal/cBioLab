@@ -4,7 +4,7 @@ import { profileMomentsAllSql, genesetMembersSql } from "../federation-views.ts"
 import { benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea } from "../stats.ts";
 import { diffexprMethod } from "../method.ts";
 import type { ViewRun } from "./run.ts";
-import { overLimit, answering, refuse, niceCeil } from "./shared.ts";
+import { overLimit, answering, refuse, niceCeil, askEachSite } from "./shared.ts";
 
 const DE_MIN_N = 3, DE_POINT_CAP = 1500, DE_PERMUTATIONS = 1000;
 const SET_NAME = /^[A-Z0-9_]{3,120}$/;
@@ -51,15 +51,15 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
       " profile — available: " + ([...offered].sort().join(", ") || "none"));
 
   const moments = new Map<string, { n: number; sx: number; sxx: number }>(); // cohort|gene
-  await Promise.all(vNames.flatMap((n) => cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
-    const rows = await ok[st].viewAggregate("diffexpr:moments:" + n, doc.cohorts[n],
-      (c, s, d) => profileMomentsAllSql(c, s, d, profileType, log2));
+  const answers = await askEachSite(ctx, ok, (n, _st, r) => r.viewAggregate("diffexpr:moments:" + n, doc.cohorts[n],
+    (c, s, d) => profileMomentsAllSql(c, s, d, profileType, log2)));
+  for (const { cohort: n, answer: rows } of answers) {
     for (const r of rows) {
       const k = n + "|" + String(r.gene), cur = moments.get(k) || { n: 0, sx: 0, sxx: 0 };
       cur.n += Number(r.n); cur.sx += Number(r.sx); cur.sxx += Number(r.sxx);
       moments.set(k, cur);
     }
-  })));
+  }
   const [A, B] = vNames;
   const genes = [...new Set([...moments.keys()].map((k) => k.slice(k.indexOf("|") + 1)))];
   const tested: DiffexprGene[] = [];

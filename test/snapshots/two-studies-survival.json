@@ -1,0 +1,467 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "TP53 mut": {
+      "count": 25555,
+      "text": "OQL[TP53: MUT] — across 2 studies",
+      "studies": [
+        "msk_chord_2024",
+        "msk_met_2021"
+      ]
+    },
+    "TP53 wt": {
+      "count": 24627,
+      "text": "NOT OQL[TP53:] AND profiled for TP53 MUTATION — across 2 studies",
+      "studies": [
+        "msk_chord_2024",
+        "msk_met_2021"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "survival",
+      "cohorts": [
+        "TP53 mut",
+        "TP53 wt"
+      ],
+      "curves": [
+        {
+          "cohort": "TP53 mut",
+          "points": [
+            {
+              "t": 0,
+              "s": 1
+            },
+            {
+              "t": 0,
+              "s": 0.9982
+            },
+            {
+              "t": 0.03,
+              "s": 0.9981
+            },
+            {
+              "t": 0.032876676,
+              "s": 0.9967
+            },
+            {
+              "t": 0.065753353,
+              "s": 0.9966
+            },
+            {
+              "t": 0.07,
+              "s": 0.9966
+            },
+            {
+              "t": 0.098630029,
+              "s": 0.9965
+            },
+            {
+              "t": 0.13,
+              "s": 0.9964
+            },
+            {
+              "t": 0.131506705,
+              "s": 0.9962
+            },
+            {
+              "t": 0.16,
+              "s": 0.996
+            },
+            {
+              "t": 0.164383381,
+              "s": 0.9957
+            },
+            {
+              "t": 0.197260058,
+              "s": 0.9956
+            },
+            {
+              "t": 0.2,
+              "s": 0.9953
+            },
+            {
+              "t": 0.23,
+              "s": 0.995
+            },
+            {
+              "t": 0.230136734,
+              "s": 0.9947
+            },
+            {
+              "t": 0.26,
+              "s": 0.9944
+            },
+            {
+              "t": 0.26301341,
+              "s": 0.9942
+            },
+            {
+              "t": 0.295890087,
+              "s": 0.9939
+            },
+            {
+              "t": 0.3,
+              "s": 0.9935
+            },
+            {
+              "t": 0.328766763,
+              "s": 0.993
+            },
+            {
+              "…": "2979 more",
+              "sha256": "ffc2d62afcd76b56"
+            }
+          ],
+          "median": 30.64106231,
+          "n": 25498,
+          "events": 12607,
+          "atRisk": [
+            25498,
+            24109,
+            23357,
+            22638,
+            21884,
+            21187,
+            20497,
+            19853,
+            19250,
+            18633,
+            17978,
+            17317,
+            16492,
+            15797,
+            15094,
+            14401,
+            13713,
+            13063,
+            12486,
+            11916,
+            {
+              "…": "99 more",
+              "sha256": "65e42ce7c5247805"
+            }
+          ],
+          "missing": 57
+        },
+        {
+          "cohort": "TP53 wt",
+          "points": [
+            {
+              "t": 0,
+              "s": 1
+            },
+            {
+              "t": 0,
+              "s": 0.9989
+            },
+            {
+              "t": 0.03,
+              "s": 0.9988
+            },
+            {
+              "t": 0.032876676,
+              "s": 0.9982
+            },
+            {
+              "t": 0.065753353,
+              "s": 0.998
+            },
+            {
+              "t": 0.07,
+              "s": 0.9978
+            },
+            {
+              "t": 0.098630029,
+              "s": 0.9977
+            },
+            {
+              "t": 0.1,
+              "s": 0.9976
+            },
+            {
+              "t": 0.13,
+              "s": 0.9975
+            },
+            {
+              "t": 0.131506705,
+              "s": 0.9974
+            },
+            {
+              "t": 0.16,
+              "s": 0.9973
+            },
+            {
+              "t": 0.164383381,
+              "s": 0.9973
+            },
+            {
+              "t": 0.197260058,
+              "s": 0.9972
+            },
+            {
+              "t": 0.2,
+              "s": 0.9971
+            },
+            {
+              "t": 0.23,
+              "s": 0.9969
+            },
+            {
+              "t": 0.230136734,
+              "s": 0.9968
+            },
+            {
+              "t": 0.26,
+              "s": 0.9967
+            },
+            {
+              "t": 0.26301341,
+              "s": 0.9966
+            },
+            {
+              "t": 0.295890087,
+              "s": 0.9964
+            },
+            {
+              "t": 0.3,
+              "s": 0.9961
+            },
+            {
+              "…": "3051 more",
+              "sha256": "28815bef7a1dd109"
+            }
+          ],
+          "median": 68.44924006,
+          "n": 24570,
+          "events": 8585,
+          "atRisk": [
+            24570,
+            23454,
+            22965,
+            22473,
+            22046,
+            21636,
+            21221,
+            20770,
+            20340,
+            19860,
+            19420,
+            18945,
+            18285,
+            17677,
+            17144,
+            16580,
+            16020,
+            15453,
+            14997,
+            14522,
+            {
+              "…": "96 more",
+              "sha256": "c627134ccc1ae86f"
+            }
+          ],
+          "missing": 57
+        }
+      ],
+      "endpoint": "OS",
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          },
+          {
+            "study": "msk_met_2021",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "logrank": {
+        "chi2": 1594.0863,
+        "p": 0,
+        "df": 1,
+        "observed": [
+          12607,
+          8585
+        ],
+        "expected": [
+          9723.3,
+          11468.7
+        ],
+        "variance": 5216.6577,
+        "strata": 2
+      },
+      "logrankPooled": {
+        "chi2": 1554.7258,
+        "p": 0,
+        "df": 1,
+        "observed": [
+          12607,
+          8585
+        ],
+        "expected": [
+          9754.9,
+          11437.1
+        ],
+        "variance": 5232.0787,
+        "strata": 1
+      },
+      "caveat": "OS from each study's own baseline (left truncation applies; baselines are NOT harmonized across studies) Status '0:...' treated as censored. The log-rank test is STRATIFIED by study (2 strata contributed events): each study is compared only against itself, so a difference in case mix between studies cannot masquerade as a difference between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer. Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count patients by time and status",
+            "detail": "The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.",
+            "scope": "TP53 mut · msk_chord_2024",
+            "rowsIn": 13105,
+            "rowsOut": 13105,
+            "params": [
+              [
+                "count rows",
+                "4,156"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count patients by time and status",
+            "detail": "The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. 57 cohort patients had no OS_MONTHS value.",
+            "scope": "TP53 mut · msk_met_2021",
+            "rowsIn": 12450,
+            "rowsOut": 12393,
+            "params": [
+              [
+                "count rows",
+                "3,164"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count patients by time and status",
+            "detail": "The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.",
+            "scope": "TP53 wt · msk_chord_2024",
+            "rowsIn": 11594,
+            "rowsOut": 11594,
+            "params": [
+              [
+                "count rows",
+                "4,433"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count patients by time and status",
+            "detail": "The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. 57 cohort patients had no OS_MONTHS value.",
+            "scope": "TP53 wt · msk_met_2021",
+            "rowsIn": 13033,
+            "rowsOut": 12976,
+            "params": [
+              [
+                "count rows",
+                "3,444"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Estimate survival by Kaplan–Meier",
+            "detail": "The product-limit estimator, one curve per cohort, pooled over its studies. The median is the first time the curve is at or below 0.5.",
+            "params": [
+              [
+                "TP53 mut",
+                "25,498 patients, 12,607 events, median 30.6 months"
+              ],
+              [
+                "TP53 wt",
+                "24,570 patients, 8,585 events, median 68.4 months"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Two-group log-rank test, stratified by study",
+            "detail": "At each event time, every cohort's observed events against its share of the risk set, with the hypergeometric variance; χ² on 1 df. Each study is its own stratum — compared only against itself — and the strata are summed, so a difference in case mix between studies cannot pass for a difference between cohorts.",
+            "params": [
+              [
+                "χ² / df / p",
+                "1594.0863 / 1 / <1e-300"
+              ],
+              [
+                "strata with events",
+                "2"
+              ],
+              [
+                "pooled, for contrast",
+                "χ² 1554.7258, p <1e-300"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "kaplanMeier",
+            "logRank"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).",
+        "check": {
+          "km:TP53 mut:n": {
+            "v": 25498,
+            "abs": 0
+          },
+          "km:TP53 mut:events": {
+            "v": 12607,
+            "abs": 0
+          },
+          "km:TP53 mut:median": {
+            "v": 30.64106231,
+            "abs": 1e-9
+          },
+          "km:TP53 wt:n": {
+            "v": 24570,
+            "abs": 0
+          },
+          "km:TP53 wt:events": {
+            "v": 8585,
+            "abs": 0
+          },
+          "km:TP53 wt:median": {
+            "v": 68.44924006,
+            "abs": 1e-9
+          },
+          "logrank:chi2": {
+            "v": 1594.0863,
+            "abs": 0.00005
+          },
+          "logrank:p": {
+            "v": 0,
+            "rel": 0.00001,
+            "abs": 1e-300
+          },
+          "logrank:pooled:chi2": {
+            "v": 1554.7258,
+            "abs": 0.00005
+          },
+          "logrank:pooled:p": {
+            "v": 0,
+            "rel": 0.00001,
+            "abs": 1e-300
+          }
+        }
+      }
+    }
+  ]
+}
