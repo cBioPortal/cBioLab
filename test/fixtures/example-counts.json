@@ -166,6 +166,12 @@
     "Brain metastasis in lung cancer by EGFR, from dated tumour sites": {
       "NSCLC": 7809
     },
+    "Endometrial cancer molecular subtypes by genetic ancestry (POLE, MMRd, p53abn, NSMP)": {
+      "Endometrial": 2373
+    },
+    "The endometrial classifier against TCGA's own molecular subtypes": {
+      "UCEC": 529
+    },
     "splitBy: one cohort, auto-split into an arm per receptor subtype": {
       "all patients": 1756
     },

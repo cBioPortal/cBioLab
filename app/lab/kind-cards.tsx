@@ -104,6 +104,7 @@ export const KIND_CARDS: Record<string, KindCardSpec> = {
   organotropism: { label: "Metastatic organotropism (genes × metastatic sites, within cancer types)", title: "Metastatic organotropism", maxCohorts: 1, cohortInHeader: true,
     why: (k) => k.attrs.some((a) => /^DMETS_DX_|^METASTATIC_SITE$/i.test(a.attribute)) || k.events.some((e) => /diagnosis/i.test(e.canonical)) ? null
       : "this study records no metastatic sites (per-organ DMETS_DX_ flags, METASTATIC_SITE, or tumour sites on a Diagnosis timeline)" },
+  molsubtype: { label: "Molecular subtypes (endometrial POLE / MMRd / p53abn / NSMP)", title: "Molecular subtypes", maxCohorts: 6 },
   actionability: { label: "Clinical actionability (OncoKB levels, primary vs metastasis)", title: "Clinical actionability", maxCohorts: 4 },
   adjusted: { label: "Adjusted enrichment (every gene, logistic on covariates)", title: "Adjusted enrichment", maxCohorts: 2, minCohorts: 2 },
   forest: { label: "Pan-cancer forest (one exposure's HR per cancer type, random-effects pooled)", title: "Forest plot", maxCohorts: 6 },
@@ -225,6 +226,8 @@ export function kindSub(kind: string, spec: any, v: any): React.ReactNode {
   if (kind === "organotropism") return (spec.measure === "any" ? "" : "driver ") + (spec.alteration || "mutation") + "s in " +
     (spec.genes?.length ? spec.genes.length + " genes" : "the " + (spec.top ?? 12) + " most altered genes") + " × metastatic sites from " + (spec.source && spec.source !== "auto" ? spec.source : "the study's site source") +
     (spec.stratifyBy === null ? ", unstratified" : ", within " + (spec.stratifyBy || "CANCER_TYPE"));
+  if (kind === "molsubtype") return "endometrial molecular classification per patient (POLE, MMRd, p53abn, NSMP)" + (spec.by ? " · by " + spec.by : "") +
+    (spec.survival === false ? "" : " · OS by subtype");
   if (kind === "actionability") return "highest OncoKB level per patient, any cancer type" + (spec.groupBy ? " · by " + spec.groupBy : "") +
     (spec.pairBy === null ? "" : " · " + (spec.pairBy?.attribute || "SAMPLE_TYPE") + " concordance");
   if (kind === "adjusted") return "mutations in every gene mutated in ≥" + (100 * (spec.minShare ?? 0.05)).toFixed(0) + "% · adjusted for " + (spec.covariates?.length ? spec.covariates.join(", ") : "nothing");
@@ -566,6 +569,31 @@ export function KindCardControls({ c }: { c: KindCardCtx }) {
               {!RISK_LABEL_STEPS.includes(labelAbove) && <option value={labelAbove}>{Math.round(labelAbove * 100)}%</option>}
               {RISK_LABEL_STEPS.map((t) => <option key={t} value={t}>{Math.round(t * 100)}%</option>)}
             </OptionSelect>
+          </label>
+        </div>
+      </div>
+    );
+  }
+  if (spec.kind === "molsubtype") {
+    const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
+    const by = spec.by || "";
+    return (
+      <div className="viewtb">
+        <div className="tbz"><span className="tbl">data</span>
+          <label className="tbfield" title="a patient attribute to cross the subtypes with">
+            by <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ by: v || undefined })}>
+              <option value="">nothing</option>
+              {by && !cats.includes(by) && <option value={by}>{by}</option>}
+              {cats.map((a) => <option key={a} value={a}>{a}</option>)}
+            </OptionSelect>
+          </label>
+          <label className="tbfield" title="an abnormal p53: an OncoKB-driver TP53 mutation, or any protein-changing one">
+            p53 <OptionSelect value={spec.p53 === "nonsynonymous" ? "nonsynonymous" : "driver"} disabled={busy} onValueChange={(v) => patch({ p53: v === "driver" ? undefined : v })}>
+              <option value="driver">OncoKB driver</option><option value="nonsynonymous">any protein-changing</option>
+            </OptionSelect>
+          </label>
+          <label className="chk" title="draw overall survival by subtype">
+            <Checkbox checked={spec.survival !== false} disabled={busy} onCheckedChange={(x) => patch({ survival: x === true ? undefined : false })} /> OS by subtype
           </label>
         </div>
       </div>
@@ -1172,6 +1200,7 @@ export function defaultKindView(kind: string, known: Known): Record<string, unkn
   if (kind === "actionability") return { kind, groupBy: "CANCER_TYPE" };
   if (kind === "drivernegative") return { kind };
   if (kind === "organotropism") return { kind };
+  if (kind === "molsubtype") return { kind };
   if (kind === "forest") return { kind, exposure: { source: "alteration", gene: known.genes[0] || "TP53" } };
   if (kind === "labs") {
     const tx = known.events.find((e) => /treat|therap|drug|medicat/i.test(e.canonical));

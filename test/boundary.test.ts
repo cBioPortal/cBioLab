@@ -448,6 +448,11 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "orgOtherValuesSql": () => federation.orgOtherValuesSql(cohortSql, "x", "db", "METASTATIC_SITE"),
     "orgTopGenesSql": () => federation.orgTopGenesSql(cohortSql, "x", "db", { alteration: "mutation", driverPin: "v7.5" }, 12),
     "orgCountsSql": () => federation.orgCountsSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }, { genes: ["EGFR", "TP53"], alteration: "mutation", driverPin: null }, "CANCER_TYPE"),
+    // molsubtype: each patient's class stays in CTEs; patients are counted per class, group and survival time
+    "molCountsSql": () => federation.molCountsSql(cohortSql, "x", "db", { poleHotspots: ["P286R", "V411L"], msi: { attribute: "MSI_TYPE", high: ["Instable"], stable: ["Stable"] }, p53Pin: "v7.5", by: "ANCESTRY_LABEL" }),
+    "molCountsSql:score": () => federation.molCountsSql(cohortSql, "x", "db", { poleHotspots: ["P286R"], msi: { attribute: "MSI_SCORE", threshold: 10, stableBelow: 3 }, p53Pin: null, by: null }),
+    "molSurvivalSql": () => federation.molSurvivalSql(cohortSql, "x", "db", { poleHotspots: ["P286R"], msi: { attribute: "MSI_TYPE", high: ["Instable"], stable: ["Stable"] }, p53Pin: "v7.5", by: null }),
+    "molMsiAttributesSql": () => federation.molMsiAttributesSql(cohortSql, "x", "db"),
     "orgIncidenceSql": () => federation.orgIncidenceSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }, { genes: ["EGFR"], alteration: "mutation", driverPin: "v7.5" }, true, "CNS/Brain"),
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),
     // run only by PatientLevelResolver.viewRows: one row of values per patient, no identifier

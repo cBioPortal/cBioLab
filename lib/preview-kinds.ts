@@ -17,6 +17,7 @@ export const PREVIEW_KINDS: Record<string, string> = {
   instability: "no method record, and no check of the arm calls and aneuploidy scores against Taylor et al.'s published values yet",
   actionability: "no method record of the per-patient highest-level counts yet",
   drivernegative: "no method record or golden test of the group split and the per-gene Fisher tests yet",
+  molsubtype: "no method record or golden test of the per-patient classification, the chi-squared tests or the survival split yet",
   organotropism: "no method record or golden test of the per-cell Cochran–Mantel–Haenszel tests or the site incidence yet",
 };
 

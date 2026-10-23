@@ -128,6 +128,16 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
         a.panels.map((pn) => [line(pn.cohort, pn), ...(pn.groups || []).map((g) => line("  " + g.label, g)),
           ...(pn.concordance ? [`    ${a.pairBy!.a.join("/")} vs ${a.pairBy!.b.join("/")} highest level, ${pn.concordance.pairs} patients with both: ${pn.concordance.discordant} discordant (${pct(pn.concordance.discordant, pn.concordance.pairs)}); rows ${a.pairBy!.a.join("/")}, columns ${a.pairBy!.b.join("/")} (1, 2, 3A, 3B, 4, none): ` +
             pn.concordance.table.map((r) => "[" + r.join(", ") + "]").join(" ")] : [])].join("\n")).join("\n") + caveatOf(v) + noteOf(v));
+    } else if (v.kind === "molsubtype") {
+      const m = v.molsubtype, pct = (k: number, n: number) => n ? (100 * k / n).toFixed(1) + "%" : "–";
+      const line = (label: string, c: { counts: number[]; classified: number; notClassifiable: number }) =>
+        `  ${label} (${c.classified.toLocaleString()} classified, ${c.notClassifiable.toLocaleString()} not classifiable): ` + m.subtypes.map((s, i) => `${s} ${c.counts[i]} (${pct(c.counts[i], c.classified)})`).join(", ");
+      out.push(`Molecular subtypes — ${m.classifierLabel}; MSI by ${m.msi}; p53 abnormal = ${m.p53}:\n` +
+        m.panels.map((pn) => [line(pn.cohort, pn), ...(pn.groups || []).map((g) => line("  " + g.label, g)),
+          ...(pn.byTest ? [`    by ${m.by}: chi-squared ${pn.byTest.chi2.toFixed(1)} (${pn.byTest.df} df), p=${pFmt(pn.byTest.p)}`] : [])].join("\n")).join("\n") +
+        (m.cohortTest ? `\n  Between cohorts: chi-squared ${m.cohortTest.chi2.toFixed(1)} (${m.cohortTest.df} df), p=${pFmt(m.cohortTest.p)}` : "") +
+        (m.survival || []).map((s) => `\n  OS by subtype, ${s.cohort}: ` + s.curves.map((c) => `${c.subtype} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : c.median.toFixed(1) + " mo"}`).join("; ") +
+          (s.logrank ? `; log-rank chi-squared ${s.logrank.chi2.toFixed(1)} (${s.logrank.df} df), p=${pFmt(s.logrank.p)}` : s.noTest ? "; " + s.noTest : "")).join("") + caveatOf(v) + noteOf(v));
     } else if (v.kind === "organotropism") {
       const o = v.organotropism, pct = (k: number, n: number) => n ? (100 * k / n).toFixed(1) + "%" : "–";
       const lab = new Map(o.sites.map((s) => [s.site, s.label]));

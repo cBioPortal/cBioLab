@@ -4,7 +4,7 @@
 const NEW_KINDS = new Set([
   "cox", "logistic", "riskmodel", "txendpoints", "multistate", "rmst", "predictive", "cutpoint", "forest", "hla",
   "course", "sequence", "incidence", "labs", "attrition",
-  "adjusted", "actionability", "drivernegative", "exclusivity", "organotropism",
+  "adjusted", "actionability", "drivernegative", "exclusivity", "organotropism", "molsubtype",
   "paired", "acquired", "ctdna", "clonality", "genome", "instability", "composition",
 ]);
 

@@ -16,6 +16,8 @@ export interface KmPanelCurve {
   atRisk?: number[];
   /** the legend's detail line (median, n, events) */
   detail: string;
+  /** the series colour to draw it in (default its place in the list) */
+  series?: number;
 }
 
 /** `shadeTo`: the area under each curve from 0 to that time is shaded (a restricted mean), with a rule at it */
@@ -50,7 +52,7 @@ export function kmPanel(curves: KmPanelCurve[], o: { y0: number; W: number; p: P
     out.push(label(tx, T + FS.small, tl, { size: FS.small, fill: p.muted }));
   }
   curves.forEach((c, i) => {
-    const st = seriesStyle(i);
+    const st = seriesStyle(c.series ?? i);
     out.push(`<path d="${stepPath(c.points.filter((q) => q.t <= tMax), xs, ys, { t: 0, s: o.origin ?? 1 }, tMax)}" fill="none" stroke="${st.color}" stroke-width="${SW.series}"` +
       (st.dash ? ` stroke-dasharray="${st.dash}"` : "") + ` stroke-linejoin="round"/>`);
   });
@@ -63,7 +65,7 @@ export function kmPanel(curves: KmPanelCurve[], o: { y0: number; W: number; p: P
     const every = Math.max(1, Math.ceil((wid + 6) / gap));
     out.push(label(8, y + FS.small, "Number at risk", { size: FS.small, fill: p.muted, weight: 600 }));
     curves.forEach((c, i) => {
-      const st = seriesStyle(i), cy = y + ROW * (i + 1) + ROW / 2, ty = cy + FS.small * 0.35;
+      const st = seriesStyle(c.series ?? i), cy = y + ROW * (i + 1) + ROW / 2, ty = cy + FS.small * 0.35;
       out.push(`<line x1="8" y1="${cy}" x2="24" y2="${cy}" stroke="${st.color}" stroke-width="${SW.series}"` + (st.dash ? ` stroke-dasharray="${st.dash}"` : "") + `/>`);
       out.push(label(28, ty, c.name, { size: FS.small, fill: p.ink, maxW: nameW }));
       xs.ticks.forEach((t, k) => {
@@ -76,7 +78,7 @@ export function kmPanel(curves: KmPanelCurve[], o: { y0: number; W: number; p: P
     });
     y += ROW * (curves.length + 1) + 8;
   }
-  const lg = legend(curves.map((c, i) => ({ label: c.name, color: seriesStyle(i).color, dash: seriesStyle(i).dash, kind: "line" as const, detail: c.detail })),
+  const lg = legend(curves.map((c, i) => ({ label: c.name, color: seriesStyle(c.series ?? i).color, dash: seriesStyle(c.series ?? i).dash, kind: "line" as const, detail: c.detail })),
     8, y, W - 16, p, { grid: true });
   out.push(lg.svg);
   y += lg.height + 4;

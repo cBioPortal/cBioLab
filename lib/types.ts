@@ -773,6 +773,50 @@ export interface OrganotropismResult {
   excluded?: { study: string; reason: string }[];
 }
 /**
+ * A published molecular classifier applied per patient as derived subtypes — the endometrial
+ * classification (TCGA 2013 / ProMisE / WHO 2020): POLE-ultramutated, else MMR-deficient (MSI-high),
+ * else p53-abnormal, else no specific molecular profile, with "not classifiable" where an input is
+ * missing. Per cohort: subtype shares, subtype by an attribute, and OS by subtype. Counts only.
+ */
+export interface MolsubtypeView {
+  note?: string;
+  kind: "molsubtype"; cohorts?: string[];
+  /** the classifier (only "endometrial" so far) */
+  classifier?: "endometrial";
+  /** the MSI call: a categorical attribute's MSI-high and stable values, or a numeric score's cut-offs (default MSI_TYPE Instable / Stable, else MSI_SCORE ≥ 10 / < 3) */
+  msi?: { attribute?: string; high?: string[]; stable?: string[]; threshold?: number; stableBelow?: number };
+  /** an abnormal p53: an OncoKB-driver TP53 mutation (default) or any protein-changing TP53 mutation */
+  p53?: "driver" | "nonsynonymous";
+  /** a patient attribute to cross the subtypes with (e.g. ANCESTRY_LABEL, STAGE_HIGHEST_RECORDED) */
+  by?: string;
+  /** groups of `by` drawn (largest first; default 8), the rest pooled into a named Other */
+  top?: number;
+  /** draw OS by subtype (default true) */
+  survival?: boolean;
+}
+export interface MolsubtypeCounts { counts: number[]; classified: number; notClassifiable: number; why: Record<string, number> }
+export interface MolsubtypePanel extends MolsubtypeCounts {
+  cohort: string; patients: number;
+  groups?: (MolsubtypeCounts & { label: string })[];
+  /** cohort's classified patients by group: chi-squared over group × subtype */
+  byTest?: import("./stats.ts").ChiSquareTest;
+  pooled?: string[];
+}
+export interface MolsubtypeResult {
+  classifier: string; classifierLabel: string;
+  /** the subtypes in hierarchy order */
+  subtypes: string[];
+  msi: string; p53: string; poleHotspots: string[];
+  by: string | null;
+  panels: MolsubtypePanel[];
+  /** classified patients' subtype shares between cohorts (two or more) */
+  cohortTest?: import("./stats.ts").ChiSquareTest;
+  /** OS by subtype, per cohort (classified patients with OS_MONTHS) */
+  survival?: { cohort: string; curves: (Omit<KmCurve, "cohort"> & { subtype: string })[]; logrank: LogRankK | null; noTest?: string }[];
+  noSurvival?: string;
+  excluded?: { study: string; reason: string }[];
+}
+/**
  * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
  * what the axes are, exactly as it does in the portal, rather than being asked for.
  */
@@ -2258,7 +2302,7 @@ import type { PlotAxis, PlotData } from "./plot.ts";
 import type { PointLayerSpec } from "./plot-layers.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 export type { PlotAxis, PlotData };
-export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView | ActionabilityView | DrivernegativeView | OrganotropismView
+export type View = CompareView | SurvivalView | OncoprintView | CooccurrenceView | ClinicalView | CoexpressionView | HotspotsView | CourseView | SequenceView | PlotView | CoxView | LogisticView | ForestView | AdjustedView | ActionabilityView | DrivernegativeView | OrganotropismView | MolsubtypeView
   | AttritionView | GenomeView | PathwaysView | DiffexprView | PairedView | ClonalityView | IncidenceView | LabsView | AcquiredView | CtdnaView | ExclusivityView | TxendpointsView | MultistateView | RmstView | PredictiveView | CutpointView | HlaView | InstabilityView
   | CancertypesView | OverlapView | EnrichmentView | AssaysView | CompositionView | CorrelatesView | TableView | MutationsView | RiskmodelView | TimelineView | AlterationsView;
 /** every view kind the document language has; a comparison against anything else is a type error */
@@ -2619,6 +2663,9 @@ export interface ViewResultFields {
   organotropism: {
     organotropism?: OrganotropismResult;
   };
+  molsubtype: {
+    molsubtype?: MolsubtypeResult;
+  };
   course: {
     course?: CourseSeries[];
     /** bin width and window actually used, in months */
@@ -2757,7 +2804,7 @@ export interface ViewResultFields {
  * nor waits for cohorts). The oncoprint has none: it carries its figure or its spec, by request.
  */
 export interface ViewResultMain {
-  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; adjusted: "adjusted"; actionability: "actionability"; drivernegative: "drivernegative"; organotropism: "organotropism"; course: "course"; sequence: "sequence";
+  compare: "rows"; survival: "curves"; cox: "cox"; logistic: "logistic"; forest: "forest"; adjusted: "adjusted"; actionability: "actionability"; drivernegative: "drivernegative"; organotropism: "organotropism"; molsubtype: "molsubtype"; course: "course"; sequence: "sequence";
   hotspots: "hotspots"; plot: "plot"; coexpression: "coexpression"; clinical: "clinical"; cooccurrence: "pairs";
   oncoprint: never; attrition: "attrition"; genome: "genome"; pathways: "pathways"; diffexpr: "diffexpr";
   paired: "paired"; clonality: "clonality"; incidence: "incidence"; labs: "labs"; riskmodel: "riskmodel";
