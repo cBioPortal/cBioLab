@@ -9,6 +9,7 @@ import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql } from "./event-name
 import { clinicalTable } from "./custom-data.ts";
 import { splitBucketSql } from "./cohort2.ts";
 import { casesCte, type CompositionSource } from "./composition.ts";
+import { finiteSql } from "./sql-number.ts";
 
 /** bare patient id for a *_unique_id column of this study */
 const pidOf = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
@@ -169,7 +170,7 @@ export function geneSetCountsSql(cohortSql: string, sets: { name: string; genes:
  */
 export function profileMomentsAllSql(cohortSql: string, study: string, db: string, profileType: string, log2: boolean): string {
   const pid = pidOf("sd.patient_unique_id", study);
-  const raw = "toFloat64OrNull(ga.alteration_value)";
+  const raw = finiteSql("ga.alteration_value");
   const val = log2 ? "log2(" + raw + " + 1)" : raw;
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
@@ -382,12 +383,12 @@ export function facetsHistogramSql(cohortSql: string, study: string, db: string,
   return (
     facetsSamplesCte(cohortSql, study, db, qc) + "\n" +
     "SELECT attribute_name AS attr,\n" +
-    "       toInt32(floor(least(if(attribute_name = 'FACETS_PURITY', 0.9999, 7.9999), greatest(0, toFloat64OrNull(attribute_value))) /\n" +
+    "       toInt32(floor(least(if(attribute_name = 'FACETS_PURITY', 0.9999, 7.9999), greatest(0, " + finiteSql("attribute_value") + ")) /\n" +
     "         if(attribute_name = 'FACETS_PURITY', 0.05, 0.25))) AS bin,\n" +
     "       count() AS n\n" +
     "FROM " + clinicalTable(db, ["FACETS_PURITY", "FACETS_PLOIDY"]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name IN ('FACETS_PURITY', 'FACETS_PLOIDY')\n" +
-    "  AND sample_unique_id IN (SELECT suid FROM samp) AND toFloat64OrNull(attribute_value) IS NOT NULL\n" +
+    "  AND sample_unique_id IN (SELECT suid FROM samp) AND " + finiteSql("attribute_value") + " IS NOT NULL\n" +
     "GROUP BY attr, bin ORDER BY attr, bin"
   );
 }
@@ -452,7 +453,7 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')) AS months,\n" +
+    "         " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
@@ -529,14 +530,14 @@ function labCtes(cohortSql: string, study: string, db: string, lab: LabSpec, anc
     "  GROUP BY pid\n" +
     "),\n" +
     "lab AS (\n" +
-    "  SELECT p.stable_id AS pid, ce.start_date AS day, toFloat64OrNull(r.value) AS v\n" +
+    "  SELECT p.stable_id AS pid, ce.start_date AS day, " + finiteSql("r.value") + " AS v\n" +
     "  FROM " + db + ".clinical_event ce\n" +
     "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "  JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("t.key", lab.testKey) + " AND " + foldedEqualsSql("t.value", lab.test) + "\n" +
     "  JOIN " + db + ".clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("r.key", lab.resultKey) + "\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", lab.eventType) + "\n" +
-    "    AND p.stable_id IN (SELECT pid FROM anch) AND toFloat64OrNull(r.value) IS NOT NULL\n" +
+    "    AND p.stable_id IN (SELECT pid FROM anch) AND " + finiteSql("r.value") + " IS NOT NULL\n" +
     "),\n" +
     "base AS (\n" +
     // the baseline is the mean of the readings on the last day with any, so several readings that day
@@ -899,7 +900,7 @@ export function compositionEntitiesSql(study: string, db: string, profileType: s
  */
 export function correlatesMomentsSql(cohortSql: string, study: string, db: string, gene: string, profileType: string, otherProfile: string): string {
   const pid = pidOf("sd.patient_unique_id", study);
-  const raw = "toFloat64OrNull(ga.alteration_value)";
+  const raw = finiteSql("ga.alteration_value");
   const vals = (pt: string, geneCond: string) =>
     "  SELECT " + pid + " AS pid, ga.hugo_gene_symbol AS gene, avg(" + raw + ") AS v\n" +
     "  FROM " + db + ".genetic_alteration_derived ga\n" +
@@ -981,7 +982,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         toFloat64OrNull(anyIf(attribute_value, attribute_name=" + sq(months) + ")) AS months,\n" +
+    "         " + finiteSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status,\n" +
     "         " + splitBucketSql(pid, study) + " AS half\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +

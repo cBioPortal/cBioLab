@@ -4,6 +4,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { clinicalRowSource, type TableColumn } from "../lib/clinical-table.ts";
 import { pageSql, countsSql } from "../lib/table-query.ts";
+import { finiteSql } from "../lib/sql-number.ts";
 
 const cols: TableColumn[] = [{ id: "AGE", name: "Age", per: "patient", numeric: true }, { id: "TYPE", name: "Type", per: "sample", numeric: false }];
 const part = (cohort: string, study: string) => ({ cohort, study, cohortSql: "SELECT '' AS pid" });
@@ -12,8 +13,9 @@ const defaults = ["patient", "sample", "AGE", "TYPE"];
 describe("clinicalRowSource", () => {
   test("numbers sort with NULLS LAST, blanks last, then patient, sample and document order; the offset is global", () => {
     const src = clinicalRowSource([part("a", "s")], "db", "sample", cols);
-    assert.match(pageSql(src, { sort: { column: "AGE", desc: true } }, defaults, 10, 20),
-      /ORDER BY toFloat64OrNull\(m\['AGE'\]\) DESC NULLS LAST, patient, sample, ord\nLIMIT 10 OFFSET 20$/);
+    // a number sorts as its finite value; "nan" and "inf" read as missing (lib/sql-number.ts)
+    assert.ok(pageSql(src, { sort: { column: "AGE", desc: true } }, defaults, 10, 20)
+      .endsWith("ORDER BY " + finiteSql("m['AGE']") + " DESC NULLS LAST, patient, sample, ord\nLIMIT 10 OFFSET 20"));
     assert.match(pageSql(src, { sort: { column: "TYPE" } }, defaults, 10, 0), /ORDER BY \(m\['TYPE'\] = ''\) ASC, m\['TYPE'\] ASC, patient, sample, ord/);
     assert.match(pageSql(src, {}, defaults, 10, 0), /ORDER BY patient, sample, patient, sample, ord/);
   });

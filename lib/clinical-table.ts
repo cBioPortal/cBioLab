@@ -5,6 +5,7 @@
 import { sq } from "./compiler.ts";
 import type { QueryColumn, RowSource } from "./table-query.ts";
 import { clinicalTable, clinicalMetaTable } from "./custom-data.ts";
+import { finiteSql } from "./sql-number.ts";
 
 export interface TableColumn {
   id: string; name: string;
@@ -81,7 +82,7 @@ export function clinicalRowSource(parts: TablePart[], db: string, unit: "sample"
   if (!parts.length) throw new Error("clinicalRowSource needs at least one part");
   const attr = (c: TableColumn): QueryColumn => {
     const v = "m[" + sq(c.id) + "]";
-    return { id: c.id, name: c.name, numeric: c.numeric, text: v, ...(c.numeric ? { num: "toFloat64OrNull(" + v + ")" } : {}) };
+    return { id: c.id, name: c.name, numeric: c.numeric, text: v, ...(c.numeric ? { num: finiteSql(v) } : {}) };
   };
   return {
     with: allRows(parts, db, unit, columns),

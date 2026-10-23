@@ -20,6 +20,7 @@ export { parseOql } from "./oql-parse.ts";
 export type { OqlSpecType, OqlRange, OqlSpec, OqlEntry } from "./oql-parse.ts";
 import type { OqlRange, OqlSpec } from "./oql-parse.ts";
 import { parseOql } from "./oql-parse.ts";
+import { finiteSql } from "./sql-number.ts";
 
 /**
  * A mutation's class as cBioPortal's OQL sees it — cbioportal-frontend's getMutationSubType and
@@ -136,7 +137,7 @@ export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db 
           "  FROM " + db + ".genetic_alteration_derived ga\n" +
           "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
           "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
-          "    AND ga.profile_type = " + sq(prof) + " AND toFloat64OrNull(ga.alteration_value) " + spec.op + " " + spec.z);
+          "    AND ga.profile_type = " + sq(prof) + " AND " + finiteSql("ga.alteration_value") + " " + spec.op + " " + spec.z);
         continue;
       }
       parts.push(

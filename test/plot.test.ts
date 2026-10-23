@@ -6,6 +6,7 @@ import { axisKind, axisLabel, axisSelect, corrPValue, plotBinsSql, plotBoxSql, p
   plotShape, plotStatsSql, plotTableSql, plotPointsSql, plotViolinSql, categoryColor, isAbsent,
   tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS , coverageNote, combineNote, plotCoverageSql, plotScatterPointsSql, type PlotData } from "../lib/plot.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
+import { finiteSql } from "../lib/sql-number.ts";
 
 const ctx = { study: "x", db: "db", unit: "sample" as const, cohortSql: "SELECT pid FROM p" };
 const num = { source: "clinical" as const, attribute: "MUTATION_COUNT" };
@@ -203,7 +204,8 @@ test("a plot says how many cases the pair left out, and on which axis", () => {
 test("log: true reads log10(v + 1), leaves out what has no such log, and says so in the label", () => {
   const ctx = { study: "s", db: "db", unit: "sample" as const, cohortSql: "SELECT '' AS pid" };
   const clin = axisSelect({ source: "clinical", attribute: "MUTATION_COUNT", log: true }, ctx, "num");
-  assert.match(clin, /if\(toFloat64OrNull\(attribute_value\) >= 0, log10\(toFloat64OrNull\(attribute_value\) \+ 1\), NULL\) IS NOT NULL/);
+  const v = finiteSql("attribute_value");
+  assert.ok(clin.includes("if(" + v + " >= 0, log10(" + v + " + 1), NULL) IS NOT NULL"), clin);
   assert.doesNotMatch(axisSelect({ source: "clinical", attribute: "MUTATION_COUNT" }, ctx, "num"), /log10/);
   const mol = axisSelect({ source: "molecular", profileType: "mrna", gene: "ESR1", log: true }, ctx, "num");
   assert.match(mol, /^SELECT id, v FROM \(/);

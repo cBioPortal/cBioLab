@@ -13,6 +13,7 @@
 import type { EventSelector, EventRel, Occurrence } from "./types.ts";
 import { foldedEqualsSql, canonicalEventName } from "./event-names.ts";
 import { linesCtes, compositionKeySql, DEFAULT_LINE_GAP, LINE_TYPE } from "./treatment-lines.ts";
+import { finiteSql } from "./sql-number.ts";
 
 /** A selector after runtime validation: defaults applied, fields narrowed. */
 export interface ValidSelector {
@@ -88,7 +89,7 @@ function selectorCte(name: string, sel: ValidSelector, db: string, priorGuard: b
   });
   if (sel.numeric) {
     joins.push("JOIN " + db + ".clinical_event_data nx ON nx.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("nx.key", sel.numeric.key));
-    conds.push("toFloat64OrNull(nx.value) " + sel.numeric.op + " " + sel.numeric.value);
+    conds.push(finiteSql("nx.value") + " " + sel.numeric.op + " " + sel.numeric.value);
   }
   if (sel.minDurationDays) {
     conds.push("ce.stop_date IS NOT NULL AND ce.stop_date - ce.start_date >= " + sel.minDurationDays);

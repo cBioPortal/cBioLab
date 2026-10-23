@@ -149,6 +149,7 @@ const GENE_TABLE_LIMIT = 500;
 /** how many genes may carry their own alteration facet at once */
 const GENE_FACET_LIMIT = 6;
 import { isClinicalLeaf } from "./types.ts";
+import { finiteSql } from "./sql-number.ts";
 
 
 export interface ExploreArgs {
@@ -969,14 +970,14 @@ async function prefetchFacets(opts: {
       "WHERE cs.cancer_study_identifier IN " + IN, conn).catch(() => ({ data: [] as ChRow[] })),
     chQuery<ChRow>(
       "SELECT cancer_study_identifier AS s, type, attribute_name AS a, uniqExact(" + clinicalValueFoldSql("attribute_value") + ") AS nv,\n" +
-      "  countIf(toFloat64OrNull(attribute_value) IS NOT NULL) / count() AS numratio,\n" +
+      "  countIf(" + finiteSql("attribute_value") + " IS NOT NULL) / count() AS numratio,\n" +
       "  uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS np,\n" +
-      "  min(toFloat64OrNull(attribute_value)) AS mn, max(toFloat64OrNull(attribute_value)) AS mx,\n" +
-      "  quantileExact(0.5)(toFloat64OrNull(attribute_value)) AS md,\n" +
-      "  quantileExact(0.25)(toFloat64OrNull(attribute_value)) AS q1,\n" +
-      "  quantileExact(0.75)(toFloat64OrNull(attribute_value)) AS q3,\n" +
-      "  countIf(toFloat64OrNull(attribute_value) IS NULL) AS na,\n" +
-      "  countIf(toFloat64OrNull(attribute_value) = round(toFloat64OrNull(attribute_value))) = countIf(toFloat64OrNull(attribute_value) IS NOT NULL) AS allints\n" +
+      "  min(" + finiteSql("attribute_value") + ") AS mn, max(" + finiteSql("attribute_value") + ") AS mx,\n" +
+      "  quantileExact(0.5)(" + finiteSql("attribute_value") + ") AS md,\n" +
+      "  quantileExact(0.25)(" + finiteSql("attribute_value") + ") AS q1,\n" +
+      "  quantileExact(0.75)(" + finiteSql("attribute_value") + ") AS q3,\n" +
+      "  countIf(" + finiteSql("attribute_value") + " IS NULL) AS na,\n" +
+      "  countIf(" + finiteSql("attribute_value") + " = round(" + finiteSql("attribute_value") + ")) = countIf(" + finiteSql("attribute_value") + " IS NOT NULL) AS allints\n" +
       "FROM " + clinicalTable(db, attrAllow.length ? attrAllow : "all") + "\n" +
       "WHERE cancer_study_identifier IN " + IN + " AND attribute_value != ''" + cond +
       (attrAllow.length ? "\n  AND attribute_name IN (" + attrAllow.map(sq).join(",") + ")" : "") + "\n" +
@@ -1086,7 +1087,7 @@ async function pooledHistograms(opts: {
     const r = await chQuery<ChRow>(
       "SELECT multiIf(v <= " + edges[0] + ", -1, v > " + lastEdge + ", -2, toInt32(ceil((v - " + edges[0] + ") / " + interval + ")) - 1) AS b,\n" +
       "       uniqExact(id) AS n\n" +
-      "FROM (SELECT toFloat64OrNull(attribute_value) AS v, " + unit + " AS id\n" +
+      "FROM (SELECT " + finiteSql("attribute_value") + " AS v, " + unit + " AS id\n" +
       "      FROM " + clinicalTable(db, [f.attribute]) + "\n" +
       "      WHERE cancer_study_identifier IN (" + studies.map(sq).join(",") + ") AND attribute_name = " + sq(f.attribute) +
       "        AND type = " + sq(f.per) + " AND attribute_value != ''" + cond + ")\n" +

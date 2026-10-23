@@ -88,6 +88,7 @@ export { POINTS_CAP, POINT_LAYER_CAP, LAYER_COLORS, LAYER_BASE, DEFAULT_POINT_LA
 import { POINTS_CAP, POINT_RULE_N_MAX } from "./plot-layers.ts";
 export { isAbsent, jitterFor } from "./plot-draw.ts";
 import { isAbsent } from "./plot-draw.ts";
+import { finiteSql } from "./sql-number.ts";
 /**
  * Over the points cap, a scatter cell holding at most this many cases is drawn as its cases
  * rather than as a shade: the sparse fringe of the density, which is where the outliers are.
@@ -246,8 +247,8 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     // are combined: a number is their mean, a category is the samples' common value, or "Multiple"
     // when they differ (combineNote says so in the caption).
     // Only the study knows whether the attribute is a number, so the caller says which.
-    const val = kind === "num" ? logOf(a, "toFloat64OrNull(attribute_value)") : "attribute_value";
-    const valCd = kind === "num" ? logOf(a, "toFloat64OrNull(cd.attribute_value)") : "cd.attribute_value";
+    const val = kind === "num" ? logOf(a, finiteSql("attribute_value")) : "attribute_value";
+    const valCd = kind === "num" ? logOf(a, finiteSql("cd.attribute_value")) : "cd.attribute_value";
     const defined = (e: string) => kind === "num" ? " AND " + e + " IS NOT NULL" : "";
     const own = "SELECT " + strip(sample ? "sample_unique_id" : "patient_unique_id", study) + " AS id, " + val + " AS v, " +
       "1 AS pref\n" +
@@ -276,12 +277,12 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     const gene = String(a.gene).toUpperCase();
     const level = "multiIf(x = -2, 'Deep deletion', x = -1, 'Shallow deletion', x = 0, 'Diploid', x = 1, 'Gain', x = 2, 'Amplification', toString(x))";
     return "SELECT id, if(uniqExact(lv) > 1, " + sq(MULTIPLE) + ", any(lv)) AS v FROM (\n" +
-      "SELECT " + strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study) + " AS id, " + level.replace(/\bx\b/g, "toFloat64OrNull(ga.alteration_value)") + " AS lv\n" +
+      "SELECT " + strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study) + " AS id, " + level.replace(/\bx\b/g, finiteSql("ga.alteration_value")) + " AS lv\n" +
       "FROM " + db + ".genetic_alteration_derived ga\n" +
       "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
       "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(a.profileType) +
       " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
-      "  AND toFloat64OrNull(ga.alteration_value) IS NOT NULL AND " + inCohort("sd.patient_unique_id") + ")\n" +
+      "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL AND " + inCohort("sd.patient_unique_id") + ")\n" +
       "GROUP BY id";
   }
   if (a.source === "molecular") {
@@ -289,12 +290,12 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     // patient mode averages a patient's samples, the same rule the oncoprint's heatmap uses; a
     // value the log leaves undefined drops the case, so coverage counts it as having none
     const q = "SELECT " + strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study) + " AS id,\n" +
-      "       " + logOf(a, sample ? "argMax(toFloat64OrNull(ga.alteration_value), 1)" : "avg(toFloat64OrNull(ga.alteration_value))") + " AS v\n" +
+      "       " + logOf(a, sample ? "argMax(" + finiteSql("ga.alteration_value") + ", 1)" : "avg(" + finiteSql("ga.alteration_value") + ")") + " AS v\n" +
       "FROM " + db + ".genetic_alteration_derived ga\n" +
       "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
       "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(a.profileType) +
       " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
-      "  AND toFloat64OrNull(ga.alteration_value) IS NOT NULL AND " + inCohort("sd.patient_unique_id") + "\n" +
+      "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL AND " + inCohort("sd.patient_unique_id") + "\n" +
       "GROUP BY id";
     return a.log ? "SELECT id, v FROM (" + q + ") WHERE v IS NOT NULL" : q;
   }
