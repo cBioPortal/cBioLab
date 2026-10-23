@@ -18,13 +18,14 @@ import { compileCohort, sq, LINE_TYPE } from "./compiler.ts";
 import { oqlLeafSql } from "./oql.ts";
 import { clinicalValueFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
-import { clinicalTable } from "./custom-data.ts";
+import { activeCustomData, clinicalTable } from "./custom-data.ts";
+import { UPLOAD_DATASET_RE, customAttr } from "./custom-data-names.ts";
 import { idSetTable, idSetIfLoaded, ID_SET_UUID } from "./id-sets.ts";
 import { lockClause } from "./cohort-lock.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
-  SampleListLeaf, PatientListLeaf, SplitLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
+  SampleListLeaf, PatientListLeaf, SplitLeaf, UploadLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
 } from "./types.ts";
 import { finiteSql } from "./sql-number.ts";
 
@@ -98,6 +99,18 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
     "  FROM " + clinicalTable(dbOf(ctx), [attr]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(ctx.study) + " AND type = " + sq(per) + "\n" +
     "    AND attribute_name = " + sq(attr) + " AND " + conds.join(" AND ");
+}
+
+/** The patients with any value in an upload: a row of any of its columns, patient or sample level. */
+function uploadLeafSql(leaf: UploadLeaf, ctx: Ctx): string {
+  const name = UPLOAD_DATASET_RE.exec(String(leaf.dataset || ""))?.[1];
+  if (!name) throw new Error('upload clause needs dataset:"custom:<name>"');
+  const d = activeCustomData()?.datasets.find((x) => x.id === name);
+  if (!d) throw new Error("this analysis uses custom data that was not sent with it: '" + name + "'");
+  const attrs = d.columns.map((c) => customAttr(d.id, c.name));
+  return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
+    "  FROM " + clinicalTable(dbOf(ctx), attrs) + "\n" +
+    "  WHERE cancer_study_identifier = " + sq(ctx.study) + " AND attribute_name IN (" + attrs.map(sq).join(",") + ")";
 }
 
 const PROFILED_TYPE: Record<string, string> = { MUTATION: "MUTATION_EXTENDED", CNA: "COPY_NUMBER_ALTERATION", SV: "STRUCTURAL_VARIANT" };
@@ -517,6 +530,7 @@ function leafSql(leaf: Leaf, ctx: Ctx): string {
     case "sampleList": return sampleListLeafSql(leaf, ctx);
     case "patientList": return patientListLeafSql(leaf, ctx);
     case "split": return splitLeafSql(leaf, ctx);
+    case "upload": return uploadLeafSql(leaf, ctx);
     default: return unknownLeaf(leaf);
   }
 }
@@ -606,6 +620,7 @@ function leafText(leaf: any): string {
   }
   if (leaf.kind === "caseList") return "in case list " + leaf.id;
   if (leaf.kind === "split") return "in the " + leaf.part + " half (fixed held-out split)";
+  if (leaf.kind === "upload") return "with a row in upload " + String(leaf.dataset).slice("custom:".length);
   if (leaf.kind === "genomicData") return leaf.gene + " " + leaf.profileType + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "genericAssay") return leaf.entity + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "proteinPosition") return leaf.gene + " protein position " + JSON.stringify(leaf.range || {});

@@ -26,7 +26,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import {
-  CUSTOM_PREFIX, LIMITS, customAttr, isCustomAttr,
+  CUSTOM_PREFIX, CUSTOM_REF_RE, LIMITS, customAttr, isCustomAttr,
   type CustomColumn, type CustomRow, type CustomDataset, type CustomDatatype, type CustomLevel
 } from "./custom-data-names.ts";
 export * from "./custom-data-names.ts";
@@ -272,10 +272,10 @@ export function assertCustomDataPresent(x: unknown): void {
   const have = new Map<string, Set<string>>();
   for (const d of activeCustomData()?.datasets ?? []) have.set(d.id, new Set(d.columns.map((c) => c.name)));
   const missing = new Set<string>(), unknownCols: string[] = [];
+  for (const m of text.matchAll(CUSTOM_REF_RE)) if (!have.has(m[1])) missing.add(m[1]);
   for (const m of text.matchAll(/"custom:([a-z0-9][a-z0-9-]{0,39})\/([A-Za-z0-9_]{1,64})"/g)) {
     const cols = have.get(m[1]);
-    if (!cols) missing.add(m[1]);
-    else if (!cols.has(m[2])) unknownCols.push("custom:" + m[1] + "/" + m[2]);
+    if (cols && !cols.has(m[2])) unknownCols.push("custom:" + m[1] + "/" + m[2]);
   }
   if (missing.size)
     throw new Error("this analysis uses custom data that was not sent with it: " + [...missing].map((m) => "'" + m + "'").join(", ") +
