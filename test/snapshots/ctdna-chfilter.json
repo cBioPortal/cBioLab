@@ -1,0 +1,786 @@
+{
+  "study": "msk_access_2021",
+  "cohorts": {
+    "all patients": {
+      "count": 617,
+      "text": "all patients in the study",
+      "studies": [
+        "msk_access_2021"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "ctdna",
+      "cohorts": [
+        "all patients"
+      ],
+      "ctdna": {
+        "attribute": "SAMPLE_CLASS",
+        "plasma": [
+          "cfDNA",
+          "ctDNA"
+        ],
+        "tissue": [
+          "Tumor"
+        ],
+        "plasmaPanels": [
+          "ACCESS129"
+        ],
+        "withinDays": null,
+        "measure": "any",
+        "top": 15,
+        "panels": [
+          {
+            "cohort": "all patients",
+            "plasmaPatients": 617,
+            "tissuePatients": 449,
+            "patients": 449,
+            "plasmaSamples": 601,
+            "tissueSamples": 646,
+            "detected": 453,
+            "detectedLow": 0.6979693268835567,
+            "detectedHigh": 0.7675279363774432,
+            "genes": [
+              {
+                "gene": "TP53",
+                "pairs": 449,
+                "both": 168,
+                "tissueOnly": 57,
+                "plasmaOnly": 14,
+                "neither": 210,
+                "ppa": 0.7466666666666667,
+                "ppaLow": 0.6860245271698205,
+                "ppaHigh": 0.7990274410007402,
+                "concordance": 0.8418708240534521
+              },
+              {
+                "gene": "EGFR",
+                "pairs": 449,
+                "both": 81,
+                "tissueOnly": 28,
+                "plasmaOnly": 5,
+                "neither": 335,
+                "ppa": 0.7431192660550459,
+                "ppaLow": 0.6538053234469022,
+                "ppaHigh": 0.8158802030776827,
+                "concordance": 0.9265033407572383
+              },
+              {
+                "gene": "KRAS",
+                "pairs": 449,
+                "both": 63,
+                "tissueOnly": 35,
+                "plasmaOnly": 5,
+                "neither": 346,
+                "ppa": 0.6428571428571429,
+                "ppaLow": 0.5442524878517956,
+                "ppaHigh": 0.7306846578277244,
+                "concordance": 0.910913140311804
+              },
+              {
+                "gene": "CDKN2A",
+                "pairs": 449,
+                "both": 15,
+                "tissueOnly": 82,
+                "plasmaOnly": 3,
+                "neither": 349,
+                "ppa": 0.15463917525773196,
+                "ppaLow": 0.09601122102239841,
+                "ppaHigh": 0.23957950938212214,
+                "concordance": 0.8106904231625836
+              },
+              {
+                "gene": "TERT",
+                "pairs": 449,
+                "both": 24,
+                "tissueOnly": 41,
+                "plasmaOnly": 1,
+                "neither": 383,
+                "ppa": 0.36923076923076925,
+                "ppaLow": 0.2622939587407091,
+                "ppaHigh": 0.4907618263744998,
+                "concordance": 0.9064587973273942
+              },
+              {
+                "gene": "ARID1A",
+                "pairs": 449,
+                "both": 26,
+                "tissueOnly": 25,
+                "plasmaOnly": 9,
+                "neither": 389,
+                "ppa": 0.5098039215686274,
+                "ppaLow": 0.37680923894569696,
+                "ppaHigh": 0.6414251410562926,
+                "concordance": 0.9242761692650334
+              },
+              {
+                "gene": "KEAP1",
+                "pairs": 449,
+                "both": 32,
+                "tissueOnly": 16,
+                "plasmaOnly": 4,
+                "neither": 397,
+                "ppa": 0.6666666666666666,
+                "ppaLow": 0.5254010970594798,
+                "ppaHigh": 0.7832321930518142,
+                "concordance": 0.955456570155902
+              },
+              {
+                "gene": "PIK3CA",
+                "pairs": 449,
+                "both": 25,
+                "tissueOnly": 19,
+                "plasmaOnly": 7,
+                "neither": 398,
+                "ppa": 0.5681818181818182,
+                "ppaLow": 0.4222414699362943,
+                "ppaHigh": 0.703172765914822,
+                "concordance": 0.9420935412026726
+              },
+              {
+                "gene": "SMAD4",
+                "pairs": 449,
+                "both": 19,
+                "tissueOnly": 25,
+                "plasmaOnly": 4,
+                "neither": 401,
+                "ppa": 0.4318181818181818,
+                "ppaLow": 0.2968272340851781,
+                "ppaHigh": 0.5777585300637057,
+                "concordance": 0.9354120267260579
+              },
+              {
+                "gene": "AR",
+                "pairs": 449,
+                "both": 19,
+                "tissueOnly": 17,
+                "plasmaOnly": 11,
+                "neither": 402,
+                "ppa": 0.5277777777777778,
+                "ppaLow": 0.37005938022987594,
+                "ppaHigh": 0.6801395848482095,
+                "concordance": 0.9376391982182628
+              },
+              {
+                "gene": "RB1",
+                "pairs": 449,
+                "both": 22,
+                "tissueOnly": 17,
+                "plasmaOnly": 8,
+                "neither": 402,
+                "ppa": 0.5641025641025641,
+                "ppaLow": 0.40975691648669477,
+                "ppaHigh": 0.7069524612431037,
+                "concordance": 0.9443207126948775
+              },
+              {
+                "gene": "ATM",
+                "pairs": 449,
+                "both": 22,
+                "tissueOnly": 8,
+                "plasmaOnly": 16,
+                "neither": 403,
+                "ppa": 0.7333333333333333,
+                "ppaLow": 0.555520383048111,
+                "ppaHigh": 0.8581733668040368,
+                "concordance": 0.9465478841870824
+              },
+              {
+                "gene": "STK11",
+                "pairs": 449,
+                "both": 29,
+                "tissueOnly": 15,
+                "plasmaOnly": 2,
+                "neither": 403,
+                "ppa": 0.6590909090909091,
+                "ppaLow": 0.5113914121793823,
+                "ppaHigh": 0.7812418048065555,
+                "concordance": 0.9621380846325167
+              },
+              {
+                "gene": "SMARCA4",
+                "pairs": 449,
+                "both": 9,
+                "tissueOnly": 30,
+                "plasmaOnly": 2,
+                "neither": 408,
+                "ppa": 0.23076923076923078,
+                "ppaLow": 0.1264580412514285,
+                "ppaHigh": 0.3833625722834177,
+                "concordance": 0.9287305122494433
+              },
+              {
+                "gene": "APC",
+                "pairs": 449,
+                "both": 20,
+                "tissueOnly": 11,
+                "plasmaOnly": 8,
+                "neither": 410,
+                "ppa": 0.6451612903225806,
+                "ppaLow": 0.46947954064368874,
+                "ppaHigh": 0.788833409061346,
+                "concordance": 0.9576837416481069
+              }
+            ],
+            "survival": {
+              "curves": [
+                {
+                  "label": "ctDNA detected",
+                  "points": [
+                    {
+                      "t": 0,
+                      "s": 1
+                    },
+                    {
+                      "t": 0,
+                      "s": 0.9793
+                    },
+                    {
+                      "t": 0.07,
+                      "s": 0.9734
+                    },
+                    {
+                      "t": 0.2,
+                      "s": 0.9704
+                    },
+                    {
+                      "t": 0.43,
+                      "s": 0.9644
+                    },
+                    {
+                      "t": 0.56,
+                      "s": 0.9615
+                    },
+                    {
+                      "t": 0.66,
+                      "s": 0.9585
+                    },
+                    {
+                      "t": 0.76,
+                      "s": 0.9555
+                    },
+                    {
+                      "t": 0.79,
+                      "s": 0.9525
+                    },
+                    {
+                      "t": 0.82,
+                      "s": 0.9495
+                    },
+                    {
+                      "t": 0.86,
+                      "s": 0.9465
+                    },
+                    {
+                      "t": 0.89,
+                      "s": 0.9404
+                    },
+                    {
+                      "t": 0.92,
+                      "s": 0.9374
+                    },
+                    {
+                      "t": 1.02,
+                      "s": 0.9344
+                    },
+                    {
+                      "t": 1.15,
+                      "s": 0.9284
+                    },
+                    {
+                      "t": 1.28,
+                      "s": 0.9254
+                    },
+                    {
+                      "t": 1.32,
+                      "s": 0.9223
+                    },
+                    {
+                      "t": 1.45,
+                      "s": 0.9163
+                    },
+                    {
+                      "t": 1.51,
+                      "s": 0.9133
+                    },
+                    {
+                      "t": 1.54,
+                      "s": 0.9103
+                    },
+                    {
+                      "…": "132 more",
+                      "sha256": "12465eeb68bc87b8"
+                    }
+                  ],
+                  "median": 31.59,
+                  "n": 338,
+                  "events": 171,
+                  "atRisk": [
+                    338,
+                    311,
+                    296,
+                    284,
+                    274,
+                    271,
+                    258,
+                    251,
+                    240,
+                    237,
+                    228,
+                    222,
+                    212,
+                    198,
+                    180,
+                    165,
+                    161,
+                    146,
+                    132,
+                    121,
+                    {
+                      "…": "60 more",
+                      "sha256": "4d0fc974e5bb866f"
+                    }
+                  ]
+                },
+                {
+                  "label": "not detected",
+                  "points": [
+                    {
+                      "t": 0,
+                      "s": 1
+                    },
+                    {
+                      "t": 0.4,
+                      "s": 0.9904
+                    },
+                    {
+                      "t": 3.09,
+                      "s": 0.9806
+                    },
+                    {
+                      "t": 3.35,
+                      "s": 0.9708
+                    },
+                    {
+                      "t": 3.45,
+                      "s": 0.961
+                    },
+                    {
+                      "t": 3.72,
+                      "s": 0.9509
+                    },
+                    {
+                      "t": 4.8,
+                      "s": 0.9406
+                    },
+                    {
+                      "t": 4.87,
+                      "s": 0.9304
+                    },
+                    {
+                      "t": 6.38,
+                      "s": 0.9199
+                    },
+                    {
+                      "t": 6.58,
+                      "s": 0.9095
+                    },
+                    {
+                      "t": 8.06,
+                      "s": 0.8987
+                    },
+                    {
+                      "t": 9.44,
+                      "s": 0.8877
+                    },
+                    {
+                      "t": 9.7,
+                      "s": 0.8767
+                    },
+                    {
+                      "t": 10.62,
+                      "s": 0.8657
+                    },
+                    {
+                      "t": 11.57,
+                      "s": 0.8543
+                    },
+                    {
+                      "t": 11.84,
+                      "s": 0.8429
+                    },
+                    {
+                      "t": 12.13,
+                      "s": 0.8315
+                    },
+                    {
+                      "t": 15.22,
+                      "s": 0.8158
+                    },
+                    {
+                      "t": 18.97,
+                      "s": 0.7949
+                    },
+                    {
+                      "t": 21.34,
+                      "s": 0.7708
+                    },
+                    {
+                      "…": "6 more",
+                      "sha256": "5a041fe6ff008265"
+                    }
+                  ],
+                  "median": null,
+                  "n": 107,
+                  "events": 25,
+                  "atRisk": [
+                    107,
+                    102,
+                    102,
+                    102,
+                    94,
+                    90,
+                    89,
+                    87,
+                    84,
+                    82,
+                    79,
+                    77,
+                    74,
+                    70,
+                    61,
+                    54,
+                    48,
+                    46,
+                    41,
+                    38,
+                    {
+                      "…": "50 more",
+                      "sha256": "a40f231d9d4c50d3"
+                    }
+                  ]
+                }
+              ],
+              "logrank": {
+                "chi2": 12.8354,
+                "p": 0.000340126236561827,
+                "df": 1,
+                "observed": [
+                  170,
+                  25
+                ],
+                "expected": [
+                  148.8,
+                  46.2
+                ],
+                "variance": 34.9635,
+                "strata": 1
+              },
+              "missing": 172
+            },
+            "ch": {
+              "calls": 2024,
+              "withNormal": 2024,
+              "byGene": 41,
+              "byNormal": 44,
+              "removed": 83,
+              "patients": 51,
+              "genes": [
+                {
+                  "gene": "SF3B1",
+                  "calls": 14,
+                  "patients": 9,
+                  "byGene": 14,
+                  "byNormal": 2
+                },
+                {
+                  "gene": "TP53",
+                  "calls": 14,
+                  "patients": 5,
+                  "byGene": 0,
+                  "byNormal": 14
+                },
+                {
+                  "gene": "DNMT3A",
+                  "calls": 11,
+                  "patients": 4,
+                  "byGene": 11,
+                  "byNormal": 0
+                },
+                {
+                  "gene": "GNAS",
+                  "calls": 8,
+                  "patients": 6,
+                  "byGene": 8,
+                  "byNormal": 0
+                },
+                {
+                  "gene": "IDH2",
+                  "calls": 4,
+                  "patients": 4,
+                  "byGene": 4,
+                  "byNormal": 0
+                },
+                {
+                  "gene": "ATM",
+                  "calls": 3,
+                  "patients": 3,
+                  "byGene": 0,
+                  "byNormal": 3
+                },
+                {
+                  "gene": "BRAF",
+                  "calls": 3,
+                  "patients": 1,
+                  "byGene": 0,
+                  "byNormal": 3
+                },
+                {
+                  "gene": "RB1",
+                  "calls": 3,
+                  "patients": 2,
+                  "byGene": 0,
+                  "byNormal": 3
+                },
+                {
+                  "gene": "U2AF1",
+                  "calls": 3,
+                  "patients": 3,
+                  "byGene": 3,
+                  "byNormal": 0
+                },
+                {
+                  "gene": "AR",
+                  "calls": 2,
+                  "patients": 2,
+                  "byGene": 0,
+                  "byNormal": 2
+                },
+                {
+                  "gene": "IDH1",
+                  "calls": 2,
+                  "patients": 1,
+                  "byGene": 0,
+                  "byNormal": 2
+                },
+                {
+                  "gene": "TSC2",
+                  "calls": 2,
+                  "patients": 2,
+                  "byGene": 0,
+                  "byNormal": 2
+                },
+                {
+                  "gene": "ASXL1",
+                  "calls": 1,
+                  "patients": 1,
+                  "byGene": 1,
+                  "byNormal": 0
+                },
+                {
+                  "gene": "CREBBP",
+                  "calls": 1,
+                  "patients": 1,
+                  "byGene": 0,
+                  "byNormal": 1
+                },
+                {
+                  "gene": "EGFR",
+                  "calls": 1,
+                  "patients": 1,
+                  "byGene": 0,
+                  "byNormal": 1
+                },
+                {
+                  "gene": "FGFR1",
+                  "calls": 1,
+                  "patients": 1,
+                  "byGene": 0,
+                  "byNormal": 1
+                },
+                {
+                  "gene": "FGFR2",
+                  "calls": 1,
+                  "patients": 1,
+                  "byGene": 0,
+                  "byNormal": 1
+                },
+                {
+                  "gene": "KDM6A",
+                  "calls": 1,
+                  "patients": 1,
+                  "byGene": 0,
+                  "byNormal": 1
+                },
+                {
+                  "gene": "MET",
+                  "calls": 1,
+                  "patients": 1,
+                  "byGene": 0,
+                  "byNormal": 1
+                },
+                {
+                  "gene": "MSH3",
+                  "calls": 1,
+                  "patients": 1,
+                  "byGene": 0,
+                  "byNormal": 1
+                },
+                {
+                  "…": "6 more",
+                  "sha256": "f72c0601d98ab272"
+                }
+              ],
+              "before": {
+                "detected": 457,
+                "detectedLow": 0.7046854301434221,
+                "detectedHigh": 0.7736975705088859,
+                "genes": [
+                  {
+                    "gene": "TP53",
+                    "both": 168,
+                    "plasmaOnly": 15,
+                    "ppa": 0.7466666666666667
+                  },
+                  {
+                    "gene": "EGFR",
+                    "both": 81,
+                    "plasmaOnly": 6,
+                    "ppa": 0.7431192660550459
+                  },
+                  {
+                    "gene": "KRAS",
+                    "both": 63,
+                    "plasmaOnly": 5,
+                    "ppa": 0.6428571428571429
+                  },
+                  {
+                    "gene": "CDKN2A",
+                    "both": 15,
+                    "plasmaOnly": 3,
+                    "ppa": 0.15463917525773196
+                  },
+                  {
+                    "gene": "TERT",
+                    "both": 24,
+                    "plasmaOnly": 1,
+                    "ppa": 0.36923076923076925
+                  },
+                  {
+                    "gene": "ARID1A",
+                    "both": 26,
+                    "plasmaOnly": 9,
+                    "ppa": 0.5098039215686274
+                  },
+                  {
+                    "gene": "KEAP1",
+                    "both": 32,
+                    "plasmaOnly": 4,
+                    "ppa": 0.6666666666666666
+                  },
+                  {
+                    "gene": "PIK3CA",
+                    "both": 25,
+                    "plasmaOnly": 7,
+                    "ppa": 0.5681818181818182
+                  },
+                  {
+                    "gene": "SMAD4",
+                    "both": 19,
+                    "plasmaOnly": 4,
+                    "ppa": 0.4318181818181818
+                  },
+                  {
+                    "gene": "AR",
+                    "both": 19,
+                    "plasmaOnly": 12,
+                    "ppa": 0.5277777777777778
+                  },
+                  {
+                    "gene": "RB1",
+                    "both": 22,
+                    "plasmaOnly": 10,
+                    "ppa": 0.5641025641025641
+                  },
+                  {
+                    "gene": "ATM",
+                    "both": 22,
+                    "plasmaOnly": 17,
+                    "ppa": 0.7333333333333333
+                  },
+                  {
+                    "gene": "STK11",
+                    "both": 29,
+                    "plasmaOnly": 2,
+                    "ppa": 0.6590909090909091
+                  },
+                  {
+                    "gene": "SMARCA4",
+                    "both": 9,
+                    "plasmaOnly": 2,
+                    "ppa": 0.23076923076923078
+                  },
+                  {
+                    "gene": "APC",
+                    "both": 20,
+                    "plasmaOnly": 8,
+                    "ppa": 0.6451612903225806
+                  }
+                ],
+                "survival": {
+                  "curves": [
+                    {
+                      "label": "ctDNA detected",
+                      "n": 341,
+                      "events": 172,
+                      "median": 31.59
+                    },
+                    {
+                      "label": "not detected",
+                      "n": 104,
+                      "events": 24,
+                      "median": null
+                    }
+                  ],
+                  "p": 0.0003520559251550135
+                }
+              }
+            }
+          }
+        ],
+        "chFilter": {
+          "genes": [
+            "DNMT3A",
+            "TET2",
+            "ASXL1",
+            "PPM1D",
+            "JAK2",
+            "SF3B1",
+            "SRSF2",
+            "U2AF1",
+            "CBL",
+            "GNB1",
+            "GNAS",
+            "IDH2"
+          ],
+          "normalMinAlt": 2,
+          "normalMinRatio": 0.3
+        }
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_access_2021",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Plasma is SAMPLE_CLASS = cfDNA/ctDNA or a sample on ACCESS129, tissue SAMPLE_CLASS = Tumor. all patients: 617 patients with plasma, 449 patients with tissue, 449 patients with both (601 plasma and 646 tissue samples); ctDNA detected in 453 of the plasma patients (73.4%). Plasma and tissue are paired by patient whenever they were drawn, not by date — the tumour may have changed between them. Per gene, counting only patients whose plasma AND tissue panels both cover it, any alteration (mutation, amplification or deep deletion, structural variant) in both, tissue only, plasma only, or neither; a patient with several samples of a kind is altered there if any is. Positive percent agreement is both ÷ altered in tissue (tissue the reference), with a 95% Wilson interval; overall concordance is (both + neither) ÷ pairs. The genes are the 15 most altered in the paired patients, not chosen in advance. Clonal-haematopoiesis filter: plasma mutation calls in DNMT3A, TET2, ASXL1, PPM1D, JAK2, SF3B1, SRSF2, U2AF1, CBL, GNB1, GNAS, IDH2, or seen in the matched normal (white-cell) sample — at least 2 alternate reads there, at an allele fraction at least 0.3 × the plasma's are left out of every count below (copy-number and structural calls are kept; tissue calls are never filtered). all patients — 83 plasma mutation calls of 2,024 removed (41 by gene, 44 by the normal), in 51 patients; ctDNA detected 453 (73.4%) against 457 (74.1%) unfiltered. The gene rule also removes a tumour's own calls in those genes (GNAS, IDH2, SF3B1 and others can be tumour drivers); the allele-fraction ratio keeps calls whose normal reads are tumour DNA in the white-cell sample (far below the plasma's fraction), and a CH clone at very low fraction in blood can still pass; TP53, ATM and CHEK2 are not on the default list because they are tumour drivers as often as CH genes (Razavi et al. 2019; Bolton et al. 2020). Tissue-only calls remain those of a tumour shedding too little DNA. ctDNA detected means any alteration (mutation, amplification or deep deletion, structural variant) called in some plasma sample, over every gene the plasma panel covers. Survival is OS_MONTHS / OS_STATUS as each study records them, from its own origin, which need not be the plasma draw; when the draw comes after that origin the comparison carries immortal-time bias. "
+    }
+  ]
+}

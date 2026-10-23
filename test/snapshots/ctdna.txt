@@ -1,0 +1,19 @@
+Analysis over nsclc_ctdx_msk_2022 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- all patients: 1,127 patients — all patients in the study
+
+ctDNA vs tissue (plasma SAMPLE_CLASS = cfDNA/ctDNA, tissue Tumor; any alteration; both panels cover the gene):
+  all patients (682 patients with both; ctDNA detected in 759 of 1,119 with plasma, 68% [95% CI 65%–71%]):
+    EGFR: both 151, tissue-only 84, plasma-only 7, neither 440 of 682; PPA 64% [58%–70%], concordance 87%
+    KRAS: both 119, tissue-only 66, plasma-only 14, neither 483 of 682; PPA 64% [57%–71%], concordance 88%
+    TP53: both 260, tissue-only 121, plasma-only 33, neither 268 of 682; PPA 68% [63%–73%], concordance 77%
+    STK11: both 28, tissue-only 65, plasma-only 7, neither 582 of 682; PPA 30% [22%–40%], concordance 89%
+    KEAP1: both 28, tissue-only 62, plasma-only 5, neither 587 of 682; PPA 31% [22%–41%], concordance 90%
+    PIK3CA: both 14, tissue-only 30, plasma-only 9, neither 629 of 682; PPA 32% [20%–47%], concordance 94%
+    BRAF: both 15, tissue-only 21, plasma-only 9, neither 637 of 682; PPA 42% [27%–58%], concordance 96%
+    MET: both 25, tissue-only 62, plasma-only 6, neither 589 of 682; PPA 29% [20%–39%], concordance 90%
+    ERBB2: both 16, tissue-only 32, plasma-only 13, neither 621 of 682; PPA 33% [22%–47%], concordance 93%
+    ALK: both 24, tissue-only 38, plasma-only 5, neither 615 of 682; PPA 39% [28%–51%], concordance 94%
+    OS: ctDNA detected n=759, 459 deaths, median 21.8mo; not detected n=360, 154 deaths, median 41.5mo; log-rank p=2.2e-12
+  CAVEAT (tell the user): Plasma is SAMPLE_CLASS = cfDNA/ctDNA, tissue SAMPLE_CLASS = Tumor. all patients: 1,119 patients with plasma, 690 patients with tissue, 682 patients with both (1,158 plasma and 945 tissue samples); ctDNA detected in 759 of the plasma patients (67.8%). Plasma and tissue are paired by patient whenever they were drawn, not by date — the tumour may have changed between them. Per gene, counting only patients whose plasma AND tissue panels both cover it, any alteration (mutation, amplification or deep deletion, structural variant) in both, tissue only, plasma only, or neither; a patient with several samples of a kind is altered there if any is. Positive percent agreement is both ÷ altered in tissue (tissue the reference), with a 95% Wilson interval; overall concordance is (both + neither) ÷ pairs. Plasma-only calls include clonal haematopoiesis (TP53, DNMT3A, TET2, PPM1D…) when the assay does not subtract white-cell DNA, and tissue-only calls a tumour shedding too little DNA — both are biology of the assay, not error. ctDNA detected means any alteration (mutation, amplification or deep deletion, structural variant) called in some plasma sample, over every gene the plasma panel covers. Survival is OS_MONTHS / OS_STATUS as each study records them, from its own origin, which need not be the plasma draw; when the draw comes after that origin the comparison carries immortal-time bias. 

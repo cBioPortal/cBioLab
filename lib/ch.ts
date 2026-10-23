@@ -231,7 +231,8 @@ export interface ChStatement { conn: ChConn; format: string; query: string; exte
 /**
  * Answers statements instead of the database, or watches them on their way to it (`send`, which
  * takes extra ClickHouse settings for that statement, e.g. "max_threads=1"). Only
- * test/view-snapshots.test.ts sets one: it records the warehouse's answers, then replays them.
+ * the view snapshot tests (test/support/view-snapshots.ts) set one: they record the warehouse's
+ * answers, then replay them.
  */
 export type ChTransport = (st: ChStatement, send: (settings?: string) => Promise<string>) => Promise<string>;
 let transport: ChTransport | null = null;

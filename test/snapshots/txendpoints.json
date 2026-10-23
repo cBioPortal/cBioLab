@@ -1,0 +1,331 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "NSCLC, KRAS mutant": {
+      "count": 2194,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample) AND OQL[KRAS: MUT]",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    },
+    "NSCLC, KRAS wild-type": {
+      "count": 5540,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample) AND NOT OQL[KRAS:] AND profiled for KRAS MUTATION",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "txendpoints",
+      "cohorts": [
+        "NSCLC, KRAS mutant",
+        "NSCLC, KRAS wild-type"
+      ],
+      "txendpoints": {
+        "endpoint": "rwpfs",
+        "endpointLabel": "real-world progression-free survival",
+        "anchoredTo": "first Treatment [SUBTYPE=Immuno]",
+        "lineGap": 90,
+        "lineClasses": "systemic",
+        "progression": {
+          "eventType": "Diagnosis",
+          "key": "PROGRESSION",
+          "values": [
+            "Y",
+            "Yes"
+          ]
+        },
+        "curves": [
+          {
+            "cohort": "NSCLC, KRAS mutant",
+            "points": [
+              {
+                "t": 0,
+                "s": 1
+              },
+              {
+                "t": 0.0329,
+                "s": 0.9945
+              },
+              {
+                "t": 0.0657,
+                "s": 0.9918
+              },
+              {
+                "t": 0.0986,
+                "s": 0.9892
+              },
+              {
+                "t": 0.1314,
+                "s": 0.9825
+              },
+              {
+                "t": 0.1643,
+                "s": 0.976
+              },
+              {
+                "t": 0.1971,
+                "s": 0.9694
+              },
+              {
+                "t": 0.23,
+                "s": 0.9669
+              },
+              {
+                "t": 0.2305,
+                "s": 0.9656
+              },
+              {
+                "t": 0.2628,
+                "s": 0.9579
+              },
+              {
+                "t": 0.2957,
+                "s": 0.9567
+              },
+              {
+                "t": 0.3285,
+                "s": 0.9503
+              },
+              {
+                "t": 0.3291,
+                "s": 0.949
+              },
+              {
+                "t": 0.3614,
+                "s": 0.9452
+              },
+              {
+                "t": 0.3615,
+                "s": 0.944
+              },
+              {
+                "t": 0.3943,
+                "s": 0.9427
+              },
+              {
+                "t": 0.3944,
+                "s": 0.9402
+              },
+              {
+                "t": 0.4271,
+                "s": 0.9327
+              },
+              {
+                "t": 0.46,
+                "s": 0.9239
+              },
+              {
+                "t": 0.4928,
+                "s": 0.9214
+              },
+              {
+                "…": "374 more",
+                "sha256": "4439836b9491bd7a"
+              }
+            ],
+            "median": 2.5626,
+            "n": 873,
+            "events": 778,
+            "atRisk": [
+              733,
+              681,
+              488,
+              378,
+              345,
+              302,
+              266,
+              240,
+              214,
+              200,
+              187,
+              170,
+              156,
+              149,
+              139,
+              125,
+              113,
+              101,
+              98,
+              93,
+              {
+                "…": "53 more",
+                "sha256": "363ed24ee932fafc"
+              }
+            ],
+            "unobserved": 108,
+            "medianLo": 2.2341,
+            "medianHi": 2.7269,
+            "cohortPatients": 2194,
+            "anchored": 981,
+            "excluded": {
+              "noAnchor": 1213,
+              "noFollowup": 0,
+              "noStop": 0
+            },
+            "late": 0
+          },
+          {
+            "cohort": "NSCLC, KRAS wild-type",
+            "points": [
+              {
+                "t": 0,
+                "s": 1
+              },
+              {
+                "t": 0.0329,
+                "s": 0.996
+              },
+              {
+                "t": 0.0345,
+                "s": 0.9952
+              },
+              {
+                "t": 0.0464,
+                "s": 0.9944
+              },
+              {
+                "t": 0.0657,
+                "s": 0.9912
+              },
+              {
+                "t": 0.0986,
+                "s": 0.9865
+              },
+              {
+                "t": 0.0992,
+                "s": 0.9857
+              },
+              {
+                "t": 0.1106,
+                "s": 0.9849
+              },
+              {
+                "t": 0.1314,
+                "s": 0.9818
+              },
+              {
+                "t": 0.1643,
+                "s": 0.9772
+              },
+              {
+                "t": 0.1733,
+                "s": 0.9764
+              },
+              {
+                "t": 0.1971,
+                "s": 0.9741
+              },
+              {
+                "t": 0.2001,
+                "s": 0.9733
+              },
+              {
+                "t": 0.2216,
+                "s": 0.9725
+              },
+              {
+                "t": 0.23,
+                "s": 0.9634
+              },
+              {
+                "t": 0.2348,
+                "s": 0.9626
+              },
+              {
+                "t": 0.2628,
+                "s": 0.9565
+              },
+              {
+                "t": 0.2957,
+                "s": 0.9497
+              },
+              {
+                "t": 0.2959,
+                "s": 0.949
+              },
+              {
+                "t": 0.31,
+                "s": 0.9482
+              },
+              {
+                "…": "563 more",
+                "sha256": "99684fea547c555d"
+              }
+            ],
+            "median": 2.5955,
+            "n": 1476,
+            "events": 1305,
+            "atRisk": [
+              1245,
+              1149,
+              843,
+              667,
+              587,
+              519,
+              463,
+              402,
+              367,
+              329,
+              298,
+              272,
+              245,
+              225,
+              205,
+              188,
+              172,
+              160,
+              152,
+              142,
+              {
+                "…": "67 more",
+                "sha256": "d9c68266bfee51fb"
+              }
+            ],
+            "unobserved": 175,
+            "medianLo": 2.4312,
+            "medianHi": 2.7598,
+            "cohortPatients": 5540,
+            "anchored": 1651,
+            "excluded": {
+              "noAnchor": 3889,
+              "noFollowup": 0,
+              "noStop": 0
+            },
+            "late": 0
+          }
+        ],
+        "logrank": {
+          "chi2": 0.0009,
+          "p": 0.9764189024658432,
+          "df": 1,
+          "observed": [
+            778,
+            1305
+          ],
+          "expected": [
+            778.7,
+            1304.3
+          ],
+          "groups": 2,
+          "strata": 1
+        }
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Real-world progression-free survival: from the start of the first Treatment [SUBTYPE=Immuno] record to the first Diagnosis event after it with PROGRESSION in Y / Yes, or death. Progression read from the record (in MSK-CHORD, from notes by NLP) is only as complete as that recording; events on the anchor's own day are not counted. Censored at the last follow-up, which is OS_MONTHS × 30.4375 days on the timeline's clock; death is OS_STATUS 1:DECEASED. That OS_MONTHS counts from the timeline's day 0 was checked on these patients: 0 of 2,632 anchored patients have a timeline event more than 31 days past it (a study above 5% is refused). Left truncation as in the survival view: a patient whose anchor falls before day 0 enters the risk set at day 0. Left out: 5102 cohort patients with no Treatment [SUBTYPE=Immuno] record, 0 with no follow-up after it, and 283 anchored before day 0 whose endpoint also came before it, so were never at risk. Medians with 95% intervals from the Greenwood band on the log scale. 2-group log-rank (1 df). Treated patients are not randomised: the cohorts can differ in who was offered the treatment, when, and how sick they were, so a difference here is an association. Each site sends only (entry, time, event) counts."
+    }
+  ]
+}

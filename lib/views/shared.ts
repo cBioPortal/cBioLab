@@ -73,7 +73,7 @@ export async function studyCatalogs(c: ViewRun, studies: string[]): Promise<Stud
  * Asks every (cohort, study) the view draws that `resolvers` holds, concurrently, and returns the
  * answers in the view's order (its cohorts, then each cohort's studies), never in the order they
  * finish. Combine them after this returns: combining inside `ask` as each answer lands makes the
- * result depend on which query finished first (test/view-snapshots.test.ts checks for that).
+ * result depend on which query finished first (test/support/view-snapshots.ts checks for that).
  */
 export async function askEachSite<R, T>(ctx: ViewRun, resolvers: Record<string, R>,
   ask: (cohort: string, study: string, r: R) => Promise<T>): Promise<{ cohort: string; study: string; answer: T }[]> {

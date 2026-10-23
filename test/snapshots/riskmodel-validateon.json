@@ -1,0 +1,1234 @@
+{
+  "study": "msk_impact_2017",
+  "cohorts": {
+    "NSCLC (MSK-IMPACT 2017)": {
+      "count": 1567,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)",
+      "studies": [
+        "msk_impact_2017"
+      ]
+    },
+    "NSCLC (MSK-CHORD)": {
+      "count": 7809,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample) — in msk_chord_2024",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "riskmodel",
+      "cohorts": [
+        "NSCLC (MSK-IMPACT 2017)"
+      ],
+      "riskmodel": {
+        "study": "msk_impact_2017",
+        "n": 1440,
+        "events": 468,
+        "notProfiled": 0,
+        "noStratum": 0,
+        "noCovariate": 0,
+        "noAnchor": 0,
+        "anchorAfterStart": 0,
+        "noFollowUp": 0,
+        "neverHeldOut": 27,
+        "genesCovered": 341,
+        "candidates": 93,
+        "minMutated": 30,
+        "strata": null,
+        "strataLevels": 1,
+        "alpha": 0.5,
+        "runs": 10,
+        "seed": 1,
+        "measure": "any",
+        "anchoredTo": null,
+        "covariates": [],
+        "reportedOn": "held-out scores",
+        "validation": null,
+        "cIndex": {
+          "median": 0.6126015735844189,
+          "q1": 0.5779661764381628,
+          "q3": 0.6210379768035842,
+          "values": [
+            0.6210379768035842,
+            0.573881580323343,
+            0.6284212455051419,
+            0.6142946230598669,
+            0.6126015735844189,
+            0.5811746266707302,
+            0.5582004851845435,
+            0.5779661764381628,
+            0.6288155740462467,
+            0.6012407633341774
+          ]
+        },
+        "features": [
+          {
+            "gene": "KEAP1",
+            "selected": 1,
+            "meanCoef": 0.38539693735888325,
+            "hr": 1.4701977820594718,
+            "mutated": 224
+          },
+          {
+            "gene": "STK11",
+            "selected": 0.9,
+            "meanCoef": 0.17038633859256822,
+            "hr": 1.1857628687976058,
+            "mutated": 235
+          },
+          {
+            "gene": "TP53",
+            "selected": 0.9,
+            "meanCoef": 0.16811283868259688,
+            "hr": 1.1830700991877459,
+            "mutated": 806
+          },
+          {
+            "gene": "EGFR",
+            "selected": 0.8,
+            "meanCoef": -0.13785784754562622,
+            "hr": 0.8712225293645339,
+            "mutated": 349
+          },
+          {
+            "gene": "IKZF1",
+            "selected": 0.4,
+            "meanCoef": 0.2794225902293096,
+            "hr": 1.3223660447805465,
+            "mutated": 32
+          },
+          {
+            "gene": "KMT2D",
+            "selected": 0.4,
+            "meanCoef": 0.14776083290881675,
+            "hr": 1.1592356121963068,
+            "mutated": 111
+          },
+          {
+            "gene": "NTRK1",
+            "selected": 0.4,
+            "meanCoef": 0.12709239831548483,
+            "hr": 1.1355219332482338,
+            "mutated": 36
+          },
+          {
+            "gene": "JAK3",
+            "selected": 0.3,
+            "meanCoef": -0.18679192974620454,
+            "hr": 0.8296163369100374,
+            "mutated": 36
+          },
+          {
+            "gene": "SMARCA4",
+            "selected": 0.3,
+            "meanCoef": 0.020427699925799726,
+            "hr": 1.0206377733887912,
+            "mutated": 128
+          },
+          {
+            "gene": "PBRM1",
+            "selected": 0.2,
+            "meanCoef": 0.10874806570415652,
+            "hr": 1.1148814380871648,
+            "mutated": 38
+          },
+          {
+            "gene": "MED12",
+            "selected": 0.2,
+            "meanCoef": -0.0609562421166403,
+            "hr": 0.9408644091103329,
+            "mutated": 62
+          },
+          {
+            "gene": "PIK3CA",
+            "selected": 0.2,
+            "meanCoef": -0.05219772493297931,
+            "hr": 0.9491411794121716,
+            "mutated": 106
+          },
+          {
+            "gene": "POLE",
+            "selected": 0.2,
+            "meanCoef": -0.035441437585562105,
+            "hr": 0.9651792558025496,
+            "mutated": 48
+          },
+          {
+            "gene": "KDR",
+            "selected": 0.1,
+            "meanCoef": 0.15283398948178678,
+            "hr": 1.1651315387960905,
+            "mutated": 56
+          },
+          {
+            "gene": "ATR",
+            "selected": 0.1,
+            "meanCoef": 0.08685522436534683,
+            "hr": 1.0907387558911674,
+            "mutated": 50
+          },
+          {
+            "gene": "ARID1B",
+            "selected": 0.1,
+            "meanCoef": -0.07117160732678922,
+            "hr": 0.9313020601568389,
+            "mutated": 47
+          },
+          {
+            "gene": "HGF",
+            "selected": 0.1,
+            "meanCoef": -0.06340309311212118,
+            "hr": 0.938565068313642,
+            "mutated": 72
+          },
+          {
+            "gene": "RET",
+            "selected": 0.1,
+            "meanCoef": -0.05615099916291561,
+            "hr": 0.9453963710513297,
+            "mutated": 39
+          },
+          {
+            "gene": "BRCA1",
+            "selected": 0.1,
+            "meanCoef": -0.03629762142908256,
+            "hr": 0.9643532385793903,
+            "mutated": 34
+          },
+          {
+            "gene": "PIK3CG",
+            "selected": 0.1,
+            "meanCoef": -0.02591353913772476,
+            "hr": 0.9744193351026584,
+            "mutated": 67
+          },
+          {
+            "…": "1 more",
+            "sha256": "3a0010ef50d71c44"
+          }
+        ],
+        "groups": [
+          {
+            "name": "Low risk",
+            "from": null,
+            "to": 0,
+            "curve": {
+              "points": [
+                {
+                  "t": 0,
+                  "s": 1
+                },
+                {
+                  "t": 0.07,
+                  "s": 0.998
+                },
+                {
+                  "t": 0.56,
+                  "s": 0.9959
+                },
+                {
+                  "t": 0.62,
+                  "s": 0.9918
+                },
+                {
+                  "t": 0.89,
+                  "s": 0.9898
+                },
+                {
+                  "t": 1.15,
+                  "s": 0.9877
+                },
+                {
+                  "t": 1.35,
+                  "s": 0.9835
+                },
+                {
+                  "t": 1.58,
+                  "s": 0.9814
+                },
+                {
+                  "t": 1.81,
+                  "s": 0.9793
+                },
+                {
+                  "t": 2.33,
+                  "s": 0.9772
+                },
+                {
+                  "t": 2.4,
+                  "s": 0.9751
+                },
+                {
+                  "t": 2.5300000000000002,
+                  "s": 0.9729
+                },
+                {
+                  "t": 2.56,
+                  "s": 0.9708
+                },
+                {
+                  "t": 2.63,
+                  "s": 0.9686
+                },
+                {
+                  "t": 2.76,
+                  "s": 0.9665
+                },
+                {
+                  "t": 2.86,
+                  "s": 0.9643
+                },
+                {
+                  "t": 2.93,
+                  "s": 0.9622
+                },
+                {
+                  "t": 3.02,
+                  "s": 0.96
+                },
+                {
+                  "t": 3.06,
+                  "s": 0.9579
+                },
+                {
+                  "t": 3.12,
+                  "s": 0.9557
+                },
+                {
+                  "…": "92 more",
+                  "sha256": "12350b86caf221e2"
+                }
+              ],
+              "median": 26.56,
+              "n": 493,
+              "events": 118,
+              "atRisk": [
+                493,
+                479,
+                462,
+                445,
+                426,
+                404,
+                378,
+                327,
+                298,
+                270,
+                248,
+                230,
+                205,
+                175,
+                155,
+                139,
+                120,
+                108,
+                97,
+                78,
+                {
+                  "…": "13 more",
+                  "sha256": "7445fed6c66d5c89"
+                }
+              ]
+            },
+            "at12": 0.7853,
+            "at36": null,
+            "hr": null,
+            "ciLow": null,
+            "ciHigh": null,
+            "p": null
+          },
+          {
+            "name": "Intermediate risk",
+            "from": 0,
+            "to": 0.16301127959913086,
+            "curve": {
+              "points": [
+                {
+                  "t": 0,
+                  "s": 1
+                },
+                {
+                  "t": 0.03,
+                  "s": 0.9978
+                },
+                {
+                  "t": 0.39,
+                  "s": 0.9955
+                },
+                {
+                  "t": 0.43,
+                  "s": 0.9933
+                },
+                {
+                  "t": 0.49,
+                  "s": 0.9911
+                },
+                {
+                  "t": 0.72,
+                  "s": 0.9866
+                },
+                {
+                  "t": 0.76,
+                  "s": 0.9843
+                },
+                {
+                  "t": 0.82,
+                  "s": 0.9821
+                },
+                {
+                  "t": 0.92,
+                  "s": 0.9798
+                },
+                {
+                  "t": 0.95,
+                  "s": 0.9775
+                },
+                {
+                  "t": 0.99,
+                  "s": 0.9753
+                },
+                {
+                  "t": 1.45,
+                  "s": 0.973
+                },
+                {
+                  "t": 1.48,
+                  "s": 0.9707
+                },
+                {
+                  "t": 1.51,
+                  "s": 0.9684
+                },
+                {
+                  "t": 1.58,
+                  "s": 0.9661
+                },
+                {
+                  "t": 1.6099999999999999,
+                  "s": 0.9639
+                },
+                {
+                  "t": 1.8399999999999999,
+                  "s": 0.9616
+                },
+                {
+                  "t": 1.94,
+                  "s": 0.9593
+                },
+                {
+                  "t": 2.07,
+                  "s": 0.957
+                },
+                {
+                  "t": 2.3,
+                  "s": 0.9547
+                },
+                {
+                  "…": "108 more",
+                  "sha256": "4ae1f3b0b11bf873"
+                }
+              ],
+              "median": 20.61,
+              "n": 449,
+              "events": 145,
+              "atRisk": [
+                449,
+                431,
+                417,
+                405,
+                380,
+                359,
+                334,
+                293,
+                257,
+                222,
+                195,
+                175,
+                147,
+                122,
+                110,
+                93,
+                79,
+                70,
+                58,
+                50,
+                {
+                  "…": "12 more",
+                  "sha256": "0210541707688310"
+                }
+              ]
+            },
+            "at12": 0.6843,
+            "at36": null,
+            "hr": 1.5185583404751872,
+            "ciLow": 1.1904294972787377,
+            "ciHigh": 1.937132302835405,
+            "p": 0.0007700381263588329
+          },
+          {
+            "name": "High risk",
+            "from": 0.16301127959913086,
+            "to": null,
+            "curve": {
+              "points": [
+                {
+                  "t": 0,
+                  "s": 1
+                },
+                {
+                  "t": 0.16,
+                  "s": 0.9979
+                },
+                {
+                  "t": 0.36,
+                  "s": 0.9957
+                },
+                {
+                  "t": 0.46,
+                  "s": 0.9936
+                },
+                {
+                  "t": 0.49,
+                  "s": 0.9893
+                },
+                {
+                  "t": 0.56,
+                  "s": 0.9871
+                },
+                {
+                  "t": 0.59,
+                  "s": 0.985
+                },
+                {
+                  "t": 0.66,
+                  "s": 0.9828
+                },
+                {
+                  "t": 0.69,
+                  "s": 0.9806
+                },
+                {
+                  "t": 0.72,
+                  "s": 0.9785
+                },
+                {
+                  "t": 0.92,
+                  "s": 0.9763
+                },
+                {
+                  "t": 0.95,
+                  "s": 0.9741
+                },
+                {
+                  "t": 1.05,
+                  "s": 0.9718
+                },
+                {
+                  "t": 1.12,
+                  "s": 0.9674
+                },
+                {
+                  "t": 1.18,
+                  "s": 0.9652
+                },
+                {
+                  "t": 1.22,
+                  "s": 0.9629
+                },
+                {
+                  "t": 1.25,
+                  "s": 0.9607
+                },
+                {
+                  "t": 1.31,
+                  "s": 0.9585
+                },
+                {
+                  "t": 1.45,
+                  "s": 0.9562
+                },
+                {
+                  "t": 1.48,
+                  "s": 0.954
+                },
+                {
+                  "…": "143 more",
+                  "sha256": "addee96a91e56f2d"
+                }
+              ],
+              "median": 14.96,
+              "n": 471,
+              "events": 198,
+              "atRisk": [
+                471,
+                440,
+                412,
+                383,
+                355,
+                322,
+                296,
+                254,
+                230,
+                203,
+                174,
+                152,
+                138,
+                123,
+                107,
+                90,
+                74,
+                62,
+                53,
+                43,
+                {
+                  "…": "19 more",
+                  "sha256": "5d155ac2d09ab2c3"
+                }
+              ]
+            },
+            "at12": 0.5842,
+            "at36": 0.3144,
+            "hr": 2.209321020827797,
+            "ciLow": 1.7582007602338594,
+            "ciHigh": 2.7761900025696384,
+            "p": 1.0287326105140663e-11
+          }
+        ],
+        "logrank": {
+          "chi2": 48.8257,
+          "p": 2.4982402779304686e-11,
+          "df": 2,
+          "observed": [
+            118,
+            145,
+            198
+          ],
+          "expected": [
+            179.1,
+            145.4,
+            136.5
+          ],
+          "groups": 3,
+          "strata": 1
+        },
+        "refit": {
+          "hr": 1.3638116104895184,
+          "ciLow": 1.2608634744428482,
+          "ciHigh": 1.475165350259595,
+          "p": 9.307264149812706e-15
+        },
+        "histogram": {
+          "edges": [
+            -0.31010503280508805,
+            -0.26442977656966465,
+            -0.2187545203342413,
+            -0.1730792640988179,
+            -0.12740400786339454,
+            -0.08172875162797116,
+            -0.03605349539254776,
+            0.009621760842875582,
+            0.05529701707829898,
+            0.10097227331372238,
+            0.14664752954914573,
+            0.19232278578456907,
+            0.23799804201999253,
+            0.2836732982554159,
+            0.3293485544908392,
+            0.3750238107262627,
+            0.420699066961686,
+            0.46637432319710936,
+            0.5120495794325328,
+            0.5577248356679562,
+            {
+              "…": "11 more",
+              "sha256": "9aa6eeec9b485027"
+            }
+          ],
+          "counts": [
+            1,
+            2,
+            9,
+            23,
+            49,
+            38,
+            381,
+            96,
+            80,
+            174,
+            184,
+            76,
+            30,
+            26,
+            18,
+            16,
+            21,
+            29,
+            50,
+            30,
+            {
+              "…": "10 more",
+              "sha256": "060f587966d110a3"
+            }
+          ]
+        },
+        "scale": {
+          "min": -0.31010503280508805,
+          "max": 1.0601526542576134
+        },
+        "percentiles": [
+          -0.31010503280508805,
+          -0.16709214644874631,
+          -0.13598582787524266,
+          -0.12011854092777559,
+          -0.11127560961224961,
+          -0.0933755085060019,
+          -0.08087926711113805,
+          -0.070766813135423,
+          -0.045155386738969724,
+          -0.03241372565242892,
+          -0.02097627251122866,
+          -0.009681262328982865,
+          -0.0034652017396736567,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          {
+            "…": "81 more",
+            "sha256": "58561e3d57dee714"
+          }
+        ],
+        "labelAbove": 0.5,
+        "cutsChosen": null,
+        "external": {
+          "cohort": "NSCLC (MSK-CHORD)",
+          "study": "msk_chord_2024",
+          "n": 7809,
+          "events": 3975,
+          "cohortPatients": 7809,
+          "rowsReturned": 7809,
+          "notProfiled": 0,
+          "noStratum": 0,
+          "noAnchor": 0,
+          "anchorAfterStart": 0,
+          "noFollowUp": 0,
+          "notCovered": 0,
+          "modelGenes": 21,
+          "cIndex": 0.6068560381183546,
+          "cIndexLo": 0.5972682687697759,
+          "cIndexHi": 0.6160543172683276,
+          "bootstrap": 200,
+          "cuts": [
+            0,
+            0.16301127959913086
+          ],
+          "groups": [
+            {
+              "name": "Low risk",
+              "curve": {
+                "points": [
+                  {
+                    "t": 0,
+                    "s": 1
+                  },
+                  {
+                    "t": 0.032876676,
+                    "s": 0.9978
+                  },
+                  {
+                    "t": 0.065753353,
+                    "s": 0.9975
+                  },
+                  {
+                    "t": 0.197260058,
+                    "s": 0.9971
+                  },
+                  {
+                    "t": 0.230136734,
+                    "s": 0.9968
+                  },
+                  {
+                    "t": 0.26301341,
+                    "s": 0.9964
+                  },
+                  {
+                    "t": 0.295890087,
+                    "s": 0.9957
+                  },
+                  {
+                    "t": 0.328766763,
+                    "s": 0.995
+                  },
+                  {
+                    "t": 0.427396792,
+                    "s": 0.9946
+                  },
+                  {
+                    "t": 0.460273468,
+                    "s": 0.9939
+                  },
+                  {
+                    "t": 0.493150144,
+                    "s": 0.9928
+                  },
+                  {
+                    "t": 0.526026821,
+                    "s": 0.9914
+                  },
+                  {
+                    "t": 0.558903497,
+                    "s": 0.991
+                  },
+                  {
+                    "t": 0.591780173,
+                    "s": 0.9906
+                  },
+                  {
+                    "t": 0.62465685,
+                    "s": 0.9903
+                  },
+                  {
+                    "t": 0.657533526,
+                    "s": 0.9895
+                  },
+                  {
+                    "t": 0.723286879,
+                    "s": 0.9892
+                  },
+                  {
+                    "t": 0.756163555,
+                    "s": 0.9885
+                  },
+                  {
+                    "t": 0.789040231,
+                    "s": 0.9874
+                  },
+                  {
+                    "t": 0.821916907,
+                    "s": 0.987
+                  },
+                  {
+                    "…": "771 more",
+                    "sha256": "a8d8e42b8bbaa0bc"
+                  }
+                ],
+                "median": 66.37800945,
+                "n": 2790,
+                "events": 1093,
+                "atRisk": [
+                  2790,
+                  2721,
+                  2663,
+                  2601,
+                  2561,
+                  2528,
+                  2488,
+                  2438,
+                  2384,
+                  2329,
+                  2267,
+                  2217,
+                  2164,
+                  2099,
+                  2049,
+                  1998,
+                  1940,
+                  1880,
+                  1826,
+                  1774,
+                  {
+                    "…": "94 more",
+                    "sha256": "4a877e3021a607b9"
+                  }
+                ]
+              },
+              "hr": null,
+              "ciLow": null,
+              "ciHigh": null,
+              "p": null
+            },
+            {
+              "name": "Intermediate risk",
+              "curve": {
+                "points": [
+                  {
+                    "t": 0,
+                    "s": 1
+                  },
+                  {
+                    "t": 0.032876676,
+                    "s": 0.9972
+                  },
+                  {
+                    "t": 0.065753353,
+                    "s": 0.9966
+                  },
+                  {
+                    "t": 0.131506705,
+                    "s": 0.9963
+                  },
+                  {
+                    "t": 0.164383381,
+                    "s": 0.996
+                  },
+                  {
+                    "t": 0.197260058,
+                    "s": 0.9957
+                  },
+                  {
+                    "t": 0.230136734,
+                    "s": 0.9954
+                  },
+                  {
+                    "t": 0.26301341,
+                    "s": 0.9947
+                  },
+                  {
+                    "t": 0.295890087,
+                    "s": 0.9941
+                  },
+                  {
+                    "t": 0.328766763,
+                    "s": 0.9932
+                  },
+                  {
+                    "t": 0.361643439,
+                    "s": 0.9929
+                  },
+                  {
+                    "t": 0.394520116,
+                    "s": 0.9926
+                  },
+                  {
+                    "t": 0.427396792,
+                    "s": 0.9913
+                  },
+                  {
+                    "t": 0.460273468,
+                    "s": 0.9907
+                  },
+                  {
+                    "t": 0.526026821,
+                    "s": 0.9898
+                  },
+                  {
+                    "t": 0.558903497,
+                    "s": 0.9891
+                  },
+                  {
+                    "t": 0.591780173,
+                    "s": 0.9879
+                  },
+                  {
+                    "t": 0.62465685,
+                    "s": 0.9863
+                  },
+                  {
+                    "t": 0.657533526,
+                    "s": 0.9845
+                  },
+                  {
+                    "t": 0.690410202,
+                    "s": 0.9835
+                  },
+                  {
+                    "…": "971 more",
+                    "sha256": "0de78041f8297595"
+                  }
+                ],
+                "median": 33.27119642,
+                "n": 3237,
+                "events": 1782,
+                "atRisk": [
+                  3237,
+                  3136,
+                  3054,
+                  2954,
+                  2876,
+                  2797,
+                  2712,
+                  2622,
+                  2553,
+                  2478,
+                  2401,
+                  2313,
+                  2228,
+                  2171,
+                  2098,
+                  2015,
+                  1964,
+                  1908,
+                  1829,
+                  1750,
+                  {
+                    "…": "99 more",
+                    "sha256": "4b053e04b0edf347"
+                  }
+                ]
+              },
+              "hr": 1.6277287421992754,
+              "ciLow": 1.5095384461851062,
+              "ciHigh": 1.755172824433477,
+              "p": 8.999745155526395e-37
+            },
+            {
+              "name": "High risk",
+              "curve": {
+                "points": [
+                  {
+                    "t": 0,
+                    "s": 1
+                  },
+                  {
+                    "t": 0.032876676,
+                    "s": 0.9972
+                  },
+                  {
+                    "t": 0.065753353,
+                    "s": 0.9966
+                  },
+                  {
+                    "t": 0.098630029,
+                    "s": 0.9955
+                  },
+                  {
+                    "t": 0.131506705,
+                    "s": 0.9944
+                  },
+                  {
+                    "t": 0.164383381,
+                    "s": 0.9938
+                  },
+                  {
+                    "t": 0.197260058,
+                    "s": 0.9933
+                  },
+                  {
+                    "t": 0.230136734,
+                    "s": 0.9927
+                  },
+                  {
+                    "t": 0.26301341,
+                    "s": 0.9916
+                  },
+                  {
+                    "t": 0.295890087,
+                    "s": 0.9904
+                  },
+                  {
+                    "t": 0.328766763,
+                    "s": 0.9887
+                  },
+                  {
+                    "t": 0.361643439,
+                    "s": 0.9876
+                  },
+                  {
+                    "t": 0.394520116,
+                    "s": 0.9871
+                  },
+                  {
+                    "t": 0.427396792,
+                    "s": 0.9865
+                  },
+                  {
+                    "t": 0.460273468,
+                    "s": 0.9854
+                  },
+                  {
+                    "t": 0.493150144,
+                    "s": 0.9826
+                  },
+                  {
+                    "t": 0.526026821,
+                    "s": 0.982
+                  },
+                  {
+                    "t": 0.558903497,
+                    "s": 0.9792
+                  },
+                  {
+                    "t": 0.591780173,
+                    "s": 0.9775
+                  },
+                  {
+                    "t": 0.62465685,
+                    "s": 0.9764
+                  },
+                  {
+                    "…": "618 more",
+                    "sha256": "afc375b2cf58765c"
+                  }
+                ],
+                "median": 20.71230607,
+                "n": 1782,
+                "events": 1100,
+                "atRisk": [
+                  1782,
+                  1697,
+                  1609,
+                  1518,
+                  1444,
+                  1395,
+                  1319,
+                  1249,
+                  1191,
+                  1134,
+                  1079,
+                  1040,
+                  991,
+                  947,
+                  910,
+                  877,
+                  846,
+                  815,
+                  803,
+                  789,
+                  {
+                    "…": "92 more",
+                    "sha256": "1691c27c2650bed8"
+                  }
+                ]
+              },
+              "hr": 2.1230991417937632,
+              "ciLow": 1.9523436405251429,
+              "ciHigh": 2.308789227634624,
+              "p": 2.5074185022917476e-69
+            }
+          ],
+          "logrank": {
+            "chi2": 332.0044,
+            "p": 8.056851699601754e-73,
+            "df": 2,
+            "observed": [
+              1093,
+              1782,
+              1100
+            ],
+            "expected": [
+              1603.4,
+              1609.2,
+              762.4
+            ],
+            "groups": 3,
+            "strata": 1
+          }
+        }
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_impact_2017",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "Association, not cause: a gene's weight is its link to OS with the other candidates held fixed, in this cohort. Without strata, a gene that marks a cancer type carries that type's prognosis; on a cohort of several cancer types, stratify by CANCER_TYPE. Each patient is scored only by models that did not train on them. The group cuts are equal quantiles of the score, chosen without the outcome. Genes outside the panels every patient was sequenced on are not candidates, so a patient is never counted as wild-type for a gene they were not tested for. The C-index ignores delayed entry. Seeded (seed 1): the same document gives the same model. External validation on “NSCLC (MSK-CHORD)” (msk_chord_2024): each patient scored with the ensemble's mean coefficients (every gene's coefficient averaged over all 10 runs, zero where a run dropped it) and cut at the training thresholds; 0 patients on panels missing one of the model's 21 weighted genes are left out rather than scored as wild-type. Harrell's C-index (within strata) with a seeded bootstrap interval (200 resamples). The two studies' baselines, panels and vocabularies are not harmonized, and a patient enrolled in both under different identifiers cannot be removed. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "One row per patient",
+            "scope": "NSCLC (MSK-IMPACT 2017) · msk_impact_2017",
+            "rowsIn": 1567,
+            "rowsOut": 1440,
+            "detail": "The riskmodel:rows query above: each patient's survival time and event, the panels their samples were sequenced on for mutations, the genes mutated in them, and their half of the engine's fixed held-out split. Patient-level: the rows never leave this server's engine, and no identifier is returned."
+          },
+          {
+            "kind": "transform",
+            "title": "Patients, candidate genes and covariates",
+            "detail": "A gene is a candidate only if every patient's panels cover it, so no patient is counted as wild-type for a gene they were never tested for, and only if at least 30 patients have it mutated.",
+            "params": [
+              [
+                "genes covered for every patient",
+                "341"
+              ],
+              [
+                "candidates",
+                "93"
+              ],
+              [
+                "left out: no mutation panel on record",
+                "0"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Elastic-net Cox, 10 random splits",
+            "detail": "Each run holds out a random 33% of the patients; on the rest, the penalty is chosen from a path of 25 by 3-fold cross-validated partial likelihood (Verweij & van Houwelingen), and the model at that penalty scores the held-out patients. Genes are scaled to unit variance before fitting; Breslow ties. A patient's risk score is the mean of the scores they got while held out (OncoCast's ensemble, Martin et al.).",
+            "params": [
+              [
+                "l1 share of the penalty (alpha)",
+                "0.5"
+              ],
+              [
+                "runs",
+                "10"
+              ],
+              [
+                "seed",
+                "1"
+              ],
+              [
+                "test-set C-index, median (IQR)",
+                "0.613 (0.578–0.621)"
+              ],
+              [
+                "never held out, so unscored",
+                "27"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Risk groups, their survival and hazard ratios",
+            "detail": "Cuts at equal quantiles of the held-out scores, each moved to the nearer edge of any run of tied scores so equal scores share a group — no outcome is used to place them. Each group is drawn as a Kaplan–Meier curve and read at 12 and 36 months; the groups are compared with a log-rank test, and a Cox model of the outcome on the group indicators gives each group's hazard ratio against the lowest (Newton–Raphson, full information matrix, 95% Wald intervals). A second Cox model on the standardised score alone gives the hazard ratio per standard deviation. The score is also shown on OncoCast's 0–10 scale, (score − min) / (max − min) × 10, min and max the lowest and highest held-out score; the scale is linear, so it moves no patient between groups and changes no number above.",
+            "params": [
+              [
+                "0 on the 0–10 scale (raw score)",
+                "-0.3101"
+              ],
+              [
+                "10 on the 0–10 scale (raw score)",
+                "1.0602"
+              ],
+              [
+                "Low risk",
+                "493 patients, 118 events, median 26.6 months"
+              ],
+              [
+                "Intermediate risk",
+                "449 patients, 145 events, median 20.6 months, HR 1.52"
+              ],
+              [
+                "High risk",
+                "471 patients, 198 events, median 15.0 months, HR 2.21"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "coxnetEnsemble",
+            "coxnetPath",
+            "cvLambda",
+            "concordance",
+            "coxFit"
+          ],
+          "file": "lib/coxnet.ts",
+          "commit": null
+        },
+        "verification": "lib/coxnet.ts's path is checked against scikit-survival's CoxnetSurvivalAnalysis, its delayed-entry, stratified fits (with standard errors) against statsmodels' PHReg and its C-index against lifelines, by test/coxnet-golden.test.ts (fixtures from python/golden/coxnet.py)."
+      }
+    }
+  ]
+}

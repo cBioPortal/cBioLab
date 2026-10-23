@@ -1,0 +1,329 @@
+{
+  "study": "prad_su2c_2019",
+  "cohorts": {
+    "mCRPC": {
+      "count": 429,
+      "text": "all patients in the study",
+      "studies": [
+        "prad_su2c_2019"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "germline",
+      "cohorts": [
+        "mCRPC"
+      ],
+      "germline": {
+        "genes": [
+          "BRCA2",
+          "ATM",
+          "BRCA1",
+          "APC",
+          "CHEK2"
+        ],
+        "minCarriers": 2,
+        "chosen": "every gene with ≥ 2 carriers",
+        "panels": [
+          {
+            "cohort": "mCRPC",
+            "patients": 429,
+            "genes": [
+              {
+                "gene": "BRCA2",
+                "sequenced": 429,
+                "carriers": 17,
+                "outsidePanel": 0,
+                "carrierSomatic": 3,
+                "carrierCnaProfiled": 17,
+                "carrierDeletion": 0,
+                "carrierEither": 3,
+                "noncarriers": 412,
+                "noncarrierSomatic": 17,
+                "noncarrierCnaProfiled": 412,
+                "noncarrierDeletion": 13,
+                "noncarrierEither": 30,
+                "p": 0.1342974639635262,
+                "q": 0.3357436599088155
+              },
+              {
+                "gene": "ATM",
+                "sequenced": 429,
+                "carriers": 7,
+                "outsidePanel": 0,
+                "carrierSomatic": 1,
+                "carrierCnaProfiled": 7,
+                "carrierDeletion": 0,
+                "carrierEither": 1,
+                "noncarriers": 422,
+                "noncarrierSomatic": 18,
+                "noncarrierCnaProfiled": 422,
+                "noncarrierDeletion": 7,
+                "noncarrierEither": 24,
+                "p": 0.34515410909803607,
+                "q": 0.5752568484967268
+              },
+              {
+                "gene": "BRCA1",
+                "sequenced": 429,
+                "carriers": 6,
+                "outsidePanel": 0,
+                "carrierSomatic": 2,
+                "carrierCnaProfiled": 6,
+                "carrierDeletion": 0,
+                "carrierEither": 2,
+                "noncarriers": 423,
+                "noncarrierSomatic": 2,
+                "noncarrierCnaProfiled": 423,
+                "noncarrierDeletion": 0,
+                "noncarrierEither": 2,
+                "p": 0.000968115884055841,
+                "q": 0.004840579420279205
+              },
+              {
+                "gene": "APC",
+                "sequenced": 429,
+                "carriers": 2,
+                "outsidePanel": 0,
+                "carrierSomatic": 0,
+                "carrierCnaProfiled": 2,
+                "carrierDeletion": 0,
+                "carrierEither": 0,
+                "noncarriers": 427,
+                "noncarrierSomatic": 28,
+                "noncarrierCnaProfiled": 427,
+                "noncarrierDeletion": 5,
+                "noncarrierEither": 33,
+                "p": 1,
+                "q": 1
+              },
+              {
+                "gene": "CHEK2",
+                "sequenced": 429,
+                "carriers": 2,
+                "outsidePanel": 0,
+                "carrierSomatic": 0,
+                "carrierCnaProfiled": 2,
+                "carrierDeletion": 0,
+                "carrierEither": 0,
+                "noncarriers": 427,
+                "noncarrierSomatic": 4,
+                "noncarrierCnaProfiled": 427,
+                "noncarrierDeletion": 6,
+                "noncarrierEither": 10,
+                "p": 1,
+                "q": 1
+              }
+            ]
+          }
+        ],
+        "survival": [
+          {
+            "cohort": "mCRPC",
+            "gene": "BRCA2",
+            "curves": [
+              {
+                "group": "BRCA2 carriers",
+                "points": [
+                  {
+                    "t": 0,
+                    "s": 1
+                  },
+                  {
+                    "t": 9.99,
+                    "s": 0.75
+                  },
+                  {
+                    "t": 12.25,
+                    "s": 0.375
+                  },
+                  {
+                    "t": 33.02,
+                    "s": 0
+                  }
+                ],
+                "median": 12.25,
+                "n": 5,
+                "events": 3,
+                "atRisk": [
+                  5,
+                  5,
+                  5,
+                  5,
+                  5,
+                  5,
+                  5,
+                  5,
+                  5,
+                  4,
+                  3,
+                  3,
+                  2,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  {
+                    "…": "14 more",
+                    "sha256": "39b3e42295cedea5"
+                  }
+                ]
+              },
+              {
+                "group": "non-carriers",
+                "points": [
+                  {
+                    "t": 0,
+                    "s": 1
+                  },
+                  {
+                    "t": 2.76,
+                    "s": 0.9915
+                  },
+                  {
+                    "t": 2.92,
+                    "s": 0.9831
+                  },
+                  {
+                    "t": 3.15,
+                    "s": 0.9746
+                  },
+                  {
+                    "t": 3.52,
+                    "s": 0.9661
+                  },
+                  {
+                    "t": 3.65,
+                    "s": 0.9576
+                  },
+                  {
+                    "t": 3.94,
+                    "s": 0.9492
+                  },
+                  {
+                    "t": 4.27,
+                    "s": 0.9321
+                  },
+                  {
+                    "t": 4.53,
+                    "s": 0.9235
+                  },
+                  {
+                    "t": 5.88,
+                    "s": 0.9149
+                  },
+                  {
+                    "t": 6.04,
+                    "s": 0.9062
+                  },
+                  {
+                    "t": 8.44,
+                    "s": 0.8972
+                  },
+                  {
+                    "t": 8.94,
+                    "s": 0.8881
+                  },
+                  {
+                    "t": 9,
+                    "s": 0.8791
+                  },
+                  {
+                    "t": 9.23,
+                    "s": 0.87
+                  },
+                  {
+                    "t": 10.35,
+                    "s": 0.8608
+                  },
+                  {
+                    "t": 10.74,
+                    "s": 0.8515
+                  },
+                  {
+                    "t": 11.99,
+                    "s": 0.842
+                  },
+                  {
+                    "t": 12.02,
+                    "s": 0.8326
+                  },
+                  {
+                    "t": 12.12,
+                    "s": 0.8231
+                  },
+                  {
+                    "…": "50 more",
+                    "sha256": "85b85dad542220bd"
+                  }
+                ],
+                "median": 28.06,
+                "n": 123,
+                "events": 73,
+                "atRisk": [
+                  123,
+                  123,
+                  120,
+                  116,
+                  111,
+                  107,
+                  106,
+                  102,
+                  101,
+                  98,
+                  95,
+                  91,
+                  89,
+                  85,
+                  83,
+                  79,
+                  77,
+                  71,
+                  66,
+                  63,
+                  {
+                    "…": "49 more",
+                    "sha256": "ae65496c83275d59"
+                  }
+                ]
+              }
+            ],
+            "logrank": {
+              "chi2": 0.9557,
+              "p": 0.32827950279908547,
+              "df": 1,
+              "observed": [
+                3,
+                72
+              ],
+              "expected": [
+                1.7,
+                73.3
+              ],
+              "groups": 2,
+              "strata": 1
+            }
+          }
+        ],
+        "loh": "not assessed"
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "prad_su2c_2019",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Carriers are patients with a mutation the study marks GERMLINE (mutation status, case-insensitive) in the gene, counted per patient over all their samples and only among the patients sequenced for the gene (a tumour mutation panel listing it, or whole-exome); none fell outside a panel. A study reports germline variants only for the patients it analysed and consented for it, and the warehouse cannot tell a patient tested and negative from one never tested, so the carrier share is of patients sequenced, not of patients germline-tested: a lower bound where germline testing was partial. A somatic second hit in a carrier is another mutation in the same gene that is not germline (any called status but GERMLINE; uncalled and off-panel calls excluded) or a deep deletion (copy number −2, among patients profiled for copy number). Loss of heterozygosity — the commonest second hit — needs allele-specific copy number and is not assessed; a deep deletion in a carrier is rare, since it removes the germline allele too. So the second-hit rate is a floor. Non-carriers' rate is the same somatic definition among the sequenced patients without a germline call; Fisher's exact test of carriers' against non-carriers' rate per gene, Benjamini–Hochberg over the genes of each cohort. Germline calls are not pathogenicity-filtered here: whatever the study deposited as germline is counted. Overall survival of the patients sequenced for BRCA2, carriers against non-carriers, from OS_MONTHS / OS_STATUS (Kaplan–Meier, log-rank); not corrected for left truncation or for cancer type and stage. "
+    }
+  ]
+}

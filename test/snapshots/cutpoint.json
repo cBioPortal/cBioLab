@@ -1,0 +1,621 @@
+{
+  "study": "tmb_mskcc_2018",
+  "cohorts": {
+    "all patients": {
+      "count": 1661,
+      "text": "all patients in the study",
+      "studies": [
+        "tmb_mskcc_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "cutpoint",
+      "cohorts": [
+        "all patients"
+      ],
+      "cutpoint": {
+        "attribute": "TMB_NONSYNONYMOUS",
+        "endpoint": "OS",
+        "permutations": 1000,
+        "seed": 1,
+        "noValue": 0,
+        "n": 1661,
+        "events": 832,
+        "cut": 14.4190189078,
+        "lowShare": 0.8061408789885611,
+        "maxStat": 67.80508751969889,
+        "permP": 0.000999000999000999,
+        "naiveChi2": 59.9946,
+        "naiveP": 9.511889775457744e-15,
+        "critical95": 8.252515601462035,
+        "hr": {
+          "hr": 0.44769076519084294,
+          "ciLow": 0.36308135201586145,
+          "ciHigh": 0.5520168417473744,
+          "p": 5.503307533430497e-14
+        },
+        "low": {
+          "n": 1339,
+          "events": 732,
+          "median": 15
+        },
+        "high": {
+          "n": 322,
+          "events": 100,
+          "median": 47
+        },
+        "candidates": [
+          {
+            "cut": 1.72939618997,
+            "stat": 1.805
+          },
+          {
+            "cut": 1.95743939523,
+            "stat": 2.4641
+          },
+          {
+            "cut": 2.2183106012,
+            "stat": 4.1498
+          },
+          {
+            "cut": 2.59409428495,
+            "stat": 2.2533
+          },
+          {
+            "cut": 2.93615909284,
+            "stat": 4.3318
+          },
+          {
+            "cut": 3.32746590179,
+            "stat": 6.9348
+          },
+          {
+            "cut": 3.45879237993,
+            "stat": 4.7173
+          },
+          {
+            "cut": 3.91487879046,
+            "stat": 2.7407
+          },
+          {
+            "cut": 4.32349047492,
+            "stat": 2.7978
+          },
+          {
+            "cut": 4.4366212023900005,
+            "stat": 3.3435
+          },
+          {
+            "cut": 4.89359848807,
+            "stat": 7.0967
+          },
+          {
+            "cut": 5.1881885699,
+            "stat": 6.8979
+          },
+          {
+            "cut": 5.54577650299,
+            "stat": 12.9792
+          },
+          {
+            "cut": 5.87231818569,
+            "stat": 19.7778
+          },
+          {
+            "cut": 6.05288666489,
+            "stat": 18.1524
+          },
+          {
+            "cut": 6.65493180359,
+            "stat": 22.226
+          },
+          {
+            "cut": 6.8510378833,
+            "stat": 23.5099
+          },
+          {
+            "cut": 6.9175847598699995,
+            "stat": 23.208
+          },
+          {
+            "cut": 7.76408710418,
+            "stat": 30.8829
+          },
+          {
+            "cut": 7.78228285485,
+            "stat": 32.2437
+          },
+          {
+            "…": "53 more",
+            "sha256": "317e891d3f189749"
+          }
+        ],
+        "curves": {
+          "low": {
+            "points": [
+              {
+                "t": 0,
+                "s": 1
+              },
+              {
+                "t": 0,
+                "s": 0.9866
+              },
+              {
+                "t": 1,
+                "s": 0.9377
+              },
+              {
+                "t": 2,
+                "s": 0.8797
+              },
+              {
+                "t": 3,
+                "s": 0.8313
+              },
+              {
+                "t": 4,
+                "s": 0.783
+              },
+              {
+                "t": 5,
+                "s": 0.7445
+              },
+              {
+                "t": 6,
+                "s": 0.7153
+              },
+              {
+                "t": 7,
+                "s": 0.6803
+              },
+              {
+                "t": 8,
+                "s": 0.6532
+              },
+              {
+                "t": 9,
+                "s": 0.621
+              },
+              {
+                "t": 10,
+                "s": 0.5926
+              },
+              {
+                "t": 11,
+                "s": 0.5627
+              },
+              {
+                "t": 12,
+                "s": 0.5436
+              },
+              {
+                "t": 13,
+                "s": 0.5201
+              },
+              {
+                "t": 14,
+                "s": 0.5025
+              },
+              {
+                "t": 15,
+                "s": 0.485
+              },
+              {
+                "t": 16,
+                "s": 0.4713
+              },
+              {
+                "t": 17,
+                "s": 0.4594
+              },
+              {
+                "t": 18,
+                "s": 0.4455
+              },
+              {
+                "…": "29 more",
+                "sha256": "9e1aeded113bf9e0"
+              }
+            ],
+            "median": 15,
+            "n": 1339,
+            "events": 732,
+            "atRisk": [
+              1339,
+              1313,
+              1229,
+              1126,
+              1032,
+              957,
+              891,
+              839,
+              777,
+              732,
+              678,
+              633,
+              590,
+              554,
+              503,
+              461,
+              422,
+              396,
+              366,
+              335,
+              {
+                "…": "59 more",
+                "sha256": "8220a954778bf568"
+              }
+            ]
+          },
+          "high": {
+            "points": [
+              {
+                "t": 0,
+                "s": 1
+              },
+              {
+                "t": 0,
+                "s": 0.9876
+              },
+              {
+                "t": 1,
+                "s": 0.9533
+              },
+              {
+                "t": 2,
+                "s": 0.9249
+              },
+              {
+                "t": 3,
+                "s": 0.9056
+              },
+              {
+                "t": 4,
+                "s": 0.8923
+              },
+              {
+                "t": 5,
+                "s": 0.872
+              },
+              {
+                "t": 6,
+                "s": 0.8582
+              },
+              {
+                "t": 7,
+                "s": 0.8367
+              },
+              {
+                "t": 8,
+                "s": 0.8259
+              },
+              {
+                "t": 9,
+                "s": 0.8183
+              },
+              {
+                "t": 10,
+                "s": 0.8106
+              },
+              {
+                "t": 11,
+                "s": 0.7947
+              },
+              {
+                "t": 12,
+                "s": 0.7825
+              },
+              {
+                "t": 13,
+                "s": 0.7619
+              },
+              {
+                "t": 14,
+                "s": 0.7409
+              },
+              {
+                "t": 15,
+                "s": 0.7234
+              },
+              {
+                "t": 16,
+                "s": 0.7187
+              },
+              {
+                "t": 18,
+                "s": 0.7134
+              },
+              {
+                "t": 19,
+                "s": 0.6966
+              },
+              {
+                "…": "13 more",
+                "sha256": "05431811010d3568"
+              }
+            ],
+            "median": 47,
+            "n": 322,
+            "events": 100,
+            "atRisk": [
+              322,
+              317,
+              302,
+              287,
+              274,
+              263,
+              253,
+              240,
+              231,
+              219,
+              211,
+              204,
+              196,
+              190,
+              181,
+              170,
+              153,
+              143,
+              136,
+              127,
+              {
+                "…": "61 more",
+                "sha256": "d1312df5a86d07ac"
+              }
+            ]
+          }
+        },
+        "strata": {
+          "attribute": "CANCER_TYPE",
+          "minStratum": 100,
+          "rows": [
+            {
+              "stratum": "Non-Small Cell Lung Cancer",
+              "n": 350,
+              "events": 219,
+              "cut": 18.5956742547,
+              "lowShare": 0.8742857142857143,
+              "maxStat": 22.174094811126363,
+              "permP": 0.000999000999000999,
+              "naiveChi2": 17.6105,
+              "naiveP": 0.00002710833832097831,
+              "critical95": 8.551944700574573,
+              "hr": {
+                "hr": 0.3337471069297766,
+                "ciLow": 0.19405006379733222,
+                "ciHigh": 0.5740123409612973,
+                "p": 0.00007298902907972714
+              },
+              "low": {
+                "n": 306,
+                "events": 205,
+                "median": 10
+              },
+              "high": {
+                "n": 44,
+                "events": 14,
+                "median": null
+              }
+            },
+            {
+              "stratum": "Melanoma",
+              "n": 320,
+              "events": 125,
+              "cut": 9.78719697615,
+              "lowShare": 0.55,
+              "maxStat": 16.30033554313912,
+              "permP": 0.000999000999000999,
+              "naiveChi2": 16.2835,
+              "naiveP": 0.00005453584904242975,
+              "critical95": 8.354446956358276,
+              "hr": {
+                "hr": 0.465886667413295,
+                "ciLow": 0.3188770674284734,
+                "ciHigh": 0.6806710455029892,
+                "p": 0.00007862136169300631
+              },
+              "low": {
+                "n": 176,
+                "events": 85,
+                "median": 32
+              },
+              "high": {
+                "n": 144,
+                "events": 40,
+                "median": 58
+              }
+            },
+            {
+              "stratum": "Bladder Cancer",
+              "n": 215,
+              "events": 95,
+              "cut": 14.6998676147,
+              "lowShare": 0.7627906976744186,
+              "maxStat": 6.235270219152118,
+              "permP": 0.12087912087912088,
+              "naiveChi2": 5.5873,
+              "naiveP": 0.01809145502893181,
+              "critical95": 8.05497478320218,
+              "hr": {
+                "hr": 0.5358252872150625,
+                "ciLow": 0.3160451669437053,
+                "ciHigh": 0.9084421103336937,
+                "p": 0.020533026289892318
+              },
+              "low": {
+                "n": 164,
+                "events": 78,
+                "median": 15
+              },
+              "high": {
+                "n": 51,
+                "events": 17,
+                "median": null
+              }
+            },
+            {
+              "stratum": "Renal Cell Carcinoma",
+              "n": 151,
+              "events": 58,
+              "cut": 1.1091553006,
+              "lowShare": 0.11920529801324503,
+              "maxStat": 2.8045961162246122,
+              "permP": 0.4405594405594406,
+              "naiveChi2": 3.171,
+              "naiveP": 0.07495495934424953,
+              "critical95": 6.807368752792455,
+              "hr": {
+                "hr": 0.5414144878859748,
+                "ciLow": 0.2731447049735918,
+                "ciHigh": 1.073166136320207,
+                "p": 0.07880200901995046
+              },
+              "low": {
+                "n": 18,
+                "events": 10,
+                "median": 26
+              },
+              "high": {
+                "n": 133,
+                "events": 48,
+                "median": 50
+              }
+            },
+            {
+              "stratum": "Head and Neck Cancer",
+              "n": 139,
+              "events": 79,
+              "cut": 8.80847727853,
+              "lowShare": 0.7913669064748201,
+              "maxStat": 8.843128424411308,
+              "permP": 0.027972027972027972,
+              "naiveChi2": 7.8836,
+              "naiveP": 0.0049886295111135105,
+              "critical95": 7.768648543331955,
+              "hr": {
+                "hr": 0.3844419619920401,
+                "ciLow": 0.19114546010753247,
+                "ciHigh": 0.7732102141329646,
+                "p": 0.007331421774737635
+              },
+              "low": {
+                "n": 110,
+                "events": 70,
+                "median": 9
+              },
+              "high": {
+                "n": 29,
+                "events": 9,
+                "median": 25
+              }
+            },
+            {
+              "stratum": "Esophagogastric Cancer",
+              "n": 126,
+              "events": 57,
+              "cut": 9.98239770538,
+              "lowShare": 0.8571428571428571,
+              "maxStat": 3.026418920803918,
+              "permP": 0.47652347652347654,
+              "naiveChi2": 2.5434,
+              "naiveP": 0.11075818236686161,
+              "critical95": 7.952068583418686,
+              "hr": {
+                "hr": 0.5077848368231322,
+                "ciLow": 0.21476372358116003,
+                "ciHigh": 1.20060053070394,
+                "p": 0.12269513187246597
+              },
+              "low": {
+                "n": 108,
+                "events": 51,
+                "median": 13
+              },
+              "high": {
+                "n": 18,
+                "events": 6,
+                "median": 21
+              }
+            },
+            {
+              "stratum": "Glioma",
+              "n": 117,
+              "events": 87,
+              "cut": 2.93615909284,
+              "lowShare": 0.48717948717948717,
+              "maxStat": 2.1403219064907852,
+              "permP": 0.6203796203796204,
+              "naiveChi2": 2.1949,
+              "naiveP": 0.13846684710609466,
+              "critical95": 7.052061850962871,
+              "hr": {
+                "hr": 1.369457347183215,
+                "ciLow": 0.8949530052964434,
+                "ciHigh": 2.09554402818378,
+                "p": 0.14744356689036148
+              },
+              "low": {
+                "n": 57,
+                "events": 43,
+                "median": 15
+              },
+              "high": {
+                "n": 60,
+                "events": 44,
+                "median": 12
+              }
+            },
+            {
+              "stratum": "Colorectal Cancer",
+              "n": 110,
+              "events": 45,
+              "cut": 11.091553006,
+              "lowShare": 0.6454545454545455,
+              "maxStat": 12.811504932575595,
+              "permP": 0.003996003996003996,
+              "naiveChi2": 12.3245,
+              "naiveP": 0.0004470502103430181,
+              "critical95": 7.836548798630535,
+              "hr": {
+                "hr": 0.2587314398271425,
+                "ciLow": 0.11486202579730972,
+                "ciHigh": 0.5828032153390259,
+                "p": 0.0011021384463524536
+              },
+              "low": {
+                "n": 71,
+                "events": 37,
+                "median": 12
+              },
+              "high": {
+                "n": 39,
+                "events": 8,
+                "median": null
+              }
+            }
+          ],
+          "omitted": {
+            "values": 3,
+            "patients": 133
+          }
+        }
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "tmb_mskcc_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "The cut was chosen from these patients to separate their OS as much as possible, so the split is optimistic in-sample: its naive log-rank p (9.5e-15) ignores the search and overstates the evidence, and the cut needs validation in an independent cohort before it is used. Scanned: 73 candidate cuts — the distinct values of TMB_NONSYNONYMOUS leaving between 10% and 90% of patients at or below them (at most 100, evenly spaced) — by the maximally selected standardized log-rank statistic (Lausen & Schumacher; R maxstat). The corrected p is from 1000 permutations of the marker over the patients (seed 1): the share whose own best cut does as well. High is TMB_NONSYNONYMOUS > 14.42 (19.4% of patients). TMB_NONSYNONYMOUS is the patient's value, or for a sample attribute the value of the patient's first sample by sample id; 0 patients with a survival time and no numeric value are left out. The status '1:…' is an event, anything else censored; times from each study's own baseline. Per CANCER_TYPE: the largest 8 values with at least 100 patients each get their own scan and permutation test (same seed); 3 other values (133 patients) are not scanned. Each stratum's cut is as optimistic as the overall one. Computed from per-patient rows inside each patient-level study."
+    }
+  ]
+}

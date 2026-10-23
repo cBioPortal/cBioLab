@@ -1,0 +1,443 @@
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "Early-onset CRC": {
+      "count": 1699,
+      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample) AND AGE_AT_DX < 50",
+      "studies": [
+        "msk_impact_50k_2026"
+      ]
+    },
+    "Average-onset CRC": {
+      "count": 3149,
+      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample) AND AGE_AT_DX >= 50",
+      "studies": [
+        "msk_impact_50k_2026"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "adjusted",
+      "cohorts": [
+        "Early-onset CRC",
+        "Average-onset CRC"
+      ],
+      "adjusted": {
+        "groups": [
+          "Early-onset CRC",
+          "Average-onset CRC"
+        ],
+        "covariates": [
+          "MSI_TYPE",
+          "TMB_SCORE"
+        ],
+        "measure": "any",
+        "minShare": 0.05,
+        "minAltered": 10,
+        "patients": [
+          {
+            "cohort": "Early-onset CRC",
+            "withPanel": 1699,
+            "used": 1693
+          },
+          {
+            "cohort": "Average-onset CRC",
+            "withPanel": 3149,
+            "used": 3146
+          }
+        ],
+        "rows": [
+          {
+            "gene": "BRAF",
+            "altered": [
+              126,
+              407
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.5411269597612929,
+            "fisherP": 2.710811860666322e-9,
+            "or": 0.5216396908714602,
+            "ciLow": 0.4183153256517837,
+            "ciHigh": 0.6504852928075174,
+            "p": 7.54781075999513e-9,
+            "q": 4.226774025597273e-7
+          },
+          {
+            "gene": "TCF7L2",
+            "altered": [
+              288,
+              423
+            ],
+            "profiled": [
+              1630,
+              3032
+            ],
+            "rawOr": 1.3236515838538858,
+            "fisherP": 0.0008578212348662324,
+            "or": 1.404435592139356,
+            "ciLow": 1.180502737160721,
+            "ciHigh": 1.6708468946135815,
+            "p": 0.0001268866627804068,
+            "q": 0.0035528265578513903
+          },
+          {
+            "gene": "TP53",
+            "altered": [
+              1309,
+              2272
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 1.311328583480047,
+            "fisherP": 0.00011775748048826727,
+            "or": 1.3133017670395535,
+            "ciLow": 1.1350484541995076,
+            "ciHigh": 1.5195488130289565,
+            "p": 0.00025022227493464745,
+            "q": 0.0046708157987800855
+          },
+          {
+            "gene": "RNF43",
+            "altered": [
+              137,
+              339
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.729043914128201,
+            "fisherP": 0.0027999834127475907,
+            "or": 0.6620228379095622,
+            "ciLow": 0.5093142741934166,
+            "ciHigh": 0.860518269604578,
+            "p": 0.0020511556715794737,
+            "q": 0.028716179402112633
+          },
+          {
+            "gene": "ARID1B",
+            "altered": [
+              85,
+              201
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.7745012499690602,
+            "fisherP": 0.05532506054373684,
+            "or": 0.7489932088466228,
+            "ciLow": 0.557772986856673,
+            "ciHigh": 1.0057690854837233,
+            "p": 0.05464152386125222,
+            "q": 0.46652783687314187
+          },
+          {
+            "gene": "SOX9",
+            "altered": [
+              179,
+              396
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.8210406575664172,
+            "fisherP": 0.040411894237794996,
+            "or": 0.8350046734269876,
+            "ciLow": 0.6893699851625684,
+            "ciHigh": 1.011405804795066,
+            "p": 0.06518532585899603,
+            "q": 0.46652783687314187
+          },
+          {
+            "gene": "APC",
+            "altered": [
+              1312,
+              2354
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 1.1585841489439987,
+            "fisherP": 0.041342749543831714,
+            "or": 1.1387886342288704,
+            "ciLow": 0.9885897522112814,
+            "ciHigh": 1.311807603253099,
+            "p": 0.07171204692126021,
+            "q": 0.46652783687314187
+          },
+          {
+            "gene": "PTCH1",
+            "altered": [
+              104,
+              163
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 1.1977745775210709,
+            "fisherP": 0.16602988006891037,
+            "or": 1.3250194585995907,
+            "ciLow": 0.9734183627616344,
+            "ciHigh": 1.803619731074945,
+            "p": 0.07365875367172238,
+            "q": 0.46652783687314187
+          },
+          {
+            "gene": "PTPRT",
+            "altered": [
+              132,
+              284
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.8521623011612275,
+            "fisherP": 0.14706368012518412,
+            "or": 0.8098204828214236,
+            "ciLow": 0.6420211662668516,
+            "ciHigh": 1.021476002435317,
+            "p": 0.0749776880688978,
+            "q": 0.46652783687314187
+          },
+          {
+            "gene": "AMER1",
+            "altered": [
+              119,
+              260
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.8391994917407878,
+            "fisherP": 0.13021342686620713,
+            "or": 0.8180709187695194,
+            "ciLow": 0.6445218640410384,
+            "ciHigh": 1.0383511645988062,
+            "p": 0.09881729624236307,
+            "q": 0.5077248205997287
+          },
+          {
+            "gene": "KMT2C",
+            "altered": [
+              149,
+              236
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 1.189926012119083,
+            "fisherP": 0.1188444777909342,
+            "or": 1.2414079415234593,
+            "ciLow": 0.9596149333281411,
+            "ciHigh": 1.6059500782597078,
+            "p": 0.09973166118923242,
+            "q": 0.5077248205997287
+          },
+          {
+            "gene": "ALK",
+            "altered": [
+              98,
+              150
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 1.227201671891327,
+            "fisherP": 0.13266423396996824,
+            "or": 1.2266799467712537,
+            "ciLow": 0.9251847438283239,
+            "ciHigh": 1.626425102498171,
+            "p": 0.1557120246584706,
+            "q": 0.7266561150728627,
+            "merged": true
+          },
+          {
+            "gene": "KRAS",
+            "altered": [
+              728,
+              1403
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.9372248217180801,
+            "fisherP": 0.28816415182439137,
+            "or": 0.923909986483505,
+            "ciLow": 0.8195332385181764,
+            "ciHigh": 1.041580283756872,
+            "p": 0.19569867163761537,
+            "q": 0.8065613922774592
+          },
+          {
+            "gene": "PTPRS",
+            "altered": [
+              178,
+              299
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 1.1187257856220405,
+            "fisherP": 0.266212584088072,
+            "or": 1.1616780454795617,
+            "ciLow": 0.9229590631628046,
+            "ciHigh": 1.4621405598691992,
+            "p": 0.2016403480693648,
+            "q": 0.8065613922774592
+          },
+          {
+            "gene": "GRIN2A",
+            "altered": [
+              99,
+              203
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.9004116421803438,
+            "fisherP": 0.4186807379137655,
+            "or": 0.841449059243645,
+            "ciLow": 0.6393279724898628,
+            "ciHigh": 1.1074699524636267,
+            "p": 0.21807411669325583,
+            "q": 0.8141433689881551
+          },
+          {
+            "gene": "ERBB4",
+            "altered": [
+              96,
+              196
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.9047576450743102,
+            "fisherP": 0.4482855526770097,
+            "or": 0.8468060994525293,
+            "ciLow": 0.6421917952897175,
+            "ciHigh": 1.1166143437670426,
+            "p": 0.23866269386673408,
+            "q": 0.8353194285335693,
+            "merged": true
+          },
+          {
+            "gene": "MGA",
+            "altered": [
+              88,
+              181
+            ],
+            "profiled": [
+              1630,
+              3032
+            ],
+            "rawOr": 0.8989115090540376,
+            "fisherP": 0.46881605021726136,
+            "or": 0.8470971509026441,
+            "ciLow": 0.6296245928768924,
+            "ciHigh": 1.1396848077179236,
+            "p": 0.2729870652389694,
+            "q": 0.8585545311158915,
+            "merged": true
+          },
+          {
+            "gene": "PIK3CA",
+            "altered": [
+              344,
+              675
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.9335024572385581,
+            "fisherP": 0.37501003639382813,
+            "or": 0.92090874427795,
+            "ciLow": 0.7906873515311479,
+            "ciHigh": 1.0725768075653632,
+            "p": 0.289490567367158,
+            "q": 0.8585545311158915
+          },
+          {
+            "gene": "FBXW7",
+            "altered": [
+              254,
+              503
+            ],
+            "profiled": [
+              1693,
+              3146
+            ],
+            "rawOr": 0.9274747622672581,
+            "fisherP": 0.38371371706610935,
+            "or": 0.9123746251684417,
+            "ciLow": 0.7680175085950384,
+            "ciHigh": 1.0838652079352247,
+            "p": 0.29669741607594663,
+            "q": 0.8585545311158915
+          },
+          {
+            "gene": "KMT2B",
+            "altered": [
+              144,
+              268
+            ],
+            "profiled": [
+              1327,
+              2498
+            ],
+            "rawOr": 1.0128562596989692,
+            "fisherP": 0.9128102190534733,
+            "or": 1.1675598503391111,
+            "ciLow": 0.8675492916581633,
+            "ciHigh": 1.5713182146900095,
+            "p": 0.30662661825567555,
+            "q": 0.8585545311158915
+          },
+          {
+            "…": "36 more",
+            "sha256": "02768078561eec72"
+          }
+        ],
+        "failed": [],
+        "significant": 4,
+        "labels": [
+          "BRAF",
+          "TCF7L2",
+          "TP53",
+          "RNF43"
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_impact_50k_2026",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "Per gene, a logistic regression of mutated (yes/no) on cohort (“Early-onset CRC” = 1 against “Average-onset CRC”) and MSI_TYPE, TMB_SCORE (MSI_TYPE as categories against its commonest value, TMB_SCORE as a number; a sample attribute is the patient's first sample's); the odds ratio is the cohort term's, Wald 95% CI, and q is Benjamini–Hochberg over the 56 genes fit. Patients, not samples: a patient is mutated in a gene when any of their samples carries a called mutation in it, and is in a gene's model only when one of their mutation panels covers it (or whole-exome) — panel-aware, so a patient not profiled for a gene is left out of that gene, never counted as wild type. Tested: the 56 genes mutated in at least 5.0% (and 10) of the patients profiled for them, both cohorts together (at most 200). “Early-onset CRC”: 1,699 patients with a mutation panel, 1,693 with every covariate; “Average-onset CRC”: 3,149 patients with a mutation panel, 3,146 with every covariate. Beside each adjusted odds ratio is the raw one with its two-sided Fisher p, on the same patients; 2 genes significant raw (Fisher p < 0.05) are not after adjustment (adjusted p ≥ 0.05). For 9 genes, a covariate category in which no patient (or every patient) was mutated was merged into its reference level, since it would separate. Adjustment removes only what the covariates measure: a hypermutated tumour raises every gene's odds at once, which TMB or MSI status as a covariate absorbs and nothing else does. Cohorts are expected not to share patients; a patient in both would count on both sides. "
+    }
+  ]
+}

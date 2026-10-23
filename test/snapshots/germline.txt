@@ -1,0 +1,14 @@
+Analysis over prad_su2c_2019 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- mCRPC: 429 patients — all patients in the study
+
+Germline carriers and somatic second hits (every gene with ≥ 2 carriers; LOH not assessed):
+  mCRPC (429 patients):
+    BRCA2: 17/429 sequenced carry a germline call (4.0%); second hit in carriers 3/17 (17.6%: 3 somatic mutation, 0/17 deep deletion) vs non-carriers 30/412 (7.3%), Fisher p=0.1343 q=0.3357
+    ATM: 7/429 sequenced carry a germline call (1.6%); second hit in carriers 1/7 (14.3%: 1 somatic mutation, 0/7 deep deletion) vs non-carriers 24/422 (5.7%), Fisher p=0.3452 q=0.5753
+    BRCA1: 6/429 sequenced carry a germline call (1.4%); second hit in carriers 2/6 (33.3%: 2 somatic mutation, 0/6 deep deletion) vs non-carriers 2/423 (0.5%), Fisher p=0.0010 q=0.0048
+    APC: 2/429 sequenced carry a germline call (0.5%); second hit in carriers 0/2 (0.0%: 0 somatic mutation, 0/2 deep deletion) vs non-carriers 33/427 (7.7%), Fisher p=1.0000 q=1.0000
+    CHEK2: 2/429 sequenced carry a germline call (0.5%); second hit in carriers 0/2 (0.0%: 0 somatic mutation, 0/2 deep deletion) vs non-carriers 10/427 (2.3%), Fisher p=1.0000 q=1.0000
+  OS by BRCA2 carrier status, mCRPC: BRCA2 carriers n=5, 3 deaths, median 12.3 mo; non-carriers n=123, 73 deaths, median 28.1 mo; log-rank p=0.3283
+  CAVEAT (tell the user): Carriers are patients with a mutation the study marks GERMLINE (mutation status, case-insensitive) in the gene, counted per patient over all their samples and only among the patients sequenced for the gene (a tumour mutation panel listing it, or whole-exome); none fell outside a panel. A study reports germline variants only for the patients it analysed and consented for it, and the warehouse cannot tell a patient tested and negative from one never tested, so the carrier share is of patients sequenced, not of patients germline-tested: a lower bound where germline testing was partial. A somatic second hit in a carrier is another mutation in the same gene that is not germline (any called status but GERMLINE; uncalled and off-panel calls excluded) or a deep deletion (copy number −2, among patients profiled for copy number). Loss of heterozygosity — the commonest second hit — needs allele-specific copy number and is not assessed; a deep deletion in a carrier is rare, since it removes the germline allele too. So the second-hit rate is a floor. Non-carriers' rate is the same somatic definition among the sequenced patients without a germline call; Fisher's exact test of carriers' against non-carriers' rate per gene, Benjamini–Hochberg over the genes of each cohort. Germline calls are not pathogenicity-filtered here: whatever the study deposited as germline is counted. Overall survival of the patients sequenced for BRCA2, carriers against non-carriers, from OS_MONTHS / OS_STATUS (Kaplan–Meier, log-rank); not corrected for left truncation or for cancer type and stage. 

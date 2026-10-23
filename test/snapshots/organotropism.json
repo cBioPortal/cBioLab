@@ -1,0 +1,785 @@
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "NSCLC": {
+      "count": 7809,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)",
+      "studies": [
+        "msk_chord_2024"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "organotropism",
+      "cohorts": [
+        "NSCLC"
+      ],
+      "organotropism": {
+        "source": "timeline",
+        "sourceLabel": "timeline Diagnosis events' TUMOR_SITE",
+        "alteration": "mutation",
+        "measure": "driver",
+        "stratifyBy": "CANCER_TYPE",
+        "minPatients": 5,
+        "patients": 7809,
+        "sites": [
+          {
+            "site": "lung",
+            "label": "Lung",
+            "evaluable": 7425,
+            "withSite": 7181
+          },
+          {
+            "site": "lymph nodes",
+            "label": "Lymph Nodes",
+            "evaluable": 7425,
+            "withSite": 5387
+          },
+          {
+            "site": "other",
+            "label": "Other",
+            "evaluable": 7425,
+            "withSite": 4653
+          },
+          {
+            "site": "bone",
+            "label": "Bone",
+            "evaluable": 7425,
+            "withSite": 3756
+          },
+          {
+            "site": "cns/brain",
+            "label": "CNS/Brain",
+            "evaluable": 7425,
+            "withSite": 2758
+          },
+          {
+            "site": "pleura",
+            "label": "Pleura",
+            "evaluable": 7425,
+            "withSite": 2372
+          },
+          {
+            "site": "liver",
+            "label": "Liver",
+            "evaluable": 7425,
+            "withSite": 2286
+          },
+          {
+            "site": "adrenal glands",
+            "label": "Adrenal Glands",
+            "evaluable": 7425,
+            "withSite": 1334
+          },
+          {
+            "site": "intra-abdominal",
+            "label": "Intra-Abdominal",
+            "evaluable": 7425,
+            "withSite": 777
+          },
+          {
+            "site": "reproductive organs",
+            "label": "Reproductive Organs",
+            "evaluable": 7425,
+            "withSite": 455
+          }
+        ],
+        "genes": [
+          {
+            "gene": "EGFR"
+          },
+          {
+            "gene": "KRAS"
+          },
+          {
+            "gene": "TP53"
+          },
+          {
+            "gene": "STK11"
+          },
+          {
+            "gene": "KEAP1"
+          },
+          {
+            "gene": "SMARCA4"
+          }
+        ],
+        "cells": [
+          {
+            "site": "lung",
+            "gene": "EGFR",
+            "withSite": 7181,
+            "withAltered": 1607,
+            "without": 244,
+            "withoutAltered": 47,
+            "or": 1.2085,
+            "log2Or": 0.273,
+            "p": 0.28348701990423947,
+            "q": 0.36976567813596456,
+            "strata": 2
+          },
+          {
+            "site": "lung",
+            "gene": "KRAS",
+            "withSite": 7181,
+            "withAltered": 2029,
+            "without": 244,
+            "withoutAltered": 65,
+            "or": 1.0841,
+            "log2Or": 0.116,
+            "p": 0.6353075092608361,
+            "q": 0.7474205991303955,
+            "strata": 2
+          },
+          {
+            "site": "lung",
+            "gene": "TP53",
+            "withSite": 7181,
+            "withAltered": 3723,
+            "without": 244,
+            "withoutAltered": 116,
+            "or": 1.1879,
+            "log2Or": 0.248,
+            "p": 0.20985666056959834,
+            "q": 0.2919959095993514,
+            "strata": 2
+          },
+          {
+            "site": "lung",
+            "gene": "STK11",
+            "withSite": 7181,
+            "withAltered": 849,
+            "without": 244,
+            "withoutAltered": 31,
+            "or": 0.9212,
+            "log2Or": -0.118,
+            "p": 0.7496243561344957,
+            "q": 0.8329159512605508,
+            "strata": 2
+          },
+          {
+            "site": "lung",
+            "gene": "KEAP1",
+            "withSite": 7181,
+            "withAltered": 560,
+            "without": 244,
+            "withoutAltered": 18,
+            "or": 1.062,
+            "log2Or": 0.087,
+            "p": 0.9043108042040912,
+            "q": 0.9499923445063648,
+            "strata": 2
+          },
+          {
+            "site": "lung",
+            "gene": "SMARCA4",
+            "withSite": 7181,
+            "withAltered": 270,
+            "without": 244,
+            "withoutAltered": 10,
+            "or": 0.914,
+            "log2Or": -0.13,
+            "p": 0.9183259330228193,
+            "q": 0.9499923445063648,
+            "strata": 2
+          },
+          {
+            "site": "lymph nodes",
+            "gene": "EGFR",
+            "withSite": 5387,
+            "withAltered": 1138,
+            "without": 2038,
+            "withoutAltered": 516,
+            "or": 0.7901,
+            "log2Or": -0.34,
+            "p": 0.00012202051223180176,
+            "q": 0.00034863003494800505,
+            "strata": 2
+          },
+          {
+            "site": "lymph nodes",
+            "gene": "KRAS",
+            "withSite": 5387,
+            "withAltered": 1496,
+            "without": 2038,
+            "withoutAltered": 598,
+            "or": 0.9244,
+            "log2Or": -0.113,
+            "p": 0.18007816415437294,
+            "q": 0.2572545202205328,
+            "strata": 2
+          },
+          {
+            "site": "lymph nodes",
+            "gene": "TP53",
+            "withSite": 5387,
+            "withAltered": 3038,
+            "without": 2038,
+            "withoutAltered": 801,
+            "or": 1.9967,
+            "log2Or": 0.998,
+            "p": 2.8932432875514818e-39,
+            "q": 1.7359459725308891e-37,
+            "strata": 2
+          },
+          {
+            "site": "lymph nodes",
+            "gene": "STK11",
+            "withSite": 5387,
+            "withAltered": 666,
+            "without": 2038,
+            "withoutAltered": 214,
+            "or": 1.2021,
+            "log2Or": 0.266,
+            "p": 0.02981934109578526,
+            "q": 0.054216983810518656,
+            "strata": 2
+          },
+          {
+            "site": "lymph nodes",
+            "gene": "KEAP1",
+            "withSite": 5387,
+            "withAltered": 471,
+            "without": 2038,
+            "withoutAltered": 107,
+            "or": 1.7294,
+            "log2Or": 0.79,
+            "p": 6.87645088328899e-7,
+            "q": 0.000002750580353315596,
+            "strata": 2
+          },
+          {
+            "site": "lymph nodes",
+            "gene": "SMARCA4",
+            "withSite": 5387,
+            "withAltered": 229,
+            "without": 2038,
+            "withoutAltered": 51,
+            "or": 1.7295,
+            "log2Or": 0.79,
+            "p": 0.000542574925431756,
+            "q": 0.0014154128489524069,
+            "strata": 2
+          },
+          {
+            "site": "other",
+            "gene": "EGFR",
+            "withSite": 4653,
+            "withAltered": 1053,
+            "without": 2772,
+            "withoutAltered": 601,
+            "or": 1.0578,
+            "log2Or": 0.081,
+            "p": 0.3468758361659519,
+            "q": 0.441143274707972,
+            "strata": 2
+          },
+          {
+            "site": "other",
+            "gene": "KRAS",
+            "withSite": 4653,
+            "withAltered": 1287,
+            "without": 2772,
+            "withoutAltered": 807,
+            "or": 0.9205,
+            "log2Or": -0.12,
+            "p": 0.1263823436056453,
+            "q": 0.1995510688510189,
+            "strata": 2
+          },
+          {
+            "site": "other",
+            "gene": "TP53",
+            "withSite": 4653,
+            "withAltered": 2547,
+            "without": 2772,
+            "withoutAltered": 1292,
+            "or": 1.3757,
+            "log2Or": 0.46,
+            "p": 4.205014759682705e-11,
+            "q": 4.2050147596827054e-10,
+            "strata": 2
+          },
+          {
+            "site": "other",
+            "gene": "STK11",
+            "withSite": 4653,
+            "withAltered": 569,
+            "without": 2772,
+            "withoutAltered": 311,
+            "or": 1.101,
+            "log2Or": 0.139,
+            "p": 0.21413033370619103,
+            "q": 0.2919959095993514,
+            "strata": 2
+          },
+          {
+            "site": "other",
+            "gene": "KEAP1",
+            "withSite": 4653,
+            "withAltered": 390,
+            "without": 2772,
+            "withoutAltered": 188,
+            "or": 1.2593,
+            "log2Or": 0.333,
+            "p": 0.01413479458134059,
+            "q": 0.03028884553144412,
+            "strata": 2
+          },
+          {
+            "site": "other",
+            "gene": "SMARCA4",
+            "withSite": 4653,
+            "withAltered": 194,
+            "without": 2772,
+            "withoutAltered": 86,
+            "or": 1.3575,
+            "log2Or": 0.441,
+            "p": 0.02394685725191403,
+            "q": 0.044900357347338805,
+            "strata": 2
+          },
+          {
+            "site": "bone",
+            "gene": "EGFR",
+            "withSite": 3756,
+            "withAltered": 971,
+            "without": 3669,
+            "withoutAltered": 683,
+            "or": 1.5246,
+            "log2Or": 0.608,
+            "p": 8.18752393132579e-14,
+            "q": 1.6375047862651579e-12,
+            "strata": 2
+          },
+          {
+            "site": "bone",
+            "gene": "KRAS",
+            "withSite": 3756,
+            "withAltered": 1015,
+            "without": 3669,
+            "withoutAltered": 1079,
+            "or": 0.887,
+            "log2Or": -0.173,
+            "p": 0.02156775008051049,
+            "q": 0.04313550016102098,
+            "strata": 2
+          },
+          {
+            "…": "40 more",
+            "sha256": "73d6aa301b8de9e4"
+          }
+        ],
+        "tested": 60,
+        "significant": 32,
+        "incidence": {
+          "site": "CNS/Brain",
+          "gene": "EGFR",
+          "curves": [
+            {
+              "cohort": "EGFR altered",
+              "n": 1350,
+              "events": 364,
+              "competing": 255,
+              "censored": 731,
+              "excluded": {
+                "prior": 411,
+                "unobserved": 0,
+                "noFollowup": 0,
+                "noAnchor": 0
+              },
+              "late": 0,
+              "points": [
+                {
+                  "t": 0.0329,
+                  "f1": 0.00444,
+                  "f2": 0,
+                  "se1": 0.00181,
+                  "atRisk": 1350
+                },
+                {
+                  "t": 0.0657,
+                  "f1": 0.00891,
+                  "f2": 0,
+                  "se1": 0.00256,
+                  "atRisk": 1339
+                },
+                {
+                  "t": 0.0658,
+                  "f1": 0.00891,
+                  "f2": 0.00074,
+                  "se1": 0.00256,
+                  "atRisk": 1333
+                },
+                {
+                  "t": 0.0986,
+                  "f1": 0.01262,
+                  "f2": 0.00074,
+                  "se1": 0.00304,
+                  "atRisk": 1332
+                },
+                {
+                  "t": 0.1314,
+                  "f1": 0.0156,
+                  "f2": 0.00074,
+                  "se1": 0.00338,
+                  "atRisk": 1327
+                },
+                {
+                  "t": 0.1643,
+                  "f1": 0.01708,
+                  "f2": 0.00074,
+                  "se1": 0.00353,
+                  "atRisk": 1323
+                },
+                {
+                  "t": 0.1971,
+                  "f1": 0.02006,
+                  "f2": 0.00074,
+                  "se1": 0.00382,
+                  "atRisk": 1321
+                },
+                {
+                  "t": 0.23,
+                  "f1": 0.02452,
+                  "f2": 0.00074,
+                  "se1": 0.00422,
+                  "atRisk": 1316
+                },
+                {
+                  "t": 0.2628,
+                  "f1": 0.02601,
+                  "f2": 0.00074,
+                  "se1": 0.00434,
+                  "atRisk": 1309
+                },
+                {
+                  "t": 0.2957,
+                  "f1": 0.02676,
+                  "f2": 0.00074,
+                  "se1": 0.0044,
+                  "atRisk": 1306
+                },
+                {
+                  "t": 0.3285,
+                  "f1": 0.0275,
+                  "f2": 0.00074,
+                  "se1": 0.00446,
+                  "atRisk": 1305
+                },
+                {
+                  "t": 0.4271,
+                  "f1": 0.02974,
+                  "f2": 0.00074,
+                  "se1": 0.00463,
+                  "atRisk": 1303
+                },
+                {
+                  "t": 0.4274,
+                  "f1": 0.02974,
+                  "f2": 0.00149,
+                  "se1": 0.00463,
+                  "atRisk": 1300
+                },
+                {
+                  "t": 0.46,
+                  "f1": 0.03347,
+                  "f2": 0.00149,
+                  "se1": 0.00491,
+                  "atRisk": 1298
+                },
+                {
+                  "t": 0.4928,
+                  "f1": 0.03571,
+                  "f2": 0.00149,
+                  "se1": 0.00506,
+                  "atRisk": 1293
+                },
+                {
+                  "t": 0.5257,
+                  "f1": 0.03646,
+                  "f2": 0.00149,
+                  "se1": 0.00511,
+                  "atRisk": 1290
+                },
+                {
+                  "t": 0.526,
+                  "f1": 0.03646,
+                  "f2": 0.00224,
+                  "se1": 0.00511,
+                  "atRisk": 1289
+                },
+                {
+                  "t": 0.5914,
+                  "f1": 0.0372,
+                  "f2": 0.00224,
+                  "se1": 0.00516,
+                  "atRisk": 1288
+                },
+                {
+                  "t": 0.5918,
+                  "f1": 0.0372,
+                  "f2": 0.00298,
+                  "se1": 0.00516,
+                  "atRisk": 1287
+                },
+                {
+                  "t": 0.6242,
+                  "f1": 0.03795,
+                  "f2": 0.00298,
+                  "se1": 0.00521,
+                  "atRisk": 1286
+                },
+                {
+                  "…": "512 more",
+                  "sha256": "b567644e812901f3"
+                }
+              ]
+            },
+            {
+              "cohort": "EGFR not altered",
+              "n": 5107,
+              "events": 1042,
+              "competing": 1712,
+              "censored": 2353,
+              "excluded": {
+                "prior": 941,
+                "unobserved": 0,
+                "noFollowup": 0,
+                "noAnchor": 0
+              },
+              "late": 0,
+              "points": [
+                {
+                  "t": 0.0329,
+                  "f1": 0.00313,
+                  "f2": 0.00196,
+                  "se1": 0.00078,
+                  "atRisk": 5107
+                },
+                {
+                  "t": 0.0657,
+                  "f1": 0.00549,
+                  "f2": 0.00196,
+                  "se1": 0.00104,
+                  "atRisk": 5060
+                },
+                {
+                  "t": 0.0658,
+                  "f1": 0.00549,
+                  "f2": 0.00235,
+                  "se1": 0.00104,
+                  "atRisk": 5048
+                },
+                {
+                  "t": 0.0986,
+                  "f1": 0.00726,
+                  "f2": 0.00255,
+                  "se1": 0.00119,
+                  "atRisk": 5046
+                },
+                {
+                  "t": 0.1314,
+                  "f1": 0.00805,
+                  "f2": 0.00255,
+                  "se1": 0.00125,
+                  "atRisk": 5035
+                },
+                {
+                  "t": 0.1315,
+                  "f1": 0.00805,
+                  "f2": 0.00274,
+                  "se1": 0.00125,
+                  "atRisk": 5031
+                },
+                {
+                  "t": 0.1643,
+                  "f1": 0.00962,
+                  "f2": 0.00274,
+                  "se1": 0.00137,
+                  "atRisk": 5029
+                },
+                {
+                  "t": 0.1644,
+                  "f1": 0.00962,
+                  "f2": 0.00314,
+                  "se1": 0.00137,
+                  "atRisk": 5021
+                },
+                {
+                  "t": 0.1971,
+                  "f1": 0.01198,
+                  "f2": 0.00314,
+                  "se1": 0.00153,
+                  "atRisk": 5018
+                },
+                {
+                  "t": 0.1973,
+                  "f1": 0.01198,
+                  "f2": 0.00353,
+                  "se1": 0.00153,
+                  "atRisk": 5006
+                },
+                {
+                  "t": 0.23,
+                  "f1": 0.01356,
+                  "f2": 0.00353,
+                  "se1": 0.00162,
+                  "atRisk": 5004
+                },
+                {
+                  "t": 0.2301,
+                  "f1": 0.01356,
+                  "f2": 0.00412,
+                  "se1": 0.00162,
+                  "atRisk": 4996
+                },
+                {
+                  "t": 0.2628,
+                  "f1": 0.01474,
+                  "f2": 0.00412,
+                  "se1": 0.00169,
+                  "atRisk": 4990
+                },
+                {
+                  "t": 0.263,
+                  "f1": 0.01474,
+                  "f2": 0.00432,
+                  "se1": 0.00169,
+                  "atRisk": 4984
+                },
+                {
+                  "t": 0.2957,
+                  "f1": 0.01612,
+                  "f2": 0.00432,
+                  "se1": 0.00177,
+                  "atRisk": 4983
+                },
+                {
+                  "t": 0.2959,
+                  "f1": 0.01612,
+                  "f2": 0.00491,
+                  "se1": 0.00177,
+                  "atRisk": 4976
+                },
+                {
+                  "t": 0.3285,
+                  "f1": 0.0169,
+                  "f2": 0.00491,
+                  "se1": 0.00181,
+                  "atRisk": 4972
+                },
+                {
+                  "t": 0.3288,
+                  "f1": 0.0169,
+                  "f2": 0.00589,
+                  "se1": 0.00181,
+                  "atRisk": 4968
+                },
+                {
+                  "t": 0.3614,
+                  "f1": 0.01809,
+                  "f2": 0.00589,
+                  "se1": 0.00187,
+                  "atRisk": 4963
+                },
+                {
+                  "t": 0.3943,
+                  "f1": 0.01966,
+                  "f2": 0.00589,
+                  "se1": 0.00195,
+                  "atRisk": 4954
+                },
+                {
+                  "…": "1504 more",
+                  "sha256": "2d11dbdb085560b6"
+                }
+              ]
+            }
+          ],
+          "late": 0,
+          "records": 6457,
+          "gray": {
+            "statistic": 26.729288267822987,
+            "p": 0.0004997501249375312,
+            "permutations": 2000,
+            "groups": 2
+          },
+          "horizons": [
+            {
+              "months": 12,
+              "cells": [
+                {
+                  "cohort": "EGFR altered",
+                  "f1": 0.14237870451829465,
+                  "lo": 0.12351062192615343,
+                  "hi": 0.16124678711043589,
+                  "atRisk": 986
+                },
+                {
+                  "cohort": "EGFR not altered",
+                  "f1": 0.12810517649158298,
+                  "lo": 0.11882169113810584,
+                  "hi": 0.13738866184506013,
+                  "atRisk": 3237
+                }
+              ]
+            },
+            {
+              "months": 24,
+              "cells": [
+                {
+                  "cohort": "EGFR altered",
+                  "f1": 0.20741393253219217,
+                  "lo": 0.18488062291229543,
+                  "hi": 0.22994724215208892,
+                  "atRisk": 716
+                },
+                {
+                  "cohort": "EGFR not altered",
+                  "f1": 0.17726684351024025,
+                  "lo": 0.16643308037263344,
+                  "hi": 0.18810060664784706,
+                  "atRisk": 2195
+                }
+              ]
+            },
+            {
+              "months": 60,
+              "cells": [
+                {
+                  "cohort": "EGFR altered",
+                  "f1": 0.3200818660934484,
+                  "lo": 0.29100349600102005,
+                  "hi": 0.34916023618587677,
+                  "atRisk": 230
+                },
+                {
+                  "cohort": "EGFR not altered",
+                  "f1": 0.22726854798461762,
+                  "lo": 0.21450841724773226,
+                  "hi": 0.240028678721503,
+                  "atRisk": 752
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_chord_2024",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Sites are the values of TUMOR_SITE on Diagnosis timeline events, at any date: a patient with any site recorded is evaluable for every site, and has a site when an event names it. The timeline's tumour sites include the primary tumour's own organ, so the column for the organ a cancer type starts in mostly records primaries. Per site and gene, the patients evaluable for the site and profiled for the gene (a mutation panel listing it, or whole-exome; a patient not profiled is in neither group, never wild-type) are split by metastasis there and by a mutation the OncoKB store (v7.5) calls oncogenic or likely oncogenic in the gene called on a covering panel, in any of their samples. The 2×2 tables are stratified by CANCER_TYPE per patient (“Multiple” when samples disagree, a stratum of its own; 2 strata), and tested by the Cochran–Mantel–Haenszel test (continuity-corrected) with the Mantel–Haenszel common odds ratio — so a gene is compared with metastasis WITHIN cancer types, and a cancer type that both carries the gene and spreads to the site does not make the association by itself. A cell is tested with at least 5 altered patients, 5 with the site and 5 without; Benjamini–Hochberg q over the 60 cells tested. The colour is log2 of the odds ratio. A site is only recorded where imaging, biopsy or the source's own abstraction found it, so detection follows practice (who was scanned, how often, which sites are biopsied); patients sequenced from a metastasis are more likely to have that site recorded. Associations are not adjusted for stage, time followed, treatment or tumour mutation burden. The lower panel: cumulative incidence of the first CNS/Brain event after the timeline's day 0 for patients profiled for EGFR, altered against not, death (OS_STATUS) competing, Aalen–Johansen with delta-method 95% intervals; patients with the site at or before day 0 are excluded rather than counted as free of it (EGFR altered 411, EGFR not altered 941), as are those without follow-up. Censoring at OS_MONTHS on the timeline's clock; 0 patients of 6,457 have the event after the last follow-up (refused above 5%). Gray's test by permutation (2000 shuffles, seeded). "
+    }
+  ]
+}
