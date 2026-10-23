@@ -46,8 +46,9 @@ interface Mutant {
 const MUTANTS: Mutant[] = [
   { id: "km-censored-as-death", layer: "statistics", guard: "unit", file: "lib/stats.ts",
     effect: "Survival curves count patients who were still alive at last follow-up as deaths, so every curve drops too fast.",
-    find: "while (i < clean.length && clean[i].t === t) { if (clean[i].event) d++; i++; }",
-    replace: "while (i < clean.length && clean[i].t === t) { d++; i++; }" },
+    // kaplanMeier's own tie loop: kmMedianCi and rmst repeat the line, then read the risk set as `n`
+    find: "while (i < clean.length && clean[i].t === t) { if (clean[i].event) d++; i++; }\n    const atRisk = atRiskAt(t);",
+    replace: "while (i < clean.length && clean[i].t === t) { d++; i++; }\n    const atRisk = atRiskAt(t);" },
   { id: "km-never-leave-risk-set", layer: "statistics", guard: "unit", file: "lib/stats.ts",
     effect: "Patients stay in the at-risk group after they leave the study, so later deaths look rarer and curves sit too high.",
     find: "while (xi < exits.length && exits[xi] < t) { exited++; xi++; }",
