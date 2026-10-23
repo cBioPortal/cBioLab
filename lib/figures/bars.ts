@@ -1,27 +1,22 @@
-// Bar figures for the views the page shows as tables (compare, co-occurrence, co-expression,
-// clinical): what MCP and `?figures=svg` get for them. Compare is grouped bars, one group per gene
-// and one bar per cohort; the other three are one horizontal bar per row on a labelled value axis,
-// signed about a zero line where the value has a direction.
-import type { DrawnResultOf } from "../types.ts";
+// What the bar figures share — the views the page shows as tables (compare, co-occurrence,
+// co-expression, clinical; each figure is lib/views/<kind>/figure.ts), drawn for MCP and
+// `?figures=svg`: compare as grouped bars, the other three as one horizontal bar per row on a
+// labelled value axis, signed about a zero line where the value has a direction.
 import {
   esc, palette, frame, caption, linear, axisBottom, bottomAxisHeight, legend, label, textWidth,
-  seriesStyle, fmtNum, fmtPct, fmtQ, fmtInt, FS, SW, OTHER, SERIES, type SvgOpts, type LegendItem, type Scale
+  fmtInt, FS, SW, SERIES, type SvgOpts, type LegendItem, type Scale
 } from "../svg-kit.ts";
-import type { ClinicalRow } from "../views/clinical/types.ts";
-import type { CoexprRow } from "../views/coexpression/types.ts";
-import type { CompareRow } from "../views/compare/types.ts";
-import type { CooccurRow } from "../views/cooccurrence/types.ts";
 
 type Pal = ReturnType<typeof palette>;
 
 /** below this the plot column stops narrowing and the figure grows instead */
 const MIN_PLOT = 160;
-const ROW = 22, PAD = 8, GUT = 12;
+export const ROW = 22, PAD = 8, GUT = 12;
 
 /** a direction's colour where the test is significant; the neutral grey where it is not */
-const UP = SERIES[0], DOWN = SERIES[1];
+export const UP = SERIES[0], DOWN = SERIES[1];
 
-interface HRow {
+export interface HRow {
   label: string;
   /** null: nothing to draw (not tested, no value); ±Infinity: past the scale either way */
   v: number | null;
@@ -33,7 +28,7 @@ interface HRow {
 }
 
 /** The figure's title line at the top; returns its drawing and the y below it. */
-function titleLine(text: string, W: number, p: Pal): { svg: string; y: number } {
+export function titleLine(text: string, W: number, p: Pal): { svg: string; y: number } {
   return { svg: label(PAD, 16, text, { size: FS.title, weight: 600, fill: p.ink, maxW: W - 2 * PAD }), y: 26 };
 }
 
@@ -47,7 +42,7 @@ function topTicks(s: Scale, fmt: (v: number) => string, y: number, p: Pal): stri
  * (the label column capped at a third of the figure, labels past it cut with their full text kept).
  * `signed` puts zero in the middle; values past `cap` (or infinite) end in an arrow at the edge.
  */
-function hbars(title: string, rows: HRow[], o: SvgOpts, a: {
+export function hbars(title: string, rows: HRow[], o: SvgOpts, a: {
   signed: boolean; axisTitle: string; cap?: number; ref?: { at: number; text: string };
   legend: LegendItem[]; note: string; fmtTick?: (v: number) => string;
 }): string {
@@ -122,141 +117,5 @@ function hbars(title: string, rows: HRow[], o: SvgOpts, a: {
 }
 
 /** a note ending in a full stop, so a sentence appended to it reads as one */
-const sentence = (s: string) => s.trim() && !/[.!?)]$/.test(s.trim()) ? s.trim() + "." : s.trim();
-const r1 = (n: number) => Math.round(n * 10) / 10;
-
-export function cooccurrenceSvg(v: DrawnResultOf<"cooccurrence">, o: SvgOpts): string {
-  const pairs = (v.pairs || []) as CooccurRow[];
-  let anyInf = false;
-  const rows = pairs.map((r): HRow => {
-    const lor = r.oddsRatioMH != null ? Math.log2(r.oddsRatioMH) : r.log2Odds;
-    if (lor != null && !Number.isFinite(lor)) anyInf = true;
-    const p = r.pStratified ?? r.p;
-    const sig = r.q < 0.05 && lor != null && lor !== 0;
-    return {
-      label: r.a + " / " + r.b, v: lor, fill: sig ? (lor! > 0 ? UP : DOWN) : OTHER,
-      text: (lor == null ? "–" : fmtNum(lor)) + " · " + fmtQ(r.q),
-      tip: r.a + " / " + r.b + ": both " + fmtInt(r.both) + ", " + r.a + " only " + fmtInt(r.onlyA) + ", " + r.b + " only " + fmtInt(r.onlyB) +
-        ", neither " + fmtInt(r.neither) + " · " + (r.pStratified != null ? "stratified " : "") + "p " + fmtQ(p).slice(2)
-    };
-  });
-  return hbars("Co-occurrence — log₂ odds ratio", rows, o, {
-    signed: true, axisTitle: "log₂ odds ratio — left: mutually exclusive, right: co-occurring",
-    legend: [{ label: "co-occur, q < 0.05", color: UP }, { label: "mutually exclusive, q < 0.05", color: DOWN }, { label: "not significant", color: OTHER }],
-    note: sentence(v.note || "") + (anyInf ? " An odds ratio of 0 or ∞ (a pair never or always seen together) is drawn to the edge of the axis." : "")
-  });
-}
-
-export function coexpressionSvg(v: DrawnResultOf<"coexpression">, o: SvgOpts): string {
-  const rows = (v.coexpression || []) as CoexprRow[];
-  return hbars("Co-expression — Pearson r", rows.map((r): HRow => {
-    const rr = r.rMeta ?? r.r;
-    const sig = r.q < 0.05 && rr != null && rr !== 0;
-    return {
-      label: r.a + " / " + r.b, v: rr, fill: sig ? (rr! > 0 ? UP : DOWN) : OTHER,
-      text: (rr == null ? "r –" : "r = " + fmtNum(rr, 2)) + " · n = " + fmtInt(r.n) + " · " + fmtQ(r.q),
-      tip: r.a + " / " + r.b + (r.rMeta != null ? ": r combined across " + (r.sites ?? 0) + " sites" : "") +
-        (r.perStudy && r.perStudy.length > 1 ? "\n" + r.perStudy.map((s) => s.study + ": r " + (s.r == null ? "–" : fmtNum(s.r, 2)) + ", n " + fmtInt(s.n)).join("\n") : "")
-    };
-  }), o, {
-    signed: true, axisTitle: "Pearson r — left: anti-correlated, right: correlated",
-    legend: [{ label: "positive, q < 0.05", color: UP }, { label: "negative, q < 0.05", color: DOWN }, { label: "not significant", color: OTHER }],
-    note: v.note || ""
-  });
-}
-
-/** −log₁₀ q past this runs off the axis as an arrow: q < 1e-50 is beyond any reading difference */
-const Q_CAP = 50;
-
-export function clinicalSvg(v: DrawnResultOf<"clinical">, o: SvgOpts): string {
-  const all = (v.clinical || []) as ClinicalRow[];
-  const rows = all.map((r): HRow => {
-    if (r.skipped) return { label: r.attribute, v: null, fill: OTHER, text: "not tested: " + r.skipped, muted: true };
-    const q = r.q;
-    return {
-      label: r.attribute, v: q == null ? null : q > 0 ? -Math.log10(q) : Infinity,
-      fill: q != null && q < 0.05 ? SERIES[0] : OTHER,
-      text: (r.test || "") + " · " + (q == null ? "q –" : fmtQ(q))
-    };
-  });
-  return hbars("Clinical comparison — −log₁₀ q", rows, o, {
-    signed: false, axisTitle: "−log₁₀ q (Benjamini–Hochberg) — longer is stronger evidence of a difference", cap: Q_CAP,
-    ref: { at: -Math.log10(0.05), text: "q = 0.05" },
-    legend: [{ label: "q < 0.05", color: SERIES[0] }, { label: "not significant", color: OTHER }],
-    note: v.note || ""
-  });
-}
-
-/** below this a column of groups is too narrow to read; more width adds columns */
-const COL_MIN = 340;
-
-/**
- * Altered %, grouped by gene: one bar per cohort in each gene's group, the cohorts keyed once in
- * a legend. Genes flow down columns as the width allows, every column on one shared scale.
- */
-export function compareSvg(v: DrawnResultOf<"compare">, o: SvgOpts): string {
-  const p = palette(o.theme);
-  const rows = (v.rows || []) as CompareRow[];
-  const names = v.cohorts && v.cohorts.length ? v.cohorts : (rows[0]?.cells || []).map((c) => c.cohort);
-  const k = Math.max(1, ...rows.map((r) => r.cells.length));
-  let W = Math.max(360, o.width || 720);
-  const grown = W < COL_MIN + 2 * PAD;
-  if (grown) W = COL_MIN + 2 * PAD;
-  const title = "Altered %, by cohort";
-
-  const out: string[] = [];
-  const t = titleLine(title, W, p);
-  out.push(t.svg);
-  let y = t.y;
-  const items: LegendItem[] = names.map((n, i) => ({ label: n, color: seriesStyle(i).color, opacity: seriesStyle(i).tint }));
-  const lg = legend(items, PAD, y, W - 2 * PAD, p, { grid: names.length > 4 });
-  out.push(lg.svg);
-  y += lg.height + 8;
-
-  // one bar per cohort, a gap between genes; the gene's name and q head its group on the left
-  const BAR = k > 6 ? 10 : 12, GAP = 10;
-  const groupH = Math.max(k * BAR, FS.body + FS.small + 6) + GAP;
-  const cols = Math.max(1, Math.min(Math.ceil(rows.length / 4), Math.floor((W - 2 * PAD + GUT * 2) / (COL_MIN + GUT * 2))));
-  const perCol = Math.ceil(rows.length / cols);
-  const colW = (W - 2 * PAD - (cols - 1) * GUT * 2) / cols;
-  const qText = (r: CompareRow) => r.qAny != null ? fmtQ(r.qAny) : "";
-  const geneW = Math.max(...rows.map((r) => Math.max(textWidth(r.gene, FS.body, 600), textWidth(qText(r), FS.small))), 30);
-  const valW = textWidth("100.0%", FS.small) + 4;
-  const top = y, plotH = perCol * groupH;
-  const maxPct = Math.max(1, ...rows.flatMap((r) => r.cells.map((c) => c.anyPct ?? 0)));
-  let notProfiled = 0;
-
-  for (let c = 0; c < cols; c++) {
-    const cx = PAD + c * (colW + GUT * 2);
-    const L = cx + geneW + GUT, R = cx + colW - valW;
-    const xs = linear(0, Math.min(100, maxPct), L, R);
-    for (const tk of xs.ticks) out.push(`<line x1="${r1(xs(tk))}" y1="${top}" x2="${r1(xs(tk))}" y2="${top + plotH}" stroke="${p.line}" stroke-width="${SW.hair}"/>`);
-    rows.slice(c * perCol, (c + 1) * perCol).forEach((r, gi) => {
-      const gy = top + gi * groupH;
-      out.push(label(cx, gy + FS.body, r.gene, { size: FS.body, weight: 600, fill: p.ink, maxW: geneW }));
-      const q = qText(r);
-      if (q) out.push(label(cx, gy + FS.body + FS.small + 3, q, { size: FS.small, fill: r.qAny! < 0.05 ? p.ink : p.muted }));
-      r.cells.forEach((cell, ci) => {
-        const st = seriesStyle(ci), by = gy + ci * BAR;
-        const pct = cell.anyPct;
-        const tip = (names[ci] || cell.cohort) + " — " + r.gene + ": " + (pct == null ? "not profiled" : fmtPct(pct) + " (" + fmtInt(cell.any) + " of " + fmtInt(cell.profiled) + " profiled)");
-        if (pct == null) {
-          notProfiled++;
-          out.push(label(L + 2, by + BAR / 2 + FS.small * 0.35, "not profiled", { size: FS.small, fill: p.muted }));
-          return;
-        }
-        const w = Math.max(pct > 0 ? 1 : 0, xs(pct) - L);
-        out.push(`<rect x="${r1(L)}" y="${r1(by + 1)}" width="${r1(w)}" height="${BAR - 2}" fill="${st.color}"${st.tint < 1 ? ` opacity="${st.tint}"` : ""}` +
-          `><title>${esc(tip)}</title></rect>`);
-        out.push(label(L + w + 3, by + BAR / 2 + FS.small * 0.35, fmtPct(pct), { size: FS.small, fill: p.muted }));
-      });
-    });
-    out.push(`<line x1="${r1(L)}" y1="${top}" x2="${r1(L)}" y2="${top + plotH}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
-    out.push(axisBottom(xs, top + plotH, p, { title: "altered, % of profiled", minX: L - GUT, maxX: cx + colW, fmt: (x) => fmtNum(x) + "%" }));
-  }
-  y = top + plotH + bottomAxisHeight("altered") + 8;
-  const note = sentence(v.note || "") + (notProfiled ? " " + fmtInt(notProfiled) + " cohort–gene pair" + (notProfiled === 1 ? " was" : "s were") + " not profiled and " + (notProfiled === 1 ? "has" : "have") + " no bar." : "") +
-    (rows.some((r) => r.qAny != null) ? " The q under each gene compares its altered share across the cohorts." : "");
-  const cap = caption(note, W, y, p.muted);
-  return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, grown, title + " — " + names.join(", "));
-}
+export const sentence = (s: string) => s.trim() && !/[.!?)]$/.test(s.trim()) ? s.trim() + "." : s.trim();
+export const r1 = (n: number) => Math.round(n * 10) / 10;

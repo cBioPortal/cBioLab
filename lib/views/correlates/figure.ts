@@ -2,6 +2,7 @@
 // most positive and most negative genes listed with their ρ as a bar.
 import type { ViewResultOf, DrawnResultOf } from "../../types.ts";
 import {
+
   palette, frame, caption, label, textWidth, wrapWidth, linear, axisLeft, axisBottom, leftAxisWidth,
   bottomAxisHeight, fmtInt, pDigits, tickFormat, esc, FS, SW, SERIES, type SvgOpts
 } from "../../svg-kit.ts";

@@ -9,6 +9,7 @@ import type { HighlightPoint, PlotData, PlotLayer } from "../../plot.ts";
 import { isAbsent, jitterFor } from "../../plot-draw.ts";
 import { LAYER_BASE } from "../../plot-layers.ts";
 import {
+
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, bandLabels, legend, label,
   textWidth, fmtInt, fmtNum, fmtP, FS, SW, SERIES, OTHER, type Scale, type SvgOpts, type LegendItem
 } from "../../svg-kit.ts";

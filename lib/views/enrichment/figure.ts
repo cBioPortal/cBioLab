@@ -3,6 +3,7 @@
 import type { ViewResultOf, DrawnResultOf } from "../../types.ts";
 import { volcano, volcanoPlotH } from "../../figures/volcano.ts";
 import {
+
   palette, frame, caption, label, textWidth, wrapWidth, linear, axisLeft, axisBottom, leftAxisWidth,
   bottomAxisHeight, bandLabels, legend, seriesStyle, textOn, fmtInt, fmtPct, pDigits, tickFormat,
   esc, FS, SW, type SvgOpts

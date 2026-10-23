@@ -11,31 +11,35 @@ import jsxA11y from "eslint-plugin-jsx-a11y-x";
 import globals from "globals";
 import path from "node:path";
 
-// View kinds stay independent: a view's runner (lib/views/<kind>.ts), its figure
-// (lib/figures/<kind>.ts) and its own parts (<kind>-<part>.ts) may import each other and the
-// shared modules below, never another kind's modules, so a change to one view cannot break
-// another. What two kinds need goes into a shared module, added here.
-const SHARED_VIEW_MODULES = {
-  "lib/views": ["run", "shared", "rows", "covariates"],
-  "lib/figures": ["common", "volcano", "bars", "forest", "km"],
-};
+// View kinds stay independent. Each kind's code is its folder, lib/views/<kind>/ (and its card,
+// app/lab/kinds/<kind>.tsx): a kind's files import one another, the shared view modules below and
+// anything outside lib/views, never another kind's files and never the registries that list every
+// kind; a shared view module imports no kind at all. So a change to one view cannot break another,
+// and what two kinds need goes into a shared module.
+const SHARED_VIEW_MODULES = ["lib/views/run.ts", "lib/views/shared.ts", "lib/views/rows.ts", "lib/views/covariates.ts",
+  "lib/views/kind-def.ts", "lib/views/text.ts"];
+const VIEW_REGISTRIES = ["lib/views/index.ts", "lib/views/kinds.ts", "app/lab/kinds/index.ts"];
 const kindBoundary = {
   meta: { type: "problem", schema: [] },
   create(context) {
     const rel = (f) => path.relative(context.cwd, f).split(path.sep).join("/");
-    const dirOf = (f) => Object.keys(SHARED_VIEW_MODULES).find((d) => path.posix.dirname(f) === d);
-    const from = rel(context.filename), fromDir = dirOf(from);
-    const base = (f) => path.posix.basename(f).replace(/\.tsx?$/, "");
-    if (!fromDir || base(from) === "index" || SHARED_VIEW_MODULES[fromDir].includes(base(from))) return {};
-    const kind = (f) => base(f).split("-")[0];
+    const resolve = (f) => [f, f + ".ts", f + ".tsx"].find((x) => /\.tsx?$/.test(x)) && (/\.tsx?$/.test(f) ? f : f + ".ts");
+    /** the kind a file belongs to, or null for shared code */
+    const kindOf = (f) => (/^lib\/views\/([^/]+)\//.exec(f) || /^app\/lab\/kinds\/([^/.]+)(\/|\.tsx?$)/.exec(f) || [])[1] ?? null;
+    const from = rel(context.filename);
+    if (VIEW_REGISTRIES.includes(from)) return {};
+    const fromKind = kindOf(from);
+    const sharedView = SHARED_VIEW_MODULES.includes(from) || /^lib\/figures\//.test(from);
+    if (!fromKind && !sharedView) return {};
     const check = (node) => {
       const spec = node.source?.value;
       if (typeof spec !== "string" || !spec.startsWith(".")) return;
-      const to = rel(path.resolve(path.dirname(context.filename), spec)), toDir = dirOf(to);
-      if (!toDir || SHARED_VIEW_MODULES[toDir].includes(base(to)) || kind(to) === kind(from)) return;
-      context.report({ node: node.source, message: from + " imports " + to + ", another view kind's module. Move what both " +
-        "need into a shared module (" + Object.entries(SHARED_VIEW_MODULES).map(([d, ms]) => d + ": " + ms.join(", ")).join("; ") +
-        ") so a change to one view cannot break the other." });
+      const to = resolve(rel(path.resolve(path.dirname(context.filename), spec)));
+      const toKind = kindOf(to);
+      const why = VIEW_REGISTRIES.includes(to) ? "the registry that lists every kind"
+        : toKind && toKind !== fromKind ? (fromKind ? "another view kind's code" : "one view kind's code, from a module every kind shares") : null;
+      if (why) context.report({ node: node.source, message: from + " imports " + to + ", " + why + ". Move what both need into a shared " +
+        "module (" + SHARED_VIEW_MODULES.join(", ") + ", lib/figures/) so a change to one view cannot break another." });
     };
     return { ImportDeclaration: check, ExportNamedDeclaration: check, ExportAllDeclaration: check, ImportExpression: check };
   },
@@ -126,7 +130,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["lib/views/*.ts", "lib/figures/*.ts"],
+    files: ["lib/views/**/*.ts", "lib/figures/*.ts", "app/lab/kinds/**/*.tsx"],
     plugins: { local: { rules: { "kind-boundary": kindBoundary } } },
     rules: { "local/kind-boundary": "error" },
   },

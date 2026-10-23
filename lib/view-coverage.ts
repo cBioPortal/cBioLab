@@ -5,6 +5,8 @@
 // is not drawn: the engine refuses it (lib/analysis.ts) and the page does not offer it
 // (app/lab/use-view-options.ts, use-view-edits.ts), both from this one rule. Browser-safe.
 
+import { kindOf } from "./views/kinds.ts";
+
 /** How this app reaches one study, as far as drawing views goes. */
 export interface StudyAccess {
   /** the instance that answers for it, as the page names it */
@@ -17,21 +19,11 @@ export interface StudyAccess {
   shares: string[];
 }
 
-/** What a view kind needs of every study it draws; a kind not listed needs only counts. */
-type Need = "patients" | "timeline" | "alterations" | "local";
-const NEEDS: Record<string, Need> = {
-  // their output is patients: columns, rows, or a model fitted on each patient
-  oncoprint: "patients", table: "patients", mutations: "patients", cox: "patients", logistic: "patients", riskmodel: "patients", predictive: "patients", cutpoint: "patients", hla: "patients", forest: "patients", adjusted: "patients",
-  // patient views a peer may share by kind
-  timeline: "timeline", alterations: "alterations",
-  // aggregates every local participant computes and a remote peer does not serve yet
-  genome: "local", pathways: "local", enrichment: "local", diffexpr: "local", paired: "local", clonality: "local",
-  incidence: "local", labs: "local", cancertypes: "local", overlap: "local", assays: "local", composition: "local",
-  correlates: "local", plot: "local", acquired: "local", ctdna: "local", exclusivity: "local", txendpoints: "local", multistate: "local", rmst: "local", instability: "local", actionability: "local", drivernegative: "local", organotropism: "local", molsubtype: "local", germline: "local"
-};
+/** What a view kind needs of every study it draws (its descriptor says); a kind without a need needs only counts. */
+export type Need = "patients" | "timeline" | "alterations" | "local";
 
-/** What `kind` needs of every study it draws (null: only counts, which every participant gives). */
-export const viewNeed = (kind: string): Need | null => NEEDS[kind] ?? null;
+/** What `kind` needs of every study it draws (its descriptor's `need`; null: only counts, which every participant gives). */
+export const viewNeed = (kind: string): Need | null => kindOf(kind)?.need ?? null;
 
 const why = (need: Need, a: StudyAccess): string | null => {
   if (need === "local") return a.remote ? "is a remote peer, which does not answer this view yet" : null;
@@ -47,7 +39,7 @@ const why = (need: Need, a: StudyAccess): string | null => {
  * when it can. A study whose access is unknown (`access` returns undefined) is not held against it.
  */
 export function cantDraw(kind: string, studies: string[], access: (study: string) => StudyAccess | undefined): string | null {
-  const need = NEEDS[kind];
+  const need = viewNeed(kind);
   if (!need) return null;
   const out = studies.flatMap((s) => {
     const a = access(s);

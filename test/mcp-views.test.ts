@@ -1,8 +1,7 @@
-// Source tripwire: every view kind the engine can produce must be described by
-// the MCP run_analysis tool.
+// Every view kind the engine can produce must be described by the MCP run_analysis tool.
 //
-// The failure this exists to prevent is silent. run_analysis formats results in
-// an if/else chain over `v.kind`; a kind with no branch used to append NOTHING,
+// The failure this exists to prevent is silent. run_analysis formats results with each kind's
+// descriptor text (lib/views/<kind>/kind.ts); a kind without one used to append NOTHING,
 // so the view ran, the numbers existed, and the model was simply never told.
 // That is worse than an error — a model writes about figures it cannot see, and
 // nothing in the response signals the omission. Six of nine kinds were in that
@@ -12,6 +11,8 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { viewKinds } from "./support/view-kinds.ts";
+import { KINDS } from "../lib/views/kinds.ts";
+import { analysisText } from "../lib/result-text.ts";
 
 const tools = readFileSync(new URL("../mcp/tools.ts", import.meta.url), "utf8");
 // the per-view text lives in lib/result-text.ts, shared by run_analysis and the WebMCP tools
@@ -22,14 +23,9 @@ const reference = readFileSync(new URL("../lib/dsl-reference.ts", import.meta.ur
 const engineViewKinds = viewKinds;
 
 /** the kinds run_analysis has a formatter branch for */
-function viewLoop(): string {
-  const start = renderer.indexOf("for (const v of r.views)");
-  assert.ok(start > 0, "could not find the view loop in lib/result-text.ts");
-  return renderer.slice(start, renderer.indexOf("return out;", start));
-}
+/** the kinds whose descriptor (lib/views/<kind>/kind.ts) gives the results text a paragraph */
 function describedKinds(): string[] {
-  const body = viewLoop();
-  return [...new Set([...body.matchAll(/v\.kind === "(\w+)"/g)].map((x) => x[1]))].sort();
+  return Object.values(KINDS).filter((k) => typeof k.text === "function").map((k) => k.kind).sort();
 }
 
 describe("MCP run_analysis describes every view the engine can produce", () => {
@@ -42,8 +38,8 @@ describe("MCP run_analysis describes every view the engine can produce", () => {
     assert.ok(engine.length >= 9, "expected the full View union; found " + engine.join(", "));
     const missing = engine.filter((k) => !described.includes(k));
     assert.deepEqual(missing, [],
-      "these view kinds run but say nothing back to the model — add a branch in " +
-      "lib/result-text.ts: " + missing.join(", "));
+      "these view kinds run but say nothing back to the model — give their descriptor a text " +
+      "(lib/views/<kind>/kind.ts): " + missing.join(", "));
   });
 
   test("the tool description and describe_dsl's views table name every kind", () => {
@@ -60,13 +56,12 @@ describe("MCP run_analysis describes every view the engine can produce", () => {
     }
   });
 
-  test("and an unknown kind still says so rather than vanishing", () => {
-    // Belt and braces: even if someone adds a view and forgets the branch, the
-    // response must admit it rather than quietly drop the figure.
-    const body = viewLoop();
-    assert.match(body, /\}\s*else\s*\{/,
-      "the if/else chain needs a final else, or an unhandled kind appends nothing");
-    assert.match(body, /has no text rendering for it yet/);
+  test("and a kind with no text still says so rather than vanishing", () => {
+    // Belt and braces: even if a view has no text for its result, the response must admit it
+    // rather than quietly drop the figure.
+    const r = { involvedStudies: ["s"], oncokbPin: null, stats: { ms: 1 }, cohorts: {}, views: [{ kind: "not-a-kind", cohorts: [] }] };
+    const out = analysisText({ study: "s", cohorts: {}, views: [] } as never, r as never);
+    assert.match(out.join("\n"), /View "not-a-kind" ran but this tool has no text rendering for it yet/);
   });
 
   test("the author's note is read from annotationNote, not the engine's note", () => {
@@ -81,11 +76,10 @@ describe("MCP run_analysis describes every view the engine can produce", () => {
     // Methodology the engine attaches (left truncation, panel-aware
     // denominators, non-harmonised vocabularies) is what stops a model
     // overstating a result, so it must not be dropped in formatting.
-    const body = viewLoop();
-    const branches = (body.match(/v\.kind === "\w+"/g) || []).length;
-    const caveats = (body.match(/caveatOf\(v\)|v\.caveat/g) || []).length;
-    assert.ok(caveats >= branches - 2,
-      `${branches} view branches but only ${caveats} surface a caveat`);
+    const texts = Object.values(KINDS).flatMap((k) => k.text ? [String(k.text)] : []);
+    const caveats = texts.filter((t) => /caveatOf\(v\)|v\.caveat/.test(t)).length;
+    assert.ok(caveats >= texts.length - 2,
+      `${texts.length} view kinds describe themselves but only ${caveats} surface a caveat`);
   });
 });
 

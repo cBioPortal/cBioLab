@@ -1,26 +1,10 @@
 // View kinds shown as previews: drawn and usable, but not yet held to invariant 12 (no method
 // record, no golden test of their statistic). Each entry says what is pending. The view header
 // marks these with a Preview badge, and scripts/check-method-scripts.ts exempts them by this list,
-// so a kind leaves both the moment its entry is removed. Browser-safe.
-export const PREVIEW_KINDS: Record<string, string> = {
-  acquired: "no method record or golden test of the before/after pairing and McNemar counts yet",
-  ctdna: "no method record or golden test of the agreement counts, Wilson intervals and survival split, or of the clonal-haematopoiesis filter (chFilter) yet",
-  exclusivity: "no method record or golden test of the DISCOVER background fit against the R package yet",
-  hla: "no method record or golden test of the homozygosity and LOH counts or the survival splits yet",
-  cutpoint: "no method record or golden test of the maximally selected log-rank scan against R maxstat yet",
-  predictive: "no method record or golden test of the per-gene interaction fits yet",
-  rmst: "no method record or golden test of the restricted means, their variances and the landmark sets against R survRM2 yet",
-  multistate: "no method record or golden test of the Aalen–Johansen occupation, Nelson–Aalen hazards or the delayed-entry Cox fits yet (no interval on the occupation)",
-  txendpoints: "no method record or golden test of the endpoint derivation (lines, stops, progression) or the median intervals yet",
-  forest: "no method record or golden test of the per-stratum Cox fits and the DerSimonian–Laird pooling yet",
-  adjusted: "no method record or golden test of the per-gene logistic fits yet",
-  instability: "no method record, and no check of the arm calls and aneuploidy scores against Taylor et al.'s published values yet",
-  actionability: "no method record of the per-patient highest-level counts yet",
-  drivernegative: "no method record or golden test of the group split and the per-gene Fisher tests yet",
-  germline: "no method record or golden test of the carrier and second-hit counts or the Fisher tests yet",
-  molsubtype: "no method record or golden test of the per-patient classification, the chi-squared tests or the survival split yet",
-  organotropism: "no method record or golden test of the per-cell Cochran–Mantel–Haenszel tests or the site incidence yet",
-};
+// so a kind leaves both the moment its descriptor's `preview` is removed. Browser-safe.
+import { KINDS } from "./views/kinds.ts";
+export const PREVIEW_KINDS: Record<string, string> = Object.fromEntries(
+  Object.values(KINDS).flatMap((k) => k.preview ? [[k.kind, k.preview]] : []));
 
 /** what a preview kind still lacks, or null for a kind held to the full checks */
 export const previewPending = (kind: unknown): string | null =>

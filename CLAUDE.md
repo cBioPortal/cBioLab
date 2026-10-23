@@ -71,9 +71,10 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   **`lib/federation-views.ts`** (re-exported by `lib/federation.ts`, so the boundary suite sweeps
   it). Every local participant has those methods, a remote peer does not, so such a view is not
   drawn over a peer's studies (`lib/view-coverage.ts`, below invariant 10).
-  Figures: **`lib/figures/<kind>.ts`**, one module per kind (the later kinds registered with their
-  title in `lib/figures/index.ts`), dispatched by **`lib/view-svg.ts`**; all browser-safe, laid out
-  with **`lib/chart/`** (see "Figures" under UI conventions); cards: `app/lab/kind-cards.tsx`.
+  Figures: **`lib/views/<kind>/figure.ts`**, drawn through the kind's descriptor (`kind.ts`, listed in
+  `lib/views/kinds.ts`) by **`lib/view-svg.ts`**; what several figures share is in `lib/figures/`; all
+  browser-safe, laid out with **`lib/chart/`** (see "Figures" under UI conventions); cards:
+  `app/lab/kind-cards.tsx`.
 - **Table views** (`table`, `mutations`, `timeline`'s patient list, `alterations`' list and three tables, and any later view that lists rows) — **every one must
   support the same five things: pagination, search over its text, a filter per column (text
   conditions or a value list for text, a range for numbers), sorting, and a CSV download of every

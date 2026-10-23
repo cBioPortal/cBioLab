@@ -3,6 +3,7 @@
 import type { ProfileInfo } from "../profile-catalog.ts";
 import type { AnalysisDoc, ViewResult, ViewParticipation } from "../types.ts";
 import type { Resolver } from "../federation.ts";
+// eslint-disable-next-line local/kind-boundary -- riskFit is how the server hands the one model-fitting kind its fitter (a worker); types only
 import type { RiskFit, RiskFitArgs } from "./riskmodel/run.ts";
 
 /** one view of a document, as authored */

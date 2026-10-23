@@ -6,6 +6,7 @@ import { survivalAxis } from "../../stats.ts";
 import { stepPath } from "../../chart/marks.ts";
 import { plotHeight } from "../../figures/common.ts";
 import {
+
   palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, legend,
   seriesStyle, fmtInt, fmtMonths, fmtP, fmtNum, label, textWidth, esc, FS, SW, type SvgOpts
 } from "../../svg-kit.ts";
