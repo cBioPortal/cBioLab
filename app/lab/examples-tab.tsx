@@ -18,6 +18,8 @@ import { parseExamplesUrl } from "../../lib/site.ts";
 import type { CohortDef } from "../../lib/types.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import CohortPills from "./pills";
+import { isNewKind } from "../../lib/new-in-lab.ts";
+import { NewMark } from "./new-mark.tsx";
 
 /** a tag filter: an outline chip, filled while it is the one shown */
 const TAG = "group rounded-pill px-2.5 text-sm font-normal aria-pressed:border-link aria-pressed:bg-link aria-pressed:text-card aria-pressed:hover:bg-link/90 aria-pressed:hover:text-card";
@@ -152,7 +154,7 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
           const { views, topics } = FEATURES.get(ex)!;
           return (
             <div className="card excard" key={ex.title}>
-              <h3>{ex.title}</h3>
+              <h3>{ex.title}{views.some(isNewKind) && <NewMark />}</h3>
               <div className="extags small">
                 {views.map(k => <span key={k} className="vkind" title="a view this example draws">{k}</span>)}
                 {topics.map(t => <span key={t} className="extag is-static">{t}</span>)}
