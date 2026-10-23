@@ -23,6 +23,9 @@ import { NewMark } from "./new-mark.tsx";
 
 /** a tag filter: an outline chip, filled while it is the one shown */
 const TAG = "group rounded-pill px-2.5 text-sm font-normal aria-pressed:border-link aria-pressed:bg-link aria-pressed:text-card aria-pressed:hover:bg-link/90 aria-pressed:hover:text-card";
+/** the views and topics lists: links flowing down columns, the chosen one in bold */
+const FACET_COLS = "mt-1 columns-[11rem] gap-x-6";
+const FACET_ITEM = "items-baseline text-sm font-normal aria-pressed:font-semibold aria-pressed:text-foreground aria-pressed:underline";
 const TAG_N = "text-muted-foreground group-aria-pressed:text-card/80";
 const FEATURES = new Map(EXAMPLES.map(e => [e, exampleFeatures(e)]));
 const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
@@ -89,12 +92,14 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
   useEffect(() => () => onQuery(latest.current), [onQuery]);
   const searched = EXAMPLES.filter(e => matchesSearch(e, draft));
   const shown = tag === "all" ? searched : searched.filter(e => has(e, tag));
-  const chip = (t: string) => {
+  const item = (t: string) => {
     const n = searched.filter(e => has(e, t)).length;
     return (
-      <Button key={t} variant="outline" size="xs" className={cn(TAG, n === 0 && "opacity-50")} aria-pressed={tag === t} onClick={() => onTag(tag === t ? "all" : t)}>
-        {t} <span className={TAG_N}>{n}</span>{HAS_NEW.has(t) && <NewMark />}
-      </Button>
+      <div key={t} className="break-inside-avoid py-0.5">
+        <Button variant="link" size="inline" className={cn(FACET_ITEM, n === 0 && "opacity-50")} aria-pressed={tag === t} onClick={() => onTag(tag === t ? "all" : t)}>
+          <span className="inline-block first-letter:uppercase">{t}</span> <span className="text-muted-foreground">{n}</span>{HAS_NEW.has(t) && <NewMark />}
+        </Button>
+      </div>
     );
   };
 
@@ -136,8 +141,8 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
             all <span className={TAG_N}>{searched.length}</span>
           </Button>
         </div>
-        <div className="extags exfacet"><span className="exfacet-l">views</span>{VIEWS.map(chip)}</div>
-        <div className="extags exfacet"><span className="exfacet-l">topics</span>{TOPICS.map(chip)}</div>
+        <div className="exfacet"><div className="exfacet-l">views</div><div className={FACET_COLS}>{VIEWS.map(item)}</div></div>
+        <div className="exfacet"><div className="exfacet-l">topics</div><div className={FACET_COLS}>{TOPICS.map(item)}</div></div>
       </div>
 
       {shown.length === 0 && (
