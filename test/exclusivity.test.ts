@@ -1,7 +1,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { poissonBinomialTails } from "../lib/stats.ts";
-import { fitBackground } from "../lib/views/exclusivity.ts";
+import { fitBackground } from "../lib/views/exclusivity/run.ts";
 import { viewToSvg } from "../lib/view-svg.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 import type { DrawnResultOf } from "../lib/types.ts";

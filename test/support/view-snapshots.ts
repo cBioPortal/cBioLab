@@ -1,12 +1,14 @@
 // Every view kind's output, pinned: one gallery example per kind (and a few that combine studies)
 // runs through the whole engine (cohort compiler, runner, statistics, figure, results text) with
-// the warehouse replaced by answers recorded from it. Four files per case in test/snapshots/ are
+// the warehouse replaced by answers recorded from it. Five files per case in test/snapshots/ are
 // compared byte for byte:
 //   <case>.sql   each cohort's compiled SQL and each view's queries, by label and study
 //   <case>.json  what each view computed (its result, without timings or the queries above; a long
 //                array, or an object of more than 50 keys, as its first 20 items, then the rest's
 //                count and digest)
 //   <case>.svg   each view's figure;  <case>.txt  the results text MCP clients and the AI tools read
+//   <case>.html  each view's card as the lab page draws it: header, controls, body
+//                (test/support/render-views.ts)
 // A change to shared code that moves another view's numbers, figure, text or queries fails here,
 // named by the case. A changed query has no recorded answer, so it fails as "not recorded".
 // Each case runs twice, its answers delivered in the order its queries were sent and then in the
@@ -47,7 +49,9 @@ const { runAnalysis } = await import("../../lib/analysis.ts");
 const { withRequestCustomData } = await import("../../lib/custom-data-server.ts");
 const { viewToSvg } = await import("../../lib/view-svg.ts");
 const { analysisText } = await import("../../lib/result-text.ts");
+const { renderViewCards } = await import("./render-views.ts");
 import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
+import { viewKinds } from "./view-kinds.ts";
 
 /**
  * One case per view kind: the smallest gallery example that draws it (the oncoprint is pinned by
@@ -167,6 +171,7 @@ function render(doc: AnalysisDoc, r: AnalysisResult): Record<string, string> {
     json: json({ study: r.study, cohorts, splits: r.splits, views }),
     svg,
     txt: analysisText(doc, r).join("\n\n").replace(/ — \d+ms\./, " — (time)ms.") + "\n",
+    html: renderViewCards(doc, r),
   };
 }
 
@@ -251,10 +256,6 @@ export function snapshotCases(shard: number, of: number): [string, () => Promise
 
 /** That CASES covers every view kind; the first shard runs it. */
 export function everyKindHasACase(): void {
-  const types = readFileSync(join(import.meta.dirname, "..", "..", "lib", "types.ts"), "utf8");
-  const m = /export type View = ([^;]+);/.exec(types);
-  assert.ok(m, "could not find the View union in lib/types.ts — did it move?");
-  const kinds = [...new Set([...m[1].matchAll(/(\w+)View/g)].map((x) => x[1].toLowerCase()))];
-  assert.deepEqual(kinds.filter((k) => k !== "oncoprint" && !(k in CASES)), [],
+  assert.deepEqual(viewKinds().filter((k) => k !== "oncoprint" && !(k in CASES)), [],
     "add a case for each to CASES above (its smallest gallery example), then RECORD_SNAPSHOTS=1");
 }

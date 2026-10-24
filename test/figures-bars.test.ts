@@ -3,10 +3,11 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg } from "../lib/view-svg.ts";
-import { chromLabels } from "../lib/figures/genome.ts";
+import { chromLabels } from "../lib/views/genome/figure.ts";
 import { textWidth } from "../lib/chart/text.ts";
 import { FS } from "../lib/chart/style.ts";
-import type { ViewResult, CompareCell } from "../lib/types.ts";
+import type { ViewResult } from "../lib/types.ts";
+import type { CompareCell } from "../lib/views/compare/types.ts";
 
 const vb = (svg: string) => Number(/viewBox="0 0 (\d+)/.exec(svg)![1]);
 const cell = (cohort: string, pct: number | null): CompareCell => ({ cohort, profiled: 100, any: pct ?? 0, driver: 0, anyPct: pct, driverPct: null,

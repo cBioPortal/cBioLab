@@ -1,4 +1,4 @@
-// The shared volcano's label placer (lib/figures/enrichment.ts): measured boxes, inside the plot,
+// The shared volcano's label placer (lib/views/enrichment/figure.ts): measured boxes, inside the plot,
 // never on another label or a labelled point, and every label it cannot place reported.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";

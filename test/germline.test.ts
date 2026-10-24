@@ -1,7 +1,7 @@
 // The germline view's per-gene counting, on fixed inputs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { germAdd } from "../lib/views/germline.ts";
+import { germAdd } from "../lib/views/germline/run.ts";
 
 const blank = () => ({ sequenced: 0, carriers: 0, outsidePanel: 0, carrierSomatic: 0, carrierCnaProfiled: 0, carrierDeletion: 0, carrierEither: 0,
   noncarriers: 0, noncarrierSomatic: 0, noncarrierCnaProfiled: 0, noncarrierDeletion: 0, noncarrierEither: 0 });

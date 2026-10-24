@@ -2,11 +2,12 @@
 // shows beside it as controls. Imports only the drawing kit and lib/lollipop.ts, so the app draws
 // it in the browser (app/_lollipop/HotspotsBody.tsx) from the same code the server uses for MCP.
 import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, type AlterationCell } from "./lollipop.ts";
-import type { HotspotGene } from "./types.ts";
+
 import {
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, legend, label, textWidth, textOn,
   fmtInt, fmtShare, FS, SW, type SvgOpts, type LegendItem
 } from "./svg-kit.ts";
+import type { HotspotGene } from "./views/hotspots/types.ts";
 
 /**
  * What the grid beside a lollipop shows in the app — somatic mutation frequency and the Driver/VUS

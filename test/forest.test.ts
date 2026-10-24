@@ -2,7 +2,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { dersimonianLaird } from "../lib/stats.ts";
-import { forestFit, type ForestPatient } from "../lib/views/forest.ts";
+import { forestFit, type ForestPatient } from "../lib/views/forest/run.ts";
 
 const near = (a: number, b: number, tol = 1e-9) => assert.ok(Math.abs(a - b) < tol, a + " is not " + b);
 

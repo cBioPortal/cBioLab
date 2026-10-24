@@ -1,7 +1,7 @@
 // The driver-negative view's per-gene tests, on fixed inputs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dnegTest } from "../lib/views/drivernegative.ts";
+import { dnegTest } from "../lib/views/drivernegative/run.ts";
 import { fisherExact } from "../lib/stats.ts";
 
 test("per gene: whole-exome patients join every gene's denominator, Fisher and BH, untested genes counted", () => {

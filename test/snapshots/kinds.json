@@ -1,0 +1,3561 @@
+{
+  "cardOrder": [
+    "attrition",
+    "genome",
+    "pathways",
+    "enrichment",
+    "assays",
+    "composition",
+    "table",
+    "mutations",
+    "timeline",
+    "alterations",
+    "correlates",
+    "overlap",
+    "cancertypes",
+    "labs",
+    "incidence",
+    "hla",
+    "cutpoint",
+    "predictive",
+    "rmst",
+    "multistate",
+    "txendpoints",
+    "clonality",
+    "paired",
+    "acquired",
+    "instability",
+    "exclusivity",
+    "ctdna",
+    "riskmodel",
+    "drivernegative",
+    "organotropism",
+    "germline",
+    "molsubtype",
+    "actionability",
+    "adjusted",
+    "forest",
+    "diffexpr"
+  ],
+  "kinds": {
+    "acquired": {
+      "added": {
+        "anchor": {
+          "eventType": "Treatment"
+        },
+        "cohorts": [
+          "A"
+        ],
+        "kind": "acquired"
+      },
+      "addedBareStudy": {
+        "anchor": {
+          "eventType": "Treatment"
+        },
+        "cohorts": [
+          "A"
+        ],
+        "kind": "acquired"
+      },
+      "addedWithTwoCohorts": {
+        "anchor": {
+          "eventType": "Treatment"
+        },
+        "cohorts": [],
+        "kind": "acquired"
+      },
+      "card": {
+        "defaults": {
+          "anchor": {
+            "eventType": "Treatment"
+          },
+          "kind": "acquired"
+        },
+        "defaultsBareStudy": {
+          "anchor": {
+            "eventType": "Treatment"
+          },
+          "kind": "acquired"
+        },
+        "genes": true,
+        "label": "Acquired under therapy (samples before vs after a treatment start)",
+        "maxCohorts": 3,
+        "title": "Acquired under therapy",
+        "why": null,
+        "whyBareStudy": "this study records no treatment timeline events to anchor on"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 3 cohorts, side by side.",
+      "figureTitle": "Acquired under therapy — A vs B",
+      "headTitle": "Acquired under therapy",
+      "help": {
+        "text": "For patients who had a tumour sample tested before a treatment started and another one afterwards, shows gene by gene how many had a change only in the later sample (acquired, to the right) or only in the earlier one (lost, to the left). Genes that keep turning up only after treatment can point to how tumours resist it. It cannot say the treatment caused the change: second biopsies are usually taken when the cancer grows again, and a change can simply have been missed the first time.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 3,
+      "menu": {
+        "label": "Acquired under therapy (samples before vs after a treatment start)",
+        "loading": false,
+        "why": "this study records no treatment timeline events to anchor on"
+      },
+      "menuAggregateOnly": {
+        "why": "this study records no treatment timeline events to anchor on"
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no treatment timeline events to anchor on"
+      },
+      "need": "local",
+      "preview": "no method record or golden test of the before/after pairing and McNemar counts yet",
+      "sub": "last sample before the first Treatment vs the first ≥30 days after, any alteration, every gene scanned",
+      "title": "Acquired under therapy (samples before vs after a treatment start)"
+    },
+    "actionability": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "groupBy": "CANCER_TYPE",
+        "kind": "actionability"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "groupBy": "CANCER_TYPE",
+        "kind": "actionability"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "groupBy": "CANCER_TYPE",
+        "kind": "actionability"
+      },
+      "card": {
+        "defaults": {
+          "groupBy": "CANCER_TYPE",
+          "kind": "actionability"
+        },
+        "defaultsBareStudy": {
+          "groupBy": "CANCER_TYPE",
+          "kind": "actionability"
+        },
+        "label": "Clinical actionability (OncoKB levels, primary vs metastasis)",
+        "maxCohorts": 4,
+        "title": "Clinical actionability",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 4 cohorts, side by side.",
+      "figureTitle": "Clinical actionability — A vs B",
+      "headTitle": "Clinical actionability",
+      "help": {
+        "text": "For each patient, finds the strongest evidence OncoKB lists for a drug that targets one of their tumour's genetic changes — Level 1 means an FDA-approved drug for that change, down to Level 4 for early biological evidence — and shows what share of patients reach each level, overall or per cancer type. The levels here are the best OncoKB gives the change in ANY cancer, so a change that is only actionable in another cancer still counts: read the bars as an upper bound. The table below compares, for patients sequenced twice, the level found in their primary tumour against their metastasis.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 4,
+      "menu": {
+        "label": "Clinical actionability (OncoKB levels, primary vs metastasis)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": "no method record of the per-patient highest-level counts yet",
+      "sub": "highest OncoKB level per patient, any cancer type · by CANCER_TYPE · SAMPLE_TYPE concordance",
+      "title": "Clinical actionability (OncoKB levels, primary vs metastasis)"
+    },
+    "adjusted": {
+      "added": {
+        "cohorts": [],
+        "kind": "adjusted"
+      },
+      "addedBareStudy": {
+        "cohorts": [],
+        "kind": "adjusted"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "adjusted"
+      },
+      "card": {
+        "defaults": {
+          "kind": "adjusted"
+        },
+        "defaultsBareStudy": {
+          "kind": "adjusted"
+        },
+        "label": "Adjusted enrichment (every gene, logistic on covariates)",
+        "maxCohorts": 2,
+        "minCohorts": 2,
+        "title": "Adjusted enrichment",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It compares exactly 2 cohorts.",
+      "figureTitle": "Adjusted enrichment — A vs B",
+      "headTitle": "Adjusted enrichment",
+      "help": {
+        "text": "Compares how often each commonly mutated gene is mutated in two groups of patients — say, colorectal cancers diagnosed before and after age 50 — after taking into account other things that differ between the groups and also change mutation rates, such as how many mutations a tumour carries overall. Each dot is a gene: right of centre means more often mutated in the first group, left in the second, and higher means more certain. The table shows each gene's raw difference beside the adjusted one, so you can see which differences were explained away. A difference here is a clue, not proof of a cause.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 2,
+      "menu": {
+        "label": "Adjusted enrichment (every gene, logistic on covariates)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": "no method record or golden test of the per-gene logistic fits yet",
+      "sub": "mutations in every gene mutated in ≥5% · adjusted for nothing",
+      "title": "Adjusted enrichment (every gene, logistic on covariates)"
+    },
+    "alterations": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "alterations"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "alterations"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "alterations"
+      },
+      "card": {
+        "cohortInHeader": true,
+        "defaults": {
+          "kind": "alterations"
+        },
+        "defaultsBareStudy": {
+          "kind": "alterations"
+        },
+        "label": "Patient alterations (mutations, copy number, SVs; one patient at a time)",
+        "maxCohorts": 1,
+        "title": "Patient alterations",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": true,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Patient alterations — A vs B",
+      "headTitle": "Patient alterations",
+      "help": {
+        "text": "Lists one patient's genetic changes as cBioPortal's patient page does, in three tables: mutations (the gene, the protein change, whether OncoKB considers it cancer-causing, and how much of the tumour carries it), copy-number changes (genes amplified or deleted outright) and structural variants (fusions and rearrangements). A change found in several of the patient's samples is one row, with a numbered marker for each sample. Cohort % says how common the same kind of change in that gene is across the study. Each table can be searched, filtered, sorted and downloaded on its own. Step to the previous or next patient with the arrows at the top (or the ← and → keys), pick another cohort in the header, or open the patient list to search, sort and pick one.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Patient alterations (mutations, copy number, SVs; one patient at a time)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "alterations",
+      "preview": null,
+      "sub": "(element)",
+      "title": "Patient alterations (mutations, copy number, SVs; one patient at a time)"
+    },
+    "assays": {
+      "added": {
+        "cohorts": [],
+        "kind": "assays",
+        "profileType": "mutational_signatures_contribution_v2"
+      },
+      "addedBareStudy": {
+        "cohorts": [],
+        "kind": "assays",
+        "profileType": ""
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "assays",
+        "profileType": "mutational_signatures_contribution_v2"
+      },
+      "card": {
+        "defaults": {
+          "kind": "assays",
+          "profileType": "mutational_signatures_contribution_v2"
+        },
+        "defaultsBareStudy": {
+          "kind": "assays",
+          "profileType": ""
+        },
+        "label": "Generic assays (signatures, arm-level CNA, …)",
+        "maxCohorts": 6,
+        "minCohorts": 2,
+        "title": "Generic assays",
+        "why": null,
+        "whyBareStudy": "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It compares 2 to 6 cohorts.",
+      "figureTitle": "Generic assays — A vs B",
+      "headTitle": "Generic assays",
+      "help": {
+        "text": "Compares two or more groups on every measurement in one kind of extra lab data the study recorded — such as which mutational signatures (like sun damage or smoking) shaped each tumour, or which chromosome arms were gained or lost. The measurements at the top differ most clearly between the groups; each one shows its average, or its mix of results, in every group, so a difference that is clear but small reads as small.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Generic assays (signatures, arm-level CNA, …)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study has no generic-assay profiles (mutational signatures, arm-level copy number, …)"
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "mutational_signatures_contribution_v2, per sample",
+      "title": "Generic assays (signatures, arm-level CNA, …)"
+    },
+    "attrition": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "attrition"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "attrition"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "attrition"
+      },
+      "card": {
+        "defaults": {
+          "kind": "attrition"
+        },
+        "defaultsBareStudy": {
+          "kind": "attrition"
+        },
+        "label": "Cohort attrition (CONSORT)",
+        "maxCohorts": 6,
+        "title": "Cohort attrition",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 6 cohorts, side by side.",
+      "figureTitle": "Cohort attrition — A vs B",
+      "headTitle": "Cohort attrition",
+      "help": {
+        "text": "Shows how each group of patients was narrowed down, one criterion at a time: how many patients the study started with, how many were left after each rule in the group's definition, and how many each rule removed. It lets a reader see who was left out before trusting any result drawn from the patients who remain.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Cohort attrition (CONSORT)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": null,
+      "preview": null,
+      "sub": "patients left after each clause, in order",
+      "title": "Cohort attrition (CONSORT)"
+    },
+    "cancertypes": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1"
+        ],
+        "kind": "cancertypes"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS"
+        ],
+        "kind": "cancertypes"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1"
+        ],
+        "kind": "cancertypes"
+      },
+      "card": {
+        "defaults": {
+          "genes": [
+            "TP53",
+            "KRAS",
+            "EGFR",
+            "STK11",
+            "KEAP1"
+          ],
+          "kind": "cancertypes"
+        },
+        "defaultsBareStudy": {
+          "genes": [
+            "TP53",
+            "KRAS"
+          ],
+          "kind": "cancertypes"
+        },
+        "genes": true,
+        "label": "Cancer types summary",
+        "maxCohorts": 2,
+        "title": "Cancer types summary",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 2 cohorts, side by side.",
+      "figureTitle": "Cancer types summary — A vs B",
+      "headTitle": "Cancer types summary",
+      "help": {
+        "text": "For a list of genes, shows what share of samples in each cancer type carry a change in at least one of them — mutated, gained in many copies, deleted, or rearranged — with each bar split by which kind of change it was. It answers which cancers these genes matter most in, the way cBioPortal's Cancer Types Summary does.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 2,
+      "menu": {
+        "label": "Cancer types summary",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "by CANCER_TYPE, any alteration, % of profiled samples",
+      "title": "Cancer types summary"
+    },
+    "clinical": {
+      "added": {
+        "attributes": [
+          "TMB_NONSYNONYMOUS",
+          "AGE",
+          "OS_MONTHS"
+        ],
+        "cohorts": [
+          "A"
+        ],
+        "kind": "clinical"
+      },
+      "addedBareStudy": {
+        "attributes": [],
+        "cohorts": [
+          "A"
+        ],
+        "kind": "clinical"
+      },
+      "addedWithTwoCohorts": {
+        "attributes": [
+          "TMB_NONSYNONYMOUS",
+          "AGE",
+          "OS_MONTHS"
+        ],
+        "cohorts": [],
+        "kind": "clinical"
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": false,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "Add one cohort, or several to compare them.",
+      "figureTitle": "Clinical comparison — A vs B",
+      "headTitle": "Clinical comparison",
+      "help": {
+        "text": "Compares things recorded about the patients themselves — age, sex, a lab result, and similar details — rather than their genetics, between two or more groups. It answers whether the groups differ in ways beyond whatever genetic difference defined them, which matters for judging whether a genetic finding is really the explanation.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": null,
+      "menu": {
+        "label": "Clinical comparison",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study declares no clinical attributes to compare"
+      },
+      "need": null,
+      "preview": null,
+      "sub": null,
+      "title": "Clinical comparison"
+    },
+    "clonality": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF"
+        ],
+        "kind": "clonality"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "APC",
+          "PIK3CA",
+          "SMAD4",
+          "CDH1"
+        ],
+        "kind": "clonality"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF"
+        ],
+        "kind": "clonality"
+      },
+      "card": {
+        "defaults": {
+          "genes": [
+            "TP53",
+            "KRAS",
+            "EGFR",
+            "STK11",
+            "KEAP1",
+            "PIK3CA",
+            "APC",
+            "BRAF"
+          ],
+          "kind": "clonality"
+        },
+        "defaultsBareStudy": {
+          "genes": [
+            "TP53",
+            "KRAS",
+            "APC",
+            "PIK3CA",
+            "SMAD4",
+            "CDH1"
+          ],
+          "kind": "clonality"
+        },
+        "genes": true,
+        "label": "Clonality (FACETS)",
+        "maxCohorts": 3,
+        "title": "Clonality",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 3 cohorts, side by side.",
+      "figureTitle": "Clonality (FACETS) — A vs B",
+      "headTitle": "Clonality",
+      "help": {
+        "text": "A tumour is a population of cells, and a genetic change can be in all of them (present from early on) or only in some (arriving later). For each gene, this shows how often its changes are in all the tumour's cells, and how often the cell has also lost its backup copy of that gene. Beside it: how often tumours have doubled their entire set of chromosomes.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 3,
+      "menu": {
+        "label": "Clonality (FACETS)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "FACETS allele-specific copy number, driver mutations, QC-passing samples",
+      "title": "Clonality (FACETS)"
+    },
+    "coexpression": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1"
+        ],
+        "kind": "coexpression",
+        "profileType": "rna_seq_v2_mrna"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [],
+        "kind": "coexpression",
+        "profileType": null
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1"
+        ],
+        "kind": "coexpression",
+        "profileType": "rna_seq_v2_mrna"
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": false,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Co-expression — A vs B",
+      "headTitle": "Co-expression",
+      "help": {
+        "text": "Checks whether two genes tend to be more or less active together across patients — measured by how much each gene is \"read out\" into the working molecules a cell actually uses. Genes that rise and fall together are often working in the same biological pathway, or controlled by the same switch.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Co-expression",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study has no continuous molecular profile (mRNA z-scores) to correlate"
+      },
+      "need": null,
+      "preview": null,
+      "sub": null,
+      "title": "Co-expression"
+    },
+    "compare": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF",
+          "ERBB2"
+        ],
+        "kind": "compare"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [],
+        "kind": "compare"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF",
+          "ERBB2"
+        ],
+        "kind": "compare"
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": false,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "Add one cohort, or several to compare them.",
+      "figureTitle": "Alteration frequencies — A vs B",
+      "headTitle": "Compare",
+      "help": {
+        "text": "Compares how often specific genes are altered — mutated, gained, or lost — between two or more groups of patients. If a gene is altered much more often in one group than another, that's a clue it might be connected to whatever makes the groups different, like a cancer subtype or how patients respond to treatment.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": null,
+      "menu": {
+        "label": "Compare genes",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": null,
+      "preview": null,
+      "sub": null,
+      "title": "Compare genes"
+    },
+    "composition": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "composition",
+        "profileType": "mutational_signatures_contribution_v2"
+      },
+      "addedBareStudy": {
+        "attributes": [],
+        "cohorts": [
+          "A"
+        ],
+        "kind": "composition"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "composition",
+        "profileType": "mutational_signatures_contribution_v2"
+      },
+      "card": {
+        "defaults": {
+          "kind": "composition",
+          "profileType": "mutational_signatures_contribution_v2"
+        },
+        "defaultsBareStudy": {
+          "attributes": [],
+          "kind": "composition"
+        },
+        "label": "Composition (cell types, states, signatures as parts of a whole)",
+        "maxCohorts": 8,
+        "minCohorts": 1,
+        "title": "Composition",
+        "why": null,
+        "whyBareStudy": "this study has no generic-assay profile and no numeric attribute to draw as parts"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It compares 1 to 8 cohorts.",
+      "figureTitle": "Composition — A vs B",
+      "headTitle": "Composition",
+      "help": {
+        "text": "Shows what each patient's (or sample's) tumour is made of — the share of each cell type, cell state or signature — as one stacked bar per case, sorted by the part you choose, with each group's average beside it. Under the bars, every group is set against the others part by part: the colour says whether a part is higher (red) or lower (blue) there, its size how sure that is. Parts of a whole move together, so one part rising means others fall.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 8,
+      "menu": {
+        "label": "Composition (cell types, states, signatures as parts of a whole)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study has no generic-assay profile and no numeric attribute to draw as parts"
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "mutational_signatures_contribution_v2, as shares",
+      "title": "Composition (cell types, states, signatures as parts of a whole)"
+    },
+    "cooccurrence": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA"
+        ],
+        "kind": "cooccurrence"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [],
+        "kind": "cooccurrence"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA"
+        ],
+        "kind": "cooccurrence"
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": false,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Co-occurrence and mutual exclusivity — A vs B",
+      "headTitle": "Co-occurrence",
+      "help": {
+        "text": "Checks whether alterations in two genes tend to show up in the same patients more often than you'd expect by chance (\"co-occurring\"), or rarely appear together (\"mutually exclusive\"). Genes that are mutually exclusive often play overlapping roles — if one is already altered, changing the other adds little, so cells rarely need both.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Co-occurrence",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": null,
+      "preview": null,
+      "sub": null,
+      "title": "Co-occurrence"
+    },
+    "correlates": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "gene": "TP53",
+        "kind": "correlates",
+        "profileType": "rna_seq_v2_mrna"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "gene": "TP53",
+        "kind": "correlates",
+        "profileType": ""
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "gene": "TP53",
+        "kind": "correlates",
+        "profileType": "rna_seq_v2_mrna"
+      },
+      "card": {
+        "defaults": {
+          "gene": "TP53",
+          "kind": "correlates",
+          "profileType": "rna_seq_v2_mrna"
+        },
+        "defaultsBareStudy": {
+          "gene": "TP53",
+          "kind": "correlates",
+          "profileType": ""
+        },
+        "label": "Co-expression with one gene (genome-wide)",
+        "maxCohorts": 1,
+        "title": "Co-expression",
+        "why": null,
+        "whyBareStudy": "this study has no continuous molecular profile (mRNA, protein, …) to correlate on"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Co-expression — A vs B",
+      "headTitle": "Co-expression",
+      "help": {
+        "text": "Takes one gene and checks every other gene for whether its activity rises and falls along with it across these patients. The genes at the top go up when it goes up; those at the bottom go down when it goes up. The chart on the left shows how all genes fall: most barely move with it, and the ones far out on either side are the ones listed. Moving together is a clue, not proof that one gene controls the other.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Co-expression with one gene (genome-wide)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study has no continuous molecular profile (mRNA, protein, …) to correlate on"
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "TP53 on rna_seq_v2_mrna · Spearman ρ, every gene",
+      "title": "Co-expression with one gene (genome-wide)"
+    },
+    "course": {
+      "added": {
+        "anchor": {
+          "eventType": "Treatment",
+          "occurrence": "FIRST"
+        },
+        "binMonths": 3,
+        "cohorts": [
+          "A"
+        ],
+        "eventTypes": [
+          "treatment",
+          "diagnosis"
+        ],
+        "fromMonths": -12,
+        "kind": "course",
+        "toMonths": 60
+      },
+      "addedBareStudy": {
+        "binMonths": 3,
+        "cohorts": [
+          "A"
+        ],
+        "eventTypes": [],
+        "fromMonths": -12,
+        "kind": "course",
+        "toMonths": 60
+      },
+      "addedWithTwoCohorts": {
+        "anchor": {
+          "eventType": "Treatment",
+          "occurrence": "FIRST"
+        },
+        "binMonths": 3,
+        "cohorts": [],
+        "eventTypes": [
+          "treatment",
+          "diagnosis"
+        ],
+        "fromMonths": -12,
+        "kind": "course",
+        "toMonths": 60
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": false,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "Add one cohort, or several to compare them.",
+      "figureTitle": "Clinical course — A vs B",
+      "headTitle": "Clinical course",
+      "help": {
+        "text": "Shows what share of patients were in each stage of their care — on treatment, in follow-up, and so on — at each point in time after diagnosis or another starting event. It's a picture of the typical patient's journey through care, not any one individual's.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": null,
+      "menu": {
+        "label": "Clinical course",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no timeline events (only 131 of 545 studies have any)"
+      },
+      "need": null,
+      "preview": null,
+      "sub": null,
+      "title": "Clinical course"
+    },
+    "cox": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "covariates": [
+          {
+            "by": "mutated",
+            "gene": "TP53",
+            "source": "alteration"
+          }
+        ],
+        "kind": "cox"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "covariates": [
+          {
+            "by": "mutated",
+            "gene": "TP53",
+            "source": "alteration"
+          }
+        ],
+        "kind": "cox"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "covariates": [
+          {
+            "by": "mutated",
+            "gene": "TP53",
+            "source": "alteration"
+          }
+        ],
+        "kind": "cox"
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "Add one cohort, or several to compare them.",
+      "figureTitle": "Cox regression — OS — A vs B",
+      "headTitle": "Cox regression",
+      "help": {
+        "text": "A more advanced version of the survival comparison above, which can weigh several factors at once — for example, a patient's age, a specific gene, and how far the disease had spread — to estimate how much each one changes risk on its own, holding the others equal. Each result is a \"hazard ratio\": above 1 means that factor is linked to worse outcomes, below 1 means it's linked to better ones.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": null,
+      "menu": {
+        "label": "Cox regression (forest plot)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": null,
+      "title": "Cox regression (forest plot)"
+    },
+    "ctdna": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF",
+          "ERBB2"
+        ],
+        "kind": "ctdna"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "ctdna"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF",
+          "ERBB2"
+        ],
+        "kind": "ctdna"
+      },
+      "card": {
+        "defaults": {
+          "genes": [
+            "TP53",
+            "KRAS",
+            "EGFR",
+            "STK11",
+            "KEAP1",
+            "PIK3CA",
+            "APC",
+            "BRAF",
+            "ERBB2"
+          ],
+          "kind": "ctdna"
+        },
+        "defaultsBareStudy": {
+          "kind": "ctdna"
+        },
+        "genes": true,
+        "label": "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)",
+        "maxCohorts": 3,
+        "title": "ctDNA vs tissue",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 3 cohorts, side by side.",
+      "figureTitle": "ctDNA vs tissue — A vs B",
+      "headTitle": "ctDNA vs tissue",
+      "help": {
+        "text": "Tumours shed DNA into the blood, and a blood test (a \"liquid biopsy\") can read it. For patients who had both a blood sample and a tumour tissue sample tested, this shows gene by gene how often a change was found in both, only in the tissue, or only in the blood — and how often the blood test caught what the tissue showed. Below, it shows how many patients had tumour DNA detected in their blood at all, and whether those patients lived shorter or longer than those without it. With the clonal-haematopoiesis filter on, changes that probably come from ageing blood cells rather than the tumour — in genes such as DNMT3A and TET2, or also found in the patient's white blood cells — are left out first, and the figure says how many were removed and what the numbers were without the filter.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 3,
+      "menu": {
+        "label": "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": "no method record or golden test of the agreement counts, Wilson intervals and survival split, or of the clonal-haematopoiesis filter (chFilter) yet",
+      "sub": "plasma SAMPLE_CLASS = cfDNA/ctDNA vs tissue Tumor, any alteration",
+      "title": "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)"
+    },
+    "cutpoint": {
+      "added": {
+        "attribute": "TMB_NONSYNONYMOUS",
+        "cohorts": [
+          "A"
+        ],
+        "kind": "cutpoint"
+      },
+      "addedBareStudy": {
+        "attribute": "TMB_NONSYNONYMOUS",
+        "cohorts": [
+          "A"
+        ],
+        "kind": "cutpoint"
+      },
+      "addedWithTwoCohorts": {
+        "attribute": "TMB_NONSYNONYMOUS",
+        "cohorts": [],
+        "kind": "cutpoint"
+      },
+      "card": {
+        "defaults": {
+          "attribute": "TMB_NONSYNONYMOUS",
+          "kind": "cutpoint"
+        },
+        "defaultsBareStudy": {
+          "attribute": "TMB_NONSYNONYMOUS",
+          "kind": "cutpoint"
+        },
+        "label": "Biomarker cut-point (best split of a number for OS)",
+        "maxCohorts": 1,
+        "title": "Cut-point",
+        "why": null,
+        "whyBareStudy": "this study has no numeric clinical attribute to find a cut-point of"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Cut-point — A vs B",
+      "headTitle": "Cut-point",
+      "help": {
+        "text": "Looks for the value of a measurement — such as tumour mutational burden — that best splits patients into a group that did better and a group that did worse. It tries every reasonable dividing line (from the lowest tenth of patients to the highest) and draws how strongly each one separates survival; the dot marks the best. Because trying many lines and keeping the best always finds something, the view also reshuffles the measurement among the patients a thousand times to see how good a 'best line' chance alone produces, and reports how surprising the real best line is once that search is accounted for. A line found this way needs checking in other patients before anyone relies on it.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Biomarker cut-point (best split of a number for OS)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study has no numeric clinical attribute to find a cut-point of"
+      },
+      "need": "patients",
+      "preview": "no method record or golden test of the maximally selected log-rank scan against R maxstat yet",
+      "sub": "TMB_NONSYNONYMOUS on OS · best log-rank cut, 1000 permutations",
+      "title": "Biomarker cut-point (best split of a number for OS)"
+    },
+    "diffexpr": {
+      "added": {
+        "cohorts": [],
+        "kind": "diffexpr",
+        "profileType": "rna_seq_v2_mrna_median_Zscores"
+      },
+      "addedBareStudy": {
+        "cohorts": [],
+        "kind": "diffexpr",
+        "profileType": ""
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "diffexpr",
+        "profileType": "rna_seq_v2_mrna_median_Zscores"
+      },
+      "card": {
+        "defaults": {
+          "kind": "diffexpr",
+          "profileType": "rna_seq_v2_mrna_median_Zscores"
+        },
+        "defaultsBareStudy": {
+          "kind": "diffexpr",
+          "profileType": ""
+        },
+        "label": "Differential expression + GSEA",
+        "maxCohorts": 2,
+        "minCohorts": 2,
+        "title": "Differential expression",
+        "why": null,
+        "whyBareStudy": "this study has no molecular profile to compare expression on"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It compares exactly 2 cohorts.",
+      "figureTitle": "Differential expression — A vs B",
+      "headTitle": "Differential expression",
+      "help": {
+        "text": "Compares how active every gene is between two groups of patients. Each dot is a gene: further left or right means a bigger difference in activity between the groups, higher up means the difference is less likely to be chance. The panel beside it asks whether whole families of related genes, such as those that drive cell division, lean towards one group.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 2,
+      "menu": {
+        "label": "Differential expression + GSEA",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study has no molecular profile to compare expression on"
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "rna_seq_v2_mrna_median_Zscores",
+      "title": "Differential expression + GSEA"
+    },
+    "drivernegative": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "drivernegative"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "drivernegative"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "drivernegative"
+      },
+      "card": {
+        "defaults": {
+          "kind": "drivernegative"
+        },
+        "defaultsBareStudy": {
+          "kind": "drivernegative"
+        },
+        "label": "Driver-negative analysis (genes enriched without a canonical driver)",
+        "maxCohorts": 1,
+        "title": "Driver-negative analysis",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Driver-negative analysis — A vs B",
+      "headTitle": "Driver-negative analysis",
+      "help": {
+        "text": "Splits one group of patients — say, lung cancers — into those whose tumour carries one of the well-known, usually treatable cancer-driving changes (EGFR, KRAS, ALK and the rest of the list) and those whose tumour carries none, and then asks which other genes are changed more often in the second group. Those genes are candidates for what drives the tumours without a known driver. Patients whose test did not cover every gene on the list are kept apart, since we cannot tell whether they have a driver. The bar shows how big each group is; in the chart, genes to the right are more common without a known driver.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Driver-negative analysis (genes enriched without a canonical driver)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": "no method record or golden test of the group split and the per-gene Fisher tests yet",
+      "sub": "mutations without vs with a driver in the NSCLC set, per patient",
+      "title": "Driver-negative analysis (genes enriched without a canonical driver)"
+    },
+    "enrichment": {
+      "added": {
+        "cohorts": [],
+        "kind": "enrichment"
+      },
+      "addedBareStudy": {
+        "cohorts": [],
+        "kind": "enrichment"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "enrichment"
+      },
+      "card": {
+        "defaults": {
+          "kind": "enrichment"
+        },
+        "defaultsBareStudy": {
+          "kind": "enrichment"
+        },
+        "label": "Alteration enrichment (all genes)",
+        "maxCohorts": 6,
+        "minCohorts": 2,
+        "title": "Alteration enrichment",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It compares 2 to 6 cohorts.",
+      "figureTitle": "Alteration enrichment — A vs B",
+      "headTitle": "Alteration enrichment",
+      "help": {
+        "text": "Checks every gene at once for whether it is changed more often in one group of patients than another — mutated, gained, deleted or rearranged, whichever you choose. The genes at the top of the list, and furthest out on the chart, differ most clearly between the groups; the share in each group is beside every gene, so a difference that is clear but small is visible as small.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Alteration enrichment (all genes)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "mutations in every gene, per sample",
+      "title": "Alteration enrichment (all genes)"
+    },
+    "exclusivity": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF"
+        ],
+        "kind": "exclusivity"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "KRAS",
+          "EGFR",
+          "BRAF",
+          "STK11",
+          "KEAP1",
+          "TP53"
+        ],
+        "kind": "exclusivity"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF"
+        ],
+        "kind": "exclusivity"
+      },
+      "card": {
+        "cohortInHeader": true,
+        "defaults": {
+          "genes": [
+            "TP53",
+            "KRAS",
+            "EGFR",
+            "STK11",
+            "KEAP1",
+            "PIK3CA",
+            "APC",
+            "BRAF"
+          ],
+          "kind": "exclusivity"
+        },
+        "defaultsBareStudy": {
+          "genes": [
+            "KRAS",
+            "EGFR",
+            "BRAF",
+            "STK11",
+            "KEAP1",
+            "TP53"
+          ],
+          "kind": "exclusivity"
+        },
+        "genes": true,
+        "label": "Mutual exclusivity (DISCOVER, burden-aware)",
+        "maxCohorts": 1,
+        "title": "Mutual exclusivity",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Mutual exclusivity (DISCOVER) — A vs B",
+      "headTitle": "Mutual exclusivity",
+      "help": {
+        "text": "Asks, for each pair of genes, whether tumours carry changes in both more or less often than chance — \"mutually exclusive\" genes are rarely changed together, which can mean either change alone is enough to drive the cancer. Its sense of \"chance\" accounts for how many changes each tumour has overall: a tumour with hundreds of changes is expected to share genes with many others, so it does not make two genes look linked just because they both turn up in heavily altered tumours. Beside it is the simpler test that ignores this, to show the difference.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Mutual exclusivity (DISCOVER, burden-aware)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": "no method record or golden test of the DISCOVER background fit against the R package yet",
+      "sub": "(element)",
+      "title": "Mutual exclusivity (DISCOVER, burden-aware)"
+    },
+    "forest": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "exposure": {
+          "gene": "TP53",
+          "source": "alteration"
+        },
+        "kind": "forest"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "exposure": {
+          "gene": "TP53",
+          "source": "alteration"
+        },
+        "kind": "forest"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "exposure": {
+          "gene": "TP53",
+          "source": "alteration"
+        },
+        "kind": "forest"
+      },
+      "card": {
+        "defaults": {
+          "exposure": {
+            "gene": "TP53",
+            "source": "alteration"
+          },
+          "kind": "forest"
+        },
+        "defaultsBareStudy": {
+          "exposure": {
+            "gene": "TP53",
+            "source": "alteration"
+          },
+          "kind": "forest"
+        },
+        "label": "Pan-cancer forest (one exposure's HR per cancer type, random-effects pooled)",
+        "maxCohorts": 6,
+        "title": "Forest plot",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 6 cohorts, side by side.",
+      "figureTitle": "Forest plot — A vs B",
+      "headTitle": "Forest plot",
+      "help": {
+        "text": "Asks whether one thing — a gene being mutated, a high tumour mutation burden — goes with shorter or longer survival, separately in each cancer type, and then combines those answers. Each row is one cancer type: its square is the hazard ratio (right of the dashed line at 1 means patients with the change died sooner; left means they lived longer) and its line how sure we can be. The diamonds at the bottom combine the rows into one overall estimate. When the rows disagree a lot (a high I²), the overall estimate is an average of different effects, so read the rows. This shows an association, not a cause.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Pan-cancer forest (one exposure's HR per cancer type, random-effects pooled)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": "no method record or golden test of the per-stratum Cox fits and the DerSimonian–Laird pooling yet",
+      "sub": "TP53 mutated · OS hazard ratio per CANCER_TYPE, random-effects pooled",
+      "title": "Pan-cancer forest (one exposure's HR per cancer type, random-effects pooled)"
+    },
+    "genome": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "genome"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "genome"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "genome"
+      },
+      "card": {
+        "defaults": {
+          "kind": "genome"
+        },
+        "defaultsBareStudy": {
+          "kind": "genome"
+        },
+        "label": "Genome-wide copy number",
+        "maxCohorts": 4,
+        "title": "Genome-wide copy number",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 4 cohorts, side by side.",
+      "figureTitle": "Genome-wide copy number — A vs B",
+      "headTitle": "Genome-wide copy number",
+      "help": {
+        "text": "Walks along every chromosome and shows, at each stretch, what share of the group's tumours have extra copies of that stretch of DNA (drawn upward, in red) or have lost copies of it (drawn downward, in blue). Stretches gained or lost in many tumours often hold genes that help the cancer grow, or genes that would have held it back.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 4,
+      "menu": {
+        "label": "Genome-wide copy number",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "from copy-number segments",
+      "title": "Genome-wide copy number"
+    },
+    "germline": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "germline"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "germline"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "germline"
+      },
+      "card": {
+        "defaults": {
+          "kind": "germline"
+        },
+        "defaultsBareStudy": {
+          "kind": "germline"
+        },
+        "label": "Germline carriers (and their somatic second hits)",
+        "maxCohorts": 4,
+        "title": "Germline carriers",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 4 cohorts, side by side.",
+      "figureTitle": "Germline carriers and second hits — A vs B",
+      "headTitle": "Germline carriers",
+      "help": {
+        "text": "Some people are born with a faulty copy of a cancer gene such as BRCA2 in every cell. For each such gene this counts those patients (carriers) among everyone whose tumour was sequenced for it, and asks whether their tumour knocked out the remaining good copy — a second hit — by a further mutation or by deleting the gene, compared with how often the same gene is hit in patients born without a faulty copy. The commonest second hit, losing the good copy outright (loss of heterozygosity), needs data this view does not read, so the second-hit share is a minimum. Optionally the curves compare survival of carriers and non-carriers for one gene.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 4,
+      "menu": {
+        "label": "Germline carriers (and their somatic second hits)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": "no method record or golden test of the carrier and second-hit counts or the Fisher tests yet",
+      "sub": "germline carriers per patient sequenced, every gene with ≥3 carriers · somatic second hit vs non-carriers",
+      "title": "Germline carriers (and their somatic second hits)"
+    },
+    "hla": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "covariates": [
+          "TMB_NONSYNONYMOUS"
+        ],
+        "kind": "hla"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "hla"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "covariates": [
+          "TMB_NONSYNONYMOUS"
+        ],
+        "kind": "hla"
+      },
+      "card": {
+        "defaults": {
+          "covariates": [
+            "TMB_NONSYNONYMOUS"
+          ],
+          "kind": "hla"
+        },
+        "defaultsBareStudy": {
+          "kind": "hla"
+        },
+        "label": "HLA class I genotype (homozygosity, HLA LOH and OS)",
+        "maxCohorts": 3,
+        "title": "HLA class I genotype",
+        "why": null,
+        "whyBareStudy": "this study records no HLA class I alleles"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 3 cohorts, side by side.",
+      "figureTitle": "HLA class I genotype and OS — A vs B",
+      "headTitle": "HLA class I genotype",
+      "help": {
+        "text": "HLA class I molecules (HLA-A, -B and -C) show pieces of a tumour's proteins to the immune system. Everyone inherits two copies of each; a person who inherited two identical copies at a gene (homozygous) shows a narrower range of pieces, and a tumour can also lose one copy (HLA loss of heterozygosity) to hide. This shows how common each is in a cohort, and whether patients homozygous at any of the three genes, or whose tumour lost a copy, lived shorter or longer. In patients treated with immunotherapy, homozygosity has been linked to worse survival; in a cohort not limited to them the comparison describes prognosis, not response to treatment.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 3,
+      "menu": {
+        "label": "HLA class I genotype (homozygosity, HLA LOH and OS)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no HLA class I alleles"
+      },
+      "need": "patients",
+      "preview": "no method record or golden test of the homozygosity and LOH counts or the survival splits yet",
+      "sub": "alleles at 2 fields · OS by homozygosity and by HLA LOH · adjusted for TMB_NONSYNONYMOUS",
+      "title": "HLA class I genotype (homozygosity, HLA LOH and OS)"
+    },
+    "hotspots": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11"
+        ],
+        "kind": "hotspots",
+        "minCount": 1
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [],
+        "kind": "hotspots",
+        "minCount": 1
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11"
+        ],
+        "kind": "hotspots",
+        "minCount": 1
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": false,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Recurrent protein changes — A vs B",
+      "headTitle": "Mutations",
+      "help": {
+        "text": "Shows exactly where along a gene's protein its mutations land, drawn as a lollipop chart — a taller stem means more patients had a mutation at that exact spot. Mutations clustering tightly at one or two spots, rather than scattering evenly, usually points to a location that matters for how the protein works.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Lollipop (hotspots)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": null,
+      "preview": null,
+      "sub": null,
+      "title": "Lollipop (hotspots)"
+    },
+    "incidence": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "event": {
+          "eventType": "Diagnosis"
+        },
+        "kind": "incidence"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "event": {
+          "eventType": ""
+        },
+        "kind": "incidence"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "event": {
+          "eventType": "Diagnosis"
+        },
+        "kind": "incidence"
+      },
+      "card": {
+        "defaults": {
+          "event": {
+            "eventType": "Diagnosis"
+          },
+          "kind": "incidence"
+        },
+        "defaultsBareStudy": {
+          "event": {
+            "eventType": ""
+          },
+          "kind": "incidence"
+        },
+        "label": "Cumulative incidence (competing risks)",
+        "maxCohorts": 6,
+        "title": "Cumulative incidence",
+        "why": null,
+        "whyBareStudy": "this study records no timeline events to estimate the incidence of"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 6 cohorts, side by side.",
+      "figureTitle": "Cumulative incidence — A vs B",
+      "headTitle": "Cumulative incidence",
+      "help": {
+        "text": "Shows what share of patients have experienced a particular event — such as the cancer spreading to the brain — by each point in time. It counts patients who died before the event as never having it, rather than pretending they might still, which is why its numbers can be noticeably lower, and more honest, than a simple survival-style curve would suggest.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Cumulative incidence (competing risks)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no timeline events to estimate the incidence of"
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "Diagnosis from day 0, death competing",
+      "title": "Cumulative incidence (competing risks)"
+    },
+    "instability": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "instability"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "instability"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "instability"
+      },
+      "card": {
+        "defaults": {
+          "kind": "instability"
+        },
+        "defaultsBareStudy": {
+          "kind": "instability"
+        },
+        "label": "Genomic instability (aneuploidy score, FGA, arm-level calls)",
+        "maxCohorts": 6,
+        "title": "Genomic instability",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 6 cohorts, side by side.",
+      "figureTitle": "Genomic instability — aneuploidy score and FGA — A vs B",
+      "headTitle": "Genomic instability",
+      "help": {
+        "text": "Cancer cells often gain or lose whole chromosome arms, and how much of a tumour's genome is out of balance is a measure of how unstable it is. For each group of tumours, this shows how many chromosome arms are typically gained or lost (the \"aneuploidy score\") and what share of the genome is altered, then which arms are gained (red) or lost (blue) most often — patterns that differ by cancer type, such as chromosome 20q gained and 18q lost in colorectal cancer.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Genomic instability (aneuploidy score, FGA, arm-level calls)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": "no method record, and no check of the arm calls and aneuploidy scores against Taylor et al.'s published values yet",
+      "sub": "from hg19 segments, ±0.2, arm called past 50% of its length",
+      "title": "Genomic instability (aneuploidy score, FGA, arm-level calls)"
+    },
+    "labs": {
+      "added": {
+        "anchor": {
+          "eventType": "Treatment"
+        },
+        "cohorts": [
+          "A"
+        ],
+        "kind": "labs",
+        "test": "PSA"
+      },
+      "addedBareStudy": {
+        "anchor": {
+          "eventType": "Treatment"
+        },
+        "cohorts": [
+          "A"
+        ],
+        "kind": "labs",
+        "test": "PSA"
+      },
+      "addedWithTwoCohorts": {
+        "anchor": {
+          "eventType": "Treatment"
+        },
+        "cohorts": [],
+        "kind": "labs",
+        "test": "PSA"
+      },
+      "card": {
+        "defaults": {
+          "anchor": {
+            "eventType": "Treatment"
+          },
+          "kind": "labs",
+          "test": "PSA"
+        },
+        "defaultsBareStudy": {
+          "anchor": {
+            "eventType": "Treatment"
+          },
+          "kind": "labs",
+          "test": "PSA"
+        },
+        "label": "Lab course and response (e.g. PSA50)",
+        "maxCohorts": 4,
+        "title": "Lab course",
+        "why": null,
+        "whyBareStudy": "this study records no lab-test timeline events"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 4 cohorts, side by side.",
+      "figureTitle": "Lab course — A vs B",
+      "headTitle": "Lab course",
+      "help": {
+        "text": "Follows a blood test — such as PSA in prostate cancer — from the moment a treatment started, as the change from each patient's own starting level. The line shows the typical patient, the shaded band the middle half of patients, and the bars on the right each patient's best result: how far their level fell, or rose, after treatment began.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 4,
+      "menu": {
+        "label": "Lab course and response (e.g. PSA50)",
+        "loading": false,
+        "why": "this study records no lab-test timeline events"
+      },
+      "menuAggregateOnly": {
+        "why": "this study records no lab-test timeline events"
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no lab-test timeline events"
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "PSA from first Treatment · responders fell ≥50%",
+      "title": "Lab course and response (e.g. PSA50)"
+    },
+    "logistic": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "covariates": [
+          {
+            "attribute": "TMB_NONSYNONYMOUS",
+            "source": "clinical"
+          }
+        ],
+        "kind": "logistic",
+        "outcome": {
+          "by": "mutated",
+          "gene": "TP53",
+          "source": "alteration"
+        },
+        "outcomeEvent": "Mutated"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "covariates": [
+          {
+            "attribute": "SEX",
+            "source": "clinical"
+          }
+        ],
+        "kind": "logistic",
+        "outcome": {
+          "by": "mutated",
+          "gene": "TP53",
+          "source": "alteration"
+        },
+        "outcomeEvent": "Mutated"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "covariates": [
+          {
+            "attribute": "TMB_NONSYNONYMOUS",
+            "source": "clinical"
+          }
+        ],
+        "kind": "logistic",
+        "outcome": {
+          "by": "mutated",
+          "gene": "TP53",
+          "source": "alteration"
+        },
+        "outcomeEvent": "Mutated"
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "Add one cohort, or several to compare them.",
+      "figureTitle": "Logistic regression — A vs B",
+      "headTitle": "Logistic regression",
+      "help": {
+        "text": "Estimates how strongly different factors are linked to a yes-or-no outcome — for example, whether a patient responded to a treatment — while accounting for several factors together. Each result is an \"odds ratio\": above 1 means that factor makes the outcome more likely, below 1 means less likely.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": null,
+      "menu": {
+        "label": "Logistic regression (odds ratios)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": null,
+      "title": "Logistic regression (odds ratios)"
+    },
+    "molsubtype": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "molsubtype"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "molsubtype"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "molsubtype"
+      },
+      "card": {
+        "defaults": {
+          "kind": "molsubtype"
+        },
+        "defaultsBareStudy": {
+          "kind": "molsubtype"
+        },
+        "label": "Molecular subtypes (endometrial POLE / MMRd / p53abn / NSMP)",
+        "maxCohorts": 6,
+        "title": "Molecular subtypes",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 6 cohorts, side by side.",
+      "figureTitle": "Molecular subtypes — A vs B",
+      "headTitle": "Molecular subtypes",
+      "help": {
+        "text": "Sorts each patient's endometrial cancer into the four molecular groups doctors now use alongside the microscope: POLE-ultramutated (a tumour with a broken DNA-copying enzyme, which does very well), mismatch-repair deficient (a tumour that cannot fix certain DNA errors, read here from its MSI test), p53-abnormal (the group that does worst), and no specific molecular profile. The groups are assigned in that order, as the WHO guideline does. Patients whose test could not tell — no MSI result, or a gene panel that missed POLE or TP53 — are counted as not classifiable rather than guessed. The bars show each group's share, overall and by the attribute you pick; the curves show survival in each group.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Molecular subtypes (endometrial POLE / MMRd / p53abn / NSMP)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": "no method record or golden test of the per-patient classification, the chi-squared tests or the survival split yet",
+      "sub": "endometrial molecular classification per patient (POLE, MMRd, p53abn, NSMP) · OS by subtype",
+      "title": "Molecular subtypes (endometrial POLE / MMRd / p53abn / NSMP)"
+    },
+    "multistate": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "multistate",
+        "progression": {
+          "eventType": "Diagnosis",
+          "key": "PROGRESSION",
+          "values": [
+            "Y",
+            "Yes"
+          ]
+        }
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "multistate",
+        "progression": {
+          "eventType": "Diagnosis",
+          "key": "PROGRESSION",
+          "values": [
+            "Y",
+            "Yes"
+          ]
+        }
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "multistate",
+        "progression": {
+          "eventType": "Diagnosis",
+          "key": "PROGRESSION",
+          "values": [
+            "Y",
+            "Yes"
+          ]
+        }
+      },
+      "card": {
+        "defaults": {
+          "kind": "multistate",
+          "progression": {
+            "eventType": "Diagnosis",
+            "key": "PROGRESSION",
+            "values": [
+              "Y",
+              "Yes"
+            ]
+          }
+        },
+        "defaultsBareStudy": {
+          "kind": "multistate",
+          "progression": {
+            "eventType": "Diagnosis",
+            "key": "PROGRESSION",
+            "values": [
+              "Y",
+              "Yes"
+            ]
+          }
+        },
+        "label": "Multistate model (progression, then death)",
+        "maxCohorts": 4,
+        "title": "Multistate model",
+        "why": null,
+        "whyBareStudy": "this study records no diagnosis or progression timeline events"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 4 cohorts, side by side.",
+      "figureTitle": "Multistate model — progression and death — A vs B",
+      "headTitle": "Multistate model",
+      "help": {
+        "text": "Follows each patient through three states — alive without progression, alive after their cancer was first recorded as growing, and dead — from the start of their record (in MSK-CHORD, their first tumour sequencing). The coloured bands show, month by month, what share of each group is in each state; the lines below show how fast patients move along each of the three paths (progressing, dying without progressing, dying after progressing), and the table gives each path's rate and how much faster or slower each group moves along it than the first. Splitting death into 'after progression' and 'without it' shows where a group's worse survival comes from. Progression is read from radiology reports by a model, so it is only seen in patients who were scanned; the groups were not randomised, so a difference is a clue, not proof.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 4,
+      "menu": {
+        "label": "Multistate model (progression, then death)",
+        "loading": false,
+        "why": "this study records no diagnosis or progression timeline events"
+      },
+      "menuAggregateOnly": {
+        "why": "this study records no diagnosis or progression timeline events"
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no diagnosis or progression timeline events"
+      },
+      "need": "local",
+      "preview": "no method record or golden test of the Aalen–Johansen occupation, Nelson–Aalen hazards or the delayed-entry Cox fits yet (no interval on the occupation)",
+      "sub": "start → progression → death, months from day 0 · progression = Diagnosis PROGRESSION",
+      "title": "Multistate model (progression, then death)"
+    },
+    "mutations": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "gene": "TP53",
+        "kind": "mutations"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "gene": "TP53",
+        "kind": "mutations"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "gene": "TP53",
+        "kind": "mutations"
+      },
+      "card": {
+        "defaults": {
+          "gene": "TP53",
+          "kind": "mutations"
+        },
+        "defaultsBareStudy": {
+          "gene": "TP53",
+          "kind": "mutations"
+        },
+        "label": "Mutation table (one gene)",
+        "maxCohorts": 6,
+        "title": "Mutations",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": true,
+      "emptyHint": "It draws up to 6 cohorts, side by side.",
+      "figureTitle": "mutations — A vs B",
+      "headTitle": "Mutations",
+      "help": {
+        "text": "Lists every mutation found in one gene in your groups, one row per mutation: which sample it was in, the exact protein change, whether OncoKB considers it cancer-causing, what kind of change it is, and how much of the tumour carries it. Click a column to sort by it; the download saves every row. It sits under the lollipop chart, which shows the same mutations as positions along the protein.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Mutation table (one gene)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": "TP53 · every mutation call",
+      "title": "Mutation table (one gene)"
+    },
+    "oncoprint": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1"
+        ],
+        "kind": "oncoprint"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [],
+        "kind": "oncoprint"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1"
+        ],
+        "kind": "oncoprint"
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": false,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 4 cohorts, side by side.",
+      "figureTitle": "Oncoprint — A vs B",
+      "headTitle": "Oncoprint",
+      "help": {
+        "text": "A grid with one column per patient and one row per gene, color-coded to show what kind of genetic change (if any) each patient has in each gene. It's a fast way to see patterns across many patients and genes at once — for example, whether certain alterations tend to show up in the same patients, or never together.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 4,
+      "menu": {
+        "label": "Oncoprint",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": null,
+      "title": "Oncoprint"
+    },
+    "organotropism": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "organotropism"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "organotropism"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "organotropism"
+      },
+      "card": {
+        "cohortInHeader": true,
+        "defaults": {
+          "kind": "organotropism"
+        },
+        "defaultsBareStudy": {
+          "kind": "organotropism"
+        },
+        "label": "Metastatic organotropism (genes × metastatic sites, within cancer types)",
+        "maxCohorts": 1,
+        "title": "Metastatic organotropism",
+        "why": null,
+        "whyBareStudy": "this study records no metastatic sites (per-organ DMETS_DX_ flags, METASTATIC_SITE, or tumour sites on a Diagnosis timeline)"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Organotropism — A vs B",
+      "headTitle": "Metastatic organotropism",
+      "help": {
+        "text": "Asks, for each organ a cancer spread to — brain, liver, bone and the rest — whether patients whose tumour carries a change in a given gene spread there more or less often than patients whose tumour does not, comparing patients within the same cancer type. Red squares mean the gene's change goes with spread to that organ, blue that it goes with spreading there less; outlined squares are the ones unlikely to be chance after testing many pairs. Where the study dates each site, the curve below shows how quickly patients with and without one gene's change develop spread to one organ, counting deaths as a separate outcome. Sites are only known where scans or biopsies found them.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Metastatic organotropism (genes × metastatic sites, within cancer types)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no metastatic sites (per-organ DMETS_DX_ flags, METASTATIC_SITE, or tumour sites on a Diagnosis timeline)"
+      },
+      "need": "local",
+      "preview": "no method record or golden test of the per-cell Cochran–Mantel–Haenszel tests or the site incidence yet",
+      "sub": "driver mutations in the 12 most altered genes × metastatic sites from the study's site source, within CANCER_TYPE",
+      "title": "Metastatic organotropism (genes × metastatic sites, within cancer types)"
+    },
+    "overlap": {
+      "added": {
+        "cohorts": [],
+        "kind": "overlap"
+      },
+      "addedBareStudy": {
+        "cohorts": [],
+        "kind": "overlap"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "overlap"
+      },
+      "card": {
+        "defaults": {
+          "kind": "overlap"
+        },
+        "defaultsBareStudy": {
+          "kind": "overlap"
+        },
+        "label": "Cohort overlap (UpSet)",
+        "maxCohorts": 6,
+        "minCohorts": 2,
+        "title": "Cohort overlap",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It compares 2 to 6 cohorts.",
+      "figureTitle": "Cohort overlap — A vs B",
+      "headTitle": "Cohort overlap",
+      "help": {
+        "text": "Shows how the groups of patients you defined overlap: for every combination of groups, how many patients belong to exactly those groups and none of the others. Each column is one combination — the dots below it say which groups — and its bar is how many patients fall there, so you can see at a glance whether two groups are mostly the same people or nearly separate.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Cohort overlap (UpSet)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "patients in exactly each combination of cohorts",
+      "title": "Cohort overlap (UpSet)"
+    },
+    "paired": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF"
+        ],
+        "kind": "paired"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "PIK3CA",
+          "ESR1",
+          "AR",
+          "CDKN2A",
+          "MYC",
+          "TERT"
+        ],
+        "kind": "paired"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF"
+        ],
+        "kind": "paired"
+      },
+      "card": {
+        "defaults": {
+          "genes": [
+            "TP53",
+            "KRAS",
+            "EGFR",
+            "STK11",
+            "KEAP1",
+            "PIK3CA",
+            "APC",
+            "BRAF"
+          ],
+          "kind": "paired"
+        },
+        "defaultsBareStudy": {
+          "genes": [
+            "TP53",
+            "KRAS",
+            "PIK3CA",
+            "ESR1",
+            "AR",
+            "CDKN2A",
+            "MYC",
+            "TERT"
+          ],
+          "kind": "paired"
+        },
+        "genes": true,
+        "label": "Paired samples (primary vs metastasis, before vs after)",
+        "maxCohorts": 3,
+        "title": "Paired samples",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 3 cohorts, side by side.",
+      "figureTitle": "Paired samples — A vs B",
+      "headTitle": "Paired samples",
+      "help": {
+        "text": "For patients who had two kinds of tumour sample tested — usually the original tumour and a later spread of it elsewhere in the body — shows, gene by gene, how often a change was found in both samples, only in the original, or only in the spread. Changes found only in the spread can point to how the cancer adapted, for example to a treatment. The two kinds can also be samples taken before and after a treatment. Without a list of genes, it checks every gene and shows the ones most often found on one side only.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 3,
+      "menu": {
+        "label": "Paired samples (primary vs metastasis, before vs after)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "SAMPLE_TYPE: Primary vs Metastasis, drivers",
+      "title": "Paired samples (primary vs metastasis, before vs after)"
+    },
+    "pathways": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "pathways"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "pathways"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "pathways"
+      },
+      "card": {
+        "defaults": {
+          "kind": "pathways"
+        },
+        "defaultsBareStudy": {
+          "kind": "pathways"
+        },
+        "label": "Oncogenic pathways",
+        "maxCohorts": 4,
+        "title": "Oncogenic signalling pathways",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 4 cohorts, side by side.",
+      "figureTitle": "Oncogenic signalling pathways — A vs B",
+      "headTitle": "Oncogenic signalling pathways",
+      "help": {
+        "text": "Groups genes into ten well-known signalling pathways — chains of genes that together tell a cell when to grow, divide or die — and shows what share of each group of patients has a harmful change in at least one gene of each pathway. Two cancers can reach the same broken pathway through different genes, and this view makes that visible.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 4,
+      "menu": {
+        "label": "Oncogenic pathways",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "OncoKB drivers, Sanchez-Vega et al. 2018",
+      "title": "Oncogenic pathways"
+    },
+    "plot": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "plot",
+        "unit": "sample",
+        "x": {
+          "attribute": "TMB_NONSYNONYMOUS",
+          "source": "clinical"
+        },
+        "y": {
+          "attribute": "AGE",
+          "source": "clinical"
+        }
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "plot",
+        "unit": "sample",
+        "x": {
+          "by": "mutationType",
+          "gene": "TP53",
+          "source": "alteration"
+        },
+        "y": {
+          "by": "mutated",
+          "gene": "KRAS",
+          "source": "alteration"
+        }
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "plot",
+        "unit": "sample",
+        "x": {
+          "attribute": "TMB_NONSYNONYMOUS",
+          "source": "clinical"
+        },
+        "y": {
+          "attribute": "AGE",
+          "source": "clinical"
+        }
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "plot — A vs B",
+      "headTitle": "Plot",
+      "help": {
+        "text": "Plots two measurements against each other for the same patients or samples — for example, a gene's activity level against a patient's age — so you can see whether they tend to rise and fall together, split into distinct clusters, or show no relationship at all.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Plot",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study declares no clinical attributes to plot"
+      },
+      "need": "local",
+      "preview": null,
+      "sub": null,
+      "title": "Plot"
+    },
+    "predictive": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "exposure": {
+          "eventType": "Treatment",
+          "key": "SUBTYPE",
+          "value": "Immuno"
+        },
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF"
+        ],
+        "kind": "predictive"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "exposure": {
+          "eventType": "Treatment",
+          "key": "SUBTYPE",
+          "value": "Immuno"
+        },
+        "genes": [
+          "STK11",
+          "KEAP1",
+          "KRAS",
+          "TP53",
+          "EGFR"
+        ],
+        "kind": "predictive"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "exposure": {
+          "eventType": "Treatment",
+          "key": "SUBTYPE",
+          "value": "Immuno"
+        },
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF"
+        ],
+        "kind": "predictive"
+      },
+      "card": {
+        "defaults": {
+          "exposure": {
+            "eventType": "Treatment",
+            "key": "SUBTYPE",
+            "value": "Immuno"
+          },
+          "genes": [
+            "TP53",
+            "KRAS",
+            "EGFR",
+            "STK11",
+            "KEAP1",
+            "PIK3CA",
+            "APC",
+            "BRAF"
+          ],
+          "kind": "predictive"
+        },
+        "defaultsBareStudy": {
+          "exposure": {
+            "eventType": "Treatment",
+            "key": "SUBTYPE",
+            "value": "Immuno"
+          },
+          "genes": [
+            "STK11",
+            "KEAP1",
+            "KRAS",
+            "TP53",
+            "EGFR"
+          ],
+          "kind": "predictive"
+        },
+        "genes": true,
+        "label": "Predictive biomarkers (gene × treatment interaction)",
+        "maxCohorts": 2,
+        "title": "Predictive biomarkers",
+        "why": null,
+        "whyBareStudy": "this study records no treatment timeline events to define an exposure"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 2 cohorts, side by side.",
+      "figureTitle": "Predictive biomarkers — A vs B",
+      "headTitle": "Predictive biomarkers",
+      "help": {
+        "text": "Asks, gene by gene, whether a mutation changes how patients do on a particular treatment — not just whether it marks a better or worse outlook in general. For each gene it compares patients with and without the mutation twice: among those who received the treatment (upper marker) and among those who did not (lower marker). A gene whose markers sit far apart — say, much worse with the mutation only among the treated — may predict who benefits from that treatment; the right-hand column tests that difference. Treatment here was not assigned at random, and patients had to live long enough to receive it, so a finding is a lead to test properly, not proof.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 2,
+      "menu": {
+        "label": "Predictive biomarkers (gene × treatment interaction)",
+        "loading": false,
+        "why": "this study records no treatment timeline events to define an exposure"
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no treatment timeline events to define an exposure"
+      },
+      "need": "patients",
+      "preview": "no method record or golden test of the per-gene interaction fits yet",
+      "sub": "gene × Treatment [SUBTYPE=Immuno] on OS · Cox per gene",
+      "title": "Predictive biomarkers (gene × treatment interaction)"
+    },
+    "riskmodel": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "riskmodel"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "riskmodel"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "riskmodel"
+      },
+      "card": {
+        "defaults": {
+          "kind": "riskmodel"
+        },
+        "defaultsBareStudy": {
+          "kind": "riskmodel"
+        },
+        "label": "Risk model (elastic-net Cox, OncoCast-style)",
+        "maxCohorts": 1,
+        "title": "Risk model",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Risk model — A vs B",
+      "headTitle": "Risk model",
+      "help": {
+        "text": "A model that predicts survival from which genes are mutated in each patient, in the style of the OncoCast package. It is trained many times, each time on two thirds of the patients and tested on the other third, so every patient's risk score comes from a model that never saw them. Patients are then split into low, intermediate and high risk, and their survival curves are drawn. The list shows the genes the model relied on most, with a hazard ratio above 1 meaning higher risk. Tick \"validate\" to train on one half of the patients and grade the model on the other half, which it never saw, or name another group of patients under \"validate on\" to grade it there — for example patients from a different study — with the same risk-group boundaries.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Risk model (elastic-net Cox, OncoCast-style)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": "OS on mutated genes · 10 held-out splits",
+      "title": "Risk model (elastic-net Cox, OncoCast-style)"
+    },
+    "rmst": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "rmst"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "rmst"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "rmst"
+      },
+      "card": {
+        "defaults": {
+          "kind": "rmst"
+        },
+        "defaultsBareStudy": {
+          "kind": "rmst"
+        },
+        "label": "Restricted mean OS time (RMST, landmarks)",
+        "maxCohorts": 6,
+        "title": "Restricted mean OS time",
+        "why": null,
+        "whyBareStudy": "this study has no <X>_MONTHS outcome column"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 6 cohorts, side by side.",
+      "figureTitle": "Restricted mean survival time — A vs B",
+      "headTitle": "Restricted mean OS time",
+      "help": {
+        "text": "Answers “how many months, on average, did patients in each group live within the first τ months?” — the shaded area under each survival curve up to τ. The difference between two groups is the months gained or lost in that window, which reads plainly even when the curves cross or only separate late (as with immunotherapy), where a single hazard ratio can mislead. τ is where every group still has at least ten patients followed, unless it is set. Landmark panels ask the same question again among the patients still alive and followed at 6 or 12 months, restarting the clock there. The groups were not randomised, so a difference is a clue, not proof.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Restricted mean OS time (RMST, landmarks)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study has no <X>_MONTHS outcome column"
+      },
+      "need": "local",
+      "preview": "no method record or golden test of the restricted means, their variances and the landmark sets against R survRM2 yet",
+      "sub": "area under the KM curve to τ where every cohort has 10 at risk · OS",
+      "title": "Restricted mean OS time (RMST, landmarks)"
+    },
+    "sequence": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "eventType": "treatment",
+        "kind": "sequence",
+        "labelKey": "SUBTYPE",
+        "lineGap": 90,
+        "maxSteps": 3,
+        "topN": 8
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "sequence",
+        "labelKey": "SUBTYPE",
+        "lineGap": 90,
+        "maxSteps": 3,
+        "topN": 8
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "eventType": "treatment",
+        "kind": "sequence",
+        "labelKey": "SUBTYPE",
+        "lineGap": 90,
+        "maxSteps": 3,
+        "topN": 8
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": false,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Treatment sequence — A vs B",
+      "headTitle": "Treatment sequence",
+      "help": {
+        "text": "Shows the order in which patients moved from one treatment to the next, drawn as flows between them. It answers a simple but useful question: after this treatment, what did doctors try next, and how often?",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Treatment sequence",
+        "loading": false,
+        "why": "this study records no treatment events, so there are no lines of therapy to sequence"
+      },
+      "menuAggregateOnly": {
+        "why": "this study records no treatment events, so there are no lines of therapy to sequence"
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no treatment events, so there are no lines of therapy to sequence"
+      },
+      "need": null,
+      "preview": null,
+      "sub": null,
+      "title": "Treatment sequence"
+    },
+    "survival": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "survival"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "survival"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "survival"
+      },
+      "card": null,
+      "drawsOwnHead": {
+        "error": false,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "Add one cohort, or several to compare them.",
+      "figureTitle": "OS survival — A vs B",
+      "headTitle": "Survival",
+      "help": {
+        "text": "Shows what share of patients in each group were still alive (or still free of disease progression) at each point in time, drawn as a curve that steps downward every time a patient's outcome is recorded. Comparing the curves for two or more groups answers: did one group tend to do better than the other, and if so, is the difference too large to be chance?",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": null,
+      "menu": {
+        "label": "Survival",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": null,
+      "preview": null,
+      "sub": null,
+      "title": "Survival"
+    },
+    "table": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "table"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "table"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "table"
+      },
+      "card": {
+        "defaults": {
+          "kind": "table"
+        },
+        "defaultsBareStudy": {
+          "kind": "table"
+        },
+        "label": "Clinical data table (download)",
+        "maxCohorts": 6,
+        "title": "Clinical data",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": true,
+      "emptyHint": "It draws up to 6 cohorts, side by side.",
+      "figureTitle": "table — A vs B",
+      "headTitle": "Clinical data",
+      "help": {
+        "text": "Lists every sample (or every patient) in your groups with everything the study recorded about them — cancer type, age, stage, survival and the rest — one row each. Click a column's name to sort by it; the download button saves every row as a file a spreadsheet can open. Studies that only share counts, never individual patients, are named rather than listed.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Clinical data table (download)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": "one row per sample",
+      "title": "Clinical data table (download)"
+    },
+    "timeline": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "timeline"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "timeline"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "timeline"
+      },
+      "card": {
+        "cohortInHeader": true,
+        "defaults": {
+          "kind": "timeline"
+        },
+        "defaultsBareStudy": {
+          "kind": "timeline"
+        },
+        "label": "Patient timeline (one patient at a time)",
+        "maxCohorts": 1,
+        "title": "Patient timeline",
+        "why": null,
+        "whyBareStudy": "this study records no timeline events"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": true,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Patient timeline — A vs B",
+      "headTitle": "Patient timeline",
+      "help": {
+        "text": "Shows one patient's medical history on a single line of time, as cBioPortal's patient page does: when samples were taken, operations, each treatment and how long it lasted, diagnoses, and lab results drawn as small charts. Time is counted from the day of diagnosis, and long stretches with nothing recorded are cut short (the dashed line). Step to the previous or next patient with the arrows at the top (or the ← and → keys), pick another cohort in the header, or open the patient list to search, sort and pick one. Studies that only share counts, never individual patients, are named rather than listed.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Patient timeline (one patient at a time)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no timeline events"
+      },
+      "need": "timeline",
+      "preview": null,
+      "sub": "(element)",
+      "title": "Patient timeline (one patient at a time)"
+    },
+    "txendpoints": {
+      "added": {
+        "anchor": {
+          "eventType": "Treatment",
+          "key": "SUBTYPE",
+          "value": "Immuno"
+        },
+        "cohorts": [
+          "A"
+        ],
+        "endpoint": "ttnt",
+        "kind": "txendpoints"
+      },
+      "addedBareStudy": {
+        "anchor": {
+          "eventType": "Treatment",
+          "key": "SUBTYPE",
+          "value": "Immuno"
+        },
+        "cohorts": [
+          "A"
+        ],
+        "endpoint": "ttnt",
+        "kind": "txendpoints"
+      },
+      "addedWithTwoCohorts": {
+        "anchor": {
+          "eventType": "Treatment",
+          "key": "SUBTYPE",
+          "value": "Immuno"
+        },
+        "cohorts": [],
+        "endpoint": "ttnt",
+        "kind": "txendpoints"
+      },
+      "card": {
+        "defaults": {
+          "anchor": {
+            "eventType": "Treatment",
+            "key": "SUBTYPE",
+            "value": "Immuno"
+          },
+          "endpoint": "ttnt",
+          "kind": "txendpoints"
+        },
+        "defaultsBareStudy": {
+          "anchor": {
+            "eventType": "Treatment",
+            "key": "SUBTYPE",
+            "value": "Immuno"
+          },
+          "endpoint": "ttnt",
+          "kind": "txendpoints"
+        },
+        "label": "Treatment endpoints (TTNT, time on treatment, real-world PFS)",
+        "maxCohorts": 6,
+        "title": "Treatment endpoints",
+        "why": null,
+        "whyBareStudy": "this study records no treatment timeline events"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 6 cohorts, side by side.",
+      "figureTitle": "Treatment endpoints — A vs B",
+      "headTitle": "Treatment endpoints",
+      "help": {
+        "text": "Starts each patient's clock on the day a treatment began — for example their first immunotherapy — and follows them to an outcome that real-world studies use in place of a trial's: when they moved on to their next treatment (time to next treatment), when they stopped this one (time on treatment), or when their cancer was recorded as growing (real-world progression-free survival). Death counts as the outcome too, and patients still followed without it are counted up to their last visit. Each group's curve shows the share not yet there at each month, with the number still followed below. The groups were not randomised to the treatment, so a gap between curves is a clue, not proof that a gene or a group changes how well the treatment works.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Treatment endpoints (TTNT, time on treatment, real-world PFS)",
+        "loading": false,
+        "why": "this study records no treatment timeline events"
+      },
+      "menuAggregateOnly": {
+        "why": "this study records no treatment timeline events"
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study records no treatment timeline events"
+      },
+      "need": "local",
+      "preview": "no method record or golden test of the endpoint derivation (lines, stops, progression) or the median intervals yet",
+      "sub": "time to next treatment from first Treatment [SUBTYPE=Immuno], death an event",
+      "title": "Treatment endpoints (TTNT, time on treatment, real-world PFS)"
+    }
+  },
+  "menuOrder": [
+    "compare",
+    "survival",
+    "cox",
+    "logistic",
+    "oncoprint",
+    "hotspots",
+    "plot",
+    "cooccurrence",
+    "clinical",
+    "coexpression",
+    "course",
+    "sequence",
+    "attrition",
+    "genome",
+    "pathways",
+    "enrichment",
+    "assays",
+    "composition",
+    "table",
+    "mutations",
+    "timeline",
+    "alterations",
+    "correlates",
+    "overlap",
+    "cancertypes",
+    "labs",
+    "incidence",
+    "hla",
+    "cutpoint",
+    "predictive",
+    "rmst",
+    "multistate",
+    "txendpoints",
+    "clonality",
+    "paired",
+    "acquired",
+    "instability",
+    "exclusivity",
+    "ctdna",
+    "riskmodel",
+    "drivernegative",
+    "organotropism",
+    "germline",
+    "molsubtype",
+    "actionability",
+    "adjusted",
+    "forest",
+    "diffexpr"
+  ]
+}

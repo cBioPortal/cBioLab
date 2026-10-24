@@ -145,7 +145,7 @@
         ],
         "implementation": {
           "functions": [],
-          "file": "lib/views/attrition.ts",
+          "file": "lib/views/attrition/run.ts",
           "commit": null
         }
       }

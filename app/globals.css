@@ -610,7 +610,7 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .row.g5 { gap: 0.5rem; }
 .facettitle { font-size: var(--t-md); font-weight: 600; }
 
-/* ---------------- view-card tables (app/lab/view-cards.tsx) ---------------- */
+/* ---------------- view-card tables (app/lab/kinds/<kind>.tsx) ---------------- */
 .vscroll { overflow-x: auto; }
 .vtable { border-collapse: collapse; font-size: var(--t-md); width: 100%; }
 .vtable th, .vtable td { padding: 0.3rem 0.6rem; }
@@ -1559,7 +1559,7 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .xc-cell { fill: var(--accent); }
 .xc-brush { fill: color-mix(in srgb, var(--accent) 15%, transparent); stroke: var(--accent); stroke-dasharray: 3 2; }
 
-/* the portal-style card bodies (app/lab/portal-bodies.tsx) */
+/* the portal-style card bodies (app/lab/kinds/<kind>.tsx, on app/lab/portal-bodies.tsx) */
 .pb-scroll { overflow-x: auto; }
 .pb-row { display: flex; gap: var(--s4); align-items: flex-start; flex-wrap: wrap; }
 .pb-row > * { min-width: 0; }

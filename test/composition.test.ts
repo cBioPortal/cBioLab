@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { partNames, validateSource, compositionCasesSql, partsSql, COMPOSITION_MAX_PARTS } from "../lib/composition.ts";
-import { compositionSvg } from "../lib/figures/composition.ts";
+import { compositionSvg } from "../lib/views/composition/figure.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 import type { DrawnResultOf } from "../lib/types.ts";
 

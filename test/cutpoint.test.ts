@@ -2,7 +2,7 @@
 // with the ordinary log-rank test at the cut it picks.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scanCutpoints, CUT_MAX_CANDIDATES, type CutRec } from "../lib/views/cutpoint.ts";
+import { scanCutpoints, CUT_MAX_CANDIDATES, type CutRec } from "../lib/views/cutpoint/run.ts";
 import { seededRandom } from "../lib/stats.ts";
 
 const cohort = (n: number, hazard: (v: number) => number, seed: number): CutRec[] => {

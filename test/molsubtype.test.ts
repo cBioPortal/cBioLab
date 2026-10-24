@@ -1,7 +1,7 @@
 // The molecular-subtype view's group pooling, on fixed inputs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { molTopGroups, POLE_HOTSPOTS } from "../lib/views/molsubtype.ts";
+import { molTopGroups, POLE_HOTSPOTS } from "../lib/views/molsubtype/run.ts";
 
 const g = (counts: number[], nc = 0): { counts: number[]; classified: number; notClassifiable: number; why: Record<string, number> } => ({ counts, classified: counts.reduce((a, b) => a + b, 0), notClassifiable: nc, why: nc ? { "no MSI call": nc } : {} });
 

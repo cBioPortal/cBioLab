@@ -3,8 +3,9 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
-import { cancertypesPanelSvg } from "../lib/figures/cancertypes.ts";
-import type { ViewResult, CancertypesGroup } from "../lib/types.ts";
+import { cancertypesPanelSvg } from "../lib/views/cancertypes/figure.ts";
+import type { ViewResult } from "../lib/types.ts";
+import type { CancertypesGroup } from "../lib/views/cancertypes/types.ts";
 
 const grp = (key: string, label: string, profiled: number, mutation: number, amp = 0, samples = profiled): CancertypesGroup =>
   ({ key, label, samples, profiled, altered: mutation + amp, mutation, amp, homdel: 0, sv: 0, multiple: 0 });

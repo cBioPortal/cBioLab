@@ -1158,7 +1158,7 @@
             "quantilesFromHistogram",
             "benjaminiHochberg"
           ],
-          "file": "lib/coxnet.ts, lib/views/riskmodel-table1.ts, lib/stats.ts",
+          "file": "lib/coxnet.ts, lib/views/riskmodel/table1.ts, lib/stats.ts",
           "commit": null
         },
         "verification": "lib/coxnet.ts's path is checked against scikit-survival's CoxnetSurvivalAnalysis, its delayed-entry, stratified fits (with standard errors) against statsmodels' PHReg and its C-index against lifelines, by test/coxnet-golden.test.ts (fixtures from python/golden/coxnet.py). The script below recomputes Table 1's tests and q-values from its counts (the model itself it does not refit); χ² matches scipy 1.18.1 chi2_contingency, Kruskal–Wallis and quantiles scipy/numpy, Benjamini–Hochberg statsmodels multipletests (test/tables-golden.test.ts, test/moments-golden.test.ts).",

@@ -39,8 +39,9 @@ import { runAnalysis } from "./analysis.ts";
 import { buildContract } from "./oncoprint.ts";
 import { hasCustomData } from "./custom-data.ts";
 import { hasIdSets } from "./id-sets.ts";
-import { riskFitDirect, type RiskFit, type RiskFitArgs } from "./views/riskmodel.ts";
-import type { AnalysisDoc, AnalysisResult, Contract, OncoprintSpec } from "./types.ts";
+import { riskFitDirect, type RiskFit, type RiskFitArgs } from "./views/riskmodel/run.ts";
+import type { AnalysisDoc, AnalysisResult, Contract } from "./types.ts";
+import type { OncoprintSpec } from "./views/oncoprint/types.ts";
 
 type Json = unknown;
 

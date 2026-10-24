@@ -9,7 +9,8 @@
 import { heatmapTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { STYLE, encodeNumeric } from "./oncoprint-style.ts";
-import type { Contract, Track, GroupRange, ZReference, ResolvedDisplay, DisplaySpec, SortKeySpec } from "./types.ts";
+import type { Contract, Track, GroupRange, ResolvedDisplay, DisplaySpec } from "./types.ts";
+import type { ZReference, SortKeySpec } from "./views/oncoprint/types.ts";
 
 // gene-track cell bitmask: one definition, the style's
 export const BITS = STYLE.bits;
@@ -88,7 +89,6 @@ export function normalizeDisplay(d: DisplaySpec | undefined): ResolvedDisplay {
     ...(colors !== undefined ? { colors } : {})
   };
 }
-
 
 export interface AssembleInput {
   /**

@@ -1,7 +1,7 @@
 // The organotropism view's per-cell test, on fixed inputs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { orgCell, flagLabel } from "../lib/views/organotropism.ts";
+import { orgCell, flagLabel } from "../lib/views/organotropism/run.ts";
 import { cochranMantelHaenszel } from "../lib/stats.ts";
 
 test("a cell's strata become 2×2 tables, pooled for display and tested by CMH", () => {

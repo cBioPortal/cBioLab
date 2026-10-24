@@ -3,7 +3,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { rmst } from "../lib/stats.ts";
-import { fromLandmark, rmstContrast } from "../lib/views/rmst.ts";
+import { fromLandmark, rmstContrast } from "../lib/views/rmst/run.ts";
 import { kaplanMeier } from "../lib/stats.ts";
 import { viewToSvg } from "../lib/view-svg.ts";
 import { lintSvg } from "../lib/chart/lint.ts";

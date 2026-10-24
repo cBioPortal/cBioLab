@@ -28,7 +28,7 @@ import { useSavedArtifacts } from "./use-saved.ts";
 import { SavedTab } from "./saved-tab.tsx";
 import { ExamplesTab } from "./examples-tab.tsx";
 import { DrawAtWidth } from "./figure.tsx";
-import { survivalSvg } from "../../lib/figures/survival.ts";
+import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
 import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
 import { CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx";

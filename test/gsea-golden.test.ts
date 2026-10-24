@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { preRankedGsea } from "../lib/stats.ts";
-import { GSEA_NULL_PY } from "../lib/method.ts";
+import { GSEA_NULL_PY } from "../lib/views/diffexpr/method.ts";
 
 const golden = JSON.parse(readFileSync("test/fixtures/golden/gsea.json", "utf8"));
 const res = preRankedGsea(golden.ranked, golden.sets, { permutations: golden.permutations });

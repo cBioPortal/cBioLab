@@ -1,7 +1,7 @@
 // The predictive view's per-gene fit: the two contrasts and the interaction are one model's.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fitPredictiveGene } from "../lib/views/predictive.ts";
+import { fitPredictiveGene } from "../lib/views/predictive/run.ts";
 import { seededRandom } from "../lib/stats.ts";
 import { viewToSvg } from "../lib/view-svg.ts";
 import { lintSvg } from "../lib/chart/lint.ts";

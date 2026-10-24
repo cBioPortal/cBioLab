@@ -22,8 +22,8 @@ interactive. Its rules are in `src/shared/components/plots/PlotsTabUtils.tsx`
   only patient-aware option is "connect samples from the same patient" on a box plot.
 - Everything is Victory SVG, one DOM node per point, with no cap and no downsampling.
 
-Our plot view (`lib/plot.ts`, `lib/views/plot.ts`, `lib/federation.ts`, the figure in
-`lib/figures/plot.ts`, the controls in `app/lab/plot-controls.tsx`) is aggregate-first: a scatter is
+Our plot view (`lib/plot.ts`, `lib/views/plot/run.ts`, `lib/federation.ts`, the figure in
+`lib/views/plot/figure.ts`, the controls in `app/lab/plot-controls.tsx`) is aggregate-first: a scatter is
 a density grid, a box is quartiles plus a violin, a table is counts.
 
 ## The model: every point when it is a drawing, the cases that matter when it is not

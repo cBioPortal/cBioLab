@@ -1,7 +1,7 @@
 // The adjusted view's per-gene fits, on fixed inputs.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { adjustedFit, covariateKinds, type AdjustedPatient } from "../lib/views/adjusted.ts";
+import { adjustedFit, covariateKinds, type AdjustedPatient } from "../lib/views/adjusted/run.ts";
 
 // cohort 1 is mostly MSI-high, and MSI-high tumours carry gene X: raw, X is enriched in cohort 1;
 // adjusted for MSI, it is not

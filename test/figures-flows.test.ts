@@ -4,11 +4,11 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg } from "../lib/view-svg.ts";
-import { placeLabels } from "../lib/figures/sequence.ts";
-import { attritionColumns, clauseLines } from "../lib/figures/attrition.ts";
-import { upsetColumns, UPSET_MIN_COL } from "../lib/figures/overlap.ts";
+import { placeLabels } from "../lib/views/sequence/figure.ts";
+import { attritionColumns, clauseLines } from "../lib/views/attrition/figure.ts";
+import { upsetColumns, UPSET_MIN_COL } from "../lib/views/overlap/figure.ts";
 import { packLines } from "../lib/chart/text.ts";
-import { tileLines } from "../lib/figures/pathways.ts";
+import { tileLines } from "../lib/views/pathways/figure.ts";
 import { textWidth, FS } from "../lib/svg-kit.ts";
 import type { ViewResult } from "../lib/types.ts";
 

@@ -4,7 +4,7 @@ import { viewToSvg } from "../lib/view-svg.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 import { wilsonInterval } from "../lib/stats.ts";
 import type { DrawnResultOf } from "../lib/types.ts";
-import { CH_GENES } from "../lib/views/ctdna.ts";
+import { CH_GENES } from "../lib/views/ctdna/run.ts";
 
 describe("wilsonInterval", () => {
   test("matches statsmodels' proportion_confint(method='wilson')", () => {

@@ -33,23 +33,33 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   observability guard, priorGuard, derived treatment lines).
 - **`lib/analysis.ts`** — `runAnalysis(doc)`: evaluates cohorts (per-study; cross-study
   federation via study-qualified member ids), then hands each view to its kind's runner.
-  **`lib/views/<kind>.ts`** holds one runner per view kind (compare, survival, cox, …), registered
-  in `lib/views/index.ts`; each gets the run's context (`ViewRun` in `lib/views/run.ts`: the
-  document, evaluated cohorts, resolvers, the view's cohorts and studies) and returns its result;
-  `lib/views/shared.ts` holds what several runners use (`overLimit`, `answering`, `refuse`). A new
-  view kind is a new runner there, registered in `index.ts` (`RUNNERS` is keyed by `ViewKind`, the
-  `View` union's kinds, so a kind without a runner does not compile). A result is a `ViewResult`, a
-  union over kinds: the common fields (`ViewResultCommon`) plus its kind's own (`ViewResultFields` in
-  `lib/types.ts`, where a new kind declares its fields), so checking `kind` narrows it and reading
-  another kind's field does not compile. A drawn result (no `error`, not `empty`) carries its kind's
-  main field (`ViewResultMain`; a runner's success path must fill it), and `isDrawn(v)` is the check
-  after which that field is read without `!`; a figure takes `DrawnResultOf<"<kind>">`. A refusal or
-  error for a kind known only at run time is `plainResult(kind, {…})`. **Kinds never import each other:** a
-  kind's runner, figure and `<kind>-<part>.ts` modules import only one another and the shared
-  modules (`lib/views/`: run, shared, rows, covariates; `lib/figures/`: common, volcano, bars,
-  forest, km) — `local/kind-boundary` in `eslint.config.mjs` enforces it; what two kinds need moves
-  into a shared module, listed there. Kinds registered through `drawn()`
-  have their figure drawn from the result and a throw reported as the view's error.
+- **View kinds** — **each kind is a folder, `lib/views/<kind>/`, plus one page file,
+  `app/lab/kinds/<kind>.tsx`, and a line in each of three registries.** The folder holds `types.ts`
+  (the kind's spec and result fields: it adds its entry to `ViewSpecs`, `ViewResultFields` and
+  `ViewResultMain` in `lib/types.ts` by `declare module`), `run.ts` (the runner), `sql.ts` (its
+  queries; `test/boundary.test.ts` sweeps every kind's), `method.ts` (its method record, invariant
+  12), `figure.ts` (its SVG) and `kind.ts` (its descriptor: figure, title, results text, help,
+  federation need, marks — `ViewKindDef` in `lib/views/kind-def.ts`). The page file is its
+  `KindUi` (`app/lab/kinds/kind-ui.ts`): its add-menu entry and why it is disabled, the view a new
+  one starts from, how many cohorts it draws, and its card — the shared card
+  (`app/lab/kind-cards.tsx`) with its subtitle, controls and body, or a `Card` of its own. The
+  registries are `lib/views/index.ts` (runners), `lib/views/kinds.ts` (descriptors) and
+  `app/lab/kinds/index.ts` (page files); each is typed by `ViewKind`, the `View` union's kinds, so
+  a kind missing from any of them does not compile, and everything else (`lib/view-svg.ts`,
+  `lib/result-text.ts`, `VIEW_HELP`, `viewNeed`, the add menu, the cards) reads them. A runner gets
+  the run's context (`ViewRun` in `lib/views/run.ts`: the document, evaluated cohorts, resolvers,
+  the view's cohorts and studies) and returns its result; `lib/views/shared.ts` holds what several
+  runners use (`overLimit`, `answering`, `refuse`, `askEachSite`). A result is a `ViewResult`, a
+  union over kinds: the common fields (`ViewResultCommon`) plus its kind's own, so checking `kind`
+  narrows it and reading another kind's field does not compile. A drawn result (no `error`, not
+  `empty`) carries its kind's main field (a runner's success path must fill it), and `isDrawn(v)` is
+  the check after which that field is read without `!`; a figure takes `DrawnResultOf<"<kind>">`. A
+  refusal or error for a kind known only at run time is `plainResult(kind, {…})`. Kinds registered
+  through `drawn()` have their figure drawn from the result and a throw reported as the view's
+  error. **Kinds never import each other:** a kind's files import only one another and the shared
+  modules (`lib/views/`: run, shared, rows, covariates, kind-def, text; `lib/figures/`;
+  `app/lab/kinds/`: kind-ui, parts) — `local/kind-boundary` in `eslint.config.mjs` enforces it, and
+  only the registries list every kind; what two kinds need moves into a shared module, listed there.
 - **`lib/oncoprint.ts`** — spec → rows (ClickHouse fetch); **`lib/oncoprint-assemble.ts`** — rows →
   render contract, pure (bitmask cells, NOT_PROFILED=-1, panel-aware denominators, staircase +
   declarative `sort`, clinical tracks incl. numeric heat, `heatmap` molecular tracks incl. synthetic
@@ -63,17 +73,18 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   `scripts/oncoprint-cli.ts` and `python -m cohortlab` wrap all of this for local tables, and
   `/oncoprint-lab/import` does the same in the browser (`POST /api/oncoprint/local`).
   `lib/oncoprint-cluster.ts` orders columns by a Ward dendrogram for the `cluster:<profile>`
-  sort key; `lib/oncoprint-detail.ts` answers one column at a time for tooltips. **`lib/view-svg.ts`** — the same contract for every other view kind: the dispatcher over
-  `lib/figures/<kind>.ts`; used by the page (drawn in the browser) and by MCP `run_analysis`
+  sort key; `lib/oncoprint-detail.ts` answers one column at a time for tooltips. **`lib/view-svg.ts`** — the same contract for every other view kind: it draws
+  each kind's figure through its descriptor (`lib/views/kinds.ts`); used by the page (drawn in the browser) and by MCP `run_analysis`
   for its figures (the oncoprint's image included).
 - **View aggregates** — most view kinds after the first few (`genome`, `pathways`, `enrichment`, …)
   query through the resolvers' `viewAggregate`/`viewAggregateMany`/`viewMeta`, whose SQL lives in
   **`lib/federation-views.ts`** (re-exported by `lib/federation.ts`, so the boundary suite sweeps
   it). Every local participant has those methods, a remote peer does not, so such a view is not
   drawn over a peer's studies (`lib/view-coverage.ts`, below invariant 10).
-  Figures: **`lib/figures/<kind>.ts`**, one module per kind (the later kinds registered with their
-  title in `lib/figures/index.ts`), dispatched by **`lib/view-svg.ts`**; all browser-safe, laid out
-  with **`lib/chart/`** (see "Figures" under UI conventions); cards: `app/lab/kind-cards.tsx`.
+  Figures: **`lib/views/<kind>/figure.ts`**, drawn through the kind's descriptor (`kind.ts`, listed in
+  `lib/views/kinds.ts`) by **`lib/view-svg.ts`**; what several figures share is in `lib/figures/`; all
+  browser-safe, laid out with **`lib/chart/`** (see "Figures" under UI conventions); cards:
+  `app/lab/kinds/<kind>.tsx`.
 - **Table views** (`table`, `mutations`, `timeline`'s patient list, `alterations`' list and three tables, and any later view that lists rows) — **every one must
   support the same five things: pagination, search over its text, a filter per column (text
   conditions or a value list for text, a range for numbers), sorting, and a CSV download of every
@@ -88,7 +99,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   `POST /api/view-page` (a page, or a column's values) and `POST /api/table` (the CSV) serve every
   table view. A view holding several tables (`alterations`) names one with `table` in those
   requests (`RunOpts.table`), and `pagedTable()` in `lib/views/rows.ts` picks it from the result.
-- **The `alterations` view** (cBioPortal's patient-view genomic tables, runner `lib/views/alterations.ts`) — one
+- **The `alterations` view** (cBioPortal's patient-view genomic tables, runner `lib/views/alterations/run.ts`) — one
   patient's Mutations, Copy Number Alterations and Structural Variants as three table views in one card, each
   with its own query under its own spec key (`mutations`, `cna`, `sv`); the top-level query is the patient list's.
   Row sources in **`lib/patient-alterations.ts`** (one row per variant / call / event however many of the
@@ -97,7 +108,7 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   Its navigator is the timeline's: **`app/lab/patient-nav.tsx`** (‹ prev / next ›, the List/Search dialog,
   ← / →) serves every view that shows one patient of a cohort at a time, stepping by the result's `position`
   (`listPosition()` in `lib/views/rows.ts`).
-- **The `timeline` view** (cBioPortal's patient-view Timeline, runner `lib/views/timeline.ts`) — one
+- **The `timeline` view** (cBioPortal's patient-view Timeline, runner `lib/views/timeline/run.ts`) — one
   patient's clinical events as tracks, with its cohort's patients (a table view) to pick from. **`lib/timeline-tracks.ts`** is
   the track model, ported from cbioportal-frontend's `cbioportal-clinical-timeline` package and
   `patientView/timeline/timeline_helpers.tsx`: the portal's track order and `trackStructures`
@@ -156,8 +167,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   what it does not know. A change to the document's shape, or to what an unchanged document means,
   bumps DOC_VERSION and adds an upgrade step there; never re-interpret an old shape anywhere else.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
-- **The `composition` view** (runner `lib/views/composition.ts`, SQL `lib/composition.ts`, figure
-  `lib/figures/composition.ts`) — parts of a whole per case (cell types, cell states, signatures):
+- **The `composition` view** (runner `lib/views/composition/run.ts`, SQL `lib/composition.ts`, figure
+  `lib/views/composition/figure.ts`) — parts of a whole per case (cell types, cell states, signatures):
   a generic-assay profile's entities or 2–16 numeric clinical attributes (`custom:` included). Each
   case's vector is built in the database (`casesCte`); every participant returns only sums
   (`compositionMomentsSql`), and the per-case stacked bars come from `PatientLevelResolver.viewRows`
@@ -270,8 +281,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   code that needs a new migration. The in-process database migrates itself on first use.
 - **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Saved /
   Analysis / Examples. Tabs move out into their own components as they are untangled
-  (`saved-tab.tsx`, `examples-tab.tsx`), and each view kind's card is its own component in
-  `view-cards.tsx`, reading the page through one `ViewCtx`; Explore's sections (study picker, bar,
+  (`saved-tab.tsx`, `examples-tab.tsx`), and each view's card (`view-cards.tsx`: its kind's
+  own or the shared one, from `app/lab/kinds/`) reads the page through one `ViewCtx`; Explore's sections (study picker, bar,
   add-chart dialog, facet cards) are `explore-sections.tsx`, reading Explore's state and actions
   from `use-explore-state.ts` (the draft, the selection, add-cohort mode) through `ExploreCtx`; the
   Analysis tab's cohort column, view column, document and genes dialogs are `analysis-sections.tsx`,
@@ -607,7 +618,7 @@ ask. These hold for every view kind, and for the chat/MCP figures that share its
   `.dt-wait` in `app/_table/DataTable.tsx`) and the count is dimmed with a spinner beside it; the
   bar, chips and headers stay visible and usable, and an action that would act on the stale
   answer (the download) waits, saying why. Such a view draws its own waiting state, so the page
-  must not cover its card (`drawsOwnWaiting` in `app/lab/kind-cards.tsx`, honoured by the lab and
+  must not cover its card (`drawsOwnWaiting` in its `app/lab/kinds/<kind>.tsx`, honoured by the lab and
   `PortalTabs`). Its controls show and edit the query **the document holds**, not the last result's,
   so a second edit made while the first is running keeps the first. A page not yet on hand is
   loading from the render that asks for it — never a flash of "no rows" first.

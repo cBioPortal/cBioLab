@@ -4,8 +4,27 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { coxMethod, logisticMethod, survivalMethod, compareMethod, cooccurrenceMethod, clinicalMethod, coexpressionMethod, diffexprMethod, incidenceMethod, pairedMethod, genomeMethod, pathwaysMethod, attritionMethod, clonalityMethod, labsMethod, courseMethod, sequenceMethod, GSEA_NULL_PY, GRAY_NULL_PY, INLINE_ROWS_MAX, type CoxTrace, type LogisticTrace, type SurvivalTrace } from "../lib/method.ts";
+import { INLINE_ROWS_MAX, type CoxTrace } from "../lib/method.ts";
 import type { CoxCovariate } from "../lib/types.ts";
+import { attritionMethod } from "../lib/views/attrition/method.ts";
+import { clinicalMethod } from "../lib/views/clinical/method.ts";
+import { clonalityMethod } from "../lib/views/clonality/method.ts";
+import { coexpressionMethod } from "../lib/views/coexpression/method.ts";
+import { compareMethod } from "../lib/views/compare/method.ts";
+import { cooccurrenceMethod } from "../lib/views/cooccurrence/method.ts";
+import { courseMethod } from "../lib/views/course/method.ts";
+import { coxMethod } from "../lib/views/cox/method.ts";
+import { diffexprMethod, GSEA_NULL_PY } from "../lib/views/diffexpr/method.ts";
+import { genomeMethod } from "../lib/views/genome/method.ts";
+import { incidenceMethod, GRAY_NULL_PY } from "../lib/views/incidence/method.ts";
+import { labsMethod } from "../lib/views/labs/method.ts";
+import { logisticMethod } from "../lib/views/logistic/method.ts";
+import type { LogisticTrace } from "../lib/views/logistic/method.ts";
+import { pairedMethod } from "../lib/views/paired/method.ts";
+import { pathwaysMethod } from "../lib/views/pathways/method.ts";
+import { sequenceMethod } from "../lib/views/sequence/method.ts";
+import { survivalMethod } from "../lib/views/survival/method.ts";
+import type { SurvivalTrace } from "../lib/views/survival/method.ts";
 
 const tp53: CoxCovariate = { source: "alteration", gene: "TP53", by: "mutated" };
 const gender: CoxCovariate = { source: "clinical", attribute: "GENDER" };

@@ -10,7 +10,8 @@
 // Unknown fields are kept (parseBody), so an addition to the document needs no change here.
 // Browser-safe: the client imports it.
 import { z } from "zod";
-import type { CohortDef, OncoprintSpec, View } from "./types.ts";
+import type { CohortDef, View } from "./types.ts";
+import type { OncoprintSpec } from "./views/oncoprint/types.ts";
 
 const isObject = (v: unknown): v is object => typeof v === "object" && v !== null && !Array.isArray(v);
 const object = <T,>(what: string) => z.custom<T>(isObject, what + " must be an object");
