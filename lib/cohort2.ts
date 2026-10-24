@@ -29,6 +29,7 @@ import type {
 } from "./types.ts";
 import { finiteSql } from "./sql-number.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "./sql-kinds.ts";
+import { DAYS_PER_MONTH } from "./time-units.ts";
 
 /** Every leaf compiler receives a fully-resolved context. */
 type Ctx = CompileCtx & { study: string };
@@ -161,14 +162,14 @@ export function derivedMetricSql(metric: DerivedMetric, study: string, db: strin
     "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
     "  GROUP BY pid";
   if (metric === "followupMonths")
-    return "SELECT p.stable_id AS pid, max(ce.start_date) / 30.4375 AS v\n" + evJoin;
+    return "SELECT p.stable_id AS pid, max(ce.start_date) / " + DAYS_PER_MONTH + " AS v\n" + evJoin;
   if (metric === "historyMonths")
-    return "SELECT p.stable_id AS pid, greatest(0, -min(ce.start_date)) / 30.4375 AS v\n" + evJoin;
+    return "SELECT p.stable_id AS pid, greatest(0, -min(ce.start_date)) / " + DAYS_PER_MONTH + " AS v\n" + evJoin;
   if (metric === "lines" || metric === "treatmentSpan") {
     const eventType = String(params?.eventType || "").trim();
     if (!eventType) throw new Error("derived clause: metric '" + metric + "' needs an eventType");
     if (metric === "treatmentSpan")
-      return "SELECT p.stable_id AS pid, (max(coalesce(ce.stop_date, ce.start_date)) - min(ce.start_date)) / 30.4375 AS v\n" +
+      return "SELECT p.stable_id AS pid, (max(coalesce(ce.stop_date, ce.start_date)) - min(ce.start_date)) / " + DAYS_PER_MONTH + " AS v\n" +
         "  FROM " + db + ".clinical_event ce\n" +
         "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
         "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +

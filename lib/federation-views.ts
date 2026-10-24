@@ -12,6 +12,7 @@ import { finiteSql } from "./sql-number.ts";
 import { linesCtes, type LineSpec } from "./treatment-lines.ts";
 import { VIEW_ATTR_RE } from "./custom-data-names.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "./sql-kinds.ts";
+import { DAYS_PER_MONTH } from "./time-units.ts";
 
 /** bare patient id for a *_unique_id column of this study */
 export const pidOf = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
@@ -191,14 +192,14 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
     "  LEFT JOIN evs ON evs.pid = anch.pid\n" +
     "),\n" +
     "cls AS (\n" +
-    "  SELECT greatest(0, -a) / 30.4375 AS entry, months - a / 30.4375 AS tend,\n" +
-    "         (first_after - a) / 30.4375 AS tev,\n" +
-    "         multiIf(months IS NULL OR months - a / 30.4375 <= 0, 'nofollowup',\n" +
+    "  SELECT greatest(0, -a) / " + DAYS_PER_MONTH + " AS entry, months - a / " + DAYS_PER_MONTH + " AS tend,\n" +
+    "         (first_after - a) / " + DAYS_PER_MONTH + " AS tev,\n" +
+    "         multiIf(months IS NULL OR months - a / " + DAYS_PER_MONTH + " <= 0, 'nofollowup',\n" +
     "                 has_ev AND n_prior > 0, 'prior',\n" +
     "                 has_ev AND n_after > 0 AND first_after < 0, 'unobserved',\n" +
     "                 'record') AS kind,\n" +
-    "         has_ev AND n_after > 0 AND (first_after - a) / 30.4375 <= months - a / 30.4375 AS hit,\n" +
-    "         has_ev AND n_after > 0 AND (first_after - a) / 30.4375 > months - a / 30.4375 AS late,\n" +
+    "         has_ev AND n_after > 0 AND (first_after - a) / " + DAYS_PER_MONTH + " <= months - a / " + DAYS_PER_MONTH + " AS hit,\n" +
+    "         has_ev AND n_after > 0 AND (first_after - a) / " + DAYS_PER_MONTH + " > months - a / " + DAYS_PER_MONTH + " AS late,\n" +
     "         dead\n" +
     "  FROM per\n" +
     ")\n" +
@@ -374,7 +375,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes" +
     (strata ? ", attrs.a0 AS stratum" : "") +
     covariates.map((_, k) => ", attrs.a" + (k + (strata ? 1 : 0)) + " AS c" + k).join("") +
-    (anchor ? ", anch.hit AS anchored, round(anch.day / 30.4375, 4) AS anchor_months" : "") +
+    (anchor ? ", anch.hit AS anchored, round(anch.day / " + DAYS_PER_MONTH + ", 4) AS anchor_months" : "") +
     describe.map((_, k) => ", descr.d" + k + " AS d" + k + ", descr.r" + k + " AS r" + k + ", descr.u" + k + " AS u" + k).join("") + "\n" +
     "FROM os\n" +
     "  LEFT JOIN panels ON panels.pid = os.pid\n" +
@@ -405,7 +406,6 @@ export function riskmodelPanelGenesSql(study: string, db: string): AggregateSql 
 // txendpoints: real-world treatment endpoints from a treatment anchor
 
 /** Days per month on the timeline clock: OS_MONTHS × this is the last follow-up's timeline day. */
-export const DAYS_PER_MONTH = 30.4375;
 /** a timeline event this many days past OS_MONTHS × DAYS_PER_MONTH says the two clocks disagree */
 export const CLOCK_SLACK_DAYS = 31;
 

@@ -58,6 +58,7 @@ import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts
 import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
 import { finiteSql } from "./sql-number.ts";
 import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type CohortSql, type PatientSql } from "./sql-kinds.ts";
+import { DAYS_PER_MONTH } from "./time-units.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -791,8 +792,8 @@ export function anchoredSurvivalSql(
     ")\n" +
     // offset = months from anchor to day 0; only anchors at or before day 0 make
     // sense as a start of follow-up, so later ones are dropped and counted.
-    "SELECT round(-anch.day / 30.4375, 4) AS entry,\n" +
-    "       round(os.months - anch.day / 30.4375, 4) AS m,\n" +
+    "SELECT round(-anch.day / " + DAYS_PER_MONTH + ", 4) AS entry,\n" +
+    "       round(os.months - anch.day / " + DAYS_PER_MONTH + ", 4) AS m,\n" +
     "       if(os.status LIKE '1%', 1, 0) AS ev, count() AS n\n" +
     "FROM os INNER JOIN anch USING (pid)\n" +
     "WHERE os.months IS NOT NULL AND anch.day <= 0\n" +
@@ -896,7 +897,6 @@ export function survivalEndpointsSql(study: string, db: string = DB): AggregateS
 // ---------------------------------------------------------------------------
 
 /** Days per month, matching the constant survival already uses. */
-const DAYS_PER_MONTH = 30.4375;
 
 /**
  * What a cohort's timeline looks like STRUCTURALLY, per event type: how many

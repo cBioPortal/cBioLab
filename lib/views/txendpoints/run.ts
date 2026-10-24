@@ -2,13 +2,14 @@
 // progression-free survival from a treatment anchor, as Kaplan–Meier curves per cohort with a
 // log-rank test. Each participant returns id-free (entry, t, event, n) counts.
 import type { ViewResult, LogRankK } from "../../types.ts";
-import { txEndpointCountsSql, labTestsSql, CLOCK_SLACK_DAYS, DAYS_PER_MONTH, type TxEndpointOpts } from "../../federation-views.ts";
+import { txEndpointCountsSql, labTestsSql, CLOCK_SLACK_DAYS, type TxEndpointOpts } from "../../federation-views.ts";
 import { kaplanMeier, kmMedianCi, logRankK, applyCutoff, type SurvRecord } from "../../stats.ts";
 import { DEFAULT_LINE_GAP, TREATMENT_EVENT } from "../../treatment-lines.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, answering, refuse, plural } from "../shared.ts";
 import { progressionEvent, progressionError, progressionCondition, clockFailures, treatmentAnchor, noAnchorMessage, CLOCK_TOLERANCE } from "../../timeline-endpoints.ts";
 import type { TxendpointsView, TxendpointsCurve } from "./types.ts";
+import { DAYS_PER_MONTH } from "../../time-units.ts";
 
 const TX_COHORT_LIMIT = 6;
 /** below this many patients in a cohort the log-rank test is refused (the survival view's floor) */

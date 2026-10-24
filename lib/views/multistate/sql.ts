@@ -1,8 +1,9 @@
 // The multistate view's SQL: what its runner (run.ts) asks each participant's database for.
 // multistate: the illness–death model (start → progression → death) from the timeline's day 0
-import { type ProgressionEvent, osCte, lastDayCte, progressionCte, cohortEventsFrom, eventHasKv, DAYS_PER_MONTH, CLOCK_SLACK_DAYS } from "../../federation-views.ts";
+import { type ProgressionEvent, osCte, lastDayCte, progressionCte, cohortEventsFrom, eventHasKv, CLOCK_SLACK_DAYS } from "../../federation-views.ts";
 import { foldedEqualsSql } from "../../event-names.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
+import { DAYS_PER_MONTH } from "../../time-units.ts";
 
 /** the event type whose day-0 record says the timeline's clock starts at sequencing */
 export const SEQUENCING_EVENT = "Sequencing";
