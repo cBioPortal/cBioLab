@@ -4,6 +4,7 @@ import { pidOf } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
 import { driverJoin } from "../../federation.ts";
 import { clinicalTable } from "../../custom-data.ts";
+import { patientSql, type PatientSql } from "../../sql-kinds.ts";
 
 /**
  * One row per patient of the cohort with a mutation panel: the panels their samples were sequenced
@@ -11,11 +12,11 @@ import { clinicalTable } from "../../custom-data.ts";
  * each covariate's value as c0, c1, … (the patient's, or the first sample's). Values only: the
  * patient id joins the CTEs and is never returned. Run only through PatientLevelResolver.viewRows.
  */
-export function adjustedRowsSql(cohortSql: string, study: string, db: string, o: { covariates: string[]; driverPin?: string | null }): string {
+export function adjustedRowsSql(cohortSql: string, study: string, db: string, o: { covariates: string[]; driverPin?: string | null }): PatientSql {
   const { covariates, driverPin = null } = o;
   for (const a of covariates) if (!/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'");
   const pid = pidOf("patient_unique_id", study), sdPid = pidOf("sd.patient_unique_id", study), gPid = pidOf("g.patient_unique_id", study);
-  return (
+  return patientSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "panels AS (\n" +
     "  SELECT " + sdPid + " AS pid, groupUniqArray(toString(sp.gene_panel_id)) AS panels\n" +
@@ -47,5 +48,5 @@ export function adjustedRowsSql(cohortSql: string, study: string, db: string, o:
     "FROM panels\n" +
     "  LEFT JOIN mut ON mut.pid = panels.pid\n" +
     (covariates.length ? "  LEFT JOIN attrs ON attrs.pid = panels.pid\n" : "")
-  );
+  ));
 }

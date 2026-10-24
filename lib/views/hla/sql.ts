@@ -5,6 +5,7 @@ import { sq } from "../../compiler.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { finiteSql } from "../../sql-number.ts";
+import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "../../sql-kinds.ts";
 
 export interface HlaRowsOpts {
   /** per locus A, B, C: the attributes that may hold its first allele, its second, or both as one "x/y" value */
@@ -29,7 +30,7 @@ const hlaFieldsSql = (x: string) => {
  * covariate as c0, c1, … (the patient's, or the first sample's). Values only: the patient id joins
  * the CTEs and is never returned. Run only through PatientLevelResolver.viewRows.
  */
-export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaRowsOpts): string {
+export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaRowsOpts): PatientSql {
   const names = [...o.loci.flatMap((l) => [...l.first, ...l.second, ...l.pair]), ...o.lohAttributes, o.months, o.status, ...o.covariates];
   for (const a of names) if (!/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'");
   const pid = pidOf("patient_unique_id", study);
@@ -43,7 +44,7 @@ export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaR
   const key = (x: string) => "arrayStringConcat(arraySlice(" + hlaFieldsSql(x) + ", 1, " + fields + "), ':')";
   const homAt = (i: number) => "if(k[" + (2 * i + 1) + "] = '' OR k[" + (2 * i + 2) + "] = '', NULL, toUInt8(k[" + (2 * i + 1) + "] = k[" + (2 * i + 2) + "]))";
   const covs = o.covariates;
-  return (
+  return patientSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "gt AS (\n" +
     "  SELECT pid, [" + o.loci.flatMap((l) => [allele(l, 1), allele(l, 2)]).join(",\n    ") + "] AS raw\n" +
@@ -87,12 +88,12 @@ export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaR
     "       if(os.months >= 0, os.months, NULL) AS m, if(os.status LIKE '1%', 1, 0) AS ev" + covs.map((_, i) => ", cov.c" + i + " AS c" + i).join("") + "\n" +
     "FROM cohort LEFT JOIN hom ON hom.pid = cohort.pid LEFT JOIN loh ON loh.pid = cohort.pid LEFT JOIN os ON os.pid = cohort.pid" +
     (covs.length ? " LEFT JOIN cov ON cov.pid = cohort.pid" : "")
-  );
+  ));
 }
 
 /** the attribute names in a study that mention HLA, with how many values each holds */
-export function hlaAttributesSql(_cohortSql: string, study: string, db: string): string {
-  return "SELECT attribute_name AS name, any(type) AS type, count() AS n FROM " + clinicalTable(db, []) + "\n" +
+export function hlaAttributesSql(_cohortSql: string, study: string, db: string): AggregateSql {
+  return aggregateSql("SELECT attribute_name AS name, any(type) AS type, count() AS n FROM " + clinicalTable(db, []) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name ILIKE '%hla%' AND trimBoth(attribute_value) != ''\n" +
-    "GROUP BY name ORDER BY name LIMIT 40";
+    "GROUP BY name ORDER BY name LIMIT 40");
 }

@@ -4,6 +4,7 @@ import { sq } from "../../compiler.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { finiteSql } from "../../sql-number.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /**
  * Per gene, over the cohort's mutation CALLS that carry a FACETS estimate (a call is one mutation
@@ -13,10 +14,10 @@ import { finiteSql } from "../../sql-number.ts";
  * read — the table also holds orphaned rows from superseded loads.
  */
 export function clonalityGenesSql(cohortSql: string, study: string, db: string, genes: string[], pin: string | null,
-  measure: "driver" | "any", qc: boolean): string {
+  measure: "driver" | "any", qc: boolean): AggregateSql {
   const geneList = genes.map(sq).join(",");
   const drv = measure === "driver" && pin;
-  return (
+  return aggregateSql((
     facetsSamplesCte(cohortSql, study, db, qc) + ",\n" +
     "prof AS (\n" +
     "  SELECT gp.genetic_profile_id AS id FROM " + db + ".genetic_profile gp\n" +
@@ -42,18 +43,18 @@ export function clonalityGenesSql(cohortSql: string, study: string, db: string, 
     Array.from({ length: 10 }, (_, i) =>
       "       countIf(ccf >= " + (i / 10) + (i === 9 ? "" : " AND ccf < " + ((i + 1) / 10)) + ") AS ccf" + i).join(",\n") + "\n" +
     "FROM calls GROUP BY gene"
-  );
+  ));
 }
 
 /**
  * Per cohort: its samples, how many carry any FACETS estimate, FACETS_QC pass/fail over ALL of
  * them, and whole-genome doubling among the samples considered (QC-passing ones, with `qc`).
  */
-export function facetsSummarySql(cohortSql: string, study: string, db: string, qc: boolean): string {
+export function facetsSummarySql(cohortSql: string, study: string, db: string, qc: boolean): AggregateSql {
   const attr = (name: string) => "(SELECT sample_unique_id AS suid, " + clinicalValueFoldSql("attribute_value") + " AS v FROM " + clinicalTable(db, [name]) + "\n" +
     "    WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(name) + ")";
   const considered = qc ? " AND suid IN (SELECT suid FROM qcv WHERE v = 'pass')" : "";
-  return (
+  return aggregateSql((
     facetsSamplesCte(cohortSql, study, db, false) + ",\n" +
     "prof AS (\n" +
     "  SELECT gp.genetic_profile_id AS id FROM " + db + ".genetic_profile gp\n" +
@@ -69,12 +70,12 @@ export function facetsSummarySql(cohortSql: string, study: string, db: string, q
     "       countIf(suid IN (SELECT suid FROM wgd WHERE v = 'true')" + considered + ") AS wgd_true,\n" +
     "       countIf(suid IN (SELECT suid FROM wgd WHERE v = 'false')" + considered + ") AS wgd_false\n" +
     "FROM samp"
-  );
+  ));
 }
 
 /** FACETS purity (0.05 bins over 0-1) and ploidy (0.25 bins over 0-8) among the samples considered. */
-export function facetsHistogramSql(cohortSql: string, study: string, db: string, qc: boolean): string {
-  return (
+export function facetsHistogramSql(cohortSql: string, study: string, db: string, qc: boolean): AggregateSql {
+  return aggregateSql((
     facetsSamplesCte(cohortSql, study, db, qc) + "\n" +
     "SELECT attribute_name AS attr,\n" +
     "       toInt32(floor(least(if(attribute_name = 'FACETS_PURITY', 0.9999, 7.9999), greatest(0, " + finiteSql("attribute_value") + ")) /\n" +
@@ -84,7 +85,7 @@ export function facetsHistogramSql(cohortSql: string, study: string, db: string,
     "WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name IN ('FACETS_PURITY', 'FACETS_PLOIDY')\n" +
     "  AND sample_unique_id IN (SELECT suid FROM samp) AND " + finiteSql("attribute_value") + " IS NOT NULL\n" +
     "GROUP BY attr, bin ORDER BY attr, bin"
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------

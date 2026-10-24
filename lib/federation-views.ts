@@ -11,6 +11,7 @@ import { splitBucketSql } from "./cohort2.ts";
 import { finiteSql } from "./sql-number.ts";
 import { linesCtes, type LineSpec } from "./treatment-lines.ts";
 import { VIEW_ATTR_RE } from "./custom-data-names.ts";
+import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "./sql-kinds.ts";
 
 /** bare patient id for a *_unique_id column of this study */
 export const pidOf = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
@@ -35,15 +36,15 @@ export const CHROM_LENGTHS: Record<"hg19" | "hg38", Record<string, number>> = {
 };
 
 /** The study's reference genome, from its own metadata. Metadata only. */
-export function studyGenomeSql(study: string, db: string): string {
-  return "SELECT rg.name AS build FROM " + db + ".cancer_study cs\n" +
+export function studyGenomeSql(study: string, db: string): AggregateSql {
+  return aggregateSql("SELECT rg.name AS build FROM " + db + ".cancer_study cs\n" +
     "JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study);
+    "WHERE cs.cancer_study_identifier = " + sq(study));
 }
 
 /** How many of the cohort's samples exist, and how many have any segment at all. */
-export function genomeCoverageSql(cohortSql: string, study: string, db: string): string {
-  return (
+export function genomeCoverageSql(cohortSql: string, study: string, db: string): AggregateSql {
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
     "  SELECT internal_id AS sid FROM " + db + ".sample_derived\n" +
@@ -54,7 +55,7 @@ export function genomeCoverageSql(cohortSql: string, study: string, db: string):
     "         WHERE cancer_study_id = (SELECT cancer_study_id FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study) + ")\n" +
     "           AND sample_id IN (SELECT sid FROM samp)) AS segmented\n" +
     "FROM system.one"
-  );
+  ));
 }
 
 /**
@@ -98,21 +99,21 @@ export function sideCountsTail(study: string, db: string, genes: string[] | null
 }
 
 /** Every value the attribute takes among the cohort's samples, for a refusal that names them. */
-export function sampleAttributeValuesSql(cohortSql: string, study: string, db: string, attribute: string): string {
-  return (
+export function sampleAttributeValuesSql(cohortSql: string, study: string, db: string, attribute: string): AggregateSql {
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT attribute_value AS value, count() AS samples FROM " + clinicalTable(db, [attribute]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(attribute) + "\n" +
     "  AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
     "GROUP BY value ORDER BY samples DESC LIMIT 50"
-  );
+  ));
 }
 
 /** Which studies hold allele-specific copy number for their current mutation profile. Metadata only. */
-export function ascnStudiesSql(_study: string, db: string): string {
-  return "SELECT DISTINCT cs.cancer_study_identifier AS study FROM " + db + ".allele_specific_copy_number a\n" +
+export function ascnStudiesSql(_study: string, db: string): AggregateSql {
+  return aggregateSql("SELECT DISTINCT cs.cancer_study_identifier AS study FROM " + db + ".allele_specific_copy_number a\n" +
     "JOIN " + db + ".genetic_profile gp ON gp.genetic_profile_id = a.genetic_profile_id\n" +
-    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id ORDER BY study";
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id ORDER BY study");
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +149,7 @@ function eventDaysSql(db: string, study: string, sel: EventSel, cohortRef: strin
  * are kept, as censored or dead at follow-up). A cohort patient with no anchor event appears in
  * no row at all; the caller counts them as the cohort size less every row's n.
  */
-export function incidenceCountsSql(cohortSql: string, study: string, db: string, event: EventSel, anchor: IncidenceAnchor | null): string {
+export function incidenceCountsSql(cohortSql: string, study: string, db: string, event: EventSel, anchor: IncidenceAnchor | null): AggregateSql {
   const pid = pidOf("patient_unique_id", study);
   const pick = anchor?.occurrence === "LAST" ? "max" : "min";
   const anchCte = anchor
@@ -164,7 +165,7 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
       "  GROUP BY pid\n" +
       "),\n"
     : "anch AS (SELECT pid, toInt64(0) AS day FROM cohort),\n";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
@@ -204,12 +205,12 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
     "SELECT kind, if(kind = 'record', round(entry, 4), 0) AS entry, if(kind = 'record', round(if(hit, tev, tend), 4), 0) AS t,\n" +
     "       if(kind != 'record', -1, if(hit, 1, if(dead, 2, 0))) AS cause, late, count() AS n\n" +
     "FROM cls GROUP BY kind, entry, t, cause, late ORDER BY t"
-  );
+  ));
 }
 
 /** The tests a lab event type holds, with how many patients and results each has. */
-export function labTestsSql(cohortSql: string, study: string, db: string, eventType: string, testKey: string): string {
-  return (
+export function labTestsSql(cohortSql: string, study: string, db: string, eventType: string, testKey: string): AggregateSql {
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT " + nameFoldSql("t.value") + " AS tk, arraySort((x) -> (-x.2, x.1), arrayMap((v) -> (v, countEqual(groupArray(trimBoth(t.value)), v)), groupUniqArray(trimBoth(t.value))))[1].1 AS test,\n" +
     "       uniqExact(ce.patient_id) AS patients, count() AS results\n" +
@@ -219,7 +220,7 @@ export function labTestsSql(cohortSql: string, study: string, db: string, eventT
     "JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("t.key", testKey) + "\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", eventType) + " AND p.stable_id IN (SELECT pid FROM cohort)\n" +
     "GROUP BY tk ORDER BY patients DESC, tk LIMIT 40"
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------
@@ -240,29 +241,29 @@ export const enrichEventCond = (a: EnrichAlteration): string =>
 // assays: a generic-assay profile's every entity, compared between cohorts
 
 /** The profile's data type as the study declared it (LIMIT-VALUE, CATEGORICAL, BINARY, …). Metadata only. */
-export function assayProfileSql(study: string, db: string, profileType: string): string {
-  return "SELECT datatype, generic_assay_type, ifNull(patient_level, 0) AS patient_level, name FROM " + db + ".genetic_profile\n" +
-    "WHERE stable_id = " + sq(study + "_" + profileType) + " AND genetic_alteration_type = 'GENERIC_ASSAY'";
+export function assayProfileSql(study: string, db: string, profileType: string): AggregateSql {
+  return aggregateSql("SELECT datatype, generic_assay_type, ifNull(patient_level, 0) AS patient_level, name FROM " + db + ".genetic_profile\n" +
+    "WHERE stable_id = " + sq(study + "_" + profileType) + " AND genetic_alteration_type = 'GENERIC_ASSAY'");
 }
 
 /** Display names for a profile's entities, where the study gave them (NAME). Metadata only: an
  *  entity is a signature, an arm or a compound, never a patient. */
-export function assayEntityNamesSql(study: string, db: string, profileType: string): string {
-  return "WITH named AS (\n" +
+export function assayEntityNamesSql(study: string, db: string, profileType: string): AggregateSql {
+  return aggregateSql("WITH named AS (\n" +
     "  SELECT ge.stable_id AS entity, p.value AS name FROM " + db + ".generic_entity_properties p\n" +
     "  JOIN " + db + ".genetic_entity ge ON ge.id = p.genetic_entity_id\n" +
     "  WHERE p.name = 'NAME' AND ge.stable_id IN (SELECT DISTINCT entity_stable_id FROM " + db + ".generic_assay_data_derived\n" +
     "    WHERE profile_type = " + sq(profileType) + " AND profile_stable_id = " + sq(study + "_" + profileType) + ")\n" +
-    ")\nSELECT entity, name FROM named";
+    ")\nSELECT entity, name FROM named");
 }
 
 /** Each gene's cytoband in the study's own reference genome (the portal's Cytoband column). Metadata only. */
-export function geneCytobandsSql(genes: string[], study: string, db: string): string {
-  return "SELECT g.hugo_gene_symbol AS gene, any(rgg.cytoband) AS cytoband FROM " + db + ".gene g\n" +
+export function geneCytobandsSql(genes: string[], study: string, db: string): AggregateSql {
+  return aggregateSql("SELECT g.hugo_gene_symbol AS gene, any(rgg.cytoband) AS cytoband FROM " + db + ".gene g\n" +
     "JOIN " + db + ".reference_genome_gene rgg ON rgg.entrez_gene_id = g.entrez_gene_id\n" +
     "WHERE rgg.reference_genome_id = (SELECT reference_genome_id FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study) + ")\n" +
     "  AND g.hugo_gene_symbol IN (" + (genes.length ? genes.map(sq).join(",") : "''") + ")\n" +
-    "GROUP BY gene";
+    "GROUP BY gene");
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +296,7 @@ export interface RiskmodelRowsOpts {
  * never returned. Run only through PatientLevelResolver.viewRows, since a model of individual
  * patients needs their rows.
  */
-export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o: RiskmodelRowsOpts): string {
+export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o: RiskmodelRowsOpts): PatientSql {
   const { endpoint, columns, strata = null, covariates = [], driverPin = null, anchor = null, describe = [] } = o;
   if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   for (const a of [strata, ...covariates, ...describe]) if (a && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'");
@@ -307,7 +308,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data\n" +
       "        WHERE " + foldedEqualsSql("key", anchor.key) + " AND " + foldedEqualsSql("value", String(anchor.value ?? "")) + ")\n"
     : "";
-  return (
+  return patientSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
@@ -386,18 +387,18 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     // document gives the same model only if the rows come back in the same order. The id orders
     // the rows inside the database and is not returned.
     "ORDER BY os.pid"
-  );
+  ));
 }
 
 /** The genes on each mutation panel this study uses (study metadata; no cohort, no patient). */
-export function riskmodelPanelGenesSql(study: string, db: string): string {
-  return (
+export function riskmodelPanelGenesSql(study: string, db: string): AggregateSql {
+  return aggregateSql((
     "SELECT toString(pg.gene_panel_id) AS panel, groupUniqArray(pg.gene) AS genes\n" +
     "FROM " + db + ".gene_panel_to_gene_derived pg\n" +
     "WHERE pg.gene_panel_id IN (SELECT DISTINCT gene_panel_id FROM " + db + ".sample_to_gene_panel_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND alteration_type = 'MUTATION_EXTENDED')\n" +
     "GROUP BY panel"
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +490,7 @@ export function progressionCte(study: string, db: string, pr: ProgressionEvent):
  * follow-up — the check that the timeline and OS_MONTHS share day 0. A cohort patient with no
  * anchored record is in no row; the caller counts them from the cohort's size.
  */
-export function txEndpointCountsSql(cohortSql: string, study: string, db: string, o: TxEndpointOpts): string {
+export function txEndpointCountsSql(cohortSql: string, study: string, db: string, o: TxEndpointOpts): AggregateSql {
   const pick = o.anchor.occurrence === "LAST" ? "max" : "min";
   const evFrom = (alias: string) => cohortEventsFrom(db, study, alias);
   const hasKv = (alias: string, key: string, valueCond: string) => eventHasKv(db, alias, key, valueCond);
@@ -564,10 +565,10 @@ export function txEndpointCountsSql(cohortSql: string, study: string, db: string
     "         ld > fu + " + CLOCK_SLACK_DAYS + " AS late\n" +
     "  FROM per\n" +
     ")");
-  return "WITH cohort AS (" + cohortSql + "),\n" + ctes.join(",\n") + "\n" +
+  return aggregateSql("WITH cohort AS (" + cohortSql + "),\n" + ctes.join(",\n") + "\n" +
     "SELECT kind, if(kind = 'record', round(entry, 4), 0) AS entry, if(kind = 'record', round(tt, 4), 0) AS t,\n" +
     "       if(kind = 'record', ev, 0) AS ev, late, count() AS n\n" +
-    "FROM cls GROUP BY kind, entry, t, ev, late ORDER BY t";
+    "FROM cls GROUP BY kind, entry, t, ev, late ORDER BY t");
 }
 
 // ---------------------------------------------------------------------------

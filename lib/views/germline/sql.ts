@@ -3,16 +3,17 @@ import { pidOf, geneList } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
 import { finiteSql } from "../../sql-number.ts";
 import { clinicalTable } from "../../custom-data.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /** Per gene: the cohort's patients with a germline call in it. Counts only. */
-export function germCarriersSql(cohortSql: string, study: string, db: string): string {
+export function germCarriersSql(cohortSql: string, study: string, db: string): AggregateSql {
   const gPid = pidOf("g.patient_unique_id", study);
-  return "WITH cohort AS (" + cohortSql + ")\n" +
+  return aggregateSql("WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT g.hugo_gene_symbol AS gene, uniqExact(" + gPid + ") AS carriers\n" +
     "FROM " + db + ".genomic_event_derived g\n" +
     "WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND " + GERMLINE + "\n" +
     "  AND " + gPid + " IN (SELECT pid FROM cohort)\n" +
-    "GROUP BY gene ORDER BY carriers DESC, gene LIMIT 500";
+    "GROUP BY gene ORDER BY carriers DESC, gene LIMIT 500");
 }
 
 /**
@@ -21,21 +22,21 @@ export function germCarriersSql(cohortSql: string, study: string, db: string): s
  * (cp) and a deep deletion (del): the number of patients. Carriers whose tumour panel does not list the
  * gene appear with mp = 0. Counts only.
  */
-export function germCountsSql(cohortSql: string, study: string, db: string, genes: string[]): string {
-  return germCtes(cohortSql, study, db, genes) + ",\n" +
+export function germCountsSql(cohortSql: string, study: string, db: string, genes: string[]): AggregateSql {
+  return aggregateSql(germCtes(cohortSql, study, db, genes) + ",\n" +
     "fl AS (\n" +
     "  SELECT gene, toUInt8((pid, gene) IN (SELECT pid, gene FROM mprof)) AS mp, toUInt8((pid, gene) IN (SELECT pid, gene FROM germ)) AS carrier,\n" +
     "         toUInt8((pid, gene) IN (SELECT pid, gene FROM som)) AS som, toUInt8((pid, gene) IN (SELECT pid, gene FROM cprof)) AS cp,\n" +
     "         toUInt8((pid, gene) IN (SELECT pid, gene FROM del)) AS del\n" +
     "  FROM base\n" +
     ")\n" +
-    "SELECT gene, mp, carrier, som, cp, del, count() AS n FROM fl GROUP BY gene, mp, carrier, som, cp, del";
+    "SELECT gene, mp, carrier, som, cp, del, count() AS n FROM fl GROUP BY gene, mp, carrier, som, cp, del");
 }
 
 /** Overall survival of the patients profiled for `gene`, by carrier status: counts of (carrier, months, dead). Counts only. */
-export function germSurvivalSql(cohortSql: string, study: string, db: string, gene: string): string {
+export function germSurvivalSql(cohortSql: string, study: string, db: string, gene: string): AggregateSql {
   const pid = pidOf("patient_unique_id", study);
-  return germCtes(cohortSql, study, db, [gene]) + ",\n" +
+  return aggregateSql(germCtes(cohortSql, study, db, [gene]) + ",\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid, " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
@@ -48,7 +49,7 @@ export function germSurvivalSql(cohortSql: string, study: string, db: string, ge
     "  SELECT toUInt8(mprof.pid IN (SELECT pid FROM germ)) AS carrier, os.months AS months, os.dead AS dead\n" +
     "  FROM mprof INNER JOIN os ON os.pid = mprof.pid WHERE os.months IS NOT NULL AND os.months >= 0\n" +
     ")\n" +
-    "SELECT carrier, round(months, 2) AS t, dead, count() AS n FROM sv GROUP BY carrier, t, dead ORDER BY t";
+    "SELECT carrier, round(months, 2) AS t, dead, count() AS n FROM sv GROUP BY carrier, t, dead ORDER BY t");
 }
 
 // ---------------------------------------------------------------------------

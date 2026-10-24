@@ -4,6 +4,7 @@ import { pidOf } from "../../federation-views.ts";
 import { finiteSql } from "../../sql-number.ts";
 import { sq } from "../../compiler.ts";
 import { clinicalTable } from "../../custom-data.ts";
+import { patientSql, type PatientSql } from "../../sql-kinds.ts";
 
 /**
  * One row per cohort patient with a survival time: months `m`, event `ev`, the marker `v` — the
@@ -13,11 +14,11 @@ import { clinicalTable } from "../../custom-data.ts";
  * PatientLevelResolver.viewRows, since a permutation test needs each patient's pair.
  */
 export function cutpointRowsSql(cohortSql: string, study: string, db: string,
-  o: { attribute: string; months: string; status: string; stratum?: string | null }): string {
+  o: { attribute: string; months: string; status: string; stratum?: string | null }): PatientSql {
   for (const a of [o.attribute, o.stratum, o.months, o.status]) if (a && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'");
   const pid = pidOf("patient_unique_id", study);
   const attrs = [o.attribute, ...(o.stratum ? [o.stratum] : [])];
-  return (
+  return patientSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
@@ -40,5 +41,5 @@ export function cutpointRowsSql(cohortSql: string, study: string, db: string,
     "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, val.v AS v" + (o.stratum ? ", val.s AS s" : "") + "\n" +
     "FROM os LEFT JOIN val ON val.pid = os.pid\n" +
     "WHERE os.months IS NOT NULL AND os.months >= 0"
-  );
+  ));
 }

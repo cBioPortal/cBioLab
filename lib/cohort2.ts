@@ -28,6 +28,7 @@ import type {
   SampleListLeaf, PatientListLeaf, SplitLeaf, UploadLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
 } from "./types.ts";
 import { finiteSql } from "./sql-number.ts";
+import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "./sql-kinds.ts";
 
 /** Every leaf compiler receives a fully-resolved context. */
 type Ctx = CompileCtx & { study: string };
@@ -460,11 +461,11 @@ function patientListLeafSql(leaf: PatientListLeaf, ctx: Ctx): string {
 }
 
 /** The samples, as bare ids, of the patients `patientsSql` selects in `study`: what a lock records beside them. */
-export function memberSamplesSql(patientsSql: string, study: string, db: string): string {
-  return "SELECT DISTINCT " + PID("sample_unique_id", study) + " AS sid\n" +
+export function memberSamplesSql(patientsSql: string, study: string, db: string): PatientSql {
+  return patientSql("SELECT DISTINCT " + PID("sample_unique_id", study) + " AS sid\n" +
     "  FROM " + db + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
-    "    AND " + PID("patient_unique_id", study) + " IN (SELECT pid FROM (" + patientsSql + "))";
+    "    AND " + PID("patient_unique_id", study) + " IN (SELECT pid FROM (" + patientsSql + "))");
 }
 
 /**
@@ -473,7 +474,7 @@ export function memberSamplesSql(patientsSql: string, study: string, db: string)
  * would add and who it would drop, and how many samples the frozen patients have that were not
  * theirs when locked (`samples`, where the lock keeps them; null when it recorded none).
  */
-export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string, samples: { set: string; part: string } | null): string {
+export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string, samples: { set: string; part: string } | null): AggregateSql {
   const pid = PID("patient_unique_id", study), sid = PID("sample_unique_id", study);
   let newSamples = "toInt64(-1)";
   if (samples) {
@@ -481,12 +482,12 @@ export function lockDriftSql(lockedSql: string, liveSql: string, study: string, 
     newSamples = "(SELECT count() FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study) +
       " AND " + pid + " IN (SELECT pid FROM locked)" + (table ? " AND " + sid + " NOT IN (SELECT id FROM " + table + ")" : "") + ")";
   }
-  return "WITH locked AS (" + lockedSql + "),\n     live AS (" + liveSql + ")\n" +
+  return aggregateSql("WITH locked AS (" + lockedSql + "),\n     live AS (" + liveSql + ")\n" +
     "SELECT (SELECT count() FROM locked) AS present,\n" +
     "       (SELECT count() FROM live) AS now,\n" +
     "       (SELECT count() FROM live WHERE pid NOT IN (SELECT pid FROM locked)) AS entered,\n" +
     "       (SELECT count() FROM locked WHERE pid NOT IN (SELECT pid FROM live)) AS left,\n" +
-    "       " + newSamples + " AS newSamples";
+    "       " + newSamples + " AS newSamples");
 }
 
 // The salt is part of what every held-out result means: changing it reshuffles every

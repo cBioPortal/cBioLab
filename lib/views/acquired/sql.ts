@@ -2,17 +2,18 @@
 import { sideCountsTail } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
 import { foldedEqualsSql, foldedInSql } from "../../event-names.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /** Per gene, among patients with a sample before and after the anchor, both profiled for it: as pairedCountsSql (a = before, b = after). */
 export function acquiredCountsSql(cohortSql: string, study: string, db: string, genes: string[] | null, o: AcquiredSides,
-  pin: string | null, measure: "driver" | "any"): string {
-  return acquiredSidesCtes(cohortSql, study, db, o) + ",\n" + sideCountsTail(study, db, genes, pin, measure);
+  pin: string | null, measure: "driver" | "any"): AggregateSql {
+  return aggregateSql(acquiredSidesCtes(cohortSql, study, db, o) + ",\n" + sideCountsTail(study, db, genes, pin, measure));
 }
 
 /** The funnel from cohort to pairs: anchored, with a dated sample, with one before, one after, both; and the pairs' spacing in days. */
-export function acquiredFunnelSql(cohortSql: string, study: string, db: string, o: AcquiredSides): string {
+export function acquiredFunnelSql(cohortSql: string, study: string, db: string, o: AcquiredSides): AggregateSql {
   const both = "n_pre > 0 AND n_post > 0";
-  return (
+  return aggregateSql((
     acquiredSidesCtes(cohortSql, study, db, o) + "\n" +
     "SELECT (SELECT count() FROM anch) AS anchored, (SELECT uniqExact(pid) FROM tl) AS with_events, count() AS dated,\n" +
     "       countIf(n_pre > 0) AS with_pre, countIf(n_post > 0) AS with_post, countIf(" + both + ") AS paired,\n" +
@@ -20,7 +21,7 @@ export function acquiredFunnelSql(cohortSql: string, study: string, db: string, 
     "       quantileExactIf(0.25)(post_rel - pre_rel, " + both + ") AS gap_q1, quantileExactIf(0.5)(post_rel - pre_rel, " + both + ") AS gap_median,\n" +
     "       quantileExactIf(0.75)(post_rel - pre_rel, " + both + ") AS gap_q3\n" +
     "FROM pick"
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------

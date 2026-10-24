@@ -4,12 +4,13 @@ import { clinicalTable } from "../../custom-data.ts";
 import { sq } from "../../compiler.ts";
 import { foldedEqualsSql, clinicalValueFoldSql, nameFoldSql } from "../../event-names.ts";
 import { driverJoin } from "../../federation.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /** Which site sources the cohort's patients carry: patients with a flag attribute (and how many
  *  flags), with a site on the timeline, and with a biopsy-site value. Counts only. */
-export function orgSourcesSql(cohortSql: string, study: string, db: string, o: { prefix: string; eventType: string; key: string; attribute: string }): string {
+export function orgSourcesSql(cohortSql: string, study: string, db: string, o: { prefix: string; eventType: string; key: string; attribute: string }): AggregateSql {
   const pid = pidOf("patient_unique_id", study), prefix = orgAttr(o.prefix), attr = orgAttr(o.attribute);
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT\n" +
     "  (SELECT uniqExact(" + pid + ") FROM " + clinicalTable(db, []) + " WHERE cancer_study_identifier = " + sq(study) +
@@ -25,37 +26,37 @@ export function orgSourcesSql(cohortSql: string, study: string, db: string, o: {
     "  (SELECT uniqExact(" + pid + ") FROM " + clinicalTable(db, [attr]) + " WHERE cancer_study_identifier = " + sq(study) +
     " AND attribute_name = " + sq(attr) + " AND trimBoth(attribute_value) != '' AND " + pid + " IN (SELECT pid FROM cohort)) AS sample_patients\n" +
     "FROM system.one"
-  );
+  ));
 }
 
 /** Per site: patients evaluable for it and those with a metastasis there. Counts only. */
-export function orgSitesSql(cohortSql: string, study: string, db: string, src: OrgSource): string {
-  return (
+export function orgSitesSql(cohortSql: string, study: string, db: string, src: OrgSource): AggregateSql {
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" + orgSiteCtes(study, db, src) + "\n" +
     "SELECT ps.site AS site, any(sl.label) AS label, count() AS evaluable, sum(ps.has) AS with_site\n" +
     "FROM ps INNER JOIN sl ON sl.site = ps.site GROUP BY site"
-  );
+  ));
 }
 
 /** Sample source: the biopsy-site values that ORG_SITE_MAP sends to "Other", with their patients. Counts only. */
-export function orgOtherValuesSql(cohortSql: string, study: string, db: string, attribute: string): string {
+export function orgOtherValuesSql(cohortSql: string, study: string, db: string, attribute: string): AggregateSql {
   const pid = pidOf("patient_unique_id", study), attr = orgAttr(attribute);
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT trimBoth(attribute_value) AS value, uniqExact(" + pid + ") AS patients\n" +
     "FROM " + clinicalTable(db, [attr]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attr) + " AND trimBoth(attribute_value) != ''\n" +
     "  AND " + pid + " IN (SELECT pid FROM cohort) AND " + orgSiteMapExpr("attribute_value") + " = 'Other'\n" +
     "GROUP BY value ORDER BY patients DESC, value LIMIT 30"
-  );
+  ));
 }
 
 /** The cohort's most altered genes (patients with the alteration on a covering panel), at most `limit`. Counts only. */
-export function orgTopGenesSql(cohortSql: string, study: string, db: string, g: Omit<OrgGenes, "genes">, limit: number): string {
-  return (
+export function orgTopGenesSql(cohortSql: string, study: string, db: string, g: Omit<OrgGenes, "genes">, limit: number): AggregateSql {
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" + orgGeneCtes(study, db, { ...g, genes: null }) + "\n" +
     "SELECT gene, count() AS altered FROM alt GROUP BY gene ORDER BY altered DESC, gene LIMIT " + Math.max(1, Math.min(200, Math.floor(limit)))
-  );
+  ));
 }
 
 /**
@@ -64,10 +65,10 @@ export function orgTopGenesSql(cohortSql: string, study: string, db: string, g: 
  * per stratum (a patient's `stratifyBy` value; "Multiple" when their samples disagree, '' when none
  * is recorded). Counts only.
  */
-export function orgCountsSql(cohortSql: string, study: string, db: string, src: OrgSource, g: OrgGenes & { genes: string[] }, stratifyBy: string | null): string {
+export function orgCountsSql(cohortSql: string, study: string, db: string, src: OrgSource, g: OrgGenes & { genes: string[] }, stratifyBy: string | null): AggregateSql {
   const pid = pidOf("patient_unique_id", study);
   const strat = stratifyBy ? orgAttr(stratifyBy) : null;
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" + orgSiteCtes(study, db, src) + ",\n" + orgGeneCtes(study, db, g) + ",\n" +
     "st AS (\n" +
     (strat
@@ -84,7 +85,7 @@ export function orgCountsSql(cohortSql: string, study: string, db: string, src: 
     "  LEFT JOIN alt ON alt.pid = ps.pid AND alt.gene = prof.gene\n" +
     "  LEFT JOIN st ON st.pid = ps.pid\n" +
     "GROUP BY site, gene, stratum"
-  );
+  ));
 }
 
 /**
@@ -92,10 +93,10 @@ export function orgCountsSql(cohortSql: string, study: string, db: string, src: 
  * death competing, for the cohort's patients profiled for `gene` and altered in it (`altered`) or
  * not: incidenceCountsSql over that half of the cohort. Counts only.
  */
-export function orgIncidenceSql(cohortSql: string, study: string, db: string, src: OrgSource, g: OrgGenes & { genes: [string] }, altered: boolean, siteValue: string): string {
+export function orgIncidenceSql(cohortSql: string, study: string, db: string, src: OrgSource, g: OrgGenes & { genes: [string] }, altered: boolean, siteValue: string): AggregateSql {
   const half = "SELECT pid FROM (" + cohortSql + ") WHERE pid IN (\n  WITH cohort AS (" + cohortSql + "),\n" + orgGeneCtes(study, db, g) + "\n" +
     "  SELECT pid FROM prof)\n  AND pid " + (altered ? "" : "NOT ") + "IN (\n  WITH cohort AS (" + cohortSql + "),\n" + orgGeneCtes(study, db, g) + "\n  SELECT pid FROM alt)";
-  return incidenceCountsSql(half, study, db, { eventType: src.eventType || "Diagnosis", attrs: [{ key: src.key || "TUMOR_SITE", value: siteValue }] }, null);
+  return aggregateSql(incidenceCountsSql(half, study, db, { eventType: src.eventType || "Diagnosis", attrs: [{ key: src.key || "TUMOR_SITE", value: siteValue }] }, null));
 }
 
 // ---------------------------------------------------------------------------

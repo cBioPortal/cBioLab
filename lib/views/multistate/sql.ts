@@ -2,6 +2,7 @@
 // multistate: the illness–death model (start → progression → death) from the timeline's day 0
 import { type ProgressionEvent, osCte, lastDayCte, progressionCte, cohortEventsFrom, eventHasKv, DAYS_PER_MONTH, CLOCK_SLACK_DAYS } from "../../federation-views.ts";
 import { foldedEqualsSql } from "../../event-names.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /** the event type whose day-0 record says the timeline's clock starts at sequencing */
 export const SEQUENCING_EVENT = "Sequencing";
@@ -18,8 +19,8 @@ export const SEQUENCING_EVENT = "Sequencing";
  * more than CLOCK_SLACK_DAYS past the end of follow-up (the clock check). 'nofollowup' patients
  * (no OS, or OS_MONTHS ≤ 0) are counted apart. Every cohort patient is in exactly one row's n.
  */
-export function multistateCountsSql(cohortSql: string, study: string, db: string, pr: ProgressionEvent): string {
-  return "WITH cohort AS (" + cohortSql + "),\n" + [
+export function multistateCountsSql(cohortSql: string, study: string, db: string, pr: ProgressionEvent): AggregateSql {
+  return aggregateSql("WITH cohort AS (" + cohortSql + "),\n" + [
     osCte(study, db),
     lastDayCte(study, db),
     progressionCte(study, db, pr),
@@ -56,5 +57,5 @@ export function multistateCountsSql(cohortSql: string, study: string, db: string
     "SELECT kind, if(kind = 'record', toUInt8(prevalent), 0) AS prevalent, if(kind = 'record', round(tp, 4), 0) AS tp,\n" +
     "       if(kind = 'record', round(te, 4), 0) AS te, if(kind = 'record', toUInt8(dead), 0) AS dead,\n" +
     "       toUInt8(afterend) AS afterend, toUInt8(assessed) AS assessed, toUInt8(seq0) AS seq0, toUInt8(late) AS late, count() AS n\n" +
-    "FROM cls GROUP BY kind, prevalent, tp, te, dead, afterend, assessed, seq0, late ORDER BY te";
+    "FROM cls GROUP BY kind, prevalent, tp, te, dead, afterend, assessed, seq0, late ORDER BY te");
 }

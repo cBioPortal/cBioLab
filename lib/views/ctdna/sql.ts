@@ -5,11 +5,12 @@ import { clinicalTable } from "../../custom-data.ts";
 import { sq } from "../../compiler.ts";
 import { clinicalValueFoldSql, foldedEqualsSql, foldedInSql } from "../../event-names.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /** Per gene, among patients with plasma and tissue both profiled for it: as pairedCountsSql (a = tissue, b = plasma). */
 export function ctdnaCountsSql(cohortSql: string, study: string, db: string, genes: string[] | null, o: CtdnaSides,
-  pin: string | null, measure: "driver" | "any"): string {
-  return ctdnaSidesCtes(cohortSql, study, db, o) + ",\n" + sideCountsTail(study, db, genes, pin, measure, chKeep(o, "ps.side"));
+  pin: string | null, measure: "driver" | "any"): AggregateSql {
+  return aggregateSql(ctdnaSidesCtes(cohortSql, study, db, o) + ",\n" + sideCountsTail(study, db, genes, pin, measure, chKeep(o, "ps.side")));
 }
 
 /**
@@ -18,8 +19,8 @@ export function ctdnaCountsSql(cohortSql: string, study: string, db: string, gen
  * (ctDNA detected: a mutation, an amplification or deep deletion, or a structural variant; with
  * `driver`, an OncoKB oncogenic one).
  */
-export function ctdnaFunnelSql(cohortSql: string, study: string, db: string, o: CtdnaSides, pin: string | null, measure: "driver" | "any"): string {
-  return (
+export function ctdnaFunnelSql(cohortSql: string, study: string, db: string, o: CtdnaSides, pin: string | null, measure: "driver" | "any"): AggregateSql {
+  return aggregateSql((
     ctdnaSidesCtes(cohortSql, study, db, o) + ",\n" +
     ctdnaDetectedCte(study, db, pin, measure, chKeep(o, "s.side")) + "\n" +
     "SELECT (SELECT uniqExactIf(pid, side = 'b') FROM classed) AS plasma_all, (SELECT uniqExactIf(pid, side = 'a') FROM classed) AS tissue_all,\n" +
@@ -31,16 +32,16 @@ export function ctdnaFunnelSql(cohortSql: string, study: string, db: string, o: 
       "       (SELECT countIf(by_gene) FROM chx) AS ch_by_gene, (SELECT countIf(by_normal) FROM chx) AS ch_by_normal, (SELECT countIf(by_gene OR by_normal) FROM chx) AS ch_removed,\n" +
       "       (SELECT uniqExact(s.pid) FROM chx INNER JOIN sides s ON s.suid = chx.suid WHERE by_gene OR by_normal) AS ch_patients" : "") + "\n" +
     "FROM system.one"
-  );
+  ));
 }
 
 /**
  * Overall survival of the patients with a plasma sample, by ctDNA detected or not: counts of
  * (detected, months, dead) — OS_MONTHS / OS_STATUS as the study records them.
  */
-export function ctdnaSurvivalSql(cohortSql: string, study: string, db: string, o: CtdnaSides, pin: string | null, measure: "driver" | "any"): string {
+export function ctdnaSurvivalSql(cohortSql: string, study: string, db: string, o: CtdnaSides, pin: string | null, measure: "driver" | "any"): AggregateSql {
   const pid = pidOf("patient_unique_id", study);
-  return (
+  return aggregateSql((
     ctdnaSidesCtes(cohortSql, study, db, o) + ",\n" +
     ctdnaDetectedCte(study, db, pin, measure, chKeep(o, "s.side")) + ",\n" +
     "os AS (\n" +
@@ -53,19 +54,19 @@ export function ctdnaSurvivalSql(cohortSql: string, study: string, db: string, o
     ")\n" +
     "SELECT detected, round(months, 2) AS t, dead, count() AS n\n" +
     "FROM os WHERE months IS NOT NULL AND months >= 0 GROUP BY detected, t, dead ORDER BY t"
-  );
+  ));
 }
 
 /** with a CH rule: per gene, the plasma mutation calls it removes and their patients, by which rule */
-export function ctdnaChRemovedSql(cohortSql: string, study: string, db: string, o: CtdnaSides): string {
+export function ctdnaChRemovedSql(cohortSql: string, study: string, db: string, o: CtdnaSides): AggregateSql {
   if (!o.ch) throw new Error("ctdnaChRemovedSql needs a CH rule");
-  return (
+  return aggregateSql((
     ctdnaSidesCtes(cohortSql, study, db, o) + "\n" +
     "SELECT chx.gene AS gene, countIf(by_gene OR by_normal) AS calls, uniqExactIf(s.pid, by_gene OR by_normal) AS patients,\n" +
     "       countIf(by_gene) AS gene_calls, countIf(by_normal) AS normal_calls\n" +
     "FROM chx INNER JOIN sides s ON s.suid = chx.suid\n" +
     "GROUP BY gene HAVING calls > 0 ORDER BY calls DESC, gene LIMIT 40"
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------

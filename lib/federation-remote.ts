@@ -22,6 +22,7 @@ import { acceptedFromPeers, allowedKinds, PATIENT_KIND_NAMES, type PatientKind }
 import type { PatientTimeline, PatientEvent, PatientSample, PeerSource } from "./types.ts";
 import type { StudyRow } from "./study-list.ts";
 import type { StudyCatalog } from "./study-catalog.ts";
+import { cohortSubquery, type CohortSql } from "./sql-kinds.ts";
 
 interface RemoteAggregates {
   study: string; instance: string; count: number;
@@ -233,11 +234,11 @@ export class RemoteAggregateResolver implements AggregateCapable {
       for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, ms: q.ms, remote: true });
   }
   /** The peer compiles and runs its own SQL against its own schema. */
-  cohortSql(): string {
+  cohortSql(): CohortSql {
     const head = "-- evaluated remotely by " + this.instance.label + " (" + this.url + ")\n";
-    return this.peerSql
+    return cohortSubquery(this.peerSql
       ? head + "-- compiled and run BY THE PEER, against its own schema; only counts came back\n" + this.peerSql
-      : head + "-- this instance receives aggregates only; the peer did not disclose its SQL";
+      : head + "-- this instance receives aggregates only; the peer did not disclose its SQL");
   }
   /** nothing carrying identifiers is allowed to leave for a remote peer */
   private guard(def: CohortDef | null | undefined): void {

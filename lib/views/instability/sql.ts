@@ -1,6 +1,7 @@
 // The instability view's SQL: what its runner (run.ts) asks each participant's database for.
 import { GENOME_CHROMS, CHROM_LENGTHS, pidOf } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /** the arms scored: 39 autosomal arms (and Xp, Xq with includeX), in genome order */
 export function instabilityArms(includeX: boolean): string[] {
@@ -8,20 +9,20 @@ export function instabilityArms(includeX: boolean): string[] {
 }
 
 /** FGA in 1-point bins × aneuploidy score, with how many arms each sample had measured: counts of samples. */
-export function instabilityScoresSql(cohortSql: string, study: string, db: string, o: InstabilityOpts): string {
-  return (
+export function instabilityScoresSql(cohortSql: string, study: string, db: string, o: InstabilityOpts): AggregateSql {
+  return aggregateSql((
     instabilityCtes(cohortSql, study, db, o) + "\n" +
     "SELECT toInt32(least(100, floor(100 * alt / greatest(1, cov)))) AS fga_bin, score, measured, count() AS n\n" +
     "FROM per GROUP BY fga_bin, score, measured ORDER BY fga_bin, score"
-  );
+  ));
 }
 
 /** Per arm: the samples that measured it, and those with it gained or lost. */
-export function instabilityArmsSql(cohortSql: string, study: string, db: string, o: InstabilityOpts): string {
-  return (
+export function instabilityArmsSql(cohortSql: string, study: string, db: string, o: InstabilityOpts): AggregateSql {
+  return aggregateSql((
     instabilityCtes(cohortSql, study, db, o) + "\n" +
     "SELECT arm, countIf(measured) AS n_measured, countIf(measured AND gain) AS n_gain, countIf(measured AND loss) AS n_loss FROM calls GROUP BY arm"
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------
