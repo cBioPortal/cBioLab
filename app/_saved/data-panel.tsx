@@ -1,14 +1,16 @@
 "use client";
 // The saved-work manager's Custom data tab: the uploads stored on the server, the reader's and
-// others' shared with them — analyse one, export it, share or delete it. Adding one happens on the
-// studies being explored (Explore → Custom data), where its ids are matched.
+// others' shared with them — analyse one, export it, edit or replace it (a new version, saved after
+// its changes are reviewed), share or delete it. Adding one happens on the studies being explored
+// (Explore → Custom data), where its ids are matched.
 import { useState } from "react";
-import { Download, Plus, Share2, Trash2, Users } from "lucide-react";
+import { Download, Pencil, Plus, Share2, Trash2, Users } from "lucide-react";
 import { ShareDialog, sharingLabel } from "../lab/share-dialog.tsx";
 import { useGroups } from "../lab/use-groups.ts";
-import { useCustomDataState } from "../lab/custom-data-panel.tsx";
+import { AddCustomData, useCustomDataState } from "../lab/custom-data-panel.tsx";
 import { datasetToTsv, deleteServerDataset, fetchServerVersion, shareServerDataset, type StoredDataset } from "../lab/custom-data-client.ts";
 import { Button } from "../_ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 import { DOC_VERSION } from "../../lib/doc-version.ts";
@@ -30,6 +32,8 @@ export function DataPanel() {
   const [err, setErr] = useState<string | null>(null);
   const groups = useGroups(server.user?.id ?? null);
   const [sharing, setSharing] = useState<DatasetMeta | null>(null);
+  const [editing, setEditing] = useState<DatasetMeta | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const act = async (label: string, f: () => Promise<unknown>) => {
     setBusy(label); setErr(null);
     try { await f(); actions.onDataChanged?.(); } catch (e) { setErr(String((e as Error).message || e)); }
@@ -79,6 +83,9 @@ export function DataPanel() {
                         onClick={() => { actions.openDoc(uploadDoc(d, v.studies)); close(); }}><Users />Analyze</Button>{" "}</>}
                       <Button variant="outline" size="sm" className={TB} disabled={!!busy}
                         onClick={() => void act("exporting…", async () => download(await fetchServerVersion(d.id, d.latestVersion)))}><Download />Export</Button>{" "}
+                      {d.rights.edit && v && <><Button variant="outline" size="sm" className={cn(TB, "cd-edit")} disabled={!!busy}
+                        title={"edit v" + d.latestVersion + "'s values, or load a replacement, and save the result as v" + (d.latestVersion + 1) + " once its changes are reviewed"}
+                        onClick={() => { setNote(null); setEditing(d); }}><Pencil />Edit / replace…</Button>{" "}</>}
                       {d.rights.share && <><Button variant="outline" size="sm" className={TB} disabled={!!busy} onClick={() => setSharing(d)}><Share2 />Share…</Button>{" "}
                         <Button variant="outline" size="sm" className={cn(TB, "text-destructive hover:text-destructive")} disabled={!!busy} onClick={() => remove(d)}><Trash2 />Delete</Button></>}
                     </td>
@@ -89,8 +96,22 @@ export function DataPanel() {
           </table>
         </div>
       ) : <p className="note">Nothing uploaded yet{add ? "." : " — add data from Explore → Custom data, on the studies it belongs to."}</p>}
+      {note && <p className="cd-added">{note}</p>}
       {busy && <p className="meta"><span className="spinner" /> {busy}</p>}
       {err && <p className="error">{err}</p>}
+      {editing && <Dialog open onOpenChange={(o) => { if (!o) setEditing(null); }}>
+        <DialogContent aria-describedby={undefined}
+          className="cd-editdialog flex h-[90vh] w-[94vw] max-w-[94vw] flex-col gap-3 overflow-auto p-6 sm:max-w-[94vw]">
+          <DialogHeader><DialogTitle className="text-base">Edit “{editing.name}” <span className="meta font-normal">
+            v{editing.latestVersion} · custom:{editing.slug}</span></DialogTitle></DialogHeader>
+          <div className="customdata">
+            <p className="note flush">Change values in the table, add or remove rows and columns, or drop in a replacement file. Nothing
+              is overwritten: saving adds v{editing.latestVersion + 1}, after showing every change from v{editing.latestVersion}.</p>
+            <AddCustomData replacing={editing} studies={editing.versions.find((x) => x.version === editing.latestVersion)?.studies ?? []}
+              onAdded={(name) => { setEditing(null); actions.onDataChanged?.(); setNote("Saved “" + name + "” as v" + (editing.latestVersion + 1) + "."); }} />
+          </div>
+        </DialogContent>
+      </Dialog>}
       {sharing && <ShareDialog kind="custom dataset" name={sharing.name} sharing={sharing.sharing}
         groups={groups.groups} groupsError={groups.error}
         onSave={async (s) => { await shareServerDataset(sharing.id, s); actions.onDataChanged?.(); }}

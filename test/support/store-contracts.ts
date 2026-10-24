@@ -39,7 +39,7 @@ export function customStoreContract(backend: string): void {
 
     test("a re-upload is a new version; the old one still reads the same", async () => {
       const v1 = await saveDataset(P, ds("pinned"), {});
-      const v2 = await saveDataset(P, ds("pinned", "Liver"), {}, v1.id);
+      const v2 = await saveDataset(P, ds("pinned", "Liver"), {}, v1.id, 1);
       assert.equal(v2.id, v1.id);
       assert.equal(v2.latestVersion, 2);
       assert.equal(unpackRows((await readVersion(P, v1.id, 1)).rowsGz)[0].values[0], "Brain");
@@ -55,7 +55,17 @@ export function customStoreContract(backend: string): void {
     test("a new version must keep the level", async () => {
       const a = await saveDataset(P, ds("levels"), {});
       const sample = { ...ds("levels"), level: "sample", rows: [{ study: "s1", patient: "P-1", sample: "P-1-T1", values: ["x"] }] };
-      await assert.rejects(saveDataset(P, sample, {}, a.id), /is patient-level; a new version must be too/);
+      await assert.rejects(saveDataset(P, sample, {}, a.id, 1), /is patient-level; a new version must be too/);
+    });
+
+    test("a new version is refused unless it was compared against the latest, and when it changes nothing", async () => {
+      const a = await saveDataset(P, ds("reviewed"), {});
+      await assert.rejects(saveDataset(P, ds("reviewed", "Liver"), {}, a.id), /names the version its changes were compared against/);
+      await assert.rejects(saveDataset(P, ds("reviewed"), {}, a.id, 1), /same data as v1 of “reviewed \(test\)”: nothing to save/);
+      await saveDataset(P, ds("reviewed", "Liver"), {}, a.id, 1);
+      // a second editor who reviewed v1 must not replace v2 unseen
+      await assert.rejects(saveDataset(P, ds("reviewed", "Bone"), {}, a.id, 1), /is at v2 now, not the v1 these changes were compared against/);
+      assert.equal((await saveDataset(P, ds("reviewed", "Bone"), {}, a.id, 2)).latestVersion, 3);
     });
 
     test("what the engine would refuse is never stored", async () => {
@@ -321,8 +331,9 @@ export function sharingContract(backend: string): void {
           assert.equal((await listDatasets(who)).some((x) => x.id === d.id), can.read, "listed");
           if (can.read) assert.deepEqual(unpackRows((await readVersion(who, d.id, 1)).rowsGz), ds("x").rows);
           else await assert.rejects(readVersion(who, d.id, 1), /no custom dataset .* that you may read/);
-          if (can.edit) assert.equal((await saveDataset(who, ds("ignored", "Lung"), {}, d.id)).latestVersion >= 2, true);
-          else await assert.rejects(saveDataset(who, ds("ignored"), {}, d.id), can.read ? /but not add versions/ : /that you may read/);
+          const base = (await listDatasets(O)).find((x) => x.id === d.id)!.latestVersion;
+          if (can.edit) assert.equal((await saveDataset(who, ds("ignored", "Lung " + who), {}, d.id, base)).latestVersion, base + 1);
+          else await assert.rejects(saveDataset(who, ds("ignored", "Lung " + who), {}, d.id, base), can.read ? /but not add versions/ : /that you may read/);
           await assert.rejects(deleteDataset(who, d.id), can.read ? /only its owner can delete/ : /that you may read/);
           await assert.rejects(shareDataset(who, d.id, { visibility: "public" }), can.read ? /only its owner can change who/ : /that you may read/);
         }

@@ -134,11 +134,12 @@ async function gzip(text: string): Promise<Blob> {
 
 const strip = (d: CustomDataset): CustomDataset => ({ id: d.id, name: d.name, level: d.level, columns: d.columns, rows: d.rows });
 
-/** Save a dataset to the server: a new one, or the next version of one (`versionOf`, its id). */
-export async function saveToServer(d: StoredDataset, versionOf?: string): Promise<DatasetMeta> {
+/** Save a dataset to the server: a new one, or the next version of one (`versionOf`: its id, and
+ *  `version`, the version its changes were reviewed against — refused if no longer the latest). */
+export async function saveToServer(d: StoredDataset, versionOf?: { id: string; version: number }): Promise<DatasetMeta> {
   if (!server.unlocked) throw new Error("sign in (top right) to save custom data");
   const res = await fetch("/api/custom-data/datasets", { method: "POST", headers: { "Content-Type": "application/gzip" },
-    body: await gzip(JSON.stringify({ dataset: strip(d), source: d.source, versionOf })) });
+    body: await gzip(JSON.stringify({ dataset: strip(d), source: d.source, versionOf: versionOf?.id, baseVersion: versionOf?.version })) });
   const j = await res.json();
   if (!res.ok || j.error) throw new Error(j.error || res.statusText);
   await loadServerData();

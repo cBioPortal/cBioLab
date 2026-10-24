@@ -136,8 +136,12 @@ export async function readVersion(principal: string, id: string, version?: numbe
  * Save an upload: a new dataset, or the next version of an existing one (`versionOf`). The
  * dataset is validated exactly as a request's customData is, so nothing is stored that the
  * engine would refuse.
+ *
+ * A new version names the version its changes were reviewed against (`baseVersion`, see
+ * lib/custom-data-diff.ts), and is refused when that is no longer the latest — someone saved in
+ * between, so what was confirmed is not what would be replaced — or when it is the same data again.
  */
-export async function saveDataset(principal: string, input: unknown, source: unknown, versionOf?: string): Promise<DatasetMeta> {
+export async function saveDataset(principal: string, input: unknown, source: unknown, versionOf?: string, baseVersion?: number): Promise<DatasetMeta> {
   const [ds] = validateCustomData([input]) as [CustomDataset];
   if (!ds || !ds.rows.length) throw new Error("a dataset needs at least one row");
   const src = (source && typeof source === "object" ? source : {}) as Partial<DatasetSource>;
@@ -156,6 +160,11 @@ export async function saveDataset(principal: string, input: unknown, source: unk
     if (target.deleted_at) throw new AccessError("custom dataset “" + target.name + "” was deleted; save it as a new dataset", 410);
     if (!canWrite(principal, target, groups)) throw new AccessError("you may read “" + target.name + "” but not add versions to it", 403);
     if (target.level !== ds.level) throw new Error("“" + target.name + "” is " + target.level + "-level; a new version must be too");
+    if (!Number.isInteger(baseVersion)) throw new Error("a new version names the version its changes were compared against (baseVersion)");
+    if (baseVersion !== target.latest_version)
+      throw new AccessError("“" + target.name + "” is at v" + target.latest_version + " now, not the v" + baseVersion + " these changes were compared against: review them again", 409);
+    const latest = (await store.versions([target.id])).find((v) => v.version === target!.latest_version);
+    if (latest?.sha256 === row.sha256) throw new Error("this is the same data as v" + target.latest_version + " of “" + target.name + "”: nothing to save");
   } else {
     const clash = await store.bySlug(principal, ds.id);
     // a deleted dataset keeps its name, so an analysis pinned to it is still refused as deleted rather than reading another
