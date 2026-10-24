@@ -700,8 +700,11 @@ they can't tell you:
   renderers, plots, gene tracks, template parameters, the panel-aware denominator, and the
   property tests of `test/properties.test.ts`). `npm run test:db` (~15 s, in `scripts/gate.sh`) runs the stores'
   Postgres SQL, `db/migrations`, their runner and their triggers on an in-process Postgres (PGlite,
-  `test/postgres.db-test.ts`). A store promise belongs in `test/support/store-contracts.ts`, which
-  runs there and on `lib/db.ts`'s own fallback.
+  `test/postgres.db-test.ts`), and the stored-id-set request boundary on it
+  (`test/request-boundary.db-test.ts`: reading a request's sets, saving a pasted list, locking
+  cohorts, against a stand-in warehouse that records which instance each statement and id table
+  went to). A store promise belongs in `test/support/store-contracts.ts`, which runs there and on
+  `lib/db.ts`'s own fallback.
   `node e2e.cjs` — the browser checks (Playwright) against a running server. The checks that need
   no server (`check:examples`, `check:denominators`, `check:genefacets`, `check:values`,
   `check:splitby-perf`) are stages of `scripts/gate.sh` of their own, and the boundary suite is in
