@@ -31,6 +31,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const genomeUi: KindUi<"genome"> = {
   kind: "genome",
   label: "Genome-wide copy number",
+  category: "copynumber",
   title: "Genome-wide copy number",
   maxCohorts: 4,
   sub: (_spec, v) => v.genome ? v.genome.build + ", " + v.genome.binMb + " Mb bins, from segments" : "from copy-number segments",

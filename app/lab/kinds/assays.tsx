@@ -71,6 +71,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const assaysUi: KindUi<"assays"> = {
   kind: "assays",
   label: "Generic assays (signatures, arm-level CNA, …)",
+  category: "expression",
   title: "Generic assays",
   maxCohorts: 6,
   minCohorts: 2,

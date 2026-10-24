@@ -79,6 +79,7 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
 export const survivalUi: KindUi<"survival"> = {
   kind: "survival",
   label: "Survival",
+  category: "outcomes",
   title: "Survival",
   why: (_k, p) => p.noSurvivalWhy(),
   loading: (_k, p) => p.catLoading,

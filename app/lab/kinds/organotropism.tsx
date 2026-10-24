@@ -43,6 +43,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const organotropismUi: KindUi<"organotropism"> = {
   kind: "organotropism",
   label: "Metastatic organotropism (genes × metastatic sites, within cancer types)",
+  category: "evolution",
   title: "Metastatic organotropism",
   maxCohorts: 1,
   cohortInHeader: true,

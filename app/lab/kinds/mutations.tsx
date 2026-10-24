@@ -39,6 +39,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const mutationsUi: KindUi<"mutations"> = {
   kind: "mutations",
   label: "Mutation table (one gene)",
+  category: "alterations",
   title: "Mutations",
   maxCohorts: 6,
   defaults: (known) => ({ kind: "mutations", gene: known.genes[0] || "TP53" }),

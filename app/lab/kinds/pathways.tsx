@@ -27,6 +27,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const pathwaysUi: KindUi<"pathways"> = {
   kind: "pathways",
   label: "Oncogenic pathways",
+  category: "alterations",
   title: "Oncogenic signalling pathways",
   maxCohorts: 4,
   sub: (spec) => (spec.measure === "any" ? "any alteration" : "OncoKB drivers") + ", Sanchez-Vega et al. 2018",

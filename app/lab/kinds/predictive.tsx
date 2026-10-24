@@ -34,6 +34,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const predictiveUi: KindUi<"predictive"> = {
   kind: "predictive",
   label: "Predictive biomarkers (gene × treatment interaction)",
+  category: "outcomes",
   title: "Predictive biomarkers",
   genes: true,
   maxCohorts: 2,

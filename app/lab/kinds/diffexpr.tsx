@@ -32,6 +32,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const diffexprUi: KindUi<"diffexpr"> = {
   kind: "diffexpr",
   label: "Differential expression + GSEA",
+  category: "expression",
   title: "Differential expression",
   maxCohorts: 2,
   minCohorts: 2,

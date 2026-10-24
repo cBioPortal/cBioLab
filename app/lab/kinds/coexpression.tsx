@@ -58,6 +58,7 @@ function CoexpressionCard({ ctx, v, vi }: CardProps) {
 export const coexpressionUi: KindUi<"coexpression"> = {
   kind: "coexpression",
   label: "Co-expression",
+  category: "expression",
   title: "Co-expression",
   maxCohorts: 1,
   why: (_k, p) => p.contProfile() ? null : "this study has no continuous molecular profile (mRNA z-scores) to correlate",

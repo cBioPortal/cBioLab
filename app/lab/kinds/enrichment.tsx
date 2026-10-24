@@ -69,6 +69,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const enrichmentUi: KindUi<"enrichment"> = {
   kind: "enrichment",
   label: "Alteration enrichment (all genes)",
+  category: "alterations",
   title: "Alteration enrichment",
   maxCohorts: 6,
   minCohorts: 2,

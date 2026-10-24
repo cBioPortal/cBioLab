@@ -46,6 +46,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const incidenceUi: KindUi<"incidence"> = {
   kind: "incidence",
   label: "Cumulative incidence (competing risks)",
+  category: "outcomes",
   title: "Cumulative incidence",
   maxCohorts: 6,
   why: (k) => k.events.length ? null : "this study records no timeline events to estimate the incidence of",

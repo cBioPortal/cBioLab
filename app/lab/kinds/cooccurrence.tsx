@@ -55,6 +55,7 @@ function CooccurrenceCard({ ctx, v, vi }: CardProps) {
 export const cooccurrenceUi: KindUi<"cooccurrence"> = {
   kind: "cooccurrence",
   label: "Co-occurrence",
+  category: "alterations",
   title: "Co-occurrence",
   maxCohorts: 1,
   defaults: (k) => ({ kind: "cooccurrence", genes: k.genes.slice(0, 6) }),

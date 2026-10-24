@@ -36,6 +36,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const actionabilityUi: KindUi<"actionability"> = {
   kind: "actionability",
   label: "Clinical actionability (OncoKB levels, primary vs metastasis)",
+  category: "clinical",
   title: "Clinical actionability",
   maxCohorts: 4,
   defaults: () => ({ kind: "actionability", groupBy: "CANCER_TYPE" }),

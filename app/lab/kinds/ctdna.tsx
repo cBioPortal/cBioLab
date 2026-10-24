@@ -43,6 +43,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const ctdnaUi: KindUi<"ctdna"> = {
   kind: "ctdna",
   label: "ctDNA vs tissue (plasma against tissue, OS by ctDNA detected)",
+  category: "clinical",
   title: "ctDNA vs tissue",
   genes: true,
   maxCohorts: 3,

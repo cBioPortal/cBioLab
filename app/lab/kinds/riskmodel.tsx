@@ -117,6 +117,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const riskmodelUi: KindUi<"riskmodel"> = {
   kind: "riskmodel",
   label: "Risk model (elastic-net Cox, OncoCast-style)",
+  category: "outcomes",
   title: "Risk model",
   maxCohorts: 1,
   sub: (spec) => (spec.endpoint || "OS") + (spec.anchor?.eventType ? " from first " + spec.anchor.eventType + (spec.anchor.key ? " [" + spec.anchor.key + "=" + spec.anchor.value + "]" : "") : "") +

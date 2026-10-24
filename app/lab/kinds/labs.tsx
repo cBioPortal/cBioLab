@@ -49,6 +49,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const labsUi: KindUi<"labs"> = {
   kind: "labs",
   label: "Lab course and response (e.g. PSA50)",
+  category: "treatment",
   title: "Lab course",
   maxCohorts: 4,
   why: (k) => k.events.some((e) => /lab/i.test(e.canonical)) ? null : "this study records no lab-test timeline events",

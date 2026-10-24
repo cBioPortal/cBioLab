@@ -53,6 +53,7 @@ function CompareCard({ ctx, v, vi }: CardProps) {
 export const compareUi: KindUi<"compare"> = {
   kind: "compare",
   label: "Compare genes",
+  category: "alterations",
   title: "Compare",
   defaults: (k) => ({ kind: "compare", genes: k.genes }),
   Card: CompareCard,

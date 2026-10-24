@@ -33,6 +33,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const drivernegativeUi: KindUi<"drivernegative"> = {
   kind: "drivernegative",
   label: "Driver-negative analysis (genes enriched without a canonical driver)",
+  category: "alterations",
   title: "Driver-negative analysis",
   maxCohorts: 1,
   sub: (spec) => (spec.alteration === "sv" ? "structural variants" : spec.alteration === "cna" ? "copy-number alterations" : "mutations") +

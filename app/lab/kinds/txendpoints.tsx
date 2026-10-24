@@ -48,6 +48,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const txendpointsUi: KindUi<"txendpoints"> = {
   kind: "txendpoints",
   label: "Treatment endpoints (TTNT, time on treatment, real-world PFS)",
+  category: "treatment",
   title: "Treatment endpoints",
   maxCohorts: 6,
   why: (k) => k.events.some((e) => /treat|therap|drug|medicat/i.test(e.canonical)) ? null : "this study records no treatment timeline events",

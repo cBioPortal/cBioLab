@@ -58,6 +58,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const acquiredUi: KindUi<"acquired"> = {
   kind: "acquired",
   label: "Acquired under therapy (samples before vs after a treatment start)",
+  category: "evolution",
   title: "Acquired under therapy",
   genes: true,
   maxCohorts: 3,

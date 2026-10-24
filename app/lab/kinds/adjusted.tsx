@@ -33,6 +33,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const adjustedUi: KindUi<"adjusted"> = {
   kind: "adjusted",
   label: "Adjusted enrichment (every gene, logistic on covariates)",
+  category: "alterations",
   title: "Adjusted enrichment",
   maxCohorts: 2,
   minCohorts: 2,

@@ -32,6 +32,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const tableUi: KindUi<"table"> = {
   kind: "table",
   label: "Clinical data table (download)",
+  category: "overview",
   title: "Clinical data",
   maxCohorts: 6,
   sub: (spec, v) => "one row per " + (spec.unit === "patient" ? "patient" : "sample") + (v.table ? " · " + v.table.total.toLocaleString() + " rows, " + v.table.columns.length + " attributes" : ""),

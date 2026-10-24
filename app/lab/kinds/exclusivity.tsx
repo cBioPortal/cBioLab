@@ -30,6 +30,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const exclusivityUi: KindUi<"exclusivity"> = {
   kind: "exclusivity",
   label: "Mutual exclusivity (DISCOVER, burden-aware)",
+  category: "alterations",
   title: "Mutual exclusivity",
   genes: true,
   maxCohorts: 1,

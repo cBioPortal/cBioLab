@@ -82,6 +82,7 @@ function Card(p: CardProps) {
 export const sequenceUi: KindUi<"sequence"> = {
   kind: "sequence",
   label: "Treatment sequence",
+  category: "treatment",
   title: "Treatment sequence",
   maxCohorts: 1,
   why: (k) => treatmentEventOf(k.events) ? null

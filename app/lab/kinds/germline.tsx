@@ -32,6 +32,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const germlineUi: KindUi<"germline"> = {
   kind: "germline",
   label: "Germline carriers (and their somatic second hits)",
+  category: "clinical",
   title: "Germline carriers",
   maxCohorts: 4,
   sub: (spec) => "germline carriers per patient sequenced, " + (spec.genes?.length ? spec.genes.length + " genes" : "every gene with ≥" + (spec.minCarriers ?? 3) + " carriers") +

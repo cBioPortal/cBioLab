@@ -5,7 +5,7 @@
 // (VIEW_KINDS, each with why it cannot when it cannot, and whether that is still being
 // fetched), and which kinds draw their own header. Read-only: it edits nothing.
 import { KIND_UI, kindUi, type AnyKindUi } from "./kinds/index.ts";
-import type { Known, MenuPage } from "./kinds/kind-ui.ts";
+import type { Known, MenuPage, ViewCategory } from "./kinds/kind-ui.ts";
 import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
 import { foldEventNames } from "../../lib/event-names.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
@@ -139,7 +139,7 @@ export function useViewOptions(page: ViewOptionsPage) {
    * with a spinner rather than guessing — enabling it could add a view that can only error, and
    * `why` alone would call a study empty when its catalog simply hasn't arrived.
    */
-  const VIEW_KINDS: { kind: string; label: string; why?: () => string | null; loading?: () => boolean }[] = (Object.values(KIND_UI) as AnyKindUi[]).map((k) => ({ kind: k.kind, label: k.label,
+  const VIEW_KINDS: { kind: string; label: string; category: ViewCategory; why?: () => string | null; loading?: () => boolean }[] = (Object.values(KIND_UI) as AnyKindUi[]).map((k) => ({ kind: k.kind, label: k.label, category: k.category,
     ...(k.why ? { why: () => k.why!(known(), menuPage),
                   loading: () => k.loading ? k.loading(known(), menuPage) : !profileOptions().length && (trackAttrsLoading || exploreBusy) } : {}) }))
   .map((k) => ({ ...k,
