@@ -2,7 +2,7 @@
 // The Custom data dialog: upload a table of curated annotations and check how it matched the
 // explored studies (Add data), and see, export or delete what is stored on the server, the only
 // place uploads live (Manage). Owns its own draft state, so typing into the paste box never
-// re-renders the analysis page (see "Keystrokes stay in the field" in CLAUDE.md). Which custom
+// re-renders the analysis page (see "Keystrokes stay in the field" in docs/UI.md). Which custom
 // attributes are drawn as charts is chosen in Explore's Add chart dialog, like any other attribute.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { ShareDialog, sharingLabel } from "./share-dialog.tsx";

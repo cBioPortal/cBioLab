@@ -1,5 +1,5 @@
 // The analysis page's requests can finish in any order. Each request-order check holds a request
-// with page.route() (CLAUDE.md, "Verify waiting states by holding the request"), lets a later one
+// with page.route() (docs/UI.md, "Verify waiting states by holding the request"), lets a later one
 // through, and then asserts that what the page shows is the newer answer. The rest check what the
 // document store (app/lab/doc-store.ts) promises: cards keep their element, edits reach the URL.
 //
