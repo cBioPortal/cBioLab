@@ -1,8 +1,8 @@
 {
- "ranAt": "2026-10-15T22:05:31.087Z",
- "commit": "6247483",
- "total": 35,
- "pass": 35,
+ "ranAt": "2026-10-23T15:56:38.440Z",
+ "commit": "94670e5",
+ "total": 37,
+ "pass": 37,
  "checks": [
   {
    "study": "msk_chord_2024",
@@ -226,6 +226,20 @@
    "group": "splits",
    "claim": "every arm holds exactly the patients a by-hand first-match-wins pass puts there",
    "detail": "PIK3CA 1908/1908, TP53 1543/1543, rest 1917/1917",
+   "pass": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "profiled",
+   "claim": "profiled for MUTATION in every one of KRAS, NRAS, BRAF, NTRK3, SOX9 is the intersection of each gene's profiled patients",
+   "detail": "gene list: 24,948 patients, identical · each gene: 24,950 / 24,950 / 24,950 / 24,950 / 24,948",
+   "pass": true
+  },
+  {
+   "study": "brca_tcga",
+   "group": "profiled",
+   "claim": "profiled for CNA in every one of KRAS, TP53, PIK3CA is the intersection of each gene's profiled patients",
+   "detail": "gene list: 1,080 patients, identical · each gene: 1,080 / 1,080 / 1,080",
    "pass": true
   },
   {
