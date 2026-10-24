@@ -477,7 +477,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
    cbioportal.org API, the warehouse, the studies named in the scripts). The three: `check:portal` (counts, gene frequencies and
    filtered cohorts against cbioportal.org's public API — exact, no tolerance), `check:cohorts` (the
    cohort algebra — and/or/not, splits, line nesting, held-out halves — as set arithmetic over
-   patient ids) and `check:mutants` (plants each bug in `scripts/check-mutants.ts` into a temp copy
+   patient ids, and fast-check-generated definitions compared with a reference evaluator over the
+   raw rows) and `check:mutants` (plants each bug in `scripts/check-mutants.ts` into a temp copy
    and requires a check to fail). The first two are gate stages. A new statistic gets a row in
    `lib/verification.ts` (`test/verification.test.ts` fails otherwise); new cohort or count logic
    should get a planted bug that proves some check would notice it breaking. A planted bug that

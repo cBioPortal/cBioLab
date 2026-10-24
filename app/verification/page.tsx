@@ -138,7 +138,7 @@ export default function VerificationPage() {
                 <td>Nothing external: no network, no database. The reference answers are saved with the code.</td></tr>
               <tr><td>Counts against cBioPortal</td><td>Cohort sizes, gene frequencies, clinical counts and filtered cohorts (section 1)</td>
                 <td>The <b>public cBioPortal API</b> at <span className="mono">www.cbioportal.org</span> (no account or key), and the <b>warehouse</b></td></tr>
-              <tr><td>Cohort logic</td><td>And / or / not, splits, lines of therapy, held-out halves (section 2)</td>
+              <tr><td>Cohort logic</td><td>And / or / not, splits, lines of therapy, held-out halves, generated definitions against a second program (section 2)</td>
                 <td>The <b>warehouse</b>, including its OncoKB annotations for driver mutations</td></tr>
               <tr><td>Method scripts</td><td>Each example analysis&apos;s Python script reproduces its numbers (section 4)</td>
                 <td>The <b>warehouse</b>, and Python with pinned versions of the statistics libraries</td></tr>
@@ -225,6 +225,13 @@ export default function VerificationPage() {
             is. For example, &ldquo;A and B&rdquo; must be exactly the patients found in both A and B, and a
             cohort plus its opposite must make up the whole study. The tool computes each side separately on
             real data, and the check compares the actual patient lists, not just the totals.
+          </p>
+          <p>
+            For the simpler conditions (a mutation or copy-number change in a gene, a clinical value or
+            number, a list of patients) there is a second way to get the answer: fetch the study&apos;s raw
+            records and work out each patient&apos;s membership by hand, in a separate program written from the
+            rules in the documentation. A random generator then writes a hundred definitions combining those
+            conditions with and, or and not, and each must pick exactly the same patients both ways.
           </p>
           <ul className="verif-checks">
             {claims.map((c) => (
