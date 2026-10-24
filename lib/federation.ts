@@ -57,6 +57,8 @@ import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } 
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
 import { finiteSql } from "./sql-number.ts";
+import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type CohortSql, type PatientSql } from "./sql-kinds.ts";
+import { DAYS_PER_MONTH } from "./time-units.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -304,11 +306,11 @@ export function driverJoin(pin: string): string {
  * naturally comes back with profiled=0 — a signal the combined 'any' row alone cannot carry,
  * since it can only ever say "altered" or "not altered", never "never checked".
  */
-export function geneCountsSql(cohortSql: string, genes: string[], study: string, pin: string | null, db: string = DB): string {
+export function geneCountsSql(cohortSql: string, genes: string[], study: string, pin: string | null, db: string = DB): AggregateSql {
   const pid = "replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '')";
   const covPid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
   const geneList = genes.map(sq).join(",");
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "altered AS (\n" +
     "  SELECT g.hugo_gene_symbol AS gene, " + pid + " AS pid, g.variant_type AS vtype,\n" +
@@ -351,7 +353,7 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
     "SELECT gene, 'any' AS vtype,\n" +
     "       uniqExact(pid) AS profiled, uniqExactIf(pid, is_alt = 1) AS altered, uniqExactIf(pid, is_drv = 1) AS driver\n" +
     "FROM perPatient GROUP BY gene"
-  );
+  ));
 }
 
 /**
@@ -367,7 +369,7 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  * only this instance knows what its panels cover. That is also why a federated
  * co-occurrence is more correct than one computed from pooled exports.
  */
-export function pairCountsSql(cohortSql: string, pairs: [string, string][], study: string, db: string = DB): string {
+export function pairCountsSql(cohortSql: string, pairs: [string, string][], study: string, db: string = DB): AggregateSql {
   const genes = [...new Set(pairs.flat())];
   const geneList = genes.map(sq).join(",");
   const pid = "replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '')";
@@ -375,7 +377,7 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
   const arrA = "[" + pairs.map((p) => sq(p[0])).join(",") + "]";
   const arrB = "[" + pairs.map((p) => sq(p[1])).join(",") + "]";
   const bothCov = "has(cov, ga) AND has(cov, gb)";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "altered AS (\n" +
     "  SELECT DISTINCT g.hugo_gene_symbol AS gene, " + pid + " AS pid\n" +
@@ -408,7 +410,7 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
     "FROM pp\n" +
     "ARRAY JOIN " + arrA + " AS ga, " + arrB + " AS gb\n" +
     "GROUP BY ga, gb"
-  );
+  ));
 }
 
 /**
@@ -420,9 +422,9 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
  * enough to define the population the drawn columns are scored against. The
  * reference gets broader without anyone's values moving.
  */
-export function profileMomentsSql(cohortSql: string, genes: string[], profileType: string, study: string, db: string = DB): string {
+export function profileMomentsSql(cohortSql: string, genes: string[], profileType: string, study: string, db: string = DB): AggregateSql {
   const pid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "vals AS (\n" +
     "  SELECT " + pid + " AS pid, ga.hugo_gene_symbol AS gene,\n" +
@@ -436,7 +438,7 @@ export function profileMomentsSql(cohortSql: string, genes: string[], profileTyp
     "  GROUP BY pid, gene\n" +
     ")\n" +
     "SELECT gene, count() AS n, sum(v) AS sx, sum(v * v) AS sxx FROM vals GROUP BY gene"
-  );
+  ));
 }
 
 /** Display cap on variants per gene; the per-gene total is reported separately. */
@@ -455,10 +457,10 @@ export const VARIANT_LIMIT = 100;
  * applies BEFORE returning anything, which is where small-cell suppression
  * belongs — at the data holder, not at the coordinator.
  */
-export function variantCountsSql(cohortSql: string, genes: string[], study: string, minCount = 1, db: string = DB): string {
+export function variantCountsSql(cohortSql: string, genes: string[], study: string, minCount = 1, db: string = DB): AggregateSql {
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   const floor = Math.max(1, Math.floor(minCount));
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT hugo_gene_symbol AS gene, mutation_variant AS variant,\n" +
     "       any(mutation_type) AS mtype,\n" +
@@ -473,7 +475,7 @@ export function variantCountsSql(cohortSql: string, genes: string[], study: stri
     "HAVING n >= " + floor + "\n" +
     "ORDER BY n DESC\n" +
     "LIMIT " + VARIANT_LIMIT + " BY gene"
-  );
+  ));
 }
 
 /**
@@ -504,10 +506,10 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
 }
 /** Per (codon, change): distinct patients (the height), raw rows (the label's ordering), and the change's
  * driver status and protein impact class (its commonest), so the plot can be filtered by class in the browser. */
-export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB): string {
-  return lollipopCte(cohortSql, genes, study, minCount, pin, db) +
+export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db) +
     "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver, topK(1)(" + impactSql("mtype") + ")[1] AS impact\n" +
-    "FROM m GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount));
+    "FROM m GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount)));
 }
 /**
  * Per (codon, mutation type, driver): raw rows — a codon's colour is decided from these, and the
@@ -515,29 +517,29 @@ export function lollipopChangesSql(cohortSql: string, genes: string[], study: st
  * counts toward the tally (the portal's badges count every mutation row), so the floor's
  * membership test compares pos through ifNull rather than letting NULL fail the tuple match.
  */
-export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB): string {
-  return lollipopCte(cohortSql, genes, study, minCount, pin, db) +
+export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db) +
     "SELECT gene, pos, mtype, driver, count() AS rows\n" +
-    "FROM m WHERE (gene, ifNull(pos, -1), change) IN (SELECT gene, ifNull(pos, -1), change FROM kept) GROUP BY gene, pos, mtype, driver";
+    "FROM m WHERE (gene, ifNull(pos, -1), change) IN (SELECT gene, ifNull(pos, -1), change FROM kept) GROUP BY gene, pos, mtype, driver");
 }
 /** Per gene: mutated patients, distinct (patient, change) pairs, and samples with a somatic one. */
-export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB): string {
-  return lollipopCte(cohortSql, genes, study, 1, null, db) +
+export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, 1, null, db) +
     "SELECT gene, uniqExact(pid) AS patients, uniqExact((pid, change)) AS pairs,\n" +
     "       uniqExactIf(sid, status != 'GERMLINE') AS somatic_samples\n" +
-    "FROM m GROUP BY gene";
+    "FROM m GROUP BY gene");
 }
 /** Samples in the cohort — the somatic mutation frequency's denominator. */
-export function cohortSampleCountSql(cohortSql: string, study: string, db: string = DB): string {
-  return "WITH cohort AS (" + cohortSql + ")\n" +
+export function cohortSampleCountSql(cohortSql: string, study: string, db: string = DB): AggregateSql {
+  return aggregateSql("WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT uniqExact(sample_unique_id) AS n FROM " + db + ".sample_derived\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + " AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM cohort)";
+    "WHERE cancer_study_identifier = " + sq(study) + " AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM cohort)");
 }
 
 /** Patients carrying ANY mutation in each gene — the lollipop's denominator. */
-export function geneMutationTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB): string {
+export function geneMutationTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB): AggregateSql {
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT hugo_gene_symbol AS gene, uniqExact(patient_unique_id) AS n,\n" +
     "       uniqExact(mutation_variant) AS distinct_variants\n" +
@@ -547,7 +549,7 @@ export function geneMutationTotalsSql(cohortSql: string, genes: string[], study:
     "  AND mutation_variant != ''\n" +
     "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "GROUP BY gene"
-  );
+  ));
 }
 
 /**
@@ -559,12 +561,12 @@ export function geneMutationTotalsSql(cohortSql: string, genes: string[], study:
  * add, the federated correlation is exact rather than approximate. Values are
  * averaged per patient first, matching the oncoprint heatmap convention.
  */
-export function momentPairsSql(cohortSql: string, pairs: [string, string][], profileType: string, study: string, db: string = DB): string {
+export function momentPairsSql(cohortSql: string, pairs: [string, string][], profileType: string, study: string, db: string = DB): AggregateSql {
   const genes = [...new Set(pairs.flat())];
   const arrA = "[" + pairs.map((p) => sq(p[0])).join(",") + "]";
   const arrB = "[" + pairs.map((p) => sq(p[1])).join(",") + "]";
   const pid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "vals AS (\n" +
     "  SELECT " + pid + " AS pid, ga.hugo_gene_symbol AS gene,\n" +
@@ -589,7 +591,7 @@ export function momentPairsSql(cohortSql: string, pairs: [string, string][], pro
     "  ARRAY JOIN " + arrA + " AS ga, " + arrB + " AS gb\n" +
     ")\n" +
     "GROUP BY ga, gb"
-  );
+  ));
 }
 
 /** Cap on distinct categorical values before an attribute is refused rather than truncated. */
@@ -603,9 +605,9 @@ export const ATTR_VALUE_CAP = 200;
  * wrong, so the caller refuses an attribute that exceeds the cap instead of
  * testing a partial table.
  */
-export function clinicalCountsSql(cohortSql: string, attrs: string[], study: string, db: string = DB): string {
+export function clinicalCountsSql(cohortSql: string, attrs: string[], study: string, db: string = DB): AggregateSql {
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT attribute_name AS a, type AS per, attribute_value AS v,\n" +
     "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
@@ -617,7 +619,7 @@ export function clinicalCountsSql(cohortSql: string, attrs: string[], study: str
     "GROUP BY a, per, v\n" +
     "ORDER BY n DESC\n" +
     "LIMIT " + (ATTR_VALUE_CAP + 1) + " BY a, per"
-  );
+  ));
 }
 
 /**
@@ -627,9 +629,9 @@ export function clinicalCountsSql(cohortSql: string, attrs: string[], study: str
  * and therefore Welch's t — are EXACT from per-site totals, never approximated.
  * No individual value is ever transmitted.
  */
-export function clinicalMomentsSql(cohortSql: string, attrs: string[], study: string, db: string = DB): string {
+export function clinicalMomentsSql(cohortSql: string, attrs: string[], study: string, db: string = DB): AggregateSql {
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx\n" +
     "FROM (\n" +
@@ -642,7 +644,7 @@ export function clinicalMomentsSql(cohortSql: string, attrs: string[], study: st
     ")\n" +
     "WHERE x IS NOT NULL AND isFinite(x)\n" +
     "GROUP BY a, per"
-  );
+  ));
 }
 
 /** Cap on distinct numeric values before a rank-sum test is refused rather than run on a truncated
@@ -659,9 +661,9 @@ export const HISTOGRAM_CAP = 20000;
  * Capped at HISTOGRAM_CAP + 1 rows per attribute; the caller refuses (attributeStats sets
  * histogramTruncated) rather than compute a quantile or a rank sum from a partial histogram.
  */
-export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: string, db: string = DB): string {
+export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: string, db: string = DB): AggregateSql {
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "     raw AS (\n" +
     "       SELECT attribute_name AS a, type AS per, " + finiteSql("attribute_value") + " AS x\n" +
@@ -677,7 +679,7 @@ export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: 
     "GROUP BY a, per, x\n" +
     "ORDER BY n DESC\n" +
     "LIMIT " + (HISTOGRAM_CAP + 1) + " BY a, per"
-  );
+  ));
 }
 
 /**
@@ -687,17 +689,17 @@ export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: 
  * A single ClickHouse aggregate; no individual value leaves the database, only the resolved
  * threshold — same shape as every other aggregate here.
  */
-export function attributeQuantileSql(cohortSql: string, attribute: string, per: "patient" | "sample", p: number, study: string, db: string = DB): string {
+export function attributeQuantileSql(cohortSql: string, attribute: string, per: "patient" | "sample", p: number, study: string, db: string = DB): AggregateSql {
   if (!(p > 0 && p < 1)) throw new Error("attributeQuantileSql: p must be between 0 and 1 (exclusive), got " + p);
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT quantileExact(" + p + ")(" + finiteSql("attribute_value") + ") AS q\n" +
     "FROM " + clinicalTable(db, [attribute]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attribute) + "\n" +
     "  AND type = " + sq(per) + " AND attribute_value != ''\n" +
     "  AND " + pid + " IN (SELECT pid FROM cohort)"
-  );
+  ));
 }
 
 /**
@@ -717,11 +719,11 @@ export const ENDPOINT_RE = /^[A-Z][A-Z0-9_]{0,39}$/;
  * told when a study has nothing for the endpoint asked for rather than seeing
  * its patients quietly vanish from a curve.
  */
-export function survivalCountsSql(cohortSql: string, study: string, db: string = DB, endpoint = "OS", columns?: EndpointColumns): string {
+export function survivalCountsSql(cohortSql: string, study: string, db: string = DB, endpoint = "OS", columns?: EndpointColumns): AggregateSql {
   if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
@@ -736,7 +738,7 @@ export function survivalCountsSql(cohortSql: string, study: string, db: string =
     "SELECT " + finiteSql("months") + " AS m, if(status LIKE '1%', 1, 0) AS ev, count() AS n\n" +
     "FROM os WHERE " + finiteSql("months") + " IS NOT NULL\n" +
     "GROUP BY m, ev ORDER BY m"
-  );
+  ));
 }
 
 /**
@@ -757,7 +759,7 @@ export function anchoredSurvivalSql(
   cohortSql: string, study: string, db: string, endpoint: string,
   anchor: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" },
   columns?: EndpointColumns
-): string {
+): AggregateSql {
   if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
@@ -766,7 +768,7 @@ export function anchoredSurvivalSql(
     ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data\n" +
       "        WHERE " + foldedEqualsSql("key", anchor.key) + " AND " + foldedEqualsSql("value", String(anchor.value ?? "")) + ")\n"
     : "";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
@@ -790,13 +792,13 @@ export function anchoredSurvivalSql(
     ")\n" +
     // offset = months from anchor to day 0; only anchors at or before day 0 make
     // sense as a start of follow-up, so later ones are dropped and counted.
-    "SELECT round(-anch.day / 30.4375, 4) AS entry,\n" +
-    "       round(os.months - anch.day / 30.4375, 4) AS m,\n" +
+    "SELECT round(-anch.day / " + DAYS_PER_MONTH + ", 4) AS entry,\n" +
+    "       round(os.months - anch.day / " + DAYS_PER_MONTH + ", 4) AS m,\n" +
     "       if(os.status LIKE '1%', 1, 0) AS ev, count() AS n\n" +
     "FROM os INNER JOIN anch USING (pid)\n" +
     "WHERE os.months IS NOT NULL AND anch.day <= 0\n" +
     "GROUP BY entry, m, ev ORDER BY m"
-  );
+  ));
 }
 
 /**
@@ -821,22 +823,22 @@ function decidedOnly(sel: string): string {
  * profiled on an undecidable axis: the patients a fit leaves out for that reason. null when no axis
  * of the model can be undecided.
  */
-function notProfiledCountSql(unfiltered: string, sels: { label: string }[], axes: PlotAxis[]): string | null {
+function notProfiledCountSql(unfiltered: PatientSql, sels: { label: string }[], axes: PlotAxis[]): AggregateSql | null {
   const cols = sels.filter((_, i) => undecidable(axes[i])).map((s) => s.label + " = " + sq(OQL_NOT_PROFILED));
-  return cols.length ? "SELECT countIf(" + cols.join(" OR ") + ") AS n FROM (\n" + unfiltered + "\n)" : null;
+  return cols.length ? aggregateSql("SELECT countIf(" + cols.join(" OR ") + ") AS n FROM (\n" + unfiltered + "\n)") : null;
 }
 
 export function coxRowsSql(
   cohortSql: string, study: string, db: string, endpoint: string, covariates: { label: string; sel: string }[],
   columns?: EndpointColumns
-): string {
+): PatientSql {
   if (!ENDPOINT_RE.test(endpoint)) throw new Error("bad survival endpoint '" + String(endpoint).slice(0, 40) + "'");
   const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   const months = columns?.months || (endpoint + "_MONTHS"), status = columns?.status || (endpoint + "_STATUS");
   const covCtes = covariates.map((c) => c.label + " AS (\n" + c.sel + "\n)").join(",\n");
   const joins = covariates.map((c) => "INNER JOIN " + c.label + " ON " + c.label + ".id = os.pid").join("\n  ");
   const select = covariates.map((c) => c.label + ".v AS " + c.label).join(", ");
-  return (
+  return patientSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
@@ -851,7 +853,7 @@ export function coxRowsSql(
     "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev" + (select ? ", " + select : "") + "\n" +
     "FROM os\n" + (joins ? "  " + joins + "\n" : "") +
     "WHERE os.months IS NOT NULL"
-  );
+  ));
 }
 
 /**
@@ -864,20 +866,20 @@ export function coxRowsSql(
  */
 export function logisticRowsSql(
   cohortSql: string, outcome: { label: string; sel: string }, covariates: { label: string; sel: string }[]
-): string {
+): PatientSql {
   const ctes = [outcome, ...covariates].map((c) => c.label + " AS (\n" + c.sel + "\n)").join(",\n");
   const joins = covariates.map((c) => "INNER JOIN " + c.label + " ON " + c.label + ".id = " + outcome.label + ".id").join("\n  ");
   const select = covariates.map((c) => c.label + ".v AS " + c.label).join(", ");
-  return (
+  return patientSql((
     "WITH cohort AS (" + cohortSql + "),\n" + ctes + "\n" +
     "SELECT " + outcome.label + ".v AS y" + (select ? ", " + select : "") + "\n" +
     "FROM " + outcome.label + (joins ? "\n  " + joins : "")
-  );
+  ));
 }
 
 /** Which (<X>_MONTHS, <X>_STATUS) pairs a study actually declares. Metadata only. */
-export function survivalEndpointsSql(study: string, db: string = DB): string {
-  return (
+export function survivalEndpointsSql(study: string, db: string = DB): AggregateSql {
+  return aggregateSql((
     "SELECT replaceOne(cam.attr_id, '_MONTHS', '') AS endpoint\n" +
     "FROM " + clinicalMetaTable(db) + " cam\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
@@ -887,7 +889,7 @@ export function survivalEndpointsSql(study: string, db: string = DB): string {
     "    JOIN " + db + ".cancer_study cs2 ON cs2.cancer_study_id = cam2.cancer_study_id\n" +
     "    WHERE cs2.cancer_study_identifier = " + sq(study) + ")\n" +
     "ORDER BY endpoint"
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------
@@ -895,7 +897,6 @@ export function survivalEndpointsSql(study: string, db: string = DB): string {
 // ---------------------------------------------------------------------------
 
 /** Days per month, matching the constant survival already uses. */
-const DAYS_PER_MONTH = 30.4375;
 
 /**
  * What a cohort's timeline looks like STRUCTURALLY, per event type: how many
@@ -909,9 +910,9 @@ const DAYS_PER_MONTH = 30.4375;
  * name: empirically only treatments carry duration, but that is a fact to be
  * read off the data, not hardcoded from a spelling.
  */
-export function timelineSpanSql(cohortSql: string, study: string, db: string = DB): string {
+export function timelineSpanSql(cohortSql: string, study: string, db: string = DB): AggregateSql {
   const pid = "p.stable_id";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT ce.event_type AS et,\n" +
     "       uniqExact(" + pid + ") AS pts,\n" +
@@ -926,7 +927,7 @@ export function timelineSpanSql(cohortSql: string, study: string, db: string = D
     "WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
     "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "GROUP BY et ORDER BY pts DESC"
-  );
+  ));
 }
 
 /** One event type's structural footprint in a cohort's timeline. */
@@ -982,7 +983,7 @@ export const COURSE_ANCHORED = "#anchored", COURSE_OBSERVED = "#observed";
 
 export function eventCourseSql(
   cohortSql: string, study: string, db: string, opts: CourseOpts
-): string {
+): AggregateSql {
   const w = Math.max(1, Number(opts.binMonths) || 3) * DAYS_PER_MONTH;
   const lo = Math.floor(Number(opts.from)), hi = Math.floor(Number(opts.to));
   if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi < lo) throw new Error("bad course window");
@@ -1022,7 +1023,7 @@ export function eventCourseSql(
     "    toInt32(greatest(floor((" + s + " - a.day) / " + w + "), " + lo + ")),\n" +
     "    toInt32(least(floor((" + e + " - a.day) / " + w + "), " + hi + ")) + 1)";
 
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" + anchCte + ",\n" +
     // Observation window: first recorded event to last contact.
     "os AS (\n" +
@@ -1072,7 +1073,7 @@ export function eventCourseSql(
     "  UNION ALL SELECT toInt32(0) AS bin, " + sq(COURSE_ANCHORED) + " AS et, uniqExact(pid) AS n FROM anch\n" +
     "  UNION ALL SELECT toInt32(0) AS bin, " + sq(COURSE_OBSERVED) + " AS et, uniqExact(pid) AS n FROM denom\n" +
     ") ORDER BY bin, et"
-  );
+  ));
 }
 
 export interface SequenceOpts {
@@ -1126,14 +1127,14 @@ export interface SequenceFlow { step: number; from: string; to: string; n: numbe
  */
 export function sequenceSql(
   cohortSql: string, study: string, db: string, opts: SequenceOpts
-): string {
+): AggregateSql {
   const gap = lineGapOf({ gap: opts.lineGap });
   const steps = Math.max(2, Math.min(8, Math.floor(Number(opts.maxSteps) || 3)));
   if (!String(opts.labelKey || "").trim()) throw new Error("a sequence view needs a labelKey (e.g. SUBTYPE)");
   const pid = "p.stable_id";
   const lineSpec = { gap, eventType: opts.eventType || TREATMENT_EVENT, labelKey: opts.labelKey, exclude: opts.exclude,
     ...(opts.lineClasses ? { classes: opts.lineClasses } : {}) };
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     // the one line definition every view and clause shares — lib/treatment-lines.ts
     linesCtes({ db, study, patientFilter: pid + " IN (SELECT pid FROM cohort)", spec: lineSpec }).join(",\n") + ",\n" +
@@ -1192,12 +1193,12 @@ export function sequenceSql(
     "       toUInt8(0) AS fate, toUInt64(count()) AS n\n" +
     "FROM txAll WHERE eid NOT IN (SELECT eid FROM txLabelled)\n" +
     "GROUP BY cls, b"
-  );
+  ));
 }
 
 /** Which label keys a study's therapy events actually carry, and how varied. */
-export function sequenceKeysSql(cohortSql: string, study: string, db: string, eventType: string): string {
-  return (
+export function sequenceKeysSql(cohortSql: string, study: string, db: string, eventType: string): AggregateSql {
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     // the display spelling: the most frequent, ties alphabetical — not whichever row came first
     "SELECT " + nameFoldSql("d.key") + " AS k, arraySort((x) -> (-x.2, x.1), arrayMap((v) -> (v, countEqual(groupArray(trimBoth(d.key)), v)), groupUniqArray(trimBoth(d.key))))[1].1 AS label,\n" +
@@ -1210,7 +1211,7 @@ export function sequenceKeysSql(cohortSql: string, study: string, db: string, ev
     "  AND " + eventTypeMatchSql("ce.event_type", eventType) + "\n" +
     "  AND p.stable_id IN (SELECT pid FROM cohort)\n" +
     "GROUP BY k ORDER BY pts DESC, k LIMIT 25"
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------
@@ -1281,7 +1282,7 @@ export interface AggregateCapable {
   lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<LollipopReport>;
   profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]>;
   /** the SQL this participant would run, for provenance */
-  cohortSql(def: CohortDef | null | undefined): string;
+  cohortSql(def: CohortDef | null | undefined): CohortSql;
   /**
    * Every aggregate query this resolver ran, in order. The document panel shows
    * cohort SQL; this is how each NUMBER was computed, which is the part a reader
@@ -1434,10 +1435,10 @@ export interface FederatedPlotCapable {
  */
 export interface ViewAggregateCapable {
   viewAggregate(label: string, def: CohortDef | null | undefined,
-    build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
+    build: (cohortSql: CohortSql, study: string, db: string) => AggregateSql): Promise<ChRow[]>;
   viewAggregateMany(label: string, defs: (CohortDef | null | undefined)[],
-    build: (cohortSqls: string[], study: string, db: string) => string): Promise<ChRow[]>;
-  viewMeta(label: string, build: (study: string, db: string) => string): Promise<ChRow[]>;
+    build: (cohortSqls: CohortSql[], study: string, db: string) => AggregateSql): Promise<ChRow[]>;
+  viewMeta(label: string, build: (study: string, db: string) => AggregateSql): Promise<ChRow[]>;
 }
 export function hasViewAggregates(r: Resolver): r is Resolver & ViewAggregateCapable {
   return typeof (r as unknown as Partial<ViewAggregateCapable>).viewAggregate === "function";
@@ -1459,7 +1460,15 @@ abstract class BaseResolver implements AggregateCapable {
    * await and stamped after, so concurrent queries each update their own entry
    * rather than racing for "the last one".
    */
-  protected async runLogged<R = ChRow>(label: string, sql: string, conn: ChConn): Promise<ChResult<R>> {
+  protected async runLogged<R = ChRow>(label: string, sql: AggregateSql, conn: ChConn): Promise<ChResult<R>> {
+    return this.logged<R>(label, sql, conn);
+  }
+  /** an aggregate this resolver needs for itself (a count, a profile's metadata), not logged */
+  protected runQuiet<R = ChRow>(sql: AggregateSql): Promise<ChResult<R>> {
+    return chQuery<R>(sql, this.instance.conn);
+  }
+  /** the one place a resolver's statement reaches the database and its log; the typed runners above and PatientLevelResolver's decide what may */
+  protected async logged<R>(label: string, sql: string, conn: ChConn): Promise<ChResult<R>> {
     const entry: QueryLogEntry = { label, sql };
     this.queries.push(entry);
     const r = await chQuery<R>(sql, conn);
@@ -1471,11 +1480,11 @@ abstract class BaseResolver implements AggregateCapable {
     this.ctx = ctx;
   }
 
-  cohortSql(def: CohortDef | null | undefined): string {
-    return compileCohortDef(def, { ...this.ctx, study: this.study, db: this.instance.conn.db });
+  cohortSql(def: CohortDef | null | undefined): CohortSql {
+    return cohortSubquery(compileCohortDef(def, { ...this.ctx, study: this.study, db: this.instance.conn.db }));
   }
   async count(def: CohortDef | null | undefined): Promise<number> {
-    const r = await chQuery<ChRow>("SELECT count() AS n FROM (" + this.cohortSql(def) + ")", this.instance.conn);
+    const r = await this.runQuiet<ChRow>(aggregateSql("SELECT count() AS n FROM (" + this.cohortSql(def) + ")"));
     return Number(r.data[0].n);
   }
   async geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]> {
@@ -1508,7 +1517,7 @@ abstract class BaseResolver implements AggregateCapable {
     }));
   }
   async survivalEndpoints(): Promise<string[]> {
-    const r = await chQuery<ChRow>(survivalEndpointsSql(this.study, this.instance.conn.db), this.instance.conn)
+    const r = await this.runQuiet<ChRow>(survivalEndpointsSql(this.study, this.instance.conn.db))
       .catch(() => ({ data: [] as ChRow[] }));
     return r.data.map((x) => String(x.endpoint));
   }
@@ -1606,11 +1615,11 @@ abstract class BaseResolver implements AggregateCapable {
     if (!attrs.length) return [];
     const db = this.instance.conn.db, conn = this.instance.conn;
     const list = attrs.map(sq).join(",");
-    const meta = await chQuery<ChRow>(
+    const meta = await this.runQuiet<ChRow>(aggregateSql(
       "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt\n" +
       "FROM " + clinicalMetaTable(db) + " cam\n" +
       "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
-      "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + list + ")", conn)
+      "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + list + ")"))
       .catch(() => ({ data: [] as ChRow[] }));
     const kindOf = new Map<string, "cat" | "num">(
       meta.data.map((r) => [r.a, String(r.dt) === "NUMBER" ? "num" as const : "cat" as const]));
@@ -1680,15 +1689,15 @@ abstract class BaseResolver implements AggregateCapable {
    * declared them. An attribute it does not declare has no answer here rather than a guess.
    */
   protected async clinicalKinds(axes: PlotAxis[]): Promise<Map<string, "num" | "cat">> {
-    const db = this.instance.conn.db, conn = this.instance.conn;
+    const db = this.instance.conn.db;
     const attrs = axes.filter((a) => a.source === "clinical").map((a) => (a as { attribute: string }).attribute);
     const kinds = new Map<string, "num" | "cat">();
     if (!attrs.length) return kinds;
-    const meta = await chQuery<ChRow>(
+    const meta = await this.runQuiet<ChRow>(aggregateSql(
       "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt\n" +
       "FROM " + clinicalMetaTable(db) + " cam\n" +
       "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
-      "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")", conn)
+      "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")"))
       .catch(() => ({ data: [] as ChRow[] }));
     for (const r of meta.data) kinds.set(String(r.a), String(r.dt) === "NUMBER" ? "num" : "cat");
     return kinds;
@@ -1922,19 +1931,19 @@ abstract class BaseResolver implements AggregateCapable {
    * document cannot reach it; every builder it is given is swept by test/boundary.test.ts.
    */
   async viewAggregate(label: string, def: CohortDef | null | undefined,
-    build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]> {
+    build: (cohortSql: CohortSql, study: string, db: string) => AggregateSql): Promise<ChRow[]> {
     const r = await this.runLogged<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data;
   }
   /** The same for an aggregate over SEVERAL cohorts at once (how they overlap): each definition is
    *  compiled by this resolver, in order, exactly as viewAggregate compiles one. */
   async viewAggregateMany(label: string, defs: (CohortDef | null | undefined)[],
-    build: (cohortSqls: string[], study: string, db: string) => string): Promise<ChRow[]> {
+    build: (cohortSqls: CohortSql[], study: string, db: string) => AggregateSql): Promise<ChRow[]> {
     const r = await this.runLogged<ChRow>(label, build(defs.map((d) => this.cohortSql(d)), this.study, this.instance.conn.db), this.instance.conn);
     return r.data;
   }
   /** Study metadata for those views (no cohort involved), logged the same way. */
-  async viewMeta(label: string, build: (study: string, db: string) => string): Promise<ChRow[]> {
+  async viewMeta(label: string, build: (study: string, db: string) => AggregateSql): Promise<ChRow[]> {
     const r = await this.runLogged<ChRow>(label, build(this.study, this.instance.conn.db), this.instance.conn);
     return r.data;
   }
@@ -1959,6 +1968,14 @@ abstract class BaseResolver implements AggregateCapable {
  */
 export class PatientLevelResolver extends BaseResolver implements PatientLevelCapable {
   readonly instance: Instance & { mode: "patient-level" };
+  /** a statement whose rows name patients or samples: only this class can run one */
+  protected runPatientRows<R = ChRow>(label: string, sql: PatientSql, conn: ChConn): Promise<ChResult<R>> {
+    return this.logged<R>(label, sql, conn);
+  }
+  /** the same, for a list this resolver needs for itself (a cohort's members), not logged */
+  protected runPatientQuiet<R = ChRow>(sql: PatientSql): Promise<ChResult<R>> {
+    return chQuery<R>(sql, this.instance.conn);
+  }
   constructor(study: string, ctx: Partial<CompileCtx>, instance: Instance) {
     super(study, ctx);
     this.instance = { ...instance, mode: "patient-level" };
@@ -1985,7 +2002,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const catSel = axisSelect(numFirst ? spec.y : spec.x, ctx, "cat");
     const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
     const ringSel = spec.ringBy ? axisSelect(spec.ringBy, ctx, "cat") : undefined;
-    const r = await this.runLogged<ChRow>(outside ? "plot:outliers" : "plot:points",
+    const r = await this.runPatientRows<ChRow>(outside ? "plot:outliers" : "plot:points",
       plotPointsSql(numSel, catSel, ctx.cohortSql, cap, colorSel, ringSel, outside), conn);
     if (r.data.length > cap) return null;
     return r.data.map((x) => ({ id: String(x.id), g: String(x.g), v: Number(x.v),
@@ -2005,7 +2022,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
     if (plotShape(xk, yk) !== "scatter") return [];
-    const r = await this.runLogged<ChRow>(sparse ? "plot:outliers" : "plot:points",
+    const r = await this.runPatientRows<ChRow>(sparse ? "plot:outliers" : "plot:points",
       plotScatterPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, cap, sparse), conn);
     if (r.data.length > cap) return null;
     return r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y) }));
@@ -2020,7 +2037,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const ctx = this.plotCtx(def, spec);
     const shape = plotShape(xk, yk);
     if (shape !== "scatter" && shape !== "box") return [];
-    const r = await this.runLogged<ChRow>("plot:layer:" + rank.by,
+    const r = await this.runPatientRows<ChRow>("plot:layer:" + rank.by,
       plotRankedPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, shape, xk === "num", rank), this.instance.conn);
     return shape === "scatter"
       ? r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y) }))
@@ -2039,26 +2056,26 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
     const shape = plotShape(xk, yk);
     if (shape === "scatter") {
-      const r = await this.runLogged<ChRow>("plot:highlight:points", plotScatterPointsSql(xSel, ySel, ctx.cohortSql, cap), this.instance.conn);
+      const r = await this.runPatientRows<ChRow>("plot:highlight:points", plotScatterPointsSql(xSel, ySel, ctx.cohortSql, cap), this.instance.conn);
       if (r.data.length > cap) return null;
       return r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y) }));
     }
     if (shape !== "box") return [];
     const numFirst = xk === "num";
-    const r = await this.runLogged<ChRow>("plot:highlight:points",
+    const r = await this.runPatientRows<ChRow>("plot:highlight:points",
       plotPointsSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql, cap), this.instance.conn);
     if (r.data.length > cap) return null;
     return r.data.map((p) => ({ id: String(p.id), g: String(p.g), v: Number(p.v) }));
   }
 
   async members(def: CohortDef | null | undefined): Promise<string[]> {
-    const r = await chQuery<ChRow>("SELECT pid FROM (" + this.cohortSql(def) + ")", this.instance.conn);
+    const r = await this.runPatientQuiet<ChRow>(patientSql("SELECT pid FROM (" + this.cohortSql(def) + ")"));
     return r.data.map((x) => x.pid);
   }
 
   /** The samples of a cohort's patients, as bare ids: what locking a cohort records beside its patients. */
   async memberSamples(def: CohortDef | null | undefined): Promise<string[]> {
-    const r = await chQuery<ChRow>(memberSamplesSql(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
+    const r = await this.runPatientQuiet<ChRow>(memberSamplesSql(this.cohortSql(def), this.study, this.instance.conn.db));
     return r.data.map((x) => x.sid);
   }
 
@@ -2081,7 +2098,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * caller (which dummy-codes categoricals) doesn't have to re-derive it.
    */
   /** a count query's answer, or 0 when there is nothing to count */
-  private async countIfAny(label: string, sql: string | null, conn: ChConn): Promise<number> {
+  private async countIfAny(label: string, sql: AggregateSql | null, conn: ChConn): Promise<number> {
     if (!sql) return 0;
     const r = await this.runLogged<ChRow>(label, sql, conn);
     return Number(r.data[0]?.n || 0);
@@ -2100,7 +2117,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const decided = sels.map((s, i) => undecidable(covariates[i]) ? { ...s, sel: decidedOnly(s.sel) } : s);
     const sql = coxRowsSql(ctx.cohortSql, this.study, db, endpoint, decided, columns);
     const [r, np] = await Promise.all([
-      this.runLogged<ChRow>("coxRows:" + endpoint, sql, conn),
+      this.runPatientRows<ChRow>("coxRows:" + endpoint, sql, conn),
       this.countIfAny("coxNotProfiled:" + endpoint, notProfiledCountSql(coxRowsSql(ctx.cohortSql, this.study, db, endpoint, sels, columns), sels, covariates), conn)]);
     const rows = r.data.map((row) => ({
       t: Number(row.m), event: Number(row.ev),
@@ -2116,8 +2133,8 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * asked, because the method does not exist on it.
    */
   async viewRows(label: string, def: CohortDef | null | undefined,
-    build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]> {
-    const r = await this.runLogged<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
+    build: (cohortSql: CohortSql, study: string, db: string) => PatientSql): Promise<ChRow[]> {
+    const r = await this.runPatientRows<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
     return r.data;
   }
 
@@ -2136,21 +2153,21 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * the aggregate builders a peer may be sent.
    */
   async rowsPage(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): Promise<{ rows: ChRow[]; total: number }> {
-    const r = await this.runLogged<ChRow>(label, pageSql(source(this.instance.conn.db), q, defaults, limit, offset), this.instance.conn);
+    const r = await this.runPatientRows<ChRow>(label, pageSql(source(this.instance.conn.db), q, defaults, limit, offset), this.instance.conn);
     return { rows: r.data, total: r.data.length ? Number(r.data[0].total) : 0 };
   }
   /** per part: the rows the query keeps and every row. Counts only. */
   async rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<{ cohort: string; study: string; n: number; all: number }[]> {
-    const r = await this.runLogged<ChRow>(label, countsSql(source(this.instance.conn.db), q, defaults), this.instance.conn);
+    const r = await this.runPatientRows<ChRow>(label, countsSql(source(this.instance.conn.db), q, defaults), this.instance.conn);
     return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all) }));
   }
   /** a column's distinct values with counts, or its range — what its filter offers */
   async rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]> {
-    return (await this.runLogged<ChRow>(label, valuesSql(source(this.instance.conn.db), q, defaults, column), this.instance.conn)).data;
+    return (await this.runPatientRows<ChRow>(label, valuesSql(source(this.instance.conn.db), q, defaults, column), this.instance.conn)).data;
   }
   /** one patient's 0-based place in the query's order, or null when the query leaves it out */
   async rowsRank(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null> {
-    const r = await this.runLogged<ChRow>(label, rankSql(source(this.instance.conn.db), q, defaults, study, patient), this.instance.conn);
+    const r = await this.runPatientRows<ChRow>(label, rankSql(source(this.instance.conn.db), q, defaults, study, patient), this.instance.conn);
     return r.data.length ? Number(r.data[0].idx) : null;
   }
 
@@ -2163,8 +2180,8 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     if (!PATIENT_ID.test(patient)) throw new Error("not a patient id: " + JSON.stringify(patient).slice(0, 90));
     const db = this.instance.conn.db, conn = this.instance.conn;
     const [ev, sm] = await Promise.all([
-      this.runLogged<ChRow>("timeline:events", patientEventsSql(this.study, patient, db), conn),
-      this.runLogged<ChRow>("timeline:samples", patientSamplesSql(this.study, patient, db), conn),
+      this.runPatientRows<ChRow>("timeline:events", patientEventsSql(this.study, patient, db), conn),
+      this.runPatientRows<ChRow>("timeline:samples", patientSamplesSql(this.study, patient, db), conn),
     ]);
     return { study: this.study, patient, events: toEvents(ev.data), samples: toSamples(sm.data), source: { label: this.instance.label } };
   }
@@ -2192,7 +2209,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const sql = logisticRowsSql(ctx.cohortSql, dOut, dSels);
     const counted = all.map((s, i) => ({ ...s, label: i === 0 ? "y" : s.label }));
     const [r, np] = await Promise.all([
-      this.runLogged<ChRow>("logisticRows", sql, conn),
+      this.runPatientRows<ChRow>("logisticRows", sql, conn),
       this.countIfAny("logisticNotProfiled", notProfiledCountSql(logisticRowsSql(ctx.cohortSql, outcomeSel, sels), counted, axes), conn)]);
     const rows = r.data.map((row) => ({
       y: outcomeKind === "num" ? Number(row.y) : String(row.y),
@@ -2214,7 +2231,7 @@ export class AggregateResolver extends BaseResolver {
     this.instance = instance;
   }
   /** compiled SQL for an aggregate-only instance may never embed identifiers */
-  cohortSql(def: CohortDef | null | undefined): string {
+  cohortSql(def: CohortDef | null | undefined): CohortSql {
     if (carriesPatientIds(def)) throw new Error(NO_IDS_MSG + " (" + this.instance.label + ")");
     return super.cohortSql(def);
   }

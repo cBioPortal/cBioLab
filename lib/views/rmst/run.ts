@@ -4,7 +4,7 @@
 // clock among the patients still followed. Meaningful whether or not the hazards are proportional.
 // Each participant returns id-free (entry, t, event, n) counts.
 import type { ViewResult } from "../../types.ts";
-import { txEndpointCountsSql, labTestsSql, CLOCK_SLACK_DAYS, DAYS_PER_MONTH, type TxEndpointOpts } from "../../federation-views.ts";
+import { txEndpointCountsSql, labTestsSql, CLOCK_SLACK_DAYS, type TxEndpointOpts } from "../../federation-views.ts";
 import type { EndpointColumns } from "../../federation.ts";
 import { expandSurvivalCounts } from "../../federation.ts";
 import { kaplanMeier, rmst, atRiskAtTimes, normalP, Z_975, type SurvRecord } from "../../stats.ts";
@@ -13,6 +13,7 @@ import type { ViewRun } from "../run.ts";
 import { overLimit, answering, refuse, plural, ATTR_NAME } from "../shared.ts";
 import { treatmentAnchor, noAnchorMessage, clockFailures, CLOCK_TOLERANCE, type TreatmentAnchor } from "../../timeline-endpoints.ts";
 import type { RmstView, RmstPanel, RmstCurve, RmstComparison } from "./types.ts";
+import { DAYS_PER_MONTH } from "../../time-units.ts";
 
 const RMST_COHORT_LIMIT = 6;
 const RMST_LANDMARK_LIMIT = 4;

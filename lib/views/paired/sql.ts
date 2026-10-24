@@ -3,6 +3,7 @@ import { sideCountsTail, pidOf } from "../../federation-views.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { sq } from "../../compiler.ts";
 import { clinicalTable } from "../../custom-data.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /**
  * Per gene, among patients with a sample on each side AND profiled for the gene on each side
@@ -15,16 +16,16 @@ import { clinicalTable } from "../../custom-data.ts";
  * carries no information about concordance or direction).
  */
 export function pairedCountsSql(cohortSql: string, study: string, db: string, genes: string[] | null, by: PairBy,
-  pin: string | null, measure: "driver" | "any"): string {
-  return pairedSidesCtes(cohortSql, study, db, by) + ",\n" + sideCountsTail(study, db, genes, pin, measure);
+  pin: string | null, measure: "driver" | "any"): AggregateSql {
+  return aggregateSql(pairedSidesCtes(cohortSql, study, db, by) + ",\n" + sideCountsTail(study, db, genes, pin, measure));
 }
 
 /** How many of the cohort's patients have a sample on each side, and how many samples each side holds. */
-export function pairedPatientsSql(cohortSql: string, study: string, db: string, by: PairBy): string {
-  return (
+export function pairedPatientsSql(cohortSql: string, study: string, db: string, by: PairBy): AggregateSql {
+  return aggregateSql((
     pairedSidesCtes(cohortSql, study, db, by) + "\n" +
     "SELECT uniqExact(pid) AS patients, countIf(side = 'a') AS a_samples, countIf(side = 'b') AS b_samples FROM ps"
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------

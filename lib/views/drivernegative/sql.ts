@@ -2,17 +2,18 @@
 import { type EnrichAlteration, pidOf, enrichEventCond, geneList, ENRICH_PANEL_TYPE } from "../../federation-views.ts";
 import { driverJoin } from "../../federation.ts";
 import { sq } from "../../compiler.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /** Patients per group (positive, negative, unprofiled), of the cohort's patients sequenced for mutations. Counts only. */
-export function dnegGroupsSql(cohortSql: string, study: string, db: string, pin: string, drivers: string[]): string {
-  return dnegCtes(cohortSql, study, db, pin, drivers, "mutation") + "\nSELECT g AS grp, count() AS n FROM grp GROUP BY grp";
+export function dnegGroupsSql(cohortSql: string, study: string, db: string, pin: string, drivers: string[]): AggregateSql {
+  return aggregateSql(dnegCtes(cohortSql, study, db, pin, drivers, "mutation") + "\nSELECT g AS grp, count() AS n FROM grp GROUP BY grp");
 }
 
 /** Per gene outside `drivers` and per group (positive, negative): patients with that alteration in it
  *  (OncoKB drivers only with `driverOnly`). Counts only. */
-export function dnegAlteredSql(cohortSql: string, study: string, db: string, pin: string, drivers: string[], alteration: EnrichAlteration, driverOnly: boolean): string {
+export function dnegAlteredSql(cohortSql: string, study: string, db: string, pin: string, drivers: string[], alteration: EnrichAlteration, driverOnly: boolean): AggregateSql {
   const gPid = pidOf("g.patient_unique_id", study);
-  return (
+  return aggregateSql((
     dnegCtes(cohortSql, study, db, pin, drivers, alteration) + "\n" +
     "SELECT g.hugo_gene_symbol AS gene, grp.g AS grp, uniqExact(" + gPid + ") AS altered\n" +
     "FROM " + db + ".genomic_event_derived g\n" + (driverOnly ? driverJoin(pin) : "") +
@@ -20,13 +21,13 @@ export function dnegAlteredSql(cohortSql: string, study: string, db: string, pin
     "WHERE g.cancer_study_identifier = " + sq(study) + " AND " + enrichEventCond(alteration) + "\n" +
     "  AND g.hugo_gene_symbol NOT IN (" + geneList(drivers) + ") AND grp.g IN ('positive', 'negative')" + (driverOnly ? " AND ann.is_driver" : "") + "\n" +
     "GROUP BY gene, grp"
-  );
+  ));
 }
 
 /** Per gene and group: patients not on whole-exome with a panel covering the gene for that alteration
  *  type; gene '' carries each group's whole-exome patients, profiled for every gene. Counts only. */
-export function dnegProfiledSql(cohortSql: string, study: string, db: string, pin: string, drivers: string[], alteration: EnrichAlteration): string {
-  return (
+export function dnegProfiledSql(cohortSql: string, study: string, db: string, pin: string, drivers: string[], alteration: EnrichAlteration): AggregateSql {
+  return aggregateSql((
     dnegCtes(cohortSql, study, db, pin, drivers, alteration) + ",\n" +
     "pw AS (SELECT pid, max(panel = 'WES') AS wes FROM pp GROUP BY pid)\n" +
     "SELECT if(pw.wes = 1, '', gp.gene) AS gene, grp.g AS grp, uniqExact(pp.pid) AS profiled\n" +
@@ -34,7 +35,7 @@ export function dnegProfiledSql(cohortSql: string, study: string, db: string, pi
     "  LEFT JOIN " + db + ".gene_panel_to_gene_derived gp ON gp.gene_panel_id = pp.panel\n" +
     "WHERE grp.g IN ('positive', 'negative')\n" +
     "GROUP BY gene, grp"
-  );
+  ));
 }
 
 /**

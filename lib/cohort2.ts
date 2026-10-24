@@ -28,6 +28,8 @@ import type {
   SampleListLeaf, PatientListLeaf, SplitLeaf, UploadLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
 } from "./types.ts";
 import { finiteSql } from "./sql-number.ts";
+import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "./sql-kinds.ts";
+import { DAYS_PER_MONTH } from "./time-units.ts";
 
 /** Every leaf compiler receives a fully-resolved context. */
 type Ctx = CompileCtx & { study: string };
@@ -160,14 +162,14 @@ export function derivedMetricSql(metric: DerivedMetric, study: string, db: strin
     "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
     "  GROUP BY pid";
   if (metric === "followupMonths")
-    return "SELECT p.stable_id AS pid, max(ce.start_date) / 30.4375 AS v\n" + evJoin;
+    return "SELECT p.stable_id AS pid, max(ce.start_date) / " + DAYS_PER_MONTH + " AS v\n" + evJoin;
   if (metric === "historyMonths")
-    return "SELECT p.stable_id AS pid, greatest(0, -min(ce.start_date)) / 30.4375 AS v\n" + evJoin;
+    return "SELECT p.stable_id AS pid, greatest(0, -min(ce.start_date)) / " + DAYS_PER_MONTH + " AS v\n" + evJoin;
   if (metric === "lines" || metric === "treatmentSpan") {
     const eventType = String(params?.eventType || "").trim();
     if (!eventType) throw new Error("derived clause: metric '" + metric + "' needs an eventType");
     if (metric === "treatmentSpan")
-      return "SELECT p.stable_id AS pid, (max(coalesce(ce.stop_date, ce.start_date)) - min(ce.start_date)) / 30.4375 AS v\n" +
+      return "SELECT p.stable_id AS pid, (max(coalesce(ce.stop_date, ce.start_date)) - min(ce.start_date)) / " + DAYS_PER_MONTH + " AS v\n" +
         "  FROM " + db + ".clinical_event ce\n" +
         "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
         "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
@@ -460,11 +462,11 @@ function patientListLeafSql(leaf: PatientListLeaf, ctx: Ctx): string {
 }
 
 /** The samples, as bare ids, of the patients `patientsSql` selects in `study`: what a lock records beside them. */
-export function memberSamplesSql(patientsSql: string, study: string, db: string): string {
-  return "SELECT DISTINCT " + PID("sample_unique_id", study) + " AS sid\n" +
+export function memberSamplesSql(patientsSql: string, study: string, db: string): PatientSql {
+  return patientSql("SELECT DISTINCT " + PID("sample_unique_id", study) + " AS sid\n" +
     "  FROM " + db + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
-    "    AND " + PID("patient_unique_id", study) + " IN (SELECT pid FROM (" + patientsSql + "))";
+    "    AND " + PID("patient_unique_id", study) + " IN (SELECT pid FROM (" + patientsSql + "))");
 }
 
 /**
@@ -473,7 +475,7 @@ export function memberSamplesSql(patientsSql: string, study: string, db: string)
  * would add and who it would drop, and how many samples the frozen patients have that were not
  * theirs when locked (`samples`, where the lock keeps them; null when it recorded none).
  */
-export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string, samples: { set: string; part: string } | null): string {
+export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string, samples: { set: string; part: string } | null): AggregateSql {
   const pid = PID("patient_unique_id", study), sid = PID("sample_unique_id", study);
   let newSamples = "toInt64(-1)";
   if (samples) {
@@ -481,12 +483,12 @@ export function lockDriftSql(lockedSql: string, liveSql: string, study: string, 
     newSamples = "(SELECT count() FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study) +
       " AND " + pid + " IN (SELECT pid FROM locked)" + (table ? " AND " + sid + " NOT IN (SELECT id FROM " + table + ")" : "") + ")";
   }
-  return "WITH locked AS (" + lockedSql + "),\n     live AS (" + liveSql + ")\n" +
+  return aggregateSql("WITH locked AS (" + lockedSql + "),\n     live AS (" + liveSql + ")\n" +
     "SELECT (SELECT count() FROM locked) AS present,\n" +
     "       (SELECT count() FROM live) AS now,\n" +
     "       (SELECT count() FROM live WHERE pid NOT IN (SELECT pid FROM locked)) AS entered,\n" +
     "       (SELECT count() FROM locked WHERE pid NOT IN (SELECT pid FROM live)) AS left,\n" +
-    "       " + newSamples + " AS newSamples";
+    "       " + newSamples + " AS newSamples");
 }
 
 // The salt is part of what every held-out result means: changing it reshuffles every

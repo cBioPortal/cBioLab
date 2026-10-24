@@ -8,6 +8,7 @@ import type { QueryColumn, RowSource } from "./table-query.ts";
 import type { TablePart } from "./clinical-table.ts";
 import type { PatientEvent, PatientSample } from "./types.ts";
 import { clinicalTable } from "./custom-data.ts";
+import { patientSql, type PatientSql } from "./sql-kinds.ts";
 
 /** A study's patient id as stored (no study prefix): what a cohort's `pid` holds. */
 export const PATIENT_ID = /^[A-Za-z0-9._-]{1,80}$/;
@@ -75,9 +76,9 @@ export function timelinePatientRowSource(parts: TimelinePart[], db: string): Row
 }
 
 /** One patient's events with their attributes, in time order. The id is checked by the caller. */
-export function patientEventsSql(study: string, patient: string, db: string): string {
+export function patientEventsSql(study: string, patient: string, db: string): PatientSql {
   // filter both event tables to the patient before joining: the attribute table is the large one
-  return "WITH pt AS (\n" +
+  return patientSql("WITH pt AS (\n" +
     "  SELECT p.internal_id FROM " + db + ".patient p JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND p.stable_id = " + sq(patient) + "\n" +
     "), ev AS (\n" +
@@ -89,18 +90,18 @@ export function patientEventsSql(study: string, patient: string, db: string): st
     "  SELECT clinical_event_id, key, value FROM " + db + ".clinical_event_data WHERE clinical_event_id IN (SELECT clinical_event_id FROM ev)\n" +
     ") d ON d.clinical_event_id = ev.clinical_event_id\n" +
     "GROUP BY id, type, start, stop\n" +
-    "ORDER BY start, id";
+    "ORDER BY start, id");
 }
 
 /** One patient's samples and their SAMPLE_TYPE (what colours a sample's marker). */
-export function patientSamplesSql(study: string, patient: string, db: string): string {
+export function patientSamplesSql(study: string, patient: string, db: string): PatientSql {
   const pre = sq(study + "_");
-  return "SELECT replaceOne(s.sample_unique_id, " + pre + ", '') AS id, any(c.attribute_value) AS type\n" +
+  return patientSql("SELECT replaceOne(s.sample_unique_id, " + pre + ", '') AS id, any(c.attribute_value) AS type\n" +
     "FROM " + db + ".sample_derived s\n" +
     "LEFT JOIN " + clinicalTable(db, ["SAMPLE_TYPE"]) + " c ON c.sample_unique_id = s.sample_unique_id AND c.type = 'sample'\n" +
     "  AND c.cancer_study_identifier = " + sq(study) + " AND c.attribute_name = 'SAMPLE_TYPE'\n" +
     "WHERE s.cancer_study_identifier = " + sq(study) + " AND s.patient_unique_id = " + sq(study + "_" + patient) + "\n" +
-    "GROUP BY id ORDER BY id";
+    "GROUP BY id ORDER BY id");
 }
 
 /** Rows as the two queries return them → the timeline's events and samples. */
