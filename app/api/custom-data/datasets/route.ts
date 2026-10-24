@@ -21,7 +21,8 @@ export async function POST(req: Request) {
     const principal = requirePrincipal(req);
     const raw = Buffer.from(await req.arrayBuffer());
     const text = (req.headers.get("content-type") || "").includes("gzip") ? gunzipSync(raw).toString("utf8") : raw.toString("utf8");
-    const { dataset, source, versionOf } = JSON.parse(text);
-    return Response.json({ dataset: await saveDataset(principal, dataset, source, versionOf ? String(versionOf) : undefined) }, { status: 201 });
+    const { dataset, source, versionOf, baseVersion } = JSON.parse(text);
+    return Response.json({ dataset: await saveDataset(principal, dataset, source, versionOf ? String(versionOf) : undefined,
+      baseVersion == null ? undefined : Number(baseVersion)) }, { status: 201 });
   } catch (e) { return fail(e); }
 }
