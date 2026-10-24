@@ -6,6 +6,7 @@ import { TimelineBody } from "../timeline-body";
 export const timelineUi: KindUi<"timeline"> = {
   kind: "timeline",
   label: "Patient timeline (one patient at a time)",
+  category: "patient",
   title: "Patient timeline",
   maxCohorts: 1,
   cohortInHeader: true,

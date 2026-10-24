@@ -8,7 +8,6 @@ import { Braces, LoaderCircle, Lock, Play, Plus, Redo2, Save, Undo2, X } from "l
 import { lockDate } from "../../lib/cohort-lock.ts";
 import type { CohortLock, LockDrift } from "../../lib/types.ts";
 import { Button } from "../_ui/button";
-import { CHIP } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 import { TB } from "../_ui/toolbar.ts";
 import { SaveToLibraryDialog } from "./dialogs.tsx";
@@ -34,15 +33,15 @@ import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort, SavedWorkspace } from "./use-saved.ts";
 import type { ExploreResult } from "../../lib/types.ts";
 import type { ViewCtx } from "./view-cards.tsx";
-import { isNewKind } from "../../lib/new-in-lab.ts";
-import { NewMark } from "./new-mark.tsx";
+import { AddViewDialog } from "./add-view-dialog.tsx";
+import type { ViewCategory } from "./kinds/kind-ui.ts";
 
-/** A kind not yet in the document: a grey fill, so each pill reads apart from its neighbours on the white card. */
-const ADD_PILL = "border-transparent bg-border text-foreground hover:bg-border/70";
+/** the add-view button's reason when the document is full */
+const FULL = "this document already has the maximum of 6 views";
 
 /** What the Analysis tab's sections read from the page and the actions they can take; the page builds one per render. */
 export interface AnalysisCtx {
-  VIEW_KINDS: { kind: string; label: string; why?: () => string | null; loading?: () => boolean; }[];
+  VIEW_KINDS: { kind: string; label: string; category: ViewCategory; why?: () => string | null; loading?: () => boolean; }[];
   addView: (kind: string) => void;
   applyText: () => void;
   busy: boolean;
@@ -372,6 +371,9 @@ export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
 
 export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
   const { VIEW_KINDS, addView, busy, doc, docDialog, docHistory, explore, fetchExplore, goTab, openWorkspaceSave, result, setCdFocus, spaces, viewCtx, viewIds } = ctx;
+  const [addOpen, setAddOpen] = useState(false);
+  // each add is another view, so a document can hold several of one kind, up to six
+  const full = (doc.views || []).length >= 6;
   return <>
     <div>
       {(busy || result || (doc.views || []).length > 0) && (
@@ -429,7 +431,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
       {!busy && !result && !(doc.views || []).length && (
         <div className="card">
           <p className="note t-md flush">
-            Start with a view: choose below what you want to see — survival, an oncoprint, a gene comparison — and
+            Start with a view: use “Add view” below to choose what you want to see — survival, an oncoprint, a gene comparison — and
             then add its cohorts, from your library, from this analysis, or built on the{" "}
             <Button variant="link" size="inline" onClick={() => { goTab("explore"); if (!explore) fetchExplore(); }}>Explore page</Button>.
           </p>
@@ -438,26 +440,19 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
       {!(busy && !result) && (
         <div className="card addview">
           <div className="row center g2">
-            <strong className="addview-title">Add a view</strong>
+            <Button size="sm" className="addview-open" disabled={full}
+              title={full ? FULL : "choose a view — survival, an oncoprint, a gene comparison — then its cohorts"}
+              onClick={() => setAddOpen(true)}><Plus />Add view</Button>
             <span className="meta">{(doc.views || []).length} of 6 in this document</span>
-            <span className="spacer" />
-            {VIEW_KINDS.map(({ kind, label, why, loading }) => {
-              // each click adds another view, so a document can hold several of one kind
-              const full = (doc.views || []).length >= 6;
+          </div>
+          <AddViewDialog open={addOpen} onOpenChange={setAddOpen} onAdd={addView}
+            items={addOpen ? VIEW_KINDS.map(({ kind, label, category, why, loading }) => {
               // with no cohorts yet there is no study to ask about: the view's cohorts decide later
               const known = Object.keys(doc.cohorts || {}).length > 0;
-              const waiting = !full && known && !!loading && loading();
-              const blocked = full ? "this document already has the maximum of 6 views"
-                : waiting ? "loading this study's catalog — a moment"
-                : (known && why ? why() : null);
-              return (
-                <Button key={kind} variant="outline" size="xs" className={cn(CHIP, ADD_PILL, waiting && "chip-wave disabled:opacity-100")}
-                  aria-busy={waiting || undefined} disabled={!!blocked}
-                  title={blocked || ("add a " + label.toLowerCase() + " view, then choose its cohorts")}
-                  onClick={() => addView(kind)}><Plus />{label}{isNewKind(kind) && <NewMark />}</Button>
-              );
-            })}
-          </div>
+              const waiting = known && !!loading && loading();
+              const blocked = waiting ? "loading this study's catalog — a moment" : (known && why ? why() : null);
+              return { kind, label, category, blocked, waiting };
+            }) : []} />
         </div>
       )}
       {!result && !busy && (doc.views || []).map((dv: any, vi: number) => viewIsEmpty(dv) ? <EmptyViewCard key={viewIds[vi] ?? vi} ctx={ctx} vi={vi} /> : null)}

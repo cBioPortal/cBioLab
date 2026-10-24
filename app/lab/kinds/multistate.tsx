@@ -39,6 +39,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const multistateUi: KindUi<"multistate"> = {
   kind: "multistate",
   label: "Multistate model (progression, then death)",
+  category: "outcomes",
   title: "Multistate model",
   maxCohorts: 4,
   why: (k) => k.events.some((e) => /diagnos|progress/i.test(e.canonical)) ? null : "this study records no diagnosis or progression timeline events",

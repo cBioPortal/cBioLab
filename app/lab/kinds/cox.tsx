@@ -76,6 +76,7 @@ function CoxCard({ ctx, v, vi }: CardProps) {
 export const coxUi: KindUi<"cox"> = {
   kind: "cox",
   label: "Cox regression (forest plot)",
+  category: "outcomes",
   title: "Cox regression",
   why: (_k, p) => p.noSurvivalWhy(),
   loading: (_k, p) => p.catLoading,

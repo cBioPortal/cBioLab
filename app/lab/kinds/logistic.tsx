@@ -68,6 +68,7 @@ function LogisticCard({ ctx, v, vi }: CardProps) {
 export const logisticUi: KindUi<"logistic"> = {
   kind: "logistic",
   label: "Logistic regression (odds ratios)",
+  category: "outcomes",
   title: "Logistic regression",
   defaults: (k, p) => ({ kind: "logistic",
     outcome: { source: "alteration", gene: k.genes[0] || "TP53", by: "mutated" }, outcomeEvent: "Mutated",

@@ -31,6 +31,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const instabilityUi: KindUi<"instability"> = {
   kind: "instability",
   label: "Genomic instability (aneuploidy score, FGA, arm-level calls)",
+  category: "copynumber",
   title: "Genomic instability",
   maxCohorts: 6,
   sub: (spec) => "from hg19 segments, ±" + (spec.threshold ?? 0.2) + ", arm called past " + Math.round(100 * (spec.armShare ?? 0.5)) + "% of its length" + (spec.includeX ? ", with chrX" : ""),

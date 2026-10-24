@@ -31,6 +31,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const hlaUi: KindUi<"hla"> = {
   kind: "hla",
   label: "HLA class I genotype (homozygosity, HLA LOH and OS)",
+  category: "copynumber",
   title: "HLA class I genotype",
   maxCohorts: 3,
   why: (k) => k.attrs.some((a) => /^hla[-_]?[abc]/i.test(a.attribute)) ? null : "this study records no HLA class I alleles",

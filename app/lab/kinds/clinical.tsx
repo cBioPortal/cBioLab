@@ -60,6 +60,7 @@ function ClinicalCard({ ctx, v, vi }: CardProps) {
 export const clinicalUi: KindUi<"clinical"> = {
   kind: "clinical",
   label: "Clinical comparison",
+  category: "overview",
   title: "Clinical comparison",
   why: (_k, p) => p.viewAttrs().length ? null : "this study declares no clinical attributes to compare",
   loading: (_k, p) => p.attrsLoading(),

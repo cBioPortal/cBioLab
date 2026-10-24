@@ -41,6 +41,7 @@ function OncoprintViewCard({ ctx, v, vi }: CardProps) {
 export const oncoprintUi: KindUi<"oncoprint"> = {
   kind: "oncoprint",
   label: "Oncoprint",
+  category: "alterations",
   title: "Oncoprint",
   maxCohorts: 4,
   defaults: (k) => ({ kind: "oncoprint", genes: k.genes.slice(0, 5) }),

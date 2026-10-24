@@ -6,6 +6,7 @@ import type { KindUi } from "./kind-ui.ts";
 export const alterationsUi: KindUi<"alterations"> = {
   kind: "alterations",
   label: "Patient alterations (mutations, copy number, SVs; one patient at a time)",
+  category: "patient",
   title: "Patient alterations",
   maxCohorts: 1,
   cohortInHeader: true,

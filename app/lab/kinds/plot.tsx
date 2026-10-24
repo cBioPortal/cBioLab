@@ -29,6 +29,7 @@ function PlotCard({ ctx, v, vi }: CardProps) {
 export const plotUi: KindUi<"plot"> = {
   kind: "plot",
   label: "Plot",
+  category: "overview",
   title: "Plot",
   maxCohorts: 1,
   why: (_k, p) => p.viewAttrs().length ? null : "this study declares no clinical attributes to plot",

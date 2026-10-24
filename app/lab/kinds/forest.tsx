@@ -64,6 +64,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const forestUi: KindUi<"forest"> = {
   kind: "forest",
   label: "Pan-cancer forest (one exposure's HR per cancer type, random-effects pooled)",
+  category: "outcomes",
   title: "Forest plot",
   maxCohorts: 6,
   defaults: (known) => ({ kind: "forest", exposure: { source: "alteration", gene: known.genes[0] || "TP53" } }),

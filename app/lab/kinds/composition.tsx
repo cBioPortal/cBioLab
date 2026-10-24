@@ -51,6 +51,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const compositionUi: KindUi<"composition"> = {
   kind: "composition",
   label: "Composition (cell types, states, signatures as parts of a whole)",
+  category: "expression",
   title: "Composition",
   maxCohorts: 8,
   minCohorts: 1,

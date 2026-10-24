@@ -26,6 +26,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const clonalityUi: KindUi<"clonality"> = {
   kind: "clonality",
   label: "Clonality (FACETS)",
+  category: "evolution",
   title: "Clonality",
   genes: true,
   maxCohorts: 3,

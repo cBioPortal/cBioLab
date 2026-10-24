@@ -55,10 +55,26 @@ export interface KindCardCtx {
   locked?: string[];
 }
 
+/** The add-view dialog's categories, in its sidebar's order. */
+export const VIEW_CATEGORIES = [
+  { id: "overview", label: "Cohort overview" },
+  { id: "alterations", label: "Mutations & alterations" },
+  { id: "copynumber", label: "Copy number & genome" },
+  { id: "expression", label: "Expression & assays" },
+  { id: "outcomes", label: "Survival & outcome models" },
+  { id: "treatment", label: "Treatment & clinical course" },
+  { id: "evolution", label: "Tumor evolution & metastasis" },
+  { id: "clinical", label: "Clinical genomics" },
+  { id: "patient", label: "Single patient" },
+] as const;
+export type ViewCategory = (typeof VIEW_CATEGORIES)[number]["id"];
+
 export interface KindUi<K extends ViewKind = ViewKind> {
   kind: K;
   /** its entry in the add-view menu */
   label: string;
+  /** where the add-view dialog lists it */
+  category: ViewCategory;
   /** its card's title */
   title: string;
   /** a gene list edited through the page's shared gene dialog */

@@ -35,6 +35,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const molsubtypeUi: KindUi<"molsubtype"> = {
   kind: "molsubtype",
   label: "Molecular subtypes (endometrial POLE / MMRd / p53abn / NSMP)",
+  category: "clinical",
   title: "Molecular subtypes",
   maxCohorts: 6,
   sub: (spec) => "endometrial molecular classification per patient (POLE, MMRd, p53abn, NSMP)" + (spec.by ? " · by " + spec.by : "") +

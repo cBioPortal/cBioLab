@@ -26,6 +26,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const rmstUi: KindUi<"rmst"> = {
   kind: "rmst",
   label: "Restricted mean OS time (RMST, landmarks)",
+  category: "outcomes",
   title: "Restricted mean OS time",
   maxCohorts: 6,
   why: (k) => k.attrs.some((a) => /_MONTHS$/i.test(a.attribute)) ? null : "this study has no <X>_MONTHS outcome column",

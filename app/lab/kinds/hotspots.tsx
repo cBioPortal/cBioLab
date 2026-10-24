@@ -25,6 +25,7 @@ function HotspotsCard({ ctx, v, vi }: CardProps) {
 export const hotspotsUi: KindUi<"hotspots"> = {
   kind: "hotspots",
   label: "Lollipop (hotspots)",
+  category: "alterations",
   title: "Mutations",
   maxCohorts: 1,
   defaults: (k) => ({ kind: "hotspots", genes: k.genes.slice(0, 4), minCount: 1 }),

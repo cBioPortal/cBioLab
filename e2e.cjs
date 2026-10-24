@@ -9,6 +9,12 @@ async function pickExploreStudies(p) {
   await p.evaluate(() => window.cohortLab.selectStudies(["msk_chord_2024", "genie_public"]));
 }
 
+/** add a view of `kind` through the analysis page's "Add view" dialog */
+async function addViewKind(p, kind) {
+  await p.locator(".addview-open").click();
+  await p.locator(`.addviewdialog [data-kind="${kind}"]`).click();
+}
+
 /**
  * Controls that sit side by side must line up: in every toolbar zone (.tbz) under `scope`, each
  * control (a button, checkbox label or select) is one control height (--ctl-h) tall and every child shares one
@@ -860,9 +866,9 @@ async function main() {
         (together.join(" + ") || "no document") + " · " + startViews + " views");
 
       // Views come in from "Add a view", each then given a cohort from its "+ Add cohort".
-      for (const label of ["Survival", "Oncoprint"]) {
+      for (const kind of ["survival", "oncoprint"]) {
         try {
-          await page.locator(".addview button", { hasText: new RegExp("^" + label + "$") }).click();
+          await addViewKind(page, kind);
           await page.locator(".emptyview .emptyview-body button").first().click();
           await page.locator(".addcohortdialog .acd-row button").first().click();
           await page.waitForFunction(() => !document.querySelector(".emptyview"), null, { timeout: 60000 });
@@ -874,7 +880,7 @@ async function main() {
       let added = [], dots = 0, emptyFirst = false, drew = [];
       try {
         await page.waitForSelector(".addview", { timeout: 120000 });
-        await page.locator(".addview button:has-text('Lollipop')").click();
+        await addViewKind(page, "hotspots");
         await page.waitForSelector(".emptyview .emptyview-body button", { timeout: 30000 });
         added = (JSON.parse(await page.locator("#docjson").inputValue()).views || []).map(v => v.kind);
         emptyFirst = (await page.locator(".lp-plot circle.lollipop-head").count()) === 0;
@@ -902,7 +908,7 @@ async function main() {
       let kinds2 = [], undone = [];
       try {
         const kinds = () => page.locator("#docjson").inputValue().then((t) => (JSON.parse(t).views || []).map(v => v.kind));
-        await page.locator(".addview button:has-text('Lollipop')").click();
+        await addViewKind(page, "hotspots");
         await page.waitForFunction(() => (JSON.parse(document.querySelector("#docjson").value).views || []).filter(v => v.kind === "hotspots").length === 2, null, { timeout: 30000 });
         kinds2 = await kinds();
         await page.locator(".undo-doc").click();
@@ -1711,7 +1717,7 @@ async function main() {
       // the store is jsonb, which does not keep key order: compare values, not text
       const keyed = (x) => JSON.stringify(x, (_, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a < b ? -1 : 1)) : v);
       await sp.goto(BASE + "/lab?tab=analysis", { waitUntil: "domcontentloaded" });
-      await sp.locator(".addview button:has-text('Survival')").click();
+      await addViewKind(sp, "survival");
       await sp.locator(".emptyview .emptyview-body button").first().click();
       await sp.getByRole("tab", { name: "Library" }).click();
       await sp.locator(".addcohortdialog .acd-row", { hasText: name }).getByRole("button").click();
@@ -1746,7 +1752,7 @@ async function main() {
       const patients = ex.patients || [];
       const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
       await sp.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify({ dsl: "2.7", study: "msk_chord_2024", cohorts: {}, views: [] })).toString("base64url"), { waitUntil: "domcontentloaded" });
-      await sp.locator(".addview button:has-text('Survival')").click();
+      await addViewKind(sp, "survival");
       await sp.locator(".emptyview .emptyview-body button").first().click();
       await sp.getByRole("tab", { name: "From a list of ids" }).click();
       await sp.locator(".addcohortdialog").getByRole("tab", { name: "patients" }).click();
@@ -1826,7 +1832,7 @@ async function main() {
       // example cohorts: on the Examples page's Cohorts tab, and not in "+ Add cohort"'s library
       // (an analysis with no cohorts, so a new view waits for one)
       await sp.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify({ dsl: "2.8", study: "msk_chord_2024", cohorts: {}, views: [] })).toString("base64url"), { waitUntil: "domcontentloaded" });
-      await sp.locator(".addview button:has-text('Survival')").click();
+      await addViewKind(sp, "survival");
       await sp.locator(".emptyview .emptyview-body button").first().click();
       await sp.getByRole("tab", { name: "Library" }).click();
       steps.noExamplesInDialog = (await sp.locator(".addcohortdialog .acd-row", { hasText: "STK11-driver" }).count()) === 0;

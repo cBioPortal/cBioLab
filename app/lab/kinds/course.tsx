@@ -101,6 +101,7 @@ function CourseCard({ ctx, v, vi }: CardProps) {
 export const courseUi: KindUi<"course"> = {
   kind: "course",
   label: "Clinical course",
+  category: "treatment",
   title: "Clinical course",
   why: (k) => k.events.length ? null
     : "this study records no timeline events (only 131 of 545 studies have any)",

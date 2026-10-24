@@ -38,6 +38,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const cutpointUi: KindUi<"cutpoint"> = {
   kind: "cutpoint",
   label: "Biomarker cut-point (best split of a number for OS)",
+  category: "outcomes",
   title: "Cut-point",
   maxCohorts: 1,
   why: (k) => k.attrs.some((a) => a.kind === "num") ? null : "this study has no numeric clinical attribute to find a cut-point of",

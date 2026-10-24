@@ -111,6 +111,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const correlatesUi: KindUi<"correlates"> = {
   kind: "correlates",
   label: "Co-expression with one gene (genome-wide)",
+  category: "expression",
   title: "Co-expression",
   maxCohorts: 1,
   why: (k) => !k.profiles.filter((p) => p !== "cna").length ? "this study has no continuous molecular profile (mRNA, protein, …) to correlate on" : null,

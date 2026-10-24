@@ -87,6 +87,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const cancertypesUi: KindUi<"cancertypes"> = {
   kind: "cancertypes",
   label: "Cancer types summary",
+  category: "overview",
   title: "Cancer types summary",
   genes: true,
   maxCohorts: 2,

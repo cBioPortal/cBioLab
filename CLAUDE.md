@@ -40,7 +40,8 @@ ClickHouse SQL; clients never send SQL. Live at https://cbiolab.vercel.app (UI a
   queries; `test/boundary.test.ts` sweeps every kind's), `method.ts` (its method record, invariant
   12), `figure.ts` (its SVG) and `kind.ts` (its descriptor: figure, title, results text, help,
   federation need, marks — `ViewKindDef` in `lib/views/kind-def.ts`). The page file is its
-  `KindUi` (`app/lab/kinds/kind-ui.ts`): its add-menu entry and why it is disabled, the view a new
+  `KindUi` (`app/lab/kinds/kind-ui.ts`): its add-view dialog entry, the category it is listed under
+  (`VIEW_CATEGORIES`, the dialog's sidebar; `app/lab/add-view-dialog.tsx`) and why it is disabled, the view a new
   one starts from, how many cohorts it draws, and its card — the shared card
   (`app/lab/kind-cards.tsx`) with its subtitle, controls and body, or a `Card` of its own. The
   registries are `lib/views/index.ts` (runners), `lib/views/kinds.ts` (descriptors) and

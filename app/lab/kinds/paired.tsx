@@ -57,6 +57,7 @@ function Controls({ c }: { c: KindCardCtx }) {
 export const pairedUi: KindUi<"paired"> = {
   kind: "paired",
   label: "Paired samples (primary vs metastasis, before vs after)",
+  category: "evolution",
   title: "Paired samples",
   genes: true,
   maxCohorts: 3,

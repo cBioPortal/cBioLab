@@ -5,6 +5,7 @@ import type { KindUi } from "./kind-ui.ts";
 export const overlapUi: KindUi<"overlap"> = {
   kind: "overlap",
   label: "Cohort overlap (UpSet)",
+  category: "overview",
   title: "Cohort overlap",
   maxCohorts: 6,
   minCohorts: 2,

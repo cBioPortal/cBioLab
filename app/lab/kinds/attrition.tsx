@@ -5,6 +5,7 @@ import type { KindUi } from "./kind-ui.ts";
 export const attritionUi: KindUi<"attrition"> = {
   kind: "attrition",
   label: "Cohort attrition (CONSORT)",
+  category: "overview",
   title: "Cohort attrition",
   maxCohorts: 6,
   sub: () => "patients left after each clause, in order",
