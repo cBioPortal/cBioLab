@@ -141,6 +141,11 @@ export function applyCutoff(data: SurvRecord[], cutoff: number): SurvRecord[] {
  * had the event by t" instead of "how much hasn't". Same points, same censoring, just flipped;
  * an event's uptick reads as a rise instead of a drop, and "median" becomes the month by which
  * half the cohort's events have happened.
+ *
+ * It is the cumulative incidence only where nothing competes with the event. 1 − KM treats a
+ * competing event (death before progression, say) as censoring, which assumes the patient could
+ * still have had the event later, so with competing risks it overstates the incidence; the
+ * `incidence` view's Aalen–Johansen estimate is the one that accounts for them.
  */
 export function toIncidence<T extends { points: KmPoint[] }>(curve: T): T {
   return { ...curve, points: curve.points.map(p => ({ t: p.t, s: Math.round((1 - p.s) * 10000) / 10000 })) };

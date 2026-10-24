@@ -108,6 +108,11 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
     }
     const toX = (r: RawCoxRow): number[] => columns.map((col) =>
       kindsFinal[col.axisIndex] === "num" ? Number(r.values[col.axisIndex]) : (String(r.values[col.axisIndex]) === col.level ? 1 : 0));
+    // Time runs from each study's own baseline (<X>_MONTHS), with no delayed entry: a patient is
+    // counted at risk from that baseline even if they only became observable later (at sequencing,
+    // say), so the fit carries the same left truncation the survival view discloses for an
+    // unanchored endpoint. coxRegression takes `entry` for the counting-process form; this view has
+    // no anchor to measure entry from, so it passes none.
     const coxInput: CoxRow[] = rowsCut
       .filter((r) => Number.isFinite(r.t) && r.t >= 0)
       .map((r) => ({ t: r.t, event: r.event, x: toX(r), ...(cx.stratifyByStudy ? { stratum: r.study } : {}) }));
