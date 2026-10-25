@@ -1156,7 +1156,7 @@ async function main() {
       ok("table: search keeps only matching rows", !!searched && searched.kept > 0 && searched.kept < all.all && searched.all === all.all, JSON.stringify(searched));
       await page.getByRole("button", { name: "clear search" }).click();
       await settle();
-      // waiting states, checked by holding the request (CLAUDE.md, "Verify waiting states by holding the request")
+      // waiting states, checked by holding the request (docs/UI.md, "Verify waiting states by holding the request")
       {
         let release, open = false;
         const gate = new Promise((r) => (release = r)); gate.then(() => (open = true));

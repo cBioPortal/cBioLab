@@ -1,8 +1,8 @@
 {
- "ranAt": "2026-10-15T22:11:15.855Z",
- "commit": "6247483",
- "total": 16,
- "caught": 16,
+ "ranAt": "2026-10-23T16:05:45.477Z",
+ "commit": "94670e5",
+ "total": 18,
+ "caught": 18,
  "mutants": [
   {
    "id": "km-censored-as-death",
@@ -21,7 +21,7 @@
    "file": "lib/stats.ts",
    "guard": "unit",
    "caught": true,
-   "failures": 17,
+   "failures": 26,
    "evidence": "not ok 1 - with no competing event, cumulative incidence is exactly 1 − Kaplan–Meier, delayed entry included"
   },
   {
@@ -41,8 +41,8 @@
    "file": "lib/stats.ts",
    "guard": "unit",
    "caught": true,
-   "failures": 30,
-   "evidence": "not ok 1 - Fisher's tea-taster 4x4 split gives p = 0.4857"
+   "failures": 31,
+   "evidence": "not ok 6 - Fisher's exact test: p in [0, 1], and the same for the table transposed or its rows swapped"
   },
   {
    "id": "bh-not-monotone",
@@ -111,8 +111,8 @@
    "file": "lib/explore.ts",
    "guard": "portal-parity",
    "caught": true,
-   "failures": 33,
-   "evidence": "FAIL nsclc_ctdx_msk_2022 mutations: PTEN  ours 77/2621 / cBioPortal 77/1257"
+   "failures": 97,
+   "evidence": "FAIL nsclc_ctdx_msk_2022 mutations: PTEN  ours 77/52/2621 / cBioPortal 77/52/1257"
   },
   {
    "id": "cna-denominator-double-count",
@@ -122,8 +122,8 @@
    "guard": "portal-parity",
    "history": "Shipped once: brca_tcga MYC amplification read 10.6% where cBioPortal says 21.2%.",
    "caught": true,
-   "failures": 30,
-   "evidence": "FAIL brca_tcga copy number: MYC amplified  ours 229/2160 / cBioPortal 229/1080"
+   "failures": 73,
+   "evidence": "FAIL brca_tcga copy number: MYC amplified  ours 229/229/2160 / cBioPortal 229/229/1080"
   },
   {
    "id": "mutation-includes-cna",
@@ -132,7 +132,7 @@
    "file": "lib/oql.ts",
    "guard": "portal-parity",
    "caught": true,
-   "failures": 12,
+   "failures": 13,
    "evidence": "FAIL brca_tcga cohort: patients with a PIK3CA mutation (OQL \"PIK3CA: MUT\")  ours 352 / cBioPortal 317"
   },
   {
@@ -165,6 +165,26 @@
    "caught": true,
    "failures": 10,
    "evidence": "FAIL brca_tcga cohort: patients matching OQL \"PIK3CA: TRUNC\" (cBioPortal's mutations, its classes)  ours 2 / cBioPortal 3"
+  },
+  {
+   "id": "table1-denominator-ignores-panel",
+   "layer": "counts",
+   "effect": "A risk group's mutation rate in Table 1 divides by every patient in the group, counting those whose panel never covered the gene as unmutated, so the rate reads too low.",
+   "file": "lib/views/riskmodel-table1.ts",
+   "guard": "unit",
+   "caught": true,
+   "failures": 2,
+   "evidence": "not ok 1 - a patient whose panels omit the gene is not profiled, not unaltered; whole-exome covers every gene"
+  },
+  {
+   "id": "table1-model-rows-in-fdr",
+   "layer": "statistics",
+   "effect": "Table 1's q-values are corrected together with the rows the model was built from, whose tiny p-values are guaranteed, so every other row looks more significant than it is.",
+   "file": "lib/views/riskmodel-table1.ts",
+   "guard": "unit",
+   "caught": true,
+   "failures": 1,
+   "evidence": "not ok 2 - they keep a p-value but get no q-value and stay out of the Benjamini–Hochberg family; the stratum stays in"
   }
  ]
 }

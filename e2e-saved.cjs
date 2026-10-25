@@ -1,5 +1,5 @@
 // The Saved tab's lists (app/lab/use-saved.ts) and the analysis page's text dialogs. The lists: loading, failed and empty are three states, each
-// said in words (CLAUDE.md, "waiting, and never hiding what isn't shown"), and saving under a name
+// said in words (docs/UI.md, "waiting, and never hiding what isn't shown"), and saving under a name
 // that exists updates it. Each waiting state is checked by holding the request.
 //
 // Run by e2e.cjs when it has a sign-in; on its own against a running server with AUTH_DEV_LOGIN=1:
