@@ -3,6 +3,7 @@ import { sq } from "../../compiler.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { clinicalTable } from "../../custom-data.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /**
  * The samples grouped by what their background probability depends on — panel signature,
@@ -10,29 +11,29 @@ import { clinicalTable } from "../../custom-data.ts";
  * bitmask, bit i for genes[i]): counts only.
  */
 export function exclusivityGroupsSql(cohortSql: string, study: string, db: string, genes: string[], stratifyBy: string | null,
-  pin: string | null, measure: "driver" | "any"): string {
+  pin: string | null, measure: "driver" | "any"): AggregateSql {
   const mask = genes.map((g, i) => "maxIf(" + (2 ** i) + ", altc.gene = " + sq(g) + ")").join(" + ") || "0";
-  return (
+  return aggregateSql((
     exclusivityCtes(cohortSql, study, db, stratifyBy, pin, measure) + ",\n" +
     "per AS (SELECT suid, count() AS r, " + mask + " AS amask FROM altc GROUP BY suid)\n" +
     "SELECT sp.sig AS sig, ifNull(strat.v, '') AS stratum, per.r AS r, per.amask AS amask, count() AS n\n" +
     "FROM sp LEFT JOIN per ON per.suid = sp.suid LEFT JOIN strat ON strat.suid = sp.suid\n" +
     "GROUP BY sig, stratum, r, amask"
-  );
+  ));
 }
 
 /** Per stratum and gene, the samples with that gene altered (the background's column sums). */
-export function exclusivityColumnsSql(cohortSql: string, study: string, db: string, stratifyBy: string | null, pin: string | null, measure: "driver" | "any"): string {
-  return (
+export function exclusivityColumnsSql(cohortSql: string, study: string, db: string, stratifyBy: string | null, pin: string | null, measure: "driver" | "any"): AggregateSql {
+  return aggregateSql((
     exclusivityCtes(cohortSql, study, db, stratifyBy, pin, measure) + "\n" +
     "SELECT ifNull(strat.v, '') AS stratum, altc.gene AS gene, count() AS n\n" +
     "FROM altc LEFT JOIN strat ON strat.suid = altc.suid GROUP BY stratum, gene"
-  );
+  ));
 }
 
 /** The genes each panel signature in the cohort covers. Metadata only. */
-export function exclusivityCoverageSql(cohortSql: string, study: string, db: string): string {
-  return exclusivityCtes(cohortSql, study, db, null, null, "any") + "\nSELECT sig, gene FROM cov";
+export function exclusivityCoverageSql(cohortSql: string, study: string, db: string): AggregateSql {
+  return aggregateSql(exclusivityCtes(cohortSql, study, db, null, null, "any") + "\nSELECT sig, gene FROM cov");
 }
 
 // ---------------------------------------------------------------------------

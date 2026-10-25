@@ -142,7 +142,10 @@ changing first. The parts, and the one place each rule lives:
    `lib/view-coverage.ts` is the one rule — the engine refuses by it before a view runs, the page
    disables the add-view button and the cohort it applies to — and a new view kind that leaves a
    participant out needs its entry there (`test/view-coverage.test.ts` checks the runners).
-   Never add an id-returning path to `AggregateResolver` / `RemoteAggregateResolver`.
+   Never add an id-returning path to `AggregateResolver` / `RemoteAggregateResolver`. A statement's
+   type says what its rows may hold (`lib/sql-kinds.ts`: `AggregateSql`, `PatientSql`, `CohortSql`):
+   a new builder declares its kind, and only `PatientLevelResolver` runs `PatientSql`
+   (`test/sql-kinds.test.ts` holds the compiler to it).
 11. **Results are cached with `'use cache: remote'`** (`lib/next-cache.ts`; Next 16 Cache
    Components). On Vercel it is Runtime Cache, shared by every function instance; elsewhere it
    is process memory. Analyses, oncoprint contracts, Explore, the study catalog and the study

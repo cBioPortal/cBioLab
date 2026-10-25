@@ -3,6 +3,7 @@
 import { pidOf } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /**
  * Per gene SET, for one cohort in one study: patients profiled for at least one member (any
@@ -13,12 +14,12 @@ import { driverJoin, ALTERED_COND } from "../../federation.ts";
  * that gene's own 'any' counts.
  */
 export function geneSetCountsSql(cohortSql: string, sets: { name: string; genes: string[] }[], study: string,
-  pin: string | null, db: string): string {
+  pin: string | null, db: string): AggregateSql {
   const genes = [...new Set(sets.flatMap((x) => x.genes))];
   const geneList = genes.map(sq).join(",");
   const pairs = sets.flatMap((x) => x.genes.map((g) => "(" + sq(x.name) + "," + sq(g) + ")")).join(",");
   const pid = pidOf("g.patient_unique_id", study), covPid = pidOf("sd.patient_unique_id", study);
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "members AS (SELECT tupleElement(m, 1) AS set_name, tupleElement(m, 2) AS gene FROM (SELECT arrayJoin([" + pairs + "]) AS m)),\n" +
     "altered AS (\n" +
@@ -52,5 +53,5 @@ export function geneSetCountsSql(cohortSql: string, sets: { name: string; genes:
     ")\n" +
     "SELECT set_name, uniqExact(pid) AS profiled, uniqExactIf(pid, is_alt = 1) AS altered, uniqExactIf(pid, is_drv = 1) AS driver\n" +
     "FROM per GROUP BY set_name"
-  );
+  ));
 }

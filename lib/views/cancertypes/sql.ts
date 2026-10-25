@@ -5,6 +5,7 @@ import { sq } from "../../compiler.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /**
  * Per group of the cohort's samples (a sample attribute's value, or the study) and per gene — plus
@@ -15,11 +16,11 @@ import { driverJoin, ALTERED_COND } from "../../federation.ts";
  * carries the union of their samples' alterations. Counts only.
  */
 export function cancerTypesSql(cohortSql: string, study: string, db: string, genes: string[], attribute: string | null,
-  pin: string | null, measure: "driver" | "any", unit: "sample" | "patient" = "sample"): string {
+  pin: string | null, measure: "driver" | "any", unit: "sample" | "patient" = "sample"): AggregateSql {
   const geneList = genes.map(sq).join(",");
   const drv = measure === "driver" && pin;
   const fold = clinicalValueFoldSql("attribute_value");
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
     "  SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM " + db + ".sample_derived\n" +
@@ -70,15 +71,15 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     "       countIf(types = ['homdel']) AS homdel, countIf(types = ['sv']) AS sv,\n" +
     "       countIf(length(types) > 1) AS multiple\n" +
     "FROM uu GROUP BY grp, gene"
-  );
+  ));
 }
 
 /** Each group's units (samples, or patients with a sample in the group), profiled or not, and how many
  *  were profiled for mutations, copy number and structural variants at all — the portal's "+" rows. */
-export function cancerTypeSamplesSql(cohortSql: string, study: string, db: string, attribute: string | null, unit: "sample" | "patient" = "sample"): string {
+export function cancerTypeSamplesSql(cohortSql: string, study: string, db: string, attribute: string | null, unit: "sample" | "patient" = "sample"): AggregateSql {
   const fold = clinicalValueFoldSql("attribute_value");
   const k = unit === "patient" ? "samp.puid" : "samp.suid";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
     "  SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM " + db + ".sample_derived\n" +
@@ -105,5 +106,5 @@ export function cancerTypeSamplesSql(cohortSql: string, study: string, db: strin
     "UNION ALL SELECT '\\x01all' AS grp, uniqExact(" + k + "), uniqExactIf(" + k + ", has(prof.types, 'MUTATION_EXTENDED')),\n" +
     "       uniqExactIf(" + k + ", has(prof.types, 'COPY_NUMBER_ALTERATION')), uniqExactIf(" + k + ", has(prof.types, 'STRUCTURAL_VARIANT'))\n" +
     "FROM samp LEFT JOIN prof ON prof.suid = samp.suid"
-  );
+  ));
 }

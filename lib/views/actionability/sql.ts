@@ -2,16 +2,17 @@
 import { pidOf } from "../../federation-views.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { sq } from "../../compiler.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /**
  * Per group (a clinical attribute's value per patient — "Multiple" when their samples disagree,
  * "" when none is recorded — or one group without `groupBy`) and per pair of a patient's best
  * sensitive and resistance ranks over every sequenced sample: the number of patients. Counts only.
  */
-export function actionLevelsSql(cohortSql: string, study: string, db: string, pin: string, groupBy: string | null): string {
+export function actionLevelsSql(cohortSql: string, study: string, db: string, pin: string, groupBy: string | null): AggregateSql {
   if (groupBy && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(groupBy)) throw new Error("bad attribute name '" + String(groupBy).slice(0, 40) + "'");
   const pid = pidOf("patient_unique_id", study);
-  return (
+  return aggregateSql((
     actionCtes(cohortSql, study, db, pin) + ",\n" +
     "pl AS (\n" +
     "  SELECT seq.pid AS pid, min(if(lv.s = 0, 9, lv.s)) AS s, min(if(lv.r = 0, 9, lv.r)) AS r\n" +
@@ -29,7 +30,7 @@ export function actionLevelsSql(cohortSql: string, study: string, db: string, pi
     "SELECT " + (groupBy ? "grp.g" : "''") + " AS grp, pl.s AS level, pl.r AS resistance, count() AS n\n" +
     "FROM pl" + (groupBy ? " LEFT JOIN grp ON grp.pid = pl.pid" : "") + "\n" +
     "GROUP BY grp, level, resistance"
-  );
+  ));
 }
 
 /**
@@ -37,10 +38,10 @@ export function actionLevelsSql(cohortSql: string, study: string, db: string, pi
  * against Metastasis, values matched case-insensitively): per pair of their best sensitive rank
  * on side a and on side b, the number of patients. Counts only.
  */
-export function actionConcordanceSql(cohortSql: string, study: string, db: string, pin: string, by: { attribute: string; a: string[]; b: string[] }): string {
+export function actionConcordanceSql(cohortSql: string, study: string, db: string, pin: string, by: { attribute: string; a: string[]; b: string[] }): AggregateSql {
   if (!/^[A-Za-z0-9_:/.-]{1,128}$/.test(by.attribute)) throw new Error("bad attribute name '" + String(by.attribute).slice(0, 40) + "'");
   const side = (vals: string[]) => "lower(trimBoth(attribute_value)) IN (" + vals.map((v) => sq(String(v).trim().toLowerCase())).join(", ") + ")";
-  return (
+  return aggregateSql((
     actionCtes(cohortSql, study, db, pin) + ",\n" +
     "st AS (\n" +
     "  SELECT sample_unique_id AS sid, multiIf(" + side(by.a) + ", 'a', " + side(by.b) + ", 'b', '') AS side\n" +
@@ -56,13 +57,13 @@ export function actionConcordanceSql(cohortSql: string, study: string, db: strin
     "  HAVING na > 0 AND nb > 0\n" +
     ")\n" +
     "SELECT sa AS a, sb AS b, count() AS n FROM ps GROUP BY a, b"
-  );
+  ));
 }
 
 /** The alteration types the store holds a therapeutic level for at `pin` (reference data, no cohort). */
-export function actionStoreTypesSql(_study: string, _db: string, pin: string): string {
-  return "SELECT toString(alteration_type) AS type, count() AS n FROM oncokb_annotation.variant_annotation\n" +
-    "WHERE oncokb_version = " + sq(pin) + " AND (highest_sensitive_level != '' OR highest_resistance_level != '')\nGROUP BY type";
+export function actionStoreTypesSql(_study: string, _db: string, pin: string): AggregateSql {
+  return aggregateSql("SELECT toString(alteration_type) AS type, count() AS n FROM oncokb_annotation.variant_annotation\n" +
+    "WHERE oncokb_version = " + sq(pin) + " AND (highest_sensitive_level != '' OR highest_resistance_level != '')\nGROUP BY type");
 }
 
 // ---------------------------------------------------------------------------

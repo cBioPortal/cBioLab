@@ -3,20 +3,21 @@ import type { IncidenceAnchor } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
 import { foldedEqualsSql } from "../../event-names.ts";
 import { finiteSql } from "../../sql-number.ts";
+import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "../../sql-kinds.ts";
 
 /**
  * The course: per time bin, the histogram of % change from baseline (each patient's mean within
  * the bin, so a patient tested weekly weighs no more than one tested monthly). The baseline
  * reading itself — 0% by definition — is not part of the course. Counts only.
  */
-export function labCourseSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts): string {
-  return (
+export function labCourseSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts): AggregateSql {
+  return aggregateSql((
     labCtes(cohortSql, study, db, lab, anchor, o) + "\n" +
     "SELECT tbin, pbin, count() AS n FROM (\n" +
     "  SELECT pid, toInt32(floor(rel / " + Math.max(1, Math.floor(o.binDays)) + ")) AS tbin, " + pctBin("avg(pc)") + " AS pbin\n" +
     "  FROM chg GROUP BY pid, tbin\n" +
     ") GROUP BY tbin, pbin ORDER BY tbin, pbin"
-  );
+  ));
 }
 
 /**
@@ -25,9 +26,9 @@ export function labCourseSql(cohortSql: string, study: string, db: string, lab: 
  * and the counts behind the denominators — patients anchored, with a baseline, with a positive
  * baseline, and with any value after the anchor.
  */
-export function labBestSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts, responseDrop: number): string {
+export function labBestSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts, responseDrop: number): AggregateSql {
   const best = "(SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid)";
-  return (
+  return aggregateSql((
     labCtes(cohortSql, study, db, lab, anchor, o) + "\n" +
     "SELECT 'best' AS what, " + pctBin("best") + " AS pbin, count() AS n FROM " + best + " GROUP BY pbin\n" +
     "UNION ALL SELECT 'responders' AS what, 0 AS pbin, countIf(best <= " + (-Math.abs(Number(responseDrop))) + ") AS n FROM " + best + "\n" +
@@ -35,7 +36,7 @@ export function labBestSql(cohortSql: string, study: string, db: string, lab: La
     "UNION ALL SELECT 'baseline' AS what, 0 AS pbin, count() AS n FROM base\n" +
     "UNION ALL SELECT 'positive_baseline' AS what, 0 AS pbin, countIf(b > 0) AS n FROM base\n" +
     "UNION ALL SELECT 'after' AS what, 0 AS pbin, uniqExactIf(pid, rel > 0) AS n FROM chg"
-  );
+  ));
 }
 
 /**
@@ -43,12 +44,12 @@ export function labBestSql(cohortSql: string, study: string, db: string, lab: La
  * waterfall. Patient-level: only PatientLevelResolver.viewRows runs it, the same entitlement
  * that lets a plot draw its points.
  */
-export function labWaterfallSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts, cap: number): string {
-  return (
+export function labWaterfallSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts, cap: number): PatientSql {
+  return patientSql((
     labCtes(cohortSql, study, db, lab, anchor, o) + "\n" +
     "SELECT round(best, 1) AS best FROM (SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid)\n" +
     "ORDER BY best LIMIT " + Math.max(1, Math.floor(cap))
-  );
+  ));
 }
 
 // ---------------------------------------------------------------------------

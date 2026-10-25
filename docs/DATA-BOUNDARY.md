@@ -34,6 +34,18 @@ one forgotten check away from a leak; a method that does not exist cannot be
 called by mistake, and adding one is a type error at every call site expecting
 the aggregate contract.
 
+**1a. A statement's type says what its rows may hold.** Every statement a resolver runs is one of
+three types (`lib/sql-kinds.ts`): an `AggregateSql` (counts, sums and other values over many
+patients), a `PatientSql` (rows that name patients or samples, or one patient's own values), or a
+`CohortSql` (a cohort's patients as a subquery, never run on its own). All three are strings to the
+database and different types to the compiler. `BaseResolver` runs only `AggregateSql`. Only
+`PatientLevelResolver` has a runner for `PatientSql`. Each builder declares which kind it returns, and
+`viewAggregate`/`viewRows` take only builders of their kind. So running a cohort's own subquery as an
+aggregate (it returns patient ids), or handing a patient-row builder to an aggregate view, does not
+compile. `test/sql-kinds.test.ts` runs the compiler over each such mix (`test/fixtures/sql-kinds/`)
+and fails if one of them compiles. The type records what a builder promises; what the text actually
+returns is what the sweep in `test/boundary.test.ts` checks.
+
 **2. Aggregates are computed inside the owning database.** Compare and survival
 push their arithmetic into SQL — per-gene `(profiled, altered, driver)` counts
 and `(months, event, n)` survival triples. The coordinator sums; it never pulls

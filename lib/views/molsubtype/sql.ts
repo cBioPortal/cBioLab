@@ -5,17 +5,18 @@ import { clinicalTable } from "../../custom-data.ts";
 import { sq } from "../../compiler.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { driverJoin } from "../../federation.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /** Patients per (class, why, group). Counts only. */
-export function molCountsSql(cohortSql: string, study: string, db: string, o: MolEndometrialOpts): string {
-  return molEndometrialCtes(cohortSql, study, db, o) + "\n" +
-    "SELECT cls.cls AS cls, cls.why AS why, grp.g AS grp, count() AS n FROM cls LEFT JOIN grp ON grp.pid = cls.pid GROUP BY cls, why, grp";
+export function molCountsSql(cohortSql: string, study: string, db: string, o: MolEndometrialOpts): AggregateSql {
+  return aggregateSql(molEndometrialCtes(cohortSql, study, db, o) + "\n" +
+    "SELECT cls.cls AS cls, cls.why AS why, grp.g AS grp, count() AS n FROM cls LEFT JOIN grp ON grp.pid = cls.pid GROUP BY cls, why, grp");
 }
 
 /** Overall survival per class: counts of (class, months, dead) from OS_MONTHS / OS_STATUS. Counts only. */
-export function molSurvivalSql(cohortSql: string, study: string, db: string, o: MolEndometrialOpts): string {
+export function molSurvivalSql(cohortSql: string, study: string, db: string, o: MolEndometrialOpts): AggregateSql {
   const pid = pidOf("patient_unique_id", study);
-  return molEndometrialCtes(cohortSql, study, db, o) + ",\n" +
+  return aggregateSql(molEndometrialCtes(cohortSql, study, db, o) + ",\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid, " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
@@ -25,18 +26,18 @@ export function molSurvivalSql(cohortSql: string, study: string, db: string, o: 
     "  GROUP BY pid\n" +
     ")\n" +
     "SELECT cls.cls AS cls, round(os.months, 2) AS t, os.dead AS dead, count() AS n\n" +
-    "FROM cls INNER JOIN os ON os.pid = cls.pid WHERE os.months IS NOT NULL AND os.months >= 0 AND cls.cls != 'NC' GROUP BY cls, t, dead ORDER BY t";
+    "FROM cls INNER JOIN os ON os.pid = cls.pid WHERE os.months IS NOT NULL AND os.months >= 0 AND cls.cls != 'NC' GROUP BY cls, t, dead ORDER BY t");
 }
 
 /** Which MSI attributes the cohort's samples carry, with how many values and patients. Counts only. */
-export function molMsiAttributesSql(cohortSql: string, study: string, db: string): string {
+export function molMsiAttributesSql(cohortSql: string, study: string, db: string): AggregateSql {
   const pid = pidOf("patient_unique_id", study);
-  return "WITH cohort AS (" + cohortSql + ")\n" +
+  return aggregateSql("WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT attribute_name AS attribute, uniqExact(" + pid + ") AS patients, uniqExact(attribute_value) AS nvalues, arraySort(groupUniqArray(8)(attribute_value)) AS examples\n" +
     "FROM " + clinicalTable(db, []) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND positionCaseInsensitive(attribute_name, 'MSI') > 0 AND trimBoth(attribute_value) != ''\n" +
     "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
-    "GROUP BY attribute ORDER BY patients DESC";
+    "GROUP BY attribute ORDER BY patients DESC");
 }
 
 // ---------------------------------------------------------------------------

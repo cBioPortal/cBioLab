@@ -10,6 +10,7 @@ import { sq } from "./compiler.ts";
 import { axisSelect } from "./plot.ts";
 import { ATTR_NAME_RE } from "./custom-data.ts";
 import { finiteSql } from "./sql-number.ts";
+import { patientSql, type PatientSql } from "./sql-kinds.ts";
 
 /** the most parts one figure can tell apart: the categorical palette, then its tints */
 export const COMPOSITION_MAX_PARTS = 16;
@@ -100,11 +101,11 @@ export function casesCte(s: CompositionSource, study: string, db: string, cohort
  * Case-level: PatientLevelResolver.compositionCases is its only caller.
  */
 export function compositionCasesSql(s: CompositionSource, study: string, db: string, cohortSql: string, sortIndex: number,
-  cap = COMPOSITION_CASES_CAP): string {
+  cap = COMPOSITION_CASES_CAP): PatientSql {
   if (!(Number.isInteger(sortIndex) && sortIndex >= 0 && sortIndex < s.parts.length)) throw new Error("sort names no part");
-  return casesCte(s, study, db, cohortSql) +
+  return patientSql(casesCte(s, study, db, cohortSql) +
     "SELECT ps, h FROM cases ORDER BY ps[" + (sortIndex + 1) + "] DESC, cityHash64(id)\n" +
-    "LIMIT " + (Math.floor(cap) + 1);
+    "LIMIT " + (Math.floor(cap) + 1));
 }
 
 /** How the figure names the parts: attribute names lose the prefix they all share

@@ -1,6 +1,7 @@
 // The genome view's SQL: what its runner (run.ts) asks each participant's database for.
 import { GENOME_CHROMS, pidOf } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 export interface GenomeBinOpts {
   /** bin width in base pairs */
@@ -21,10 +22,10 @@ export interface GenomeBinOpts {
  * A sample with overlapping segments at one midpoint (it happens in a few studies' files) takes
  * their mean, so it is still counted once.
  */
-export function genomeBinsSql(cohortSql: string, study: string, db: string, o: GenomeBinOpts): string {
+export function genomeBinsSql(cohortSql: string, study: string, db: string, o: GenomeBinOpts): AggregateSql {
   const B = Math.max(1, Math.floor(o.binBp)), half = Math.floor(B / 2), T = Number(o.threshold);
   const chroms = GENOME_CHROMS.filter((c) => o.includeX || c !== "X");
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
     "  SELECT internal_id AS sid FROM " + db + ".sample_derived\n" +
@@ -47,5 +48,5 @@ export function genomeBinsSql(cohortSql: string, study: string, db: string, o: G
     ")\n" +
     "SELECT chrom, bin, count() AS profiled, countIf(v >= " + T + ") AS gain, countIf(v <= " + (-T) + ") AS loss\n" +
     "FROM binned GROUP BY chrom, bin ORDER BY chrom, bin"
-  );
+  ));
 }

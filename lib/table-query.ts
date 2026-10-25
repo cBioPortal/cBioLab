@@ -10,6 +10,7 @@
 // The query (TableQuery) is part of the view's spec, so a shared document reproduces the filtered,
 // sorted table; the page is the reader's and is not.
 import { sq } from "./compiler.ts";
+import { patientSql, type PatientSql } from "./sql-kinds.ts";
 
 export type TextFilterOp = "contains" | "notContains" | "equals" | "notEquals" | "startsWith" | "endsWith" | "regex";
 export const TEXT_FILTER_OPS: readonly TextFilterOp[] = ["contains", "notContains", "equals", "notEquals", "startsWith", "endsWith", "regex"];
@@ -171,12 +172,12 @@ function orderSql(src: RowSource, q: TableQuery): string {
 }
 
 /** One page of the query's rows, in its one order, with the count of every row it keeps. */
-export function pageSql(src: RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): string {
-  return src.with +
+export function pageSql(src: RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): PatientSql {
+  return patientSql(src.with +
     "SELECT " + src.select + ", count() OVER () AS total FROM rows\n" +
     "WHERE " + whereSql(src, q, defaults) + "\n" +
     "ORDER BY " + orderSql(src, q) + "\n" +
-    "LIMIT " + Math.max(0, Math.floor(limit)) + " OFFSET " + Math.max(0, Math.floor(offset));
+    "LIMIT " + Math.max(0, Math.floor(limit)) + " OFFSET " + Math.max(0, Math.floor(offset)));
 }
 
 /**
@@ -184,16 +185,16 @@ export function pageSql(src: RowSource, q: TableQuery, defaults: string[], limit
  * (`idx`), or no row when the query leaves it out. Assumes one row per study and patient, as a
  * one-cohort list of patients has.
  */
-export function rankSql(src: RowSource, q: TableQuery, defaults: string[], study: string, patient: string): string {
-  return src.with +
+export function rankSql(src: RowSource, q: TableQuery, defaults: string[], study: string, patient: string): PatientSql {
+  return patientSql(src.with +
     "SELECT idx FROM (SELECT study, patient, row_number() OVER (ORDER BY " + orderSql(src, q) + ") - 1 AS idx FROM rows\n" +
     "WHERE " + whereSql(src, q, defaults) + ")\n" +
-    "WHERE study = " + sq(study) + " AND patient = " + sq(patient) + " LIMIT 1";
+    "WHERE study = " + sq(study) + " AND patient = " + sq(patient) + " LIMIT 1");
 }
 
 /** Per cohort and study: the rows the query keeps (`n`) and every row (`all`). Counts only. */
-export function countsSql(src: RowSource, q: TableQuery, defaults: string[]): string {
-  return src.with + "SELECT cohort, study, countIf(" + whereSql(src, q, defaults) + ") AS n, count() AS all FROM rows GROUP BY cohort, study";
+export function countsSql(src: RowSource, q: TableQuery, defaults: string[]): PatientSql {
+  return patientSql(src.with + "SELECT cohort, study, countIf(" + whereSql(src, q, defaults) + ") AS n, count() AS all FROM rows GROUP BY cohort, study");
 }
 
 /**
@@ -201,13 +202,13 @@ export function countsSql(src: RowSource, q: TableQuery, defaults: string[]): st
  * out — what its filter offers: the distinct values with their counts (most frequent first), or a
  * numeric column's range. Counts only.
  */
-export function valuesSql(src: RowSource, q: TableQuery, defaults: string[], column: string): string {
+export function valuesSql(src: RowSource, q: TableQuery, defaults: string[], column: string): PatientSql {
   const col = src.columns.find((c) => c.id === column);
   if (!col) throw new Error("unknown column " + column);
   const where = whereSql(src, q, defaults, column);
-  return col.numeric
+  return patientSql(col.numeric
     ? src.with + "SELECT min(v) AS lo, max(v) AS hi, count() AS n FROM (SELECT " + (col.num || col.text) + " AS v FROM rows WHERE " + where + ") WHERE v IS NOT NULL"
-    : src.with + "SELECT v, count() AS n FROM (SELECT " + col.text + " AS v FROM rows WHERE " + where + ") GROUP BY v ORDER BY n DESC, v LIMIT " + VALUES_MAX;
+    : src.with + "SELECT v, count() AS n FROM (SELECT " + col.text + " AS v FROM rows WHERE " + where + ") GROUP BY v ORDER BY n DESC, v LIMIT " + VALUES_MAX);
 }
 
 /** A column's values, as valuesSql returns them, merged across databases. */

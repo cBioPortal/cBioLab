@@ -3,6 +3,7 @@
 import { pidOf } from "../../federation-views.ts";
 import { finiteSql } from "../../sql-number.ts";
 import { sq } from "../../compiler.ts";
+import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /**
  * Per GENE, over the cohort's patients with a value for both it and the query gene (each the mean
@@ -11,7 +12,7 @@ import { sq } from "../../compiler.ts";
  * which is Spearman's ρ. x is the query gene on `profileType`; y every gene on `otherProfile`
  * (the same profile unless given). Sums only: ranks and values never leave the database.
  */
-export function correlatesMomentsSql(cohortSql: string, study: string, db: string, gene: string, profileType: string, otherProfile: string): string {
+export function correlatesMomentsSql(cohortSql: string, study: string, db: string, gene: string, profileType: string, otherProfile: string): AggregateSql {
   const pid = pidOf("sd.patient_unique_id", study);
   const raw = finiteSql("ga.alteration_value");
   const vals = (pt: string, geneCond: string) =>
@@ -22,7 +23,7 @@ export function correlatesMomentsSql(cohortSql: string, study: string, db: strin
     "    AND " + raw + " IS NOT NULL AND isFinite(" + raw + ")\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "  GROUP BY pid, gene\n";
-  return (
+  return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "q AS (\n" + vals(profileType, " AND ga.hugo_gene_symbol = " + sq(gene)) + "),\n" +
     "o AS (\n" + vals(otherProfile, "") + "),\n" +
@@ -37,5 +38,5 @@ export function correlatesMomentsSql(cohortSql: string, study: string, db: strin
     "SELECT gene, count() AS n, sum(x) AS sx, sum(y) AS sy, sum(x * y) AS sxy, sum(x * x) AS sxx, sum(y * y) AS syy,\n" +
     "       sum(rx) AS rsx, sum(ry) AS rsy, sum(rx * ry) AS rsxy, sum(rx * rx) AS rsxx, sum(ry * ry) AS rsyy\n" +
     "FROM ranked GROUP BY gene"
-  );
+  ));
 }

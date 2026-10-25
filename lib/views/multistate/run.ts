@@ -3,7 +3,8 @@
 // occupation and a Cox hazard ratio per transition against the first cohort. Each participant
 // returns id-free (prevalent, t_progression, t_end, dead, n) counts.
 import type { ViewResult } from "../../types.ts";
-import { labTestsSql, CLOCK_SLACK_DAYS, DAYS_PER_MONTH } from "../../federation-views.ts";
+import { labTestsSql, CLOCK_SLACK_DAYS } from "../../federation-views.ts";
+import { DAYS_PER_MONTH } from "../../time-units.ts";
 import { illnessDeath, coxRegression, COX_MAX_ITERATIONS, Z_975, type IllnessDeathRecord, type CoxRow } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, answering, refuse, plural } from "../shared.ts";

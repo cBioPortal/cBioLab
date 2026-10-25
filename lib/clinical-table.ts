@@ -6,6 +6,7 @@ import { sq } from "./compiler.ts";
 import type { QueryColumn, RowSource } from "./table-query.ts";
 import { clinicalTable, clinicalMetaTable } from "./custom-data.ts";
 import { finiteSql } from "./sql-number.ts";
+import { aggregateSql, type AggregateSql } from "./sql-kinds.ts";
 
 export interface TableColumn {
   id: string; name: string;
@@ -20,12 +21,12 @@ export const TABLE_COLUMNS_MAX = 200;
 export const TABLE_CHUNK = 10000;
 
 /** The study's clinical attributes, highest priority first (the portal's column order). Metadata only. */
-export function tableAttributesSql(study: string, db: string): string {
-  return "SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority\n" +
+export function tableAttributesSql(study: string, db: string): AggregateSql {
+  return aggregateSql("SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority\n" +
     "FROM " + clinicalMetaTable(db) + " m\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = m.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
-    "ORDER BY priority DESC, name";
+    "ORDER BY priority DESC, name");
 }
 
 /** One (cohort, study) part of a table: the cohort's SQL as that study's resolver compiles it. */
