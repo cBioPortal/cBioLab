@@ -363,7 +363,7 @@ and the pair decides the shape — the portal's own rule:
 | `source` | shape of the axis | fields |
 | --- | --- | --- |
 | `clinical` | number or category, **as the study declared it** | `attribute` |
-| `profile` | **as the study describes the profile** (below) | `profile` (its id without the study prefix), `gene`, `by` for a mutation profile, `log` for numbers |
+| `profile` | **as the study describes the profile** (below) | `profile` (its id without the study prefix), `gene` (or `entity` for a generic assay), `by` for a mutation profile, `log` for numbers |
 | `alteration` | category | `oql` (below), or `genes` (2-20, any mutated) |
 
 **A profile axis** reads one gene in one of the study's profiles, and what it is follows from the
@@ -375,10 +375,16 @@ Amplification, drawn in that order); and a **continuous** one (mRNA, z-scores, l
 protein) is a number. A case with no mutation, SV or high-level call in the gene is the wild-type
 answer only when it is profiled for that gene; otherwise it is **Not profiled**. A profile a study
 does not have is refused with the list it does have, and one that two pooled studies describe
-differently is refused, never read as one thing. Generic-assay profiles (methylation, arm-level copy
-number, …) are not plot axes yet. The engine runs a profile axis as the lower-level forms it
-resolves to, which a document may also give directly: `{"source":"molecular","profileType","gene",
-"discrete"?}` and `{"source":"alteration","gene","by":"mutationType"|"mutated"|"cna"|"sv"}`.
+differently is refused, never read as one thing. A **generic-assay** profile (mutational signatures,
+arm-level copy number, methylation probes, phosphosites, treatment response, …) reads one `entity`
+of the profile instead of a gene — `{"source":"profile","profile":"armlevel_cna","entity":"8q_status"}`
+— as a number, or as a category where the study declares the profile CATEGORICAL or BINARY; values
+that are not numbers (NA, a limit like ">8") and categorical "NA" are left out, and an entity the
+profile lacks is refused with the closest it has. A patient-level assay's value is shared by the
+patient's samples. The engine runs a profile axis as the lower-level forms it resolves to, which a
+document may also give directly: `{"source":"molecular","profileType","gene","discrete"?}`,
+`{"source":"assay","profileType","entity","categorical"?,"patientLevel"?}` and
+`{"source":"alteration","gene","by":"mutationType"|"mutated"|"cna"|"sv"}`.
 
 number × number draws a **density scatter**, number × category a **box**, category × category a
 **contingency table**. Every statistic is computed where the rows are and is therefore exact over
@@ -539,7 +545,12 @@ one continuous row per gene from a molecular profile (mRNA/protein z-scores, met
 samples, since columns are patients). Z-score profiles render on a **fixed diverging ±3
 blue→white→red ramp** so colors are comparable across oncoprints; other sign-spanning data gets a
 symmetric diverging ramp; positive-only data a sequential ramp. Track labels are
-`GENE <short-profile>` (e.g. `ERBB2 mRNA-z`) and are valid `sort` keys. Unknown profiles
+`GENE <short-profile>` (e.g. `ERBB2 mRNA-z`) and are valid `sort` keys. A numeric
+**generic-assay** profile draws its `entities` instead of genes — `{"profileType":
+"mutational_signatures_contribution_SBS", "entities": ["mutational_signature_contribution_SBS4"]}`, at
+most 12 — labelled by the entity without the words it repeats from the profile and the assay's
+kind (`SBS4 sig`, `cg00032419 meth`), and sortable and clusterable like any other; a
+categorical assay (arm-level copy number) is refused, as is a federation reference. Unknown profiles
 error loudly, listing what the study has. The synthetic profile `"VAF"` renders variant allele
 fraction computed from mutation allele counts (max across a patient's mutations in the gene,
 fixed 0–1 ramp) — available wherever the study loaded tumor alt/ref counts.
@@ -567,7 +578,7 @@ take a standalone spec (the analysis oncoprint view compiles to the same engine)
 { "study"?: "<id>",
   "genes": [≤12],
   "clinical": [≤8],
-  "heatmap"?: [{ "profileType": P, "genes"?: [...] } × ≤4],                   // continuous molecular tracks
+  "heatmap"?: [{ "profileType": P, "genes"?: [...] | "entities"?: [...] } × ≤4], // continuous molecular / generic-assay tracks
   "sort"?: ["CANCER_TYPE", "-CURRENT_AGE_DEID", "genomic"],                   // column sort (≤4 keys)
   "derivedEvents": [{ "label": L, "expression": <event cohortDef> } × ≤3],   // phenotype tracks
   "cohort"?: { "dsl": <cohortDef> },                                          // single column group

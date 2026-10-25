@@ -24,7 +24,7 @@ function OncoprintViewCard({ ctx, v, vi }: CardProps) {
           onSaveFeature={(sel, all) => featureFromSelection(sel, all, (c ? c.studies : vStudies) || vStudies)}
           busy={busy}
           cohortNames={Object.keys(result.cohorts)}
-          catalog={{ attrs: trackAttrs.attrs, profiles: trackAttrs.profiles, loading: trackAttrsLoading }}
+          catalog={{ attrs: trackAttrs.attrs, profiles: trackAttrs.profiles, profileCatalog: ctx.profileCatalog(), loading: trackAttrsLoading }}
           onView={(next, rerun) => rerun ? updateView(vi, () => next) : updateViewLocal(vi, () => next)}
           onGenes={() => openGenes(vi)}
           onCreateCohort={(sel) => cohortFromSelection(sel, (c ? c.studies : vStudies) || vStudies)}

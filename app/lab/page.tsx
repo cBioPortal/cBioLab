@@ -30,7 +30,7 @@ import { ExamplesTab } from "./examples-tab.tsx";
 import { DrawAtWidth } from "./figure.tsx";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
-import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
+import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, AssayFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
 import { CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
@@ -479,6 +479,7 @@ export default function AnalysisPage() {
                   so a chart you configured actually reaches this grid rather than only
                   living inside the dialog that configured it. */}
               <GeneFacets ctx={exploreCtx} />
+              <AssayFacets ctx={exploreCtx} />
               <StudyBreakdown ctx={exploreCtx} />
               <DataTypes ctx={exploreCtx} />
               <AlteredGenes ctx={exploreCtx} />

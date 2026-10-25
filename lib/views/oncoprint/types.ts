@@ -4,6 +4,8 @@ import type { GeneTrackSpec } from "../../gene-tracks.ts";
 
 export interface HeatmapSpec {
   profileType: string; genes?: string[];
+  /** a generic-assay profile's tracks: its entities (signatures, probes, …), at most 12, in place of genes */
+  entities?: string[];
   /**
    * "federation" z-scores the drawn values against a reference distribution
    * pooled from EVERY participating study — including instances that disclose

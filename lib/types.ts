@@ -857,6 +857,29 @@ export type ClinicalFacet =
       naCount?: number;
     });
 
+/**
+ * One entity of a generic-assay profile as an Explore chart: a histogram of its numbers, or its
+ * values' counts. Counted in PATIENTS with a value in the bar, the unit a click filters in (a
+ * genericAssay clause keeps a patient with any sample in range), so a patient whose samples fall
+ * in two bars is in both. Over the selected studies that hold the profile (`studies`).
+ */
+export interface AssayFacet {
+  profileType: string; entity: string;
+  /** the entity's display name, where the study gives one */
+  name?: string;
+  kind: "num" | "cat";
+  /** patients in the cohort of the studies holding the profile, and those with a value */
+  total: number; measured: number;
+  bins?: NumericBin[];
+  min?: number; max?: number; median?: number;
+  values?: { v: string; n: number }[];
+  studies: string[];
+  /** counted against the draft without its own clauses on this entity */
+  disjunctive?: true;
+  /** why there is nothing to draw */
+  error?: string;
+}
+
 /** one bar of a numeric histogram */
 export interface NumericBin {
   /** "<=" and ">" mark the outlier bins; interior bins have neither */
@@ -950,6 +973,8 @@ export interface ExploreResult {
    * gene is not wild-type for it and must not land in the unaltered slice.
    */
   geneFacets?: GeneStateFacet[];
+  /** one entity of a generic-assay profile per chart the reader asked for (AssayFacet) */
+  assayFacets?: AssayFacet[];
   /** portal-equivalent gene tables (samples, panel-aware denominators) */
   mutatedGenes?: GeneTableRow[];
   cnaGenes?: GeneTableRow[];

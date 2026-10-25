@@ -1,5 +1,6 @@
 import { parseBody, ExploreRequest } from "../../../lib/api-schemas.ts";
-import { buildExplore, buildExploreFederated } from "../../../lib/explore.ts";
+import { buildExplore, buildExploreFederated, buildAssayFacets } from "../../../lib/explore.ts";
+import { ENTITY_RE } from "../../../lib/generic-assay.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
 import { mergeExplore } from "../../../lib/explore.ts";
@@ -117,7 +118,11 @@ async function exploreFor(body: any) {
         ...oneProfiles, conn: connByStudy.get(local[0]) })
     : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived });
   // every local study's profiles as it describes them, once per profile id, for a plot axis's Data picker
+  const assayFacets = body.assayCharts && body.assayCharts.length
+    ? await buildAssayFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy,
+        charts: body.assayCharts.filter((c: { profileType: string; entity: string }) => ENTITY_RE.test(c.entity)) })
+    : undefined;
   const profileCatalog = [...new Map(local.flatMap((st) => (profilesByStudy.get(st)?.catalog || []).map((p: ProfileInfo) => [p.profile, p] as const))).values()];
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
-  return { ...result, profileCatalog };
+  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}) };
 }

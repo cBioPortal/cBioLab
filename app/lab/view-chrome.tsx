@@ -3,6 +3,7 @@
 // menus, the cohort and value pickers, the axis picker, the gene inputs. Module-level components,
 // so React keeps their state across the analysis page's renders.
 import { useState } from "react";
+import { EntityField, searchEntities } from "./entity-field.tsx";
 import { attributeLabel } from "../../lib/custom-data-names.ts";
 import type { AnalysisSource, ViewParticipation } from "../../lib/types.ts";
 import { VIEW_HELP } from "../../lib/view-help.ts";
@@ -137,7 +138,7 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
   const data: string = !axis ? "none"
     : a.source === "clinical" ? "clinical"
     : a.source === "profile" ? "profile:" + a.profile
-    : a.source === "molecular" ? "profile:" + a.profileType
+    : a.source === "molecular" || a.source === "assay" ? "profile:" + a.profileType
     : a.source === "alteration" && a.oql != null ? "oql"
     // a gene set (any mutated) shows as the OQL query that asks the same
     : a.source === "alteration" && Array.isArray(a.genes) && a.genes.length > 1 ? "oql"
@@ -151,7 +152,14 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
     if (v === "clinical") return set({ source: "clinical", attribute: a.attribute || (attrs[0] || {}).attribute || "" });
     if (v === "oql") return set({ source: "alteration", oql: a.oql || gene + ": MUT" });
     const p = catalog.find((x) => "profile:" + x.profile === v);
-    if (p) set({ source: "profile", profile: p.profile, gene, ...(profileUse(p) === "mutation" ? { by: a.by === "mutated" ? "mutated" : "mutationType" } : {}) });
+    if (!p) return;
+    const u = profileUse(p);
+    // a generic assay reads an entity, not a gene: it starts on the profile's first
+    if (u === "assayNumber" || u === "assayCategory") {
+      searchEntities(p.study || "", p.profile, "").then((r) => r.entities[0] && set({ source: "profile", profile: p.profile, entity: r.entities[0].entity }), () => {});
+      return;
+    }
+    set({ source: "profile", profile: p.profile, gene, ...(u === "mutation" ? { by: a.by === "mutated" ? "mutated" : "mutationType" } : {}) });
   };
   // the Data list: the profiles grouped under their type, in the study's own order
   const groups: { label: string; items: { value: string; label: string; disabled?: string }[] }[] = [];
@@ -160,8 +168,7 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
     if (!offered(p)) continue;
     const g = profileGroup(p);
     const at = groups.find((x) => x.label === g) || (groups.push({ label: g, items: [] }), groups[groups.length - 1]);
-    const assay = p.type === "GENERIC_ASSAY";
-    at.items.push({ value: "profile:" + p.profile, label: p.name, ...(assay ? { disabled: "generic assays (" + p.name + ") come to plot axes next" } : {}) });
+    at.items.push({ value: "profile:" + p.profile, label: p.name, ...(p.type === "GENERIC_ASSAY" && !p.study ? { disabled: "no study here can be searched for " + p.name + "'s entities" } : {}) });
   }
   groups.push({ label: "Across genes", items: [{ value: "oql", label: "OQL query" }] });
   const dataPicker = loading && !catalog.length && !attrs.length ? <Waiting what="profiles" /> : (
@@ -198,6 +205,10 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
           {attrs.map((x) => <option key={x.attribute} value={x.attribute}>{attributeLabel(x.attribute)}{x.kind === "num" ? "" : " (categorical)"}</option>)}
         </OptionSelect>
       )}
+      {current && (use === "assayNumber" || use === "assayCategory") && field(use === "assayCategory" ? "Entity (categorical)" : "Entity",
+        <EntityField study={current.study || ""} profile={current.profile} value={String(a.entity || "")} busy={busy} side={side}
+          className={stacked ? "w-full" : "w-40"}
+          onPick={(entity) => set({ ...(a.source === "profile" ? a : {}), source: "profile", profile: current.profile, entity, gene: undefined })} />)}
       {current && use !== "assayNumber" && use !== "assayCategory" && <>
         {field("Gene", <QueryField mode="genes" value={gene} shown={gene} placeholder="choose a gene" busy={busy}
             className={stacked ? "w-full" : "w-28"} title="Gene for this axis"

@@ -6,7 +6,8 @@ import { sq } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, DerivedRequest } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, DerivedRequest, AssayFacet } from "./types.ts";
+import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor } from "./custom-data.ts";
 
@@ -1294,4 +1295,95 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     // subsequent key one place along.
     stats: { ms: Date.now() - t0, perStudy: Object.fromEntries(parts.filter((p) => p.study).map((p) => [p.study, p.draftCount])) }
   };
+}
+
+// ---------------------------------------------------------------------------
+// Generic-assay charts: one entity of a profile per chart, pooled over every selected study that
+// holds the profile, one pass per connection. Edges come from the pooled statistics, exactly as a
+// federated clinical histogram's do, so bars over several studies line up and add.
+
+/** how many generic-assay entities may be charted at once */
+export const ASSAY_CHART_LIMIT = 6;
+/** a categorical entity's values shown, most common first */
+const ASSAY_VALUE_LIMIT = 30;
+
+/** a genericAssay clause on this entity, possibly negated: what the chart itself adds */
+function isAssayClauseFor(c: unknown, profileType: string, entity: string): boolean {
+  const leaf = (x: unknown) => { const l = x as { kind?: string; profileType?: string; entity?: string };
+    return !!l && l.kind === "genericAssay" && l.profileType === profileType && l.entity === entity; };
+  return leaf(c) || (!!c && leaf((c as { not?: unknown }).not));
+}
+
+export async function buildAssayFacets(o: {
+  studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null;
+  profilesByStudy: Map<string, { profiles?: string[]; gaProfiles?: string[] }>;
+  connByStudy?: Map<string, ChConn>;
+  charts: { profileType: string; entity: string }[];
+}): Promise<AssayFacet[]> {
+  const ctx: DefCtx = { oncokbPin: o.oncokbPin, profilesByStudy: o.profilesByStudy };
+  return ensureChContext(() => Promise.all(o.charts.slice(0, ASSAY_CHART_LIMIT).map(async ({ profileType, entity }): Promise<AssayFacet> => {
+    const holders = o.studies.filter((s) => (o.profilesByStudy.get(s)?.gaProfiles || []).includes(profileType));
+    const none = { profileType, entity, kind: "num" as const, total: 0, measured: 0, studies: holders };
+    if (!holders.length) return { ...none, error: "no selected study has the generic-assay profile '" + profileType + "'" };
+    const own = !!o.draft && Array.isArray(o.draft.all) && o.draft.all.some((c) => isAssayClauseFor(c, profileType, entity));
+    const def = own ? draftWithout(o.draft!, (c) => isAssayClauseFor(c, profileType, entity)) : o.draft;
+    const groups = byConnection(holders, o.connByStudy).map((g) => ({ ...g, cond: inPatients(patientSet(g.studies, g.conn.db, def, ctx)) }));
+    // every statement aggregates straight off the table: none projects a patient id, even inside
+    // a subquery (the boundary suite's rule for this module)
+    const from = (g: (typeof groups)[number]) => " FROM " + g.conn.db + ".generic_assay_data_derived\n" +
+      "  WHERE profile_type = " + sq(profileType) + " AND profile_stable_id IN (" + g.studies.map((s) => sq(s + "_" + profileType)).join(",") + ")\n" +
+      "    AND entity_stable_id = " + sq(entity) + g.cond;
+    const num = "WITH " + finiteSql("value") + " AS v\n";
+    const notMissing = " AND trimBoth(value) NOT IN (" + ASSAY_MISSING_VALUES.map(sq).join(",") + ")";
+    const [first, ...stats] = await Promise.all([
+      chQuery<ChRow>(assayEntitySearchSql(holders[0], groups[0].conn.db, profileType, entity, 3), groups[0].conn),
+      ...groups.map((g) => chQuery<ChRow>(num +
+        "SELECT (SELECT uniqExact(patient_unique_id) FROM " + g.conn.db + ".sample_derived WHERE " + studyIn(g.studies) + g.cond + ") AS total,\n" +
+        "       (SELECT any(datatype)" + from(g) + ") AS dt,\n" +
+        "       uniqExact(patient_unique_id) AS nnum, min(v) AS mn, max(v) AS mx,\n" +
+        "       quantile(0.25)(v) AS q1, quantile(0.5)(v) AS q2, quantile(0.75)(v) AS q3, count() AS nv, min(v = floor(v)) AS allints\n" +
+        from(g) + " AND v IS NOT NULL", g.conn)),
+    ]);
+    const st = stats.map((r) => r.data[0] || {});
+    const name = String(first.data.find((r) => String(r.entity) === entity)?.name || "");
+    const total = st.reduce((n, r) => n + Number(r.total || 0), 0);
+    const base = { ...none, ...(name && name !== entity ? { name } : {}), total, ...(own ? { disjunctive: true as const } : {}) };
+    if (isCategoricalAssay(String(st.find((r) => r.dt)?.dt || ""))) {
+      const counts = new Map<string, number>();
+      const measured = await Promise.all(groups.map(async (g) => {
+        const [r, m] = await Promise.all([
+          chQuery<ChRow>("SELECT trimBoth(value) AS v, uniqExact(patient_unique_id) AS n" + from(g) + notMissing + "\nGROUP BY v", g.conn),
+          chQuery<ChRow>("SELECT uniqExact(patient_unique_id) AS n" + from(g) + notMissing, g.conn),
+        ]);
+        for (const x of r.data) counts.set(String(x.v), (counts.get(String(x.v)) || 0) + Number(x.n));
+        return Number(m.data[0]?.n || 0);
+      }));
+      const values = [...counts].map(([v, n]) => ({ v, n })).sort((a, b) => b.n - a.n || (a.v < b.v ? -1 : 1)).slice(0, ASSAY_VALUE_LIMIT);
+      return { ...base, kind: "cat", measured: measured.reduce((a, b) => a + b, 0), values };
+    }
+    const measured = st.reduce((n, r) => n + Number(r.nnum || 0), 0);
+    const live = st.filter((r) => Number(r.nv) > 0);
+    if (!live.length) return { ...base, measured };
+    // min and max pool exactly; quartiles do not, so they are weighted by size (sharedBinEdges' rule)
+    const nv = live.reduce((n, r) => n + Number(r.nv), 0);
+    const wavg = (k: string) => live.reduce((a, r) => a + Number(r[k]) * Number(r.nv), 0) / nv;
+    const min = Math.min(...live.map((r) => Number(r.mn))), max = Math.max(...live.map((r) => Number(r.mx)));
+    const allInts = live.every((r) => Number(r.allints) === 1);
+    // a zero-inflated entity (most signatures) has no spread between its quartiles: bin its whole range
+    let { edges, interval } = numericBinEdges(min, max, wavg("q1"), wavg("q3"), allInts);
+    if (edges.length < 2) ({ edges, interval } = numericBinEdges(min, max, min, max, allInts));
+    const out = { ...base, measured, min, max, median: wavg("q2") };
+    if (edges.length < 2) return out;
+    const lastEdge = edges[edges.length - 1] + interval;
+    const binned = await Promise.all(groups.map((g) => chQuery<ChRow>(num +
+      "SELECT multiIf(v <= " + edges[0] + ", -1, v > " + lastEdge + ", -2, toInt32(ceil((v - " + edges[0] + ") / " + interval + ")) - 1) AS b,\n" +
+      "       uniqExact(patient_unique_id) AS n" + from(g) + " AND v IS NOT NULL\nGROUP BY b", g.conn)));
+    const count = (b: number) => binned.reduce((n, r) => n + Number(r.data.find((x) => Number(x.b) === b)?.n || 0), 0);
+    // portal bins are (start, end]: a value on an edge belongs to the lower bar
+    const bins: NumericBin[] = [];
+    if (count(-1)) bins.push({ special: "<=", end: edges[0], count: count(-1) });
+    edges.forEach((e, i) => bins.push({ start: e, end: Math.round((e + interval) * 1e6) / 1e6, count: count(i) }));
+    if (count(-2)) bins.push({ special: ">", start: lastEdge, count: count(-2) });
+    return { ...out, bins };
+  })));
 }

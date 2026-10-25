@@ -6,6 +6,8 @@ import { geneCytobandsSql } from "../federation-views.ts";
 import type { ViewRun } from "./run.ts";
 import type { StudyCatalog } from "../plot-profile.ts";
 import { VIEW_ATTR_RE } from "../custom-data-names.ts";
+import type { PlotAxis } from "../plot.ts";
+import { assayEntitySearchSql } from "../generic-assay.ts";
 
 /** 12 genes = 66 pairs; beyond this the multiplicity correction eats the signal */
 export const COOCCUR_GENE_LIMIT = 12;
@@ -67,6 +69,34 @@ export async function cytobands(ok: Record<string, ViewResolver>, genes: string[
 /** each study's profiles as it describes them, for resolving a profile axis (lib/plot-profile.ts) */
 export async function studyCatalogs(c: ViewRun, studies: string[]): Promise<StudyCatalog[]> {
   return Promise.all(studies.map(async (st) => ({ study: st, catalog: (await c.studyProfiles(st)).catalog || [] })));
+}
+
+/**
+ * Each assay axis checked against the studies it is drawn over and labelled with its entity's
+ * display name where the study gives one ("SBS4 (Smoking)" rather than its stable id). An entity
+ * its profile lacks in any study is refused, offering the entities whose names come closest,
+ * rather than drawn as a plot with no values. A study whose participant cannot answer metadata is
+ * left to the view's own coverage note. Every other axis is returned as it was.
+ */
+export async function assayEntitiesKnown<T extends PlotAxis | undefined>(c: ViewRun, axes: Record<string, T>, studies: string[]): Promise<Record<string, T>> {
+  const out: Record<string, T> = { ...axes };
+  for (const [which, a] of Object.entries(axes)) {
+    if (!a || a.source !== "assay") continue;
+    let name = "";
+    for (const st of studies) {
+      const r = c.resolvers[st];
+      if (!r || !hasViewAggregates(r)) continue;
+      const hits = await r.viewMeta("assay:entity", (s, d) => assayEntitySearchSql(s, d, a.profileType, a.entity, 6));
+      const hit = hits.find((h) => String(h.entity) === a.entity);
+      if (hit) { name ||= String(hit.name || ""); continue; }
+      const near = hits.length ? hits : await r.viewMeta("assay:entities", (s, d) => assayEntitySearchSql(s, d, a.profileType, "", 6));
+      throw new Error(which + " axis: " + st + "'s " + a.profileType + " has no entity '" + a.entity + "'" +
+        (near.length ? "; " + (hits.length ? "closest" : "it has") + " " + near.map((h) => String(h.entity)).join(", ") + (Number(near[0].total) > near.length ? ", …" : "") : ""));
+    }
+    if (name && name !== a.entity && a.label && a.label.startsWith(a.entity + ": "))
+      out[which] = { ...a, label: name + a.label.slice(a.entity.length) } as T;
+  }
+  return out;
 }
 
 /**

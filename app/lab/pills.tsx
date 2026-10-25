@@ -5,6 +5,7 @@
 import { Fragment } from "react";
 import { isCustomAttr, attributeLabel } from "../../lib/custom-data-names.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
+import { entityShortName } from "../../lib/profile-names.ts";
 
 /** opens the uploaded data behind a clause (see custom-data-dialog.tsx) */
 export type OnCustomData = (attribute: string, leaf: any, negated: boolean) => void;
@@ -95,7 +96,9 @@ function leafText(leaf: any) {
   if (k === "caseList") return leaf.id;
   if (k === "split") return leaf.part + " half";
   if (k === "genomicData") return `${leaf.gene} ${leaf.profileType} ` + (leaf.range ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ") : "");
-  if (k === "genericAssay") return `${leaf.entity} ` + JSON.stringify(leaf.range || leaf.values);
+  if (k === "genericAssay") return entityShortName(String(leaf.entity), String(leaf.profileType)) + " " + (leaf.range
+    ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ")
+    : (leaf.values || []).join(" or "));
   if (k === "sampleList" || k === "patientList") {
     // a stored set: its name and size as the page wrote them beside the reference (never compiled)
     if (typeof leaf.set === "string")

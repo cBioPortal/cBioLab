@@ -24,14 +24,22 @@ export function resolveProfileAxis(a: PlotAxis, which: string, studies: StudyCat
   const info = found[0].info!, use = uses[0];
   if (!use) throw new Error(which + " axis: '" + a.profile + "' (" + info.type + ", " + info.datatype + ") is not a profile a plot axis reads");
   if (a.by != null && use !== "mutation") throw new Error(which + " axis: only a mutation profile groups by mutation type or mutated; '" + a.profile + "' is " + info.name);
-  if (a.log && use !== "number") throw new Error(which + " axis: a log scale applies to numbers; '" + a.profile + "' is " + info.name);
+  if (a.log && use !== "number" && use !== "assayNumber") throw new Error(which + " axis: a log scale applies to numbers; '" + a.profile + "' is " + info.name);
+  if (use === "assayNumber" || use === "assayCategory") {
+    if (a.entity == null) throw new Error(which + " axis: '" + a.profile + "' is a generic assay (" + info.name + "); name the entity it reads (a signature, an arm, a probe), not a gene");
+    const levels = new Set(found.map((f) => !!f.info!.patientLevel));
+    if (levels.size > 1) throw new Error(which + " axis: '" + a.profile + "' is measured per patient in " + found.filter((f) => f.info!.patientLevel).map((f) => f.study).join(", ") +
+      " and per sample in " + found.filter((f) => !f.info!.patientLevel).map((f) => f.study).join(", ") + ", so one axis cannot read it across them");
+    return { source: "assay", profileType: a.profile, entity: String(a.entity), ...(use === "assayCategory" ? { categorical: true } : {}),
+      ...(info.patientLevel ? { patientLevel: true } : {}), ...(a.log ? { log: true } : {}), label: a.entity + ": " + info.name };
+  }
+  if (a.entity != null) throw new Error(which + " axis: only a generic-assay profile reads an entity; '" + a.profile + "' is " + info.name + ", which reads a gene");
   const gene = String(a.gene).toUpperCase();
   const label = gene + ": " + info.name;
   if (use === "mutation") return { source: "alteration", gene, by: a.by || "mutationType" };
   if (use === "sv") return { source: "alteration", gene, by: "sv" };
   if (use === "discrete") return { source: "molecular", profileType: a.profile, gene, discrete: true, label };
-  if (use === "number") return { source: "molecular", profileType: a.profile, gene, ...(a.log ? { log: true } : {}), label };
-  throw new Error(which + " axis: '" + a.profile + "' is a generic assay (" + info.name + "), which a plot axis does not read yet");
+  return { source: "molecular", profileType: a.profile, gene, ...(a.log ? { log: true } : {}), label };
 }
 
 /** every axis of a view resolved; `null` axes (an unset colour) pass through */

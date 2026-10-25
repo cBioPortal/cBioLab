@@ -1212,6 +1212,65 @@ async function main() {
     await ctx.close();
   }
 
+  // Generic assays (lib/generic-assay.ts): a plot axis reads one entity of a profile, found by search;
+  // the oncoprint's Tracks menu adds a profile's entities as heatmap rows; Explore charts an entity and
+  // a click on it is a genericAssay clause.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1500, height: 1200 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const STUDY = "brca_tcga_pan_can_atlas_2018";
+    const enc = (d) => Buffer.from(JSON.stringify(d)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const pick = async (field, q, option) => {
+      await page.getByRole("button", { name: field }).click();
+      await page.getByLabel("search entities").fill(q);
+      await page.waitForSelector("[aria-label=entities][aria-busy=false]", { timeout: 30000 });
+      await page.getByRole("option", { name: option }).first().click();
+    };
+    const docNow = async () => JSON.parse(await page.locator("#docjson").inputValue());
+    try {
+      await page.goto(BASE + "/lab?tab=analysis&doc=" + enc({ study: STUDY, cohorts: { all: { all: [] } }, views: [{ kind: "plot", cohorts: ["all"],
+        x: { source: "profile", profile: "armlevel_cna", entity: "1p_status" }, y: { source: "profile", profile: "rna_seq_v2_mrna_median_Zscores", gene: "MYC" } }] }), { waitUntil: "domcontentloaded" });
+      await page.getByRole("button", { name: "x entity" }).waitFor({ timeout: 120000 });
+      await pick("x entity", "8q", /^8q/);
+      await page.waitForFunction(() => /8q: Putative arm-level/.test(document.body.innerText), null, { timeout: 120000 });
+      const x = (await docNow()).views[0].x;
+      ok("generic assays: a plot axis's entity is found by search, and the box is drawn by its values", x.entity === "8q_status" && /Gain \(\d+\)/.test(await page.locator("body").innerText()), JSON.stringify(x));
+
+      await page.goto(BASE + "/lab?tab=analysis&doc=" + enc({ study: STUDY, cohorts: { all: { all: [] } }, views: [{ kind: "oncoprint", cohorts: ["all"], genes: ["TP53"] }] }), { waitUntil: "domcontentloaded" });
+      await page.locator("canvas").first().waitFor({ timeout: 120000 });
+      await page.getByRole("button", { name: /tracks/ }).first().click();
+      await page.getByRole("tab", { name: /Heatmap/ }).click();
+      await page.getByText("Genetic Ancestry (generic assay)").click();
+      await page.waitForFunction(() => /"entities"/.test(document.querySelector("#docjson")?.value || ""), null, { timeout: 60000 });
+      await pick("genetic_ancestry entity", "EUR", /EUR/);
+      await page.waitForFunction(() => /"EUR"/.test(document.querySelector("#docjson")?.value || ""), null, { timeout: 60000 });
+      await page.keyboard.press("Escape");
+      const hm = (await docNow()).views[0].heatmap;
+      ok("generic assays: the oncoprint's Tracks menu adds a profile's entities as heatmap rows", hm.length === 1 && JSON.stringify(hm[0].entities) === JSON.stringify(["AFR", "EUR"]), JSON.stringify(hm));
+
+      await page.goto(BASE + "/lab?tab=explore&study=" + STUDY, { waitUntil: "domcontentloaded" });
+      await page.locator(".facettitle").first().waitFor({ timeout: 120000 });   // the dialog lists what Explore's answer holds
+      await page.getByRole("button", { name: /add chart/i }).first().click();
+      await page.getByRole("tab", { name: "Generic assays" }).click();
+      await page.locator(".addchart [role=combobox]").first().click();
+      await page.getByRole("option", { name: /arm-level/i }).click();
+      await pick("chart entity", "8q", /^8q/);
+      for (let i = 0; i < 3 && await page.locator(".addchart").count(); i++) { await page.keyboard.press("Escape"); await page.waitForTimeout(400); }
+      const facet = page.locator("[data-assayfacet='armlevel_cna|8q_status']");
+      await facet.locator("button.valrow").first().waitFor({ timeout: 120000 });
+      const gain = Number(((await facet.locator("button.valrow", { hasText: "Gain" }).locator(".vn").innerText()) || "").replace(/,/g, ""));
+      await facet.locator("button.valrow", { hasText: "Gain" }).click();
+      await page.waitForFunction((n) => new RegExp("\\b" + n.toLocaleString("en-US") + " patients match").test(document.body.innerText), gain, { timeout: 120000 });
+      ok("generic assays: Explore charts an entity, and a click filters to exactly the patients its bar counts", gain > 0, gain + " patients with 8q gained");
+    } catch (e) {
+      ok("generic assays: axis, oncoprint and Explore", false, String(e.message).replace(/\s+/g, " ").slice(0, 400));
+    }
+    ok("generic assays: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+
   // The risk model (lib/views/riskmodel/run.ts): the volcano's label threshold is applied in the browser
   // (no request), and a cut is one request answered from the cached fit (lib/next-cache.ts
   // cachedRiskFit), not a refit; the caveat then says the cuts were chosen.

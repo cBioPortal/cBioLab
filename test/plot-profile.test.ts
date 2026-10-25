@@ -44,6 +44,12 @@ describe("a profile axis resolved against the studies it is drawn over", () => {
       { source: "molecular", profileType: "gistic", gene: "ERBB2", discrete: true, label: "ERBB2: Putative copy-number alterations from GISTIC" });
     assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "rna_seq_v2_mrna", gene: "ESR1", log: true }, "y", one),
       { source: "molecular", profileType: "rna_seq_v2_mrna", gene: "ESR1", log: true, label: "ESR1: mRNA Expression, RSEM" });
+    assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "methylation_hm450", entity: "cg00000292", log: true }, "y", one),
+      { source: "assay", profileType: "methylation_hm450", entity: "cg00000292", log: true, label: "cg00000292: Methylation (HM450)" });
+    assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "armlevel_cna", entity: "1p_status" }, "x", one),
+      { source: "assay", profileType: "armlevel_cna", entity: "1p_status", categorical: true, label: "1p_status: Putative arm-level copy-number from GISTIC" });
+    const perPatient = [{ study: "pog", catalog: [P("immune", "GENERIC_ASSAY", "LIMIT-VALUE", "Immune", { patientLevel: true })] }];
+    assert.equal((resolveProfileAxis({ source: "profile", profile: "immune", entity: "B_Cells" }, "x", perPatient) as { patientLevel?: boolean }).patientLevel, true);
     const clin = { source: "clinical" as const, attribute: "AGE" };
     assert.equal(resolveProfileAxis(clin, "x", one), clin, "any other axis passes through untouched");
   });
@@ -53,7 +59,11 @@ describe("a profile axis resolved against the studies it is drawn over", () => {
     assert.throws(() => resolveProfileAxis({ source: "profile", profile: "gistic", gene: "ERBB2" }, "x", other), /described differently by brca \(COPY_NUMBER_ALTERATION, DISCRETE\) and panel/);
     assert.throws(() => resolveProfileAxis({ source: "profile", profile: "gistic", gene: "ERBB2", by: "mutated" }, "x", one), /only a mutation profile groups by/);
     assert.throws(() => resolveProfileAxis({ source: "profile", profile: "gistic", gene: "ERBB2", log: true }, "x", one), /a log scale applies to numbers/);
-    assert.throws(() => resolveProfileAxis({ source: "profile", profile: "methylation_hm450", gene: "ERBB2" }, "x", one), /is a generic assay \(Methylation \(HM450\)\), which a plot axis does not read yet/);
+    assert.throws(() => resolveProfileAxis({ source: "profile", profile: "methylation_hm450", gene: "ERBB2" }, "x", one), /is a generic assay \(Methylation \(HM450\)\); name the entity it reads/);
+    assert.throws(() => resolveProfileAxis({ source: "profile", profile: "gistic", entity: "1p_status" }, "x", one), /only a generic-assay profile reads an entity/);
+    assert.throws(() => resolveProfileAxis({ source: "profile", profile: "armlevel_cna", entity: "1p_status", log: true }, "x", one), /a log scale applies to numbers/);
+    const mixed = [{ study: "brca", catalog: BRCA }, { study: "pog", catalog: [P("methylation_hm450", "GENERIC_ASSAY", "LIMIT-VALUE", "m", { patientLevel: true })] }];
+    assert.throws(() => resolveProfileAxis({ source: "profile", profile: "methylation_hm450", entity: "cg1" }, "x", mixed), /measured per patient in pog and per sample in brca/);
   });
   test("a profile axis is shaped before it is read, and only once resolved does it have a kind", () => {
     assert.throws(() => validateAxis({ source: "profile", profile: "", gene: "TP53" }, "x"), /is not a profile/);
@@ -70,6 +80,29 @@ describe("the SQL each reading runs", () => {
     assert.match(sql, /= -2, 'Deep deletion',[\s\S]*?= -1, 'Shallow deletion',[\s\S]*?= 0, 'Diploid',[\s\S]*?= 1, 'Gain',[\s\S]*?= 2, 'Amplification', toString\(/);
     assert.match(sql, /ga\.profile_type = 'gistic'/);
     assert.match(sql, /if\(uniqExact\(lv\) > 1, 'Multiple', any\(lv\)\)/);
+  });
+  test("a generic-assay entity: one entity of the study's own profile, numbers finite, categories without their not-called values", () => {
+    const num = axisSelect({ source: "assay", profileType: "mutational_signatures", entity: "SBS1" }, ctx, "num");
+    assert.match(num, /profile_type = 'mutational_signatures' AND entity_stable_id = 'SBS1' AND profile_stable_id = 'x_mutational_signatures'/);
+    assert.match(num, /isFinite\(ifNull\(toFloat64OrNull\(value\), nan\)\)/);
+    assert.match(num, /replaceOne\(r\.sample_unique_id, 'x_', ''\) AS id, avg\(r\.av\) AS v/, "a sample's own value in sample mode");
+    assert.doesNotMatch(num, /sample_derived/);
+    const pat = axisSelect({ source: "assay", profileType: "mutational_signatures", entity: "SBS1" }, { ...ctx, unit: "patient" }, "num");
+    assert.match(pat, /replaceOne\(r\.patient_unique_id, 'x_', ''\) AS id, avg\(r\.av\) AS v/, "a patient's samples averaged");
+    const pl = axisSelect({ source: "assay", profileType: "immune", entity: "B_Cells", patientLevel: true }, ctx, "num");
+    assert.match(pl, /JOIN db\.sample_derived sd ON sd\.patient_unique_id = r\.patient_unique_id/, "a patient-level value is every sample's");
+    const cat = axisSelect({ source: "assay", profileType: "armlevel_cna", entity: "1p_status", categorical: true }, { ...ctx, unit: "patient" }, "cat");
+    assert.match(cat, /trimBoth\(value\) NOT IN \('', 'NA',/);
+    assert.match(cat, /if\(uniqExact\(r\.av\) > 1, 'Multiple', any\(r\.av\)\)/);
+    const log = axisSelect({ source: "assay", profileType: "p", entity: "e", log: true }, ctx, "num");
+    assert.match(log, /log10\(avg\(r\.av\) \+ 1\)[\s\S]*WHERE v IS NOT NULL/);
+    assert.equal(axisKind({ source: "assay", profileType: "p", entity: "e", categorical: true }), "cat");
+    assert.equal(axisKind({ source: "assay", profileType: "p", entity: "e" }), "num");
+    assert.equal(axisLabel({ source: "assay", profileType: "p", entity: "SBS1", label: "SBS1: Signatures" }), "SBS1: Signatures");
+    assert.throws(() => validateAxis({ source: "assay", profileType: "p", entity: "" }, "x"), /reads one entity/);
+    assert.throws(() => validateAxis({ source: "assay", profileType: "p", entity: "1p", categorical: true, log: true }, "x"), /log scale applies to numbers/);
+    assert.throws(() => validateAxis({ source: "profile", profile: "p", entity: "x'; DROP" }, "x"), /is not a generic-assay entity/);
+    validateAxis({ source: "profile", profile: "armlevel_cna", entity: "1p_status" }, "x");
   });
   test("a gene's mutations, copy number or SVs: no such event is the wild-type answer only when the case is profiled for it", () => {
     for (const [by, type, label] of [["mutated", "MUTATION_EXTENDED", "Not mutated"], ["cna", "COPY_NUMBER_ALTERATION", "Neutral"], ["sv", "STRUCTURAL_VARIANT", "No structural variant"]] as const) {

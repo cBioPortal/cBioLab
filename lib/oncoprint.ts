@@ -28,6 +28,7 @@ import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, 
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
 import { clinicalTable, assertCustomDataPresent } from "./custom-data.ts";
 import { finiteSql } from "./sql-number.ts";
+import { ENTITY_RE, isCategoricalAssay } from "./generic-assay.ts";
 import type { OncoprintSpec, HeatmapSpec } from "./views/oncoprint/types.ts";
 export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
 
@@ -176,6 +177,19 @@ async function studyProfileTypes(study: string, db: string = DB, conn: ChConn = 
   return set;
 }
 
+// per-study generic-assay profiles, by profile type: their datatype and whether a value is a patient's
+const _assayCache = new Map<string, Map<string, { datatype: string; patientLevel: boolean }>>();
+async function studyAssayProfiles(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Map<string, { datatype: string; patientLevel: boolean }>> {
+  const key = conn.id + "." + db + "." + study;
+  if (_assayCache.has(key)) return _assayCache.get(key)!;
+  const r = await chQuery("SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt, gp.datatype AS datatype, toInt32OrZero(ifNull(toString(gp.patient_level), '')) AS pl\n" +
+    "FROM " + db + ".genetic_profile gp JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'GENERIC_ASSAY'", conn);
+  const m = new Map((r.data as ChRow[]).map((x) => [String(x.pt), { datatype: String(x.datatype), patientLevel: Number(x.pl) === 1 }] as const));
+  _assayCache.set(key, m);
+  return m;
+}
+
 // synthetic "VAF" heatmap profile: variant allele fraction from mutation allele
 // counts (the portal's "Variant Allele Frequency in Selected Mutations Profile").
 // Patient-level value = max across the patient's mutations in the gene.
@@ -211,6 +225,22 @@ export function heatmapSql(profileType: string, genes: string[], study: string =
     "GROUP BY pid, gene";
 }
 
+// A generic-assay profile's values for heatmap tracks, one row per (column, entity): a column's
+// samples averaged in patient mode, and a patient-level assay's value given to each of the
+// patient's samples in sample mode. Values that are not numbers are left out.
+export function assayHeatmapSql(profileType: string, entities: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", patientLevel = false): string {
+  const strip = (col: string) => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
+  const sampleLevel = unit === "sample" && patientLevel;
+  return "SELECT " + (unit === "sample" ? strip(sampleLevel ? "sd.sample_unique_id" : "g.sample_unique_id") : strip("g.patient_unique_id")) + " AS pid,\n" +
+    "       g.entity_stable_id AS gene, avg(" + finiteSql("g.value") + ") AS v\n" +
+    "FROM " + db + ".generic_assay_data_derived g\n" +
+    (sampleLevel ? "JOIN " + db + ".sample_derived sd ON sd.patient_unique_id = g.patient_unique_id\n" : "") +
+    "WHERE g.profile_type = " + sq(profileType) + " AND g.profile_stable_id = " + sq(study + "_" + profileType) + "\n" +
+    "  AND g.entity_stable_id IN (" + entities.map(sq).join(",") + ")\n" +
+    "  AND " + finiteSql("g.value") + " IS NOT NULL\n" +
+    "GROUP BY pid, gene";
+}
+
 export function normalizeSpec(spec: OncoprintSpec) {
   // `geneList` is the rows (a symbol, or a merged group); `genes` is the flat symbol list every
   // query and the coverage mask are built from. One normalizer owns both, and the assembler runs
@@ -225,13 +255,20 @@ export function normalizeSpec(spec: OncoprintSpec) {
   // track label, or "-label" for descending. Default is the genomic staircase.
   const sort = normalizeSort(spec.sort);
   // heatmap: continuous per-gene molecular-profile tracks (portal-style).
-  // [{profileType, genes?}] — genes default to the spec's gene tracks.
-  const heatmap = (Array.isArray(spec.heatmap) ? spec.heatmap : []).slice(0, 4).map((h: HeatmapSpec) => ({
-    profileType: String(h && h.profileType || ""),
-    reference: h && h.reference === "federation" ? "federation" as const : "cohort" as const,
-    genes: (Array.isArray(h?.genes) && h.genes!.length ? h.genes! : genes)
-      .map((g: string) => String(g).toUpperCase().trim()).filter((g: string) => GENE_RE.test(g)).slice(0, 12)
-  })).filter((h) => h.profileType);
+  // [{profileType, genes?}] — genes default to the spec's gene tracks. A generic-assay profile's
+  // tracks are its `entities` instead, carried in `genes` from here on; `assay` marks them.
+  const heatmap = (Array.isArray(spec.heatmap) ? spec.heatmap : []).slice(0, 4).map((h: HeatmapSpec) => {
+    const entities = Array.isArray(h?.entities) ? h.entities.map((e) => String(e).trim()) : [];
+    for (const e of entities) if (!ENTITY_RE.test(e)) throw new Error("heatmap: '" + e.slice(0, 60) + "' is not a generic-assay entity");
+    if (entities.length > 12) throw new Error("heatmap: a profile draws at most 12 entities; this asks for " + entities.length);
+    return {
+      profileType: String(h && h.profileType || ""),
+      reference: h && h.reference === "federation" ? "federation" as const : "cohort" as const,
+      assay: entities.length > 0,
+      genes: entities.length ? entities : (Array.isArray(h?.genes) && h.genes!.length ? h.genes! : genes)
+        .map((g: string) => String(g).toUpperCase().trim()).filter((g: string) => GENE_RE.test(g)).slice(0, 12)
+    };
+  }).filter((h) => h.profileType);
   const unit: Unit = spec.unit === "sample" ? "sample" : "patient";
   // overlays: thresholded molecular evidence drawn into the gene cells (mRNA outline,
   // protein bars) rather than as tracks of their own — the portal's ±2 z-score rule
@@ -414,6 +451,22 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   const heatmapIn: AssembleInput["heatmap"] = [];
   for (const h of heatmap) {
     const isVaf = /^vaf$/i.test(h.profileType);
+    const assays = await Promise.all(studies.map(async (s) => (await studyAssayProfiles(s, dbOf(s), connOf(s))).get(h.profileType)));
+    if (!isVaf && assays.some((a) => a)) {
+      if (!h.assay) throw new Error("heatmap: '" + h.profileType + "' is a generic assay; name the entities to draw (entities: [...]) rather than genes");
+      if (assays.some((a) => a && isCategoricalAssay(a.datatype)))
+        throw new Error("heatmap: '" + h.profileType + "' is categorical; a heatmap track draws numbers");
+      if (h.reference === "federation") throw new Error("heatmap: a federation reference z-scores a gene's values; '" + h.profileType + "' is a generic assay");
+      const okStudies = studies.filter((_, i) => assays[i]);
+      const values = new Map<string, number>();
+      const fetched = await Promise.all(okStudies.map(async (s) =>
+        ({ s, r: await lqRows("oncoprint:assay heatmap", assayHeatmapSql(h.profileType, h.genes, s, dbOf(s), unit, !!assays[studies.indexOf(s)]!.patientLevel), s) })));
+      for (const { s, r } of fetched)
+        for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
+      heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf: false, assay: true, values });
+      continue;
+    }
+    if (h.assay) throw new Error("heatmap: entities name a generic assay's tracks; '" + h.profileType + "' is not a generic-assay profile of " + studies.join("/"));
     const avail = await Promise.all(studies.map(async (s) =>
       (isVaf ? await vafAvailable(s, dbOf(s), connOf(s)) : (await studyProfileTypes(s, dbOf(s), connOf(s))).has(h.profileType)) ? s : null));
     const okStudies = avail.filter((s): s is string => s !== null);
@@ -421,7 +474,9 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
       throw new Error(isVaf
         ? "heatmap: 'VAF' needs mutation allele counts, which " + studies.join("/") + " did not load"
         : "heatmap: profile '" + h.profileType + "' not in " + studies.join("/") +
-          " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0]), connOf(studies[0])))].join(", ") || "none") + ", VAF)");
+          " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0]), connOf(studies[0])))].join(", ") || "none") + ", VAF" +
+          [...(await studyAssayProfiles(studies[0], dbOf(studies[0]), connOf(studies[0]))).entries()].filter(([, a]) => !isCategoricalAssay(a.datatype))
+            .map(([pt]) => ", " + pt + " (generic assay: name its entities)").join("") + ")");
     const values = new Map<string, number>(); // columnId|gene -> value
     const hFetched = await Promise.all(okStudies.map(async (s) =>
       ({ s, r: await lqRows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s), unit) : heatmapSql(h.profileType, h.genes, s, dbOf(s), unit), s) })));

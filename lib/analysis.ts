@@ -75,7 +75,8 @@ export async function studyProfilesMany(studies: string[]): Promise<Map<string, 
         "JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
         "WHERE cs.cancer_study_identifier IN " + IN + " AND gp.genetic_alteration_type = 'GENERIC_ASSAY'", conn),
       chQuery("SELECT cs.cancer_study_identifier AS s, replaceOne(gp.stable_id, concat(cs.cancer_study_identifier, '_'), '') AS profile, gp.genetic_alteration_type AS type, gp.datatype AS datatype,\n" +
-        "       gp.name AS name, ifNull(toString(gp.generic_assay_type), '') AS assay, toInt32OrZero(ifNull(toString(gp.sort_order), '')) AS ord\n" +
+        "       gp.name AS name, ifNull(toString(gp.generic_assay_type), '') AS assay, toInt32OrZero(ifNull(toString(gp.sort_order), '')) AS ord,\n" +
+        "       toInt32OrZero(ifNull(toString(gp.patient_level), '')) AS pl\n" +
         "FROM " + conn.db + ".genetic_profile gp\n" +
         "JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
         "WHERE cs.cancer_study_identifier IN " + IN, conn),
@@ -84,8 +85,8 @@ export async function studyProfilesMany(studies: string[]): Promise<Map<string, 
     for (const r of types.data) out.get(String(r.s))?.profiles.push(r.profile_type);
     for (const r of ga.data) out.get(String(r.s))?.gaProfiles.push(r.pt);
     for (const r of cat.data) out.get(String(r.s))?.catalog.push({
-      profile: String(r.profile), type: String(r.type), datatype: String(r.datatype), name: String(r.name),
-      ...(r.assay ? { assayType: String(r.assay) } : {}), order: Number(r.ord) || 0 });
+      profile: String(r.profile), type: String(r.type), datatype: String(r.datatype), name: String(r.name), study: String(r.s),
+      ...(r.assay ? { assayType: String(r.assay) } : {}), ...(Number(r.pl) === 1 ? { patientLevel: true } : {}), order: Number(r.ord) || 0 });
     for (const [s, p] of out) _profileCache.set(s, p);
   }));
   return new Map(studies.map((s) => [s, _profileCache.get(s)!]));
