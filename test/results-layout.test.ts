@@ -61,3 +61,12 @@ test("co-expression is for one study; expression in Plots across studies only wh
   assert.ok(refused.left.some((l) => /cannot be compared across the selected studies/.test(l)));
   assert.ok(two.left.some((l) => /structural-variant profiling/.test(l)), "a type only some studies hold is named");
 });
+
+test("each kind of generic assay is a sub-tab of Comparison/Survival, comparing Altered with Unaltered", () => {
+  const l = resultsLayout(q(["a"], ["KRAS"]), data({ assays: [{ label: "Mutational signature", profile: "mutational_signatures_contribution_SBS" }, { label: "Arm-level copy number", profile: "armlevel_cna" }] }));
+  const comp = l.tabs.find((t) => t.title === "Comparison/Survival")!;
+  const sub = comp.sub!.filter((s) => s.title === "Mutational signature" || s.title === "Arm-level copy number");
+  assert.deepEqual(sub.map((s) => (l.doc.views![s.views[0]] as any).profileType), ["mutational_signatures_contribution_SBS", "armlevel_cna"]);
+  for (const s of sub) assert.deepEqual((l.doc.views![s.views[0]] as any).cohorts, ["Altered", "Unaltered"]);
+  assert.ok(!resultsLayout(q(["a"], ["KRAS"]), data()).tabs.find((t) => t.title === "Comparison/Survival")!.sub!.some((s) => /signature/i.test(s.title)));
+});

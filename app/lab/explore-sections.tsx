@@ -788,7 +788,7 @@ function AssayChartPicker({ ctx }: { ctx: ExploreCtx }) {
 
 /** each charted generic-assay entity: a histogram or its values, a click a genericAssay clause */
 export function AssayFacets({ ctx }: { ctx: ExploreCtx }) {
-  const { addClause, exStudies, unchartAssay } = ctx;
+  const { addClause, exStudies, unchartAssay, addMode, splittingBy, splitDraftBy } = ctx;
   const explore = ctx.explore!;
   return <>
     {(explore.assayFacets || []).map((f) => {
@@ -802,6 +802,12 @@ export function AssayFacets({ ctx }: { ctx: ExploreCtx }) {
         <div key={f.profileType + "|" + f.entity} data-assayfacet={f.profileType + "|" + f.entity} className="card">
           <div className="facettitle flex items-center gap-1">
             <span className="min-w-0 flex-1 truncate" title={f.entity}>{title}</span>
+            <ChartMenu label={title} actions={addMode || exStudies.length > 1 ? [] : [
+              { label: "Split by this", disabled: !!splittingBy, working: splittingBy === title,
+                title: "Analyze the current selection split by " + title + (f.kind === "num"
+                  ? ": above / at or below its median within the selection" : ": one arm per value with at least 10 patients, the rest in Other") +
+                  "; patients with no value get their own arm",
+                onClick: () => void splitDraftBy({ assay: { profileType: f.profileType, entity: f.entity } }, title) }]} />
             <Button variant="ghost" size="icon-xs" title="stop charting this" aria-label={"stop charting " + f.entity}
               onClick={() => unchartAssay(f.profileType, f.entity)}><X /></Button>
           </div>

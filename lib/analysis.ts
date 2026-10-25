@@ -14,13 +14,15 @@ import { describeCohortDef } from "./cohort2.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, ViewKind, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
 import { plainResult } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
-import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, type Resolver } from "./federation.ts";
+import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, hasViewAggregates, type Resolver } from "./federation.ts";
 import { cantDraw } from "./view-coverage.ts";
 import { describeSources, sourceIndex } from "./provenance.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
-import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey } from "./partition-arms.ts";
+import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey, chooseArmValues, armLabel, SPLIT_BY_DEFAULT_MIN_COUNT } from "./partition-arms.ts";
+import { ENTITY_RE, isCategoricalAssay, assayCohortMedianSql, assayCohortValuesSql } from "./generic-assay.ts";
+import { entityShortName } from "./profile-names.ts";
 import { upgradeDocument } from "./doc-version.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { ATTR_NAME_RE, assertCustomDataPresent } from "./custom-data.ts";
@@ -199,6 +201,8 @@ export interface PartitionProposalRequest {
   /** the cohort to split: a named cohort or a partition's child */
   cohort: string;
   attribute?: string; gene?: string; oql?: string[];
+  /** a generic-assay entity: a median split of its numbers, or an arm per value of its categories */
+  assay?: { profileType: string; entity: string };
   maxArms?: number; minCount?: number;
   /** the partition's name; default "<cohort> by <attribute|gene>" */
   name?: string;
@@ -231,8 +235,8 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
   const cohort = String(req.cohort || "");
   const def = doc.cohorts?.[cohort];
   if (!def) throw new Error("no cohort “" + cohort + "” to split; have " + Object.keys(doc.cohorts || {}).join(", "));
-  const modes = [req.attribute, req.gene, req.oql].filter((x) => x != null && x !== "").length;
-  if (modes !== 1) throw new Error("name exactly one of attribute, gene or oql to split by");
+  const modes = [req.attribute, req.gene, req.oql, req.assay].filter((x) => x != null && x !== "").length;
+  if (modes !== 1) throw new Error("name exactly one of attribute, gene, oql or assay to split by");
   // a split is named on its cohort, so only that cohort's other splits (and the cohort names its
   // children would collide with) are taken
   const taken = Object.values(flattenSplits((paramsDoc as AnalysisDoc).cohorts || {})).filter((p) => p.of === cohort).map((p) => p.split);
@@ -246,6 +250,7 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
     return { name, def: { ...p, split: name } };
   }
   if (req.oql) { const name = nameFor("OQL"); return { name, def: { ...partitionFromOql(cohort, req.oql), split: name } }; }
+  if (req.assay) return assayPartition(cohort, def, docStudy, req.assay, nameFor, { maxArms: req.maxArms, minCount: req.minCount });
 
   const attribute = String(req.attribute).trim();
   if (!ATTR_NAME_RE.test(attribute)) throw new Error("'" + attribute + "' is not a valid attribute name");
@@ -272,6 +277,44 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
   return { name, def: { ...p, split: name },
     ...(pooled.length ? { note: (dist.partial ? "Values" : pooled.length + " value" + (pooled.length === 1 ? "" : "s")) +
       " with fewer patients go to Other: " + pooled.slice(0, 12).join(", ") + (pooled.length > 12 || dist.partial ? ", …" : "") } : {}) };
+}
+
+/**
+ * A split on one generic-assay entity, written out as explicit genericAssay clauses: a numeric
+ * entity at its median within the cohort (the cut is written into the arm, so re-running cannot
+ * move it), a categorical one an arm per value. A patient with no value goes to the engine's
+ * "No … measured" child, never to an arm.
+ */
+async function assayPartition(cohort: string, def: CohortDef, docStudy: string, assay: { profileType: string; entity: string },
+  nameFor: (what: string) => string, opts: { maxArms?: number; minCount?: number }): Promise<{ name: string; def: PartitionDef; note?: string }> {
+  const { profileType, entity } = assay;
+  if (!/^[A-Za-z0-9_.-]{1,64}$/.test(profileType) || !ENTITY_RE.test(entity)) throw new Error("name a generic-assay profile and one of its entities to split by");
+  const studies: string[] = [];
+  for (const s of cohortStudies(def, docStudy)) studies.push(await resolveStudy(s, docStudy));
+  if (studies.length > 1) throw new Error("a split on a generic assay needs a cohort in a single study (“" + cohort + "” spans " + studies.length + ")");
+  const study = studies[0];
+  const { profiles, gaProfiles } = await studyProfiles(study);
+  if (!gaProfiles.includes(profileType)) throw new Error(study + " has no generic-assay profile '" + profileType + "'");
+  const r = await resolverFor(study, { oncokbPin: process.env.ONCOKB_PIN || await oncokbPin(), profiles, gaProfiles });
+  if (!hasViewAggregates(r)) throw new Error(study + " cannot answer a split on a generic assay here");
+  const short = entityShortName(entity, profileType);
+  const name = nameFor(short);
+  const source = { assay: { profileType, entity } };
+  const [m] = await r.viewAggregate("partition:assay", def, (c, s, d) => assayCohortMedianSql(c, s, d, profileType, entity));
+  if (isCategoricalAssay(String(m?.dt || ""))) {
+    const rows = await r.viewAggregate("partition:assay values", def, (c, s, d) => assayCohortValuesSql(c, s, d, profileType, entity));
+    const minCount = opts.minCount ?? SPLIT_BY_DEFAULT_MIN_COUNT;
+    const { own, pooled } = chooseArmValues(rows.map((x) => ({ v: String(x.v), n: Number(x.n) })), opts.maxArms, minCount);
+    if (!own.length) throw new Error("no value of " + short + " is held by at least " + minCount + " patients in “" + cohort + "” — nothing to split on");
+    return { name, def: { of: cohort, split: name, arms: own.map((x) => ({ name: short + " " + armLabel(x.v), where: { kind: "genericAssay", profileType, entity, values: [x.v] } })),
+      source: { ...source, minCount, ...(pooled.length ? { otherValues: pooled.slice(0, 50).map((x) => x.v) } : {}) } },
+      ...(pooled.length ? { note: pooled.length + " value" + (pooled.length === 1 ? "" : "s") + " with fewer patients go to Other: " + pooled.slice(0, 12).map((x) => x.v).join(", ") } : {}) };
+  }
+  if (!(Number(m?.n) > 0)) throw new Error("no patient of “" + cohort + "” has a value for " + short);
+  const cut = Number(m.median);
+  return { name, note: "split at the median of " + short + " within “" + cohort + "” (" + cut.toPrecision(4) + ", over its samples' values)",
+    def: { of: cohort, split: name, arms: [{ name: short + " above median", where: { kind: "genericAssay", profileType, entity, range: { gt: cut } } }],
+      other: short + " at or below median", source: { ...source, median: true } } };
 }
 
 export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: RunOpts = {}): Promise<AnalysisResult> {

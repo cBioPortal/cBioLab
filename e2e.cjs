@@ -1264,6 +1264,28 @@ async function main() {
       await facet.locator("button.valrow", { hasText: "Gain" }).click();
       await page.waitForFunction((n) => new RegExp("\\b" + n.toLocaleString("en-US") + " patients match").test(document.body.innerText), gain, { timeout: 120000 });
       ok("generic assays: Explore charts an entity, and a click filters to exactly the patients its bar counts", gain > 0, gain + " patients with 8q gained");
+
+      // a split on an entity: its arms and a "No … measured" child add up to the cohort
+      const base = { study: STUDY, cohorts: { all: { all: [] } }, views: [] };
+      const prop = await (await ctx.request.post(BASE + "/api/partition", { data: { doc: base, cohort: "all", assay: { profileType: "armlevel_cna", entity: "8q_status" } } })).json();
+      const split = await (await ctx.request.post(BASE + "/api/analysis", { data: { ...base, cohorts: { all: { all: [], splits: { [prop.name]: { arms: prop.def.arms } } } } } })).json();
+      const kids = Object.entries(split.cohorts || {}).filter(([n]) => n.startsWith("all / "));
+      const sum = kids.reduce((n, [, c]) => n + c.count, 0);
+      ok("generic assays: a split on an entity gives each value an arm and unmeasured patients their own, adding up to the cohort",
+        sum === split.cohorts.all.count && kids.some(([n]) => /No 8q_status measured/.test(n)) && kids.some(([n]) => /8q_status Gain/.test(n)), kids.map(([n, c]) => n.slice(6) + " " + c.count).join(", "));
+
+      // correlates against a generic assay: ESR1's mRNA against every phosphosite finds ESR1's own first
+      const co = (await (await ctx.request.post(BASE + "/api/analysis", { data: { ...base, views: [{ kind: "correlates", cohorts: ["all"], gene: "ESR1",
+        profileType: "rna_seq_v2_mrna_median_Zscores", otherProfile: "phosphoprotein_quantification", show: 5 }] } })).json()).views[0];
+      ok("generic assays: correlates reads every entity of a generic assay, ESR1's mRNA ranking its own phosphosite first",
+        !co.error && co.correlates.otherIsAssay && co.correlates.positive[0].gene === "ESR1_pS294", co.error || co.correlates.positive.map((g) => g.gene).join(", "));
+
+      // the results page compares Altered with Unaltered on each kind of generic assay
+      await page.goto(BASE + "/portal/results?study=" + STUDY + "&genes=MYC", { waitUntil: "domcontentloaded" });
+      await page.locator("button, [role=tab]").filter({ hasText: /^Comparison\/Survival$/ }).first().click({ timeout: 120000 });
+      await page.locator("button, [role=tab]").filter({ hasText: /^Arm-level copy number$/ }).first().click({ timeout: 60000 });
+      await page.waitForFunction(() => /entities tested/.test(document.body.innerText), null, { timeout: 180000 });
+      ok("generic assays: the results page's Comparison/Survival has a tab per kind of generic assay", true);
     } catch (e) {
       ok("generic assays: axis, oncoprint and Explore", false, String(e.message).replace(/\s+/g, " ").slice(0, 400));
     }

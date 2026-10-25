@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import type { ViewKind } from "../../../lib/types.ts";
 import type { CardProps } from "../view-cards.tsx";
+import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 
 /** What the page knows about the study before a view is added. */
 export interface Known {
@@ -48,6 +49,8 @@ export interface KindCardCtx {
   attrs: { attribute: string; kind: string }[];
   profiles: string[];
   assays: string[];
+  /** every profile as the studies describe them, for a field that searches a generic assay's entities */
+  catalog?: ProfileInfo[];
   events: { canonical: string; label: string; n: number }[];
   /** the document as it stands, for a table's download */
   docJson?: () => string;

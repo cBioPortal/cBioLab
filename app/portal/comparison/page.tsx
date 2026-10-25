@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AnalysisDoc, View } from "../../../lib/types";
 import { PortalTabs } from "../PortalTabs";
-import { useStudyKnown, expressionProfile, type StudyKnown } from "../study-known";
+import { useStudyKnown, expressionProfile, assayComparisonProfiles, type StudyKnown } from "../study-known";
 import { arrange, decodeDoc, usePageDoc, type PageLayout } from "../page-doc";
 import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
 import { SiteHeader } from "../../_ui/site-header.tsx";
@@ -18,10 +18,10 @@ const CLINICAL_SHOWN = 8;
 function comparisonLayout(linked: AnalysisDoc, study: string, known: StudyKnown): PageLayout {
   const names = Object.keys(linked.cohorts || {});
   const expr = expressionProfile(known.profileCatalog);
-  const ga = known.gaProfiles.find((p) => /signature/i.test(p) && /contribution/i.test(p)) || known.gaProfiles.find((p) => !/methylation/i.test(p)) || null;
+  const assays = assayComparisonProfiles(known.profileCatalog);
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
   const left = [!known.clinical.length && "Clinical (no attributes)", !(expr && names.length === 2) && "mRNA (" + (expr ? "compares exactly two cohorts" : "no mRNA profile") + ")",
-    !ga && "Generic Assays (no generic-assay profile)"].filter(Boolean) as string[];
+    !assays.length && "Generic Assays (no generic-assay profile)"].filter(Boolean) as string[];
   return arrange({ study, cohorts: linked.cohorts }, [
     { title: "Overlap", views: [v("Overlap", { kind: "overlap" })] },
     { title: "Survival", views: [v("Survival", { kind: "survival" })] },
@@ -29,7 +29,7 @@ function comparisonLayout(linked: AnalysisDoc, study: string, known: StudyKnown)
     { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation" }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna" }),
       v("Structural variants", { kind: "enrichment", alteration: "sv" })] },
     ...(expr && names.length === 2 ? [{ title: "mRNA", views: [v("mRNA", { kind: "diffexpr", profileType: expr })] }] : []),
-    ...(ga ? [{ title: "Generic Assays", views: [v(ga, { kind: "assays", profileType: ga })] }] : []),
+    ...assays.map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile })] })),
     { title: "Clinical Data", views: [v("Clinical data", { kind: "table" })] }
   ], left);
 }

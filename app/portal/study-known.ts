@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lab/api.ts";
 import type { Clause } from "../../lib/types";
-import type { ProfileInfo } from "../../lib/profile-catalog.ts";
+import { profileGroup, type ProfileInfo } from "../../lib/profile-catalog.ts";
 
 type ProfileType = "MUTATION" | "CNA" | "SV";
 
@@ -75,6 +75,19 @@ export const useStudyKnown = (study: string) => useQueryKnown(study ? [study] : 
 export function expressionProfile(catalog: ProfileInfo[]): string | null {
   const m = catalog.filter((p) => p.type === "MRNA_EXPRESSION").sort((a, b) => a.order - b.order);
   return (m.find((p) => p.datatype === "CONTINUOUS") || m.find((p) => p.datatype === "Z-SCORE") || m[0])?.profile || null;
+}
+/**
+ * One generic-assay profile per kind (signatures, arm-level copy number, ancestry, …), for a
+ * comparison's Generic Assay tabs, as the portal gives each kind its own: a signature's
+ * contributions before its counts, the study's own order otherwise. Methylation is left out — per
+ * probe, it is more entities than the assays view compares.
+ */
+export function assayComparisonProfiles(catalog: ProfileInfo[], max = 4): { label: string; profile: string }[] {
+  const out = new Map<string, string>();
+  const ga = catalog.filter((p) => p.type === "GENERIC_ASSAY" && !/METHYLATION/i.test(p.assayType || "") && !/methylation/i.test(p.profile))
+    .sort((a, b) => Number(/contribution/i.test(b.profile)) - Number(/contribution/i.test(a.profile)) || a.order - b.order || a.profile.localeCompare(b.profile));
+  for (const p of ga) { const g = profileGroup(p); if (!out.has(g)) out.set(g, p.profile); }
+  return [...out].slice(0, max).map(([label, profile]) => ({ label, profile }));
 }
 /** the study's discrete copy-number profile (GISTIC, or a panel study's calls) */
 export function discreteCnaProfile(catalog: ProfileInfo[]): string | null {

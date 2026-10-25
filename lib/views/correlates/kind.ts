@@ -6,12 +6,12 @@ import type { CorrelatesGene } from "./types.ts";
 export const correlatesKind: ViewKindDef<"correlates"> = {
   kind: "correlates",
   figure: (v, o) => v.correlates && v.correlates.tested > 0 ? correlatesSvg(v, o) : null,
-  title: (v) => "Co-expression" + (v.correlates ? " — " + v.correlates.gene + " against every gene" : ""),
+  title: (v) => "Co-expression" + (v.correlates ? " — " + v.correlates.gene + " against every " + (v.correlates.otherIsAssay ? "entity of " + v.correlates.otherProfile : "gene") : ""),
   text: (v, { out, pFmt, caveatOf, noteOf }) => {
     const co = v.correlates;
-    const line = (g: CorrelatesGene) => `  ${g.gene}: ρ ${g.rho} (q=${pFmt(g.q)}), r ${g.r}, n=${g.n}`;
-    out.push(`Genes co-expressed with ${co.gene} (${co.profileType}${co.otherProfile !== co.profileType ? " against " + co.otherProfile : ""}) in ${co.cohort}; ` +
-      `Spearman ρ${co.rhoFrom === "meta" ? " combined across studies by Fisher z" : ""}, BH q over ${co.tested.toLocaleString()} genes; ${co.significant.toLocaleString()} at q<0.05:\n` +
+    const line = (g: CorrelatesGene) => `  ${g.gene}${g.name ? " (" + g.name + ")" : ""}: ρ ${g.rho} (q=${pFmt(g.q)}), r ${g.r}, n=${g.n}`;
+    out.push(`${co.otherIsAssay ? "Entities of the generic assay " + co.otherProfile + " correlated" : "Genes co-expressed"} with ${co.gene} (${co.profileType}${co.otherProfile !== co.profileType ? " against " + co.otherProfile : ""}) in ${co.cohort}; ` +
+      `Spearman ρ${co.rhoFrom === "meta" ? " combined across studies by Fisher z" : ""}, BH q over ${co.tested.toLocaleString()} ${co.otherIsAssay ? "entities" : "genes"}; ${co.significant.toLocaleString()} at q<0.05:\n` +
       ` most positively correlated:\n` + co.positive.map(line).join("\n") +
       `\n most negatively correlated:\n` + co.negative.map(line).join("\n") + caveatOf(v) + noteOf(v));
   },

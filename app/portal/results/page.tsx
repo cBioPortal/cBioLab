@@ -8,7 +8,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PortalTabs } from "../PortalTabs";
-import { useQueryKnown, expressionProfile, discreteCnaProfile } from "../study-known";
+import { useQueryKnown, expressionProfile, discreteCnaProfile, assayComparisonProfiles } from "../study-known";
 import { decodeDoc, usePageDoc } from "../page-doc";
 import { resultsLayout } from "../results-layout.ts";
 import { Button } from "../../_ui/button";
@@ -43,7 +43,8 @@ export default function ResultsPage() {
   const fresh = useMemo(() => known && genes.length && genes.length <= RESULTS_MAX_GENES && !queryError
     ? resultsLayout({ studies, filters, entries: check.entries.map((e) => e.text), genes }, {
         expr: expressionProfile(known.profileCatalog), cna: discreteCnaProfile(known.profileCatalog), clinical: known.clinical,
-        numeric: known.attrs.filter((a) => a.kind === "num").map((a) => a.attribute), expressionAcross: across, held: known.held })
+        numeric: known.attrs.filter((a) => a.kind === "num").map((a) => a.attribute), expressionAcross: across, held: known.held,
+        assays: assayComparisonProfiles(known.profileCatalog) })
     : null, [known, studies, filters, check, genes, queryError, across]);
   const page = usePageDoc(fresh, linked);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);

@@ -57,3 +57,33 @@ export function assayEntitySearchSql(study: string, db: string, profileType: str
     "FROM ents e LEFT JOIN props pr ON pr.entity = e.entity\n" + match +
     "ORDER BY " + exact + "length(e.entity), e.entity LIMIT " + Math.max(1, Math.min(200, Math.floor(limit))));
 }
+
+/** One entity's rows of the study's profile for the cohort's patients, as a CTE pair (cohort, rows). */
+function cohortRowsCte(cohortSql: string, study: string, db: string, profileType: string, entity: string): string {
+  return "WITH cohort AS (" + cohortSql + "),\n" +
+    "rows AS (\n" +
+    "  SELECT patient_unique_id AS id, value, datatype FROM " + db + ".generic_assay_data_derived\n" +
+    "  WHERE profile_type = " + sq(profileType) + " AND profile_stable_id = " + sq(study + "_" + profileType) + "\n" +
+    "    AND entity_stable_id = " + sq(entity) + "\n" +
+    "    AND patient_unique_id IN (SELECT concat(" + sq(study + "_") + ", pid) FROM cohort)\n" +
+    ")\n";
+}
+
+/** The profile's datatype and, over the cohort's numeric values of one entity, their median and count. */
+export function assayCohortMedianSql(cohortSql: string, study: string, db: string, profileType: string, entity: string): AggregateSql {
+  return aggregateSql(cohortRowsCte(cohortSql, study, db, profileType, entity) +
+    "SELECT any(datatype) AS dt, countIf(" + finiteSql("value") + " IS NOT NULL) AS n,\n" +
+    "       quantileExactIf(0.5)(" + finiteSql("value") + ", " + finiteSql("value") + " IS NOT NULL) AS median FROM rows");
+}
+
+/** Each value of one categorical entity over the cohort, with how many of its patients take it; "not called" left out. */
+export function assayCohortValuesSql(cohortSql: string, study: string, db: string, profileType: string, entity: string): AggregateSql {
+  return aggregateSql(cohortRowsCte(cohortSql, study, db, profileType, entity) +
+    "SELECT trimBoth(value) AS v, uniqExact(id) AS n FROM rows\n" +
+    "WHERE trimBoth(value) NOT IN (" + ASSAY_MISSING_VALUES.map(sq).join(", ") + ")\nGROUP BY v");
+}
+
+/** How many entities the study's profile has. Metadata only. */
+export function assayEntityCountSql(study: string, db: string, profileType: string): AggregateSql {
+  return aggregateSql("SELECT count() AS n FROM " + db + ".generic_assay_profile_entity_derived WHERE profile_stable_id = " + sq(study + "_" + profileType));
+}

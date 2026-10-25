@@ -94,6 +94,7 @@ export const PartitionRequest = z.object({
   attribute: z.string().optional(),
   gene: z.string().optional(),
   oql: z.array(z.string()).optional(),
+  assay: z.object({ profileType: z.string(), entity: z.string() }).optional(),
   name: z.string().optional(),
   maxArms: z.number().optional(),
   minCount: z.number().optional(),

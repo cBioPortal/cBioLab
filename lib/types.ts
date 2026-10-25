@@ -131,6 +131,8 @@ export interface GenomicDataLeaf {
 export interface GenericAssayLeaf {
   kind: "genericAssay"; profileType: string; entity: string;
   range?: ClinicalRange; values?: (string | number)[];
+  /** any value at all: the patient was measured for the entity (a split's "evaluable" condition) */
+  measured?: boolean;
 }
 /**
  * A patient carries a mutation in `gene` whose protein position falls in
@@ -321,6 +323,8 @@ export interface PartitionDef {
    * determines the children.
    */
   source?: { attribute?: string; gene?: string; oql?: string[]; minCount?: number; median?: boolean;
+    /** a generic-assay entity the arms read */
+    assay?: { profileType: string; entity: string };
     /** values seen but given no arm of their own (too few patients, or past the arm limit), up to 50 */
     otherValues?: string[];
     /** the attribute had more values than were ranked, so otherValues does not list them all */

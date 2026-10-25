@@ -16,7 +16,7 @@ import { Choice } from "../_ui/choice.tsx";
 import { GearMenu } from "../_ui/gear-menu.tsx";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 
-export type SplitSpec = { attribute: string } | { gene: string } | { oql: string[] };
+export type SplitSpec = { attribute: string } | { gene: string } | { oql: string[] } | { assay: { profileType: string; entity: string } };
 
 type SplitProps = {
   cohort: string; attrs: { attribute: string; kind: string }[]; busy?: boolean;
