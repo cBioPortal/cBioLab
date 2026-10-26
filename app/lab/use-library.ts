@@ -10,7 +10,7 @@ import { DOC_VERSION } from "../../lib/doc-version.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 
 import type { DocStore } from "./doc-store.ts";
-import type { SavedCohort, Shared } from "./use-saved.ts";
+import type { SavedCohort } from "./use-saved.ts";
 
 const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
 
@@ -50,57 +50,18 @@ export const EXAMPLES: Example[] = [
 export interface LibraryPage {
   docs: DocStore;
   evalDef: (name: string, def: CohortDef) => Promise<{ count: number; text: string; }>;
-  goTab: (t: "explore" | "cohorts" | "analysis" | "examples") => void;
+  goTab: (t: "explore" | "analysis" | "examples") => void;
   persist: (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"]) => Promise<unknown>;
-  saved: Record<string, SavedCohort>;
-  /** cohorts others shared with the reader, ticked as "shared:<id>" */
-  sharedSaved: Shared<SavedCohort>[];
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setStudy: React.Dispatch<React.SetStateAction<string>>;
   study: string;
 }
 
 export function useLibrary(page: LibraryPage) {
-  const { docs, evalDef, goTab, persist, saved, sharedSaved, setError, setStudy, study } = page;
-  /** The "Saved" tab's own sub-tabs (Cohorts / Analyses) — these used to be
-   *  two separate top-level tabs ("Cohorts" and "Saved") with a cross-link
-   *  between them ("manage on the Saved tab"); one tab, two sub-tabs instead. */
-  const [cohortsSubTab, setCohortsSubTab] = useState<"cohorts" | "analyses">("cohorts");
+  const { docs, evalDef, goTab, persist, setError, setStudy, study } = page;
   const [exTag, setExTag] = useState<string>("all");     // Examples tab filter
   const [exQuery, setExQuery] = useState("");           // Examples tab search
-  const [picked, setPicked] = useState<string[]>([]);        // Cohorts tab: keys "ex:<name>" / "saved:<name>" / "shared:<id>"
   const [exEvals, setExEvals] = useState<Record<string, { count?: number; error?: string; busy?: boolean } | null>>({});
-
-  /**
-   * Cohorts tab: analyse the ticked cohorts together. Like Explore's Analyze it
-   * REPLACES the document — the selection is the analysis, not an addition to
-   * whatever was there before.
-   */
-  const analyzePicked = () => {
-    const chosen: [string, CohortDef][] = [];
-    for (const key of picked) {
-      const rest = key.slice(key.indexOf(":") + 1);
-      const other = key.startsWith("shared:") ? sharedSaved.find((x) => x.id === rest) : undefined;
-      let name = other ? other.name : rest;
-      const def = other ? other.item.def : (saved[name] || {}).def;
-      // someone else's cohort may share a name with one already chosen: say whose it is
-      if (other && chosen.some(([n]) => n === name)) name += " (" + (other.owner.name || other.owner.email) + ")";
-      if (def) chosen.push([name, def]);
-    }
-    if (!chosen.length) return;
-    // refused rather than cut to the first sixteen: the reader ticked these, so analysing some
-    // of them without saying which would answer a different question than the one asked
-    if (chosen.length > 16) {
-      setError("an analysis takes at most 16 cohorts; " + chosen.length + " are ticked — untick " + (chosen.length - 16) + " and analyse again");
-      return;
-    }
-    const nd: AnalysisDoc = { dsl: DOC_VERSION, study, cohorts: Object.fromEntries(chosen), views: [] };
-    docs.replace(nd);
-    setError(null);
-    goTab("analysis");
-  };
-  const togglePick = (key: string) =>
-    setPicked((p) => p.includes(key) ? p.filter((x) => x !== key) : [...p, key]);
 
   /** A fresh analysis of one example cohort, as Analyze does for the explored cohort: no views yet. */
   const analyzeExampleCohort = (ex: { name: string; def: CohortDef }) => {
@@ -137,5 +98,5 @@ export function useLibrary(page: LibraryPage) {
     try { await persist(ex.name, ex.def, lastEval); } catch { /* the Examples tab has no error banner of its own */ }
   };
 
-  return { cohortsSubTab, setCohortsSubTab, exTag, setExTag, exQuery, setExQuery, picked, setPicked, exEvals, setExEvals, analyzePicked, togglePick, runDocExample, docLink, previewExample, saveExample, analyzeExampleCohort };
+  return { exTag, setExTag, exQuery, setExQuery, exEvals, setExEvals, runDocExample, docLink, previewExample, saveExample, analyzeExampleCohort };
 }

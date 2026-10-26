@@ -35,7 +35,6 @@ export default async function OncoprintLabPage({ searchParams }: { searchParams:
       <header>
         <h1>cbio-lab</h1>
         <span className="sub">oncoprint lab — level-of-detail canvas over the binary contract</span>
-        <span className="spacer" />
         <a href="/oncoprint-lab/import" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>pasted data →</a>
         <a href="/oncoprint-lab/cli" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>command line →</a>
         <a href="/oncoprint-lab/python" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>python notebook →</a>

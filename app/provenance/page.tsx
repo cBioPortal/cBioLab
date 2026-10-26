@@ -26,7 +26,6 @@ export default async function ProvenancePage({ searchParams }: { searchParams: P
       <header>
         <h1>cbio-lab</h1>
         <span className="sub">oncoprint provenance — the picture, the DSL, and the SQL behind it</span>
-        <span className="spacer" />
         {typeof sp.spec === "string" && <>
           <a href={"/oncoprint-lab?spec=" + sp.spec} style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>interactive figure →</a>
           <a href={"/oncoprint-lab/cli?spec=" + sp.spec} style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>command line →</a>

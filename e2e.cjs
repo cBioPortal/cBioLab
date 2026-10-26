@@ -90,10 +90,11 @@ async function main() {
     await a.close(); await b.close();
   }
 
-  // Sharing through the page: an owner makes a group on the Groups page, adds someone by email,
-  // shares a cohort with it from the Saved tab's dialog and an analysis the group may edit; the
-  // member sees both under "Shared with you", opens the analysis and saves back to it, after which
-  // the owner's save from the version they had is refused rather than overwriting.
+  // Sharing through the page: an owner makes a group in their saved work (Groups), finds someone by
+  // the start of their email and adds them, shares a cohort with it and an analysis the group may
+  // edit; the member sees both under "Shared with you", opens the analysis (a link into the lab) and
+  // saves back to it, after which the owner's save from the version they had is refused rather than
+  // overwriting.
   if (LOGIN) {
     const T = Date.now().toString(36), A = "ada." + T + "." + LOGIN, B = "bob." + T + "." + LOGIN;
     const ca = await browser.newContext({ viewport: { width: 1400, height: 900 } }), cb = await browser.newContext({ viewport: { width: 1400, height: 900 } });
@@ -102,18 +103,20 @@ async function main() {
       await signIn(ca, A); await signIn(cb, B);
       const a = await ca.newPage();
       a.on("pageerror", (e) => errs.push(e.message));
-      await a.goto(BASE + "/groups", { waitUntil: "domcontentloaded" });
+      await a.goto(BASE + "/groups", { waitUntil: "domcontentloaded" });   // the old link: the manager's Groups tab
       await a.locator("input[aria-label='new group name']").fill("e2e lab " + T);
       await a.locator("button", { hasText: "Make group" }).click();
       await a.locator(".groupcard h2", { hasText: "e2e lab " + T }).waitFor({ timeout: 120000 });
-      await a.locator("input[aria-label='email to add']").fill(B);
+      await a.locator("input[aria-label='person to add']").fill("bob." + T);
+      await a.locator("[role=listbox] [role=option]", { hasText: B }).click({ timeout: 30000 });
+      steps.found = await a.locator("input[aria-label='person to add']").inputValue();
       await a.locator(".groupcard button", { hasText: "Add" }).click();
       steps.member = await a.locator(".membertable td", { hasText: B }).waitFor({ timeout: 30000 }).then(() => true, () => false);
       const mk = async (kind, name, definition) => (await (await ca.request.post(BASE + "/api/artifacts", { data: { kind, name, definition } })).json()).artifact;
       await mk("cohort", "e2e shared cohort " + T, { all: [{ kind: "oql", q: "KRAS: MUT" }] });
       const ws = await mk("workspace", "e2e shared analysis " + T, { study: "msk_chord_2024", title: "e2e shared analysis " + T,
         cohorts: { "KRAS mutant": { all: [{ kind: "oql", q: "KRAS: MUT" }] } }, views: [] });
-      await a.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
+      await a.goto(BASE + "/saved?tab=cohorts", { waitUntil: "domcontentloaded" });
       const dlg = a.locator("[role=dialog].sharedialog");
       const shareFrom = async (row, edit) => {
         await row.locator("button.sharebadge").click({ timeout: 120000 });
@@ -129,7 +132,7 @@ async function main() {
       steps.analysis = await shareFrom(a.locator(".listrow", { hasText: "e2e shared analysis " + T }), true);
       const b = await cb.newPage();
       b.on("pageerror", (e) => errs.push(e.message));
-      await b.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
+      await b.goto(BASE + "/saved?tab=cohorts", { waitUntil: "domcontentloaded" });
       steps.bobSees = (await b.locator(".listrow", { hasText: "e2e shared cohort " + T }).innerText({ timeout: 120000 }).catch(() => "")).includes("from " + A);
       await b.getByRole("tab", { name: "Analyses" }).click();
       await b.locator(".listrow", { hasText: "e2e shared analysis " + T }).locator("button", { hasText: "open" }).click();
@@ -140,7 +143,7 @@ async function main() {
       steps.stale = (await ca.request.patch(BASE + "/api/artifacts/" + ws.id, { data: { name: "x", definition: { views: [] }, version: 1 } })).status();
     } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
     ok("sharing from the page: a group, a shared cohort and an editable analysis, saved back by the member, a stale save refused",
-      steps.member && /^shared: “e2e lab/.test(steps.cohort) && /who can edit$/.test(steps.analysis) && steps.bobSees &&
+      steps.found === B && steps.member && /^shared: “e2e lab/.test(steps.cohort) && /who can edit$/.test(steps.analysis) && steps.bobSees &&
       steps.savedBack === 2 && steps.stale === 409 && !errs.length, JSON.stringify({ ...steps, errs }));
     await ca.close(); await cb.close();
   }
@@ -173,7 +176,7 @@ async function main() {
       page.url() + " status " + rootResp.status());
     await page.goto(BASE + "/lab", { waitUntil: "domcontentloaded" });
     await page.waitForSelector("[aria-label='lab sections'] [role=tab]", { timeout: 90000 });
-    ok(scheme + ": app shell loads", (await page.getByRole("tab").count()) >= 3);
+    ok(scheme + ": app shell loads", (await page.getByRole("tab").count()) >= 2);
 
     if (scheme === "light") {
       // No credentials anywhere client-visible: check for env var names plus the
@@ -451,9 +454,10 @@ async function main() {
         await page.locator("[role=dialog].savedialog button[type=submit]").click();
         await page.waitForFunction(() => /saved/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 120000 });
-        await page.getByRole("tab", { name: "Saved", exact: true }).click();
+        await page.locator("header a.savedbtn").click();   // the saved-work manager, over the lab
         await page.waitForTimeout(1500);
         const inList = await page.locator("text=e2e dialog cohort").count();
+        await page.keyboard.press("Escape");
         savedOk = !!prefilled && closedOnEsc && inList > 0;
         saveFlow = "prefilled '" + prefilled + "', esc closed: " + closedOnEsc + ", in Cohorts: " + (inList > 0);
       } catch (e) { saveFlow = String(e.message).split("\n")[0]; }
@@ -463,11 +467,11 @@ async function main() {
       // DIFFERENTLY-named cohort first, so replacement is provable: the bar now
       // derives the name from the draft, so two Analyze runs share a name and
       // counting cohorts could not tell replace from overwrite.
-      await page.getByRole("tab", { name: "Saved", exact: true }).click();
-      await page.waitForSelector(".pick [role=checkbox]", { timeout: 240000 });
+      await page.locator("header a.savedbtn").click();   // the saved-work manager, over the lab
+      await page.waitForSelector("[role=checkbox].cohortpick", { timeout: 240000 });
       let seeded = [];
       try {
-        await page.locator(".pick [role=checkbox]").nth(0).check();
+        await page.locator("[role=checkbox].cohortpick").nth(0).check();
         await page.locator("button:has-text('Analyze selected')").click();
         await page.waitForSelector(".cohortbox", { timeout: 300000 });
         seeded = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
@@ -845,15 +849,15 @@ async function main() {
       for (const [n, q] of [["e2e pick KRAS " + scheme, "KRAS: MUT"], ["e2e pick TP53 " + scheme, "TP53: MUT"]])
         await page.context().request.post(BASE + "/api/artifacts", { data: { kind: "cohort", name: n, definition: { study: "msk_chord_2024", all: [{ kind: "oql", q }] } } });
       await page.goto(BASE + "/lab");
-      await page.getByRole("tab", { name: "Saved", exact: true }).click();
-      await page.waitForSelector(".pick [role=checkbox]", { timeout: 240000 });
+      await page.locator("header a.savedbtn").click();   // the saved-work manager, over the lab
+      await page.waitForSelector("[role=checkbox].cohortpick", { timeout: 240000 });
       ok("cohort rows use checkboxes, not per-row add links",
         (await page.locator("button:has-text('add to analysis')").count()) === 0,
-        (await page.locator(".pick [role=checkbox]").count()) + " selectable cohorts");
+        (await page.locator("[role=checkbox].cohortpick").count()) + " selectable cohorts");
       ok("submit is refused with nothing ticked",
         await page.locator("button:has-text('Analyze selected')").isDisabled());
-      await page.locator(".pick [role=checkbox]").nth(0).check();
-      await page.locator(".pick [role=checkbox]").nth(1).check();
+      await page.locator("[role=checkbox].cohortpick").nth(0).check();
+      await page.locator("[role=checkbox].cohortpick").nth(1).check();
       await page.locator("button:has-text('Analyze selected')").click();
       let together = [], startViews = -1;
       try {
@@ -1887,7 +1891,7 @@ async function main() {
         await dlg.waitFor({ state: "detached", timeout: 60000 });
       };
       // the library: no analysis around it, so the study is chosen
-      await sp.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
+      await sp.goto(BASE + "/saved?tab=cohorts", { waitUntil: "domcontentloaded" });
       await sp.locator(".newlistcohort").click();
       const lib = sp.locator("[role=dialog].listcohortdialog");
       await lib.waitFor({ timeout: 30000 });
@@ -1899,7 +1903,7 @@ async function main() {
       const art = ((await (await ctx.request.get(BASE + "/api/artifacts?kind=cohort")).json()).artifacts || []).find((a) => a.name === libName);
       const leaf = art?.definition?.all?.[0] || {};
       steps.inLibrary = !!art && leaf.kind === "patientList" && /^[0-9a-f-]{36}$/.test(leaf.set || "") && art.definition.study === "msk_chord_2024";
-      steps.noExamplesInSaved = (await sp.locator("h2.savedsec", { hasText: /^Examples/ }).count()) === 0;
+      steps.noExamplesInSaved = (await sp.locator("h2", { hasText: /^Examples/ }).count()) === 0;
       // the analysis's cohort panel, with no view yet
       await sp.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify({ dsl: "2.8", study: "msk_chord_2024", cohorts: {}, views: [] })).toString("base64url"), { waitUntil: "domcontentloaded" });
       await sp.locator(".fromlist").click();

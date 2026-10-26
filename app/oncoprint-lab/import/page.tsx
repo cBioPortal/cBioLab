@@ -14,7 +14,6 @@ export default function ImportPage() {
       <header>
         <h1>cbio-lab</h1>
         <span className="sub">oncoprint from pasted data — the portal&apos;s Oncoprinter shape, this engine</span>
-        <span className="spacer" />
         <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>interactive lab →</a>
         <a href="/oncoprint-lab/cli" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>command line →</a>
       </header>

@@ -54,7 +54,7 @@ export interface AnalysisCtx {
   explore: ExploreResult | null;
   fetchExplore: (draftOverride?: CohortDef | null, studiesOverride?: string[] | string, attrsOverride?: string[]) => void;
   genesFor: number | null;
-  goTab: (t: "explore" | "cohorts" | "analysis" | "examples") => void;
+  goTab: (t: "explore" | "analysis" | "examples") => void;
   menuOpenRef: React.RefObject<Map<string, boolean>>;
   /** open "+ Add cohort" for the view at vi */
   openCohortChooser: (vi: number) => void;
@@ -100,7 +100,7 @@ export interface AnalysisCtx {
   splitCohortBy: (cohort: string, spec: SplitSpec) => Promise<void>;
   splitsFlat: () => Record<string, PartitionDef>;
   studyNames: Map<string, string>;
-  tab: "explore" | "cohorts" | "analysis" | "examples";
+  tab: "explore" | "analysis" | "examples";
   upgradeNote: DocUpgrade | null;
   viewCtx: Omit<ViewCtx, "result">;
   viewIds: number[];

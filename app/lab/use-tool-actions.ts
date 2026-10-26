@@ -16,7 +16,7 @@ import type { QueryClient } from "@tanstack/react-query";
 export interface ToolActionsPage {
   doc: AnalysisDoc;
   docs: DocStore;
-  goTab: (t: "explore" | "cohorts" | "analysis" | "examples") => void;
+  goTab: (t: "explore" | "analysis" | "examples") => void;
   persistSpaces: (name: string, doc: AnalysisDoc) => Promise<void>;
   queryClient: QueryClient;
   setError: React.Dispatch<React.SetStateAction<string | null>>;

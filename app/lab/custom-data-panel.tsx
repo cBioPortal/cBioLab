@@ -1,32 +1,23 @@
 "use client";
 // The Custom data dialog: upload a table of curated annotations and check how it matched the
-// explored studies (Add data), and see, export or delete what is stored on the server, the only
-// place uploads live (Manage). Owns its own draft state, so typing into the paste box never
+// explored studies. What is stored is seen, exported, shared and deleted in the saved-work manager
+// (app/_saved/data-panel.tsx). Owns its own draft state, so typing into the paste box never
 // re-renders the analysis page (see "Keystrokes stay in the field" in docs/UI.md). Which custom
 // attributes are drawn as charts is chosen in Explore's Add chart dialog, like any other attribute.
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ShareDialog, sharingLabel } from "./share-dialog.tsx";
-import { useGroups } from "./use-groups.ts";
 import {
-  onCustomDataChange, loadCustomData, parseUpload, buildDataset, datasetToTsv, serverState, requestLogin, saveToServer,
-  deleteServerDataset, shareServerDataset, serverBySlug, fetchServerVersion, resolveIds, exampleUpload, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
+  onCustomDataChange, loadCustomData, parseUpload, buildDataset, serverState, requestLogin, saveToServer,
+  serverBySlug, resolveIds, exampleUpload, type ParsedUpload, type ResolveResponse, type ServerState
 } from "./custom-data-client.ts";
-import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { LIMITS } from "../../lib/custom-data-names.ts";
-import { Download, LoaderCircle, Share2, Trash2, Users } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Input } from "../_ui/input";
-import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { Textarea } from "../_ui/textarea";
-import { cn } from "../../lib/cn";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { TB } from "../_ui/toolbar.ts";
-import { encodeParam } from "../portal/page-doc.ts";
-import { DOC_VERSION } from "../../lib/doc-version.ts";
-
-/** a tab of the custom-data manager */
-const TAB = "h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary";
+import { useSaved } from "../_saved/saved-context.tsx";
 
 /** what an upload looks like, shown in the empty paste box */
 const PLACEHOLDER = "PATIENT_ID\tMET_SITE\tKPS\nP-0001\tBrain\t80\nP-0002\tLiver\t90";
@@ -43,7 +34,7 @@ export function useCustomDataState(): ServerState {
   return useSyncExternalStore(onCustomDataChange, serverState, serverState);
 }
 
-/** the dialog's two tabs */
+/** where Custom data opens: adding an upload here, or the saved uploads in the saved-work manager */
 export type CustomDataTab = "add" | "manage";
 
 function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name: string) => void }) {
@@ -247,107 +238,23 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
   );
 }
 
-/** A new analysis of the patients with a row in this upload, pinned to its latest version */
-function analyzeUploadHref(d: DatasetMeta, studies: string[]): string {
-  const where = studies.length > 1 ? { studies } : { study: studies[0] };
-  const doc = { dsl: DOC_VERSION, study: studies[0], uploads: [{ as: d.slug, dataset: d.id, version: d.latestVersion }],
-    cohorts: { [d.name]: { ...where, all: [{ kind: "upload", dataset: "custom:" + d.slug }] } }, views: [] };
-  return "/lab?" + new URLSearchParams({ tab: "analysis", doc: encodeParam(doc) }).toString();
-}
-
-function SavedCustomData({ onChanged, onAdd }: { onChanged: () => void; onAdd: () => void }) {
-  const server = useCustomDataState();
-  const [serverBusy, setServerBusy] = useState<string | null>(null);
-  const [serverErr, setServerErr] = useState<string | null>(null);
-  const serverAct = async (label: string, f: () => Promise<unknown>) => {
-    setServerBusy(label); setServerErr(null);
-    try { await f(); onChanged(); } catch (e) { setServerErr(String((e as Error).message || e)); }
-    finally { setServerBusy(null); }
-  };
-  const removeServer = (d: DatasetMeta) => {
-    if (!confirm("Delete “" + d.name + "” from the server? Analyses pinned to it will be refused, with the date it was deleted.")) return;
-    void serverAct("deleting…", () => deleteServerDataset(d.id));
-  };
-  const exportServer = (d: DatasetMeta) => serverAct("exporting…", async () => download(await fetchServerVersion(d.id, d.latestVersion)));
-  const groups = useGroups(server.user?.id ?? null);
-  const [sharing, setSharing] = useState<DatasetMeta | null>(null);
-
-  const download = (d: StoredDataset) => {
-    const url = URL.createObjectURL(new Blob([datasetToTsv(d)], { type: "text/tab-separated-values" }));
-    const a = document.createElement("a"); a.href = url; a.download = d.id + ".tsv"; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
-  return (
-    <section className="cd-saved">
-      <h4>Saved datasets{server.datasets.length ? " (" + server.datasets.length + ")" : ""}</h4>
-      <p className="meta flush">
-        Yours, and others' shared with you. A saved version never changes; an analysis that uses one is
-        pinned to it. Each holds patient-level values: share one only with people entitled to them.
-      </p>
-      {server.datasets.length ? (
-        <div className="attrtablewrap" style={{ maxHeight: "30vh" }}>
-          <table className="attrtable customlist">
-            <thead><tr><th>Dataset</th><th>Columns</th><th>Rows</th><th>Studies</th><th></th></tr></thead>
-            <tbody>
-              {server.datasets.map((d) => {
-                const v = d.versions.find((x) => x.version === d.latestVersion);
-                return (
-                  <tr key={d.id} style={{ cursor: "default" }}>
-                    <td><b>{d.name}</b> <span className="meta">custom:{d.slug} · {d.level} level · v{d.latestVersion}
-                      {d.versions.length > 1 ? " of " + d.versions.length : ""} · {new Date(d.updatedAt).toLocaleDateString()}
-                      {" · "}{d.rights.share ? "shared with " + sharingLabel(d.sharing) : "from " + d.ownerEmail}</span></td>
-                    <td className="meta">{v?.columns.map((c) => c.name).join(", ")}</td>
-                    <td className="meta">{v?.rowCount.toLocaleString()} {d.level}s</td>
-                    <td className="meta">{v?.studies.join(", ")}</td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      {v && v.studies.length > 0 && <><Button variant="outline" size="sm" className={TB} asChild>
-                        <a href={analyzeUploadHref(d, v.studies)} title={"start an analysis with one cohort: the " + v.rowCount.toLocaleString() + " " + d.level + "s' patients with a row in this upload"}>
-                          <Users />Analyze</a></Button>{" "}</>}
-                      <Button variant="outline" size="sm" className={TB} disabled={!!serverBusy} onClick={() => exportServer(d)}><Download />Export</Button>{" "}
-                      {d.rights.share && <><Button variant="outline" size="sm" className={TB} disabled={!!serverBusy} onClick={() => setSharing(d)}><Share2 />Share…</Button>{" "}
-                        <Button variant="outline" size="sm" className={cn(TB, "text-destructive hover:text-destructive")} disabled={!!serverBusy} onClick={() => removeServer(d)}><Trash2 />Delete</Button></>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : <p className="meta">Nothing saved yet. <Button variant="link" size="inline" className="text-md" onClick={onAdd}>Add data</Button></p>}
-      {serverBusy && <p className="meta"><span className="spinner" /> {serverBusy}</p>}
-      {serverErr && <p className="error">{serverErr}</p>}
-      {sharing && <ShareDialog kind="custom dataset" name={sharing.name} sharing={sharing.sharing}
-        groups={groups.groups} groupsError={groups.error}
-        onSave={async (s) => { await shareServerDataset(sharing.id, s); onChanged(); }}
-        onClose={() => setSharing(null)} />}
-    </section>
-  );
-}
-
 /**
- * The Custom data dialog, opened on one of its tabs (`tab`), closed with null. Uploads match their
- * ids against the explored studies (`studies`); `onChanged` re-runs Explore so a new or deleted
- * dataset's attributes appear or go.
+ * The Custom data dialog: an upload matched against the explored studies (`studies`), open while
+ * `tab` is "add". Once saved it is managed with the rest of the reader's saved work, which opens on
+ * its Custom data tab; `onChanged` re-runs Explore so the new dataset's attributes appear.
  */
 export default function CustomDataManager({ tab, setTab, studies, onChanged }: {
   tab: CustomDataTab | null; setTab: (t: CustomDataTab | null) => void; studies: string[]; onChanged: () => void;
 }) {
   const server = useCustomDataState();
-  const [added, setAdded] = useState<string | null>(null);
-  useEffect(() => { if (!tab) setAdded(null); }, [tab]);
+  const saved = useSaved();
   return (
-    <Dialog open={!!tab} onOpenChange={(open) => { if (!open) setTab(null); }}>
+    <Dialog open={tab === "add"} onOpenChange={(open) => { if (!open) setTab(null); }}>
     <DialogContent aria-describedby={undefined}
       className="customdatamanager flex h-[90vh] w-[94vw] max-w-[94vw] flex-col gap-3 overflow-auto p-6 sm:max-w-[94vw]">
-      <DialogHeader><DialogTitle className="text-base">Custom data</DialogTitle></DialogHeader>
-      <Tabs value={tab || "add"} onValueChange={(v) => setTab(v as CustomDataTab)}>
-        <TabsList variant="line" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
-          <TabsTrigger value="add" className={TAB}>Add data</TabsTrigger>
-          <TabsTrigger value="manage" className={TAB}>
-            Manage{server.unlocked && server.datasets.length ? " (" + server.datasets.length + ")" : ""}</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <DialogHeader><DialogTitle className="flex items-baseline gap-2.5 text-base">Add custom data
+        {server.unlocked && <Button variant="link" size="inline" className="ml-auto text-sm font-normal" onClick={() => { setTab(null); saved.open("data"); }}>
+          your uploads{server.datasets.length ? " (" + server.datasets.length + ")" : ""}</Button>}</DialogTitle></DialogHeader>
       <div className="customdata">
         <p className="note flush">
           Your own annotations (a curated metastasis site, a field extracted from the record), used like any clinical
@@ -362,13 +269,9 @@ export default function CustomDataManager({ tab, setTab, studies, onChanged }: {
             <Button size="sm" onClick={requestLogin}>Sign in</Button>
           </div>
         )}
-        {server.unlocked && tab === "add" && <AddCustomData studies={studies}
-          onAdded={(name) => { setAdded(name); onChanged(); setTab("manage"); }} />}
-        {server.unlocked && tab === "manage" && <>
-          {added && <p className="cd-added">Added &ldquo;{added}&rdquo;. Its attributes are charted in Explore; choose which
-            under <b>+ Add chart → Custom data</b>.</p>}
-          <SavedCustomData onChanged={onChanged} onAdd={() => setTab("add")} />
-        </>}
+        {server.unlocked && <AddCustomData studies={studies}
+          onAdded={(name) => { onChanged(); setTab(null);
+            saved.open("data", "Added “" + name + "”. Its attributes are charted in Explore; choose which under + Add chart → Custom data."); }} />}
       </div>
       <DialogFooter className="mt-auto">
         <DialogClose asChild><Button>Done</Button></DialogClose>

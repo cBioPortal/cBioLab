@@ -133,7 +133,9 @@ header {
   padding: 0.8rem 1.4rem; border-bottom: 1px solid var(--line); background: var(--card);
 }
 header h1 { font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-lg); font-weight: 600; margin: 0; }
-header .sub { color: var(--muted); font-size: var(--t-md); }
+/* the page's description takes the room the links leave, cut short rather than pushing them to a new line */
+header .sub { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--t-md); }
+@media (max-width: 1100px) { header .sub { display: none; } header h1 { margin-right: auto; } }
 .spacer { flex: 1; }
 /* which commit this deployment runs — apparatus, a step below everything else */
 .build-stamp { padding: var(--s2) 1.4rem var(--s4); color: var(--muted); font-size: var(--t-xs); text-align: right; }
@@ -641,7 +643,6 @@ main.analysis-main { max-width: min(132rem, 100%); }
 /* ---------------- Saved tab ---------------- */
 .flush, .card h2.flush, dialog h3.flush { margin: 0; }
 .savedbar { align-items: center; gap: var(--s2); margin-bottom: var(--s0); }
-.card h2.savedsec { margin-top: var(--s4); }
 /* a list of named things, one per row, ruled between */
 .listrow { border-top: 1px solid var(--line); padding: var(--s3) 0; }
 .listrow-head { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: baseline; }

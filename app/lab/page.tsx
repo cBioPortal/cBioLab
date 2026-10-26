@@ -22,10 +22,10 @@ import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
 import { useExamplesUrl } from "./examples-tab.tsx";
 import { useAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Save, Upload } from "lucide-react";
 import { api } from "./api.ts";
 import { useSavedArtifacts } from "./use-saved.ts";
-import { SavedTab } from "./saved-tab.tsx";
+import { useSaved, useSavedActions } from "../_saved/saved-context.tsx";
 import { ExamplesTab } from "./examples-tab.tsx";
 import { DrawAtWidth } from "./figure.tsx";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
@@ -46,9 +46,9 @@ import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { PAGE_TAB } from "../_ui/toolbar.ts";
 
-const TABS = ["explore", "cohorts", "analysis", "examples"] as const;
-/** the tabs the lab's own bar shows; Examples opens from the site header */
-const TAB_LABELS: [typeof TABS[number], string][] = [["explore", "Explore"], ["cohorts", "Saved"], ["analysis", "Analysis"]];
+const TABS = ["explore", "analysis", "examples"] as const;
+/** the tabs the lab's own bar shows; Examples opens from the site header, saved work from its "saved work" */
+const TAB_LABELS: [typeof TABS[number], string][] = [["explore", "Explore"], ["analysis", "Analysis"]];
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -60,7 +60,8 @@ type SearchParams = { [key: string]: string | string[] | undefined };
  * from ?tab=analysis — no longer matches what the client says the first
  * render should be, so React discards and re-renders the whole tree, which is
  * the flash. Reading the identical resolved value on both sides sidesteps it.
- * An explicit ?tab= wins; a shared ?doc= link without one implies Analysis.
+ * An explicit ?tab= wins; a shared ?doc= link without one implies Analysis. The tab that was
+ * "Saved" (?tab=cohorts, in links from before) is the saved-work manager now: Explore, with it open.
  */
 function tabFromParams(sp: SearchParams): typeof TABS[number] {
   const wanted = typeof sp.tab === "string" ? sp.tab : null;
@@ -91,24 +92,7 @@ function AddCohortBar({ existing, target, ready, error, onAdd, onCancel }: {
   const [name, setName] = useState(() => {
     for (let i = existing.length + 1; ; i++) if (!existing.includes("cohort " + i)) return "cohort " + i;
   });
-  const cancel = useRef(onCancel);
-  cancel.current = onCancel;
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && !(e.target as HTMLElement)?.closest?.("details[open]")) cancel.current(); };
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, []);
-  // Explore's own sticky filter bar sits just below this one; this bar can wrap, so it says how tall it is
-  const bar = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = bar.current, host = el?.parentElement;
-    if (!el || !host) return;
-    const set = () => host.style.setProperty("--addbar-h", el.getBoundingClientRect().height + "px");
-    set();
-    const ro = new ResizeObserver(set);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const bar = useOverBar(onCancel);
   const clash = existing.includes(name.trim());
   return (
     <div className="addcohortbar" ref={bar}>
@@ -129,6 +113,50 @@ function AddCohortBar({ existing, target, ready, error, onAdd, onCancel }: {
   );
 }
 
+/** The bar across the top of Explore while it edits a saved cohort's filters: save them over it, or cancel. */
+function EditCohortBar({ name, locked, ready, error, onSave, onCancel }: {
+  name: string; locked: boolean; ready: boolean; error?: string | null; onSave: () => Promise<void>; onCancel: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const bar = useOverBar(onCancel);
+  return (
+    <div className="addcohortbar" ref={bar}>
+      <strong>Editing “{name}”</strong>
+      <span className="meta">change its studies and filters below{locked ? " — saving unlocks it, so it follows its new definition" : ""}; its name, note and splits stay</span>
+      <span className="spacer" />
+      <Button disabled={!ready || saving} onClick={async () => { setSaving(true); try { await onSave(); } finally { setSaving(false); } }}
+        title={ready ? "save these filters over “" + name + "” in your library" : "select a study first"}>
+        {saving ? <span className="spinner" /> : <Save />}Save changes
+      </Button>
+      <Button variant="outline" onClick={onCancel} title="close without saving (Esc)">Cancel</Button>
+      {error && <p className="error fullrow flush">{error}</p>}
+    </div>
+  );
+}
+
+/** Esc cancels a bar over Explore, and the bar tells Explore's own sticky filter bar how tall it is. */
+function useOverBar(onCancel: () => void) {
+  const cancel = useRef(onCancel);
+  cancel.current = onCancel;
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && !(e.target as HTMLElement)?.closest?.("details[open]")) cancel.current(); };
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, []);
+  // Explore's own sticky filter bar sits just below this one; this bar can wrap, so it says how tall it is
+  const bar = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = bar.current, host = el?.parentElement;
+    if (!el || !host) return;
+    const set = () => host.style.setProperty("--addbar-h", el.getBoundingClientRect().height + "px");
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return bar;
+}
+
 export default function AnalysisPage() {
   // Read through useSearchParams, never `use(searchParams)`: every syncUrl() is a
   // history.replaceState, which hands the page a NEW searchParams promise, and
@@ -141,7 +169,7 @@ export default function AnalysisPage() {
   // the ?doc= link as the page was opened with it: by the time the mount effect reads it, the
   // document store may already have written the URL
   const openedWith = useRef(typeof sp.doc === "string" ? sp.doc : null);
-  const [tab, setTab] = useState<"explore" | "cohorts" | "analysis" | "examples">(() => tabFromParams(sp));
+  const [tab, setTab] = useState<typeof TABS[number]>(() => tabFromParams(sp));
   /** set when an opened document was written for an older version and has been upgraded */
   const [upgradeNote, setUpgradeNote] = useState<DocUpgrade | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -340,20 +368,48 @@ export default function AnalysisPage() {
   // ---- the page's actions, each group in its own hook; later groups use earlier ones ----------
   const toolActions = useToolActions({ doc, docs, goTab, persistSpaces, queryClient, setError, setStudy, setValidating, study });
   const { commitDoc, proposePartition, saveAs, validateDoc } = toolActions;
-  const library = useLibrary({ docs, evalDef, goTab, persist, saved, sharedSaved: savedArtifacts.sharedCohorts, setError, setStudy, study });
-  const { analyzeExampleCohort, analyzePicked, cohortsSubTab, docLink, exEvals, exQuery, exTag, picked, previewExample, runDocExample, saveExample, setCohortsSubTab, setExQuery, setExTag, setPicked, togglePick } = library;
+  const library = useLibrary({ docs, evalDef, goTab, persist, setError, setStudy, study });
+  const { analyzeExampleCohort, docLink, exEvals, exQuery, exTag, previewExample, runDocExample, saveExample, setExQuery, setExTag } = library;
   // where the gallery examples run (EXAMPLES_URL): here, or a deployment that holds their studies
   const { examplesUrl, examplesUrlError } = useExamplesUrl();
   const exampleLink = (ex: DslExample) => examplesUrl ? examplesUrl + "/lab?doc=" + docParam(ex.doc) : docLink(ex.doc);
   const workspace = useWorkspace({ canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study,
     sharedSpaces: savedArtifacts.sharedWorkspaces,
     saveShared: async (id, name, d, version) => savedArtifacts.saveShared("workspace", id, name, await withListsStored(d), version) });
-  const { sharedOpen, openShared, confirmSharedSave, analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
+  const { sharedOpen, openShared, confirmSharedSave, analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openDocument, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
   const savedReady = loggedIn && !savedArtifacts.cohortsState.pending && !savedArtifacts.cohortsState.error;
   const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, storeLists, study });
   const { lockCohorts, unlockCohort, unlockAll, analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells } = cohortEdits;
-  const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study, tab });
-  const { setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
+  const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
+  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
+  // The saved-work manager, opened over this page, opens what is chosen in it here, in place
+  const savedWork = useSaved();
+  /** one of the reader's saved cohorts open in Explore to change its filters; false while their list has not arrived */
+  const editSavedCohort = (id: string): boolean => {
+    const own = Object.entries(saved).find(([, c]) => c.id === id);
+    if (own) openEditCohort({ id, name: own[0], def: own[1].def });
+    return !!own;
+  };
+  useSavedActions({ openDoc: openDocument, openShared, showClauseData, onDataChanged: () => fetchExplore(), addData: () => openCustomManager("add"),
+    editCohort: editSavedCohort });
+  // links into it: ?tab=cohorts (the lab's Saved tab, before the manager) opens it; ?shared=<id> opens
+  // that shared analysis, and ?editCohort=<id> that saved cohort in Explore, once the list holding it has arrived
+  const sharedParam = useRef(typeof sp.shared === "string" ? sp.shared : null);
+  const editParam = useRef(typeof sp.editCohort === "string" ? sp.editCohort : null);
+  useEffect(() => {
+    if (!editParam.current || !editSavedCohort(editParam.current)) return;
+    editParam.current = null;
+    const u = new URL(location.href);
+    u.searchParams.delete("editCohort");
+    history.replaceState(history.state, "", u.pathname + u.search + u.hash);
+  }, [saved]); // eslint-disable-line react-hooks/exhaustive-deps -- the param is read once, when the list holding it arrives
+  useEffect(() => { if (sp.tab === "cohorts") savedWork.open("cohorts"); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, as the page opens
+  useEffect(() => {
+    const id = sharedParam.current;
+    if (!id || !savedArtifacts.sharedWorkspaces.some((x) => x.id === id)) return;
+    sharedParam.current = null;
+    openShared(id);
+  }, [savedArtifacts.sharedWorkspaces]); // eslint-disable-line react-hooks/exhaustive-deps -- openShared reads the same list
   const openTab = (t: typeof TABS[number]) => { goTab(t); if (t === "explore" && !explore) fetchExplore(); };
   const viewOptions = useViewOptions({ cat, catLoading, doc, explore, exploreBusy, result, trackAttrs, trackAttrsLoading, studies });
   const { VIEW_KINDS, assayOptions, attrsLoading, cantDrawCohort, catalogAttrs, contProfile, drawsOwnHead, geneChoices, numericAttrs, profileOptions, profileCatalog, viewAttrs, viewEvents, viewGenes } = viewOptions;
@@ -370,7 +426,7 @@ export default function AnalysisPage() {
   // what the page offers the researcher's AI assistant (app/lab/agent-tools.ts), current every render
   const webmcp = useLabTools({
     doc, result, busy, error, tab, study, savedAs: analysisSaved ? doc.title || null : null,
-    validate: validateDoc, proposePartition, commit: commitDoc, goTab: (t) => goTab(t as typeof TABS[number]),
+    validate: validateDoc, proposePartition, commit: commitDoc, goTab: (t) => t === "saved" ? savedWork.open("cohorts") : goTab(t as typeof TABS[number]),
     runExample: runDocExample, examplesElsewhere: examplesUrl, exampleLink, save: saveAs, link: docLink,
     exploreStudies: exSel.current, draft: parseDraft(), explore, exploreBusy,
     setExploreStudies, addClause, removeDraftClause, clearDraft, analyzeDraft,
@@ -423,8 +479,12 @@ export default function AnalysisPage() {
 
         {/* ================= Explore tab ================= */}
         {(tab === "explore" || addMode) && <div className={addMode ? "exploremodal" : undefined}
-          role={addMode ? "dialog" : undefined} aria-modal={addMode ? true : undefined} aria-label={addMode ? "add a cohort to " + addMode.target.title : undefined}>
-          {addMode && <AddCohortBar existing={Object.keys(doc.cohorts || {})} target={addMode.target.title} ready={exStudies.length > 0} error={exMsg}
+          role={addMode ? "dialog" : undefined} aria-modal={addMode ? true : undefined}
+          aria-label={addMode ? (addMode.target ? "add a cohort to " + addMode.target.title : "edit the saved cohort " + addMode.editing.name) : undefined}>
+          {addMode?.editing && <EditCohortBar name={addMode.editing.name} locked={!!addMode.editing.def.lock} ready={exStudies.length > 0} error={exMsg}
+            onSave={async () => { const r = await saveEditedCohort(); if (r) savedWork.open("cohorts", "Saved changes to “" + r.name + "” — " + r.count.toLocaleString() + " patients."); }}
+            onCancel={closeAddCohort} />}
+          {addMode?.target && <AddCohortBar existing={Object.keys(doc.cohorts || {})} target={addMode.target.title} ready={exStudies.length > 0} error={exMsg}
             onAdd={addDraftToAnalysis} onCancel={closeAddCohort} />}
           <StudyPicker ctx={exploreCtx} />
           {/* Underneath study selection, and only present once there's something to
@@ -488,14 +548,6 @@ export default function AnalysisPage() {
           </>}
           </div>
         </div>}
-
-        {/* ================= Saved tab ================= */}
-        {tab === "cohorts" && <SavedTab login={customState} onLogin={requestLogin}
-          sub={cohortsSubTab} onSub={setCohortsSubTab}
-          picked={picked} onTogglePick={togglePick} onClearPicked={() => setPicked([])} onAnalyze={analyzePicked}
-          studies={studies} onNewFromList={async (name, def) => { await persist(name, def, null); }}
-          saved={savedArtifacts} onOpenWorkspace={openWorkspace} onOpenShared={openShared} onDeleteWorkspace={deleteWorkspace}
-          wsError={wsError} onCustomData={showClauseData} />}
 
         {/* ================= Examples tab ================= */}
         {tab === "examples" && <ExamplesTab tag={exTag} onTag={setExTag} query={exQuery} onQuery={setExQuery} busy={busy}
