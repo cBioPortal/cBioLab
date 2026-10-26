@@ -5,6 +5,7 @@ import { ExploreCharts } from "./explore-charts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
+import { decodeUrlJson } from "../../lib/url-json.ts";
 import type { SignInState } from "./list-cohort.tsx";
 import { useLabTools, LAB_TOOL_NAMES } from "./agent-tools.ts";
 import { AgentToolsMenu } from "../_agent/AgentToolsMenu.tsx";
@@ -310,7 +311,7 @@ export default function AnalysisPage() {
     try {
       const b64 = openedWith.current;
       if (b64) {
-        const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0))));
+        const d = decodeUrlJson<AnalysisDoc>(b64);
         if (d.study) { setStudy(d.study); setExStudies([d.study]); exSel.current = [d.study]; }
         docs.replace(d, { undoable: false });   // the link the page opened: the first step, not a new one
         if (tabRef.current === "explore") fetchExplore();
@@ -341,8 +342,7 @@ export default function AnalysisPage() {
     try {
       const q = new URLSearchParams(window.location.search);
       q.set("tab", nextTab || tabRef.current);
-      if (d) q.set("doc", btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
-        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
+      if (d) q.set("doc", docParam(d));
       docHistory.record("?" + q.toString(), push);
     } catch { /* URL state is a convenience, never a failure */ }
   };

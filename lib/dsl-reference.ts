@@ -1572,7 +1572,8 @@ the first time an analysis uses a server dataset. A \`custom:\` name with no pin
 browser that holds it.
 
 Sent to \`POST /api/analysis\`, edited by the researcher's assistant through the page's WebMCP tools, and encoded in shareable
-\`/analysis?doc=<base64url>\` links.
+\`/analysis?doc=<base64url>\` links: the base64url of the document's UTF-8 JSON opens as it is, and the app writes it
+deflated (\`1.<base64url>\`, \`lib/url-json.ts\`) to keep links short.
 
 ## Cohort definitions
 

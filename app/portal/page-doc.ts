@@ -1,12 +1,15 @@
 "use client";
 // A portal page's state is one ordinary analysis document — the page's cohorts and ALL its views —
-// carried in the URL as the lab carries its own (?doc=), plus the open tab (?tab=). The tabs are
-// the page's: each lists the indices of the views it shows, and opening one sends only that slice
-// as an analysis request, so the engine never sees a tab or more views than one run computes.
-// A setting changed on the page is an edit to that view in this document, so a shared link
-// reproduces it.
+// plus the open tab (?tab=). The tabs are the page's: each lists the indices of the views it shows,
+// and opening one sends only that slice as an analysis request, so the engine never sees a tab or
+// more views than one run computes. A setting changed on the page is an edit to that view in this
+// document, and the URL carries how the views differ from the page's defaults (?changes=,
+// page-changes.ts), so a shared link reproduces it. A link made before that carries the whole
+// document in ?doc=, and still opens.
 import { useEffect, useState } from "react";
 import type { AnalysisDoc, View } from "../../lib/types";
+import { encodeUrlJson, readUrlJson } from "../../lib/url-json.ts";
+import { applyChanges, pageChanges, type PageChanges } from "./page-changes.ts";
 
 /**
  * A control over a whole tab — the portal's gene chips over its Mutations tab: one choice that
@@ -36,18 +39,12 @@ export interface PageLayout {
   left: string[];
 }
 
-/** any JSON value as a URL parameter (base64url) */
-export function encodeParam(x: unknown): string {
-  return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(x)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
+/** any JSON value as a URL parameter (lib/url-json.ts) */
+export const encodeParam = (x: unknown): string => encodeUrlJson(x);
 /** a URL parameter written by encodeParam; null when there is none or it does not decode */
-export function decodeParam<T>(b64: string | null): T | null {
-  if (!b64) return null;
-  try { return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)))); }
-  catch { return null; }
-}
+export const decodeParam = <T,>(s: string | null): T | null => readUrlJson<T>(s);
 export const encodeDoc = (d: AnalysisDoc): string => encodeParam(d);
-export const decodeDoc = (b64: string | null): AnalysisDoc | null => decodeParam<AnalysisDoc>(b64);
+export const decodeDoc = (s: string | null): AnalysisDoc | null => decodeParam<AnalysisDoc>(s);
 
 /**
  * The document a link carries, if it is this page's: the same cohorts and the same kinds of view
@@ -87,22 +84,38 @@ export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left:
 }
 
 
+const param = (k: string): string | null => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
+
 /**
- * The page's document and open tab, kept in the URL: the link's document when it is this page's,
- * else the page's own defaults (and a note saying the link's could not be used).
+ * The page's document and open tab, kept in the URL: the page's defaults with the link's changes
+ * made to them when they were made on this layout, else the link's whole document when it is this
+ * page's, else the defaults (and a note saying the link's could not be used). `input` is what of
+ * the link's ?doc= the page is built from (the comparison page's cohorts), kept in the URL without
+ * the views; a page built from its query alone drops ?doc= once it writes its changes.
  */
-export function usePageDoc(fresh: PageLayout | null, linked: AnalysisDoc | null) {
+export function usePageDoc(fresh: PageLayout | null, linked: AnalysisDoc | null, input: AnalysisDoc | null = null) {
   const [doc, setDoc] = useState<AnalysisDoc | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [open, setOpen] = useState<string>(() => { try { return new URLSearchParams(window.location.search).get("tab") || ""; } catch { return ""; } });
+  const [open, setOpen] = useState<string>(() => param("tab") || "");
+  const [changes] = useState(() => readUrlJson<PageChanges>(param("changes")));
   const freshKey = fresh ? JSON.stringify(fresh.doc) : "";
   useEffect(() => {
     if (!fresh) return;
+    if (changes) {
+      const views = applyChanges(fresh.doc.views || [], changes);
+      setDoc(views ? { ...fresh.doc, views } : fresh.doc);
+      setNote(views ? null : "the settings in this link were made on another layout of this page, so its views are shown with their defaults");
+      return;
+    }
     const kept = compatible(linked, fresh.doc);
     setDoc(kept || fresh.doc);
     setNote(linked && linked.views && linked.views.length && !kept ? "the views in this link are not this page's own, so the page's are shown with their defaults" : null);
   }, [freshKey]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const update = (d: AnalysisDoc) => { setDoc(d); syncUrl({ doc: encodeDoc(d) }); };
+  const update = (d: AnalysisDoc) => {
+    setDoc(d);
+    const c = fresh ? pageChanges(fresh.doc.views || [], d.views || []) : null;
+    syncUrl({ changes: c ? encodeUrlJson(c) : null, doc: input ? encodeDoc(input) : null });
+  };
   const openTab = (k: string) => { setOpen(k); syncUrl({ tab: k }); };
   return { doc, note, open, update, openTab };
 }

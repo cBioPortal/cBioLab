@@ -5,7 +5,7 @@
 // there and in the database, so this page cannot skip one even by accident.
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { encodeSpec } from "../../../lib/lab-links.ts";
+import { encodeUrlJson } from "../../../lib/url-json.ts";
 import { withSplit, primaryCohorts, type Hypothesis } from "../../../lib/hypothesis.ts";
 import type { Campaign, Funnel, HypothesisRow } from "../../../lib/campaign.ts";
 import { installAgentTools } from "../agent-tools.ts";
@@ -24,7 +24,7 @@ type View = { campaign: Campaign; funnel: Funnel; prior: Record<string, Prior[]>
 const STEPS = ["Ask", "Propose", "Review", "Lock", "Test", "Report"] as const;
 const fmtP = (p?: number | null) => p == null ? "–" : p < 1e-3 ? p.toExponential(1) : p.toFixed(3);
 const labLink = (h: HypothesisRow, part?: "discovery" | "validation") =>
-  "/lab?doc=" + encodeSpec(part ? withSplit(h.spec.doc, part) : h.spec.doc);
+  "/lab?doc=" + encodeUrlJson(part ? withSplit(h.spec.doc, part) : h.spec.doc);
 const asHyp = (h: HypothesisRow): Hypothesis => ({ statement: h.statement, ...h.spec });
 
 function testLabel(h: HypothesisRow): string {

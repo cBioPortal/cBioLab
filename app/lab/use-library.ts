@@ -8,6 +8,7 @@ import type { AnalysisDoc, TemplateDoc, CohortDef } from "../../lib/types.ts";
 import type { DslExample } from "../../lib/dsl-reference.ts";
 import { DOC_VERSION } from "../../lib/doc-version.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
+import { encodeUrlJson } from "../../lib/url-json.ts";
 
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort } from "./use-saved.ts";
@@ -15,10 +16,9 @@ import type { SavedCohort } from "./use-saved.ts";
 const IMMUNO_EVENT: any = { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } };
 
 interface Example { name: string; desc: string; def: CohortDef }
-/** A document as a ?doc= value: base64url of its UTF-8 JSON, as the page reads it back. */
+/** A document as a ?doc= value (lib/url-json.ts), as the page reads it back. */
 export function docParam(d: AnalysisDoc | TemplateDoc): string {
-  return btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(d))))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return encodeUrlJson(d);
 }
 
 export const EXAMPLES: Example[] = [

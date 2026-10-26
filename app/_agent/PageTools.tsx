@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { exposeTools, type AgentTool } from "../../lib/webmcp.ts";
 import { REPRODUCTIONS } from "../../lib/reproductions.ts";
 import { encodeSpec } from "../../lib/lab-links.ts";
+import { encodeUrlJson } from "../../lib/url-json.ts";
 import { AgentToolsMenu } from "./AgentToolsMenu.tsx";
 
 type Kind = "reproductions" | "provenance" | "oncoprint-lab" | "rationale" | "datasets" | "verification";
@@ -33,7 +34,7 @@ function toolsFor(kind: Kind, spec: unknown): { tools: AgentTool[]; rows: [strin
         inputSchema: { type: "object", required: ["slug"], properties: { slug: { type: "string" } } },
         run: async ({ slug }) => {
           const r = find(slug);
-          setTimeout(() => location.assign("/lab?doc=" + encodeSpec(r.doc)), 300);
+          setTimeout(() => location.assign("/lab?doc=" + encodeUrlJson(r.doc)), 300);
           return `Opening "${r.title}" in /lab. Once it loads, use analysis_get_results there.`;
         } }
     ];

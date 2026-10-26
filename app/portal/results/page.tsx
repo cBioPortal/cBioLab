@@ -4,7 +4,8 @@
 // the genes with the profiled rest. What is
 // queried is one study (?study=) or several (?studies=a,b), narrowed by Explore's filters
 // (?filters=) or not; ?genes= is the query, as OQL. The page's state — every setting changed on
-// it — is one analysis document in ?doc= (page-doc.ts), built by results-layout.ts.
+// it — is one analysis document built by results-layout.ts, whose changes travel in ?changes=
+// (page-doc.ts).
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PortalTabs } from "../PortalTabs";

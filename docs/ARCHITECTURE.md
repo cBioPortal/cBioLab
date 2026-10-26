@@ -295,6 +295,13 @@ The map of the code: what each part does, where it lives, and the one place each
   `use-explore.ts` (keyed by everything that decides the answer, so a superseded request is
   cancelled and can never land; `e2e-lab-races.cjs` holds requests to prove it). The standalone query-builder (`/`) and interactive oncoprint (`/oncoprint`)
   demo pages were retired once the Analysis app subsumed them.
+- **Links (`lib/url-json.ts`)** — a document in a URL (`?doc=`, and every JSON parameter) is written
+  `1.<base64url>`: the JSON raw-deflated, about half the plain form's length on the gallery and less on
+  large documents, readable by any zlib. The plain base64url JSON of
+  older links, scripts and hand-made links still opens. The portal pages (`app/portal/`) carry only how their
+  views differ from the page's defaults (`?changes=`, `page-changes.ts`), tied to the kinds of the
+  page's views in order, so changes made on another layout are refused and said so rather than
+  applied to the wrong view; the defaults themselves are rebuilt from the query.
 - **The homepage (`/`, `app/_home/`)** — cBioPortal's: choose studies, then **Explore selected
   studies** (the lab's Explore, `/lab?tab=explore&study=a,b`) or **Query by gene** (the gene query
   dialog, whose Submit opens the Results page). One study chooser serves it, Explore's picker and

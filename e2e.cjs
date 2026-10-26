@@ -37,6 +37,7 @@ async function misalignedControls(p, scope) {
 }
 
 async function main() {
+  const { decodeUrlJson } = await import("./lib/url-json.ts");
   const browser = await launch();
   const results = [];
   const ok = (name, cond, extra) =>
@@ -783,7 +784,7 @@ async function main() {
         await page.locator(".undo-error").first().click();
         await page.waitForSelector(".onco-legend", { timeout: 120000 });
         const errLeft = await page.locator(".error").filter({ hasText: "NOT_A_PROFILE" }).count();
-        const docBack = await page.evaluate(() => JSON.parse(atob((new URLSearchParams(location.search).get("doc") || "").replace(/-/g, "+").replace(/_/g, "/"))));
+        const docBack = decodeUrlJson(new URL(page.url()).searchParams.get("doc") || "");
         undoOk = grew === 1 && errLeft === 0 && !JSON.stringify(docBack).includes("NOT_A_PROFILE");
         undoWhat = "history +" + grew + ", error after undo: " + errLeft + ", document back: " + !JSON.stringify(docBack).includes("NOT_A_PROFILE");
       } catch (e) { undoWhat = String(e.message).split("\n")[0]; }
@@ -1386,7 +1387,7 @@ async function main() {
       views: [{ kind: "riskmodel", cohorts: ["NSCLC"], runs: 2 }] };
     const b64 = Buffer.from(JSON.stringify(doc)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     const fig = page.locator("svg[aria-label^='Risk model']");
-    const urlDoc = () => { const d = new URL(page.url()).searchParams.get("doc") || ""; return JSON.parse(Buffer.from(d.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8")); };
+    const urlDoc = () => decodeUrlJson(new URL(page.url()).searchParams.get("doc") || "");
     try {
       await page.goto(BASE + "/lab?tab=analysis&doc=" + b64, { waitUntil: "domcontentloaded" });
       await fig.waitFor({ timeout: 240000 });
@@ -1596,6 +1597,10 @@ async function main() {
       await settle();
       const t1 = await tableCount(), chip = await page.locator(".dt-chips").innerText().catch(() => "");
       ok("lollipop: on the Results page the table follows, through its Alteration filter", !!t1 && t1.kept < t0.kept && t1.all === t0.all && /Alteration/.test(chip), JSON.stringify(t0) + " -> " + JSON.stringify(t1));
+      // the link carries how the views differ from the page's defaults, not the page's whole document
+      const linkQ = new URL(page.url()).searchParams, linkChanges = linkQ.get("changes") || "";
+      ok("Results page: a changed setting travels as ?changes= alone", !linkQ.has("doc") && /^1\./.test(linkChanges) && linkChanges.length < 400,
+        "doc: " + linkQ.has("doc") + ", changes: " + linkChanges.length + " chars");
       await page.reload({ waitUntil: "domcontentloaded" });
       await page.locator(".lp-grid").first().waitFor({ timeout: 240000 });
       await settle();
