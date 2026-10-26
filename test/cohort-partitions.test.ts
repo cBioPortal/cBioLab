@@ -177,7 +177,7 @@ describe("resolvePartitions", () => {
   });
 });
 
-import { armsFromSelection, renamePartitionChild } from "../lib/partition-arms.ts";
+import { armsFromItems, armsFromSelection, renamePartitionChild } from "../lib/partition-arms.ts";
 
 describe("arms from Explore's selection in one chart", () => {
   const stage = (vals: string[]) => ({ kind: "clinical", attribute: "STAGE", values: vals } as Clause);
@@ -206,6 +206,25 @@ describe("arms from Explore's selection in one chart", () => {
       { kind: "clinical", attribute: "X", per: "sample" })!;
     assert.deepEqual(r.arms.map((a) => a.name), ["a"]);
     assert.equal(r.base.all.length, 1);
+  });
+});
+
+describe("arms from a chart's checked rows", () => {
+  const arm = (v: string) => ({ name: v, where: { kind: "clinical", attribute: "STAGE", values: [v] } as Clause });
+  test("only the checked items are arms: the chart's own filter leaves the parent", () => {
+    const r = armsFromItems({ all: [luad.all![0], { kind: "clinical", attribute: "STAGE", values: ["I", "II"] } as Clause] },
+      { kind: "clinical", attribute: "STAGE" }, [arm("IV"), arm("III")]);
+    assert.deepEqual(r.base.all, [luad.all![0]]);
+    assert.deepEqual(r.arms.map((a) => a.name), ["IV", "III"]);
+  });
+  test("a generic-assay chart drops its own clause and keeps another entity's", () => {
+    const mine = { kind: "genericAssay", profileType: "armlevel_cna", entity: "8q_status", values: ["Gain"] } as Clause;
+    const other = { kind: "genericAssay", profileType: "armlevel_cna", entity: "1p_status", values: ["Loss"] } as Clause;
+    const r = armsFromItems({ all: [mine, other] }, { kind: "assay", profileType: "armlevel_cna", entity: "8q_status" }, [arm("Gain")]);
+    assert.deepEqual(r.base.all, [other]);
+  });
+  test("more checked items than a split takes is refused, naming the limit", () => {
+    assert.throws(() => armsFromItems({ all: [] }, { kind: "clinical", attribute: "STAGE" }, "abcdefghi".split("").map(arm)), /at most 8 arms, and 9 items are checked/);
   });
 });
 

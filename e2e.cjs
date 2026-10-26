@@ -9,6 +9,14 @@ async function pickExploreStudies(p) {
   await p.evaluate(() => window.cohortLab.selectStudies(["msk_chord_2024", "genie_public"]));
 }
 
+/** filter Explore by the `nth` facet value: a pie slice filters on click, a list row once checked and applied */
+async function pickFacet(p, nth) {
+  const el = p.locator(".valrow, .slice").nth(nth);
+  const isRow = await el.evaluate((e) => e.classList.contains("valrow"));
+  await el.click();
+  if (isRow) await el.locator("xpath=ancestor::div[contains(concat(' ', @class, ' '), ' card ')][1]").getByRole("button", { name: "Apply filter" }).click();
+}
+
 /** add a view of `kind` through the analysis page's "Add view" dialog */
 async function addViewKind(p, kind) {
   await p.locator(".addview-open").click();
@@ -278,7 +286,8 @@ async function main() {
       const vals = await page.evaluate(() => {
         const lists = [...document.querySelectorAll(".vallist")];
         const big = lists.map(l => ({
-          rows: l.querySelectorAll(".valrow").length,
+          // only the rows in view are mounted; the list's full height says how many it holds
+          rows: Math.round((l.querySelector(".vrows")?.getBoundingClientRect().height || 0) / (l.querySelector(".valrow")?.getBoundingClientRect().height || 1)),
           scrolls: l.scrollHeight > l.clientHeight + 2,
           capped: [...l.querySelectorAll("span")].some(s2 => /showing .* of .* values/.test(s2.textContent || ""))
         })).sort((a, b) => b.rows - a.rows)[0];
@@ -295,9 +304,7 @@ async function main() {
         const r = b2.getBoundingClientRect();
         return { h: Math.round(r.height), w: Math.round(r.width) };
       });
-      // 8px + a 1px border each side, matching .gsplit's frame — a deliberate
-      // widening from the original 3px hint so clinical, genomic and the
-      // alteration-split bar all read as one family of bar (see globals.css).
+      // 8px + a 1px border each side: a hint at relative size, not a chart
       ok("value bars stay small", !!vals.bars && !!barBox && barBox.h <= 10 && barBox.w <= 80,
         barBox ? vals.bars + " bars, " + barBox.w + "x" + barBox.h + "px" : "no bars found");
 
@@ -409,7 +416,7 @@ async function main() {
         noDraftCard && noGeneFinder && noNameBox,
         "no card: " + noDraftCard + ", no gene finder: " + noGeneFinder + ", no name box: " + noNameBox);
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
-      await page.locator(".valrow, .slice").first().click();
+      await pickFacet(page, 0);
       let drafted = true;
       try {
         await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
@@ -480,7 +487,7 @@ async function main() {
       await page.getByRole("tab", { name: "Explore", exact: true }).click();
       await page.waitForSelector(".exbar", { timeout: 120000 });
       await page.waitForSelector(".pie, .vallist", { timeout: 240000 });
-      await page.locator(".valrow, .slice").nth(2).click();
+      await pickFacet(page, 2);
       try {
         await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""),
           null, { timeout: 240000 });
@@ -1264,9 +1271,10 @@ async function main() {
       await pick("chart entity", "8q", /^8q/);
       for (let i = 0; i < 3 && await page.locator(".addchart").count(); i++) { await page.keyboard.press("Escape"); await page.waitForTimeout(400); }
       const facet = page.locator("[data-assayfacet='armlevel_cna|8q_status']");
-      await facet.locator("button.valrow").first().waitFor({ timeout: 120000 });
-      const gain = Number(((await facet.locator("button.valrow", { hasText: "Gain" }).locator(".vn").innerText()) || "").replace(/,/g, ""));
-      await facet.locator("button.valrow", { hasText: "Gain" }).click();
+      await facet.locator(".valrow").first().waitFor({ timeout: 120000 });
+      const gain = Number(((await facet.locator(".valrow", { hasText: "Gain" }).locator(".vn").innerText()) || "").replace(/,/g, ""));
+      await facet.locator(".valrow", { hasText: "Gain" }).click();
+      await facet.getByRole("button", { name: "Apply filter" }).click();
       await page.waitForFunction((n) => new RegExp("\\b" + n.toLocaleString("en-US") + " patients match").test(document.body.innerText), gain, { timeout: 120000 });
       ok("generic assays: Explore charts an entity, and a click filters to exactly the patients its bar counts", gain > 0, gain + " patients with 8q gained");
 

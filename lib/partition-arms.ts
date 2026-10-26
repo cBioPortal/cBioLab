@@ -156,17 +156,15 @@ function rangeLabel(r: { gt?: number; gte?: number; lt?: number; lte?: number })
 export type ChartKey =
   | { kind: "clinical"; attribute: string; per?: "patient" | "sample" }
   /** a gene table: the OQL entries of one alteration kind (": MUT", ": AMP"/": HOMDEL", ": FUSION") */
-  | { kind: "genes"; specs: string[] };
+  | { kind: "genes"; specs: string[] }
+  /** one generic-assay entity's chart */
+  | { kind: "assay"; profileType: string; entity: string };
 
-/**
- * Explore's selection in ONE chart, turned into arms: each selected item becomes an arm, in the
- * order it was clicked, and the rest of the selection stays as the cohort being split. A
- * categorical chart's selection is one clause listing its values; each clicked histogram bin is
- * its own range clause; the gene tables share one OQL clause whose entries are split out by kind.
- * Returns null when the chart has nothing selected.
- */
-export function armsFromSelection(draft: { all: Clause[] }, chart: ChartKey):
-  { base: { all: Clause[] }; arms: PartitionArm[] } | null {
+/** a split takes at most this many arms */
+const MAX_SELECTION_ARMS = 8;
+
+/** the draft's clauses split into the ones that are this chart's selection (as arms) and the rest */
+function chartSelection(draft: { all: Clause[] }, chart: ChartKey): { rest: Clause[]; arms: PartitionArm[] } {
   const rest: Clause[] = [];
   const arms: PartitionArm[] = [];
   for (const c of draft.all) {
@@ -191,17 +189,51 @@ export function armsFromSelection(draft: { all: Clause[] }, chart: ChartKey):
       if (others.length) rest.push({ kind: "oql", q: others.join("; ") });
       continue;
     }
+    if (chart.kind === "assay" && l.kind === "genericAssay" && l.profileType === chart.profileType && l.entity === chart.entity) {
+      if (Array.isArray(l.values)) for (const v of l.values) arms.push({ name: armLabel(String(v)), where: { ...l, values: [v] } as Leaf });
+      else if (l.range) arms.push({ name: armLabel(rangeLabel(l.range)), where: c });
+      else rest.push(c);
+      continue;
+    }
     rest.push(c);
   }
-  if (!arms.length) return null;
+  return { rest, arms };
+}
+
+/** arms named uniquely, refused past the most a split takes */
+function nameArms(arms: PartitionArm[], what: string): PartitionArm[] {
   const seen = new Set<string>();
-  for (const a of arms) {
+  const named = arms.map((a) => {
     let n = a.name, k = 2;
     while (seen.has(n)) n = a.name + " " + k++;
-    a.name = n; seen.add(n);
-  }
-  if (arms.length > 8) throw new Error("a split takes at most 8 arms, and " + arms.length + " items are selected in this chart — merge or deselect some first");
-  return { base: { all: rest }, arms };
+    seen.add(n);
+    return { ...a, name: n };
+  });
+  if (named.length > MAX_SELECTION_ARMS) throw new Error("a split takes at most " + MAX_SELECTION_ARMS + " arms, and " + named.length + " " + what + " — merge or deselect some first");
+  return named;
+}
+
+/**
+ * Explore's selection in ONE chart, turned into arms: each selected item becomes an arm, in the
+ * order it was clicked, and the rest of the selection stays as the cohort being split. A
+ * categorical chart's selection is one clause listing its values; each clicked histogram bin is
+ * its own range clause; the gene tables share one OQL clause whose entries are split out by kind.
+ * Returns null when the chart has nothing selected.
+ */
+export function armsFromSelection(draft: { all: Clause[] }, chart: ChartKey):
+  { base: { all: Clause[] }; arms: PartitionArm[] } | null {
+  const { rest, arms } = chartSelection(draft, chart);
+  if (!arms.length) return null;
+  return { base: { all: rest }, arms: nameArms(arms, "items are selected in this chart") };
+}
+
+/**
+ * Arms given item by item — a chart's checked rows — over the draft without that chart's own
+ * clauses: only the checked items divide the cohort, whatever the chart already filters it by.
+ */
+export function armsFromItems(draft: { all: Clause[] }, chart: ChartKey, arms: PartitionArm[]):
+  { base: { all: Clause[] }; arms: PartitionArm[] } {
+  return { base: { all: chartSelection(draft, chart).rest }, arms: nameArms(arms, "items are checked") };
 }
 
 /**

@@ -28,7 +28,7 @@
   --color-muted: var(--code-bg); --color-muted-foreground: var(--muted);
   --color-accent: var(--accent-soft); --color-accent-foreground: var(--accent-ink);
   --color-destructive: var(--err); --color-destructive-soft: var(--err-soft);
-  --color-border: var(--line); --color-input: var(--line); --color-ring: var(--accent);
+  --color-border: var(--line); --color-input: var(--control-line); --color-ring: var(--accent);
   --color-paper: var(--paper); --color-link: var(--accent-ink);
   --color-ok: var(--ok); --color-ok-soft: var(--ok-soft);
   --color-new: var(--new);
@@ -88,6 +88,9 @@
 :root {
   --page: #eef2f5; --paper: #fafbfc; --card: #ffffff; --bg: var(--card); --ink: #1f2933; --muted: #5b6b76;
   --accent: #0f86a1; --accent-ink: #0b6478; --accent-soft: #e3f0f3;
+  /* a form control's edge (checkbox, radio, text field, select): dark enough that an
+     unchecked box reads as one rather than as disabled; --line is for dividers */
+  --control-line: #9aa7b0;
   --line: #dde4e8; --code-bg: #f1f5f7; --mark: #b25e09; --mark-soft: #fbf0e2;
   --ok: #2e7d32; --ok-soft: #e6f2e6; --err: #b3261e; --err-soft: #fbeae9;
   /* the NEW mark's text (app/lab/new-mark.tsx) */
@@ -115,6 +118,7 @@
   :root {
     --page: #0e1418; --paper: #12181c; --card: #171f24; --ink: #e4eaee; --muted: #93a3ad;
     --accent: #45b8c2; --accent-ink: #7fd3da; --accent-soft: #16333a;
+    --control-line: #4f5f69;
     --line: #2a353c; --code-bg: #1a242a; --mark: #e0a35c; --mark-soft: #35270f;
     --ok: #7bc47f; --ok-soft: #17301a; --err: #f2b8b5; --err-soft: #3a2323;
     --new: #fb923c;
@@ -156,6 +160,7 @@ label:where(:not([data-slot])) { display: block; font-size: var(--t-sm); color: 
   font: inherit; color: var(--ink); background: var(--paper);
   border: 1px solid var(--line); border-radius: var(--r-sm); padding: 0.35rem 0.55rem;
 }
+:where(input, select):where(:not([data-slot])) { border-color: var(--control-line); }
 :where(input, select, button):where(:not([data-slot])):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 input[type=number] { width: 6.2rem; font-variant-numeric: tabular-nums; }
 button { cursor: pointer; }
@@ -225,9 +230,15 @@ pre {
    edge; the reading order stays left to right. */
 .facetgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.8rem; align-items: stretch; }
 .facetgrid > .card { margin-bottom: 0; min-width: 0; }
-/* Studies, data types and the three gene tables are dense multi-column rows (see
-   .sbrow/.generow's own grid-template-columns) that read as cramped at one tile's
-   width — matching the portal's own wider tiles for these same tables. */
+/* A tile whose body is a scrolling list fills the height its row gives it: the list's flex-basis
+   of 0 keeps its rows out of the row's height (its min-height is the least it shows), and it
+   grows into whatever height a taller neighbour sets, so no tile ends in empty space. */
+.facetgrid > .card:has(> .vallist, > .generows, > .sbrows) { display: flex; flex-direction: column; }
+.facetgrid > .card > :is(.vallist, .generows, .sbrows) { flex: 1 1 0; max-height: none; }
+.facetgrid > .card > .vallist { min-height: 13.5rem; }
+.facetgrid > .card > :is(.generows, .sbrows) { min-height: 20rem; }
+/* Studies and data types are dense multi-column rows (see .sbrow/.dtrow's own
+   grid-template-columns) that read as cramped at one tile's width. */
 .facetgrid > .card.wide { grid-column: span 2; }
 /* Explore's reading order: what the selection is (cancer type, then detailed), then what is altered
    in it, then everything else; the two derived charts (survival, mutation count vs FGA) come after
@@ -434,12 +445,12 @@ main.analysis-main { max-width: min(132rem, 100%); }
   display: grid;
   /* fixed tracks: every row is its own grid, so shared widths must be explicit
      or the proportion bars would not be comparable between rows */
-  grid-template-columns: minmax(9rem, 1.6fr) 5.5rem minmax(4rem, 1fr) 3.2rem 5rem 2.6rem;
+  grid-template-columns: calc(0.75rem + 2px) minmax(9rem, 1.6fr) 5.5rem minmax(4rem, 1fr) 3.2rem 5rem;
   gap: 0 0.6rem; align-items: center;
   padding: 0.22rem 0; border-top: 1px solid var(--line);
   font-size: var(--t-md);
 }
-.sbrow:first-of-type { border-top: none; }
+.sbrows { max-height: 20rem; overflow-y: auto; overscroll-behavior: contain; }
 .sbrow .mono { font-family: "IBM Plex Mono", monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sbrow .inst { color: var(--accent-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--t-sm); }
 .sbrow .bar { display: block; height: 8px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
@@ -448,35 +459,37 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .sbrow .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 
 /* Explore: gene tables (Mutated / CNA / SV) — portal-equivalent */
-/* Caps a gene table tile's height the same way .vallist already caps a clinical one's —
-   "show more" still works, it just fills this same scrolling area instead of growing
-   the tile past its neighbors every click. */
-.generows { display: flex; flex-direction: column; max-height: 20rem; overflow-y: auto; overscroll-behavior: contain; }
+/* Caps a gene table tile's height the same way .vallist caps a clinical one's: every loaded
+   gene is in this scrolling area, rendered as it scrolls into view. */
+.generows { max-height: 20rem; overflow-y: auto; overscroll-behavior: contain; }
 .generow {
   display: grid;
-  /* gene · coverage split · events|cytoband · CNA tag · freq · altered/profiled */
-  grid-template-columns: minmax(4.5rem, 1fr) 4.5rem minmax(3.5rem, 0.9fr) 3.6rem 3rem 7rem;
-  gap: 0 0.5rem; align-items: center; width: 100%;
-  padding: 0.16rem 0.3rem; border: none; border-top: 1px solid var(--line);
+  /* checkbox · gene · # Mut|# SV · # · Freq (CNA: checkbox · gene · cytoband · CNA · # · Freq).
+     Every row is its own grid, so every track but the gene's is a fixed width — a track sized by
+     its content would move the columns of the rows whose content is wider. */
+  grid-template-columns: calc(0.75rem + 2px) minmax(3rem, 1fr) 3rem 3rem 2.5rem;
+  gap: 0 0.4rem; align-items: center; width: 100%;
+  padding: 0.16rem 0; border: none; border-top: 1px solid var(--line);
   background: none; color: var(--ink); font: inherit; font-size: var(--t-md);
   text-align: left; cursor: pointer; border-radius: var(--r-sm);
 }
-.generow:first-child { border-top: none; }
 .generow:hover { background: var(--code-bg); }
+.generow.gk-cna { grid-template-columns: calc(0.75rem + 2px) minmax(3rem, 1fr) 3.2rem 3.3rem 2.8rem 2.5rem; gap: 0 0.35rem; }
+/* a gene table's rows are the portal's small table text; the tracks above hold a 7-digit count at this size */
+.generow:is(.gk-mutated, .gk-cna, .gk-sv) { font-size: var(--t-sm); }
+/* the column names, held at the top of the scroll area (VirtualRows' header) */
+.vrowshead { position: sticky; top: 0; z-index: 1; background: var(--card); border-bottom: 1px solid var(--line); }
+.generow.ghead { border-top: none; cursor: default; font-size: var(--t-xs); font-weight: 600; color: var(--muted); }
+.generow.ghead:hover { background: none; }
+.generow .gnum { text-align: right; font-variant-numeric: tabular-nums; }
 .generow .gname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-.generow .cnatag { font-size: var(--t-xs); letter-spacing: 0.03em; padding: 0.05rem 0.25rem; border-radius: 3px; text-align: center; }
+.generow .cnatag { font-size: var(--t-xs); padding: 0.05rem 0.2rem; border-radius: 3px; text-align: center; }
 .generow .cnatag.amp { background: #e41a1c22; color: #b3131a; }
 .generow .cnatag.del { background: #2166ac22; color: #1b4f86; }
-.generow .cnatag.none { background: none; }
-/* Same bar as a clinical value's (.valrow .vbar), which in turn matches the
-   gene alteration split's frame (.gsplit) — one family, whether the bar is a
-   relative magnitude or a proportion. */
+/* a data type's bar: the same frame as a clinical value's (.valrow .vbar) */
 .generow .gbar { height: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
 .generow .gbar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
-.generow .gfreq { text-align: right; font-variant-numeric: tabular-nums; }
 .generow .gcount { text-align: right; font-variant-numeric: tabular-nums; font-size: var(--t-sm); }
-/* off-panel calls: counted in "#", not in the frequency — said under the fraction they are not part of */
-.generow .gcount .goff { display: block; font-size: var(--t-xs); line-height: 1.1; }
 
 /* Explore: numeric clinical histograms (cBioPortal study-view bins) */
 .histo { display: flex; align-items: flex-end; gap: 2px; height: 62px; }
@@ -517,7 +530,7 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .pikey .pn { color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* Explore: data-types rows */
-.generow.dtrow { grid-template-columns: minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 6rem; }
+.generow.dtrow { grid-template-columns: calc(0.75rem + 2px) minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 6rem; }
 .generow.dtrow.is-static { cursor: default; }
 .generow.dtrow.is-static:hover { background: none; }
 /* Selected, not just hovered: a flat accent tint flush with the row above and
@@ -528,7 +541,7 @@ main.analysis-main { max-width: min(132rem, 100%); }
 
 /* Explore: high-cardinality categorical facets as a ranked list (portal table) */
 .vallist {
-  display: flex; flex-direction: column; margin-top: 0.25rem;
+  margin-top: 0.25rem;
   /* every value is present; the list scrolls rather than being trimmed */
   max-height: 13.5rem; overflow-y: auto; overscroll-behavior: contain;
 }
@@ -538,9 +551,9 @@ main.analysis-main { max-width: min(132rem, 100%); }
      relative size, deliberately small so the label and the number stay the
      content. Declare a column for EVERY child: adding the share without one
      wrapped it to a second line under each value. */
-  display: grid; grid-template-columns: 1fr 2.25rem minmax(3.5rem, auto) 3.25rem;
+  display: grid; grid-template-columns: calc(0.75rem + 2px) 1fr 2.25rem minmax(3.5rem, auto) 3.25rem;
   gap: 0 0.6rem; align-items: center; width: 100%;
-  background: none; border: none; padding: 0.12rem 0.3rem; border-radius: var(--r-sm);
+  background: none; border: none; padding: 0.12rem 0; border-radius: var(--r-sm);
   font: inherit; font-size: var(--t-md); color: var(--ink); text-align: left; cursor: pointer;
 }
 .valrow:hover { background: var(--code-bg); }
@@ -549,12 +562,33 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .valrow.on { background: var(--accent-soft); border-radius: 0; }
 .valrow.on .vname { color: var(--accent-ink); font-weight: 600; }
 .valrow .vname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Same frame as a gene's alteration split (.generow .gsplit) — a bordered
-   8px track, solid fill, no track tint and no hover-opacity trick — so a
-   relative-magnitude bar and a proportion bar read as one family. */
+/* A bordered 8px track, solid fill, no track tint and no hover-opacity trick: a hint at relative
+   size, not a chart. */
 .valrow .vbar { height: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
 .valrow .vbar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .valrow .vn { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* Explore's lists (app/lab/pick-list.tsx): only the rows in view are mounted, each placed at its
+   offset in a box as tall as the whole list, so every row is one line — no cell wraps; a value
+   too long for its column is cut with an ellipsis and shown whole in the row's tooltip. */
+/* a thin scrollbar: where it is not an overlay it takes its width from the rows */
+.vallist, .generows, .sbrows { scrollbar-width: thin; }
+.vrows { position: relative; width: 100%; }
+.vrow { position: absolute; top: 0; left: 0; width: 100%; }
+.vrow[data-index="0"] > .generow, .vrow[data-index="0"] > .sbrow { border-top: none; }
+.sbrow { cursor: pointer; }
+.valrow, .generow, .sbrow { margin: 0; }
+/* The checkbox's track (the first of each row's grid) is a little narrower than the 1rem box, which
+   overhangs into the gap after it: the checkbox sits closer to its row's name than columns do. */
+.valrow > *, .generow > *, .sbrow > * { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.valrow.is-static, .generow.is-static, .sbrow.is-static { cursor: default; }
+.valrow.is-static:hover, .generow.is-static:hover { background: none; }
+/* a list's checked rows and the button that applies them, under the list */
+.pickbar {
+  display: flex; align-items: center; gap: var(--s2); margin-top: var(--s1);
+  padding: var(--s1) var(--s2); border-top: 1px solid var(--line); white-space: nowrap;
+}
+.pickbar > .meta { overflow: hidden; text-overflow: ellipsis; }
 
 /* Survival: log-rank readout under the KM chart */
 .logrank {
@@ -1159,7 +1193,7 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
   width: 100%; box-sizing: border-box; margin-top: 0.3rem; padding: 0.45rem;
   font: 0.78rem/1.45 'IBM Plex Sans', system-ui, sans-serif;
   background: var(--card); color: var(--ink);
-  border: 1px solid var(--line); border-radius: var(--r-sm);
+  border: 1px solid var(--control-line); border-radius: var(--r-sm);
 }
 /* An author's note sits with the figure it describes. Rendered as plain text,
    never markdown: a ?doc= link is shareable, so notes are untrusted input and
@@ -1278,14 +1312,8 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
   color: var(--muted); font-size: var(--t-xs);
 }
 
-/* cytoband (CNA) and event count (mutations/SV) — columns whose data was
-   already in the payload and simply not drawn. */
-.generow .gcyto,
-.generow .gevents {
-  font-size: var(--t-sm); color: var(--muted); text-align: right;
-  font-variant-numeric: tabular-nums; min-width: 4.5rem;
-}
-.generow .gcyto { text-align: left; min-width: 6rem; }
+/* a CNA gene's cytoband */
+.generow .gcyto { font-size: var(--t-sm); color: var(--muted); }
 
 /* share of the cases that carry a value for the attribute */
 .valrow .vpct {
@@ -1298,22 +1326,6 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 .applybar {
   margin: 0.5rem 0; padding: 0.5rem 0.65rem;
   background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
-}
-
-/* Per-gene alteration split: altered / profiled-and-unaltered / NOT PROFILED.
-   The third segment is hatched rather than merely paler, because "never tested"
-   is a different kind of thing from "tested and negative" — the distinction the
-   panel-aware denominator exists to preserve. */
-.generow .gsplit {
-  display: inline-flex; width: 100%; height: 8px;
-  border: 1px solid var(--line); border-radius: 2px; overflow: hidden;
-}
-.generow .gsplit i { display: block; height: 100%; }
-.generow .gsplit .s-alt { background: var(--accent); }
-.generow .gsplit .s-wt  { background: var(--accent-soft); }
-.generow .gsplit .s-np  {
-  background: repeating-linear-gradient(45deg,
-    var(--line) 0 2px, transparent 2px 4px);
 }
 
 /* Selected-study chips in the Explore header. One per study is fine for a
