@@ -118,7 +118,7 @@ The kinds (`lib/disclosure.ts`, `PATIENT_KINDS`), each one view's needs and noth
 A plot's **aggregates** cross for every peer, whatever its rules: `federated_plot` answers a whole
 plot (density grid, quartiles, violin, contingency, coefficients) or one piece of a plot pooled
 across sites (extent, bin counts on a shared grid and extent, the six sums behind a correlation,
-box quartiles, contingency cells, coverage, a cohort layer's count, cells or quartiles), counts
+box quartiles, a box's density bins over a shared range, contingency cells, coverage, a cohort layer's count, cells or quartiles), counts
 only, so a plot is drawn over a peer's study like any other aggregate view. Its **cases** are the
 `plot` kind: `federated_plot_cases`, registered with the other patient-level tools, answers them
 only where the peer's rules disclose `plot` for the study, and the coordinator asks only where its

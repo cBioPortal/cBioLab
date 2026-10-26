@@ -410,10 +410,12 @@ refused outright before), its own six sums (n, Σx, Σy, Σxy, Σx², Σy²) for
 regression line, and its own contingency cells or per-group quartiles. All of that pools exactly
 except one thing: **Spearman rank correlation is not reported for a federated plot**, because a
 rank needs the pooled *global* ordering, which no per-site aggregate can reconstruct — reported
-as absent, not approximated. A federated box plot draws only points behind it, never the density
-overlay a single-study box can fall back to (that needs the same shared-scale binning a scatter
-uses, not yet built for a box); its quartiles are a size-weighted approximation across sites, the
-same one Explore's federated numeric histograms already disclose.
+as absent, not approximated. A federated box plot's quartiles are a size-weighted approximation
+across sites, the same one Explore's federated numeric histograms already disclose. When it draws
+no points, its violin is binned the way a scatter's grid is: every site cuts the same bins over one
+shared range (the pooled whiskers, reaching at most one whisker span past them, which is the axis
+the figure draws), so the counts add exactly; a value past that range is off the figure and left
+out of the density.
 
 **Points: every case when it is a drawing, the outliers when it is not.** cBioPortal draws every
 case as a point. So does this, up to 10,000 cases, on a scatter as on a box, and only when the

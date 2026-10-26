@@ -29,11 +29,11 @@ import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validate
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, OQL_NOT_PROFILED,
   type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape,
-  type PlotXYPoint, type SparseCells, type Whiskers, type PointRank } from "./plot.ts";
+  type PlotXYPoint, type SparseCells, type Whiskers, type PointRank, type ViolinBin } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
 export * from "./federation-views.ts";
 export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
-export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotLayer, HighlightPoint } from "./plot.ts";
+export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotLayer, HighlightPoint, ViolinBin } from "./plot.ts";
 import { impactSql } from "./lollipop.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
@@ -1429,6 +1429,9 @@ export interface FederatedPlotCapable {
     Promise<{ cx: string; cy: string; n: number }[]>;
   plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]>;
+  /** a box's density per group (and colour class), binned over a value range every site shares */
+  plotViolinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: number, range: [number, number]): Promise<ViolinBin[]>;
   plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<NonNullable<PlotData["coverage"]>>;
   /** a highlight's patients that are in the plotted cohort, here — a count */
@@ -1895,6 +1898,19 @@ abstract class BaseResolver implements AggregateCapable {
   async plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
     return this.boxRowsIn("plot:box", this.plotCtx(def, spec), spec, xk, yk);
+  }
+
+  /** Pass 2 of a federated box's density: this site's bins against the range every participant was given. */
+  async plotViolinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: number, range: [number, number]): Promise<ViolinBin[]> {
+    const ctx = this.plotCtx(def, spec);
+    const numFirst = xk === "num";
+    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
+    const r = await this.runLogged<ChRow>("plot:violin",
+      plotViolinSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql, bins, colorSel, range), this.instance.conn);
+    return r.data.map((row) => ({ g: String(row.g), b: Number(row.b), n: Number(row.n),
+      ...(spec.colorBy ? { c: String(row.c ?? "") } : {}) }));
   }
 
   private async boxRowsIn(label: string, ctx: ReturnType<BaseResolver["plotCtx"]>, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
