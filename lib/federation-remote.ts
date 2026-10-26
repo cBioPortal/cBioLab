@@ -12,7 +12,7 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
 import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers } from "./plot.ts";
 import type { Moments } from "./stats.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
@@ -349,6 +349,10 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
     return this.plotOp("box", def, spec, { kinds: { xk, yk } });
   }
+  async plotViolinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: number, range: [number, number]): Promise<ViolinBin[]> {
+    return this.plotOp("violin", def, spec, { kinds: { xk, yk }, violinBins: bins, range });
+  }
   async plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<NonNullable<PlotData["coverage"]>> {
     return this.plotOp("coverage", def, spec, { kinds: { xk, yk } });
   }
@@ -510,8 +514,10 @@ export class RemotePatientResolver extends RemoteAggregateResolver implements Re
 /** The plot-case methods a peer that shares them answers, each a federated_plot_cases call. */
 function plotCaseMethods(r: RemotePatientResolver): PlotCasesCapable {
   return {
-    plotPoints: (def, spec, cap?: number, outside?: Whiskers[]) =>
-      r.casesCall<PlotPoint[] | null>("points", def, spec, { ...(cap != null ? { cap } : {}), ...(outside ? { outside } : {}) }),
+    plotPoints: (def, spec, cap?: number) =>
+      r.casesCall<PlotPoint[] | null>("points", def, spec, cap != null ? { cap } : {}),
+    plotOutlierPoints: (def, spec, cap: number, whiskers: Whiskers[]) =>
+      r.casesCall<{ points: PlotPoint[]; total: number }>("outliers", def, spec, { cap, outside: whiskers }),
     plotScatterPoints: (def, spec, cap?: number, sparse?: SparseCells) =>
       r.casesCall<PlotXYPoint[] | null>("scatterPoints", def, spec, { ...(cap != null ? { cap } : {}), ...(sparse ? { sparse } : {}) }),
     plotRankedPoints: (def, spec, xk, yk, rank: PointRank) =>

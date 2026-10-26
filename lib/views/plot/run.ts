@@ -3,8 +3,9 @@
 import type { ViewResult } from "../../types.ts";
 import { pearsonFromMoments, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
-import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, tukey, coverageNote, combineNote, sparseCellMax,
-  type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank } from "../../plot.ts";
+import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
+  type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
+  type ViolinBin, type Whiskers } from "../../plot.ts";
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { resolveAxes } from "../../plot-profile.ts";
@@ -34,6 +35,32 @@ function poolBoxRows(parts: BoxRow[][]): PlotGroup[] {
 }
 
 type Def = ViewRun["doc"]["cohorts"][string];
+
+/**
+ * The value range every site bins a pooled box's density over, and how many bins. The figure's
+ * axis spans the whiskers and reaches at most one whisker span past them, so that is the range: a
+ * value beyond it is off the figure, and an outlier far past it would otherwise squeeze every
+ * group's density into one bin. The bin count keeps a bin about as tall as a single study's.
+ */
+export function pooledViolinRange(groups: PlotGroup[]): { range: [number, number]; bins: number } {
+  const wLo = Math.min(...groups.map((g) => g.loWhisker)), wHi = Math.max(...groups.map((g) => g.hiWhisker));
+  const span = wHi - wLo;
+  const x0 = Math.max(Math.min(...groups.map((g) => g.lo)), wLo - span);
+  const x1 = Math.min(Math.max(...groups.map((g) => g.hi)), wHi + span);
+  const bins = span > 0 ? Math.max(VIOLIN_BINS, Math.min(3 * VIOLIN_BINS, Math.round(VIOLIN_BINS * (x1 - x0) / span))) : VIOLIN_BINS;
+  return { range: [x0, x1], bins };
+}
+
+/** each site's density bins summed per group, bin and colour class: exact, because every site cut the same bins */
+function poolViolin(parts: ViolinBin[][]): ViolinBin[] {
+  const byKey = new Map<string, ViolinBin>();
+  for (const part of parts) for (const v of part) {
+    const key = v.g + "\u0000" + v.b + "\u0000" + (v.c ?? "");
+    const cur = byKey.get(key);
+    if (cur) cur.n += v.n; else byKey.set(key, { ...v });
+  }
+  return [...byKey.values()];
+}
 
 /** copy-number levels in their own order, as the portal draws them; anything else keeps its place after them */
 const CNA_LEVELS = ["Deep deletion", "Shallow deletion", "Diploid", "Gain", "Amplification"];
@@ -250,10 +277,12 @@ async function ruleLayer(l: Exclude<PointLayerSpec, { cohort: string }>, base: {
     if (data.n <= POINTS_CAP) return none("at or under " + fmt(POINTS_CAP) + " cases there is no density for them to stand out of");
     if (data.shape === "box") {
       if (budget <= 0) return none("the earlier layers used every point the figure draws");
-      const parts = await Promise.all(entitled.map((r) => r.plotPoints(def, spec, budget, data.groups || [])));
-      if (parts.some((p) => !p)) return none("more than " + fmt(budget) + " values lie beyond the whiskers");
-      const g = gather(parts as PlotPoint[][], sites);
-      return { layer: { kind, ...base, n: g.points.length, shown: "points", points: g.points.map(({ id, g: gr, v }) => ({ id, g: gr, v })) }, keys: g.keys };
+      // each site's most extreme `budget`, pooled into the overall most extreme `budget`: exact,
+      // as the ranked layers are, and the caption says how many it left out
+      const whiskers = data.groups || [];
+      const { points, keys, total } = pooledOutliers(
+        await Promise.all(entitled.map((r) => r.plotOutlierPoints(def, spec, budget, whiskers))), sites, whiskers, budget);
+      return { layer: { kind, ...base, n: points.length, shown: "points", points, ...(total > points.length ? { of: total } : {}) }, keys };
     }
     if (sites.length > 1) return none("a pooled scatter's sparse cells are known only after pooling, and no study can be asked for them yet");
     if (!data.bins || !data.grid || !data.extent) return none("the plot has no density to find sparse cells in");
@@ -279,6 +308,22 @@ async function ruleLayer(l: Exclude<PointLayerSpec, { cohort: string }>, base: {
   const kept = topRanked(g.points, g.keys, rank, data.shape === "box");
   if (kept.points.length > budget) return tooMany(kept.points.length);
   return { layer: { kind, ...base, n: kept.points.length, shown: "points", points: kept.points }, keys: kept.keys };
+}
+
+/**
+ * Each site's most extreme outliers pooled into the overall `budget` most extreme, by how far each
+ * lies beyond its own group's whiskers (outlierExtremity, the order every site already used, so the
+ * pooled top is exact). Ties go by study and case. `total` is how many lie beyond the whiskers in all.
+ */
+export function pooledOutliers(parts: { points: PlotPoint[]; total: number }[], sites: string[], whiskers: Whiskers[], budget: number):
+  { points: PlotPoint[]; keys: string[]; total: number } {
+  const g = gather(parts.map((p) => p.points), sites);
+  const at = new Map(whiskers.map((w) => [w.g, w]));
+  const ext = (p: PlotPoint) => { const w = at.get(p.g); return w ? outlierExtremity(p.v, w) : 0; };
+  const order = g.points.map((_, i) => i)
+    .sort((i, j) => ext(g.points[j]) - ext(g.points[i]) || (g.keys[i] < g.keys[j] ? -1 : 1)).slice(0, budget);
+  return { points: order.map((i) => ({ id: g.points[i].id, g: g.points[i].g, v: g.points[i].v })), keys: order.map((i) => g.keys[i]),
+    total: parts.reduce((a, p) => a + p.total, 0) };
 }
 
 /** each study's own top `n` pooled into the overall top `n` (per end, and per group on a box) */
@@ -318,6 +363,7 @@ function layerNote(ls: PlotLayer[], unit: "patient" | "sample"): string {
     if (l.shown !== "points") return l.label + ": not drawn, " + (l.why || "nothing to draw");
     const what = l.kind === "outliers"
       ? (l.cellMax ? cases(l.n) + " in cells holding at most " + l.cellMax + ", left unshaded under them"
+        : l.of ? "the " + fmt(l.n) + " most extreme of the " + fmt(l.of) + " values beyond the whiskers (the most points a figure draws)"
         : fmt(l.n) + " value" + (l.n === 1 ? "" : "s") + " beyond the whiskers")
       : cases(l.n);
     return l.label + ": " + what + shared;
@@ -445,9 +491,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         const n = groups.reduce((a, g) => a + g.n, 0);
         data = { shape, n, ...label, groups, overlay: "none",
           note: scaleNote + ". Counts and extremes per group sum exactly; the quartiles are a size-weighted" +
-            " approximation across sites (it can shift where an outlier bar falls, never a count). A federated" +
-            " box does not draw a density behind it — that needs the same shared-scale binning a scatter does," +
-            " not yet built for this shape — so points are shown when an entitled site has few enough to draw." };
+            " approximation across sites (it can shift where an outlier bar falls, never a count)." };
         // Points, unlike a density, just concatenate: each entitled site's own case-level
         // rows are already independent of any shared scale. A site that may not disclose
         // cases contributes none, the same rule the oncoprint's columns follow.
@@ -463,6 +507,19 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
             if (pv.colorBy) data.legend = legendFor(pts.map((x) => x.c || ""));
             if (pv.ringBy) data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)];
           }
+        }
+        // Without the points, a density: every site bins over one shared range, so the counts add.
+        // A peer that predates the op leaves the boxes bare and the caption says why.
+        if (!data.points && n) {
+          const { range, bins: vBins } = pooledViolinRange(groups);
+          const box = data;
+          await peerSafe(sites.map((s) => resolvers[s]), async () => {
+            const violin = poolViolin(await Promise.all(sites.map((s) => fr[s].plotViolinCounts(doc.cohorts[cn], spec, xk, yk, vBins, range))));
+            box.violin = violin; box.violinBins = vBins; box.violinExtent = range; box.overlay = "violin";
+            if (spec.colorBy) { box.colorLabel = axisLabel(spec.colorBy); box.legend = legendFor(violin.map((v) => v.c || "")); }
+            box.note += " The density behind each box is binned by every site over one shared range, the pooled whiskers and up to" +
+              " one whisker span beyond them, so its counts add exactly; a value past that range is off the figure and not in it.";
+          }, (why) => { box.note += " No density is drawn behind the boxes: " + why + "."; });
         }
       }
 

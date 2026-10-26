@@ -568,9 +568,17 @@ export function plotBoxSql(numSel: string, catSel: string, cohortSql: string): A
 /**
  * The values behind a box, as a density per group — bins, not points, so this is an aggregate
  * and stays answerable by a participant that may not disclose a case.
+ *
+ * `range`, when given, is a value range shared by every participant in a federated plot: bin b
+ * then means the same values at every site, so the sites' counts add. A value outside it is not
+ * counted. Omitted for a single-study plot, which cuts its bins over its own middle 99%.
  */
-export function plotViolinSql(numSel: string, catSel: string, cohortSql: string, bins = VIOLIN_BINS, colorSel?: string): AggregateSql {
+export function plotViolinSql(numSel: string, catSel: string, cohortSql: string, bins = VIOLIN_BINS, colorSel?: string,
+  range?: [number, number]): AggregateSql {
   const b = Math.max(4, Math.min(200, Math.round(bins)));
+  const eCte = range
+    ? "     e AS (SELECT " + num(range[0]) + " AS x0, " + num(range[1]) + " AS x1)\n"
+    : "     e AS (SELECT quantileExact(0.005)(x) x0, quantileExact(0.995)(x) x1 FROM j)\n";
   // Cut the bins over the middle 99% rather than min..max. One mutation count of 25,697 would
   // otherwise put every other value in bin 0, and the density would be a solid block. The box
   // is drawn between its whiskers, and the renderer clips whatever falls outside.
@@ -581,12 +589,12 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
     "     gs AS (" + catSel + ")" + (colorSel ? ",\n     cs AS (" + colorSel + ")" : "") + ",\n" +
     "     j AS (SELECT gs.v AS g, vs.v AS x" + (colorSel ? ", cs.v AS c" : "") + " FROM vs INNER JOIN gs ON gs.id = vs.id" +
       (colorSel ? "\n            LEFT JOIN cs ON cs.id = vs.id" : "") + "),\n" +
-    "     e AS (SELECT quantileExact(0.005)(x) x0, quantileExact(0.995)(x) x1 FROM j)\n" +
+    eCte +
     // the extent travels with the bins: a box is drawn between its whiskers, so the renderer
     // needs to know what value a bin index stands for rather than assuming it spans the axis
     "SELECT g, least(" + (b - 1) + ", toUInt32(floor((x - x0) / if(x1 > x0, x1 - x0, 1) * " + b + "))) AS b, " +
       (colorSel ? "c, " : "") + "count() AS n, any(x0) AS vx0, any(x1) AS vx1\n" +
-    "FROM j, e GROUP BY g, b" + (colorSel ? ", c" : ""));
+    "FROM j, e" + (range ? " WHERE x >= x0 AND x <= x1" : "") + " GROUP BY g, b" + (colorSel ? ", c" : ""));
 }
 
 /**
@@ -598,18 +606,49 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
  * site has no method that could call it — see docs/DATA-BOUNDARY.md.
  */
 export function plotPointsSql(numSel: string, catSel: string, cohortSql: string, cap = POINTS_CAP,
-  colorSel?: string, ringSel?: string, outside?: Whiskers[]): PatientSql {
-  return patientSql("WITH cohort AS (" + cohortSql + "),\n" +
+  colorSel?: string, ringSel?: string): PatientSql {
+  return patientSql(boxCasesHead(numSel, catSel, cohortSql, colorSel, ringSel) +
+    "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1));
+}
+
+/**
+ * A box's values beyond their group's whiskers, WITH their case ids, the most extreme first: at
+ * most `cap` of them, each row carrying how many there are in all, so a caller past the cap draws
+ * the most extreme and says how many it left out. Returns ids, so like plotPointsSql it is
+ * reachable only from `PatientLevelResolver`. The order is outlierExtremity's, in SQL.
+ */
+export function plotOutlierPointsSql(numSel: string, catSel: string, cohortSql: string, whiskers: Whiskers[], cap = POINTS_CAP): PatientSql {
+  const at = "indexOf([" + whiskers.map((w) => sq(w.g)).join(", ") + "], gs.v)";
+  const arr = (f: (w: Whiskers) => number) => "arrayElement([" + whiskers.map((w) => num(f(w))).join(", ") + "], " + at + ")";
+  const lo = arr((w) => w.loWhisker), hi = arr((w) => w.hiWhisker);
+  const ext = "if(vs.v > " + hi + ", vs.v - " + hi + ", " + lo + " - vs.v) / if(" + hi + " > " + lo + ", " + hi + " - " + lo + ", 1)";
+  return patientSql(boxCasesHead(numSel, catSel, cohortSql, undefined, undefined, ", count() OVER () AS total") +
+    outsideWhiskers(whiskers) + "\n" +
+    "ORDER BY " + ext + " DESC, id\n" +
+    "LIMIT " + Math.max(1, Math.min(50000, Math.round(cap))));
+}
+
+/**
+ * How far a value lies beyond its group's whiskers, in units of the whisker span, so a group with
+ * a narrow spread is not drowned out by a wide one. 0 inside the whiskers. plotOutlierPointsSql
+ * orders by the same expression, so pooling sites' answers by this keeps the overall most extreme.
+ */
+export function outlierExtremity(v: number, w: Whiskers): number {
+  const span = w.hiWhisker > w.loWhisker ? w.hiWhisker - w.loWhisker : 1;
+  return v > w.hiWhisker ? (v - w.hiWhisker) / span : v < w.loWhisker ? (w.loWhisker - v) / span : 0;
+}
+
+/** a box's cases and their values, the start of both points queries */
+function boxCasesHead(numSel: string, catSel: string, cohortSql: string, colorSel?: string, ringSel?: string, extra = ""): string {
+  return "WITH cohort AS (" + cohortSql + "),\n" +
     "     vs AS (" + numSel + "),\n" +
     "     gs AS (" + catSel + ")" +
     (colorSel ? ",\n     cs AS (" + colorSel + ")" : "") +
     (ringSel ? ",\n     rs AS (" + ringSel + ")" : "") + "\n" +
-    "SELECT vs.id AS id, gs.v AS g, vs.v AS v" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + "\n" +
+    "SELECT vs.id AS id, gs.v AS g, vs.v AS v" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + extra + "\n" +
     "FROM vs INNER JOIN gs ON gs.id = vs.id" +
     (colorSel ? "\n  LEFT JOIN cs ON cs.id = vs.id" : "") +
-    (ringSel ? "\n  LEFT JOIN rs ON rs.id = vs.id" : "") + "\n" +
-    (outside ? outsideWhiskers(outside) + "\n" : "") +
-    "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1));
+    (ringSel ? "\n  LEFT JOIN rs ON rs.id = vs.id" : "") + "\n";
 }
 
 /**
@@ -816,6 +855,8 @@ export interface PlotLayer {
   groups?: PlotGroup[];
   /** a scatter's outliers: the cells holding at most this many cases, left unshaded under their points */
   cellMax?: number;
+  /** a box's outliers past the points budget: how many lie beyond the whiskers, of which the `n` most extreme are drawn */
+  of?: number;
 }
 
 export interface PlotRequest {
@@ -826,6 +867,9 @@ export interface PlotRequest {
 /** one highlighted case: a scatter's (x, y), or a box's group and value */
 export type HighlightPoint = { id: string; x: number; y: number } | { id: string; g: string; v: number };
 export interface PlotGroup { g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number; loWhisker: number; hiWhisker: number }
+/** one bin of a box's density: group, bin index, count, and the colour class when the density is split */
+export type ViolinBin = { g: string; b: number; n: number; c?: string };
+
 export interface PlotData {
   shape: "scatter" | "box" | "table";
   n: number;
@@ -844,7 +888,7 @@ export interface PlotData {
   xyPoints?: PlotXYPoint[];
   /** whether the plotted cohort's own cases are points, how many, and why not when they are not */
   pointSet?: PointSet;
-  violin?: { g: string; b: number; n: number; c?: string }[];
+  violin?: ViolinBin[];
   /** what the colours mean: the fill category, the ring category, and the key to draw */
   colorLabel?: string;
   ringLabel?: string;

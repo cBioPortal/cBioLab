@@ -40,7 +40,8 @@ a hover lands on an arbitrary one. So:
 - **Over the cap, the crowd is density, and point layers draw chosen subsets in colour over it.**
   `points` is an ordered list of at most four layers (`lib/plot-layers.ts`):
   - `{rule:"outliers"}` (the default): where the plotted cohort is density, a box's values beyond
-    its whiskers (the violin then stops at the whiskers) and a single study's scatter's cases in
+    its whiskers (the violin then stops at the whiskers; past the budget, the most extreme by
+    `outlierExtremity`, pooled exactly across studies, with the total stated) and a single study's scatter's cases in
     sparse cells (every cell holding at most `k` cases, `k` the largest value up to
     `OUTLIER_CELL_MAX` that fits the budget; those cells are left unshaded under their points).
   - `{rule:"extremes", axis, n}`: the `n` highest and lowest values of a numeric axis, per group
@@ -49,7 +50,8 @@ a hover lands on an arbitrary one. So:
   - `{cohort}`: the plotted cohort's cases that are also in that cohort (once called a highlight).
   `[]` draws none. Every layer shares one `POINTS_CAP` budget; a case two layers share is drawn by
   the first. A layer is never cut to its first cases: a cohort layer past the budget becomes density
-  cells or a box per group, a rule layer is not drawn, and the caption says which and why. With a
+  cells or a box per group, a box's outliers are cut to the most extreme, any other rule layer is
+  not drawn, and the caption says which and why. With a
   box's cases coloured by a category, a layer is a ring round the case.
 - **Nothing is dropped silently.** `PlotData.pointSet` says whether the plotted cohort's own cases
   are points; each `PlotLayer` says what it holds, how many it drew, how many an earlier layer drew,

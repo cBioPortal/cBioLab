@@ -26,14 +26,14 @@ import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treat
 import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
-  plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
+  plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotOutlierPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, OQL_NOT_PROFILED,
   type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape,
-  type PlotXYPoint, type SparseCells, type Whiskers, type PointRank } from "./plot.ts";
+  type PlotXYPoint, type SparseCells, type Whiskers, type PointRank, type ViolinBin } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
 export * from "./federation-views.ts";
 export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
-export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotLayer, HighlightPoint } from "./plot.ts";
+export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotLayer, HighlightPoint, ViolinBin } from "./plot.ts";
 import { impactSql } from "./lollipop.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
@@ -1296,8 +1296,10 @@ export interface QueryLogEntry { label: string; sql: string; ms?: number; remote
 
 /** Additionally available when the instance permits patient-level access. */
 export interface PatientLevelCapable extends AggregateCapable {
-  /** the values behind a box plot (every one, or those beyond `outside`'s whiskers), with their case ids; null past the cap */
-  plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number, outside?: Whiskers[]): Promise<PlotPoint[] | null>;
+  /** the values behind a box plot, with their case ids; null past the cap */
+  plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number): Promise<PlotPoint[] | null>;
+  /** a box's values beyond `whiskers`, the `cap` most extreme with their case ids, and how many there are in all */
+  plotOutlierPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap: number, whiskers: Whiskers[]): Promise<{ points: PlotPoint[]; total: number }>;
   /** a scatter's cases (every one, or those in `sparse` cells), with their case ids; null past the cap */
   plotScatterPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap?: number, sparse?: SparseCells): Promise<PlotXYPoint[] | null>;
   /** a ranked layer's points (the extremes on an axis, or the cases furthest from the fit), with their case ids */
@@ -1387,7 +1389,7 @@ export function peerRowsFor(r: Resolver, kind: PatientKind): (Resolver & RemoteP
 }
 
 /** The case-level pieces of a plot: what an entitled participant answers, local or a peer sharing `plot`. */
-export type PlotCasesCapable = Pick<PatientLevelCapable, "plotPoints" | "plotScatterPoints" | "plotRankedPoints" | "plotHighlightPoints">;
+export type PlotCasesCapable = Pick<PatientLevelCapable, "plotPoints" | "plotOutlierPoints" | "plotScatterPoints" | "plotRankedPoints" | "plotHighlightPoints">;
 /**
  * Who may be asked for a plot's cases: a local patient-level participant, or a peer this instance
  * accepts the `plot` kind from (whose resolver then has the methods; lib/federation-remote.ts).
@@ -1429,6 +1431,9 @@ export interface FederatedPlotCapable {
     Promise<{ cx: string; cy: string; n: number }[]>;
   plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]>;
+  /** a box's density per group (and colour class), binned over a value range every site shares */
+  plotViolinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: number, range: [number, number]): Promise<ViolinBin[]>;
   plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<NonNullable<PlotData["coverage"]>>;
   /** a highlight's patients that are in the plotted cohort, here — a count */
@@ -1897,6 +1902,19 @@ abstract class BaseResolver implements AggregateCapable {
     return this.boxRowsIn("plot:box", this.plotCtx(def, spec), spec, xk, yk);
   }
 
+  /** Pass 2 of a federated box's density: this site's bins against the range every participant was given. */
+  async plotViolinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+    bins: number, range: [number, number]): Promise<ViolinBin[]> {
+    const ctx = this.plotCtx(def, spec);
+    const numFirst = xk === "num";
+    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
+    const r = await this.runLogged<ChRow>("plot:violin",
+      plotViolinSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql, bins, colorSel, range), this.instance.conn);
+    return r.data.map((row) => ({ g: String(row.g), b: Number(row.b), n: Number(row.n),
+      ...(spec.colorBy ? { c: String(row.c ?? "") } : {}) }));
+  }
+
   private async boxRowsIn(label: string, ctx: ReturnType<BaseResolver["plotCtx"]>, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
     const numFirst = xk === "num";
@@ -1995,31 +2013,49 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   }
   /**
    * The points behind a box plot, with their case ids, so a reader can find one on the figure:
-   * every value, or with `outside` only the values beyond their group's whiskers (the outliers
-   * drawn over a violin once the cohort is past the cap).
+   * every value. (Past the cap, the values beyond the whiskers are plotOutlierPoints'.)
    *
    * It lives here and nowhere else. `AggregateResolver` has no such method, and neither does a
    * remote peer, so a participant that may not disclose a case cannot be asked for one — the
    * same guarantee as `members()`, and for the same reason. The cap is what stops a quarter of
    * a million dots being called a drawing: past it this returns null, never the first `cap`.
    */
-  async plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP, outside?: Whiskers[]): Promise<PlotPoint[] | null> {
-    const db = this.instance.conn.db, conn = this.instance.conn;
+  async plotPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP): Promise<PlotPoint[] | null> {
+    const b = await this.boxSelects(def, spec);
+    if (!b) return [];
+    const colorSel = spec.colorBy ? axisSelect(spec.colorBy, b.ctx, "cat") : undefined;
+    const ringSel = spec.ringBy ? axisSelect(spec.ringBy, b.ctx, "cat") : undefined;
+    const r = await this.runPatientRows<ChRow>("plot:points",
+      plotPointsSql(b.numSel, b.catSel, b.ctx.cohortSql, cap, colorSel, ringSel), this.instance.conn);
+    if (r.data.length > cap) return null;
+    return r.data.map((x) => ({ id: String(x.id), g: String(x.g), v: Number(x.v),
+      ...(colorSel ? { c: String(x.c ?? "") } : {}), ...(ringSel ? { r: String(x.r ?? "") } : {}) }));
+  }
+
+  /**
+   * A box's values beyond their group's whiskers, with their case ids: the `cap` most extreme
+   * (outlierExtremity), and how many lie beyond the whiskers in all. Here for the reason
+   * plotPoints is.
+   */
+  async plotOutlierPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap: number, whiskers: Whiskers[]):
+    Promise<{ points: PlotPoint[]; total: number }> {
+    const b = await this.boxSelects(def, spec);
+    if (!b) return { points: [], total: 0 };
+    const r = await this.runPatientRows<ChRow>("plot:outliers",
+      plotOutlierPointsSql(b.numSel, b.catSel, b.ctx.cohortSql, whiskers, cap), this.instance.conn);
+    return { points: r.data.map((x) => ({ id: String(x.id), g: String(x.g), v: Number(x.v) })), total: Number(r.data[0]?.total || 0) };
+  }
+
+  /** a box's numeric and categorical axes as this study answers them; null when the pair is not a box */
+  private async boxSelects(def: CohortDef | null | undefined, spec: PlotRequest) {
+    const db = this.instance.conn.db;
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
     const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
-    if (plotShape(xk, yk) !== "box") return [];
+    if (plotShape(xk, yk) !== "box") return null;
     const numFirst = xk === "num";
-    const numSel = axisSelect(numFirst ? spec.x : spec.y, ctx, "num");
-    const catSel = axisSelect(numFirst ? spec.y : spec.x, ctx, "cat");
-    const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
-    const ringSel = spec.ringBy ? axisSelect(spec.ringBy, ctx, "cat") : undefined;
-    const r = await this.runPatientRows<ChRow>(outside ? "plot:outliers" : "plot:points",
-      plotPointsSql(numSel, catSel, ctx.cohortSql, cap, colorSel, ringSel, outside), conn);
-    if (r.data.length > cap) return null;
-    return r.data.map((x) => ({ id: String(x.id), g: String(x.g), v: Number(x.v),
-      ...(colorSel ? { c: String(x.c ?? "") } : {}), ...(ringSel ? { r: String(x.r ?? "") } : {}) }));
+    return { ctx, numSel: axisSelect(numFirst ? spec.x : spec.y, ctx, "num"), catSel: axisSelect(numFirst ? spec.y : spec.x, ctx, "cat") };
   }
 
   /**

@@ -66,7 +66,7 @@ function LayerCount({ n, busy, onCommit }: { n: number; busy: boolean; onCommit:
  */
 function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: {
   layers: PointLayerSpec[];
-  plot?: { shape: string; x: { kind: string }; y: { kind: string } };
+  plot?: { shape: string; x: { kind: string }; y: { kind: string }; layers?: { shown: string; why?: string; n: number; of?: number }[] };
   cohortOptions: { name: string; label: string; depth: number }[];
   axisName: (side: "x" | "y") => string;
   busy: boolean;
@@ -86,8 +86,13 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
   const move = (i: number) => { const next = [...layers]; [next[i - 1], next[i]] = [next[i], next[i - 1]]; onChange(next); };
   return (
     <div className="plot-layers flex flex-col gap-1">
-      {layers.map((l, i) => (
-        <div key={i} className="plot-layer flex min-h-ctl items-center gap-1 rounded-sm border bg-card py-0.5 pr-0.5 pl-1.5 text-sm"
+      {layers.map((l, i) => {
+        // the result's layers come back in the view's order; under its chip, why one drew nothing or how much of it was drawn
+        const res = plot?.layers?.[i];
+        const layerNote = res?.shown === "none" ? "Not drawn: " + (res.why || "nothing to draw") + "."
+          : res?.of ? "The " + res.n.toLocaleString() + " most extreme of " + res.of.toLocaleString() + "." : null;
+        return <div key={i} className="flex flex-col gap-0.5">
+        <div className="plot-layer flex min-h-ctl items-center gap-1 rounded-sm border bg-card py-0.5 pr-0.5 pl-1.5 text-sm"
           title={i ? "drawn under the layers above it: a case they share is theirs" : "drawn first: a case it shares with a later layer is its own"}>
           <span className="size-2.5 flex-none rounded-full" style={{ background: LAYER_COLORS[i] }} />
           <span className="min-w-0 flex-1 truncate" title={"cohort" in l ? l.cohort : layerLabel(l, axisName)}>{"cohort" in l ? l.cohort : layerLabel(l, axisName)}</span>
@@ -100,7 +105,9 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
             aria-label={"remove the layer " + ("cohort" in l ? l.cohort : layerLabel(l, axisName))} title="remove this layer"
             onClick={() => onChange(layers.filter((_, j) => j !== i))}><X /></Button>
         </div>
-      ))}
+        {layerNote && <p className="plot-layer-why m-0 pl-1.5 text-sm text-muted-foreground">{layerNote}</p>}
+        </div>;
+      })}
       {!layers.length && <p className="m-0 text-sm text-muted-foreground">none: the plotted cohort alone</p>}
       <OptionSelect className="w-full max-w-none" value="" disabled={busy || full || !offers.length} ariaLabel="add a point layer"
         title={full ? "a plot draws at most " + POINT_LAYER_CAP + " point layers; remove one to add another"
@@ -118,7 +125,7 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
   spec: any;
   /** the last result's plot: which shape is on screen, each axis's name and kind, how many cases it shows, its layers */
   plot?: { shape: string; n: number; x: { kind: string; label: string }; y: { kind: string; label: string }; coverage?: { total: number };
-    layers?: { label: string; color: string; n: number; shown: string }[] };
+    layers?: { label: string; color: string; n: number; shown: string; why?: string; of?: number }[] };
   attrs: { attribute: string; kind: string }[];
   /** the studies' profiles as they describe them, for each axis's Data picker */
   catalog: ProfileInfo[]; loading?: boolean; busy: boolean;
@@ -190,10 +197,10 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
             {plot?.shape !== "table" && (
               <div className="axfield flex flex-col gap-1">
                 <span className="axfield-name text-sm font-semibold text-foreground"
-                  title="subsets of the plotted cases drawn in their own colour over it; the first layer draws a case two share">Points</span>
+                  title="Highlight groups of cases as coloured points over the plot. A case in more than one layer takes the colour of the first.">Points</span>
                 <label className="chk text-md text-foreground" title={overCap
-                  ? "this plot has " + plot!.n.toLocaleString() + " " + unit + "s, more than " + CAP + ", so it is drawn as density whatever this says"
-                  : "every case as a point when there are at most " + CAP + " and the study may show cases; off draws the density alone"}>
+                  ? "This plot has " + plot!.n.toLocaleString() + " " + unit + "s, more than the " + CAP + " that can be drawn as points, so it is shown as a density."
+                  : "Draw every " + unit + " as a point (up to " + CAP + ", where the study allows it). Untick to show the density instead."}>
                   <Checkbox checked={spec.allPoints !== false} disabled={busy || overCap}
                     onCheckedChange={(c) => update((vv) => { const n = { ...vv }; if (c === true) delete n.allPoints; else n.allPoints = false; return n; })} />
                   every {unit} (up to {CAP})

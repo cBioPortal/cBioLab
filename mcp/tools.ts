@@ -245,20 +245,22 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       description:
         "Federation endpoint for another cbio-lab instance's plot view: evaluates a cohort definition against a study THIS instance holds and returns a plot's aggregates — " +
         "a whole plot (density grid, quartiles, violin, contingency, coefficients), or one piece of a plot pooled across sites: the axes' kinds, the extent, bin counts on a shared grid and extent, " +
-        "the six sums behind a correlation, box quartiles, contingency cells, coverage, or a second cohort's count, cells or quartiles within it. Never returns patient identifiers.",
+        "the six sums behind a correlation, box quartiles, a box's density on a shared range, contingency cells, coverage, or a second cohort's count, cells or quartiles within it. Never returns patient identifiers.",
       inputSchema: {
         study: z.string().max(120),
         cohort: z.record(z.string(), z.any()),
-        op: z.enum(["plot", "axisKinds", "extent", "bins", "moments", "table", "box", "coverage", "highlightCount", "highlightBins", "highlightBox"]),
+        op: z.enum(["plot", "axisKinds", "extent", "bins", "moments", "table", "box", "violin", "coverage", "highlightCount", "highlightBins", "highlightBox"]),
         spec: z.record(z.string(), z.any()).describe("x, y, unit, and optionally colorBy, ringBy, bins: the plot as a view states it"),
         kinds: z.object({ xk: z.enum(["num", "cat", "none"]), yk: z.enum(["num", "cat", "none"]) }).nullish(),
         bins: z.tuple([z.number().int().min(1).max(1000), z.number().int().min(1).max(1000)]).nullish(),
         extent: z.object({ x0: z.number(), x1: z.number(), y0: z.number(), y1: z.number() }).nullish(),
+        violinBins: z.number().int().min(4).max(200).nullish().describe("for violin: how many bins to cut the shared range into"),
+        range: z.tuple([z.number(), z.number()]).nullish().describe("for violin: the value range every site bins over"),
         highlight: z.record(z.string(), z.any()).nullish().describe("for the highlight ops: the second cohort, whose cases within the first are counted"),
       }
     },
     async (args: { study: string; cohort: any; op: string; spec: any; kinds?: { xk: AxisKind; yk: AxisKind } | null; bins?: [number, number] | null;
-      extent?: { x0: number; x1: number; y0: number; y1: number } | null; highlight?: any }) => {
+      extent?: { x0: number; x1: number; y0: number; y1: number } | null; violinBins?: number | null; range?: [number, number] | null; highlight?: any }) => {
       try {
         if (carriesPatientIds(args.cohort) || carriesPatientIds(args.highlight))
           throw new Error("cohort contains an explicit sample or patient list; identifiers are not accepted across instances");
@@ -278,6 +280,8 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           case "moments": need(k, "kinds"); result = await res.plotMoments(args.cohort, spec, k!.xk, k!.yk); break;
           case "table": need(k, "kinds"); result = await res.plotTableCells(args.cohort, spec, k!.xk, k!.yk); break;
           case "box": need(k, "kinds"); result = await res.plotBoxRows(args.cohort, spec, k!.xk, k!.yk); break;
+          case "violin": need(k, "kinds"); need(args.violinBins, "violinBins"); need(args.range, "range");
+            result = await res.plotViolinCounts(args.cohort, spec, k!.xk, k!.yk, args.violinBins!, args.range!); break;
           case "coverage": need(k, "kinds"); result = await res.plotCoverage(args.cohort, spec, k!.xk, k!.yk); break;
           case "highlightCount": need(hl, "highlight"); result = await res.plotHighlightCount(args.cohort, hl); break;
           case "highlightBins": need(hl, "highlight"); need(k, "kinds"); need(args.bins, "bins"); need(args.extent, "extent");
@@ -442,12 +446,12 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       {
         description:
           "Patient-level federation endpoint (opt-in: MCP_DISCLOSE_PATIENTS rules, kind 'plot') for another cbio-lab instance's plot view: the cases a plot draws as points, with their case ids, " +
-          "for a study THIS instance holds — every case up to the cap, a box's values beyond given whiskers, a scatter's cases in sparse cells of a given grid, the extremes on an axis or the cases " +
+          "for a study THIS instance holds — every case up to the cap, a box's most extreme values beyond given whiskers (and how many there are), a scatter's cases in sparse cells of a given grid, the extremes on an axis or the cases " +
           "furthest from a fitted line, or a second cohort's cases within the first. Returns case identifiers.",
         inputSchema: {
           study: z.string().max(120),
           cohort: z.record(z.string(), z.any()),
-          op: z.enum(["points", "scatterPoints", "ranked", "highlightPoints"]),
+          op: z.enum(["points", "outliers", "scatterPoints", "ranked", "highlightPoints"]),
           spec: z.record(z.string(), z.any()),
           cap: z.number().int().min(1).max(50000).nullish(),
           outside: z.array(z.object({ g: z.string().max(200), loWhisker: z.number(), hiWhisker: z.number() }).passthrough()).max(200).nullish(),
@@ -467,7 +471,11 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           const spec = await plotSpecHere(s, args.spec);
           const cap = args.cap ?? undefined;
           let points: unknown;
-          if (args.op === "points") points = await res.plotPoints(args.cohort, spec, cap, args.outside ?? undefined);
+          if (args.op === "points") points = await res.plotPoints(args.cohort, spec, cap);
+          else if (args.op === "outliers") {
+            if (!args.outside || cap == null) throw new Error("outliers needs outside and cap");
+            points = await res.plotOutlierPoints(args.cohort, spec, cap, args.outside);
+          }
           else if (args.op === "scatterPoints") points = await res.plotScatterPoints(args.cohort, spec, cap, args.sparse ?? undefined);
           else if (args.op === "ranked") {
             if (!args.rank || !args.kinds) throw new Error("ranked needs rank and kinds");
