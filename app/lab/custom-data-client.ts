@@ -135,11 +135,12 @@ async function gzip(text: string): Promise<Blob> {
 const strip = (d: CustomDataset): CustomDataset => ({ id: d.id, name: d.name, level: d.level, columns: d.columns, rows: d.rows });
 
 /** Save a dataset to the server: a new one, or the next version of one (`versionOf`: its id, and
- *  `version`, the version its changes were reviewed against — refused if no longer the latest). */
-export async function saveToServer(d: StoredDataset, versionOf?: { id: string; version: number }): Promise<DatasetMeta> {
+ *  `version`, the version its changes were reviewed against — refused if no longer the latest).
+ *  `note`, when given, becomes the dataset's note; otherwise a new version keeps the one it had. */
+export async function saveToServer(d: StoredDataset, versionOf?: { id: string; version: number }, note?: string): Promise<DatasetMeta> {
   if (!server.unlocked) throw new Error("sign in (top right) to save custom data");
   const res = await fetch("/api/custom-data/datasets", { method: "POST", headers: { "Content-Type": "application/gzip" },
-    body: await gzip(JSON.stringify({ dataset: strip(d), source: d.source, versionOf: versionOf?.id, baseVersion: versionOf?.version })) });
+    body: await gzip(JSON.stringify({ dataset: strip(d), source: d.source, versionOf: versionOf?.id, baseVersion: versionOf?.version, note })) });
   const j = await res.json();
   if (!res.ok || j.error) throw new Error(j.error || res.statusText);
   await loadServerData();
@@ -157,6 +158,15 @@ export async function deleteServerDataset(id: string): Promise<void> {
 export async function shareServerDataset(id: string, sharing: Sharing): Promise<void> {
   const res = await fetch("/api/custom-data/datasets/" + id + "/sharing",
     { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharing) });
+  const j = await res.json();
+  if (!res.ok || j.error) throw new Error(j.error || res.statusText);
+  await loadServerData();
+}
+
+/** A stored dataset's note, changed without saving a version. */
+export async function setServerNote(id: string, note: string): Promise<void> {
+  const res = await fetch("/api/custom-data/datasets/" + id + "/note",
+    { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note }) });
   const j = await res.json();
   if (!res.ok || j.error) throw new Error(j.error || res.statusText);
   await loadServerData();

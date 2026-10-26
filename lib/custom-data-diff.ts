@@ -5,7 +5,8 @@
 // (lib/custom-store.ts `baseVersion`), so every change a version makes was on screen when it was saved.
 //
 // Cases are keyed by study and id (the sample's at sample level, else the patient's). Values are
-// compared only where both versions have the case and the column; a NUMBER column compares numbers,
+// compared where both versions have the case, in every column the new version has — a column it adds
+// was empty before, so its values for kept cases are "filled in"; a NUMBER column compares numbers,
 // so "80" and "80.0" are the same value and a round trip through an export changes nothing.
 import type { CustomColumn, CustomDataset, CustomDatatype } from "./custom-data-names.ts";
 
@@ -65,16 +66,18 @@ export function diffDatasets(before: Side, after: Side): DatasetDiff {
   const addedCases = [...newRows.keys()].filter((k) => !oldRows.has(k));
   const removedCases = [...oldRows.keys()].filter((k) => !newRows.has(k));
 
-  const values: ColumnChanges[] = shared.map((c) => ({ column: c.name, changed: 0, filled: 0, cleared: 0, examples: [] }));
+  const compared = after.columns;
+  const values: ColumnChanges[] = compared.map((c) => ({ column: c.name, changed: 0, filled: 0, cleared: 0, examples: [] }));
   const all: ValueChange[] = [];
   let kept = 0;
   for (const [k, nr] of newRows) {
     const or = oldRows.get(k);
     if (!or) continue;
     kept++;
-    shared.forEach((c, j) => {
-      const from = or.values[oldCols.get(c.name)!.i] ?? "", to = nr.values[newCols.get(c.name)!.i] ?? "";
-      const numeric = c.datatype === "NUMBER" && oldCols.get(c.name)!.c.datatype === "NUMBER";
+    compared.forEach((c, j) => {
+      const old = oldCols.get(c.name);
+      const from = old ? or.values[old.i] ?? "" : "", to = nr.values[newCols.get(c.name)!.i] ?? "";
+      const numeric = c.datatype === "NUMBER" && old?.c.datatype === "NUMBER";
       if (sameValue(from, to, numeric)) return;
       const v = values[j];
       if (from === "") v.filled++; else if (to === "") v.cleared++; else v.changed++;
