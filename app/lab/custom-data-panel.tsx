@@ -4,11 +4,15 @@
 // (app/_saved/data-panel.tsx). Owns its own draft state, so typing into the paste box never
 // re-renders the analysis page (see "Keystrokes stay in the field" in docs/UI.md). Which custom
 // attributes are drawn as charts is chosen in Explore's Add chart dialog, like any other attribute.
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useState, useSyncExternalStore } from "react";
 import {
-  onCustomDataChange, loadCustomData, parseUpload, buildDataset, serverState, requestLogin, saveToServer,
-  serverBySlug, resolveIds, exampleUpload, type ParsedUpload, type ResolveResponse, type ServerState
+  onCustomDataChange, loadCustomData, parseUpload, buildDataset, serverState, requestLogin, saveToServer, fetchServerVersion,
+  serverBySlug, resolveIds, exampleUpload, type ParsedUpload, type ResolveResponse, type ServerState, type StoredDataset
 } from "./custom-data-client.ts";
+import { DatasetDiffView } from "./dataset-diff.tsx";
+import { diffDatasets, type DatasetDiff } from "../../lib/custom-data-diff.ts";
+import { mergeDataset } from "../../lib/custom-data-edit.ts";
+import type { DatasetMeta } from "../../lib/custom-store.ts";
 import { LIMITS } from "../../lib/custom-data-names.ts";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "../_ui/button";
@@ -37,9 +41,19 @@ export function useCustomDataState(): ServerState {
 /** where Custom data opens: adding an upload here, or the saved uploads in the saved-work manager */
 export type CustomDataTab = "add" | "manage";
 
-function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name: string) => void }) {
+/**
+ * Load, check and save an upload, matched against the explored `studies`. An upload whose name is
+ * one already stored adds to and updates it as the next version (lib/custom-data-edit.ts
+ * `mergeDataset`: its ids already there update, new ones are added, everything else stays): it first
+ * shows what changes from the latest version, and waits for a tick when a value is overwritten. (Editing a stored dataset in
+ * place is the saved-work manager's: app/_saved/dataset-editor.tsx.)
+ */
+export function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name: string) => void }) {
+  const server = useCustomDataState();
   const [text, setText] = useState("");
   const [name, setName] = useState("");
+  const [note, setNote] = useState("");
+  const noteId = useId();
   const [parsed, setParsed] = useState<ParsedUpload | null>(null);
   const [types, setTypes] = useState<Record<string, "STRING" | "NUMBER">>({});
   const [resolved, setResolved] = useState<ResolveResponse | null>(null);
@@ -48,6 +62,8 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
   const [confirmLow, setConfirmLow] = useState(false);
   /** the studies the preview was matched against: what the dataset is added to */
   const [matchedStudies, setMatchedStudies] = useState<string[]>([]);
+  /** the stored version a save would replace, as read to compare against */
+  const [base, setBase] = useState<(StoredDataset & { server: DatasetMeta; version: number }) | null>(null);
 
   const [dragging, setDragging] = useState(false);
   // a file dropped just outside the drop zone would otherwise open in place of the page
@@ -82,35 +98,47 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
     finally { setExampleBusy(false); }
   };
 
-  const reset = () => { setText(""); setName(""); setParsed(null); setResolved(null); setTypes({}); setErr(null); setConfirmLow(false); setMatchedStudies([]); };
+  const reset = () => {
+    setText(""); setName(""); setNote("");
+    setParsed(null); setResolved(null); setTypes({}); setErr(null); setConfirmLow(false); setMatchedStudies([]);
+  };
+  /** the text was edited: what was checked no longer describes it */
+  const edited = (t: string) => { setText(t); setParsed(null); setResolved(null); };
 
-  /** parse the table and match its ids against the studies being explored */
+  /** parse the table, match its ids against the studies, and read the stored version it would replace */
   const preview = async (t = text) => {
     setErr(null); setResolved(null); setConfirmLow(false);
     let p: ParsedUpload;
     try { p = parseUpload(t); } catch (e) { setParsed(null); setErr(String((e as Error).message || e)); return; }
     setParsed(p);
-    setTypes(Object.fromEntries(p.columns.map((c) => [c.name, c.datatype])));
-    if (!studies.length) { setErr("select a study above first: ids are matched against the studies being explored"); return; }
+    if (!studies.length) { setTypes(Object.fromEntries(p.columns.map((c) => [c.name, c.datatype]))); setErr("select a study above first: ids are matched against the studies being explored"); return; }
     setBusy(true);
     try {
+      const into = target && (!base || base.server.id !== target.id || base.version !== target.latestVersion)
+        ? await fetchServerVersion(target.id, target.latestVersion) : base;
+      if (target) setBase(into);
+      // a column kept from the stored version keeps its type unless its values no longer allow it
+      const was = new Map((target && into ? into.columns : []).map((c) => [c.name, c.datatype]));
+      setTypes(Object.fromEntries(p.columns.map((c) => [c.name, was.get(c.name) === "STRING" ? "STRING" : c.datatype])));
       setResolved(await resolveIds(studies, p.level, p.rows.map((r) => r[0])));
       setMatchedStudies([...studies]);
     } catch (e) { setErr(String((e as Error).message || e)); }
     finally { setBusy(false); }
   };
 
-  /** a new dataset, or the next version of the server one of that name */
+  /** a new dataset, or the next version of the stored one being replaced, as reviewed */
   const save = async () => {
     if (!parsed || !resolved) return;
     if (stale) { setErr("the studies being explored changed since the preview: preview again"); return; }
-    const d = buildDataset(name || "Custom data", parsed, resolved, matchedStudies, types);
+    if (target && !change) { setErr("check the changes from the saved version first"); return; }
+    if (change?.diff?.same) { setErr("nothing changed from v" + change.version + ": nothing to save"); return; }
+    const d = change?.after ? { ...change.after, createdAt: draft!.createdAt, source: draft!.source } : draft!;
     if (!d.rows.length) { setErr("no row matched a " + parsed.level + " of " + matchedStudies.join(", ") + ": nothing to save"); return; }
     if (d.rows.length * d.columns.length > LIMITS.cells) {
       setErr("this upload has " + (d.rows.length * d.columns.length).toLocaleString() + " values; the limit is " + LIMITS.cells.toLocaleString()); return;
     }
     setBusy(true);
-    try { await saveToServer(d, serverBySlug(d.id)?.id); }
+    try { await saveToServer(d, target && change ? { id: target.id, version: change.version } : undefined, target ? undefined : note); }
     catch (e) { setErr(String((e as Error).message || e)); setBusy(false); return; }
     setBusy(false);
     reset();
@@ -120,9 +148,24 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
   const matchedRows = resolved ? resolved.matches.filter((m) => m.length).length : 0;
   // the name a save would use, so a clash with a server dataset reads as "a new version of it"
   const slugPreview = (name || "Custom data").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "custom";
+  const clash = serverBySlug(slugPreview);
+  /** the stored dataset a save adds a version to, as the server lists it now */
+  const target = clash ? server.datasets.find((x) => x.id === clash.id) ?? clash : undefined;
+  const draft = useMemo(() => parsed && resolved ? buildDataset(name || "Custom data", parsed, resolved, matchedStudies, types) : null,
+    [parsed, resolved, name, matchedStudies, types]);
+  /** what the save changes, against the version read for it — none while that is not the latest */
+  const change = useMemo((): { version: number; diff: DatasetDiff | null; after?: StoredDataset; error?: string } | null => {
+    if (!target || !draft || !base || base.server.id !== target.id || base.version !== target.latestVersion) return null;
+    if (draft.level !== base.level) return { version: base.version, diff: null, error: "“" + target.name + "” is " + base.level + "-level; this upload has " + draft.level + " ids: rename it to keep both" };
+    try { const after = mergeDataset(base, draft); return { version: base.version, diff: diffDatasets(base, after), after }; }
+    catch (e) { return { version: base.version, diff: null, error: String((e as Error).message || e) }; }
+  }, [target, draft, base]);
   const rate = parsed && parsed.rows.length ? matchedRows / parsed.rows.length : 0;
   const stale = !!resolved && matchedStudies.join(",") !== studies.join(",");
-  const target = matchedStudies.length === 1 ? matchedStudies[0] : matchedStudies.length + " studies";
+  const studyLabel = matchedStudies.length === 1 ? matchedStudies[0] : matchedStudies.length + " studies";
+  /** a stored dataset of this name that the reader may only read: saving would be refused */
+  const readOnlyClash = !!clash && !clash.rights.edit;
+  const blocked = !!target && (!change || !change.diff || change.diff.same);
   const downloadDropped = () => {
     if (!parsed || !resolved) return;
     const lines = [[parsed.idColumn, ...parsed.columns.map((c) => c.header)].join("\t"),
@@ -160,7 +203,7 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
                 </Button>
               </div>
               <Textarea className="customdata-text bg-card font-mono text-md md:text-md" rows={text ? 8 : 4} spellCheck={false} value={text}
-                placeholder={PLACEHOLDER} onChange={(e) => { setText(e.target.value); setParsed(null); setResolved(null); }} />
+                aria-label="the table, tab- or comma-separated" placeholder={PLACEHOLDER} onChange={(e) => edited(e.target.value)} />
               {dragging && <div className="cd-dropover">Drop to load</div>}
             </div>}
         <details className="cd-format">
@@ -221,18 +264,41 @@ function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded: (name
             </table>
           </div>
 
-          <div className="cd-step"><span className="cd-num">3</span><h4>Name and add</h4></div>
-          <div className="row center g5">
-            <Input type="text" placeholder="dataset name (e.g. Brain mets — curated)" value={name}
-              onChange={(e) => setName(e.target.value)} className="h-8 w-96 text-md md:text-md" />
-            {rate < LOW_MATCH && !confirmLow
-              ? <Button variant="outline" size="sm" className={TB} disabled={!resolved || !matchedRows || stale} onClick={() => setConfirmLow(true)}>Save anyway…</Button>
-              : <Button size="sm" disabled={!resolved || !matchedRows || busy || stale} onClick={save}
-                  title="stored on the server: anyone who logs in can read it, and analyses that use it can be shared">
-                  Add data to {target}{serverBySlug(slugPreview) ? " (as v" + (serverBySlug(slugPreview)!.latestVersion + 1) + " of " + slugPreview + ")" : ""}</Button>}
-            <Button variant="link" size="inline" className="text-md" onClick={reset}>start over</Button>
+          <div className="cd-step"><span className="cd-num">3</span><h4>{target ? "Review the changes and save" : "Name and add"}</h4></div>
+          {target && resolved && <p className="meta flush">
+            “{target.name}” is already stored under this name, so this upload adds to and updates it as v{target.latestVersion + 1}: its {parsed.level}s
+            already there take its values, new ones are added, and every other {parsed.level} and column stays. Rename this upload to keep both apart.</p>}
+          {readOnlyClash && <p className="error">“{clash!.name}” is {clash!.ownerEmail}&apos;s, and you may read it but not add versions to it: rename this upload.</p>}
+          {target && resolved && !readOnlyClash && (change?.error ? <p className="error">{change.error}</p>
+            : change?.diff && base && draft ? <>
+                <DatasetDiffView diff={change.diff} before={base} after={change.after!} version={change.version} />
+                {change.diff.losesData && <p className="meta flush">Values struck through are the ones this overwrites.</p>}
+              </>
+            : <p className="meta"><span className="spinner" /> reading v{target.latestVersion} to compare… {base && base.version !== target.latestVersion &&
+                <>v{target.latestVersion} was saved since this check: <Button variant="link" size="inline" className="text-md" onClick={() => preview()}>check again</Button></>}</p>)}
+          <div data-tw className="grid max-w-2xl gap-2.5">
+            <label className="m-0 grid gap-1">
+              <span className="text-md font-semibold">Name</span>
+              <Input type="text" placeholder="e.g. Brain mets — curated" value={name}
+                onChange={(e) => setName(e.target.value)} className="h-8 text-md md:text-md" />
+            </label>
+            {!target && <label className="m-0 grid gap-1" htmlFor={noteId}>
+              <span className="text-md font-semibold">Note <span className="font-normal text-muted-foreground">(optional)</span></span>
+              <Textarea id={noteId} value={note} onChange={(e) => setNote(e.target.value)} rows={3}
+                placeholder="what this data is, where it came from, how it was coded" className="bg-card text-md md:text-md" />
+            </label>}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {rate < LOW_MATCH && !confirmLow
+                ? <Button variant="outline" size="sm" className={TB} disabled={!resolved || !matchedRows || stale} onClick={() => setConfirmLow(true)}>Save anyway…</Button>
+                : <Button size="sm" className="cd-save" disabled={!resolved || !matchedRows || busy || stale || readOnlyClash || blocked} onClick={save}
+                    title={change?.diff?.same ? "nothing changed from v" + change.version
+                      : "stored on the server: anyone who logs in can read it, and analyses that use it can be shared"}>
+                    {target ? "Save as v" + (target.latestVersion + 1) + " of “" + target.name + "”" : "Add data to " + studyLabel}</Button>}
+              <Button variant="link" size="inline" className="text-md" onClick={reset}>start over</Button>
+            </div>
           </div>
-          <p className="meta">Its columns become <code>custom:{slugPreview}/…</code> attributes.</p>
+          <p className="meta">Its columns {target ? "stay" : "become"} <code>custom:{slugPreview}/…</code> attributes{target && <>; v{target.latestVersion} and
+            every earlier version stay as they are, and analyses pinned to them keep reading them</>}.</p>
         </>}
     </section>
   );

@@ -390,8 +390,7 @@ export default function AnalysisPage() {
     if (own) openEditCohort({ id, name: own[0], def: own[1].def });
     return !!own;
   };
-  useSavedActions({ openDoc: openDocument, openShared, showClauseData, onDataChanged: () => fetchExplore(), addData: () => openCustomManager("add"),
-    editCohort: editSavedCohort });
+  useSavedActions({ openDoc: openDocument, openShared, showClauseData, onDataChanged: () => fetchExplore(), editCohort: editSavedCohort, studies: () => exStudies });
   // links into it: ?tab=cohorts (the lab's Saved tab, before the manager) opens it; ?shared=<id> opens
   // that shared analysis, and ?editCohort=<id> that saved cohort in Explore, once the list holding it has arrived
   const sharedParam = useRef(typeof sp.shared === "string" ? sp.shared : null);
