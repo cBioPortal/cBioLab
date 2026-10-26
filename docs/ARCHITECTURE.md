@@ -260,6 +260,12 @@ The map of the code: what each part does, where it lives, and the one place each
   `drop trigger if exists`). A configured database is migrated only by `npm run db:migrate`
   (`npm run db:status` lists applied and pending), never by the app — run it before deploying
   code that needs a new migration. The in-process database migrates itself on first use.
+  **Two roles:** the app connects as `cohort_lab_app` (`0009_app_role.sql`), granted per table only
+  what the app does — no truncate, no DDL, no delete of a stored version, insert-only access logs —
+  and migrations run as the tables' owner (`MIGRATION_DATABASE_URL`). A new table needs its grant in
+  its migration (`test:db` refuses one without). The tests' stores run as that role too, so a
+  statement it was not granted fails there. The same migration takes every table away from
+  Supabase's REST API roles (`anon`, `authenticated`), which Supabase grants by default.
 - **The saved-work manager** (`app/_saved/`): everything the reader keeps — Cohorts, Analyses,
   Custom data, Groups, Gene lists — one tab each, as a dialog any page opens on the tab the moment
   calls for (`useSaved().open("groups")`, or `?saved=groups` in any page's link) and as the page

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import type { PGlite } from "@electric-sql/pglite";
 import { PGlite as PGliteDb } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
-import { startPostgres, reapplyMigrations, migrationFiles, target } from "./support/postgres.ts";
+import { startPostgres, reapplyMigrations, migrationFiles, target, APP_ROLE } from "./support/postgres.ts";
 import { migrate, migrationSql } from "../lib/migrate.ts";
 import { customStoreContract, artifactContract, userContract, sharingContract, idSetContract } from "./support/store-contracts.ts";
 import { saveDataset } from "../lib/custom-store.ts";
@@ -17,7 +17,7 @@ const db: PGlite = await startPostgres();
 
 describe("migrations", () => {
   test("apply in order to an empty database, and again without harm", async () => {
-    assert.deepEqual(migrationFiles(), ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql", "0004_users.sql", "0005_sharing.sql", "0006_id_sets.sql", "0007_id_set_parts.sql"]);
+    assert.deepEqual(migrationFiles(), ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql", "0004_users.sql", "0005_sharing.sql", "0006_id_sets.sql", "0007_id_set_parts.sql", "0009_app_role.sql"]);
     const tables = async () => (await db.query<{ t: string }>(
       "select table_name as t from information_schema.tables where table_schema = 'public' order by 1")).rows.map((r) => r.t);
     const before = await tables();
@@ -117,5 +117,43 @@ describe("a locked campaign is immutable in the database", () => {
     await reapplyMigrations(db);
     await assert.rejects(db.query("delete from campaign_hypotheses where id = $1", [hid]), /hypothesis list is frozen/);
     await assert.rejects(db.query("delete from campaigns where id = $1", [id]), /campaign is locked/);
+  });
+});
+
+describe("the app's role holds only what the app does", () => {
+  const asApp = (sql: string) => db.transaction(async (tx) => { await tx.exec("set local role " + APP_ROLE); return tx.query(sql); });
+
+  test("every table but the migrations' record is granted to it", async () => {
+    const ungranted = (await db.query<{ t: string }>(
+      `select table_name as t from information_schema.tables where table_schema = 'public' and table_name <> 'schema_migrations'
+       except select table_name from information_schema.role_table_grants where grantee = $1 order by 1`, [APP_ROLE])).rows.map((r) => r.t);
+    assert.deepEqual(ungranted, [], "grant the app's role what it needs on these in their migration");
+  });
+
+  test("it cannot change a table, its triggers, a stored version or an access log", async () => {
+    await assert.rejects(asApp("truncate custom_dataset_version"), /permission denied|must be owner/);
+    await assert.rejects(asApp("alter table custom_dataset_version disable trigger all"), /must be owner/);
+    await assert.rejects(asApp("drop table saved_artifacts"), /must be owner/);
+    await assert.rejects(asApp("create table planted (x int)"), /permission denied/);
+    await assert.rejects(asApp("delete from custom_dataset_version"), /permission denied/);
+    await assert.rejects(asApp("delete from custom_dataset"), /permission denied/);
+    await assert.rejects(asApp("select * from custom_data_access_log"), /permission denied/);
+    await assert.rejects(asApp("update id_set_access_log set at = now()"), /permission denied/);
+    await assert.rejects(asApp("select * from schema_migrations"), /permission denied/);
+  });
+
+  test("Supabase's API roles lose every table, and the ones made after", async () => {
+    const supa = await PGliteDb.create({ extensions: { pgcrypto } });
+    await supa.exec(`create role anon nologin; create role authenticated nologin;
+      alter default privileges in schema public grant all on tables to anon, authenticated;`);
+    for (const f of migrationFiles().filter((f) => f < "0009")) await supa.exec(migrationSql(f));
+    const held = async () => (await supa.query<{ n: number }>(
+      "select count(*)::int as n from information_schema.role_table_grants where grantee in ('anon', 'authenticated')")).rows[0].n;
+    assert.ok(await held() > 0, "as Supabase gives them");
+    assert.ok((await migrate(target(supa))).includes("0009_app_role.sql"));
+    assert.equal(await held(), 0);
+    await supa.exec("create table later (x int)");
+    assert.equal(await held(), 0, "nor a table a later migration makes");
+    await supa.close();
   });
 });

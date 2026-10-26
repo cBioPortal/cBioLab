@@ -10,8 +10,9 @@
 // patient-level values and is reached only through lib/custom-store.ts.
 //
 // Which database:
-//   - DATABASE_URL (or its older name SUPABASE_DB_URL): that Postgres. Its migrations are applied
-//     by `npm run db:migrate`, never by the app.
+//   - DATABASE_URL (or its older name SUPABASE_DB_URL): that Postgres, reached as the app's role
+//     (db/migrations/0009_app_role.sql, given a login by `npm run db:app-role`). Its migrations are
+//     applied as the tables' owner (MIGRATION_DATABASE_URL) by `npm run db:migrate`, never by the app.
 //   - neither, outside Vercel production: an in-process Postgres (PGlite) with the migrations
 //     applied on first use, so a session, the e2e gate or a fresh checkout runs the same SQL with
 //     nothing to set up. `next dev` keeps it in .data/pglite (or PGLITE_DIR) across restarts;
@@ -24,8 +25,11 @@ import { migrate } from "./migrate.ts";
 
 type Query = (sql: string, params: unknown[]) => Promise<{ rows: unknown[] }>;
 
-/** The configured Postgres, if any. An empty value counts as unset (scripts/gate.sh relies on it). */
-export const databaseUrl = (): string | undefined => process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || undefined;
+/** The configured Postgres, if any. An empty value counts as unset (scripts/gate.sh relies on it); a stray newline is dropped. */
+export const databaseUrl = (): string | undefined => (process.env.DATABASE_URL || process.env.SUPABASE_DB_URL)?.trim() || undefined;
+
+/** The configured Postgres as its tables' owner, for migrations; the app's own URL where they are one. */
+export const migrationDatabaseUrl = (): string | undefined => process.env.MIGRATION_DATABASE_URL?.trim() || databaseUrl();
 
 let pool: Pool | null = null;
 function getPool(url: string): Pool {
