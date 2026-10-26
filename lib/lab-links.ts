@@ -8,30 +8,17 @@
 // URL and the cut is stated, in the link and on the page, rather than being silently applied.
 //
 // Isomorphic: the figure encodes in the browser, the lab pages decode on the server.
+import { fromBase64Url, toBase64Url } from "./url-json.ts";
 
 /** encoded characters; Node's HTTP parser caps the whole request line at 16 KB */
 export const SPEC_URL_MAX = 8000;
 
-// Plain base64 both sides, url-safe by hand: the browser's bundled Buffer shim is not Node's and
-// does not know the "base64url" encoding, so asking it for one throws at run time.
-const toUrl = (s: string) => s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-const fromUrl = (s: string) => s.replace(/-/g, "+").replace(/_/g, "/");
-
 export function encodeSpec(spec: unknown): string {
-  const bytes = new TextEncoder().encode(JSON.stringify(spec));
-  if (typeof btoa === "function") {
-    let s = "";
-    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    return toUrl(btoa(s));
-  }
-  return toUrl(Buffer.from(bytes).toString("base64"));
+  return toBase64Url(new TextEncoder().encode(JSON.stringify(spec)));
 }
 
 export function decodeSpec(encoded: string): unknown {
-  const b64 = fromUrl(encoded);
-  const binary = typeof atob === "function" ? atob(b64) : Buffer.from(b64, "base64").toString("binary");
-  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-  return JSON.parse(new TextDecoder().decode(bytes));
+  return JSON.parse(new TextDecoder().decode(fromBase64Url(encoded)));
 }
 
 /** what the cut removed, in the reader's terms; absent means the link carries the whole spec */

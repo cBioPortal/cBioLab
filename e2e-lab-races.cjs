@@ -174,11 +174,10 @@ async function labRaces(browser, ok, BASE) {
       await settled(page);
       await page.locator(".lp-colname").first().click();
       await page.waitForTimeout(300);
-      const fromUrl = await page.evaluate(() => {
-        const b64 = new URLSearchParams(location.search).get("doc") || "";
-        const json = new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)));
-        return JSON.parse(json).views[0].hide || null;
-      }).catch((e) => "unreadable: " + e.message);
+      const { decodeUrlJson } = await import("./lib/url-json.ts");
+      let fromUrl;
+      try { fromUrl = decodeUrlJson(new URL(page.url()).searchParams.get("doc") || "").views[0].hide || null; }
+      catch (e) { fromUrl = "unreadable: " + e.message; }
       const onPage = (await doc(page)).views[0].hide;
       ok("lab: a browser-only edit is in the URL at once", Array.isArray(fromUrl) && JSON.stringify(fromUrl) === JSON.stringify(onPage),
         "url " + JSON.stringify(fromUrl) + " · page " + JSON.stringify(onPage));

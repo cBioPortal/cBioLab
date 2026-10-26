@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc } from "../../lib/types.ts";
 import type { DocStore } from "./doc-store.ts";
+import { readUrlJson } from "../../lib/url-json.ts";
 
 const KEY = "labDepth";
 
@@ -31,10 +32,7 @@ const depthOf = (state: unknown): number | null => {
 
 /** `?doc=` → the document it holds; null when there is none or it does not decode */
 export function decodeDocParam(search: string): AnalysisDoc | null {
-  const b64 = new URLSearchParams(search).get("doc");
-  if (!b64) return null;
-  try { return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)))); }
-  catch { return null; }
+  return readUrlJson<AnalysisDoc>(new URLSearchParams(search).get("doc"));
 }
 
 export function useDocHistory(docs: DocStore, emptyDoc: AnalysisDoc, currentTab: () => string): DocHistory {

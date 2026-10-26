@@ -3,13 +3,14 @@
 // list of real AnalysisDocs — nothing here queries the database itself, that happens once each
 // reader clicks through to /lab, exactly like the Examples tab's "copy link"/"Run" pattern.
 //
-// Each card's "Open in Lab" link carries the FULL document as a ?doc= base64url blob (the same
+// Each card's "Open in Lab" link carries the FULL document as a ?doc= value (lib/url-json.ts, the same
 // encoding /lab's own docLink() produces client-side) — the document's own `notes` and each
 // view's own `note` are what actually explain the paper connection, so it travels with the
 // analysis rather than living only on this listing page.
 import { REPRODUCTIONS, type PaperReproduction } from "../../lib/reproductions.ts";
 import { PageTools } from "../_agent/PageTools.tsx";
 import { SiteHeader } from "../_ui/site-header.tsx";
+import { encodeUrlJson } from "../../lib/url-json.ts";
 
 export const metadata = { title: "Paper reproductions — cbio-lab" };
 
@@ -18,7 +19,7 @@ const BADGE_LABEL: Record<PaperReproduction["badge"], string> = {
 };
 
 function docLink(doc: unknown): string {
-  return "/lab?doc=" + Buffer.from(JSON.stringify(doc), "utf-8").toString("base64url");
+  return "/lab?doc=" + encodeUrlJson(doc);
 }
 
 export default function ReproductionsPage() {

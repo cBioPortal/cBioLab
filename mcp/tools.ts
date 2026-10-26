@@ -27,6 +27,7 @@ import { connections, directConnections } from "../lib/ch.ts";
 import { studiesFor } from "../lib/study-list.ts";
 import { catalogFor } from "../lib/study-catalog.ts";
 import type { AnalysisDoc, AnalysisResult, Contract } from "../lib/types.ts";
+import { encodeUrlJson } from "../lib/url-json.ts";
 import type { OncoprintSpec } from "../lib/views/oncoprint/types.ts";
 import { validateAxis, type PlotAxis, type PlotRequest, type AxisKind, type PointRank, type SparseCells, type Whiskers } from "../lib/plot.ts";
 import { resolveAxes } from "../lib/plot-profile.ts";
@@ -592,7 +593,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       try { r = await engine.runAnalysis(document); }
       catch (e) { return text("REJECTED: " + String((e as Error)?.message || e) + "\nCall describe_dsl for the grammar and runnable examples."); }
       const base = process.env.APP_BASE_URL || "https://cohort-lab.vercel.app";
-      const docB64 = Buffer.from(JSON.stringify(document)).toString("base64url");
+      const docB64 = encodeUrlJson(document);
       const content: any[] = [];
       const out = analysisText(document, r);
       // FIGURES. lib/view-svg.ts renders every view kind the app draws, and the
