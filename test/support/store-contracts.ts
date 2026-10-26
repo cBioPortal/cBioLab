@@ -146,7 +146,8 @@ export function idSetContract(backend: string): void {
       const meta = await saveIdSet(P, input("frozen"));
       await assert.rejects(dbQuery("update id_set set id_count = 99 where id = $1", [meta.id]), /members are immutable/);
       await assert.rejects(dbQuery("update id_set set ids_gz = ''::bytea where id = $1", [meta.id]), /members are immutable/);
-      await assert.rejects(dbQuery("delete from id_set where id = $1", [meta.id]), /never deleted/);
+      // the app's role is refused before the trigger is reached
+      await assert.rejects(dbQuery("delete from id_set where id = $1", [meta.id]), /never deleted|permission denied/);
       await dbQuery("update id_set set name = 'renamed' where id = $1", [meta.id]);
     });
   });

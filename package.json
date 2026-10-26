@@ -21,6 +21,7 @@
     "test:boundary": "node --test test/boundary.test.ts",
     "test:db": "node --test \"test/*.db-test.ts\"",
     "db:migrate": "node --env-file-if-exists=.env.local scripts/db-migrate.ts",
+    "db:app-role": "node --env-file-if-exists=.env.local scripts/db-app-role.ts",
     "db:status": "node --env-file-if-exists=.env.local scripts/db-migrate.ts --status",
     "db:claim-legacy": "node --env-file-if-exists=.env.local scripts/claim-legacy.ts",
     "test:python": "python/.venv/bin/python -m unittest discover -s python/tests -v",

@@ -1,15 +1,16 @@
-// Apply db/migrations to the deployment's Postgres (DATABASE_URL, or SUPABASE_DB_URL), recording
-// each in schema_migrations so it runs once. The app never migrates a configured database itself;
-// run this before deploying code that needs a new migration:
+// Apply db/migrations to the deployment's Postgres, recording each in schema_migrations so it runs
+// once. It connects as the tables' owner: MIGRATION_DATABASE_URL, else DATABASE_URL (or
+// SUPABASE_DB_URL) for a database whose app still connects as the owner. The app never migrates a
+// configured database itself; run this before deploying code that needs a new migration:
 //   node --env-file=.env.local scripts/db-migrate.ts            (npm run db:migrate)
 //   node --env-file=.env.local scripts/db-migrate.ts --status   lists applied and pending, changes nothing
 import pg from "pg";
-import { databaseUrl } from "../lib/db.ts";
+import { migrationDatabaseUrl } from "../lib/db.ts";
 import { migrate, migrationFiles } from "../lib/migrate.ts";
 
-const url = databaseUrl();
+const url = migrationDatabaseUrl();
 if (!url) {
-  console.error("DATABASE_URL is not set (without it the app uses its own in-process database, which migrates itself)");
+  console.error("MIGRATION_DATABASE_URL and DATABASE_URL are not set (without either, the app uses its own in-process database, which migrates itself)");
   process.exit(1);
 }
 const client = new pg.Client({ connectionString: url, ssl: /localhost|127\.0\.0\.1/.test(url) ? false : { rejectUnauthorized: false } });

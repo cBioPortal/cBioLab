@@ -101,7 +101,8 @@ see the security notes below.
 | `AUTH_URL` | the request's own origin | this site's public origin, for the sign-in callback when it sits behind a proxy |
 | `AUTH_SESSION_SECRET` | one per process (dev only) | signs the session cookie; 32+ characters, required with `AUTH_OIDC_ISSUER` |
 | `AUTH_DEV_LOGIN` | — | `1`: the development sign-in (any email, no password). Refused on Vercel production |
-| `DATABASE_URL` (or `SUPABASE_DB_URL`) | an in-process Postgres | the Postgres for saved cohorts and analyses, campaigns and custom data. Migrate it with `npm run db:migrate` before deploying code that needs a new migration |
+| `DATABASE_URL` (or `SUPABASE_DB_URL`) | an in-process Postgres | the Postgres for saved cohorts and analyses, campaigns and custom data, as the app's role `cohort_lab_app`: `npm run db:app-role -- <file>` gives it a new password and writes this URL to the file |
+| `MIGRATION_DATABASE_URL` | `DATABASE_URL` | the same Postgres as its tables' owner, for `npm run db:migrate` (run before deploying code that needs a new migration) and `db:app-role`. Never set on the deployment |
 | `PGLITE_DIR` | `.data/pglite` under `next dev`, else memory | where the in-process Postgres keeps its files when `DATABASE_URL` is unset |
 
 ## The site
