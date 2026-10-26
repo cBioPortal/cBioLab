@@ -1386,6 +1386,19 @@ export function peerRowsFor(r: Resolver, kind: PatientKind): (Resolver & RemoteP
   return typeof p.patientRows === "function" && !!p.patientKinds?.has(kind) ? r as Resolver & RemotePatientRows : null;
 }
 
+/** The case-level pieces of a plot: what an entitled participant answers, local or a peer sharing `plot`. */
+export type PlotCasesCapable = Pick<PatientLevelCapable, "plotPoints" | "plotScatterPoints" | "plotRankedPoints" | "plotHighlightPoints">;
+/**
+ * Who may be asked for a plot's cases: a local patient-level participant, or a peer this instance
+ * accepts the `plot` kind from (whose resolver then has the methods; lib/federation-remote.ts).
+ * null for every other participant, whose plot draws its density alone.
+ */
+export function plotCasesOf(r: Resolver): (Resolver & PlotCasesCapable) | null {
+  if (isPatientLevel(r)) return r;
+  const p = r as unknown as Partial<PlotCasesCapable>;
+  return typeof p.plotScatterPoints === "function" && typeof p.plotPoints === "function" ? r as Resolver & PlotCasesCapable : null;
+}
+
 export function isPatientLevel(r: Resolver): r is PatientLevelCapable {
   return r.instance.mode === "patient-level";
 }

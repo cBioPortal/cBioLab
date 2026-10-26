@@ -109,20 +109,20 @@ async function exploreFor(body: any) {
     const peer = peers.get(s)!;
     return remoteFacets(s, peer.url, draft, peer.label, geneSearch);
   }));
+  // every study's profiles as it describes them (a peer's from the peer), once per profile id, for a plot axis's Data picker
+  const profileCatalog = [...new Map(studies.flatMap((st) => (profilesByStudy.get(st)?.catalog || []).map((p: ProfileInfo) => [p.profile, p] as const))).values()];
   if (!local.length) {
-    return remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts);
+    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog };
   }
   const { catalog: _c, ...oneProfiles } = profilesByStudy.get(local[0]) || {};
   const localResult = local.length === 1
     ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts, derived,
         ...oneProfiles, conn: connByStudy.get(local[0]) })
     : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived });
-  // every local study's profiles as it describes them, once per profile id, for a plot axis's Data picker
   const assayFacets = body.assayCharts && body.assayCharts.length
     ? await buildAssayFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy,
         charts: body.assayCharts.filter((c: { profileType: string; entity: string }) => ENTITY_RE.test(c.entity)) })
     : undefined;
-  const profileCatalog = [...new Map(local.flatMap((st) => (profilesByStudy.get(st)?.catalog || []).map((p: ProfileInfo) => [p.profile, p] as const))).values()];
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
   return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}) };
 }

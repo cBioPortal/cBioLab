@@ -665,7 +665,7 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     assert.deepEqual([...allowedKinds(r, "s2")].sort(), ["alterations", "timeline"], "s2's own rule and the * rule together");
     assert.deepEqual([...allowedKinds(r, "s3")], ["alterations"]);
     assert.deepEqual([...allowedKinds(parseRules("s1", "X"), "s1")], ["timeline"]);
-    assert.deepEqual([...allowedKinds(parseRules("s1:*", "X"), "s1")].sort(), ["alterations", "timeline"]);
+    assert.deepEqual([...allowedKinds(parseRules("s1:*", "X"), "s1")].sort(), ["alterations", "plot", "timeline"]);
     assert.equal(allowedKinds(parseRules("", "X"), "s1").size, 0);
     assert.throws(() => parseRules("s1:timline", "PEER_MCP_PATIENT_LEVEL"), /PEER_MCP_PATIENT_LEVEL: unknown kind 'timline'/);
     assert.throws(() => parseRules("s1:", "X"), /names no kind/);
@@ -710,6 +710,38 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     // the plain remote resolver is unchanged
     for (const m of ["patientTimeline", "patientRows"])
       assert.equal(typeof (RemoteAggregateResolver.prototype as unknown as Record<string, unknown>)[m], "undefined");
+  });
+
+  test("a plot's cases from a peer only where this instance accepts the plot kind: the methods are the object's own, never the class's", () => {
+    const CASES = ["plotPoints", "plotScatterPoints", "plotRankedPoints", "plotHighlightPoints"];
+    for (const C of [RemoteAggregateResolver, RemotePatientResolver, RemoteTimelineResolver])
+      for (const m of CASES) assert.equal(typeof (C.prototype as unknown as Record<string, unknown>)[m], "undefined", C.name + ".prototype must not have " + m);
+    const without = new RemoteTimelineResolver("s", "http://peer.invalid/api/mcp", AGG, ["timeline", "alterations"]);
+    const plain = new RemoteAggregateResolver("s", "http://peer.invalid/api/mcp", AGG);
+    for (const r of [without, plain]) {
+      for (const m of CASES) assert.equal(typeof (r as unknown as Record<string, unknown>)[m], "undefined", "no plot kind accepted: no " + m);
+      assert.equal(federation.plotCasesOf(r), null);
+    }
+    const sharing = new RemotePatientResolver("s", "http://peer.invalid/api/mcp", AGG, ["plot"]);
+    for (const m of CASES) assert.ok(Object.prototype.hasOwnProperty.call(sharing, m), "accepted: " + m + " is the object's own");
+    assert.equal(federation.plotCasesOf(sharing), sharing);
+    assert.equal(federation.isPatientLevel(sharing), false, "sharing plot cases makes it patient-level for nothing else");
+    for (const m of ["members", "rowsPage", "coxRows", "logisticRows", "viewRows", "viewAggregate"])
+      assert.equal(typeof (sharing as unknown as Record<string, unknown>)[m], "undefined", "a plot-sharing peer must not have " + m);
+    // a peer answers a plot's aggregates whatever it shares
+    assert.equal(federation.hasFederatedPlot(plain), true);
+  });
+
+  test("a peer's plot cases are refused before the network is touched for an explicit id list", async () => {
+    const original = globalThis.fetch;
+    let called = false;
+    globalThis.fetch = (async () => { called = true; throw new Error("no network in this test"); }) as typeof fetch;
+    try {
+      const r = new RemotePatientResolver("s", "http://peer.invalid/api/mcp", AGG, ["plot"]);
+      const spec = { x: { source: "clinical" as const, attribute: "AGE" }, y: { source: "clinical" as const, attribute: "TMB" }, unit: "sample" as const };
+      await assert.rejects(() => federation.plotCasesOf(r)!.plotScatterPoints({ all: [{ kind: "patientList", ids: ["P1"] }] } as never, spec), /explicit sample or patient list/);
+      assert.equal(called, false);
+    } finally { globalThis.fetch = original; }
   });
 
   test("a table of a kind not accepted, and an explicit id list in a cohort, are refused before the network is touched", async () => {

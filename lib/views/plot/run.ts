@@ -2,7 +2,7 @@
 // the axes decide; local, or federated where every participant can answer.
 import type { ViewResult } from "../../types.ts";
 import { pearsonFromMoments, regressionFromMoments, type Moments } from "../../stats.ts";
-import { isPatientLevel, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PatientLevelResolver } from "../../federation.ts";
+import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank } from "../../plot.ts";
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
@@ -49,18 +49,27 @@ const fmt = (n: number) => n.toLocaleString("en-US");
 
 /**
  * The plotted cohort's own cases as points, set on `data`: every case at or under POINTS_CAP, from
- * a participant entitled to see cases, unless the view says `allPoints: false`. Over the cap the
- * crowd is density, and the subsets worth seeing one by one are the view's point layers.
- * isPatientLevel is a type guard, so asking an aggregate-only participant is a compile error.
+ * a participant entitled to see cases (a local patient-level one, or a peer sharing `plot`), unless
+ * the view says `allPoints: false`. Over the cap the crowd is density, and the subsets worth seeing
+ * one by one are the view's point layers. plotCasesOf is a type guard, so asking a participant that
+ * may not show cases is a compile error.
  */
 async function basePoints(pv: PlotView, r0: Resolver, def: Def, spec: PlotRequest, data: PlotData, site: string): Promise<void> {
   if (data.shape === "table" || !data.n) return;
   const none = (why: string) => { data.pointSet = { rule: "none", drawn: 0, why }; };
   if (pv.allPoints === false) return none("allPoints: false");
   if (data.n > POINTS_CAP) return none("more than " + fmt(POINTS_CAP) + " cases");
-  if (!isPatientLevel(r0)) return none(site + " may not show individual cases");
+  const rc = plotCasesOf(r0);
+  if (!rc) return none(site + " may not show individual cases");
+  // a peer that refuses (its rules do not share this study's plot cases) leaves the density, saying why
+  try { await drawAll(rc, def, spec, data); }
+  catch (e) { if (r0.instance.id !== "peer") throw e; none(String((e as Error).message || e)); }
+}
+
+/** every case of a plot at or under the cap, from a participant that may show them */
+async function drawAll(rc: PlotCasesCapable, def: Def, spec: PlotRequest, data: PlotData): Promise<void> {
   if (data.shape === "box") {
-    const all = await r0.plotPoints(def, spec);
+    const all = await rc.plotPoints(def, spec);
     if (!all || !all.length) return;
     data.points = all; data.overlay = "points";
     data.pointSet = { rule: "all", drawn: all.length };
@@ -68,7 +77,7 @@ async function basePoints(pv: PlotView, r0: Resolver, def: Def, spec: PlotReques
     if (spec.ringBy) data.legend = [...(data.legend || []), ...legendFor(all.map((x) => x.r || ""), true)];
     return;
   }
-  const all = await r0.plotScatterPoints(def, spec);
+  const all = await rc.plotScatterPoints(def, spec);
   if (!all || !all.length) return;
   data.xyPoints = all;
   data.pointSet = { rule: "all", drawn: all.length };
@@ -117,6 +126,17 @@ function layersProblem(pv: PlotView, c: ViewRun, cn: string): string | null {
   return null;
 }
 
+/**
+ * A call that may reach a peer for cases: run as it is when every participant is this instance's
+ * own (an error then is a real one), and when one is a peer, its refusal (its rules do not share the
+ * study's plot cases, or it predates them) becomes `fallback`'s answer, which the caption says.
+ */
+async function peerSafe<T>(rs: Resolver[], run: () => Promise<T>, fallback: (why: string) => T): Promise<T> {
+  if (!rs.some((r) => r.instance.id === "peer")) return run();
+  try { return await run(); }
+  catch (e) { return fallback(String((e as Error).message || e)); }
+}
+
 /** a layer's points, each with the key that says whether an earlier layer already drew the case */
 type Picked = { layer: PlotLayer; keys?: string[] };
 
@@ -133,7 +153,7 @@ async function pointLayers(pv: PlotView, data: PlotData, c: ViewRun, cn: string,
   const fr = c.resolvers as Record<string, Resolver & FederatedPlotCapable>;
   const def = c.doc.cohorts[cn];
   const xk = data.x.kind, yk = data.y.kind;
-  const closed = sites.filter((s) => !isPatientLevel(c.resolvers[s]));
+  const closed = sites.filter((s) => !plotCasesOf(c.resolvers[s]));
   // each drawn case, and the layer (its place in the list) that drew it
   const seen = new Map<string, number>();
   let budget = POINTS_CAP;
@@ -146,7 +166,8 @@ async function pointLayers(pv: PlotView, data: PlotData, c: ViewRun, cn: string,
     else if (data.shape === "table" || !data.n)
       picked = { layer: { kind, ...base, n: 0, shown: "none", why: data.n ? TABLE_WHY : undefined } };
     else if (closed.length) picked = { layer: { kind, ...base, n: 0, shown: "none", why: closed.join(", ") + " may not show individual cases" } };
-    else picked = await ruleLayer(l, base, data, fr, def, sites, spec, xk, yk, budget);
+    else picked = await peerSafe(sites.map((s) => c.resolvers[s]), () => ruleLayer(l, base, data, fr, def, sites, spec, xk, yk, budget),
+      (why) => ({ layer: { kind, ...base, n: 0, shown: "none", why } }));
     const { layer, keys } = picked;
     if (layer.shown === "points" && layer.points && keys) {
       const kept = layer.points.filter((_, j) => !seen.has(keys[j]));
@@ -185,18 +206,19 @@ async function cohortLayer(name: string, base: { label: string; color: string },
   if (data.shape === "table") return { layer: { ...head, inPlot, n: 0, shown: "none", why: TABLE_WHY } };
   if (!inPlot || !data.n) return { layer: { ...head, inPlot, n: 0, shown: "none" } };
   let why: string;
-  const closed = hSites.filter((s) => !isPatientLevel(c.resolvers[s]));
+  let closedWhy = "";
+  const closed = hSites.filter((s) => !plotCasesOf(c.resolvers[s]));
   if (!closed.length && budget > 0) {
-    const parts = await Promise.all(hSites.map((s) => {
-      const r = c.resolvers[s];
-      return isPatientLevel(r) ? r.plotHighlightPoints(def, hDef, spec, xk, yk, budget) : Promise.resolve(null);
-    }));
-    if (parts.every((p) => p)) {
+    // a peer that refuses its cases leaves this layer to its aggregate form, saying why
+    const parts = await peerSafe(hSites.map((s) => c.resolvers[s]),
+      () => Promise.all(hSites.map((s) => plotCasesOf(c.resolvers[s])!.plotHighlightPoints(def, hDef, spec, xk, yk, budget))),
+      (w) => { closedWhy = w; return hSites.map(() => null); });
+    if (!closedWhy && parts.every((p) => p)) {
       const g = gather(parts as HighlightPoint[][], hSites);
       if (g.points.length <= budget) return { layer: { ...head, inPlot, n: g.points.length, shown: "points", points: g.points }, keys: g.keys };
     }
-    why = budget === POINTS_CAP ? "more than " + fmt(POINTS_CAP) + " cases, too many to draw as points"
-      : "more cases than the " + fmt(budget) + " points the earlier layers left";
+    why = closedWhy || (budget === POINTS_CAP ? "more than " + fmt(POINTS_CAP) + " cases, too many to draw as points"
+      : "more cases than the " + fmt(budget) + " points the earlier layers left");
   } else {
     why = closed.length ? closed.join(", ") + " may not show individual cases" : "the earlier layers used every point the figure draws";
   }
@@ -222,7 +244,7 @@ async function ruleLayer(l: Exclude<PointLayerSpec, { cohort: string }>, base: {
   const kind = l.rule;
   const none = (why: string): Picked => ({ layer: { kind, ...base, n: 0, shown: "none", why } });
   const tooMany = (n: number) => none(fmt(n) + " cases, more than the " + fmt(budget) + " points " + (budget === POINTS_CAP ? "a figure draws" : "the earlier layers left"));
-  const entitled = sites.map((s) => fr[s] as unknown as PatientLevelResolver);
+  const entitled = sites.map((s) => plotCasesOf(fr[s])!);
   if (l.rule === "outliers") {
     // outliers stand out of a density too large to draw as points; under the cap there is none
     if (data.n <= POINTS_CAP) return none("at or under " + fmt(POINTS_CAP) + " cases there is no density for them to stand out of");
@@ -430,8 +452,10 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         // rows are already independent of any shared scale. A site that may not disclose
         // cases contributes none, the same rule the oncoprint's columns follow.
         if (pv.allPoints !== false) {
-          const perSite = await Promise.all(sites.map((s) =>
-            isPatientLevel(resolvers[s]) ? resolvers[s].plotPoints(doc.cohorts[cn], spec) : Promise.resolve([])));
+          const perSite = await peerSafe(sites.map((s) => resolvers[s]), () => Promise.all(sites.map((s) => {
+            const rc = plotCasesOf(resolvers[s]);
+            return rc ? rc.plotPoints(doc.cohorts[cn], spec) : Promise.resolve([]);
+          })), () => []);
           const pts = perSite.every((p) => p) ? perSite.flatMap((p) => p!) : [];
           if (pts.length && pts.length <= POINTS_CAP) {
             data.points = pts; data.overlay = "points";

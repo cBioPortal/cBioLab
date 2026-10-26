@@ -54,13 +54,24 @@ export interface StudyProfiles {
  * Fills the same cache studyProfiles reads.
  */
 export async function studyProfilesMany(studies: string[]): Promise<Map<string, StudyProfiles>> {
-  const { peerForStudy } = await import("./federation-remote.ts");
+  const { peerForStudy, remoteProfiles } = await import("./federation-remote.ts");
   const routing = await studyRouting();
   const todo = studies.filter((s) => !_profileCache.has(s));
   const peers = await Promise.all(todo.map((s) => peerForStudy(s)));
+  // a peer's study: its profiles as the peer describes them (metadata only); a peer that cannot say
+  // has none to offer, and a view that needs one is refused naming what is missing. Cached only once
+  // the peer has answered, so a peer that was down is asked again
+  const fromPeers = new Map<string, StudyProfiles>();
+  const peerAsks = todo.map(async (s, i) => {
+    const peer = peers[i];
+    if (!peer) return;
+    const out = await remoteProfiles(s, peer.url).catch(() => ({ profiles: [], gaProfiles: [], catalog: [] }));
+    fromPeers.set(s, out);
+    if (out.catalog.length) _profileCache.set(s, out);
+  });
   const groups = new Map<string, { conn: ChConn; studies: string[] }>();
   todo.forEach((s, i) => {
-    if (peers[i]) { _profileCache.set(s, { profiles: [], gaProfiles: [], catalog: [] }); return; } // the peer owns its own profile inventory
+    if (peers[i]) return;
     const conn = routing.get(s) || PRIMARY;
     const k = conn.id + "|" + conn.db;
     if (!groups.has(k)) groups.set(k, { conn, studies: [] });
@@ -91,7 +102,8 @@ export async function studyProfilesMany(studies: string[]): Promise<Map<string, 
       ...(r.assay ? { assayType: String(r.assay) } : {}), ...(Number(r.pl) === 1 ? { patientLevel: true } : {}), order: Number(r.ord) || 0 });
     for (const [s, p] of out) _profileCache.set(s, p);
   }));
-  return new Map(studies.map((s) => [s, _profileCache.get(s)!]));
+  await Promise.all(peerAsks);
+  return new Map(studies.map((s) => [s, _profileCache.get(s) || fromPeers.get(s)!]));
 }
 
 export async function studyProfiles(study: string): Promise<StudyProfiles> {
