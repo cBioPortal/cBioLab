@@ -104,6 +104,10 @@ export const api = {
     share: (id: string, sharing: Sharing) => send("PUT", "/api/id-sets/" + id + "/sharing", sharing),
   },
 
+  /** People who have signed in, by email prefix or a word of their name (lib/users.ts). */
+  users: {
+    search: (q: string, opts: Opts = {}) => fetch("/api/users?q=" + encodeURIComponent(q), { signal: opts.signal }),
+  },
   /** Groups (lib/groups.ts): the reader's, and managing one. */
   groups: {
     list: (opts: Opts = {}) => fetch("/api/groups", { signal: opts.signal }),

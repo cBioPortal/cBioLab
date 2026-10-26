@@ -28,7 +28,6 @@ export default async function PythonPage({ searchParams }: { searchParams: Promi
       <header>
         <h1>cbio-lab</h1>
         <span className="sub">{spec ? "your oncoprint in Python" : "oncoprint in Python"} — the package running in your browser via Pyodide</span>
-        <span className="spacer" />
         <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>interactive lab →</a>
         <a href="/oncoprint-lab/import" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>pasted data →</a>
         <a href={"/oncoprint-lab/cli" + (encoded ? "?spec=" + encoded + (cut ? "&cut=" + encodeURIComponent(cut) : "") : "")} style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>command line →</a>

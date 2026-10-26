@@ -55,7 +55,8 @@ export interface LabBridge {
   openSaved: (name: string) => void;
 }
 
-const TABS = ["explore", "cohorts", "saved", "analysis", "examples"];
+/** the page's tabs, and "saved": the reader's saved work, opened over the page */
+const TABS = ["explore", "analysis", "examples", "saved"];
 const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
 const cap = (s: string, n = 20000) => s.length <= n ? s : s.slice(0, n) + `\n… [${(s.length - n).toLocaleString()} more characters not shown]`;
 

@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { listDatasets, saveDataset, readVersion, deleteDataset, unpackRows, shareDataset } from "../../lib/custom-store.ts";
 import { listArtifacts, getArtifact, createArtifact, updateArtifact, deleteArtifact, shareArtifact } from "../../lib/artifacts.ts";
 import { createGroup, addMember, getGroup, listGroups, removeMember, setRole, deleteGroup } from "../../lib/groups.ts";
-import { userForEmail, signIn, claimLegacy } from "../../lib/users.ts";
+import { userForEmail, signIn, claimLegacy, searchUsers } from "../../lib/users.ts";
 import { dbQuery } from "../../lib/db.ts";
 import { saveIdSet, listIdSets, getIdSet, readIdSet, deleteIdSet, shareIdSet, loadIdSetForRequest } from "../../lib/id-set-store.ts";
 
@@ -228,6 +228,18 @@ export function userContract(backend: string): void {
       const a = await signIn({ provider: iss, subject: "same", email: "one@example.org", emailVerified: true });
       const b = await signIn({ provider: "https://other.test", subject: "same", email: "two@example.org", emailVerified: true });
       assert.notEqual(a.id, b.id);
+    });
+    test("search finds people who have signed in, by email prefix or a word of their name", async () => {
+      await signIn({ provider: iss, subject: "s-search-1", email: "barbara.mcclintock@example.org", emailVerified: true, name: "Barbara McClintock" });
+      await signIn({ provider: iss, subject: "s-search-2", email: "rosalind@example.org", emailVerified: true, name: "Rosalind Franklin" });
+      await userForEmail("barbara.never@example.org");
+      const emails = async (q: string) => (await searchUsers(q)).map((u) => u.email);
+      assert.deepEqual(await emails("barb"), ["barbara.mcclintock@example.org"], "an email prefix, and never someone who has not signed in");
+      assert.deepEqual(await emails("frank"), ["rosalind@example.org"], "a word of the name");
+      assert.deepEqual(await emails("ara"), [], "not the middle of a word");
+      assert.deepEqual(await emails("b"), [], "two characters at least");
+      assert.deepEqual(await emails("%a"), [], "LIKE's wildcards are only text");
+      assert.deepEqual(await emails("rosalind_"), [], "an underscore too");
     });
     test("a disabled user cannot sign in", async () => {
       const u = await signIn({ provider: iss, subject: "s-6", email: "gone@example.org", emailVerified: true });

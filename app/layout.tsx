@@ -1,6 +1,8 @@
 import "./globals.css";
 import { BUILD_INFO } from "../lib/build-info.ts";
 import { ChatSidebar } from "./_agent/ChatSidebar.tsx";
+import { LabProviders } from "./lab/providers.tsx";
+import { SavedProvider } from "./_saved/saved-context.tsx";
 
 export const metadata = {
   title: "cbio-lab",
@@ -15,7 +17,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:wght@600&display=swap" />
       </head>
       <body>
-        {children}
+        {/* one query cache per browser tab, and the saved-work manager any page can open */}
+        <LabProviders><SavedProvider>{children}</SavedProvider></LabProviders>
         {/* which code this deployment runs (lib/build-info.ts); also served as /api/version */}
         <footer className="build-stamp">
           build{" "}

@@ -1,16 +1,18 @@
 "use client";
-// Top-right "Sign in" / who is signed in and "Sign out", like the portal's. Signing in lets a
+// Top-right "Sign in", or once signed in the account menu (who, and sign out), like
+// the portal's "Logged in as" menu. Signing in lets a
 // reader save and open their own cohorts and analyses and use custom data (lib/auth.ts). A
 // deployment offers its provider (Google, MSK…), the development sign-in, or both; with only a
 // provider the button goes straight there. Shown only where the deployment signs people in.
 import { useCallback, useEffect, useState } from "react";
-import { LogIn, LogOut, Users } from "lucide-react";
+import { ChevronDown, LogIn, LogOut, UserRound } from "lucide-react";
 import { loadCustomData, devSignIn, signInWithProvider, logOut, onLoginRequest, serverState } from "./custom-data-client.ts";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 import { Button } from "../_ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Input } from "../_ui/input";
 import { TB } from "../_ui/toolbar.ts";
+import { GearMenu, MenuItem, MenuSeparator } from "../_ui/gear-menu.tsx";
 
 export default function LoginButton() {
   const server = useCustomDataState();
@@ -49,9 +51,18 @@ export default function LoginButton() {
   return (
     <>
       {server.unlocked
-        ? <span className="loginstate"><span className="meta" title={server.user?.email}>{who}</span>
-            <Button variant="outline" size="sm" className={TB} asChild><a href="/groups" title="the groups you share saved work with"><Users />Groups</a></Button>
-            <Button variant="outline" size="sm" className={TB} onClick={() => void logOut()} title="sign this browser out"><LogOut />Sign out</Button></span>
+        ? <span className="loginstate">
+            <GearMenu menuId="account" className="accountbtn" title={"signed in as " + server.user?.email}
+              label={<><UserRound /><span className="meta">{who}</span><ChevronDown /></>}>
+              {(close) => <>
+                <div className="px-2 py-1">
+                  <div>{server.user?.name || "Signed in"}</div>
+                  <div className="meta">{server.user?.email}</div>
+                </div>
+                <MenuSeparator />
+                <MenuItem onClick={() => { close(); void logOut(); }}><LogOut />Sign out</MenuItem>
+              </>}
+            </GearMenu></span>
         : <Button variant="outline" size="sm" className={TB} onClick={open} title="sign in to save cohorts and analyses and use custom data"><LogIn />Sign in</Button>}
       <Dialog open={shown} onOpenChange={setShown}>
         <DialogContent className="logindialog sm:max-w-sm">

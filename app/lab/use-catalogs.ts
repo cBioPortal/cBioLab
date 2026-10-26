@@ -72,7 +72,11 @@ export function useStudyCatalog(study: string, enabled = true): { cat: any; catL
  * exist. An upload adds attributes to the same studies, so the datasets are part of the key.
  */
 export function useTrackAttrs(result: AnalysisResult | null): { trackAttrs: TrackAttrs; trackAttrsLoading: boolean } {
-  const studies = result ? (result.involvedStudies && result.involvedStudies.length ? result.involvedStudies : [result.study]) : [];
+  return useStudyAttrs(result ? (result.involvedStudies && result.involvedStudies.length ? result.involvedStudies : [result.study]) : []);
+}
+
+/** The same catalog for any studies — a saved cohort's, say, with no analysis run. */
+export function useStudyAttrs(studies: string[]): { trackAttrs: TrackAttrs; trackAttrsLoading: boolean } {
   const key = studies.join(",") + "|" + customDataKey();
   const q = useQuery({
     queryKey: ["trackAttrs", key],

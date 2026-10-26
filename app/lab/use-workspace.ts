@@ -18,7 +18,7 @@ export interface WorkspacePage {
   canSave: () => boolean;
   doc: AnalysisDoc;
   docs: DocStore;
-  goTab: (t: "explore" | "cohorts" | "analysis" | "examples") => void;
+  goTab: (t: "explore" | "analysis" | "examples") => void;
   persistSpaces: (name: string, doc: AnalysisDoc) => Promise<void>;
   removeSpace: (name: string) => Promise<void>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
@@ -58,8 +58,10 @@ export function useWorkspace(page: WorkspacePage) {
   };
   const openWorkspace = (name: string) => {
     const w = spaces[name];
-    if (!w) return;
-    const d = w.doc;
+    if (w) openDocument(w.doc);
+  };
+  /** An analysis to work on as the reader's own: one of theirs saved, or a new one. */
+  const openDocument = (d: AnalysisDoc) => {
     setSharedFrom(null);
     docs.replace(d);
     setError(null);
@@ -145,5 +147,5 @@ export function useWorkspace(page: WorkspacePage) {
     docs.set(d); setError(null);
   };
 
-  return { sharedOpen, openShared, confirmSharedSave, wsOpen, setWsOpen, wsError, setWsError, viewNoteEditing, setViewNoteEditing, openWorkspaceSave, confirmWorkspaceSave, openWorkspace, deleteWorkspace, makeTemplate, setParam, setNotes, analysisSaved, noteEdit, openViewNoteEdit, confirmViewNoteEdit, clearAnalysis };
+  return { sharedOpen, openShared, confirmSharedSave, wsOpen, setWsOpen, wsError, setWsError, viewNoteEditing, setViewNoteEditing, openWorkspaceSave, confirmWorkspaceSave, openWorkspace, openDocument, deleteWorkspace, makeTemplate, setParam, setNotes, analysisSaved, noteEdit, openViewNoteEdit, confirmViewNoteEdit, clearAnalysis };
 }

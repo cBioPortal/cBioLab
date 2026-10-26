@@ -174,7 +174,6 @@ export default async function CliPage({ searchParams }: { searchParams: Promise<
       <header>
         <h1>cbio-lab</h1>
         <span className="sub">{spec ? "your oncoprint, on the command line" : "oncoprint from the command line — Node and Python, one contract"}</span>
-        <span className="spacer" />
         <a href="/oncoprint-lab" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>interactive lab →</a>
         <a href="/oncoprint-lab/import" style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)", marginRight: "1rem" }}>pasted data →</a>
         <a href={link("/oncoprint-lab/python")} style={{ color: "var(--accent-ink)", fontSize: "var(--t-md)" }}>python notebook →</a>

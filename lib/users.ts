@@ -58,6 +58,22 @@ export async function userForEmail(email: unknown): Promise<User> {
   return asUser(u);
 }
 
+/**
+ * People who have signed in, found by a prefix of their email or any word of their name, for adding
+ * them to a group. Someone added by email who never signed in, and anyone disabled, is not offered.
+ */
+export async function searchUsers(q: unknown, limit = 10): Promise<User[]> {
+  const t = typeof q === "string" ? q.trim().toLowerCase() : "";
+  if (t.length < 2) return [];
+  // LIKE's wildcards and its escape character, taken as text
+  const lit = t.replace(/[\\%_]/g, "\\$&");
+  const rows = await dbQuery<UserRow>(
+    "select * from app_user where last_login_at is not null and disabled_at is null" +
+    " and (email like $1 or lower(coalesce(name, '')) like $1 or lower(coalesce(name, '')) like $2)" +
+    " order by email limit $3", [lit + "%", "% " + lit + "%", Math.min(Math.max(1, limit), 25)]);
+  return rows.map(asUser);
+}
+
 export async function getUser(id: string): Promise<(User & { disabled: boolean }) | null> {
   if (!/^[0-9a-f-]{36}$/.test(id)) return null;
   const [u] = await dbQuery<UserRow>("select * from app_user where id = $1", [id]);

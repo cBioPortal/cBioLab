@@ -4,6 +4,7 @@
 // also edit it. Opened by the owner only. Sharing an analysis wider than a custom dataset it uses
 // comes back with that dataset named; the dialog offers to share the reader's own such datasets the
 // same way, and says to ask the owner of anyone else's. Nothing is shared but by a click here.
+import { useSaved } from "../_saved/saved-context.tsx";
 import { useState } from "react";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { Sharing, Visibility } from "../../lib/access.ts";
@@ -72,10 +73,12 @@ export function ShareDialog({ kind, name, sharing, groups, groupsError, onSave, 
     finally { setBusy(false); }
   };
 
+  const saved = useSaved();
   const groupPicker = groups === undefined
     ? (groupsError ? <span className="error">could not load your groups: {groupsError}</span> : <Waiting what="your groups" />)
     : groups.length === 0
-      ? <span className={META}>You are in no groups yet — make one on the <a href="/groups" target="_blank" rel="noreferrer">Groups</a> page.</span>
+      ? <span className={META}>You are in no groups yet — <Button variant="link" size="inline" className="text-sm"
+          onClick={() => { onClose(); saved.open("groups"); }}>make one</Button> under Groups in your saved work.</span>
       : <Choice value={groupId} onChange={setGroupId} placeholder="choose a group…" title="group" className="w-full"
           options={groups.map((g) => [g.id, g.name + " (" + g.members + " member" + (g.members === 1 ? "" : "s") + ")"] as const)} />;
 

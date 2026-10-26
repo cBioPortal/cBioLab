@@ -19,9 +19,9 @@ async function savedLists(browser, ok, BASE, LOGIN) {
     {
       let release; const gate = new Promise((r) => (release = r));
       await page.route("**/api/auth", async (route) => { await gate; await route.continue().catch(() => {}); });
-      await page.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
+      await page.goto(BASE + "/saved?tab=cohorts", { waitUntil: "domcontentloaded" });
       await page.getByText("loading your sign-in").waitFor({ timeout: 120000 });
-      ok("Saved tab waits for the sign-in rather than claiming there is none",
+      ok("saved work waits for the sign-in rather than claiming there is none",
         (await page.getByText("This deployment has no sign-in").count()) === 0);
       release(); await page.unroute("**/api/auth");
     }
@@ -40,7 +40,7 @@ async function savedLists(browser, ok, BASE, LOGIN) {
     {
       let release; const gate = new Promise((r) => (release = r));
       await page.route(LIST, async (route) => { await gate; await route.continue().catch(() => {}); });
-      await page.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
+      await page.goto(BASE + "/saved?tab=cohorts", { waitUntil: "domcontentloaded" });
       await page.getByText("loading saved cohorts").waitFor({ timeout: 120000 });
       const claimsEmpty = await page.getByText("Nothing saved yet").count();
       const usable = await page.locator(".newlistcohort").isEnabled();
@@ -77,10 +77,54 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       await row.getByRole("button", { name: "save to library" }).click();
       await page.waitForTimeout(2500);
       const stored = await savedCount(name);
-      await page.goto(BASE + "/lab?tab=cohorts", { waitUntil: "domcontentloaded" });
+      await page.goto(BASE + "/saved?tab=cohorts", { waitUntil: "domcontentloaded" });
       await page.locator("label.pick", { hasText: name }).first().waitFor({ timeout: 120000 });
       const listed = await page.locator("label.pick", { hasText: name }).count();
       ok("saving a cohort under a name it has updates it", stored === 1 && listed === 1, "stored " + stored + ", listed " + listed);
+    }
+
+    // a saved cohort's menu (app/_saved/cohort-menu.tsx): duplicated, the copy renamed with a note,
+    // split by a gene and the split removed, opened in Explore to edit and cancelled, then deleted
+    {
+      const steps = {};
+      try {
+        const rowOf = (n) => page.locator(".listrow").filter({ has: page.locator("strong", { hasText: n }) });
+        const menu = async (n) => { await rowOf(n).locator("button.savedcohortgear").click(); return page.locator("[data-slot=popover-content]"); };
+        const first = (await page.locator(".listrow label.pick strong").first().innerText()).trim();
+        const copy = "e2e copy " + Date.now();
+        await (await menu(first)).getByRole("button", { name: "duplicate" }).click();
+        await rowOf(first + " copy").first().waitFor({ timeout: 30000 });
+        await (await menu(first + " copy")).getByRole("button", { name: /^rename/ }).click();
+        const dlg = page.locator("[role=dialog].cohortdialog");
+        await dlg.locator("#cename").fill(copy); await dlg.locator("#cenotes").fill("e2e note");
+        await dlg.getByRole("button", { name: "Save" }).click();
+        await rowOf(copy).waitFor({ timeout: 30000 });
+        steps.renamed = (await rowOf(copy).getByText("e2e note", { exact: true }).count()) === 1 && (await savedCount(first + " copy")) === 0;
+        const m = await menu(copy);
+        await m.getByRole("button", { name: /split into arms/ }).click();
+        await m.locator("[role=combobox]").first().click();
+        await page.getByRole("option", { name: /a gene/ }).click();
+        await m.locator("input").fill("TP53");
+        await m.getByRole("button", { name: /^Split$/ }).click();
+        await rowOf(copy).getByText(/split “/).waitFor({ timeout: 120000 });
+        steps.split = /TP53/.test(await rowOf(copy).getByText(/split “/).locator("..").innerText());
+        await rowOf(copy).getByRole("button", { name: /remove the split/ }).click();
+        for (let i = 0; i < 40 && (await rowOf(copy).getByText(/split “/).count()); i++) await page.waitForTimeout(250);
+        steps.unsplit = (await rowOf(copy).getByText(/split “/).count()) === 0;
+        await (await menu(copy)).getByRole("button", { name: /edit filters/ }).click();
+        const bar = page.locator(".addcohortbar");
+        await bar.waitFor({ timeout: 60000 });
+        steps.editing = (await bar.innerText()).includes("Editing “" + copy + "”") && !page.url().includes("editCohort=");
+        await bar.getByRole("button", { name: "Cancel" }).click();
+        await page.goto(BASE + "/saved?tab=cohorts", { waitUntil: "domcontentloaded" });
+        await rowOf(copy).waitFor({ timeout: 120000 });
+        page.once("dialog", (d) => d.accept());
+        await (await menu(copy)).getByRole("button", { name: /delete/ }).click();
+        for (let i = 0; i < 40 && (await savedCount(copy)); i++) await page.waitForTimeout(250);
+        steps.deleted = (await savedCount(copy)) === 0;
+      } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
+      ok("a saved cohort's menu duplicates, renames, splits, opens in Explore and deletes it",
+        steps.renamed && steps.split && steps.unsplit && steps.editing && steps.deleted, JSON.stringify(steps));
     }
 
     // the analysis page's text dialogs (app/lab/dialogs.tsx): a workspace saved and reopened, a
@@ -146,8 +190,8 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       await page.goto(BASE + "/lab?tab=explore", { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => window.cohortLab && window.cohortLab.call, null, { timeout: 120000 });
       await tool("explore_select_studies", { studies: ["msk_chord_2024"] });
+      // nothing uploaded yet, so Custom data opens on adding one
       await page.locator('button[title^="upload your own annotations"]').click();
-      await page.locator("[role=dialog].customdatamanager [role=tab]", { hasText: "Add data" }).click();
       await page.locator("textarea.customdata-text").fill("PATIENT_ID\tGROUP\nP-0000012\tA\nP-0000015\tB\nNOT_A_PATIENT\tC\n");
       await page.locator("[role=dialog].customdatamanager button", { hasText: "Check ids" }).click();
       const said = await page.waitForFunction(() => {
@@ -170,7 +214,8 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       let cohort = "";
       try {
         await page.locator("[role=dialog].customdatamanager button", { hasText: /^Add data to/ }).click();
-        await page.locator("[role=dialog].customdatamanager .customlist a", { hasText: "Analyze" }).first().click({ timeout: 60000 });
+        // saved, the upload is shown in the saved-work manager, opened on its Custom data tab
+        await page.locator("[role=dialog].saveddialog .customlist button", { hasText: "Analyze" }).first().click({ timeout: 60000 });
         cohort = await page.waitForFunction(() => {
           const b = [...document.querySelectorAll(".cohortbox")].find((x) => /a row in /.test(x.textContent || ""));
           return b && /\d+ patients/.test(b.textContent) && b.textContent.replace(/\s+/g, " ");

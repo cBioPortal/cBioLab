@@ -210,7 +210,7 @@ function StudyActions({ id, ctx, onQuery }: { id: string; ctx: ExploreCtx; onQue
 }
 
 export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
-  const { clearDraft, confirmSave, exMsg, exStudies, explore, exploreBusy, openSaveDialog, parseDraft, removeDraftClause, saveDraftAsFeature, confirmSaveFeature, saving, setSaving, savingFeature, setSavingFeature, showClauseData } = ctx;
+  const { addMode, clearDraft, confirmSave, exMsg, exStudies, explore, exploreBusy, openSaveDialog, parseDraft, removeDraftClause, saveDraftAsFeature, confirmSaveFeature, saving, setSaving, savingFeature, setSavingFeature, showClauseData } = ctx;
   return <>
     {(() => {
       const d = parseDraft();
@@ -231,14 +231,17 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
             {/* Naming is asked for on demand rather than sitting in the bar:
                 Analyze needs no name, so a permanent field implied one was
                 required for both. */}
-            <Button variant="outline" size="sm" onClick={openSaveDialog} disabled={!ready}
-              title={ready ? "keep this definition on the Saved tab without running anything" : "select a study first"}>
-              <Save />Save as a Cohort
-            </Button>
-            <Button variant="outline" size="sm" onClick={saveDraftAsFeature} disabled={!ready}
-              title={ready ? "freeze who matches these filters into a yes/no custom attribute you can chart, split and filter on" : "select a study first"}>
-              <Tag />Save as feature
-            </Button>
+            {/* editing a saved cohort, its bar above saves the filters over it */}
+            {!addMode?.editing && <>
+              <Button variant="outline" size="sm" onClick={openSaveDialog} disabled={!ready}
+                title={ready ? "keep this definition on the Saved tab without running anything" : "select a study first"}>
+                <Save />Save as a Cohort
+              </Button>
+              <Button variant="outline" size="sm" onClick={saveDraftAsFeature} disabled={!ready}
+                title={ready ? "freeze who matches these filters into a yes/no custom attribute you can chart, split and filter on" : "select a study first"}>
+                <Tag />Save as feature
+              </Button>
+            </>}
             <Button variant="ghost" size="sm" onClick={clearDraft}><X />Clear</Button>
           </div>
           <div className="row mt-1.5">

@@ -4,9 +4,10 @@
 // add-cohort mode — and every action on them. The analysis page calls this once and hands the
 // result to Explore's sections (explore-sections.tsx); the facets themselves come from
 // use-explore.ts.
-import { useEffect, useRef, useState } from "react";
+import { useSaved } from "../_saved/saved-context.tsx";
+import { useRef, useState } from "react";
 import { normalizeDef } from "./pills";
-import type { AnalysisDoc, CohortDef, DerivedRequest, PartitionDef } from "../../lib/types.ts";
+import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, PartitionDef } from "../../lib/types.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { type SplitSpec } from "./partitions.tsx";
 import { armsFromSelection, editSplits, splitKey, type ChartKey } from "../../lib/partition-arms.ts";
@@ -21,6 +22,9 @@ import { useExplore, type ExploreAsk } from "./use-explore.ts";
  *  (studyview_clinical_attribute_chart_count) */
 export const DEFAULT_CLINICAL_CHARTS = 20;
 
+/** a saved cohort open in Explore to change its filters */
+export type EditingCohort = { id: string; name: string; def: CohortDef };
+
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort } from "./use-saved.ts";
 
@@ -30,14 +34,13 @@ export interface ExplorePage {
   docs: DocStore;
   study: string;
   setStudy: React.Dispatch<React.SetStateAction<string>>;
-  tab: "explore" | "cohorts" | "analysis" | "examples";
-  goTab: (t: "explore" | "cohorts" | "analysis" | "examples") => void;
+  goTab: (t: "explore" | "analysis" | "examples") => void;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setToast: React.Dispatch<React.SetStateAction<string | null>>;
   /** saving needs the login; asks for it, and says whether saving may go ahead */
   canSave: () => boolean;
   evalDef: (name: string, def: CohortDef) => Promise<{ count: number; text: string }>;
-  persist: (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"]) => Promise<unknown>;
+  persist: (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"], id?: string) => Promise<unknown>;
   featureSaved: (d: StoredDataset) => string;
   /** the studies the open analysis reads — what add-cohort mode opens Explore on */
   analysisStudies: () => string[];
@@ -57,15 +60,17 @@ const DEFAULT_DERIVED: DerivedRequest[] = SHOW_DERIVED_FACETS
   ? [{ metric: "followupMonths" }, { metric: "historyMonths" }, { metric: "alteredGenes" }] : [];
 
 export function useExploreState(page: ExplorePage) {
-  const { addCohortToView, analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, setError, setStudy, study, tab } = page;
+  const { addCohortToView, analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, setError, setStudy, study } = page;
   const [exMsg, setExMsg] = useState<string | null>(null);
   /** the facet whose "split by this" is waiting on the server's proposed arms */
   const [splittingBy, setSplittingBy] = useState<string | null>(null);
   /**
-   * Explore opened over the analysis to add one cohort to it ("+ Add cohort"), with the Explore
-   * state it replaced, restored when it closes so the Explore tab is as the reader left it.
+   * Explore opened over the page for one cohort, with the Explore state it replaced, restored when
+   * it closes so the Explore tab is as the reader left it: adding one to the analysis ("+ Add
+   * cohort", `target`), or changing a saved cohort's filters (`editing`).
    */
-  const [addMode, setAddMode] = useState<null | { ids: string[]; text: string; explore: ExploreAsk | null; target: AddCohortTarget }>(null);
+  const [addMode, setAddMode] = useState<null | { ids: string[]; text: string; explore: ExploreAsk | null } &
+    ({ target: AddCohortTarget; editing?: undefined } | { target?: undefined; editing: EditingCohort })>(null);
   /** the Custom data dialog's open tab, or null when it is closed */
   const [customTab, setCustomTab] = useState<CustomDataTab | null>(null);
   /** Explore's save dialog is open, prefilled with this name */
@@ -255,7 +260,10 @@ export function useExploreState(page: ExplorePage) {
   };
 
   /** the Custom data dialog, over Explore: an upload is matched against the explored studies, and its charts land there */
+  const saved = useSaved();
+  /** adding an upload opens on Explore, where its ids are matched; the saved ones are in the saved-work manager */
   const openCustomManager = (on: CustomDataTab = "manage") => {
+    if (on === "manage") { saved.open("data"); return; }
     goTab("explore");
     setCustomTab(on);
   };
@@ -582,17 +590,34 @@ export function useExploreState(page: ExplorePage) {
     setCustomTab("add");
   };
 
-  // the creator's quick-add row needs the study catalog even before Explore is visited
-  useEffect(() => {
-    if (tab === "cohorts" && !explore && !exploreBusy && exStudies.length) fetchExplore(null);
-  }, [tab, study, explore]); // eslint-disable-line
-  const openAddCohort = (target: AddCohortTarget) => {
-    setAddMode({ ids: exSel.current, text: cDefText, explore: exploring.current, target });
-    const ids = analysisStudies();
+  /** Explore over the page, on these studies and filters, keeping what it replaces to restore */
+  const openOver = (mode: { target: AddCohortTarget } | { editing: EditingCohort }, ids: string[], all: Clause[]) => {
+    setAddMode({ ids: exSel.current, text: cDefText, explore: exploring.current, ...mode });
     exSel.current = ids; setExStudies(ids);
-    setCDefText(JSON.stringify(draftScaffold(ids), null, 2));
+    const d = { ...draftScaffold(ids), all };
+    setCDefText(JSON.stringify(d, null, 2));
     setExMsg(null);
-    fetchExplore(null, ids);
+    fetchExplore(all.length ? d : null, ids);
+  };
+  const openAddCohort = (target: AddCohortTarget) => openOver({ target }, analysisStudies(), []);
+  /** A saved cohort's studies and filters in Explore, to change and save back over it. */
+  const openEditCohort = (editing: EditingCohort) => {
+    const { def } = editing;
+    openOver({ editing }, def.studies?.length ? def.studies : [def.study || study], def.all || []);
+  };
+  /** Save Explore's filters over the cohort being edited, keeping its name, note and splits. A
+   *  cohort locked to its patients follows its definition again, since that is what changed. */
+  const saveEditedCohort = async (): Promise<{ name: string; count: number } | null> => {
+    const edit = addMode?.editing, d = barDef();
+    if (!edit || !d) { setExMsg("select at least one study first"); return null; }
+    const { lock: _lock, study: _s, studies: _ss, ...keep } = edit.def;
+    const def: CohortDef = { ...keep, ...d };
+    try {
+      const ev = await evalDef(edit.name, def);
+      await persist(edit.name, def, ev, edit.id);
+      closeAddCohort();
+      return { name: edit.name, count: ev.count };
+    } catch (e) { setExMsg("could not save: " + String((e as Error)?.message || e)); return null; }
   };
   const closeAddCohort = () => {
     if (!addMode) return;
@@ -613,7 +638,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

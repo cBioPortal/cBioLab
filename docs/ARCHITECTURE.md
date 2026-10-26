@@ -239,14 +239,15 @@ The map of the code: what each part does, where it lives, and the one place each
   (`canRead`/`canWrite`/`canShare`); both stores call it, never a rule of their own. Sharing an
   analysis wider than a custom dataset it pins returns `warnings` naming the dataset — patient-level
   data is never shared but by its own owner, explicitly. **Groups** (`lib/groups.ts`) are run by
-  their admins (always at least one); people are added by email, signed in yet or not; deleting a
-  group makes what it shared private. The access matrix is in `test/support/store-contracts.ts`
+  their admins (always at least one); people are added by email, signed in yet or not, found by
+  name or email prefix among those who have signed in (`searchUsers`, `GET /api/users?q=`); deleting
+  a group makes what it shared private. The access matrix is in `test/support/store-contracts.ts`
   (`sharingContract`), and `npm run check:access-mutants` (a gate stage) plants six sharing bugs
   into a copy of `lib/access.ts` and requires each to fail it. A change to the rules updates both.
   On the page, the reader's OWN items stay keyed by name (`use-saved.ts`); others' come separately,
   keyed by id, since two people may use one name. UI: `app/lab/share-dialog.tsx` (owner only; from
-  the Saved tab's badges and the custom-data manager), the Saved tab's "Shared with you" sections,
-  `/groups` (`app/groups/page.tsx`, linked from the signed-in header). Opening someone else's analysis
+  the saved-work manager's badges), its "Shared with you" sections and its Groups tab (below).
+  Opening someone else's analysis
   gives a working copy that remembers its source (`use-workspace.ts` `sharedOpen`); where the group
   may edit, the workspace dialog's "Save to theirs" saves back from the version opened.
 - **The writable store** (`lib/db.ts`, the only Postgres client): saved cohorts and analyses,
@@ -259,16 +260,27 @@ The map of the code: what each part does, where it lives, and the one place each
   `drop trigger if exists`). A configured database is migrated only by `npm run db:migrate`
   (`npm run db:status` lists applied and pending), never by the app — run it before deploying
   code that needs a new migration. The in-process database migrates itself on first use.
-- **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Saved /
-  Analysis / Examples. Tabs move out into their own components as they are untangled
-  (`saved-tab.tsx`, `examples-tab.tsx`), and each view's card (`view-cards.tsx`: its kind's
+- **The saved-work manager** (`app/_saved/`): everything the reader keeps — Cohorts, Analyses,
+  Custom data, Groups, Gene lists — one tab each, as a dialog any page opens on the tab the moment
+  calls for (`useSaved().open("groups")`, or `?saved=groups` in any page's link) and as the page
+  `/saved?tab=…` (`/groups` and the lab's old `?tab=cohorts` land on it). It is the only place saved
+  things are listed and managed. Opening something from it acts on the page it was opened over when
+  that page registers how (`useSavedActions`: the lab opens an analysis in place); anywhere else it
+  is a link into the lab (`?doc=`, or `?shared=<id>` for someone else's analysis). A saved cohort's
+  Actions menu (`cohort-menu.tsx`) renames it, adds a note, splits it (stored on the cohort, so every
+  analysis it joins has the split), duplicates and deletes it, and edits its filters in Explore
+  opened over the page (`?editCohort=<id>` from elsewhere), which saves back over it keeping its
+  name, note and splits. The query cache and the manager's provider wrap every page (`app/layout.tsx`).
+- **`app/lab/page.tsx`** — the app: Explore (study checkboxes + facets) / Analysis / Examples (from
+  the site header). Tabs move out into their own components as they are untangled
+  (`examples-tab.tsx`), and each view's card (`view-cards.tsx`: its kind's
   own or the shared one, from `app/lab/kinds/`) reads the page through one `ViewCtx`; Explore's sections (study picker, bar,
   add-chart dialog, facet cards) are `explore-sections.tsx`, reading Explore's state and actions
   from `use-explore-state.ts` (the draft, the selection, add-cohort mode) through `ExploreCtx`; the
   Analysis tab's cohort column, view column, document and genes dialogs are `analysis-sections.tsx`,
   through one `AnalysisCtx`. The page itself holds only its own state and wires the rest: its
   actions are hooks, called in dependency order — `use-tool-actions.ts` (what the AI tools do to
-  the document), `use-library.ts` (the Saved and Examples tabs), `use-workspace.ts`,
+  the document), `use-library.ts` (the Examples tab), `use-workspace.ts`,
   `use-cohort-edits.ts`, `use-explore-state.ts`, `use-view-options.ts` (what building a view
   offers), `use-view-edits.ts`; the AI tools' bridge is `useLabTools` in `agent-tools.ts`. A new
   action goes in the hook for its kind, not in the page. State that must outlive a tab switch

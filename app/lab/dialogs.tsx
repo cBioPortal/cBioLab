@@ -118,8 +118,10 @@ export function SaveFeatureDialog({ initial, meta, onSave, onClose }: {
 
 /** The cohort gear menu's "edit…": name and note together, since renaming is the one cohort-level
  *  edit the app supports without reopening Explore or the JSON editor. */
-export function CohortEditDialog({ name: initialName, notes: initialNotes, taken, onSave, onClose }: {
+export function CohortEditDialog({ name: initialName, notes: initialNotes, focusNotes, taken, onSave, onClose }: {
   name: string; notes: string;
+  /** opened to write the note, so the cursor starts there */
+  focusNotes?: boolean;
   /** another cohort already has this name */
   taken: (name: string) => boolean;
   onSave: (name: string, notes: string) => void; onClose: () => void;
@@ -138,11 +140,11 @@ export function CohortEditDialog({ name: initialName, notes: initialNotes, taken
       footer={<CancelSave onClose={onClose} disabled={!name.trim()} />}>
       <div className="grid gap-1.5">
         <Label htmlFor="cename" className={META}>Name</Label>
-        <Input id="cename" className={FIELD} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <Input id="cename" className={FIELD} value={name} onChange={(e) => setName(e.target.value)} autoFocus={!focusNotes} />
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="cenotes" className={META}>Note</Label>
-        <Textarea id="cenotes" className={AREA} value={notes} onChange={(e) => setNotes(e.target.value)} spellCheck
+        <Textarea id="cenotes" className={AREA} value={notes} onChange={(e) => setNotes(e.target.value)} spellCheck autoFocus={focusNotes}
           placeholder="What is this cohort? Why is it defined this way?" />
       </div>
       {error && <p className="error text-md text-destructive">{error}</p>}
