@@ -57,6 +57,8 @@ export const ExploreRequest = z.object({
   geneSearch: z.string().optional(),
   attributes: z.array(z.string()).optional(),
   geneCharts: z.array(z.string()).optional(),
+  /** generic-assay entities to chart, one each */
+  assayCharts: z.array(z.object({ profileType: z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/), entity: z.string().max(120) })).max(6).optional(),
   derived: z.array(z.object({ metric: z.string(), eventType: z.string().optional(), lineGap: z.number().optional() })).optional(),
   ...customData,
 });
@@ -92,6 +94,7 @@ export const PartitionRequest = z.object({
   attribute: z.string().optional(),
   gene: z.string().optional(),
   oql: z.array(z.string()).optional(),
+  assay: z.object({ profileType: z.string(), entity: z.string() }).optional(),
   name: z.string().optional(),
   maxArms: z.number().optional(),
   minCount: z.number().optional(),
@@ -138,6 +141,13 @@ export const GenesRequest = z.object({
   geneset: z.string().max(200).optional(),
 });
 
+/** POST /api/assay-entities — a generic-assay profile's entities matching `q`, for an axis's entity picker. */
+export const AssayEntitiesRequest = z.object({
+  study: z.string().regex(/^[A-Za-z0-9._-]{1,120}$/),
+  profile: z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/),
+  q: z.string().max(80).optional(),
+});
+
 /** A spec or a document goes out with the fields the envelope does not name. */
 type Open<T> = T & Record<string, unknown>;
 export type AnalysisBody = z.input<typeof AnalysisRequest>;
@@ -153,6 +163,7 @@ export type ViewPageBody = z.input<typeof ViewPageRequest>;
 export type TableBody = z.input<typeof TableRequest>;
 export type LockBody = z.input<typeof LockRequest>;
 export type GenesBody = z.input<typeof GenesRequest>;
+export type AssayEntitiesBody = z.input<typeof AssayEntitiesRequest>;
 
 /**
  * The body, checked against its envelope, with its defaults filled in and every field the

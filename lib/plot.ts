@@ -34,17 +34,25 @@ export type PlotAxis =
    * the axis is follows from the profile's own type and datatype (lib/profile-catalog.ts): a
    * mutation profile groups cases by mutation type (or `by: "mutated"`), a structural-variant
    * profile by whether the case has one, a discrete copy-number profile by its levels, and a
-   * continuous one (expression, z-scores, log2 copy number, protein) is a number. Resolved against
-   * the study before it runs (lib/plot-profile.ts) into the forms below; a profile the study does
-   * not have is refused by name.
+   * continuous one (expression, z-scores, log2 copy number, protein) is a number. A generic-assay
+   * profile (signatures, arm-level copy number, methylation probes, …) reads one `entity` instead
+   * of a gene: a number, or a category where the study declares the profile categorical. Resolved
+   * against the study before it runs (lib/plot-profile.ts) into the forms below; a profile the
+   * study does not have is refused by name.
    */
-  | { source: "profile"; profile: string; gene: string; by?: "mutationType" | "mutated"; log?: boolean }
+  | { source: "profile"; profile: string; gene?: string; entity?: string; by?: "mutationType" | "mutated"; log?: boolean }
   /**
    * The forms a profile axis resolves to, which the engine runs, and which a document may also give
    * directly: one gene's value in a profile (`discrete` reads it as copy-number levels), and below,
    * a gene's alterations from the event table. `label` is what the figure calls the axis.
    */
   | { source: "molecular"; profileType: string; gene: string; log?: boolean; discrete?: boolean; label?: string }
+  /**
+   * One entity of a generic-assay profile: its value per case, a number, or a category when
+   * `categorical`. `patientLevel` marks a profile measured once per patient, whose value every
+   * sample of the patient shares.
+   */
+  | { source: "assay"; profileType: string; entity: string; categorical?: boolean; patientLevel?: boolean; log?: boolean; label?: string }
   /**
    * `genes` (2+) asks "is ANY of these altered" as one categorical — a pathway rollup (e.g. a
    * DDR gene set) instead of one gene at a time — and only for `by:"mutated"`: combining several
@@ -64,7 +72,7 @@ export type PlotAxis =
   | { source: "alteration"; oql: string; by?: "any" | "statement" }
   | { source: "none" };
 export type AlterationBy = "mutated" | "mutationType" | "cna" | "sv";
-const AXIS_SOURCES: readonly string[] = ["clinical", "profile", "molecular", "alteration", "none"] satisfies PlotAxis["source"][];
+const AXIS_SOURCES: readonly string[] = ["clinical", "profile", "molecular", "assay", "alteration", "none"] satisfies PlotAxis["source"][];
 /** an alteration axis given as an OQL query, rather than as genes */
 function isOqlAxis(a: PlotAxis): a is { source: "alteration"; oql: string; by?: "any" | "statement" } {
   return a.source === "alteration" && "oql" in a && a.oql != null;
@@ -89,6 +97,7 @@ import { POINTS_CAP, POINT_RULE_N_MAX } from "./plot-layers.ts";
 export { isAbsent, jitterFor } from "./plot-draw.ts";
 import { isAbsent } from "./plot-draw.ts";
 import { finiteSql } from "./sql-number.ts";
+import { assayEntityRowsSql, ENTITY_RE } from "./generic-assay.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql, cohortSubquery, type CohortSql } from "./sql-kinds.ts";
 /**
  * Over the points cap, a scatter cell holding at most this many cases is drawn as its cases
@@ -146,7 +155,11 @@ export function axisLabel(a: PlotAxis): string {
     const name = a.label || a.gene + " " + a.profileType;
     return a.log ? "log10(" + name + " + 1)" : name;
   }
-  if (a.source === "profile") return a.gene + " " + a.profile;
+  if (a.source === "assay") {
+    const name = a.label || a.entity + " " + a.profileType;
+    return a.log ? "log10(" + name + " + 1)" : name;
+  }
+  if (a.source === "profile") return (a.entity || a.gene) + " " + a.profile;
   if (isOqlAxis(a)) {
     const q = oqlStatements(a.oql).join("; ");
     return (q.length > 48 ? q.slice(0, 47) + "…" : q) + (a.by === "statement" ? " (OQL, by line)" : " (OQL)");
@@ -168,6 +181,7 @@ export function axisKind(a: PlotAxis, clinicalKind?: (attr: string) => "num" | "
   if (a.source === "none") return "none";
   if (a.source === "profile") throw new Error("a profile axis is read only once resolved against the study's profiles (lib/plot-profile.ts)");
   if (a.source === "molecular") return a.discrete ? "cat" : "num";
+  if (a.source === "assay") return a.categorical ? "cat" : "num";
   if (a.source === "alteration") return "cat";
   const k = clinicalKind ? clinicalKind(a.attribute) : undefined;
   if (!k) throw new Error("clinical attribute '" + a.attribute + "' is not declared by this study, so its type is unknown");
@@ -182,8 +196,10 @@ export function validateAxis(a: PlotAxis, which: string): void {
     throw new Error(which + " axis: '" + a.attribute + "' is not a clinical attribute name");
   if (a.source === "profile") {
     if (!PROFILE_RE.test(String(a.profile || ""))) throw new Error(which + " axis: '" + a.profile + "' is not a profile");
-    if (!GENE_RE.test(String(a.gene || "").toUpperCase()))
-      throw new Error(which + " axis: a profile axis reads one gene; name it");
+    if (a.entity != null) {
+      if (!ENTITY_RE.test(String(a.entity))) throw new Error(which + " axis: '" + String(a.entity).slice(0, 60) + "' is not a generic-assay entity");
+    } else if (!GENE_RE.test(String(a.gene || "").toUpperCase()))
+      throw new Error(which + " axis: a profile axis reads one gene (or, for a generic assay, one entity); name it");
     if (a.by != null && a.by !== "mutationType" && a.by !== "mutated")
       throw new Error(which + " axis: a mutation profile groups by \"mutationType\" or \"mutated\"; not " + JSON.stringify(a.by));
   }
@@ -193,6 +209,13 @@ export function validateAxis(a: PlotAxis, which: string): void {
     // 630 million values in this warehouse — to draw one picture. It is refused by name.
     if (!GENE_RE.test(String(a.gene || "").toUpperCase()))
       throw new Error(which + " axis: a molecular axis needs one gene. Plotting a whole profile would read every gene of every case; name the gene you mean.");
+  }
+  if (a.source === "assay") {
+    if (!PROFILE_RE.test(String(a.profileType || ""))) throw new Error(which + " axis: '" + a.profileType + "' is not a profile type");
+    // as with a gene, one entity: a probe-level profile is hundreds of thousands of them
+    if (!ENTITY_RE.test(String(a.entity || "")))
+      throw new Error(which + " axis: an assay axis reads one entity of its profile (a signature, an arm, a probe); name it");
+    if (a.log && a.categorical) throw new Error(which + " axis: a log scale applies to numbers; " + a.entity + " is categorical");
   }
   if (isOqlAxis(a)) {
     if ("gene" in a || "genes" in a)
@@ -298,6 +321,19 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
       " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
       "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL AND " + inCohort("sd.patient_unique_id") + "\n" +
       "GROUP BY id";
+    return a.log ? "SELECT id, v FROM (" + q + ") WHERE v IS NOT NULL" : q;
+  }
+
+  if (a.source === "assay") {
+    // A sample's own value; a patient-level profile's value is the patient's, shared by every sample.
+    // In patient mode a patient's samples combine as every axis combines them: a number is their
+    // mean, a category their common value or "Multiple".
+    const rows = assayEntityRowsSql({ db, study, profileType: a.profileType, entity: a.entity, numeric: !a.categorical, inCohort: inCohort("patient_unique_id") });
+    const idCol = !sample ? strip("r.patient_unique_id", study) : a.patientLevel ? strip("sd.sample_unique_id", study) : strip("r.sample_unique_id", study);
+    const from = "FROM (\n" + rows + "\n) r" + (sample && a.patientLevel ? "\nJOIN " + db + ".sample_derived sd ON sd.patient_unique_id = r.patient_unique_id" : "");
+    if (a.categorical)
+      return "SELECT " + idCol + " AS id, if(uniqExact(r.av) > 1, " + sq(MULTIPLE) + ", any(r.av)) AS v\n" + from + "\nGROUP BY id";
+    const q = "SELECT " + idCol + " AS id, " + logOf(a, "avg(r.av)") + " AS v\n" + from + "\nGROUP BY id";
     return a.log ? "SELECT id, v FROM (" + q + ") WHERE v IS NOT NULL" : q;
   }
 
@@ -433,11 +469,16 @@ export function coverageNote(d: PlotData, unit: "patient" | "sample"): string {
     (miss.length ? " (" + miss.join("; ") + ")" : "") + "; only those are drawn.";
 }
 
-/** exact statistics over every point: both coefficients and the least-squares line */
+/**
+ * exact statistics over every point: both coefficients and the least-squares line. A coefficient
+ * is NULL when either axis has no spread, and the line when x has none: rankCorr returns a number
+ * for an axis whose values are all tied, and that number means nothing.
+ */
 export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): AggregateSql {
+  const spread = "min(x) < max(x) AND min(y) < max(y)";
   return aggregateSql(pairCte(xSel, ySel, cohortSql) +
-    "SELECT count() AS n, corr(x, y) AS pearson, rankCorr(x, y) AS spearman,\n" +
-    "       simpleLinearRegression(x, y).1 AS slope, simpleLinearRegression(x, y).2 AS intercept\n" +
+    "SELECT count() AS n, if(" + spread + ", corr(x, y), NULL) AS pearson, if(" + spread + ", rankCorr(x, y), NULL) AS spearman,\n" +
+    "       if(min(x) < max(x), simpleLinearRegression(x, y).1, NULL) AS slope, if(min(x) < max(x), simpleLinearRegression(x, y).2, NULL) AS intercept\n" +
     "FROM pair");
 }
 
@@ -488,7 +529,7 @@ function clampGrid(bins: [number, number]): [number, number] {
  * not count it in.
  */
 function binIndex(col: "x" | "y", n: number): string {
-  return "least(" + (n - 1) + ", toUInt32(floor((" + col + " - " + col + "0) / nullIf(" + col + "1 - " + col + "0, 0) * " + n + ")))";
+  return "least(" + (n - 1) + ", toUInt32(floor((" + col + " - " + col + "0) / if(" + col + "1 > " + col + "0, " + col + "1 - " + col + "0, 1) * " + n + ")))";
 }
 
 /**
@@ -543,7 +584,7 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
     "     e AS (SELECT quantileExact(0.005)(x) x0, quantileExact(0.995)(x) x1 FROM j)\n" +
     // the extent travels with the bins: a box is drawn between its whiskers, so the renderer
     // needs to know what value a bin index stands for rather than assuming it spans the axis
-    "SELECT g, least(" + (b - 1) + ", toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * " + b + "))) AS b, " +
+    "SELECT g, least(" + (b - 1) + ", toUInt32(floor((x - x0) / if(x1 > x0, x1 - x0, 1) * " + b + "))) AS b, " +
       (colorSel ? "c, " : "") + "count() AS n, any(x0) AS vx0, any(x1) AS vx1\n" +
     "FROM j, e GROUP BY g, b" + (colorSel ? ", c" : ""));
 }

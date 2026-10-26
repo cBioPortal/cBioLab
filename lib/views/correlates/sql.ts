@@ -12,8 +12,17 @@ import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
  * which is Spearman's ρ. x is the query gene on `profileType`; y every gene on `otherProfile`
  * (the same profile unless given). Sums only: ranks and values never leave the database.
  */
-export function correlatesMomentsSql(cohortSql: string, study: string, db: string, gene: string, profileType: string, otherProfile: string): AggregateSql {
+export function correlatesMomentsSql(cohortSql: string, study: string, db: string, gene: string, profileType: string, otherProfile: string, otherIsAssay = false): AggregateSql {
   const pid = pidOf("sd.patient_unique_id", study);
+  // a generic-assay profile's entities in place of genes, each patient's samples averaged the same way
+  const assayPid = pidOf("patient_unique_id", study), assayRaw = finiteSql("value");
+  const assayVals = (pt: string) =>
+    "  SELECT " + assayPid + " AS pid, entity_stable_id AS gene, avg(" + assayRaw + ") AS v\n" +
+    "  FROM " + db + ".generic_assay_data_derived\n" +
+    "  WHERE profile_type = " + sq(pt) + " AND profile_stable_id = " + sq(study + "_" + pt) + "\n" +
+    "    AND " + assayRaw + " IS NOT NULL\n" +
+    "    AND " + assayPid + " IN (SELECT pid FROM cohort)\n" +
+    "  GROUP BY pid, gene\n";
   const raw = finiteSql("ga.alteration_value");
   const vals = (pt: string, geneCond: string) =>
     "  SELECT " + pid + " AS pid, ga.hugo_gene_symbol AS gene, avg(" + raw + ") AS v\n" +
@@ -26,7 +35,7 @@ export function correlatesMomentsSql(cohortSql: string, study: string, db: strin
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "q AS (\n" + vals(profileType, " AND ga.hugo_gene_symbol = " + sq(gene)) + "),\n" +
-    "o AS (\n" + vals(otherProfile, "") + "),\n" +
+    "o AS (\n" + (otherIsAssay ? assayVals(otherProfile) : vals(otherProfile, "")) + "),\n" +
     "paired AS (SELECT o.gene AS gene, q.v AS x, o.v AS y FROM o INNER JOIN q ON q.pid = o.pid),\n" +
     // average rank among tied values: the first rank of the tie plus half its width
     "ranked AS (\n" +

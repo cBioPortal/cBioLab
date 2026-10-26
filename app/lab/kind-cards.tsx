@@ -60,7 +60,7 @@ export function KindCard({ ctx, v, vi }: CardProps) {
           : undefined} />
       {(() => {
         const mc = { vi, spec: docView(vi), v, busy, updating: busy || pendingKeys.has(viewIds[vi]), patch: (p: Record<string, unknown>) => patchView(vi, p),
-          attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), docJson: () => JSON.stringify(doc) };
+          attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), catalog: ctx.profileCatalog(), events: viewEvents(), docJson: () => JSON.stringify(doc) };
         const body = KindCardBody({ c: mc });
         return <>
           <KindCardControls c={mc} />

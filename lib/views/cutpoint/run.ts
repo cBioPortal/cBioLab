@@ -5,7 +5,9 @@ import type { ViewResult } from "../../types.ts";
 import { hasViewAggregates, isPatientLevel } from "../../federation.ts";
 import { kaplanMeier, logRank, coxRegression, seededRandom } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
-import { refuse, plural, ATTR_NAME } from "../shared.ts";
+import { refuse, plural, ATTR_NAME, PROFILE_NAME } from "../shared.ts";
+import { ENTITY_RE, assayEntitySearchSql } from "../../generic-assay.ts";
+import { entityShortName } from "../../profile-names.ts";
 import type { CutpointView, CutpointScan, CutpointResult } from "./types.ts";
 import { cutpointRowsSql } from "./sql.ts";
 
@@ -96,8 +98,11 @@ export async function runCutpoint(view: CutpointView, ctx: ViewRun): Promise<Vie
   const { doc, cohorts, vNames } = ctx;
   if (vNames.length !== 1) return refuse("cutpoint", ctx, "a cut-point is found in one cohort; this view names " + vNames.length + " — choose one");
   const name = vNames[0];
-  const attribute = String(view.attribute || "TMB_NONSYNONYMOUS").trim();
-  if (!ATTR_NAME.test(attribute)) return refuse("cutpoint", ctx, "“" + attribute.slice(0, 40) + "” is not a clinical attribute's name");
+  const assay = view.assay ? { profileType: String(view.assay.profileType || ""), entity: String(view.assay.entity || "") } : undefined;
+  if (assay && (!PROFILE_NAME.test(assay.profileType) || !ENTITY_RE.test(assay.entity))) return refuse("cutpoint", ctx, "assay names a generic-assay profile and one of its entities");
+  if (assay && view.attribute) return refuse("cutpoint", ctx, "the marker is an attribute or an assay entity, not both");
+  let attribute = assay ? entityShortName(assay.entity, assay.profileType) : String(view.attribute || "TMB_NONSYNONYMOUS").trim();
+  if (!assay && !ATTR_NAME.test(attribute)) return refuse("cutpoint", ctx, "“" + attribute.slice(0, 40) + "” is not a clinical attribute's name");
   const endpoint = String(view.endpoint || "OS").toUpperCase().trim();
   if (!/^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint)) return refuse("cutpoint", ctx, "endpoint is a name like OS or PFS");
   if (!!view.monthsAttribute !== !!view.statusAttribute) return refuse("cutpoint", ctx, "monthsAttribute and statusAttribute go together");
@@ -121,7 +126,14 @@ export async function runCutpoint(view: CutpointView, ctx: ViewRun): Promise<Vie
     const r = ctx.resolvers[st];
     if (!isPatientLevel(r) || !hasViewAggregates(r)) return refuse("cutpoint", ctx, st + " answers in aggregate only; a permutation test needs each patient's (marker, time, event), which only a patient-level participant returns");
     const mark = r.queries.length;
-    const rows = await r.viewRows("cutpoint:rows", doc.cohorts[name], (c, s, d) => cutpointRowsSql(c, s, d, { attribute, months, status, stratum: stratifyBy }));
+    if (assay) {
+      if (!(await ctx.studyProfiles(st)).gaProfiles.includes(assay.profileType)) return refuse("cutpoint", ctx, st + " has no generic-assay profile '" + assay.profileType + "'");
+      const hits = await r.viewMeta("cutpoint:entity", (s, d) => assayEntitySearchSql(s, d, assay.profileType, assay.entity, 6));
+      const hit = hits.find((h) => String(h.entity) === assay.entity);
+      if (!hit) return refuse("cutpoint", ctx, st + "'s " + assay.profileType + " has no entity '" + assay.entity + "'" + (hits.length ? "; closest " + hits.map((h) => String(h.entity)).join(", ") : ""));
+      if (hit.name && String(hit.name) !== assay.entity) attribute = String(hit.name);
+    }
+    const rows = await r.viewRows("cutpoint:rows", doc.cohorts[name], (c, s, d) => cutpointRowsSql(c, s, d, { attribute, months, status, stratum: stratifyBy, ...(assay ? { assay } : {}) }));
     for (const q of r.queries.slice(mark)) queries.push({ study: st, label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}) });
     for (const x of rows) {
       const v = x.v == null ? NaN : Number(x.v);
@@ -164,7 +176,8 @@ export async function runCutpoint(view: CutpointView, ctx: ViewRun): Promise<Vie
       " (at most " + CUT_MAX_CANDIDATES + ", evenly spaced) — by the maximally selected standardized log-rank statistic (Lausen & Schumacher; R maxstat). " +
       "The corrected p is from " + permutations + " permutations of the marker over the patients (seed " + seed + "): the share whose own best cut does as well. High is " + attribute + " > " + Number(overall.cut.toPrecision(4)) +
       " (" + pct(1 - overall.lowShare) + " of patients). " +
-      attribute + " is the patient's value, or for a sample attribute the value of the patient's first sample by sample id; " + noValue + " patients with a survival time and no numeric value are left out. " +
+      (assay ? attribute + " (" + assay.entity + " of " + assay.profileType + ") is the value of the patient's first sample with one, by sample id; "
+        : attribute + " is the patient's value, or for a sample attribute the value of the patient's first sample by sample id; ") + noValue + " patients with a survival time and no numeric value are left out. " +
       "The status '1:…' is an event, anything else censored; times from each study's own baseline" + (ctx.vStudies.length > 1 ? ", pooled across " + ctx.vStudies.length + " studies without harmonizing baselines or panels (a panel-dependent marker such as TMB is not comparable across panels)" : "") + ". " +
       (result.strata ? "Per " + stratifyBy + ": the largest " + CUT_MAX_STRATA + " values with at least " + minStratum + " patients each get their own scan and permutation test (same seed); " +
         result.strata.omitted.values + " other values (" + result.strata.omitted.patients + " patients) are not scanned. Each stratum's cut is as optimistic as the overall one. " : "") +

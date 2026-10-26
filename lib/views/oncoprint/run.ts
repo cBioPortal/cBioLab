@@ -40,7 +40,7 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
   const heatSpecs = (view as OncoprintView).heatmap || [];
   const zReference: Record<string, ZReference> = {};
   for (const h of heatSpecs) {
-    if (h.reference !== "federation" || /^vaf$/i.test(h.profileType)) continue;
+    if (h.reference !== "federation" || /^vaf$/i.test(h.profileType) || (h.entities && h.entities.length)) continue;
     const hGenes = h.genes && h.genes.length ? geneSymbols(h.genes) : geneSymbols(genes);
     if (!hGenes.length) continue;
     const per = await Promise.all(vStudies.map(async (st) => ({

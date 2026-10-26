@@ -10,10 +10,12 @@ import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 import OncoprintFigure, { type ColumnSelection } from "./OncoprintFigure.tsx";
 import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, sortKeyText } from "./view-display.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
-import { heatmapTrackLabel, STUDY_TRACK } from "../../lib/profile-names.ts";
+import { heatmapTrackLabel, assayTrackLabel, STUDY_TRACK } from "../../lib/profile-names.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
+import { EntityField, searchEntities } from "../lab/entity-field.tsx";
+import { profileUse } from "../../lib/profile-catalog.ts";
 import { Rows3 } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
@@ -30,7 +32,8 @@ type V = Record<string, any>;
 // ---- the view as tracks: pure edits, each returning the next view --------------------------------
 
 export const heatmapLabels = (v: V): string[] => (v.heatmap || []).flatMap((h: V) =>
-  (h.genes && h.genes.length ? h.genes : v.genes || []).map((g: unknown) => heatmapTrackLabel(String(g).toUpperCase(), h.profileType)));
+  h.entities && h.entities.length ? h.entities.map((e: unknown) => assayTrackLabel(String(e), h.profileType))
+    : (h.genes && h.genes.length ? h.genes : v.genes || []).map((g: unknown) => heatmapTrackLabel(String(g).toUpperCase(), h.profileType)));
 
 /** drop sort keys whose track no longer exists */
 export const pruneSort = (v: V): V => {
@@ -117,24 +120,28 @@ export function Waiting({ what }: { what: string }) {
  * because a study can declare sixty attributes; the count of cases carrying each one, most
  * first, because that is what decides whether a track is worth a row.
  */
-export function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derivedCohorts, busy, loading, onClinical, onHeatmap, onDerived }: {
+type HeatEntry = { profileType: string; genes?: string[]; entities?: string[] };
+export function TracksMenu({ attrs, profiles, assays = [], clinical, heatmap, cohorts, derivedCohorts, busy, loading, onClinical, onHeatmap, onDerived }: {
   attrs: { attribute: string; kind: string; patients: number }[];
   /** the attribute/profile catalog is still being fetched */
   loading?: boolean;
   profiles: string[];
+  /** the numeric generic-assay profiles, whose tracks are entities rather than genes */
+  assays?: ProfileInfo[];
   clinical: string[];
-  heatmap: { profileType: string; genes?: string[] }[];
+  heatmap: HeatEntry[];
   cohorts: string[];
   derivedCohorts: string[];
   busy: boolean;
   onClinical: (next: string[]) => void;
-  onHeatmap: (next: { profileType: string; genes?: string[] }[]) => void;
+  onHeatmap: (next: HeatEntry[]) => void;
   onDerived: (next: string[]) => void;
 }) {
   const [tab, setTab] = useState<"clinical" | "custom" | "heatmap" | "cohorts">("clinical");
   const [q, setQ] = useState("");
   const match = (s: string) => s.toLowerCase().includes(q.trim().toLowerCase());
-  const heatOptions = ["VAF", ...profiles];
+  const heatOptions = ["VAF", ...profiles, ...assays.map((p) => p.profile)];
+  const assayOf = (name: string) => assays.find((p) => p.profile === name);
   // uploads get their own tab, but they are clinical tracks to the engine: one list, one cap of 8
   const studyAttrs = attrs.filter((a) => !isCustomAttr(a.attribute)), customAttrs = attrs.filter((a) => isCustomAttr(a.attribute));
   const isClin = tab === "clinical" || tab === "custom";
@@ -144,13 +151,23 @@ export function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derive
   const cap = isClin ? 8 : tab === "heatmap" ? 4 : 3;
   const toggle = (name: string) => {
     if (isClin) onClinical(clinical.includes(name) ? clinical.filter((x) => x !== name) : clinical.length < 8 ? [...clinical, name] : clinical);
-    else if (tab === "heatmap") onHeatmap(chosen.includes(name) ? heatmap.filter((h) => h.profileType !== name) : heatmap.length < 4 ? [...heatmap, { profileType: name }] : heatmap);
+    else if (tab === "heatmap") {
+      const ga = assayOf(name);
+      if (chosen.includes(name)) onHeatmap(heatmap.filter((h) => h.profileType !== name));
+      else if (heatmap.length >= 4) return;
+      // a generic assay starts on its first entity; more are added by search
+      else if (ga) searchEntities(ga.study || "", ga.profile, "").then((r) => r.entities[0] &&
+        onHeatmap([...heatmap, { profileType: name, entities: [r.entities[0].entity] }]), () => {});
+      else onHeatmap([...heatmap, { profileType: name }]);
+    }
     else onDerived(derivedCohorts.includes(name) ? derivedCohorts.filter((x) => x !== name) : derivedCohorts.length < 3 ? [...derivedCohorts, name] : derivedCohorts);
   };
   const setHeatGenes = (profileType: string, text: string) => {
     const genes = text.split(/[\s,]+/).map((g) => g.trim().toUpperCase()).filter(Boolean).slice(0, 12);
     onHeatmap(heatmap.map((h) => h.profileType === profileType ? (genes.length ? { ...h, genes } : { profileType }) : h));
   };
+  const setEntities = (profileType: string, entities: string[]) => onHeatmap(entities.length
+    ? heatmap.map((h) => h.profileType === profileType ? { profileType, entities } : h) : heatmap.filter((h) => h.profileType !== profileType));
   return (
     <GearMenu menuId="onco-tracks" title="add or remove tracks" wide contentClassName="min-w-[340px] max-w-[34rem] px-2.5"
       label={<><Rows3 />tracks{chosen.length ? " (" + chosen.length + ")" : ""}</>}>
@@ -168,7 +185,7 @@ export function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derive
         <span className="meta">{chosen.length} of {cap} chosen{
           tab === "clinical" ? " · cases with data, most first"
           : tab === "custom" ? " · your uploads, kept in this browser; they share the 8 clinical tracks"
-          : tab === "heatmap" ? " · a profile draws one row per gene; leave the genes blank to follow the figure"
+          : tab === "heatmap" ? " · a profile draws one row per gene (blank genes follow the figure); a generic assay one per entity"
           : " · any cohort in this document can be a binary row (patients only, one study)"}</span>
         <div style={{ maxHeight: 260, overflowY: "auto", marginTop: "0.3rem" }}>
           {!shown.length && (loading && !attrs.length ? <Waiting what="tracks" />
@@ -178,15 +195,25 @@ export function TracksMenu({ attrs, profiles, clinical, heatmap, cohorts, derive
             const on = chosen.includes(name);
             const a = isClin ? attrs.find((x) => x.attribute === name) : undefined;
             const h = tab === "heatmap" && on ? heatmap.find((x) => x.profileType === name) : undefined;
+            const ga = tab === "heatmap" ? assayOf(name) : undefined;
             return (
               <div key={name}>
                 <label className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
                   <Checkbox className="self-center" checked={on} disabled={busy || (!on && chosen.length >= cap)} onCheckedChange={() => toggle(name)} />
-                  <span style={{ flex: 1 }} title={tab === "custom" ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
+                  <span style={{ flex: 1 }} title={tab === "custom" || ga ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : ga ? ga.name + " (generic assay)" : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
                     {tab === "custom" && <span className="meta"> · {parseCustomAttr(name)?.dataset}</span>}</span>
                   {a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
                 </label>
-                {h && <Input defaultValue={(h.genes || []).join(" ")} placeholder="genes for this profile — blank follows the figure"
+                {h && ga && <div className="mb-1.5 ml-6 flex flex-wrap items-center gap-1">
+                  {(h.entities || []).map((e) => <span key={e} className="flex items-center gap-1 rounded border border-input px-1 text-sm">
+                    <span className="max-w-40 truncate" title={e}>{assayTrackLabel(e, name)}</span>
+                    <button type="button" aria-label={"remove " + e} disabled={busy} className="text-muted-foreground hover:text-foreground"
+                      onClick={() => setEntities(name, (h.entities || []).filter((x) => x !== e))}>×</button></span>)}
+                  {(h.entities || []).length < 12 && <EntityField study={ga.study || ""} profile={name} value="" placeholder="add an entity…" busy={busy}
+                    side={name} className="h-7 w-40 text-sm"
+                    onPick={(e) => !(h.entities || []).includes(e) && setEntities(name, [...(h.entities || []), e])} />}
+                </div>}
+                {h && !ga && <Input defaultValue={(h.genes || []).join(" ")} placeholder="genes for this profile — blank follows the figure"
                   disabled={busy} onBlur={(e) => setHeatGenes(name, e.target.value)}
                   className="mb-1.5 ml-6 h-7 w-[calc(100%-1.5rem)] text-sm md:text-sm" />}
               </div>
@@ -272,6 +299,7 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
         </>}
         tracksMenu={<TracksMenu
           attrs={catalog.attrs} profiles={catalog.profiles} loading={catalog.loading}
+          assays={(catalog.profileCatalog || []).filter((p) => profileUse(p) === "assayNumber" && p.study)}
           clinical={view.clinical || []} heatmap={view.heatmap || []}
           cohorts={cohortNames} derivedCohorts={view.derivedCohorts || []}
           busy={busy}

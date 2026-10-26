@@ -38,7 +38,7 @@ test("an axis that would read a whole profile is refused by name", () => {
     /needs one gene.*name the gene you mean/s);
   assert.throws(() => validateAxis({ source: "alteration" } as never, "y"), /needs a gene, a gene set, or an OQL query/);
   assert.throws(() => validateAxis({ source: "alateration", gene: "APC" } as never, "covariate 1"),
-    /unknown source 'alateration' — use one of clinical, profile, molecular, alteration, none/);
+    /unknown source 'alateration' — use one of clinical, profile, molecular, assay, alteration, none/);
   assert.throws(() => validateAxis({ source: "clinical", attribute: "not a name!" }, "x"), /not a clinical attribute name/);
   assert.throws(() => validateAxis({ source: "alteration", gene: "TP53", by: "driver" } as never, "x"), /not supported yet/);
   validateAxis(num, "x");   // the ordinary cases do not throw
@@ -88,6 +88,16 @@ test("no plot query returns a case id: every one groups it away", () => {
     assert.equal(/\bid\b/.test(outer), false, "an id reached the outer projection of: " + outer.slice(0, 90));
     assert.equal(/sample_unique_id|patient_unique_id/.test(outer), false, outer.slice(0, 90));
   }
+});
+
+test("an axis with no spread draws in one row and has no correlation", () => {
+  const x = axisSelect(num, ctx, "num");
+  // ClickHouse computes a division under a NULL, so nullIf(width, 0) still casts 0/0 to a bin
+  for (const sql of [plotBinsSql(x, x, ctx.cohortSql), plotViolinSql(x, x, ctx.cohortSql)])
+    assert.equal(/nullIf\([xy]1 - [xy]0, 0\)/.test(sql), false, "a bin divides by a width that may be 0");
+  const st = plotStatsSql(x, x, ctx.cohortSql);
+  assert.match(st, /if\(min\(x\) < max\(x\) AND min\(y\) < max\(y\), rankCorr\(x, y\), NULL\)/);
+  assert.match(st, /if\(min\(x\) < max\(x\) AND min\(y\) < max\(y\), corr\(x, y\), NULL\)/);
 });
 
 test("the grid is what bounds a scatter, not the cohort", () => {

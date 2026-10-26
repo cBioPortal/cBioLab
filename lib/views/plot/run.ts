@@ -8,6 +8,7 @@ import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, tukey, covera
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { resolveAxes } from "../../plot-profile.ts";
+import { assayEntitiesKnown } from "../shared.ts";
 import type { PlotView } from "./types.ts";
 
 type BoxRow = { g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number };
@@ -318,6 +319,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
   try {
     const catalogs = await Promise.all(sites.map(async (st) => ({ study: st, catalog: (await c.studyProfiles(st)).catalog || [] })));
     axes = resolveAxes({ x: pv.x, y: pv.y, colorBy: pv.colorBy, ringBy: pv.ringBy }, catalogs);
+    axes = await assayEntitiesKnown(c, axes, sites) as typeof axes;
   } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
   const spec = { x: axes.x, y: axes.y, unit,
     ...(axes.colorBy ? { colorBy: axes.colorBy } : {}), ...(axes.ringBy ? { ringBy: axes.ringBy } : {}) };

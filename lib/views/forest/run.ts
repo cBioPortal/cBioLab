@@ -7,7 +7,7 @@ import { isPatientLevel, type EndpointColumns } from "../../federation.ts";
 import { validateAxis, axisLabel, isAbsent, OQL_NOT_PROFILED, MULTIPLE, type AxisKind } from "../../plot.ts";
 import { resolveProfileAxis } from "../../plot-profile.ts";
 import type { ViewRun } from "../run.ts";
-import { overLimit, refuse, studyCatalogs, plural, ATTR_NAME } from "../shared.ts";
+import { overLimit, refuse, studyCatalogs, plural, ATTR_NAME, assayEntitiesKnown } from "../shared.ts";
 import { buildCoxColumns, notProfiledNote } from "../covariates.ts";
 import type { ForestView, ForestRow, ForestResult, ForestPooled } from "./types.ts";
 
@@ -136,6 +136,9 @@ export async function runForest(view: ForestView, ctx: ViewRun): Promise<ViewRes
     validateAxis(exposure, "exposure");
     covariates = covIn.map((cv, i) => ({ ...resolveProfileAxis(cv, "covariate " + (i + 1), catalogs), ...(cv.reference != null ? { reference: cv.reference } : {}) }));
     covariates.forEach((cv, i) => validateAxis(cv, "covariate " + (i + 1)));
+    const named = await assayEntitiesKnown(ctx, { exposure, ...Object.fromEntries(covariates.map((cv, i) => ["covariate " + (i + 1), cv])) }, vStudies);
+    exposure = named.exposure!;
+    covariates = covariates.map((cv, i) => named["covariate " + (i + 1)] as CoxCovariate || cv);
   } catch (e) { return no((e as Error).message); }
   if (exposure.source === "none") return no("the exposure axis is \"none\"; name a gene's alteration or an attribute");
   const stratumAxis: PlotAxis[] = byStudy || byCohort ? [] : [{ source: "clinical", attribute: strata }];

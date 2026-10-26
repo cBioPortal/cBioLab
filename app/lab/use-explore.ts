@@ -23,6 +23,8 @@ export interface ExploreRequest {
   /** narrows the server's work to the attributes that will be shown; empty asks for all */
   attributes: string[];
   geneCharts: string[];
+  /** generic-assay entities charted one each */
+  assayCharts: { profileType: string; entity: string }[];
   /** the derived facets to compute; the server computes none it is not asked for */
   derived: DerivedRequest[];
   /** the uploads' datasets and versions (customDataKey) — they are part of the answer */
@@ -52,6 +54,7 @@ export function useExplore(onError: (message: string) => void) {
         studies: r.studies, draft: r.draft,
         ...(r.attributes.length ? { attributes: r.attributes } : {}),
         ...(r.geneCharts.length ? { geneCharts: r.geneCharts } : {}),
+        ...(r.assayCharts.length ? { assayCharts: r.assayCharts } : {}),
         ...(r.derived.length ? { derived: r.derived } : {}),
       }, { signal });
       if (res.status === 499) throw new Superseded();

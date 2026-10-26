@@ -13,7 +13,8 @@ export interface CorrelatesView {
   gene: string;
   /** the query gene's profile */
   profileType: string;
-  /** the profile every other gene is read from (default: the same one) — e.g. protein against mRNA */
+  /** the profile every other gene is read from (default: the same one) — e.g. protein against mRNA; or
+   *  a numeric generic-assay profile, whose every entity (a signature, a phosphosite, a drug's response) is read instead */
   otherProfile?: string;
   /** genes listed in each direction (default 100, at most 250) */
   show?: number;
@@ -21,7 +22,10 @@ export interface CorrelatesView {
   minN?: number;
 }
 export interface CorrelatesGene {
+  /** a gene, or a generic-assay entity's id when the other profile is a generic assay */
   gene: string; n: number;
+  /** a generic-assay entity's display name, where the study gives one */
+  name?: string;
   /** in the study's reference genome, when known */
   cytoband?: string;
   /** Spearman's ρ with its p (the t approximation scipy uses, or the Fisher-z meta p across studies) and BH q */
@@ -31,6 +35,8 @@ export interface CorrelatesGene {
 }
 export interface CorrelatesResult {
   gene: string; profileType: string; otherProfile: string; cohort: string;
+  /** the other profile is a generic assay: its rows are entities, not genes */
+  otherIsAssay?: boolean;
   tested: number; untested: number; significant: number; minN: number;
   /** "rank" when ρ is one study's; "meta" when ρ combines several studies' by Fisher z */
   rhoFrom: "rank" | "meta";

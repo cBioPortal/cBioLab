@@ -1,13 +1,13 @@
 // Logistic view: a multivariate logistic regression on the Cox view's covariate coding, fit
 // from per-patient rows inside each local study (patient-level participants only).
 import { logisticRegression, type LogisticRow } from "../../stats.ts";
-import type { ViewResult } from "../../types.ts";
+import type { ViewResult, CoxCovariate } from "../../types.ts";
 import { isPatientLevel } from "../../federation.ts";
 import { axisLabel, validateAxis, type AxisKind } from "../../plot.ts";
 import { type CoxTrace } from "../../method.ts";
 import { buildCoxColumns, notProfiledNote } from "../covariates.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
-import { overLimit, studyCatalogs } from "../shared.ts";
+import { overLimit, studyCatalogs, assayEntitiesKnown } from "../shared.ts";
 import { resolveProfileAxis } from "../../plot-profile.ts";
 import type { LogisticView, LogisticCoefficient } from "./types.ts";
 import { logisticMethod } from "./method.ts";
@@ -26,6 +26,8 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
       ...(Array.isArray(lv.covariates) ? { covariates: lv.covariates.map((cv, i) => ({ ...resolveProfileAxis(cv, "covariate " + (i + 1), catalogs),
         ...((cv as { reference?: string }).reference != null ? { reference: (cv as { reference?: string }).reference } : {}) })) } : {}) };
     validateAxis(lv.outcome, "outcome");
+    const named = await assayEntitiesKnown(c, { outcome: lv.outcome, ...Object.fromEntries((lv.covariates || []).map((cv, i) => ["covariate " + (i + 1), cv])) }, vStudies);
+    lv = { ...lv, outcome: named.outcome, ...(Array.isArray(lv.covariates) ? { covariates: lv.covariates.map((cv, i) => ({ ...named["covariate " + (i + 1)], ...(cv.reference != null ? { reference: cv.reference } : {}) }) as CoxCovariate) } : {}) };
   }
   catch (e) { return untimed({ kind: "logistic", error: (e as Error).message }); }
   const outcomeLabel = axisLabel(lv.outcome);
@@ -35,8 +37,8 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
   if (lv.outcome.source === "alteration" && !lv.outcomeEvent) {
     return untimed({ kind: "logistic", error: "a categorical outcome needs outcomeEvent, naming which observed value of " + outcomeLabel + " counts as the event" });
   }
-  if (lv.outcome.source === "molecular" && lv.outcomeEvent) {
-    return untimed({ kind: "logistic", error: outcomeLabel + " is numeric (a molecular axis) — outcomeEvent only applies to a categorical outcome" });
+  if ((lv.outcome.source === "molecular" || (lv.outcome.source === "assay" && !lv.outcome.categorical)) && lv.outcomeEvent) {
+    return untimed({ kind: "logistic", error: outcomeLabel + " is numeric (a " + lv.outcome.source + " axis) — outcomeEvent only applies to a categorical outcome" });
   }
   const lCovariates = Array.isArray(lv.covariates) ? lv.covariates : [];
   if (!lCovariates.length) return untimed({ kind: "logistic", error: "a logistic view needs at least one covariate" });

@@ -14,10 +14,21 @@ import { patientSql, type PatientSql } from "../../sql-kinds.ts";
  * PatientLevelResolver.viewRows, since a permutation test needs each patient's pair.
  */
 export function cutpointRowsSql(cohortSql: string, study: string, db: string,
-  o: { attribute: string; months: string; status: string; stratum?: string | null }): PatientSql {
-  for (const a of [o.attribute, o.stratum, o.months, o.status]) if (a && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'");
+  o: { attribute: string; months: string; status: string; stratum?: string | null; assay?: { profileType: string; entity: string } }): PatientSql {
+  for (const a of [o.assay ? null : o.attribute, o.stratum, o.months, o.status]) if (a && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'");
   const pid = pidOf("patient_unique_id", study);
-  const attrs = [o.attribute, ...(o.stratum ? [o.stratum] : [])];
+  const attrs = [...(o.assay ? [] : [o.attribute]), ...(o.stratum ? [o.stratum] : [])];
+  // a generic-assay marker: the patient's first sample with a numeric value, by sample id
+  const assay = o.assay
+    ? "ga AS (\n" +
+      "  SELECT " + pid + " AS pid, argMin(" + finiteSql("value") + ", sample_unique_id) AS v\n" +
+      "  FROM " + db + ".generic_assay_data_derived\n" +
+      "  WHERE profile_type = " + sq(o.assay.profileType) + " AND profile_stable_id = " + sq(study + "_" + o.assay.profileType) +
+      " AND entity_stable_id = " + sq(o.assay.entity) + "\n" +
+      "    AND " + finiteSql("value") + " IS NOT NULL AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+      "  GROUP BY pid\n" +
+      ")" + (attrs.length ? "," : "") + "\n"
+    : "";
   return patientSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
@@ -29,17 +40,18 @@ export function cutpointRowsSql(cohortSql: string, study: string, db: string,
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "  GROUP BY pid\n" +
     "),\n" +
-    "val AS (\n" +
-    "  SELECT " + pid + " AS pid,\n" +
-    "         " + finiteSql("argMinIf(attribute_value, sample_unique_id, attribute_name = " + sq(o.attribute) + ")") + " AS v" +
+    assay +
+    (attrs.length ? "val AS (\n" +
+    "  SELECT " + pid + " AS pid" +
+    (o.assay ? "" : ",\n         " + finiteSql("argMinIf(attribute_value, sample_unique_id, attribute_name = " + sq(o.attribute) + ")") + " AS v") +
     (o.stratum ? ",\n         argMinIf(trimBoth(attribute_value), sample_unique_id, attribute_name = " + sq(o.stratum) + ") AS s" : "") + "\n" +
     "  FROM " + clinicalTable(db, attrs) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name IN (" + attrs.map(sq).join(", ") + ") AND trimBoth(attribute_value) != ''\n" +
     "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
     "  GROUP BY pid\n" +
-    ")\n" +
-    "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, val.v AS v" + (o.stratum ? ", val.s AS s" : "") + "\n" +
-    "FROM os LEFT JOIN val ON val.pid = os.pid\n" +
+    ")\n" : "") +
+    "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, " + (o.assay ? "ga.v" : "val.v") + " AS v" + (o.stratum ? ", val.s AS s" : "") + "\n" +
+    "FROM os" + (o.assay ? " LEFT JOIN ga ON ga.pid = os.pid" : "") + (attrs.length ? " LEFT JOIN val ON val.pid = os.pid" : "") + "\n" +
     "WHERE os.months IS NOT NULL AND os.months >= 0"
   ));
 }

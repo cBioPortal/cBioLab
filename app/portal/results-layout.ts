@@ -35,6 +35,8 @@ export interface ResultsData {
   expressionAcross: boolean;
   /** the genomic data types every queried study holds, and those only some do */
   held: { every: ProfileType[]; some: ProfileType[] };
+  /** one generic-assay profile per kind, each a sub-tab of Comparison/Survival (assayComparisonProfiles) */
+  assays?: { label: string; profile: string }[];
 }
 
 type ProfileType = "MUTATION" | "CNA" | "SV";
@@ -148,7 +150,8 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       { title: "Survival", views: [v("Survival", { kind: "survival", cohorts: both })] },
       ...(data.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", attributes: data.clinical.slice(0, CLINICAL_SHOWN), cohorts: both })] }] : []),
       { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", cohorts: both }),
-        v("Copy-number alterations", { kind: "enrichment", alteration: "cna", cohorts: both })] }
+        v("Copy-number alterations", { kind: "enrichment", alteration: "cna", cohorts: both })] },
+      ...(data.assays || []).map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile, cohorts: both })] }))
     ] },
     { title: "CN Segments", views: [v("Genome-wide copy number", { kind: "genome", cohorts: queried })] }
   ], left);

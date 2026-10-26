@@ -13,6 +13,10 @@ export interface ProfileInfo {
   name: string;
   /** a generic assay's own kind: METHYLATION, PHOSPHOSITE_QUANTIFICATION, ARMLEVEL_CNA, … */
   assayType?: string;
+  /** a generic assay measured once per patient rather than per sample */
+  patientLevel?: boolean;
+  /** a study holding the profile, which a picker asks for its entities */
+  study?: string;
   /** the study's own order among its profiles */
   order: number;
 }

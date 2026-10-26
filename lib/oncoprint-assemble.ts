@@ -6,7 +6,7 @@
 // panel-aware frequencies — separated from where the rows come from. `buildContract`
 // fetches from ClickHouse and calls this; a CLI or a notebook can call it on local
 // tables, and a port in another language has this function as its conformance target.
-import { heatmapTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
+import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { STYLE, encodeNumeric } from "./oncoprint-style.ts";
 import type { Contract, Track, GroupRange, ResolvedDisplay, DisplaySpec } from "./types.ts";
@@ -127,7 +127,8 @@ export interface AssembleInput {
   /** clinical attributes in track order, each with its per-column value */
   clinical: { attr: string; values: Map<string, string> }[];
   /** continuous per-gene values per profile, keyed "<columnId>|<gene>" */
-  heatmap: { profileType: string; genes: string[]; isVaf: boolean; values: Map<string, number> }[];
+  /** `assay`: a generic-assay profile, whose `genes` are its entities */
+  heatmap: { profileType: string; genes: string[]; isVaf: boolean; assay?: boolean; values: Map<string, number> }[];
   /** "<profileType>|<gene>" -> pooled reference (federated z-scoring) */
   zReference?: Record<string, ZReference>;
   /**
@@ -356,7 +357,7 @@ export function assembleContract(input: AssembleInput): Contract {
   for (const h of heatmap) {
     const isZ = /zscore/i.test(h.profileType);
     for (const gene of h.genes) {
-      const label = heatmapTrackLabel(gene, h.profileType);
+      const label = h.assay ? assayTrackLabel(gene, h.profileType) : heatmapTrackLabel(gene, h.profileType);
       // A federation reference re-scores the drawn values against a distribution
       // pooled from every participating study — including ones that disclose no
       // patients, and so appear nowhere in the columns.

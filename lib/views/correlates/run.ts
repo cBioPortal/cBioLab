@@ -4,11 +4,15 @@ import { benjaminiHochberg, pearsonFromMoments, pearsonR, fisherZMeta } from "..
 import { geneSymbols } from "../../gene-tracks.ts";
 import type { ViewRun } from "../run.ts";
 import { cytobands, answering, refuse, PROFILE_NAME } from "../shared.ts";
+import { isCategoricalAssay, assayEntityCountSql } from "../../generic-assay.ts";
+import { assayEntityNamesSql } from "../../federation-views.ts";
 import type { CorrelatesView, CorrelatesGene } from "./types.ts";
 import { correlatesMomentsSql } from "./sql.ts";
 import { correlatesMethod } from "./method.ts";
 
 const CORR_SHOW_MAX = 250;
+/** past this many entities a generic-assay profile is refused: a probe-level methylation profile has hundreds of thousands */
+const CORR_MAX_ENTITIES = 25000;
 
 export async function runCorrelates(view: CorrelatesView, ctx: ViewRun): Promise<ViewResult> {
   const { doc, cohorts, vNames } = ctx;
@@ -25,8 +29,23 @@ export async function runCorrelates(view: CorrelatesView, ctx: ViewRun): Promise
   if (!cohorts[cn].count) return refuse("correlates", ctx, "nothing to correlate: cohort “" + cn + "” is empty");
 
   const { ok, excluded } = answering(ctx);
-  const inventory = await Promise.all(cohorts[cn].studies.filter((st) => ok[st]).map(async (st) => ({ st, profiles: (await ctx.studyProfiles(st)).profiles })));
+  const inventory = await Promise.all(cohorts[cn].studies.filter((st) => ok[st]).map(async (st) => {
+    const p = await ctx.studyProfiles(st);
+    // a generic-assay "other" profile reads as entities; its own profiles list does not hold it
+    return { st, profiles: [...p.profiles, ...p.gaProfiles], ga: p.gaProfiles, catalog: p.catalog || [] };
+  }));
   const holders = inventory.filter((x) => x.profiles.includes(pt) && x.profiles.includes(other)).map((x) => x.st);
+  if (inventory.some((x) => x.ga.includes(pt))) return refuse("correlates", ctx, "“" + pt + "” is a generic assay; the query is a gene's profile, and a generic assay can be the one it is correlated against");
+  const otherIsAssay = inventory.some((x) => x.ga.includes(other));
+  if (otherIsAssay) {
+    const info = inventory.flatMap((x) => x.catalog).find((p) => p.profile === other);
+    if (info && isCategoricalAssay(info.datatype)) return refuse("correlates", ctx, "“" + other + "” is a categorical generic assay; a correlation needs numbers");
+    for (const st of holders) {
+      const [c] = await ok[st].viewMeta("correlates:entities", (s, d) => assayEntityCountSql(s, d, other));
+      if (Number(c?.n) > CORR_MAX_ENTITIES) return refuse("correlates", ctx, "“" + other + "” has " + Number(c.n).toLocaleString("en-US") + " entities in " + st +
+        ", more than this view correlates (at most " + CORR_MAX_ENTITIES.toLocaleString("en-US") + "); plot chosen ones against " + gene + " instead");
+    }
+  }
   for (const x of inventory) if (!holders.includes(x.st)) excluded.push({ study: x.st, reason: "has no " + [pt, other].filter((p, i, a) => a.indexOf(p) === i && !x.profiles.includes(p)).join(" or ") + " profile" });
   if (!holders.length) {
     const avail = [...new Set(inventory.flatMap((x) => x.profiles))].filter((p) => p !== "cna").sort();
@@ -38,7 +57,7 @@ export async function runCorrelates(view: CorrelatesView, ctx: ViewRun): Promise
   const perStudy = new Map<string, { study: string; m: Sums; rk: Sums }[]>();
   const rows: { study: string; gene: string; m: Sums; rk: Sums }[] = [];
   await Promise.all(holders.map(async (st) => {
-    const out = await ok[st].viewAggregate("correlates:moments", doc.cohorts[cn], (c, s, d) => correlatesMomentsSql(c, s, d, gene, pt, other));
+    const out = await ok[st].viewAggregate("correlates:moments", doc.cohorts[cn], (c, s, d) => correlatesMomentsSql(c, s, d, gene, pt, other, otherIsAssay));
     for (const r of out) {
       const g = String(r.gene);
       const m = { n: Number(r.n), sx: Number(r.sx), sy: Number(r.sy), sxy: Number(r.sxy), sxx: Number(r.sxx), syy: Number(r.syy) };
@@ -68,16 +87,24 @@ export async function runCorrelates(view: CorrelatesView, ctx: ViewRun): Promise
   tested.sort((a, b) => b.rho! - a.rho! || a.gene.localeCompare(b.gene));
   const positive = tested.filter((g) => g.rho! > 0).slice(0, show);
   const negative = tested.filter((g) => g.rho! < 0).reverse().slice(0, show);
-  const bands = await cytobands(ok, [...positive, ...negative].map((g) => g.gene));
-  for (const g of [...positive, ...negative]) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
+  if (otherIsAssay) {
+    const names = new Map<string, string>();
+    for (const rws of await Promise.all(holders.map((st) => ok[st].viewMeta("correlates:names", (s, d) => assayEntityNamesSql(s, d, other)))))
+      for (const r of rws) if (!names.has(String(r.entity))) names.set(String(r.entity), String(r.name));
+    for (const g of [...positive, ...negative]) { const n = names.get(g.gene); if (n && n !== g.gene) g.name = n; }
+  } else {
+    const bands = await cytobands(ok, [...positive, ...negative].map((g) => g.gene));
+    for (const g of [...positive, ...negative]) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
+  }
   const bins = new Map<number, number>();
   for (const g of tested) { const b = Math.min(39, Math.floor((g.rho! + 1) / 0.05)); bins.set(b, (bins.get(b) || 0) + 1); }
   const histogram = Array.from({ length: 40 }, (_, b) => [Math.round((-1 + b * 0.05) * 100) / 100, bins.get(b) || 0] as [number, number]);
   const significant = tested.filter((g) => g.q < 0.05).length;
   const reported = [...positive, ...negative];
+  const noun = otherIsAssay ? "entities" : "genes";
   return {
     kind: "correlates", cohorts: [cn],
-    correlates: { gene, profileType: pt, otherProfile: other, cohort: cn, tested: tested.length, untested, significant, minN, rhoFrom: multi ? "meta" : "rank",
+    correlates: { gene, profileType: pt, otherProfile: other, ...(otherIsAssay ? { otherIsAssay: true } : {}), cohort: cn, tested: tested.length, untested, significant, minN, rhoFrom: multi ? "meta" : "rank",
       positive, negative, histogram, ...(excluded.length ? { excluded } : {}) },
     method: correlatesMethod({ gene, profileType: pt, otherProfile: other, cohort: cn, minN, multi, tested: tested.length, untested,
       perSite: holders.map((st) => ({ study: st, genes: rows.filter((r) => r.study === st).length, patients: cohorts[cn].perStudy[st]?.count || 0 })),
@@ -85,11 +112,11 @@ export async function runCorrelates(view: CorrelatesView, ctx: ViewRun): Promise
       results: reported.map((g) => ({ gene: g.gene, rho: g.rho!, rhoP: g.rhoP, q: g.q, r: g.r!, p: g.p })) }),
     participation: ctx.participationFor(cohorts[cn].studies, false),
     ...(cohorts[cn].studies.length > 1 ? { studies: cohorts[cn].studies } : {}),
-    caveat: gene + " on “" + pt + "” against every gene on “" + other + "”, over the patients in “" + cn + "” with both values (a patient's samples averaged, as the heatmap takes them). " +
-      "Ranked by Spearman's ρ, as the portal ranks, with Pearson's r beside it; q is Benjamini–Hochberg over ρ's p across all " + tested.length.toLocaleString("en-US") + " genes tested. " +
+    caveat: gene + " on “" + pt + "” against every " + (otherIsAssay ? "entity of the generic assay" : "gene on") + " “" + other + "”, over the patients in “" + cn + "” with both values (a patient's samples averaged, as the heatmap takes them). " +
+      "Ranked by Spearman's ρ, as the portal ranks, with Pearson's r beside it; q is Benjamini–Hochberg over ρ's p across all " + tested.length.toLocaleString("en-US") + " " + noun + " tested. " +
       (multi ? "Pearson's r pools every study's sums (exact); ρ is each study's own, combined by Fisher z weighted by size, since ranks do not add across studies. " : "") +
       "A correlation is not a regulatory link: genes that rise together across a cohort often both track a third thing — a subtype, the tumour's purity, proliferation. " +
-      untested.toLocaleString("en-US") + " genes were not tested: fewer than " + minN + " patients with both values, or no spread." +
+      untested.toLocaleString("en-US") + " " + noun + " were not tested: fewer than " + minN + " patients with both values, or no spread." +
       (excluded.length ? " Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
   };
 }

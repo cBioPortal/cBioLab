@@ -31,6 +31,9 @@ import { StudyRowActions } from "../_studies/study-actions.tsx";
 import { QueryGenesDialog, studiesProblem } from "../portal/query-editor.tsx";
 import { resultsMaxStudies } from "../../lib/results-settings.ts";
 import { usePublicEnv } from "../_env/public-env-context.tsx";
+import { EntityField } from "./entity-field.tsx";
+import { plottableProfiles, profileUse } from "../../lib/profile-catalog.ts";
+import { entityShortName } from "../../lib/profile-names.ts";
 
 /** The most studies "add all" stages at once (each adds dozens of queries to Explore's facets). */
 export const ADD_ALL_LIMIT = 30;
@@ -263,7 +266,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
         <DialogHeader className="mb-2"><DialogTitle className="text-base">Add chart</DialogTitle></DialogHeader>
         <Tabs value={chartTab} onValueChange={(v) => setChartTab(v as typeof chartTab)} className="mb-3">
           <TabsList variant="line" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
-            {([["clinical", "Clinical"], ["gene", "Gene status"], ["derived", "Derived timeline filters"], ["custom", "Custom data"]] as const).map(([t, label]) =>
+            {([["clinical", "Clinical"], ["gene", "Gene status"], ["assay", "Generic assays"], ["derived", "Derived timeline filters"], ["custom", "Custom data"]] as const).map(([t, label]) =>
               <TabsTrigger key={t} value={t} className="h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
@@ -398,6 +401,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
             )}
           </div>
         )}
+        {chartTab === "assay" && <AssayChartPicker ctx={ctx} />}
         {chartTab === "derived" && (explore.events.length === 0 ? (
           <p className="note mt-0 mb-3">This study has no clinical timeline events to derive a filter from.</p>
         ) : (() => {
@@ -748,6 +752,109 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
           </div>}
       </div>
     ))}
+  </>;
+}
+
+/** the Add chart dialog's generic-assay tab: a profile, then one of its entities found by search */
+function AssayChartPicker({ ctx }: { ctx: ExploreCtx }) {
+  const { assayCharts, chartAssay, unchartAssay, exploreBusy } = ctx;
+  const explore = ctx.explore!;
+  const profiles = plottableProfiles(explore.profileCatalog || []).filter((p) => p.type === "GENERIC_ASSAY" && p.study);
+  const [profile, setProfile] = useState("");
+  const current = profiles.find((p) => p.profile === profile) || profiles[0];
+  if (!profiles.length) return <p className="note mt-0 mb-3">No selected study has generic-assay data (mutational signatures, arm-level copy number, methylation, …).</p>;
+  return (
+    <div>
+      <p className="note mt-0 mb-3">
+        Chart one measurement of a generic assay — a mutational signature, a chromosome arm, a methylation probe — as a
+        histogram or its values, counted in patients. Click a bar or value to filter on it.
+      </p>
+      <div className="row baseline g5">
+        <Choice className="w-80" value={current.profile} onChange={setProfile}
+          options={profiles.map((p) => [p.profile, p.name + (profileUse(p) === "assayCategory" ? " (categorical)" : "")] as const)} />
+        <EntityField study={current.study || ""} profile={current.profile} value="" placeholder="choose what to chart…" busy={exploreBusy}
+          side="chart" className="w-64" onPick={(e) => chartAssay(current.profile, e)} />
+      </div>
+      {assayCharts.map((c) => (
+        <span key={c.profileType + "|" + c.entity} className="qchip mr-1 mt-1.5">
+          {entityShortName(c.entity, c.profileType)}<span className="meta"> · {profiles.find((p) => p.profile === c.profileType)?.name || c.profileType}</span>
+          <Button variant="ghost" size="icon-xs" className={CHIP_X} title={"stop charting " + c.entity} aria-label={"stop charting " + c.entity}
+            onClick={() => unchartAssay(c.profileType, c.entity)}><X /></Button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** each charted generic-assay entity: a histogram or its values, a click a genericAssay clause */
+export function AssayFacets({ ctx }: { ctx: ExploreCtx }) {
+  const { addClause, exStudies, unchartAssay, addMode, splittingBy, splitDraftBy } = ctx;
+  const explore = ctx.explore!;
+  return <>
+    {(explore.assayFacets || []).map((f) => {
+      const profileName = (explore.profileCatalog || []).find((p) => p.profile === f.profileType)?.name || f.profileType;
+      const title = (f.name || entityShortName(f.entity, f.profileType)) + ": " + profileName;
+      // a study without the profile cannot compile the clause, so a partial chart only shows
+      const clickable = f.studies.length >= exStudies.length;
+      const why = clickable ? "" : " — held by " + f.studies.length + " of " + exStudies.length + " selected studies, so it cannot filter them all";
+      const base = { kind: "genericAssay", profileType: f.profileType, entity: f.entity };
+      return (
+        <div key={f.profileType + "|" + f.entity} data-assayfacet={f.profileType + "|" + f.entity} className="card">
+          <div className="facettitle flex items-center gap-1">
+            <span className="min-w-0 flex-1 truncate" title={f.entity}>{title}</span>
+            <ChartMenu label={title} actions={addMode || exStudies.length > 1 ? [] : [
+              { label: "Split by this", disabled: !!splittingBy, working: splittingBy === title,
+                title: "Analyze the current selection split by " + title + (f.kind === "num"
+                  ? ": above / at or below its median within the selection" : ": one arm per value with at least 10 patients, the rest in Other") +
+                  "; patients with no value get their own arm",
+                onClick: () => void splitDraftBy({ assay: { profileType: f.profileType, entity: f.entity } }, title) }]} />
+            <Button variant="ghost" size="icon-xs" title="stop charting this" aria-label={"stop charting " + f.entity}
+              onClick={() => unchartAssay(f.profileType, f.entity)}><X /></Button>
+          </div>
+          <span className="meta">patients · {fmtInt(f.measured)} of {fmtInt(f.total)} with a value{f.disjunctive ? " · counted without its own filter" : ""}{why}</span>
+          {f.error && <p className="note flush mt-1">{f.error}</p>}
+          {f.kind === "cat" && f.values && (() => {
+            const max = Math.max(...f.values.map((v) => v.n), 1);
+            return <div className="vallist">
+              {f.values.map((v) => (
+                <button key={v.v} className="valrow" disabled={!clickable}
+                  title={v.v + " — " + fmtInt(v.n) + " patients" + (clickable ? " (click to filter)" : why)}
+                  onClick={() => addClause({ ...base, values: [v.v] })}>
+                  <span className="vname">{v.v}</span>
+                  <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * v.n / max)) + "%" }} /></span>
+                  <span className="vn">{fmtInt(v.n)}</span>
+                  <span className="vpct">{f.measured ? fmtPct(100 * v.n / f.measured) : ""}</span>
+                </button>
+              ))}
+            </div>;
+          })()}
+          {f.kind === "num" && f.bins && f.bins.length > 1 && (() => {
+            const maxN = Math.max(...f.bins.map((b) => b.count), 1);
+            const range = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? { lte: b.end } : b.special === ">" ? { gt: b.start } : { gt: b.start, lte: b.end };
+            const label = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!) + "–" + fmtNum(b.end!);
+            const tick = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!);
+            return (
+              <Histogram ticks={f.bins.map(tick)} na={f.total > f.measured ? "NA " + fmtInt(f.total - f.measured) : null}>
+                {f.bins.map((b, i) => (
+                  <button key={i} className="hbar" disabled={!clickable}
+                    title={label(b) + " · " + fmtInt(b.count) + " patients" + (clickable ? " — click to filter" : why)}
+                    onClick={() => addClause({ ...base, range: range(b) })}>
+                    <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
+                  </button>
+                ))}
+              </Histogram>
+            );
+          })()}
+          {f.kind === "num" && f.median != null && <div className="flex items-center gap-1 mt-1 flex-wrap">
+            <span className="meta">min {fmtNum(f.min!)} · median {fmtNum(f.median)} · max {fmtNum(f.max!)}</span>
+            {clickable && <>
+              <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ ...base, range: { gt: f.median } })}>&gt; median</Button>
+              <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ ...base, range: { lte: f.median } })}>≤ median</Button>
+            </>}
+          </div>}
+        </div>
+      );
+    })}
   </>;
 }
 

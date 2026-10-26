@@ -47,7 +47,7 @@ export function legendFor(values: string[], ring = false): { label: string; colo
     .map(([label], i) => ({ label, color: categoryColor(label, i), ...(ring ? { ring: true } : {}) }));
 }
 
-const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
+const num = (v: unknown): number | null => { if (v == null || v === "") return null; const x = Number(v); return Number.isFinite(x) ? x : null; };
 /** a plot's coverage row: the cohort's cases, each axis's, and (patient mode) the patients with several samples */
 const coverageOf = (row: Record<string, unknown>): NonNullable<PlotData["coverage"]> =>
   ({ total: Number(row.total || 0), nx: Number(row.nx || 0), ny: Number(row.ny || 0), ...(row.multi != null ? { multi: Number(row.multi) } : {}) });

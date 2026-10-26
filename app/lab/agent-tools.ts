@@ -26,7 +26,7 @@ export interface LabBridge {
   /** run a document on the server without changing the page; throws with the engine's reason */
   validate: (d: AnalysisDoc) => Promise<AnalysisResult>;
   /** have the server write a split's arms from the data (POST /api/partition) */
-  proposePartition: (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; name?: string; maxArms?: number; minCount?: number })
+  proposePartition: (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; assay?: { profileType: string; entity: string }; name?: string; maxArms?: number; minCount?: number })
     => Promise<{ name: string; def: PartitionDef; note?: string }>;
   /** put an already-validated document and its result on the page */
   commit: (d: AnalysisDoc, r: AnalysisResult) => void;
@@ -239,10 +239,12 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
         d.views = (d.views || []).map((v: any) => Array.isArray(v.cohorts) ? { ...v, cohorts: v.cohorts.filter((c: string) => c !== name) } : v);
         return edit(`remove cohort "${name}"`, d);
       } },
-    { name: "analysis_split_cohort", description: "Split a cohort: child cohorts that are disjoint and together exactly the cohort, for comparing them, stored on the cohort as one of its `splits`. Split by a categorical attribute (one arm per value held by at least minCount patients, most frequent first, at most maxArms-1 arms; the rest go to Other), a numeric attribute (at its median within the cohort), a gene (mutated / wild-type), or a list of OQL queries (one arm each, first match wins). Patients not profiled for a gene, or with no value recorded, get their own child instead of being counted as wild-type or Other. Name a cohort, or an arm (\"<cohort> / <split> / <arm>\") to split it further. Each child is the cohort \"<cohort> / <split> / <arm>\"; every view showing the split cohort then shows its arms instead. Edit it afterwards with analysis_set_split.",
+    { name: "analysis_split_cohort", description: "Split a cohort: child cohorts that are disjoint and together exactly the cohort, for comparing them, stored on the cohort as one of its `splits`. Split by a categorical attribute (one arm per value held by at least minCount patients, most frequent first, at most maxArms-1 arms; the rest go to Other), a numeric attribute (at its median within the cohort), a gene (mutated / wild-type), a list of OQL queries (one arm each, first match wins), or one entity of a generic assay ({profileType, entity}: a signature or score at its median within the cohort, a categorical one like an arm-level call one arm per value). Patients not profiled for a gene, or with no value recorded or measured, get their own child instead of being counted as wild-type or Other. Name a cohort, or an arm (\"<cohort> / <split> / <arm>\") to split it further. Each child is the cohort \"<cohort> / <split> / <arm>\"; every view showing the split cohort then shows its arms instead. Edit it afterwards with analysis_set_split.",
       inputSchema: { type: "object", required: ["cohort"], properties: {
         cohort: { type: "string" }, attribute: { type: "string" }, gene: { type: "string" },
-        oql: { type: "array", items: { type: "string" } }, name: { type: "string", description: "the split's name; default the attribute or gene" },
+        oql: { type: "array", items: { type: "string" } },
+        assay: { type: "object", required: ["profileType", "entity"], properties: { profileType: { type: "string" }, entity: { type: "string" } } },
+        name: { type: "string", description: "the split's name; default the attribute or gene" },
         maxArms: { type: "integer" }, minCount: { type: "integer" } } },
       run: async (args) => {
         const b = get();
@@ -486,7 +488,7 @@ export const LAB_TOOL_NAMES = [
   ["analysis_get_provenance", "getProvenance()"], ["dsl_reference", "dslReference()"], ["study_vocabulary", "studyVocabulary(study?)"],
   ["list_studies", "listStudies()"], ["list_examples", "listExamples()"], ["analysis_set_document", "setDocument(doc)"],
   ["analysis_set_cohort", "setCohort(name, def)"], ["analysis_remove_cohort", "removeCohort(name)"],
-  ["analysis_split_cohort", "splitCohort({cohort, attribute|gene|oql})"], ["analysis_set_split", "setSplit(cohort, name, {arms, other?})"],
+  ["analysis_split_cohort", "splitCohort({cohort, attribute|gene|oql|assay})"], ["analysis_set_split", "setSplit(cohort, name, {arms, other?})"],
   ["analysis_remove_split", "removeSplit(cohort, name)"], ["analysis_add_view", "addView(view, position?)"],
   ["analysis_update_view", "updateView(i, patch)"], ["analysis_remove_view", "removeView(i)"], ["analysis_move_view", "moveView(from, to)"],
   ["analysis_set_details", "setDetails({study, title, notes, params})"], ["analysis_undo", "undo()"], ["analysis_load_example", "loadExample(title)"],

@@ -6,7 +6,7 @@ import { isPatientLevel, type EndpointColumns } from "../../federation.ts";
 import { validateAxis, type AxisKind } from "../../plot.ts";
 import { type CoxTrace } from "../../method.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
-import { overLimit, studyCatalogs, ATTR_NAME } from "../shared.ts";
+import { overLimit, studyCatalogs, ATTR_NAME, assayEntitiesKnown } from "../shared.ts";
 import { buildCoxColumns, notProfiledNote } from "../covariates.ts";
 import { resolveProfileAxis } from "../../plot-profile.ts";
 import type { CoxView, CoxCoefficient } from "./types.ts";
@@ -43,6 +43,8 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
     const catalogs = await studyCatalogs(c, vStudies);
     covariates = covariates.map((cv, i) => ({ ...resolveProfileAxis(cv, "covariate " + (i + 1), catalogs), ...(cv.reference != null ? { reference: cv.reference } : {}) }));
     covariates.forEach((cv, i) => validateAxis(cv, "covariate " + (i + 1)));
+    const named = await assayEntitiesKnown(c, Object.fromEntries(covariates.map((cv, i) => ["covariate " + (i + 1), cv])), vStudies);
+    covariates = covariates.map((cv, i) => named["covariate " + (i + 1)] || cv);
   }
   catch (e) { return untimed({ kind: "cox", endpoint, error: (e as Error).message }); }
   const rawCutoff = cx.cutoffMonths;

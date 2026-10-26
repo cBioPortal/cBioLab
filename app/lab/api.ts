@@ -6,7 +6,7 @@
 // They return the Response, as fetch does: a caller still decides how to read it (JSON, the
 // binary contract, a file) and what an error status means for it.
 import type {
-  AnalysisBody, NotebookBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody, CellExplorerBody, LockBody, GenesBody,
+  AnalysisBody, NotebookBody, ExploreBody, OncoprintBody, OncoprintDetailBody, PatientsOfBody, PartitionBody, ViewPageBody, TableBody, CellExplorerBody, LockBody, GenesBody, AssayEntitiesBody,
 } from "../../lib/api-schemas.ts";
 import { withCustomData, type UploadBinding } from "./custom-data-client.ts";
 import type { ArtifactKind } from "../../lib/artifacts.ts";
@@ -76,6 +76,9 @@ export const api = {
 
   /** The gene catalog: symbols checked, genes and gene sets searched, a gene set's members. */
   genes: (body: GenesBody, opts: Opts = {}) => post("/api/genes", body, opts.signal),
+
+  /** A generic-assay profile's entities found by name, for an axis's entity picker. */
+  assayEntities: (body: AssayEntitiesBody, opts: Opts = {}) => post("/api/assay-entities", body, opts.signal),
 
   /** One study's timeline vocabulary and declared survival endpoints. */
   catalog: (study: string, opts: Opts = {}) => fetch("/api/catalog?study=" + encodeURIComponent(study), { signal: opts.signal }),

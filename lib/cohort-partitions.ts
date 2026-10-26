@@ -24,6 +24,7 @@
 import type { AnalysisDoc, Clause, CohortDef, Leaf, PartitionDef, ProfiledLeaf } from "./types.ts";
 import { parseOql } from "./oql.ts";
 import { OQL_PROFILE } from "./oql-parse.ts";
+import { entityShortName } from "./profile-names.ts";
 
 export const PARTITION_MAX_ARMS = 8;
 export const PARTITION_SEP = " / ";
@@ -59,6 +60,10 @@ function leafEvaluability(leaf: Leaf): Evaluability {
     }
     return { leaves, unchecked };
   }
+  if (kind === "genericAssay") {
+    const g = leaf as { profileType: string; entity: string };
+    return { leaves: [{ kind: "genericAssay", profileType: g.profileType, entity: g.entity, measured: true }], unchecked: [] };
+  }
   if (kind === "proteinPosition") return { leaves: [{ kind: "profiled", type: "MUTATION", gene: (leaf as { gene: string }).gene }], unchecked: [] };
   if (kind === "clinical") {
     const c = leaf as { attribute: string; per?: "patient" | "sample" };
@@ -93,6 +98,7 @@ function notEvaluableLabel(e: Leaf): string {
   const l = e as unknown as Record<string, unknown>;
   if (l.kind === "profiled") return "Not profiled: " + String(l.gene) + " " + PROFILE_WORD[l.type as ProfiledLeaf["type"]];
   if (l.kind === "clinical") return "No " + String(l.attribute) + " recorded";
+  if (l.kind === "genericAssay") return "No " + entityShortName(String(l.entity), String(l.profileType)) + " measured";
   return "Not evaluable";
 }
 

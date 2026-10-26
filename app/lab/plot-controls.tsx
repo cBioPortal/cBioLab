@@ -22,7 +22,7 @@ const CAP = POINTS_CAP.toLocaleString("en-US");
 
 function LogToggle({ spec, side, numeric, busy, update }: { spec: any; side: "x" | "y"; numeric: boolean; busy: boolean; update: Update }) {
   const axis = spec[side];
-  if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular" && axis.source !== "profile")) return null;
+  if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular" && axis.source !== "assay" && axis.source !== "profile")) return null;
   return (
     <label className="chk text-md text-foreground" title="draw this axis on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out">
       <Checkbox checked={!!axis.log} disabled={busy}

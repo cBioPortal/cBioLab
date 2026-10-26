@@ -28,6 +28,7 @@ import type {
   SampleListLeaf, PatientListLeaf, SplitLeaf, UploadLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
 } from "./types.ts";
 import { finiteSql } from "./sql-number.ts";
+import { ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
 
@@ -358,7 +359,8 @@ function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): string {
   const conds = numRangeConds(leaf.range, finiteSql("value"));
   if (Array.isArray(leaf.values) && leaf.values.length)
     conds.push("value IN (" + leaf.values.slice(0, 20).map(v => sq(String(v))).join(",") + ")");
-  if (!conds.length) throw new Error("genericAssay clause needs range or values[]");
+  if (leaf.measured === true) conds.push("trimBoth(value) NOT IN (" + ASSAY_MISSING_VALUES.map(sq).join(",") + ")");
+  if (!conds.length) throw new Error("genericAssay clause needs range, values[] or measured: true");
   return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
     "  FROM " + dbOf(ctx) + ".generic_assay_data_derived\n" +
     // the study's own profile by its exact id: a prefix match on the ids also reads every sibling
