@@ -90,6 +90,16 @@ test("no plot query returns a case id: every one groups it away", () => {
   }
 });
 
+test("an axis with no spread draws in one row and has no correlation", () => {
+  const x = axisSelect(num, ctx, "num");
+  // ClickHouse computes a division under a NULL, so nullIf(width, 0) still casts 0/0 to a bin
+  for (const sql of [plotBinsSql(x, x, ctx.cohortSql), plotViolinSql(x, x, ctx.cohortSql)])
+    assert.equal(/nullIf\([xy]1 - [xy]0, 0\)/.test(sql), false, "a bin divides by a width that may be 0");
+  const st = plotStatsSql(x, x, ctx.cohortSql);
+  assert.match(st, /if\(min\(x\) < max\(x\) AND min\(y\) < max\(y\), rankCorr\(x, y\), NULL\)/);
+  assert.match(st, /if\(min\(x\) < max\(x\) AND min\(y\) < max\(y\), corr\(x, y\), NULL\)/);
+});
+
 test("the grid is what bounds a scatter, not the cohort", () => {
   const x = axisSelect(num, ctx, "num");
   const sql = plotBinsSql(x, x, ctx.cohortSql, [40, 30]);

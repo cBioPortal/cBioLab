@@ -73,8 +73,8 @@ SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id,
 ) GROUP BY id),
      pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)
 ,    e AS (SELECT 33 AS x0, 90 AS x1, 0 AS y0, 67.2 AS y1)
-SELECT least(239, toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * 240))) AS bx,
-       least(159, toUInt32(floor((y - y0) / nullIf(y1 - y0, 0) * 160))) AS by,
+SELECT least(239, toUInt32(floor((x - x0) / if(x1 > x0, x1 - x0, 1) * 240))) AS bx,
+       least(159, toUInt32(floor((y - y0) / if(y1 > y0, y1 - y0, 1) * 160))) AS by,
        count() AS n
 FROM pair, e GROUP BY bx, by
 
@@ -105,8 +105,8 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id,
 ) GROUP BY id),
      pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)
 ,    e AS (SELECT 33 AS x0, 90 AS x1, 0 AS y0, 67.2 AS y1)
-SELECT least(239, toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * 240))) AS bx,
-       least(159, toUInt32(floor((y - y0) / nullIf(y1 - y0, 0) * 160))) AS by,
+SELECT least(239, toUInt32(floor((x - x0) / if(x1 > x0, x1 - x0, 1) * 240))) AS bx,
+       least(159, toUInt32(floor((y - y0) / if(y1 > y0, y1 - y0, 1) * 160))) AS by,
        count() AS n
 FROM pair, e GROUP BY bx, by
 

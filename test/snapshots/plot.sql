@@ -86,7 +86,7 @@ WHERE ga.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND ga.profile
 GROUP BY id),
      j AS (SELECT gs.v AS g, vs.v AS x FROM vs INNER JOIN gs ON gs.id = vs.id),
      e AS (SELECT quantileExact(0.005)(x) x0, quantileExact(0.995)(x) x1 FROM j)
-SELECT g, least(39, toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * 40))) AS b, count() AS n, any(x0) AS vx0, any(x1) AS vx1
+SELECT g, least(39, toUInt32(floor((x - x0) / if(x1 > x0, x1 - x0, 1) * 40))) AS b, count() AS n, any(x0) AS vx0, any(x1) AS vx1
 FROM j, e GROUP BY g, b
 
 -- view 1 plot: plot:box · brca_tcga_pan_can_atlas_2018
@@ -228,5 +228,5 @@ WHERE sd.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND replaceOne
 GROUP BY alt_case)),
      j AS (SELECT gs.v AS g, vs.v AS x FROM vs INNER JOIN gs ON gs.id = vs.id),
      e AS (SELECT quantileExact(0.005)(x) x0, quantileExact(0.995)(x) x1 FROM j)
-SELECT g, least(39, toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * 40))) AS b, count() AS n, any(x0) AS vx0, any(x1) AS vx1
+SELECT g, least(39, toUInt32(floor((x - x0) / if(x1 > x0, x1 - x0, 1) * 40))) AS b, count() AS n, any(x0) AS vx0, any(x1) AS vx1
 FROM j, e GROUP BY g, b

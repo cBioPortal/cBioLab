@@ -469,11 +469,16 @@ export function coverageNote(d: PlotData, unit: "patient" | "sample"): string {
     (miss.length ? " (" + miss.join("; ") + ")" : "") + "; only those are drawn.";
 }
 
-/** exact statistics over every point: both coefficients and the least-squares line */
+/**
+ * exact statistics over every point: both coefficients and the least-squares line. A coefficient
+ * is NULL when either axis has no spread, and the line when x has none: rankCorr returns a number
+ * for an axis whose values are all tied, and that number means nothing.
+ */
 export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): AggregateSql {
+  const spread = "min(x) < max(x) AND min(y) < max(y)";
   return aggregateSql(pairCte(xSel, ySel, cohortSql) +
-    "SELECT count() AS n, corr(x, y) AS pearson, rankCorr(x, y) AS spearman,\n" +
-    "       simpleLinearRegression(x, y).1 AS slope, simpleLinearRegression(x, y).2 AS intercept\n" +
+    "SELECT count() AS n, if(" + spread + ", corr(x, y), NULL) AS pearson, if(" + spread + ", rankCorr(x, y), NULL) AS spearman,\n" +
+    "       if(min(x) < max(x), simpleLinearRegression(x, y).1, NULL) AS slope, if(min(x) < max(x), simpleLinearRegression(x, y).2, NULL) AS intercept\n" +
     "FROM pair");
 }
 
@@ -524,7 +529,7 @@ function clampGrid(bins: [number, number]): [number, number] {
  * not count it in.
  */
 function binIndex(col: "x" | "y", n: number): string {
-  return "least(" + (n - 1) + ", toUInt32(floor((" + col + " - " + col + "0) / nullIf(" + col + "1 - " + col + "0, 0) * " + n + ")))";
+  return "least(" + (n - 1) + ", toUInt32(floor((" + col + " - " + col + "0) / if(" + col + "1 > " + col + "0, " + col + "1 - " + col + "0, 1) * " + n + ")))";
 }
 
 /**
@@ -579,7 +584,7 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
     "     e AS (SELECT quantileExact(0.005)(x) x0, quantileExact(0.995)(x) x1 FROM j)\n" +
     // the extent travels with the bins: a box is drawn between its whiskers, so the renderer
     // needs to know what value a bin index stands for rather than assuming it spans the axis
-    "SELECT g, least(" + (b - 1) + ", toUInt32(floor((x - x0) / nullIf(x1 - x0, 0) * " + b + "))) AS b, " +
+    "SELECT g, least(" + (b - 1) + ", toUInt32(floor((x - x0) / if(x1 > x0, x1 - x0, 1) * " + b + "))) AS b, " +
       (colorSel ? "c, " : "") + "count() AS n, any(x0) AS vx0, any(x1) AS vx1\n" +
     "FROM j, e GROUP BY g, b" + (colorSel ? ", c" : ""));
 }

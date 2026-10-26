@@ -70,3 +70,11 @@ test("each kind of generic assay is a sub-tab of Comparison/Survival, comparing 
   for (const s of sub) assert.deepEqual((l.doc.views![s.views[0]] as any).cohorts, ["Altered", "Unaltered"]);
   assert.ok(!resultsLayout(q(["a"], ["KRAS"]), data()).tabs.find((t) => t.title === "Comparison/Survival")!.sub!.some((s) => /signature/i.test(s.title)));
 });
+
+test("a study's mutational signatures compare on single-base contributions first", async () => {
+  const { assayComparisonProfiles } = await import("../app/portal/study-known.ts");
+  const sig = (profile: string, order: number) => ({ profile, type: "GENERIC_ASSAY", datatype: "LIMIT-VALUE", name: profile, assayType: "MUTATIONAL_SIGNATURE", order });
+  const picked = assayComparisonProfiles([sig("mutational_signatures_counts_SBS", 1), sig("mutational_signatures_contribution_DBS", 2),
+    sig("mutational_signatures_contribution_ID", 3), sig("mutational_signatures_contribution_SBS", 4)]);
+  assert.deepEqual(picked.map((p) => p.profile), ["mutational_signatures_contribution_SBS"]);
+});
