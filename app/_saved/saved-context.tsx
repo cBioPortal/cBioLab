@@ -22,10 +22,10 @@ export interface SavedActions {
   showClauseData?: (cohort: string) => OnCustomData;
   /** an upload was added, changed or deleted (the lab re-reads Explore's attributes) */
   onDataChanged?: () => void;
-  /** add an upload (the lab opens Custom data → Add data on the studies explored) */
-  addData?: () => void;
   /** one of the reader's saved cohorts, by id, in Explore to change its filters */
   editCohort: (id: string) => void;
+  /** the studies the page is exploring: where adding an upload starts */
+  studies?: () => string[];
 }
 
 const labHref = (params: Record<string, string>) => "/lab?" + new URLSearchParams(params).toString();
@@ -33,7 +33,6 @@ const labHref = (params: Record<string, string>) => "/lab?" + new URLSearchParam
 export const LINK_ACTIONS: SavedActions = {
   openDoc: (doc) => location.assign(labHref({ tab: "analysis", doc: encodeParam(doc) })),
   openShared: (id) => location.assign(labHref({ tab: "analysis", shared: id })),
-  addData: () => location.assign(labHref({ tab: "explore" })),
   editCohort: (id) => location.assign(labHref({ tab: "explore", editCohort: id })),
 };
 
@@ -78,8 +77,8 @@ export function useSavedActions(actions: SavedActions) {
       openShared: (id) => latest.current.openShared(id),
       showClauseData: (c) => latest.current.showClauseData?.(c) ?? (() => {}),
       onDataChanged: () => latest.current.onDataChanged?.(),
-      addData: () => latest.current.addData?.(),
       editCohort: (id) => latest.current.editCohort(id),
+      studies: () => latest.current.studies?.() ?? [],
     });
     return () => setActions(null);
   }, [setActions]);

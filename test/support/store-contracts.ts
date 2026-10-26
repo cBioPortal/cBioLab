@@ -2,7 +2,7 @@
 // (test/custom-store.test.ts) and on a Postgres the test supplies (test/postgres.db-test.ts).
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
-import { listDatasets, saveDataset, readVersion, deleteDataset, unpackRows, shareDataset } from "../../lib/custom-store.ts";
+import { listDatasets, saveDataset, readVersion, deleteDataset, unpackRows, shareDataset, setDatasetNote } from "../../lib/custom-store.ts";
 import { listArtifacts, getArtifact, createArtifact, updateArtifact, deleteArtifact, shareArtifact } from "../../lib/artifacts.ts";
 import { createGroup, addMember, getGroup, listGroups, removeMember, setRole, deleteGroup } from "../../lib/groups.ts";
 import { userForEmail, signIn, claimLegacy, searchUsers } from "../../lib/users.ts";
@@ -39,7 +39,7 @@ export function customStoreContract(backend: string): void {
 
     test("a re-upload is a new version; the old one still reads the same", async () => {
       const v1 = await saveDataset(P, ds("pinned"), {});
-      const v2 = await saveDataset(P, ds("pinned", "Liver"), {}, v1.id);
+      const v2 = await saveDataset(P, ds("pinned", "Liver"), {}, v1.id, 1);
       assert.equal(v2.id, v1.id);
       assert.equal(v2.latestVersion, 2);
       assert.equal(unpackRows((await readVersion(P, v1.id, 1)).rowsGz)[0].values[0], "Brain");
@@ -55,7 +55,21 @@ export function customStoreContract(backend: string): void {
     test("a new version must keep the level", async () => {
       const a = await saveDataset(P, ds("levels"), {});
       const sample = { ...ds("levels"), level: "sample", rows: [{ study: "s1", patient: "P-1", sample: "P-1-T1", values: ["x"] }] };
-      await assert.rejects(saveDataset(P, sample, {}, a.id), /is patient-level; a new version must be too/);
+      await assert.rejects(saveDataset(P, sample, {}, a.id, 1), /is patient-level; a new version must be too/);
+    });
+
+    test("a new version is refused unless it was compared against the latest, when it changes nothing, and when it leaves out a row or column", async () => {
+      const a = await saveDataset(P, ds("reviewed"), {});
+      await assert.rejects(saveDataset(P, ds("reviewed", "Liver"), {}, a.id), /names the version its changes were compared against/);
+      await assert.rejects(saveDataset(P, ds("reviewed"), {}, a.id, 1), /same data as v1 of “reviewed \(test\)”: nothing to save/);
+      await saveDataset(P, ds("reviewed", "Liver"), {}, a.id, 1);
+      // a second editor who reviewed v1 must not replace v2 unseen
+      await assert.rejects(saveDataset(P, ds("reviewed", "Bone"), {}, a.id, 1), /is at v2 now, not the v1 these changes were compared against/);
+      const one = ds("reviewed", "Bone"); one.rows = one.rows.slice(0, 1);
+      await assert.rejects(saveDataset(P, one, {}, a.id, 2), /adds and updates only: it leaves out 1 patient of v2 of “reviewed \(test\)” \(s1:P-2\)/);
+      const other = { ...ds("reviewed"), columns: [{ name: "GRADE", datatype: "STRING" }] };
+      await assert.rejects(saveDataset(P, other, {}, a.id, 2), /adds and updates only: it leaves out MET_SITE of v2/);
+      assert.equal((await saveDataset(P, ds("reviewed", "Bone"), {}, a.id, 2)).latestVersion, 3);
     });
 
     test("what the engine would refuse is never stored", async () => {
@@ -69,6 +83,20 @@ export function customStoreContract(backend: string): void {
       await assert.rejects(readVersion(P, d.id, 1), /was deleted on \d{4}-\d{2}-\d{2}/);
       // its name stays taken, so a link pinned to it cannot quietly read a newer upload
       await assert.rejects(saveDataset(P, ds("gone"), {}), /belonged to a dataset that was deleted, and is not reused: rename/);
+    });
+
+    test("a note is saved with the upload, kept by a version that gives none, and changed without a version", async () => {
+      const a = await saveDataset(P, ds("noted"), {}, undefined, undefined, "  curated from path reports  ");
+      assert.equal(a.note, "curated from path reports");
+      assert.equal((await saveDataset(P, ds("noted", "Liver"), {}, a.id, 1)).note, "curated from path reports");
+      const b = await setDatasetNote(P, a.id, "rev 2: KPS added");
+      assert.deepEqual([b.note, b.latestVersion], ["rev 2: KPS added", 2]);
+      assert.equal((await saveDataset(P, ds("noted", "Bone"), {}, a.id, 2, "")).note, "");
+      assert.equal((await saveDataset(P, ds("plain"), {})).note, "");
+      await assert.rejects(setDatasetNote(P, a.id, "x".repeat(4001)), /at most 4,000 characters/);
+      await assert.rejects(setDatasetNote(OTHER, a.id, "mine now"), /no custom dataset .* that you may read/);
+      await shareDataset(P, a.id, { visibility: "public", groupId: null, groupCanEdit: false });
+      await assert.rejects(setDatasetNote(OTHER, a.id, "mine now"), /may read “noted \(test\)” but not change its note/);
     });
 
     test("another principal can read nothing it was not granted", async () => {
@@ -321,8 +349,9 @@ export function sharingContract(backend: string): void {
           assert.equal((await listDatasets(who)).some((x) => x.id === d.id), can.read, "listed");
           if (can.read) assert.deepEqual(unpackRows((await readVersion(who, d.id, 1)).rowsGz), ds("x").rows);
           else await assert.rejects(readVersion(who, d.id, 1), /no custom dataset .* that you may read/);
-          if (can.edit) assert.equal((await saveDataset(who, ds("ignored", "Lung"), {}, d.id)).latestVersion >= 2, true);
-          else await assert.rejects(saveDataset(who, ds("ignored"), {}, d.id), can.read ? /but not add versions/ : /that you may read/);
+          const base = (await listDatasets(O)).find((x) => x.id === d.id)!.latestVersion;
+          if (can.edit) assert.equal((await saveDataset(who, ds("ignored", "Lung " + who), {}, d.id, base)).latestVersion, base + 1);
+          else await assert.rejects(saveDataset(who, ds("ignored", "Lung " + who), {}, d.id, base), can.read ? /but not add versions/ : /that you may read/);
           await assert.rejects(deleteDataset(who, d.id), can.read ? /only its owner can delete/ : /that you may read/);
           await assert.rejects(shareDataset(who, d.id, { visibility: "public" }), can.read ? /only its owner can change who/ : /that you may read/);
         }

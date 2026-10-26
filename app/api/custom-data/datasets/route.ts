@@ -13,7 +13,7 @@ export async function GET(req: Request) {
 }
 
 /**
- * Save an upload: `{ dataset, source, versionOf? }`. The browser gzips the body (a function's
+ * Save an upload: `{ dataset, source, versionOf?, baseVersion?, note? }`. The browser gzips the body (a function's
  * request is capped at 4.5 MB on Vercel, and a 10k x 50 upload is ~20 MB as JSON).
  */
 export async function POST(req: Request) {
@@ -21,7 +21,8 @@ export async function POST(req: Request) {
     const principal = requirePrincipal(req);
     const raw = Buffer.from(await req.arrayBuffer());
     const text = (req.headers.get("content-type") || "").includes("gzip") ? gunzipSync(raw).toString("utf8") : raw.toString("utf8");
-    const { dataset, source, versionOf } = JSON.parse(text);
-    return Response.json({ dataset: await saveDataset(principal, dataset, source, versionOf ? String(versionOf) : undefined) }, { status: 201 });
+    const { dataset, source, versionOf, baseVersion, note } = JSON.parse(text);
+    return Response.json({ dataset: await saveDataset(principal, dataset, source, versionOf ? String(versionOf) : undefined,
+      baseVersion == null ? undefined : Number(baseVersion), note) }, { status: 201 });
   } catch (e) { return fail(e); }
 }
