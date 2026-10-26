@@ -45,17 +45,20 @@ test("every kind of change is counted, and the ones that lose data say so", () =
   assert.deepEqual(d.columns.retyped, [{ name: "KPS", from: "NUMBER", to: "STRING" }]);
   assert.deepEqual(d.cases, { added: ["s2:P-9"], removed: ["s1:P-4"], kept: 3, before: 4, after: 4 });
   assert.deepEqual(d.studies, { added: ["s2"], removed: [] });
-  assert.deepEqual(d.values.map((v) => [v.column, v.changed, v.filled, v.cleared]), [["SITE", 1, 0, 0], ["KPS", 0, 1, 1]]);
+  // GRADE is new, so each kept case's value in it is filled in
+  assert.deepEqual(d.values.map((v) => [v.column, v.changed, v.filled, v.cleared]), [["SITE", 1, 0, 0], ["KPS", 0, 1, 1], ["GRADE", 0, 3, 0]]);
   assert.deepEqual(d.all.map((v) => [v.id, v.column, v.from, v.to]),
-    [["s1:P-2", "KPS", "", "60"], ["s1:P-3", "SITE", "Bone", "Brain"], ["s1:P-3", "KPS", "90", ""]]);
+    [["s1:P-1", "GRADE", "", "1"], ["s1:P-2", "KPS", "", "60"], ["s1:P-2", "GRADE", "", "2"],
+     ["s1:P-3", "SITE", "Bone", "Brain"], ["s1:P-3", "KPS", "90", ""], ["s1:P-3", "GRADE", "", "3"]]);
   const s = diffSentences(d, "patient");
   assert.equal(s[0], "1 patient removed (of 4)");
   assert.ok(s.includes("1 column removed: NOTE"));
   assert.ok(s.includes("KPS changes type: numeric → categorical"));
   assert.ok(s.includes("KPS: 1 value cleared, 1 value filled in"));
+  assert.ok(s.includes("GRADE: 3 values filled in"));
   assert.ok(s.includes("renamed “Mets” → “Mets (curated)”"));
   const tsv = diffToTsv(d).trim().split("\n");
-  assert.equal(tsv.length, 1 + 1 + 1 + 1 + 1 + 1 + 3);
+  assert.equal(tsv.length, 1 + 1 + 1 + 1 + 1 + 1 + 6);
   assert.ok(tsv.includes("value changed\ts1:P-3\tSITE\tBone\tBrain"));
 });
 

@@ -15,6 +15,7 @@ import { gzipSync, gunzipSync } from "node:zlib";
 import { dbQuery } from "./db.ts";
 import { validateCustomData, type CustomDataset, type CustomColumn, type CustomLevel } from "./custom-data.ts";
 import { AccessError } from "./auth.ts";
+import { lostFrom } from "./custom-data-edit.ts";
 import { groupsOf, readableWhere, canRead, canWrite, canShare, rightsOf, sharingOf, validateSharing, type Rights, type Shareable, type Sharing } from "./access.ts";
 
 export interface DatasetSource { rowsIn: number; unmatched: number; duplicates: number; multiStudy: number; studies: string[] }
@@ -24,7 +25,7 @@ export interface DatasetVersionMeta {
   source: DatasetSource; createdBy: string; createdAt: string;
 }
 export interface DatasetMeta {
-  id: string; slug: string; name: string; owner: string; ownerEmail: string; level: CustomLevel;
+  id: string; slug: string; name: string; note: string; owner: string; ownerEmail: string; level: CustomLevel;
   latestVersion: number; createdAt: string; updatedAt: string; deletedAt: string | null;
   sharing: Sharing & { groupName: string | null };
   /** what the asking user may do with it */
@@ -33,7 +34,7 @@ export interface DatasetMeta {
 }
 
 interface DatasetRow extends Shareable {
-  id: string; slug: string; name: string; level: CustomLevel; latest_version: number; created_at: string; updated_at: string; deleted_at: string | null;
+  id: string; slug: string; name: string; note: string; level: CustomLevel; latest_version: number; created_at: string; updated_at: string; deleted_at: string | null;
   owner_email: string; group_name: string | null;
 }
 interface VersionRow { dataset_id: string; version: number; columns: CustomColumn[]; studies: string[]; row_count: number; rows_gz: Buffer; sha256: string; source: DatasetSource; created_by: string; created_at: string }
@@ -50,7 +51,9 @@ interface Store {
   versions(ids: string[]): Promise<Omit<VersionRow, "rows_gz">[]>;
   version(id: string, version: number): Promise<VersionRow | null>;
   /** creates the dataset row (when `create`) and its next version, atomically */
-  write(d: { id: string; slug: string; name: string; owner: string; level: CustomLevel; create: boolean }, v: Omit<VersionRow, "created_at">): Promise<void>;
+  /** `note` null keeps the dataset's note as it is */
+  write(d: { id: string; slug: string; name: string; note: string | null; owner: string; level: CustomLevel; create: boolean }, v: Omit<VersionRow, "created_at">): Promise<void>;
+  setNote(id: string, note: string): Promise<void>;
   softDelete(id: string): Promise<void>;
   log(principal: string, action: "read" | "create" | "version" | "delete", id: string, version: number | null): Promise<void>;
 }
@@ -75,15 +78,16 @@ const store: Store = {
     await dbQuery(
       "with ds as (" +
       (d.create
-        ? "insert into custom_dataset (id, slug, name, owner_id, level, latest_version) values ($1::uuid, $2::text, $3::text, $4::uuid, $5::text, $6::int) returning id"
-        : "update custom_dataset set name = $3::text, latest_version = $6::int where id = $1::uuid and latest_version = $6::int - 1 and deleted_at is null" +
+        ? "insert into custom_dataset (id, slug, name, owner_id, level, latest_version, note) values ($1::uuid, $2::text, $3::text, $4::uuid, $5::text, $6::int, coalesce($14::text, '')) returning id"
+        : "update custom_dataset set name = $3::text, latest_version = $6::int, note = coalesce($14::text, note) where id = $1::uuid and latest_version = $6::int - 1 and deleted_at is null" +
           " and $2::text is not null and $4::text is not null and $5::text is not null returning id") +
       ") insert into custom_dataset_version (dataset_id, version, columns, studies, row_count, rows_gz, sha256, source, created_by)" +
       " select id, $6::int, $7::jsonb, $8::text[], $9::int, $10::bytea, $11::text, $12::jsonb, $13::text from ds",
       [d.id, d.slug, d.name, d.owner, d.level, v.version, JSON.stringify(v.columns), v.studies, v.row_count, v.rows_gz, v.sha256,
-        JSON.stringify(v.source), v.created_by]);
+        JSON.stringify(v.source), v.created_by, d.note]);
     if (!(await this.version(d.id, v.version))) throw new Error("another version of this dataset was saved at the same time; reload and save again");
   },
+  async setNote(id, note) { await dbQuery("update custom_dataset set note = $2 where id = $1 and deleted_at is null", [id, note]); },
   async softDelete(id) { await dbQuery("update custom_dataset set deleted_at = now() where id = $1 and deleted_at is null", [id]); },
   async log(principal, action, id, version) {
     await dbQuery("insert into custom_data_access_log (principal, action, dataset_id, version) values ($1, $2, $3, $4)", [principal, action, id, version]);
@@ -98,7 +102,7 @@ const store: Store = {
 const iso = (x: unknown): string => x instanceof Date ? x.toISOString() : String(x);
 
 const metaOf = (d: DatasetRow, vs: Omit<VersionRow, "rows_gz">[], principal: string, groups: Set<string>): DatasetMeta => ({
-  id: d.id, slug: d.slug, name: d.name, owner: d.owner_id ?? "", ownerEmail: d.owner_email ?? "", level: d.level, latestVersion: d.latest_version,
+  id: d.id, slug: d.slug, name: d.name, note: d.note ?? "", owner: d.owner_id ?? "", ownerEmail: d.owner_email ?? "", level: d.level, latestVersion: d.latest_version,
   createdAt: iso(d.created_at), updatedAt: iso(d.updated_at), deletedAt: d.deleted_at ? iso(d.deleted_at) : null,
   sharing: { ...sharingOf(d), groupName: d.group_name }, rights: rightsOf(principal, d, groups),
   versions: vs.filter((v) => v.dataset_id === d.id).map((v) => ({
@@ -106,6 +110,14 @@ const metaOf = (d: DatasetRow, vs: Omit<VersionRow, "rows_gz">[], principal: str
     source: v.source, createdBy: v.created_by, createdAt: iso(v.created_at)
   }))
 });
+
+const NOTE_MAX = 4000;
+function validNote(note: unknown): string {
+  if (typeof note !== "string") throw new Error("a note is text");
+  const t = note.trim();
+  if (t.length > NOTE_MAX) throw new Error("a note is at most " + NOTE_MAX.toLocaleString("en-US") + " characters; this one has " + t.length.toLocaleString("en-US"));
+  return t;
+}
 
 /** Every live dataset this principal may read, newest first, without rows. */
 export async function listDatasets(principal: string): Promise<DatasetMeta[]> {
@@ -140,8 +152,13 @@ export async function readVersion(principal: string, id: string, version?: numbe
  * A new version names the version its changes were reviewed against (`baseVersion`, see
  * lib/custom-data-diff.ts), and is refused when that is no longer the latest — someone saved in
  * between, so what was confirmed is not what would be replaced — or when it is the same data again.
+ * It adds and updates only: one that leaves out a row or a column of the latest is refused
+ * (lib/custom-data-edit.ts `lostFrom`).
+ *
+ * `note`, when given, becomes the dataset's note; a new version without one keeps the note it had.
  */
-export async function saveDataset(principal: string, input: unknown, source: unknown, versionOf?: string, baseVersion?: number): Promise<DatasetMeta> {
+export async function saveDataset(principal: string, input: unknown, source: unknown, versionOf?: string, baseVersion?: number, note?: unknown): Promise<DatasetMeta> {
+  const text = note === undefined || note === null ? null : validNote(note);
   const [ds] = validateCustomData([input]) as [CustomDataset];
   if (!ds || !ds.rows.length) throw new Error("a dataset needs at least one row");
   const src = (source && typeof source === "object" ? source : {}) as Partial<DatasetSource>;
@@ -163,8 +180,15 @@ export async function saveDataset(principal: string, input: unknown, source: unk
     if (!Number.isInteger(baseVersion)) throw new Error("a new version names the version its changes were compared against (baseVersion)");
     if (baseVersion !== target.latest_version)
       throw new AccessError("“" + target.name + "” is at v" + target.latest_version + " now, not the v" + baseVersion + " these changes were compared against: review them again", 409);
-    const latest = (await store.versions([target.id])).find((v) => v.version === target!.latest_version);
+    const latest = await store.version(target.id, target.latest_version);
     if (latest?.sha256 === row.sha256) throw new Error("this is the same data as v" + target.latest_version + " of “" + target.name + "”: nothing to save");
+    if (latest) {
+      const lost = lostFrom({ level: ds.level, columns: latest.columns, rows: unpackRows(latest.rows_gz) }, ds);
+      const v = "v" + target.latest_version + " of “" + target.name + "”";
+      if (lost.columns.length) throw new Error("a new version adds and updates only: it leaves out " + lost.columns.join(", ") + " of " + v);
+      if (lost.cases.length) throw new Error("a new version adds and updates only: it leaves out " + lost.cases.length.toLocaleString("en-US") + " " + ds.level +
+        (lost.cases.length === 1 ? "" : "s") + " of " + v + " (" + lost.cases.slice(0, 3).join(", ") + (lost.cases.length > 3 ? ", …" : "") + ")");
+    }
   } else {
     const clash = await store.bySlug(principal, ds.id);
     // a deleted dataset keeps its name, so an analysis pinned to it is still refused as deleted rather than reading another
@@ -172,10 +196,19 @@ export async function saveDataset(principal: string, input: unknown, source: unk
     if (clash) throw new Error("a server dataset is already named " + ds.id + ": save as a new version of it, or rename this upload");
   }
   const id = target?.id ?? randomUUID(), version = target ? target.latest_version + 1 : 1;
-  await store.write({ id, slug: target?.slug ?? ds.id, name: ds.name, owner: target?.owner_id ?? principal, level: ds.level, create: !target },
+  await store.write({ id, slug: target?.slug ?? ds.id, name: ds.name, note: text, owner: target?.owner_id ?? principal, level: ds.level, create: !target },
     { dataset_id: id, version, ...row });
   await store.log(principal, target ? "version" : "create", id, version);
   return metaOf((await store.dataset(id))!, await store.versions([id]), principal, target ? groups : await groupsOf(principal));
+}
+
+/** Change a dataset's note (whoever may add versions to it). Its versions stay as they are. */
+export async function setDatasetNote(principal: string, id: string, note: unknown): Promise<DatasetMeta> {
+  const { d, groups } = await readable(principal, id);
+  if (d.deleted_at) throw new AccessError("custom dataset “" + d.name + "” was deleted", 410);
+  if (!canWrite(principal, d, groups)) throw new AccessError("you may read “" + d.name + "” but not change its note", 403);
+  await store.setNote(d.id, validNote(note));
+  return metaOf((await store.dataset(d.id))!, await store.versions([d.id]), principal, groups);
 }
 
 /** Delete (its owner only). */
