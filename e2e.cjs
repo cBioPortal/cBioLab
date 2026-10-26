@@ -468,10 +468,10 @@ async function main() {
       // derives the name from the draft, so two Analyze runs share a name and
       // counting cohorts could not tell replace from overwrite.
       await page.locator("header a.savedbtn").click();   // the saved-work manager, over the lab
-      await page.waitForSelector(".pick [role=checkbox]", { timeout: 240000 });
+      await page.waitForSelector("[role=checkbox].cohortpick", { timeout: 240000 });
       let seeded = [];
       try {
-        await page.locator(".pick [role=checkbox]").nth(0).check();
+        await page.locator("[role=checkbox].cohortpick").nth(0).check();
         await page.locator("button:has-text('Analyze selected')").click();
         await page.waitForSelector(".cohortbox", { timeout: 300000 });
         seeded = Object.keys(JSON.parse(await page.locator("#docjson").inputValue()).cohorts || {});
@@ -850,14 +850,14 @@ async function main() {
         await page.context().request.post(BASE + "/api/artifacts", { data: { kind: "cohort", name: n, definition: { study: "msk_chord_2024", all: [{ kind: "oql", q }] } } });
       await page.goto(BASE + "/lab");
       await page.locator("header a.savedbtn").click();   // the saved-work manager, over the lab
-      await page.waitForSelector(".pick [role=checkbox]", { timeout: 240000 });
+      await page.waitForSelector("[role=checkbox].cohortpick", { timeout: 240000 });
       ok("cohort rows use checkboxes, not per-row add links",
         (await page.locator("button:has-text('add to analysis')").count()) === 0,
-        (await page.locator(".pick [role=checkbox]").count()) + " selectable cohorts");
+        (await page.locator("[role=checkbox].cohortpick").count()) + " selectable cohorts");
       ok("submit is refused with nothing ticked",
         await page.locator("button:has-text('Analyze selected')").isDisabled());
-      await page.locator(".pick [role=checkbox]").nth(0).check();
-      await page.locator(".pick [role=checkbox]").nth(1).check();
+      await page.locator("[role=checkbox].cohortpick").nth(0).check();
+      await page.locator("[role=checkbox].cohortpick").nth(1).check();
       await page.locator("button:has-text('Analyze selected')").click();
       let together = [], startViews = -1;
       try {
@@ -1903,7 +1903,7 @@ async function main() {
       const art = ((await (await ctx.request.get(BASE + "/api/artifacts?kind=cohort")).json()).artifacts || []).find((a) => a.name === libName);
       const leaf = art?.definition?.all?.[0] || {};
       steps.inLibrary = !!art && leaf.kind === "patientList" && /^[0-9a-f-]{36}$/.test(leaf.set || "") && art.definition.study === "msk_chord_2024";
-      steps.noExamplesInSaved = (await sp.locator("h2.savedsec", { hasText: /^Examples/ }).count()) === 0;
+      steps.noExamplesInSaved = (await sp.locator("h2", { hasText: /^Examples/ }).count()) === 0;
       // the analysis's cohort panel, with no view yet
       await sp.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify({ dsl: "2.8", study: "msk_chord_2024", cohorts: {}, views: [] })).toString("base64url"), { waitUntil: "domcontentloaded" });
       await sp.locator(".fromlist").click();

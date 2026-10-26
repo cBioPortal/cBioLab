@@ -83,7 +83,7 @@ export function SavedCohortRow({ id, name, def, picked, onPick, meta, onAnalyze,
   const box = useId();
   return (
     <div className="listrow flex items-start gap-2.5">
-      <Checkbox id={box} className="mt-2" checked={picked} onCheckedChange={onPick} aria-label={"tick “" + name + "” to analyse"} />
+      <Checkbox id={box} className="cohortpick mt-2" checked={picked} onCheckedChange={onPick} aria-label={"tick “" + name + "” to analyse"} />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex flex-wrap items-baseline gap-x-2.5">
           <label htmlFor={box} className="pick"><strong>{name}</strong></label>
