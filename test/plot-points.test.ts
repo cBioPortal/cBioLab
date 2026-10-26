@@ -4,7 +4,7 @@
 // what was asked of whom, and what was NOT.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { runPlot } from "../lib/views/plot/run.ts";
+import { runPlot, pooledOutliers } from "../lib/views/plot/run.ts";
 import { POINTS_CAP, OUTLIER_CELL_MAX, sparseCellMax } from "../lib/plot.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { PlotData, ViewResultOf } from "../lib/types.ts";
@@ -20,7 +20,7 @@ const box = (n: number): PlotData => ({ shape: "box", n, x: { label: "CANCER_TYP
 
 type Call = { m: string; cap?: number; extra?: unknown };
 function fake(mode: "patient-level" | "aggregate-only", calls: Call[], data: () => PlotData, answers: {
-  all?: unknown[] | null; outliers?: unknown[] | null;
+  all?: unknown[] | null; outliers?: unknown[] | null; outlierTotal?: number;
 } = {}) {
   const r: Record<string, unknown> = {
     instance: { mode, conn: { db: "db" }, label: mode },
@@ -32,10 +32,14 @@ function fake(mode: "patient-level" | "aggregate-only", calls: Call[], data: () 
       return sparse ? (answers.outliers === undefined ? [{ id: "o1", x: 99, y: 49 }] : answers.outliers)
         : (answers.all === undefined ? [{ id: "a1", x: 1, y: 1 }, { id: "a2", x: 2, y: 2 }] : answers.all);
     };
-    r.plotPoints = async (_d: unknown, _s: unknown, cap?: number, outside?: unknown) => {
-      calls.push({ m: "boxPoints", cap, extra: outside });
-      return outside ? (answers.outliers === undefined ? [{ id: "o1", g: "A", v: 90 }] : answers.outliers)
-        : (answers.all === undefined ? [{ id: "a1", g: "A", v: 3 }] : answers.all);
+    r.plotPoints = async (_d: unknown, _s: unknown, cap?: number) => {
+      calls.push({ m: "boxPoints", cap });
+      return answers.all === undefined ? [{ id: "a1", g: "A", v: 3 }] : answers.all;
+    };
+    r.plotOutlierPoints = async (_d: unknown, _s: unknown, cap: number, whiskers: unknown) => {
+      calls.push({ m: "boxOutliers", cap, extra: whiskers });
+      const points = answers.outliers === undefined ? [{ id: "o1", g: "A", v: 90 }] : answers.outliers || [];
+      return { points: points.slice(0, cap), total: answers.outlierTotal ?? points.length };
     };
   }
   return r;
@@ -132,7 +136,7 @@ describe("a box's points", () => {
   test("over the cap the values beyond each group's whiskers are points over the violin", async () => {
     const calls: Call[] = [];
     const r = await run(fake("patient-level", calls, () => box(POINTS_CAP + 1)));
-    assert.equal(calls.length, 1, "over the cap the every-value query is not run");
+    assert.deepEqual(calls.map((c) => c.m), ["boxOutliers"], "over the cap the every-value query is not run");
     assert.deepEqual(calls[0].extra, [{ g: "A", n: POINTS_CAP + 1, lo: 0, hi: 100, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 12 }]);
     assert.equal(r.plot!.overlay, "violin", "the violin stays: the outliers are drawn over it");
     assert.equal(r.plot!.pointSet!.rule, "none");
@@ -140,11 +144,25 @@ describe("a box's points", () => {
     assert.match(r.note!, /outliers: 1 value beyond the whiskers/);
   });
 
-  test("more outliers than the cap: none, never the first POINTS_CAP", async () => {
+  test("more outliers than the cap: the most extreme POINTS_CAP, and the caption says how many there were", async () => {
     const calls: Call[] = [];
-    const r = await run(fake("patient-level", calls, () => box(POINTS_CAP * 3), { outliers: null }));
-    assert.equal(r.plot!.points, undefined);
-    assert.equal(r.plot!.layers![0].shown, "none");
-    assert.match(r.note!, new RegExp("outliers: not drawn, more than " + CAP + " values lie beyond the whiskers"));
+    const most = Array.from({ length: POINTS_CAP }, (_, i) => ({ id: "o" + i, g: "A", v: 1000 - i / 100 }));
+    const r = await run(fake("patient-level", calls, () => box(POINTS_CAP * 3), { outliers: most, outlierTotal: 25000 }));
+    assert.equal(calls[0].cap, POINTS_CAP, "asked for at most the budget");
+    const l = r.plot!.layers![0];
+    assert.equal(l.shown, "points");
+    assert.equal(l.points!.length, POINTS_CAP);
+    assert.equal(l.of, 25000);
+    assert.match(r.note!, new RegExp("outliers: the " + CAP + " most extreme of the 25,000 values beyond the whiskers"));
+  });
+
+  test("pooled across studies: each site's most extreme, kept by how far beyond its own group's whiskers", () => {
+    const whiskers = [{ g: "A", loWhisker: 0, hiWhisker: 10 }, { g: "B", loWhisker: 0, hiWhisker: 100 }];
+    const r = pooledOutliers([
+      { points: [{ id: "a1", g: "A", v: 30 }, { id: "a2", g: "A", v: 12 }], total: 900 },
+      { points: [{ id: "b1", g: "B", v: 250 }], total: 5 }], ["s1", "s2"], whiskers, 2);
+    assert.deepEqual(r.points.map((p) => p.id), ["a1", "b1"], "20 past a span of 10 (2.0) and 150 past 100 (1.5) beat 2 past 10 (0.2)");
+    assert.deepEqual(r.keys, ["s1\u0000a1", "s2\u0000b1"], "keyed by study, so two studies' ids never collide");
+    assert.equal(r.total, 905);
   });
 });

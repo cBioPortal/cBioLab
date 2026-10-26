@@ -514,8 +514,10 @@ export class RemotePatientResolver extends RemoteAggregateResolver implements Re
 /** The plot-case methods a peer that shares them answers, each a federated_plot_cases call. */
 function plotCaseMethods(r: RemotePatientResolver): PlotCasesCapable {
   return {
-    plotPoints: (def, spec, cap?: number, outside?: Whiskers[]) =>
-      r.casesCall<PlotPoint[] | null>("points", def, spec, { ...(cap != null ? { cap } : {}), ...(outside ? { outside } : {}) }),
+    plotPoints: (def, spec, cap?: number) =>
+      r.casesCall<PlotPoint[] | null>("points", def, spec, cap != null ? { cap } : {}),
+    plotOutlierPoints: (def, spec, cap: number, whiskers: Whiskers[]) =>
+      r.casesCall<{ points: PlotPoint[]; total: number }>("outliers", def, spec, { cap, outside: whiskers }),
     plotScatterPoints: (def, spec, cap?: number, sparse?: SparseCells) =>
       r.casesCall<PlotXYPoint[] | null>("scatterPoints", def, spec, { ...(cap != null ? { cap } : {}), ...(sparse ? { sparse } : {}) }),
     plotRankedPoints: (def, spec, xk, yk, rank: PointRank) =>

@@ -606,18 +606,49 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
  * site has no method that could call it — see docs/DATA-BOUNDARY.md.
  */
 export function plotPointsSql(numSel: string, catSel: string, cohortSql: string, cap = POINTS_CAP,
-  colorSel?: string, ringSel?: string, outside?: Whiskers[]): PatientSql {
-  return patientSql("WITH cohort AS (" + cohortSql + "),\n" +
+  colorSel?: string, ringSel?: string): PatientSql {
+  return patientSql(boxCasesHead(numSel, catSel, cohortSql, colorSel, ringSel) +
+    "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1));
+}
+
+/**
+ * A box's values beyond their group's whiskers, WITH their case ids, the most extreme first: at
+ * most `cap` of them, each row carrying how many there are in all, so a caller past the cap draws
+ * the most extreme and says how many it left out. Returns ids, so like plotPointsSql it is
+ * reachable only from `PatientLevelResolver`. The order is outlierExtremity's, in SQL.
+ */
+export function plotOutlierPointsSql(numSel: string, catSel: string, cohortSql: string, whiskers: Whiskers[], cap = POINTS_CAP): PatientSql {
+  const at = "indexOf([" + whiskers.map((w) => sq(w.g)).join(", ") + "], gs.v)";
+  const arr = (f: (w: Whiskers) => number) => "arrayElement([" + whiskers.map((w) => num(f(w))).join(", ") + "], " + at + ")";
+  const lo = arr((w) => w.loWhisker), hi = arr((w) => w.hiWhisker);
+  const ext = "if(vs.v > " + hi + ", vs.v - " + hi + ", " + lo + " - vs.v) / if(" + hi + " > " + lo + ", " + hi + " - " + lo + ", 1)";
+  return patientSql(boxCasesHead(numSel, catSel, cohortSql, undefined, undefined, ", count() OVER () AS total") +
+    outsideWhiskers(whiskers) + "\n" +
+    "ORDER BY " + ext + " DESC, id\n" +
+    "LIMIT " + Math.max(1, Math.min(50000, Math.round(cap))));
+}
+
+/**
+ * How far a value lies beyond its group's whiskers, in units of the whisker span, so a group with
+ * a narrow spread is not drowned out by a wide one. 0 inside the whiskers. plotOutlierPointsSql
+ * orders by the same expression, so pooling sites' answers by this keeps the overall most extreme.
+ */
+export function outlierExtremity(v: number, w: Whiskers): number {
+  const span = w.hiWhisker > w.loWhisker ? w.hiWhisker - w.loWhisker : 1;
+  return v > w.hiWhisker ? (v - w.hiWhisker) / span : v < w.loWhisker ? (w.loWhisker - v) / span : 0;
+}
+
+/** a box's cases and their values, the start of both points queries */
+function boxCasesHead(numSel: string, catSel: string, cohortSql: string, colorSel?: string, ringSel?: string, extra = ""): string {
+  return "WITH cohort AS (" + cohortSql + "),\n" +
     "     vs AS (" + numSel + "),\n" +
     "     gs AS (" + catSel + ")" +
     (colorSel ? ",\n     cs AS (" + colorSel + ")" : "") +
     (ringSel ? ",\n     rs AS (" + ringSel + ")" : "") + "\n" +
-    "SELECT vs.id AS id, gs.v AS g, vs.v AS v" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + "\n" +
+    "SELECT vs.id AS id, gs.v AS g, vs.v AS v" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + extra + "\n" +
     "FROM vs INNER JOIN gs ON gs.id = vs.id" +
     (colorSel ? "\n  LEFT JOIN cs ON cs.id = vs.id" : "") +
-    (ringSel ? "\n  LEFT JOIN rs ON rs.id = vs.id" : "") + "\n" +
-    (outside ? outsideWhiskers(outside) + "\n" : "") +
-    "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1));
+    (ringSel ? "\n  LEFT JOIN rs ON rs.id = vs.id" : "") + "\n";
 }
 
 /**
@@ -824,6 +855,8 @@ export interface PlotLayer {
   groups?: PlotGroup[];
   /** a scatter's outliers: the cells holding at most this many cases, left unshaded under their points */
   cellMax?: number;
+  /** a box's outliers past the points budget: how many lie beyond the whiskers, of which the `n` most extreme are drawn */
+  of?: number;
 }
 
 export interface PlotRequest {

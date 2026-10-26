@@ -1979,7 +1979,9 @@ values beyond each group's Tukey whiskers, drawn over a **violin** (from per-gro
 at the whiskers; on a scatter, the cases in **sparse cells** of the grid — every cell holding at
 most 3 cases (fewer, if that is what keeps the points under ${POINTS_CAP_TEXT}) is drawn as its cases instead of
 as a shade. Both subsets are chosen in the database, against the same grid and whiskers the figure
-draws, and if a subset is itself past ${POINTS_CAP_TEXT} none of it is drawn, never the first ${POINTS_CAP_TEXT}. With
+draws. A scatter's subset past ${POINTS_CAP_TEXT} is not drawn, never its first ${POINTS_CAP_TEXT}; a box's draws the
+${POINTS_CAP_TEXT} **most extreme** — furthest beyond their group's whiskers, measured in that group's whisker spans
+so a narrow group is not drowned out by a wide one — and the caption says how many lie beyond in all. With
 \`allPoints: false\` and \`points: []\`, or from a participant that may not disclose a case, the
 figure is density alone.
 The caption always says which it drew, how many points, and why there are none when there are
@@ -2031,7 +2033,8 @@ patients fall outside the plotted cohort is stated, and they are not drawn). The
 caption counts what each layer left to an earlier one. Every layer shares one ${POINTS_CAP_TEXT}-point budget,
 and a layer is never cut to its first cases: a cohort layer past the budget, or from a study that
 may not show cases, is drawn as an aggregate on the plot's own scale (cells on the scatter's grid,
-or a narrow box per group), and a rule layer is not drawn — the caption says which and why.
+or a narrow box per group), and a rule layer is not drawn — the caption says which and why. A box's
+outliers are the exception: past the budget they are cut by extremity, never by order, as above.
 Extremes and trend are exact over several studies (each returns its own top \`n\`). Layers change no
 statistic: the coefficients and quartiles stay those of the whole plotted cohort. A contingency
 table has no points to mark. On a box plot a value beyond the axis is pinned to the frame's edge as

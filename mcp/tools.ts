@@ -446,12 +446,12 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       {
         description:
           "Patient-level federation endpoint (opt-in: MCP_DISCLOSE_PATIENTS rules, kind 'plot') for another cbio-lab instance's plot view: the cases a plot draws as points, with their case ids, " +
-          "for a study THIS instance holds — every case up to the cap, a box's values beyond given whiskers, a scatter's cases in sparse cells of a given grid, the extremes on an axis or the cases " +
+          "for a study THIS instance holds — every case up to the cap, a box's most extreme values beyond given whiskers (and how many there are), a scatter's cases in sparse cells of a given grid, the extremes on an axis or the cases " +
           "furthest from a fitted line, or a second cohort's cases within the first. Returns case identifiers.",
         inputSchema: {
           study: z.string().max(120),
           cohort: z.record(z.string(), z.any()),
-          op: z.enum(["points", "scatterPoints", "ranked", "highlightPoints"]),
+          op: z.enum(["points", "outliers", "scatterPoints", "ranked", "highlightPoints"]),
           spec: z.record(z.string(), z.any()),
           cap: z.number().int().min(1).max(50000).nullish(),
           outside: z.array(z.object({ g: z.string().max(200), loWhisker: z.number(), hiWhisker: z.number() }).passthrough()).max(200).nullish(),
@@ -471,7 +471,11 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           const spec = await plotSpecHere(s, args.spec);
           const cap = args.cap ?? undefined;
           let points: unknown;
-          if (args.op === "points") points = await res.plotPoints(args.cohort, spec, cap, args.outside ?? undefined);
+          if (args.op === "points") points = await res.plotPoints(args.cohort, spec, cap);
+          else if (args.op === "outliers") {
+            if (!args.outside || cap == null) throw new Error("outliers needs outside and cap");
+            points = await res.plotOutlierPoints(args.cohort, spec, cap, args.outside);
+          }
           else if (args.op === "scatterPoints") points = await res.plotScatterPoints(args.cohort, spec, cap, args.sparse ?? undefined);
           else if (args.op === "ranked") {
             if (!args.rank || !args.kinds) throw new Error("ranked needs rank and kinds");

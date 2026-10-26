@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotBinsSql, plotBoxSql, plotCountSql,
-  plotShape, plotStatsSql, plotTableSql, plotPointsSql, plotViolinSql, categoryColor, isAbsent,
+  plotShape, plotStatsSql, plotTableSql, plotPointsSql, plotOutlierPointsSql, outlierExtremity, plotViolinSql, categoryColor, isAbsent,
   tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS , coverageNote, combineNote, plotCoverageSql, plotScatterPointsSql, type PlotData } from "../lib/plot.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
 import { finiteSql } from "../lib/sql-number.ts";
@@ -277,15 +277,29 @@ test("unaltered is absence: neutral, and never a ring", () => {
 
 test("a box's outlier query keeps the values beyond their own group's whiskers, labels quoted", () => {
   const numSel = "SELECT 1 AS id, 1 AS v", catSel = "SELECT 1 AS id, 'g' AS v";
-  const sql = plotPointsSql(numSel, catSel, "SELECT '' AS pid", 100, undefined, undefined,
-    [{ g: "Missense", loWhisker: 0.5, hiWhisker: 12 }, { g: "it's", loWhisker: -1, hiWhisker: 3 }]);
+  const sql = plotOutlierPointsSql(numSel, catSel, "SELECT '' AS pid",
+    [{ g: "Missense", loWhisker: 0.5, hiWhisker: 12 }, { g: "it's", loWhisker: -1, hiWhisker: 3 }], 100);
   assert.match(sql, /indexOf\(\['Missense', 'it\\'s'\], gs\.v\)/, "a label is a quoted literal, never spliced");
   assert.match(sql, /vs\.v < arrayElement\(\[0\.5, -1\]/);
   assert.match(sql, /vs\.v > arrayElement\(\[12, 3\]/);
   assert.match(sql, /WHERE indexOf\([^)]*\) > 0 AND/, "a group with no whiskers matches nothing");
-  assert.match(plotPointsSql(numSel, catSel, "SELECT '' AS pid", 100, undefined, undefined, []), /WHERE 0/);
-  assert.throws(() => plotPointsSql(numSel, catSel, "SELECT '' AS pid", 100, undefined, undefined,
-    [{ g: "A", loWhisker: NaN, hiWhisker: 1 }]), /finite/);
+  assert.match(plotOutlierPointsSql(numSel, catSel, "SELECT '' AS pid", [], 100), /WHERE 0/);
+  assert.throws(() => plotOutlierPointsSql(numSel, catSel, "SELECT '' AS pid", [{ g: "A", loWhisker: NaN, hiWhisker: 1 }], 100), /finite/);
+});
+
+test("past the cap the outlier query keeps the most extreme, and says how many there were", () => {
+  const sql = plotOutlierPointsSql("SELECT 1 AS id, 1 AS v", "SELECT 1 AS id, 'g' AS v", "SELECT '' AS pid", [{ g: "A", loWhisker: 0, hiWhisker: 10 }], 100);
+  assert.match(sql, /count\(\) OVER \(\) AS total/, "the total is counted before the limit");
+  assert.match(sql, /ORDER BY if\(vs\.v > .* DESC, id\nLIMIT 100$/, "most extreme first, ties by case id, exactly the cap");
+});
+
+test("outlierExtremity: distance beyond the whiskers in whisker spans, so a narrow group is not drowned out", () => {
+  const narrow = { g: "n", loWhisker: 0, hiWhisker: 2 }, wide = { g: "w", loWhisker: 0, hiWhisker: 100 };
+  assert.equal(outlierExtremity(5, narrow), 1.5);
+  assert.equal(outlierExtremity(150, wide), 0.5, "50 past a span of 100 is less extreme than 3 past a span of 2");
+  assert.equal(outlierExtremity(-4, narrow), 2, "below the low whisker counts the same way");
+  assert.equal(outlierExtremity(1, narrow), 0, "inside the whiskers");
+  assert.equal(outlierExtremity(7, { g: "z", loWhisker: 5, hiWhisker: 5 }), 2, "no spread: measured in the values' own units");
 });
 
 test("a scatter's sparse cells are binned exactly as its density is", () => {
