@@ -27,6 +27,9 @@ const nextConfig = (phase) => ({
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // `'use cache: remote'` (lib/next-cache.ts) needs Cache Components
   cacheComponents: true,
+  // Off Vercel that cache is this process-memory LRU; `next start` reads it at startup, so a
+  // deployment sizes it without a rebuild
+  cacheMaxMemorySize: (Number(process.env.RESULT_CACHE_MB) || 50) * 1024 * 1024,
   // hosts besides localhost that may load `next dev`'s scripts and HMR socket (e.g. a tailnet
   // proxy in front of a dev server); comma-separated, dev only
   allowedDevOrigins: (process.env.ALLOWED_DEV_ORIGINS || "").split(",").map((h) => h.trim()).filter(Boolean),
