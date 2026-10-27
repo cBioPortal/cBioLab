@@ -7,10 +7,10 @@
 import { useSaved } from "../_saved/saved-context.tsx";
 import { useRef, useState } from "react";
 import { normalizeDef } from "./pills";
-import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, PartitionDef } from "../../lib/types.ts";
+import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, PartitionArm, PartitionDef } from "../../lib/types.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { type SplitSpec } from "./partitions.tsx";
-import { armsFromSelection, editSplits, splitKey, type ChartKey } from "../../lib/partition-arms.ts";
+import { armsFromItems, armsFromSelection, editSplits, splitKey, type ChartKey } from "../../lib/partition-arms.ts";
 import { DOC_VERSION } from "../../lib/doc-version.ts";
 import { saveToServer, customDataKey, featureFromCohort, type StoredDataset } from "./custom-data-client.ts";
 import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
@@ -90,7 +90,6 @@ export function useExploreState(page: ExplorePage) {
   const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
   const exSel = useRef<string[]>([]);                   // current selection (ref: immune to state races)
   const exFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);                                    // debounce for multi-toggle refetch
-  const [geneRowLimit, setGeneRowLimit] = useState(12);                 // rows shown per gene table
   /**
    * Minimum share of the selected studies an attribute must appear in to be
    * shown. Across 64 studies the union of vocabularies is 1,634 facets, and the
@@ -214,12 +213,8 @@ export function useExploreState(page: ExplorePage) {
     if (!d) return 0;
     try { return armsFromSelection(d, chart)?.arms.length ?? 0; } catch { return 9; }
   };
-  const splitDraftBySelection = (chart: ChartKey, label: string) => {
-    const d = parseDraft();
-    if (!d) return;
-    let r: ReturnType<typeof armsFromSelection>;
-    try { r = armsFromSelection(d, chart); } catch (e) { setExMsg("Could not split by the selected " + label + ": " + String((e as Error)?.message || e)); return; }
-    if (!r) return;
+  /** the analysis of the selection's `base` divided into `arms`, replacing the document */
+  const analyzeArms = (d: CohortDef, r: { base: { all: Clause[] }; arms: PartitionArm[] }, label: string) => {
     setExMsg(null);
     const name = r.base.all.length ? "explored cohort"
       : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
@@ -231,6 +226,24 @@ export function useExploreState(page: ExplorePage) {
     docs.replace(nd);
     setError(null);
     goTab("analysis");
+  };
+  const splitDraftBySelection = (chart: ChartKey, label: string) => {
+    const d = parseDraft();
+    if (!d) return;
+    let r: ReturnType<typeof armsFromSelection>;
+    try { r = armsFromSelection(d, chart); } catch (e) { setExMsg("Could not split by the selected " + label + ": " + String((e as Error)?.message || e)); return; }
+    if (r) analyzeArms(d, r, label);
+  };
+  /**
+   * Analyze the selection with a chart's CHECKED rows as the arms, in the order checked: the
+   * cohort split is the draft without that chart's own clauses, so only the checked items divide it.
+   */
+  const splitDraftByPicks = (chart: ChartKey, arms: PartitionArm[], label: string) => {
+    if (!exSel.current.length) { setExMsg("select at least one study first"); return; }
+    const d = parseDraft() || { all: [] };
+    let r: ReturnType<typeof armsFromItems>;
+    try { r = armsFromItems(d, chart, arms); } catch (e) { setExMsg("Could not split by the checked " + label + ": " + String((e as Error)?.message || e)); return; }
+    analyzeArms(d, r, label);
   };
   /**
    * Saving asks for a name when you ask to save, rather than keeping a field in
@@ -366,10 +379,10 @@ export function useExploreState(page: ExplorePage) {
   const addClause = (clause: any) => {
     let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
     if (!d || !Array.isArray(d.all)) d = { all: [] };
-    if (clause.kind === "clinical" && clause.op === "=") {
+    if (clause.kind === "clinical" && (clause.op === "=" || clause.values)) {
       const same = d.all.find((c: any) => c.kind === "clinical" && c.attribute === clause.attribute && (c.per || "patient") === (clause.per || "patient") && (c.op === "=" || c.values));
-      if (same) { // second value on the same attribute becomes an OR list
-        const vals = new Set([...(same.values || []), ...(same.op === "=" ? [same.value] : []), clause.value]);
+      if (same) { // more values on the same attribute join its OR list
+        const vals = new Set([...(same.values || []), ...(same.op === "=" ? [same.value] : []), ...(clause.values || [clause.value])]);
         delete same.op; delete same.value; same.values = [...vals];
         const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return;
       }
@@ -430,6 +443,26 @@ export function useExploreState(page: ExplorePage) {
     if (state === "del") return [prof, oql("HOMDEL")];
     // unaltered: profiled and none of the calls this facet counts
     return [prof, { not: oql(type === "CNA" ? "AMP HOMDEL" : "MUT") }];
+  };
+
+  /**
+   * The clauses that select any of several states of one gene's facet, or why that cannot be one
+   * filter. Profiled states combine inside the profiled set; "not profiled" joins them only when
+   * nothing else narrows it, since `any` takes leaves and "not profiled OR mutated" is not one.
+   */
+  const geneStatesClauses = (gene: string, type: "MUTATION" | "CNA", states: string[]): { clauses: any[] } | { why: string } => {
+    if (states.length === 1) return { clauses: geneStateClauses(gene, type, states[0]) };
+    const calls: Record<string, string> = type === "CNA" ? { amp: "AMP", del: "HOMDEL" } : { altered: "MUT" };
+    const prof = { kind: "profiled", type, gene };
+    const oql = (q: string) => ({ kind: "oql", q: gene + ": " + q });
+    const picked = Object.keys(calls).filter((s) => states.includes(s)).map((s) => calls[s]);
+    const rest = Object.keys(calls).filter((s) => !states.includes(s)).map((s) => calls[s]);
+    const unaltered = states.includes("unaltered");
+    // the profiled part: every profiled state is no narrowing; with unaltered, "none of the rest"
+    const within = unaltered ? (rest.length ? { not: oql(rest.join(" ")) } : null) : oql(picked.join(" "));
+    if (!states.includes("notProfiled")) return { clauses: within ? [prof, within] : [prof] };
+    if (!within) return { why: "every state is checked, which is no filter" };
+    return { why: "\"Not profiled\" with another state is not one filter — apply them separately" };
   };
 
   const chartGene = (raw: string) => {
@@ -638,7 +671,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, geneRowLimit, setGeneRowLimit, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, splitDraftByPicks, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;
