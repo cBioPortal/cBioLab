@@ -9,6 +9,8 @@
 // `genie_public:*`. A bare study id allows the timeline alone. Rules are separated by commas or
 // whitespace. An unknown kind is refused by name, never ignored: a typo must not read as "nothing".
 
+import { setting } from "./settings.ts";
+
 /** The kinds of patient-level data a rule can allow — each one view's needs, and nothing else. */
 export const PATIENT_KINDS = ["timeline", "alterations", "plot"] as const;
 export type PatientKind = (typeof PATIENT_KINDS)[number];
@@ -51,9 +53,9 @@ export function allowedKinds(rules: DisclosureRules, study: string): Set<Patient
 }
 
 /** The peer's own rules: what this instance sends to callers over MCP. */
-export const disclosedByThisInstance = () => parseRules(process.env.MCP_DISCLOSE_PATIENTS, "MCP_DISCLOSE_PATIENTS");
+export const disclosedByThisInstance = () => parseRules(setting("MCP_DISCLOSE_PATIENTS"), "MCP_DISCLOSE_PATIENTS");
 /** The coordinator's rules: what this instance accepts from the peer serving each study. */
-export const acceptedFromPeers = () => parseRules(process.env.PEER_MCP_PATIENT_LEVEL, "PEER_MCP_PATIENT_LEVEL");
+export const acceptedFromPeers = () => parseRules(setting("PEER_MCP_PATIENT_LEVEL"), "PEER_MCP_PATIENT_LEVEL");
 
 /** "patient timelines and patient alterations" */
 export const kindsText = (kinds: Iterable<PatientKind>) => {

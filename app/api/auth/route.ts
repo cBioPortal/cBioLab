@@ -1,8 +1,10 @@
 import { connection } from "next/server";
-import { loginEnabled, loginOptions, userFor } from "../../../lib/auth.ts";
+import { isAdmin, loginEnabled, loginOptions, userFor } from "../../../lib/auth.ts";
 
-// Whether this deployment signs people in, how, and who this browser is signed in as (lib/auth.ts).
+// Whether this deployment signs people in, how, who this browser is signed in as and whether they
+// administer it (lib/auth.ts).
 export async function GET(req: Request) {
   await connection();
-  return Response.json({ enabled: loginEnabled(), options: loginOptions(), user: userFor(req) });
+  const user = userFor(req);
+  return Response.json({ enabled: loginEnabled(), options: loginOptions(), user: user && { ...user, admin: isAdmin(user) } });
 }

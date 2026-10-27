@@ -20,11 +20,12 @@
 // another build. The study list reads the connection directly.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { setting } from "./settings.ts";
 
 export const LOOPBACK_HEADER = "x-cbio-loopback-peer";
 
 /** the connection served as a simulated peer, or null when there is none */
-export const loopbackConnId = (): string | null => (process.env.LOOPBACK_PEER || "").trim() || null;
+export const loopbackConnId = (): string | null => (setting("LOOPBACK_PEER") || "").trim() || null;
 
 // one token and one context per process: Next may load this module once per route bundle
 const g = globalThis as unknown as { __cbioLoopback?: { token: string; als: AsyncLocalStorage<true> } };

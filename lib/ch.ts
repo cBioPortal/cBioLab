@@ -15,6 +15,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { ChResult, ChRow } from "./types.ts";
 import { customExternalsFor } from "./custom-data.ts";
 import { idSetExternalsFor } from "./id-sets.ts";
+import { setting } from "./settings.ts";
 
 export interface ChConn {
   id: string;
@@ -38,7 +39,7 @@ export const PRIMARY: ChConn = {
   user: process.env.CLICKHOUSE_USER || "",
   password: process.env.CLICKHOUSE_PASSWORD || "",
   db: DB,
-  label: process.env.CLICKHOUSE_LABEL || "primary"
+  get label() { return setting("CLICKHOUSE_LABEL") || "primary"; }
 };
 
 /** Secondary instance, present only when CLICKHOUSE2_* is configured. */
@@ -50,7 +51,7 @@ export function secondary(): ChConn | null {
     user: process.env.CLICKHOUSE2_USER || "",
     password: process.env.CLICKHOUSE2_PASSWORD || "",
     db: clean(process.env.CLICKHOUSE2_DB),
-    label: process.env.CLICKHOUSE2_LABEL || "secondary"
+    label: setting("CLICKHOUSE2_LABEL") || "secondary"
   };
 }
 
@@ -58,6 +59,15 @@ export function secondary(): ChConn | null {
 export function connections(): ChConn[] {
   const b = secondary();
   return b ? [PRIMARY, b] : [PRIMARY];
+}
+
+/** The configured connections as /admin shows them: never a password, nor credentials in a URL. */
+export function describeConnections(): { id: string; label: string; url: string; user: string; db: string; passwordSet: boolean }[] {
+  return connections().map((c) => {
+    let url: string;
+    try { const u = new URL(c.url); u.username = ""; u.password = ""; url = u.toString(); } catch { url = c.url ? "(not a URL)" : ""; }
+    return { id: c.id, label: c.label, url, user: c.user, db: c.db, passwordSet: !!c.password };
+  });
 }
 
 export function connById(id: string): ChConn | null {

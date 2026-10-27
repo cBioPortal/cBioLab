@@ -135,6 +135,12 @@ ignored.
 | peer (data owner) | `MCP_DISCLOSE_PATIENTS=<rules>` | registers `federated_patient_rows` and `federated_patient_timeline`; without it the tools **do not exist**. Every call is checked against the rules — the study and the kind its table belongs to (`PEER_TABLES` in `lib/federation.ts`), before anything is read — and answers only for studies the peer holds itself at patient level (never a study it reaches through a peer of its own, never an aggregate-only one) |
 | coordinator | `PEER_MCP_PATIENT_LEVEL=<rules>` | the `PEER_MCP` peer for a study becomes a `RemotePatientResolver` carrying the kinds accepted for it — a `RemoteTimelineResolver` when they include `timeline` — instead of a `RemoteAggregateResolver` |
 
+Both settings, like the rest of federation's (`PEER_MCP`, `LOOPBACK_PEER`, `STUDY_DENY`,
+`AGGREGATE_ONLY_*`…), can be overridden at run time by an administrator at `/admin`
+(`lib/settings.ts`): a value the setting's parser refuses is refused there, every change is logged
+with who made it, and the result cache is re-keyed so no answer computed under the old rules is
+served under the new ones.
+
 Data crosses only where both sides' rules allow the same study and kind. A coordinator that
 accepts a kind the peer does not disclose gets a refusal naming the peer's setting; a peer that
 discloses a kind the coordinator does not accept is never asked, and the view is not drawn

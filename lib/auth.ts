@@ -10,6 +10,10 @@
 // Either way the result is a session: an httpOnly cookie carrying the user's id, email and name,
 // signed with AUTH_SESSION_SECRET (HMAC-SHA256). Requests are decided from the cookie alone, so a
 // disabled user keeps their session until it expires (SESSION_DAYS); signing in again is refused.
+//
+// Administrators (/admin: the result cache and the federation settings, lib/settings.ts) are the
+// signed-in users whose email is in ADMIN_EMAILS. With the development sign-in anyone can claim an
+// address, so there it is a convenience, not a guard; it is refused on Vercel production.
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const SESSION_COOKIE = "cl_session";
@@ -100,4 +104,17 @@ export function requirePrincipal(req: Request, what = "use saved cohorts, analys
   const p = principalFor(req);
   if (!p) throw new AccessError("sign in to " + what, 403);
   return p;
+}
+
+const adminEmails = (): string[] => (process.env.ADMIN_EMAILS || "").split(/[,\s]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
+
+export const isAdmin = (u: SessionUser | null): boolean => !!u?.email && adminEmails().includes(u.email.toLowerCase());
+
+/** The signed-in administrator behind a request; refused for anyone else. */
+export function requireAdmin(req: Request): SessionUser {
+  if (!loginEnabled()) throw new AccessError("this deployment has no sign-in, so it has no administrators", 404);
+  const u = userFor(req);
+  if (!u) throw new AccessError("sign in as an administrator to see this page", 403);
+  if (!isAdmin(u)) throw new AccessError(u.email + " is not an administrator of this deployment (ADMIN_EMAILS)", 403);
+  return u;
 }

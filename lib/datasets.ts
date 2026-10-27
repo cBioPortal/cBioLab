@@ -3,6 +3,7 @@
 // queries. Counts only; restricted studies are left out exactly as the router leaves them out.
 import { chQuery, directConnections, loopbackOnlyConn, type ChConn } from "./ch.ts";
 import { isRestrictedStudy } from "./federation.ts";
+import { setting } from "./settings.ts";
 
 export interface DatasetRow {
   id: string; name: string; cancerType: string;
@@ -87,7 +88,7 @@ export async function datasetsFor(conn: ChConn): Promise<DatasetRow[]> {
 export async function allDatasets(): Promise<{ rows: DatasetRow[]; unreachable: string[]; overMcp: string[] }> {
   const unreachable: string[] = [];
   // the simulated peer's database is read only over MCP, which has no per-sample catalog: named, not listed
-  const overMcp = [loopbackOnlyConn()].filter((c) => c != null).map((c) => process.env.LOOPBACK_PEER_LABEL || c.label);
+  const overMcp = [loopbackOnlyConn()].filter((c) => c != null).map((c) => setting("LOOPBACK_PEER_LABEL") || c.label);
   const per = await Promise.all(directConnections().map((c) => datasetsFor(c).catch(() => { unreachable.push(c.label); return [] as DatasetRow[]; })));
   const seen = new Set<string>(), rows: DatasetRow[] = [];
   for (const list of per) for (const r of list) if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); }

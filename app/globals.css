@@ -1732,3 +1732,21 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-table tr.dt-pick.sel td { background: var(--accent-soft); }
 .cohortsum-skel { display: inline-block; width: 4rem; height: 0.9rem; }
 } /* @layer legacy */
+
+/* ---------------------------------------------------------------------------
+   /admin — the result cache and the federation settings (app/admin/page.tsx)
+   --------------------------------------------------------------------------- */
+.admin-page { max-width: 1100px; }
+.admin-section { margin-top: var(--s5); }
+.admin-section h2 { font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-xl); margin: 0 0 var(--s2); }
+.admin-section > p { max-width: 75ch; line-height: 1.6; }
+.admin-group { margin-top: var(--s4); }
+.admin-group h3 { font-size: var(--t-lg); margin: 0 0 var(--s1); }
+.admin-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: var(--s2); font-size: var(--t-md); }
+.admin-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: var(--t-sm); border-bottom: 1px solid var(--line); padding: var(--s1) var(--s2); }
+.admin-table td { vertical-align: top; border-bottom: 1px solid var(--line); padding: var(--s2); }
+.admin-table th:first-child { width: 40%; }
+.admin-table th:nth-child(2):not(:last-child) { width: 25%; }
+.admin-table td { overflow-wrap: anywhere; }
+.admin-table tr.overridden td:last-child { background: var(--mark-soft); }
+.admin-value { word-break: break-all; }

@@ -159,6 +159,12 @@ changing first. The parts, and the one place each rule lives:
    - **Read through `throughCache(cached, direct)`.** A production build replaces the message of
      anything thrown inside a cached function, so when the cached call throws the direct one runs
      and reports the real error. It also covers a cache that cannot be read.
+   - **An administrator clears it, and changes federation settings, at `/admin`** (the users in
+     `ADMIN_EMAILS`; account menu → Admin). `lib/settings.ts`: an `app_setting` row overrides the
+     environment variable of the same name for every process within seconds; federation code reads
+     those settings through `setting(name)`, never `process.env`. `cacheVersion()` (data version plus
+     the settings' fingerprint, which includes the last clear) is every cached entry's key argument —
+     cohort locks keep `dataVersion()` alone. Database addresses and credentials are never editable.
    - **`RESULT_CACHE=off` turns it off.** `throughCache` then runs the direct call on every
      request, so a server answers everything cold — for measuring what a first reader waits for.
      Without a cache handler configured (anywhere but Vercel), the cache is the Node process's own

@@ -26,6 +26,7 @@ import type { PatientTimeline, PatientEvent, PatientSample, PeerSource } from ".
 import type { StudyRow } from "./study-list.ts";
 import type { StudyCatalog } from "./study-catalog.ts";
 import { cohortSubquery, type CohortSql } from "./sql-kinds.ts";
+import { setting } from "./settings.ts";
 
 interface RemoteAggregates {
   study: string; instance: string; count: number;
@@ -53,13 +54,13 @@ export async function peerForStudy(study: string): Promise<{ url: string; label:
   if (!id || servingAsLoopbackPeer()) return null;
   const conn = (await studyRouting()).get(study);
   if (conn?.id !== id) return null;
-  return { url: loopbackUrl(), label: process.env.LOOPBACK_PEER_LABEL || conn.label + " (simulated peer)" };
+  return { url: loopbackUrl(), label: setting("LOOPBACK_PEER_LABEL") || conn.label + " (simulated peer)" };
 }
 
 /** PEER_MCP as a map from study to the peer URL that serves it. */
 export function peerMcpEntries(): Map<string, string> {
   const out = new Map<string, string>();
-  for (const entry of (process.env.PEER_MCP || "").split(/[,\s]+/).filter(Boolean)) {
+  for (const entry of (setting("PEER_MCP") || "").split(/[,\s]+/).filter(Boolean)) {
     const i = entry.indexOf("=");
     if (i < 0) continue;
     const study = entry.slice(0, i).trim(), url = entry.slice(i + 1).trim();
@@ -68,7 +69,7 @@ export function peerMcpEntries(): Map<string, string> {
   return out;
 }
 
-const peerLabel = (): string => process.env.PEER_LABEL || "peer via MCP";
+const peerLabel = (): string => setting("PEER_LABEL") || "peer via MCP";
 
 /**
  * The study list rows of every PEER_MCP peer, for the studies PEER_MCP maps to it: each peer is
@@ -91,7 +92,7 @@ export async function remoteStudies(): Promise<{ rows: StudyRow[]; failed: strin
   const loop = loopbackOnlyConn();
   if (loop) {
     try {
-      const label = process.env.LOOPBACK_PEER_LABEL || loop.label + " (simulated peer)";
+      const label = setting("LOOPBACK_PEER_LABEL") || loop.label + " (simulated peer)";
       for (const r of await loopbackStudies()) rows.push({ ...r, instance: "peer", instanceLabel: label });
     } catch { failed.push(loopbackUrl()); }
   }

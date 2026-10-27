@@ -5,8 +5,7 @@ import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
 import { mergeExplore } from "../../../lib/explore.ts";
 import { PRIMARY, withChContext, ensureChContext, withoutFailedQueries } from "../../../lib/ch.ts";
-import { cacheLife } from "next/cache";
-import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
+import { pack, throughCache, cacheVersion, resultEntry } from "../../../lib/next-cache.ts";
 import { studyProfilesMany, resolveStudy } from "../../../lib/analysis.ts";
 import { chQuery } from "../../../lib/ch.ts";
 import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
@@ -38,7 +37,7 @@ async function handle(req: Request) {
     // facets over uploaded data or a stored id set are their reader's alone: answered directly, never cached
     if ((Array.isArray(customData) && customData.length) || (Array.isArray(customRefs) && customRefs.length) || idSetRefsIn(body.draft).length)
       return Response.json(await withRequestCustomData(customData, () => ensureChContext(() => exploreFor(body)), { refs: customRefs, req, uses: body.draft }));
-    return Response.json(await throughCache(async () => exploreEntry(body, await dataVersion()), () => ensureChContext(() => exploreFor(body))));
+    return Response.json(await throughCache(async () => exploreEntry(body, await cacheVersion()), () => ensureChContext(() => exploreFor(body))));
   } catch (e) {
     // The reader superseded this request: not a failure, and there is nobody left to tell.
     if ((e as { name?: string })?.name === "AbortError" || req.signal.aborted)
@@ -50,7 +49,7 @@ async function handle(req: Request) {
 
 async function exploreEntry(body: any, _version: string): Promise<string> {
   "use cache: remote";
-  cacheLife("days");
+  resultEntry();
   return pack(await ensureChContext(() => withoutFailedQueries(() => exploreFor(body))));
 }
 

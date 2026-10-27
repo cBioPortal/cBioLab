@@ -4,6 +4,7 @@ import { registerTools } from "../../../mcp/tools.ts";
 import { cachedAnalysis, cachedContract } from "../../../lib/next-cache.ts";
 import { asLoopbackPeer, isLoopbackRequest } from "../../../lib/loopback-peer.ts";
 import { logInbound } from "../../../lib/federation-log.ts";
+import { refreshSettings } from "../../../lib/settings.ts";
 
 const handler = createMcpHandler(
   (server) => registerTools(server, { runAnalysis: (doc) => cachedAnalysis(doc), buildContract: cachedContract }),
@@ -13,6 +14,8 @@ const handler = createMcpHandler(
 
 // a call this app made to itself is answered as its simulated peer (lib/loopback-peer.ts)
 const serve = async (req: Request) => {
+  // which tools exist and who counts as the simulated peer are settings an administrator may change
+  await refreshSettings();
   const asPeer = isLoopbackRequest(req);
   const call = req.method === "POST" ? await toolCall(req) : null;
   const t0 = Date.now();
