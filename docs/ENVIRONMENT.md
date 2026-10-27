@@ -131,6 +131,7 @@ see the security notes below.
 | var | default | meaning |
 |---|---|---|
 | `RESULT_CACHE` | on | `off`: answer every request directly, bypassing the result cache, to measure what a first reader waits for |
+| `RESULT_CACHE_MB` | `50` | the result cache's size in MB where it is process memory (anywhere but Vercel); read at server start |
 | `CLICKHOUSE_MAX_INFLIGHT` | `8` | ClickHouse queries in flight at once per process; the rest queue (`docs/PERFORMANCE.md`) |
 | `EXPLORE_COHORT_EXTERNAL_LIMIT` | `50000` | the most patient ids Explore ships to ClickHouse for one draft cohort |
 | `ONCOPRINT_CLUSTER_LIMIT` | `4000` | the most columns an oncoprint clusters (`cluster:<profile>` sort) |

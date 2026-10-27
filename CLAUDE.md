@@ -162,7 +162,8 @@ changing first. The parts, and the one place each rule lives:
    - **`RESULT_CACHE=off` turns it off.** `throughCache` then runs the direct call on every
      request, so a server answers everything cold — for measuring what a first reader waits for.
      Without a cache handler configured (anywhere but Vercel), the cache is the Node process's own
-     50 MB LRU (`cacheMaxMemorySize`): lost on restart, and not shared between replicas.
+     LRU (`cacheMaxMemorySize`, 50 MB unless `RESULT_CACHE_MB` says otherwise): lost on restart,
+     and not shared between replicas.
    - **Arguments are the key.** A cached function takes only serializable arguments and computes
      everything else itself; a function passed in cannot be called. Anything that changes the
      answer must be an argument.
