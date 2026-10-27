@@ -1,7 +1,7 @@
 // The catalog of one study: its timeline event types with their attribute keys and values, its
 // survival endpoints and the derived treatment lines — what the cohort builder offers. Vocabulary
-// and counts only; it names no patient. A peer serves it for its studies through the MCP tool
-// federated_catalog.
+// and counts only; it names no patient. A peer serves it for its studies through the federation
+// API's `catalog` op.
 import { chQuery, PORTAL } from "./ch.ts";
 import { catalogSqls, lineCatalogSqls, LINE_TYPE } from "./compiler.ts";
 import { survivalEndpointsSql, studyRouting } from "./federation.ts";

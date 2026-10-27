@@ -1,13 +1,13 @@
 // Patient-level federation end to end, against a server whose second database is served to itself
-// as a simulated peer over MCP (lib/loopback-peer.ts): the timeline and alterations views list and
+// as a simulated peer through its own federation API (lib/loopback-peer.ts): the timeline and alterations views list and
 // show a peer's patients beside this instance's own, a plot draws from the peer's counts (its cases
 // are not shared under these rules), every other view keeps the peer aggregate-only, and nothing
-// patient-level answers an outside MCP caller.
+// patient-level answers an outside caller of the federation API.
 //
 // Run by scripts/gate.sh when a second database is configured; on its own against a server started
 // with the simulated peer on:
-//   PORT=3110 LOOPBACK_PEER=b MCP_DISCLOSE_PATIENTS='*:timeline+alterations' \
-//     PEER_MCP_PATIENT_LEVEL='*:timeline+alterations' npx next start -p 3110
+//   PORT=3110 LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations' \
+//     FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations' npx next start -p 3110
 //   E2E_PORT=3110 node scripts/e2e-federation.cjs
 const { launch } = require("../e2e-browser.cjs");
 
@@ -23,13 +23,20 @@ async function post(path, body) {
   return j;
 }
 
-/** An outside MCP client's call — no token, so never answered as the peer. */
-async function outsideCall(name, args) {
-  const headers = { "content-type": "application/json", accept: "application/json, text/event-stream" };
-  const r = await fetch(BASE + "/api/mcp", { method: "POST", headers, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }) });
+/** An outside caller of the federation API — no token, so never answered as the peer. */
+async function outsideCall(op, args) {
+  const r = await fetch(BASE + "/api/federation/v1/" + op, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args) });
+  const j = await r.json().catch(() => ({}));
+  return { status: r.status, error: String(j.error || "") };
+}
+
+/** An agent's view of /api/mcp: the tools it lists. */
+async function mcpToolNames() {
+  const r = await fetch(BASE + "/api/mcp", { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }) });
   const text = await r.text();
   const line = text.includes("data:") ? text.split("\n").filter((l) => l.startsWith("data:")).pop().slice(5) : text;
-  return JSON.parse(line).result;
+  return (JSON.parse(line).result?.tools || []).map((t) => t.name);
 }
 
 async function main() {
@@ -75,17 +82,17 @@ async function main() {
 
     // every other view keeps the peer aggregate-only, and one that would leave its patients out is not drawn
     ok("the clinical table is not drawn without the peer's patients, and says why", !table.table && new RegExp("Cannot be drawn without leaving out the patients of " + PEER).test(table.error || ""), table.error);
-    ok("an aggregate view reaches the peer over MCP", !compare.error && remoteQueries(compare) > 0 && compare.participation.studies.some((s) => s.study === PEER && s.remote), compare.error);
+    ok("an aggregate view reaches the peer through the federation API", !compare.error && remoteQueries(compare) > 0 && compare.participation.studies.some((s) => s.study === PEER && s.remote), compare.error);
 
-    // a plot: its counts from the peer over MCP, pooled or alone; its cases only where the rules share
-    // them, and these do not (MCP_DISCLOSE_PATIENTS without "plot"), so the peer's study is density
+    // a plot: its counts from the peer through the federation API, pooled or alone; its cases only where the rules share
+    // them, and these do not (FEDERATION_DISCLOSE_PATIENTS without "plot"), so the peer's study is density
     const plots = await post("/api/analysis", doc([
       { kind: "plot", unit: "sample", cohorts: ["KRAS mut"], x: { source: "clinical", attribute: "MUTATION_COUNT" }, y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" } },
       { kind: "plot", unit: "sample", cohorts: ["peer's patients"], x: { source: "alteration", gene: "TP53", by: "mutated" }, y: { source: "clinical", attribute: "MUTATION_COUNT" } },
       { kind: "plot", unit: "sample", cohorts: ["peer first"], x: { source: "clinical", attribute: "MUTATION_COUNT" }, y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" } },
     ]));
     const [pooled, peerBox, peerFirst] = plots.views;
-    ok("a plot pooled with the peer's study draws, its counts from the peer over MCP", !pooled.error && pooled.plot?.n > 0 && remoteQueries(pooled) > 0,
+    ok("a plot pooled with the peer's study draws, its counts from the peer through the federation API", !pooled.error && pooled.plot?.n > 0 && remoteQueries(pooled) > 0,
       pooled.error || pooled.plot?.n + " samples, " + remoteQueries(pooled) + " queries on the peer");
     // the axes' kinds are asked of the first study, here the peer's, with no cohort
     ok("a pooled plot whose first study is the peer's draws", !peerFirst.error && peerFirst.plot?.n > 0 && remoteQueries(peerFirst) > 0,
@@ -96,12 +103,15 @@ async function main() {
       /may not show individual cases/.test(pb.pointSet?.why || "") && !(pb.points || []).length,
       peerBox.error || JSON.stringify(pb?.pointSet) + "; " + (pb?.groups || []).map((g) => g.g + " " + g.n).join(", "));
 
-    // an outside MCP caller: patient-level data of neither database
+    // an outside caller: patient-level data of neither database
     const parts = [{ cohort: "c", cohortDef: { all: [] } }];
-    const own = await outsideCall("federated_patient_rows", { study: LOCAL, table: "timeline", parts, source: "x", defaults: ["patient"], mode: "counts" });
-    ok("an outside caller gets no patient of this instance's own database", own.isError && /not a study this instance discloses/.test(own.content[0].text), own.content[0].text);
-    const peer = await outsideCall("federated_patient_rows", { study: PEER, table: "timeline", parts, source: "x", defaults: ["patient"], mode: "counts" });
-    ok("nor of the simulated peer's, without the token", peer.isError && /not held here at patient level/.test(peer.content[0].text), peer.content[0].text);
+    const own = await outsideCall("patient-rows", { study: LOCAL, table: "timeline", parts, source: "x", defaults: ["patient"], mode: "counts" });
+    ok("an outside caller gets no patient of this instance's own database", own.status === 422 && /not a study this instance discloses/.test(own.error), own.status + " " + own.error);
+    const peer = await outsideCall("patient-rows", { study: PEER, table: "timeline", parts, source: "x", defaults: ["patient"], mode: "counts" });
+    ok("nor of the simulated peer's, without the token", peer.status === 422 && /not held here at patient level/.test(peer.error), peer.status + " " + peer.error);
+    // and an agent at /api/mcp is offered no federation op at all
+    const tools = await mcpToolNames();
+    ok("/api/mcp lists its agent tools and no federation op", tools.includes("run_analysis") && !tools.some((n) => /^federated_/.test(n)), tools.join(","));
   } catch (e) {
     ok("the federated analysis", false, String(e.message).split("\n")[0].slice(0, 200));
   }
@@ -116,7 +126,7 @@ async function main() {
     await p.goto(BASE + "/lab?tab=analysis&doc=" + encodeURIComponent(Buffer.from(JSON.stringify(d)).toString("base64")));
     await p.waitForSelector(".tl-who", { timeout: 300000 });
     const who = await p.locator(".tl-who").first().evaluate((e) => e.parentElement.innerText);
-    ok("the alterations card says the patient came from the peer over MCP", new RegExp(PEER_PATIENT + "[\\s\\S]*simulated peer[\\s\\S]*over MCP").test(who), who.split("\n")[0]);
+    ok("the alterations card says the patient came from the peer via federation", new RegExp(PEER_PATIENT + "[\\s\\S]*simulated peer[\\s\\S]*via federation").test(who), who.split("\n")[0]);
     ok("the card has no JS errors", errors.length === 0, errors.slice(0, 2).join(" | "));
   } catch (e) {
     ok("the alterations card", false, String(e.message).split("\n")[0].slice(0, 200));

@@ -85,13 +85,13 @@ export async function datasetsFor(conn: ChConn): Promise<DatasetRow[]> {
 
 /** Every instance's catalog, first instance winning an id collision (the router's rule); the
  *  instances that did not answer are named rather than silently missing. */
-export async function allDatasets(): Promise<{ rows: DatasetRow[]; unreachable: string[]; overMcp: string[] }> {
+export async function allDatasets(): Promise<{ rows: DatasetRow[]; unreachable: string[]; viaFederation: string[] }> {
   const unreachable: string[] = [];
-  // the simulated peer's database is read only over MCP, which has no per-sample catalog: named, not listed
-  const overMcp = [loopbackOnlyConn()].filter((c) => c != null).map((c) => setting("LOOPBACK_PEER_LABEL") || c.label);
+  // the simulated peer's database is read only through the federation API, which has no per-sample catalog: named, not listed
+  const viaFederation = [loopbackOnlyConn()].filter((c) => c != null).map((c) => setting("LOOPBACK_PEER_LABEL") || c.label);
   const per = await Promise.all(directConnections().map((c) => datasetsFor(c).catch(() => { unreachable.push(c.label); return [] as DatasetRow[]; })));
   const seen = new Set<string>(), rows: DatasetRow[] = [];
   for (const list of per) for (const r of list) if (!seen.has(r.id)) { seen.add(r.id); rows.push(r); }
   rows.sort((a, b) => b.samples - a.samples);
-  return { rows, unreachable, overMcp };
+  return { rows, unreachable, viaFederation };
 }

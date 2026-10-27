@@ -1150,7 +1150,7 @@ function sharedBinEdges(parts: ExploreResult[]): Record<string, { edges: number[
  * Merge faceted catalogs from several participants. Every input is already
  * aggregate, and the merge is pure arithmetic — which is exactly why it does
  * not matter whether a part was computed over a local connection or fetched
- * from a remote peer over MCP.
+ * from a remote peer through its federation API.
  */
 export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): ExploreResult {
   const t0 = Date.now();

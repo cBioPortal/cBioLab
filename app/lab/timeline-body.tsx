@@ -63,7 +63,7 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch }: {
       {p ? (
         <div className="tl-head">
           <span className="tl-who mono">{p.patient}</span>
-          <span className="meta">{p.study}{p.source.remote ? " · from " + p.source.label + " over MCP" : ""}</span>
+          <span className="meta">{p.study}{p.source.remote ? " · from " + p.source.label + " via federation" : ""}</span>
           <span className="meta">{p.events.length.toLocaleString()} events · {p.samples.length} sample{p.samples.length === 1 ? "" : "s"}</span>
           {[...marks.values()].map((m) => (
             <span key={m.id} className="tl-sample" title={m.id + (m.type ? " — " + m.type : "")}>

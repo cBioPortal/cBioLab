@@ -7,8 +7,8 @@ import { cantDraw, cohortStudies, viewNeed, type StudyAccess } from "../lib/view
 
 const LOCAL: StudyAccess = { instance: "primary", patientLevel: true, remote: false, shares: [] };
 const AGG: StudyAccess = { instance: "primary (aggregate-only)", patientLevel: false, remote: false, shares: [] };
-const PEER: StudyAccess = { instance: "GENIE (via MCP)", patientLevel: false, remote: true, shares: [] };
-const SHARING: StudyAccess = { instance: "GENIE (via MCP)", patientLevel: false, remote: true, shares: ["timeline", "alterations"] };
+const PEER: StudyAccess = { instance: "GENIE (federated)", patientLevel: false, remote: true, shares: [] };
+const SHARING: StudyAccess = { instance: "GENIE (federated)", patientLevel: false, remote: true, shares: ["timeline", "alterations"] };
 const access = (m: Record<string, StudyAccess>) => (s: string) => m[s];
 
 describe("which views a federated study lets be drawn", () => {
@@ -20,7 +20,7 @@ describe("which views a federated study lets be drawn", () => {
   test("a view whose output is patients is not drawn over a study that does not disclose them", () => {
     for (const kind of ["oncoprint", "table", "mutations", "cox", "logistic", "riskmodel"]) {
       assert.equal(cantDraw(kind, ["l"], access({ l: LOCAL })), null, kind);
-      assert.match(cantDraw(kind, ["l", "p"], access({ l: LOCAL, p: SHARING }))!, /leaving out the patients of p — GENIE \(via MCP\) is a remote peer, which shares no patient-level data/, kind);
+      assert.match(cantDraw(kind, ["l", "p"], access({ l: LOCAL, p: SHARING }))!, /leaving out the patients of p — GENIE \(federated\) is a remote peer, which shares no patient-level data/, kind);
       assert.match(cantDraw(kind, ["g"], access({ g: AGG }))!, /g — primary \(aggregate-only\) answers with aggregate counts only/, kind);
     }
   });
@@ -38,11 +38,11 @@ describe("which views a federated study lets be drawn", () => {
   test("the aggregates a remote peer does not serve: drawn over local participants, aggregate-only included", () => {
     for (const kind of ["genome", "pathways", "enrichment", "labs", "composition"]) {
       assert.equal(cantDraw(kind, ["l", "g"], access({ l: LOCAL, g: AGG })), null, kind);
-      assert.match(cantDraw(kind, ["l", "p"], access({ l: LOCAL, p: SHARING }))!, /p — GENIE \(via MCP\) is a remote peer, which does not answer this view yet/, kind);
+      assert.match(cantDraw(kind, ["l", "p"], access({ l: LOCAL, p: SHARING }))!, /p — GENIE \(federated\) is a remote peer, which does not answer this view yet/, kind);
     }
   });
 
-  test("a plot is drawn over every participant, a remote peer included: its counts come over MCP, its cases only where shared", () => {
+  test("a plot is drawn over every participant, a remote peer included: its counts come through the federation API, its cases only where shared", () => {
     for (const p of [LOCAL, AGG, PEER, SHARING]) assert.equal(cantDraw("plot", ["x"], access({ x: p })), null);
   });
 

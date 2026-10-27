@@ -111,7 +111,7 @@ export class FailedQueriesError extends Error {
     this.count = count;
   }
 }
-/** Count a failed request to another participant (a peer over MCP) as a failed query: its answer is not cached either. */
+/** Count a failed request to another participant (a federation peer) as a failed query: its answer is not cached either. */
 export function noteFailedQuery(): void {
   const f = failedStore.getStore();
   if (f) f.n++;
@@ -204,7 +204,7 @@ function externalsFor(query: string): ChExternalEnc[] {
 
 /**
  * The simulated peer's database (LOOPBACK_PEER, lib/loopback-peer.ts) is read only while answering
- * as that peer, over MCP — never directly by the app it serves. Refused before anything is sent:
+ * as that peer, through the federation API — never directly by the app it serves. Refused before anything is sent:
  * a query on its connection, and a query naming its database on any other connection (the two may
  * share a server and a login).
  */
@@ -214,7 +214,7 @@ export function assertNotLoopbackDirect(sql: string, conn: ChConn): void {
   const id = peer.id;
   const names = peer.db && new RegExp("(^|[^A-Za-z0-9_.])`?" + peer.db.replace(/[^A-Za-z0-9_]/g, "") + "`?\\.").test(sql);
   if (conn.id === id || names) {
-    const e = new LoopbackDirectError("the " + peer.label + " database is reached only over MCP (LOOPBACK_PEER=" + id + "); this query went to it directly");
+    const e = new LoopbackDirectError("the " + peer.label + " database is reached only through the federation API (LOOPBACK_PEER=" + id + "); this query went to it directly");
     // logged as well as thrown: a caller that treats a failed instance as an absent one must not hide it
     console.error("[boundary] " + e.message + "\n" + sql.slice(0, 300) + "\n" + e.stack);
     throw e;

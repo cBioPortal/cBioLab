@@ -568,7 +568,7 @@ Five reasons the code fans out per study, of which one is load-bearing:
 So the shape of a faster version is **partition by connection, not by study**:
 one set of queries per connection covering all its studies with
 `GROUP BY cancer_study_identifier`, merged as today. Federation survives — a peer
-study still goes over MCP, a study on another instance still gets its own pass.
+study still goes through its federation API, a study on another instance still gets its own pass.
 
 ### What pooling actually costs, measured
 

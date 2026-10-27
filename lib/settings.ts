@@ -6,7 +6,7 @@
 // It is synchronous, so the 40-odd places federation consults one keep their shape: it answers from
 // this process's copy of the overrides, which `refreshSettings()` reloads at most every few seconds.
 // The request paths that decide federation await that refresh first — the study routing, every
-// cached result's key (lib/next-cache.ts) and the MCP route — so a process answers by a change
+// cached result's key (lib/next-cache.ts) and the federation API route — so a process answers by a change
 // within REFRESH_MS of it, and a cold one never answers by the environment alone.
 //
 // Overrides apply only under the Next server, which turns them on in instrumentation.ts. The CLI,
@@ -51,8 +51,8 @@ export const SETTINGS: readonly SettingSpec[] = [
   { name: "CLICKHOUSE_LABEL", group: "databases", editable: true, check: label, help: "how results and captions name the primary warehouse (connection a)" },
   { name: "CLICKHOUSE2_LABEL", group: "databases", editable: true, check: label, help: "how results and captions name the second warehouse (connection b)" },
   {
-    name: "PEER_MCP", group: "peers", editable: true,
-    help: "studies held by peer cbio-lab instances, as study=URL pairs (the peer's /api/mcp); this instance asks them for aggregates over MCP",
+    name: "FEDERATION_PEERS", group: "peers", editable: true,
+    help: "studies held by peer cbio-lab instances, as study=URL pairs (the peer's /api/federation/v1); this instance asks them for aggregates",
     check: (v) => {
       for (const e of list(v)) {
         const i = e.indexOf("=");
@@ -63,28 +63,28 @@ export const SETTINGS: readonly SettingSpec[] = [
       }
     },
   },
-  { name: "PEER_LABEL", group: "peers", editable: true, check: label, help: "how results and captions name a PEER_MCP peer" },
+  { name: "PEER_LABEL", group: "peers", editable: true, check: label, help: "how results and captions name a FEDERATION_PEERS peer" },
   {
     name: "LOOPBACK_PEER", group: "peers", editable: true,
-    help: "a connection id (e.g. b, the second warehouse) this app serves to itself over MCP as a simulated peer",
+    help: "a connection id (e.g. b, the second warehouse) this app serves to itself through its own federation API as a simulated peer",
     check: (v) => { if (v.trim() && !/^[ab]$/.test(v.trim())) throw new Error("LOOPBACK_PEER names a connection: a or b"); },
   },
   { name: "LOOPBACK_PEER_LABEL", group: "peers", editable: true, check: label, help: "how results and captions name the simulated peer" },
-  { name: "LOOPBACK_PEER_URL", group: "peers", editable: false, help: "this app's own /api/mcp, where the simulated peer is reached (else 127.0.0.1 on PORT); not editable, as the loopback token is sent to it" },
+  { name: "LOOPBACK_PEER_URL", group: "peers", editable: false, help: "this app's own /api/federation/v1, where the simulated peer is reached (else 127.0.0.1 on PORT); not editable, as the loopback token is sent to it" },
   { name: "LOOPBACK_PEER_TOKEN", group: "peers", editable: false, secret: true, help: "what tells this app's calls to itself from anyone else's, where several processes serve it" },
   {
-    name: "PEER_MCP_PATIENT_LEVEL", group: "patient-level", editable: true,
+    name: "FEDERATION_ACCEPT_PATIENT_LEVEL", group: "patient-level", editable: true,
     help: "as the coordinator: the kinds of patient-level data accepted from the peer serving each study (e.g. genie_public:timeline+alterations, *:timeline)",
-    check: (v) => { parseRules(v, "PEER_MCP_PATIENT_LEVEL"); },
+    check: (v) => { parseRules(v, "FEDERATION_ACCEPT_PATIENT_LEVEL"); },
   },
   {
-    name: "MCP_DISCLOSE_PATIENTS", group: "patient-level", editable: true,
-    help: "as a peer: the kinds of patient-level data this instance sends to any caller of its /api/mcp, per study. There is no caller authentication yet (docs/DATA-BOUNDARY.md)",
-    check: (v) => { parseRules(v, "MCP_DISCLOSE_PATIENTS"); },
+    name: "FEDERATION_DISCLOSE_PATIENTS", group: "patient-level", editable: true,
+    help: "as a peer: the kinds of patient-level data this instance sends to any caller of its /api/federation/v1, per study. There is no caller authentication yet (docs/DATA-BOUNDARY.md)",
+    check: (v) => { parseRules(v, "FEDERATION_DISCLOSE_PATIENTS"); },
   },
   {
     name: "FEDERATION_HIDE_SQL", group: "peers", editable: true,
-    help: "1 keeps this instance's compiled SQL out of what it answers peers over MCP",
+    help: "1 keeps this instance's compiled SQL out of what it answers peers",
     check: (v) => { if (v !== "" && v !== "1") throw new Error("FEDERATION_HIDE_SQL is 1 or empty"); },
   },
   {

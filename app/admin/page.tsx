@@ -15,7 +15,7 @@ import type { SettingGroup, SettingRow, SettingsReport } from "../../lib/setting
 
 const GROUPS: { key: SettingGroup; title: string; about: string }[] = [
   { key: "databases", title: "Databases", about: "The warehouses this instance queries directly. Their addresses and credentials are read from the environment and cannot be changed here." },
-  { key: "peers", title: "Peers over MCP", about: "Studies this instance reaches through another cbio-lab instance's /api/mcp, which answers with aggregates only." },
+  { key: "peers", title: "Federation peers", about: "Studies this instance reaches through another cbio-lab instance's federation API (/api/federation/v1), which answers with aggregates only." },
   { key: "patient-level", title: "Patient-level federation", about: "The opt-in exception to aggregate-only federation (docs/DATA-BOUNDARY.md): data crosses only where the peer discloses a kind and the coordinator accepts it." },
   { key: "access", title: "Access", about: "Which studies are routed at all, and which are treated as aggregate-only." },
 ];

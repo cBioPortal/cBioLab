@@ -320,15 +320,15 @@ describe("the SQL a point layer adds", () => {
   });
 });
 
-describe("a study served by a peer over MCP", () => {
+describe("a study served by a federation peer", () => {
   /** a peer: its counts answered, its cases only if it shares them (and then possibly refused by it) */
   const peer = (calls: Calls, cases: "none" | "shared" | "refused") => {
     const r = fake("aggregate-only", calls) as Record<string, unknown>;
-    r.instance = { id: "peer", mode: "aggregate-only", conn: { db: "db" }, label: "GENIE (via MCP)" };
+    r.instance = { id: "peer", mode: "aggregate-only", conn: { db: "db" }, label: "GENIE (federated)" };
     if (cases !== "none") {
       const answer = (pts: unknown[]) => async () => {
         calls.push("peer cases");
-        if (cases === "refused") throw new Error("the peer serving s does not share plot cases of s (its MCP_DISCLOSE_PATIENTS does not allow it)");
+        if (cases === "refused") throw new Error("the peer serving s does not share plot cases of s (its FEDERATION_DISCLOSE_PATIENTS does not allow it)");
         return pts;
       };
       Object.assign(r, { plotScatterPoints: answer([{ id: "P1", x: 10, y: 5 }]), plotPoints: answer([{ id: "P1", g: "A", v: 5 }]),

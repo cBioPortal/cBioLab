@@ -235,7 +235,7 @@ export function timelineSummary(t: PatientTimeline, layout: Pick<TimelineLayout,
   if (!n) return t.patient + " (" + t.study + ") has no timeline events recorded" + (t.samples.length ? "; " + t.samples.length + " sample" + (t.samples.length === 1 ? "" : "s") : "") + ".";
   const lo = Math.min(...t.events.map((e) => e.start)), hi = Math.max(...t.events.map((e) => e.end != null && e.end > e.start ? e.end : e.start));
   const marks = [...sampleMarks(t.samples, t.events).values()];
-  return t.patient + " (" + t.study + (t.source.remote ? ", from " + t.source.label + " over MCP" : "") + "): " +
+  return t.patient + " (" + t.study + (t.source.remote ? ", from " + t.source.label + " via federation" : "") + "): " +
     n.toLocaleString("en-US") + " events in " + layout.tracks.length + " event type" + (layout.tracks.length === 1 ? "" : "s") +
     ", from " + formatDays(lo) + " to " + formatDays(hi) + " relative to diagnosis (day 0). " +
     (marks.length ? "Samples, numbered in collection order: " + marks.map((m) => m.label + " " + m.id + (m.type ? " (" + m.type + ")" : "")).join(", ") + ". " : "") +

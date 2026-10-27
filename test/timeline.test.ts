@@ -96,7 +96,7 @@ describe("timeline figure", () => {
     const drawn = new Set([...svg.matchAll(/data-ev="([0-9,]+)"/g)].flatMap((m) => m[1].split(",").map(Number)));
     assert.equal(drawn.size, EVENTS.length, "every event has a mark");
     const text = timelineSummary(t, layout);
-    assert.match(text, /over MCP/);
+    assert.match(text, /via federation/);
     assert.match(text, /cut from the axis/);
     assert.match(text, /1 lab value is recorded as a bound/);
   });

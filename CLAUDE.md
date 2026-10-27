@@ -60,6 +60,8 @@ changing first. The parts, and the one place each rule lives:
   hook for its kind. The homepage is `app/_home/`; shared study chooser and gene editor in
   `app/_studies/`, `app/_genes/`.
 - **Agents** — WebMCP tools `lib/webmcp.ts` / `app/lab/agent-tools.ts`; MCP server `mcp/tools.ts`.
+  **Federation is not MCP**: peers talk through `lib/federation-api.ts` at `/api/federation/v1/<op>`
+  (client `lib/federation-remote.ts`); never register a federation op as an MCP tool.
   **The chat sidebar is the app's only model call and is just another WebMCP client** — never give it
   a private way in. **The campaign engine (`lib/campaign.ts`, `lib/hypothesis.ts`) never calls a
   model**, and a locked campaign is immutable at the database level.
@@ -97,7 +99,7 @@ changing first. The parts, and the one place each rule lives:
    shareable `?doc=`/`?spec=` link. Two levels: the document panel shows each cohort's compiled
    SQL, and every view shows the aggregate queries that produced its numbers (resolvers log what
    they run; a peer returns its own log, marked as having executed there). OncoKB annotations are version-pinned (pin echoed in results).
-   Every result lists its `sources` (`lib/provenance.ts`): each database and MCP peer, with what a
+   Every result lists its `sources` (`lib/provenance.ts`): each database and federation peer, with what a
    peer reports about itself in every answer (name, build, each study's import date), and each
    view's participation points into that list.
 3. **Compilers are single-study; federation happens at the analysis layer** with study-qualified

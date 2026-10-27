@@ -53,10 +53,10 @@ export function Participation({ p }: { p?: ViewParticipation }) {
     ? "This view's output IS patients, so it needs identities from each contributing instance; an aggregate-only participant cannot contribute columns."
     : "Computed entirely from aggregates. Every participant answered with counts — no identifier was needed from any of them, whatever each instance would have permitted.";
   const srcTitle = p.studies.map(x =>
-    x.study + " — " + x.mode + (x.remote ? " (remote MCP peer)" : "")).join("\n");
+    x.study + " — " + x.mode + (x.remote ? " (remote federation peer)" : "")).join("\n");
   const srcLabel = !restricted.length ? null
     : remotes.length === restricted.length
-      ? restricted.length + (restricted.length === 1 ? " source via MCP peer" : " sources via MCP peers")
+      ? restricted.length + (restricted.length === 1 ? " source via a federation peer" : " sources via federation peers")
       : restricted.length + (restricted.length === 1 ? " aggregate-only source" : " aggregate-only sources");
   return (
     <span className="partwrap">
@@ -466,7 +466,7 @@ export function CohortStudies({ ids, names }: { ids: string[]; names: Map<string
 
 /**
  * Where an analysis's data came from (the result's `sources`): each database of this deployment and
- * each peer reached over MCP, with what the peer reported about itself and when each study's data
+ * each peer reached through its federation API, with what the peer reported about itself and when each study's data
  * was imported. Said only when there is more than one source or a remote one; one local database
  * is the default and goes without saying.
  */
@@ -479,7 +479,7 @@ export function AnalysisSources({ sources, names }: { sources?: AnalysisSource[]
       <span className="font-semibold text-foreground">Data from:</span>{" "}
       {sources.map((s, i) => {
         const peer = s.remote ? [
-          "over MCP at " + (s.url || "an unknown address"),
+          "via federation at " + (s.url || "an unknown address"),
           s.reportedName ? "which calls itself “" + s.reportedName + "”" : "which has not described itself",
           s.build ? "build " + s.build : null,
           s.answeredAt ? "first answered " + new Date(s.answeredAt).toLocaleString() : null
@@ -487,7 +487,7 @@ export function AnalysisSources({ sources, names }: { sources?: AnalysisSource[]
         return (
           <span key={i} title={s.label + " — " + peer + "\n" + s.studies.map((x) => x.study + ": imported " + (x.imported || "unknown")).join("\n")}>
             {i > 0 && " · "}<strong className="font-medium text-foreground">{s.label}</strong>
-            {" "}({s.remote ? "via MCP" + (s.reportedName && s.reportedName !== s.label ? ", calls itself “" + s.reportedName + "”" : "") : "local"}) — {studies(s)}
+            {" "}({s.remote ? "via federation" + (s.reportedName && s.reportedName !== s.label ? ", calls itself “" + s.reportedName + "”" : "") : "local"}) — {studies(s)}
           </span>
         );
       })}

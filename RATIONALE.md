@@ -13,7 +13,7 @@ definitions with dynamic membership and versioned annotation (roadmap, below); a
 **portable representation of the question** rather than of any backend, it already extends
 across portal instances — **cross-instance federation is built**, in both a data-level and a
 document-level mode, verified to agree to the last digit against a real second ClickHouse
-instance reached both directly and as an MCP peer.
+instance reached both directly and as a federation peer.
 
 **Key advantages at a glance:**
 
@@ -32,7 +32,7 @@ instance reached both directly and as an MCP peer.
   set of types, so a change to what's possible ships as a single commit and deploy, not a
   backend version a frontend has to catch up to
 - **Cross-instance federation, built and verified** — one document fulfilled across ClickHouse
-  instances or over MCP to a peer, with every visualization stating which participants answered
+  instances or through the federation API to a peer, with every visualization stating which participants answered
   and how (built-in, not roadmap)
 - **Living user state** *(roadmap)* — dynamic groups, versioned annotation, and membership
   diffs subsume virtual studies / groups / sessions
@@ -307,11 +307,11 @@ redesign.
 | mode | instance is reached as | what crosses the wire | fits |
 |---|---|---|---|
 | **Data-level** | a second ClickHouse connection (`CLICKHOUSE2_*`) | aggregates, computed per-instance and summed by the one engine | instances under one trust umbrella |
-| **Document-level** | another cbio-lab, over MCP (`PEER_MCP`) | a cohort definition out; *counts* back, never rows | institutions that cannot share patient-level data |
+| **Document-level** | another cbio-lab, through its federation API (`FEDERATION_PEERS`) | a cohort definition out; *counts* back, never rows | institutions that cannot share patient-level data |
 
 Both were run against the same real second database (a separate ClickHouse instance holding a
 GENIE-derived study, `cbioportal_genie_green`) — once as a direct data-level connection, once
-fronted by a second cbio-lab process reached purely over MCP — and the two were compared:
+fronted by a second cbio-lab process reached purely as a peer — and the two were compared:
 
 - cohort sizes: **25,555 / 24,627** patients, identical on both paths
 - per-gene compare counts, identical
@@ -383,7 +383,7 @@ remote participant belongs in an analysis at all.
 Every visualization also carries an explicit participation marker, deliberately split into two
 facts rather than one word: **method** (`aggregate-only` for every view but the oncoprint,
 *regardless of deployment* — the arithmetic never changes) and **sources** (how many
-participants were aggregate-only, or reached via an MCP peer). They are kept apart because a
+participants were aggregate-only, or reached via a federation peer). They are kept apart because a
 single label like "mixed" would wrongly suggest the *feature* varies by who answers, which is
 exactly what this architecture is built to prevent.
 
@@ -405,7 +405,7 @@ The honest remainder, unchanged in kind from the original plan:
    already-idempotent) sync pipeline replicated per instance, with a loud label when pins
    diverge across the federation rather than one assumed pin.
 2. **N-way instance registry.** The connection layer today is `PRIMARY` plus one optional
-   `secondary()` (`CLICKHOUSE2_*`) for data-level, and one `PEER_MCP` mapping per study for
+   `secondary()` (`CLICKHOUSE2_*`) for data-level, and one `FEDERATION_PEERS` mapping per study for
    document-level — proven correct at that scale, not yet generalized to an arbitrary list of
    instances.
 3. **Partial availability inside a running analysis.** The study *catalog* already isolates a
@@ -484,7 +484,7 @@ agents tested, including the ones that failed.
 ### Replication is a routing change
 
 The same document runs on the discovery study and on a peer instance without a row moving. A
-campaign becomes: discover on msk_chord_2024, replicate on GENIE over MCP, keep only what
+campaign becomes: discover on msk_chord_2024, replicate on GENIE through the federation API, keep only what
 survives — with every figure's participation marker stating which site answered. Replication is
 the step AI hypothesis pipelines skip because it needs a second dataset they cannot reach.
 Cross-instance federation, already built, makes it a parameter.

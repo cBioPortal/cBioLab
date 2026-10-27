@@ -1,6 +1,6 @@
 // The study list: one row per study an instance holds, with its counts and data capabilities.
 // Read from a ClickHouse connection; /api/studies merges every connection's rows with those of
-// the peers in PEER_MCP, which serve theirs through the MCP tool federated_studies.
+// the peers in FEDERATION_PEERS, which serve theirs through the federation API's `studies` op.
 import { chQuery, type ChConn } from "./ch.ts";
 import { isRestrictedStudy } from "./federation.ts";
 

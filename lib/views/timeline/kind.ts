@@ -13,7 +13,7 @@ export const timelineKind: ViewKindDef<"timeline"> = {
       const shown = pt.events.slice(0, TIMELINE_TEXT_EVENTS);
       const line = (e: (typeof pt.events)[number]) => `  day ${e.start}${e.end != null && e.end > e.start ? `–${e.end}` : ""}: ${e.type}` +
         (e.attrs.length ? " — " + e.attrs.filter(([k]) => !/^STYLE_/i.test(k)).map(([k, x]) => `${k}=${x}`).join(", ") : "");
-      out.push(head + `\n${pt.patient} (${pt.study}${pt.source.remote ? ", from " + pt.source.label + " over MCP" : ""}): ${pt.events.length} events, days from diagnosis; ` +
+      out.push(head + `\n${pt.patient} (${pt.study}${pt.source.remote ? ", from " + pt.source.label + " via federation" : ""}): ${pt.events.length} events, days from diagnosis; ` +
         `samples: ${pt.samples.map((x) => x.id + (x.type ? " (" + x.type + ")" : "")).join(", ") || "none"}\n` +
         shown.map(line).join("\n") +
         (pt.events.length > shown.length ? `\n  … ${pt.events.length - shown.length} later events not listed here (the figure draws all of them)` : "") +

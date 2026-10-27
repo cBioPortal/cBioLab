@@ -1,20 +1,20 @@
-// A simulated peer: one of this app's own database connections served to itself over MCP, so
-// document-level federation can be run and tested without standing up a second instance.
+// A simulated peer: one of this app's own database connections served to itself through its own
+// federation API (lib/federation-api.ts), so document-level federation can be run and tested without standing up a second instance.
 //
 // LOOPBACK_PEER=<connection id> (e.g. "b", the CLICKHOUSE2_* database) makes every study on that
 // connection a peer-held study: the analysis side reaches it through RemoteAggregateResolver /
-// RemotePatientResolver at this app's own /api/mcp, exactly as it would a peer at another address,
-// and the MCP side answers those calls from that connection — and from no other. The patient-level
-// rules apply as for any peer: MCP_DISCLOSE_PATIENTS (what the simulated peer sends) and
-// PEER_MCP_PATIENT_LEVEL (what this app accepts).
+// RemotePatientResolver at this app's own /api/federation/v1, exactly as it would a peer at another
+// address, and the federation API answers those calls from that connection — and from no other. The patient-level
+// rules apply as for any peer: FEDERATION_DISCLOSE_PATIENTS (what the simulated peer sends) and
+// FEDERATION_ACCEPT_PATIENT_LEVEL (what this app accepts).
 //
 // The two sides are told apart per request. A call this app makes to itself carries LOOPBACK_HEADER
-// with a token only this app knows; the MCP route runs such a call as the peer (`asLoopbackPeer`),
+// with a token only this app knows; the federation route runs such a call as the peer (`asLoopbackPeer`),
 // where nothing is routed to the simulated peer again — so it is answered from its database, and a
 // loopback call can never make another. The token is LOOPBACK_PEER_TOKEN where several processes
 // serve the app (Vercel: the call back lands on another function instance), else one generated per
-// process. With LOOPBACK_PEER_URL naming the deployment's own /api/mcp, that is all a deployment
-// needs to federate over MCP without a second instance.
+// process. With LOOPBACK_PEER_URL naming the deployment's own /api/federation/v1, that is all a
+// deployment needs to federate without a second instance.
 //
 // What it does not simulate: two processes with their own settings or credentials, or a peer on
 // another build. The study list reads the connection directly.
@@ -52,11 +52,11 @@ export const isLoopbackRequest = (req: Request): boolean => {
   return !!got && got.length === want.length && timingSafeEqual(Buffer.from(got), Buffer.from(want));
 };
 
-/** This app's own MCP endpoint: LOOPBACK_PEER_URL, else 127.0.0.1 on PORT. */
+/** This app's own federation API: LOOPBACK_PEER_URL, else 127.0.0.1 on PORT. */
 export function loopbackUrl(): string {
   if (process.env.LOOPBACK_PEER_URL) return process.env.LOOPBACK_PEER_URL;
-  if (!process.env.PORT) throw new Error("LOOPBACK_PEER needs this app's own MCP address: set PORT (the port it listens on) or LOOPBACK_PEER_URL");
-  return "http://127.0.0.1:" + process.env.PORT + "/api/mcp";
+  if (!process.env.PORT) throw new Error("LOOPBACK_PEER needs this app's own federation API address: set PORT (the port it listens on) or LOOPBACK_PEER_URL");
+  return "http://127.0.0.1:" + process.env.PORT + "/api/federation/v1";
 }
 
 /** The header a call to `url` carries: the token, when `url` is this app's own endpoint. */

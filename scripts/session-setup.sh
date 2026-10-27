@@ -58,16 +58,16 @@ cp "$ROOT/.env.local" "$DIR/.env.local"
 ( cd "$DIR" && npm ci --no-audit --no-fund )
 
 sed "s/3102/$PORT/g" "$ROOT/serve-3102.sh" > "$DIR/serve-$PORT.sh"
-# Federation over MCP for the dev server: set in its own script, not in .env.local, so a gate run
-# in the same folder keeps its own address (lib/loopback-peer.ts calls PORT's /api/mcp).
+# Federation for the dev server: set in its own script, not in .env.local, so a gate run in the same
+# folder keeps its own address (lib/loopback-peer.ts calls PORT's /api/federation/v1).
 if ! grep -q LOOPBACK_PEER "$DIR/serve-$PORT.sh"; then
   sed -i "/^cd \"\$(dirname \"\$0\")\"/r /dev/stdin" "$DIR/serve-$PORT.sh" <<FED
-# Federation over MCP: the second database (CLICKHOUSE2_*) is served to this app as a simulated
-# peer at its own /api/mcp (lib/loopback-peer.ts), patient timelines and alterations disclosed to
+# Federation: the second database (CLICKHOUSE2_*) is served to this app as a simulated peer at
+# its own /api/federation/v1 (lib/loopback-peer.ts), patient timelines and alterations disclosed to
 # the app alone. Here rather than in .env.local, so a gate run in this folder keeps its own address.
-export PORT=$PORT LOOPBACK_PEER=b MCP_DISCLOSE_PATIENTS='*:timeline+alterations' PEER_MCP_PATIENT_LEVEL='*:timeline+alterations'
+export PORT=$PORT LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations' FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations'
 FED
-  grep -q LOOPBACK_PEER "$DIR/serve-$PORT.sh" || echo "WARNING: serve-$PORT.sh has no 'cd \"\$(dirname \"\$0\")\"' line; its dev server federates without MCP" >&2
+  grep -q LOOPBACK_PEER "$DIR/serve-$PORT.sh" || echo "WARNING: serve-$PORT.sh has no 'cd \"\$(dirname \"\$0\")\"' line; its dev server does not federate" >&2
 fi
 chmod +x "$DIR/serve-$PORT.sh"
 ( cd "$DIR" && setsid "./serve-$PORT.sh" >/dev/null 2>&1 & )

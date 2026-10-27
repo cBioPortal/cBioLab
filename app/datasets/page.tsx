@@ -20,7 +20,7 @@ async function datasetsEntry(_version: string): Promise<string> {
 
 export default async function DatasetsPage() {
   await connection();
-  const { rows, unreachable, overMcp = [] } = await throughCache<{ rows: DatasetRow[]; unreachable: string[]; overMcp?: string[] }>(
+  const { rows, unreachable, viaFederation = [] } = await throughCache<{ rows: DatasetRow[]; unreachable: string[]; viaFederation?: string[] }>(
     async () => datasetsEntry(await cacheVersion()), allDatasets);
   const sum = (k: keyof DatasetRow) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
   return (
@@ -33,7 +33,7 @@ export default async function DatasetsPage() {
           warehouse every view in the app works from — {rows.length.toLocaleString()} studies, {sum("samples").toLocaleString()} samples.
           A study&apos;s name opens it in Explore; its download links to the public cBioPortal datahub, where its files come from.
           {unreachable.length > 0 && <> Not shown: {unreachable.join(", ")} did not answer, so its studies are missing from this list.</>}
-          {overMcp.length > 0 && <> Not shown: the studies of {overMcp.join(", ")}, reached over MCP, which serves no per-sample catalog — they are in Explore&apos;s study list.</>}
+          {viaFederation.length > 0 && <> Not shown: the studies of {viaFederation.join(", ")}, reached through federation, which serves no per-sample catalog — they are in Explore&apos;s study list.</>}
         </p>
       </div>
       <DatasetsTable rows={rows} />

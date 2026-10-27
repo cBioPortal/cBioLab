@@ -1,8 +1,9 @@
-// Which patient-level data may cross between cbio-lab instances over MCP — the rules each side of
-// the opt-in patient-level federation mode writes in one setting (docs/DATA-BOUNDARY.md):
+// Which patient-level data may cross between cbio-lab instances through the federation API — the
+// rules each side of the opt-in patient-level federation mode writes in one setting
+// (docs/DATA-BOUNDARY.md):
 //
-//   MCP_DISCLOSE_PATIENTS   on the peer (the data owner): what it will send, for which studies
-//   PEER_MCP_PATIENT_LEVEL  on the coordinator: what it accepts from its PEER_MCP peer, per study
+//   FEDERATION_DISCLOSE_PATIENTS     on the peer (the data owner): what it will send, for which studies
+//   FEDERATION_ACCEPT_PATIENT_LEVEL  on the coordinator: what it accepts from its FEDERATION_PEERS peer, per study
 //
 // Data crosses only where both allow it. A rule names a study (or `*`, every study) and the kinds of
 // patient-level data allowed for it: `genie_public:timeline+alterations`, `*:timeline`,
@@ -52,10 +53,10 @@ export function allowedKinds(rules: DisclosureRules, study: string): Set<Patient
   return new Set([...(rules.get("*") || []), ...(rules.get(study) || [])]);
 }
 
-/** The peer's own rules: what this instance sends to callers over MCP. */
-export const disclosedByThisInstance = () => parseRules(setting("MCP_DISCLOSE_PATIENTS"), "MCP_DISCLOSE_PATIENTS");
+/** The peer's own rules: what this instance sends to callers of its federation API. */
+export const disclosedByThisInstance = () => parseRules(setting("FEDERATION_DISCLOSE_PATIENTS"), "FEDERATION_DISCLOSE_PATIENTS");
 /** The coordinator's rules: what this instance accepts from the peer serving each study. */
-export const acceptedFromPeers = () => parseRules(setting("PEER_MCP_PATIENT_LEVEL"), "PEER_MCP_PATIENT_LEVEL");
+export const acceptedFromPeers = () => parseRules(setting("FEDERATION_ACCEPT_PATIENT_LEVEL"), "FEDERATION_ACCEPT_PATIENT_LEVEL");
 
 /** "patient timelines and patient alterations" */
 export const kindsText = (kinds: Iterable<PatientKind>) => {

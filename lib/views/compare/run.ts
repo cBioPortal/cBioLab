@@ -52,7 +52,7 @@ export async function runCompare(view: DocView, c: ViewRun): Promise<ViewResult 
     const k = n + "|" + c.gene;
     const cur = tally.get(k) || zeroCounts(c.gene);
     cur.profiled += c.profiled; cur.altered += c.altered; cur.driver += c.driver;
-    // an older MCP peer may not send byType yet — treat it as absent, not a crash
+    // an older peer may not send byType yet — treat it as absent, not a crash
     for (const t of ALTERATION_TYPES) {
       cur.byType[t].profiled += c.byType?.[t]?.profiled ?? 0;
       cur.byType[t].altered += c.byType?.[t]?.altered ?? 0;

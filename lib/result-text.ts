@@ -39,7 +39,7 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
   out.push(`Analysis over ${r.involvedStudies.join(" + ")} — OncoKB pin ${r.oncokbPin || "none"} — ${r.stats.ms}ms.`);
   // where the data came from, when a peer or more than one database answered
   if (r.sources && (r.sources.length > 1 || r.sources.some((x) => x.remote)))
-    out.push("Data from: " + r.sources.map((x) => x.label + (x.remote ? " (over MCP at " + (x.url || "?") + (x.reportedName ? ", calls itself " + x.reportedName : "") +
+    out.push("Data from: " + r.sources.map((x) => x.label + (x.remote ? " (via federation at " + (x.url || "?") + (x.reportedName ? ", calls itself " + x.reportedName : "") +
       (x.build ? ", build " + x.build : "") + ")" : " (local)") + " — " +
       x.studies.map((st) => st.study + " imported " + (st.imported || "unknown")).join(", ")).join("; ") + ".");
   // The document's own title and notes are the author's framing of the whole
