@@ -5,8 +5,7 @@ import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
 import { mergeExplore } from "../../../lib/explore.ts";
 import { PRIMARY, withChContext, ensureChContext, withoutFailedQueries } from "../../../lib/ch.ts";
-import { cacheLife } from "next/cache";
-import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
+import { pack, throughCache, dataVersion, resultEntry } from "../../../lib/next-cache.ts";
 import { studyProfilesMany, resolveStudy } from "../../../lib/analysis.ts";
 import { chQuery } from "../../../lib/ch.ts";
 import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
@@ -50,7 +49,7 @@ async function handle(req: Request) {
 
 async function exploreEntry(body: any, _version: string): Promise<string> {
   "use cache: remote";
-  cacheLife("days");
+  resultEntry();
   return pack(await ensureChContext(() => withoutFailedQueries(() => exploreFor(body))));
 }
 

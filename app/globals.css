@@ -1732,3 +1732,10 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-table tr.dt-pick.sel td { background: var(--accent-soft); }
 .cohortsum-skel { display: inline-block; width: 4rem; height: 0.9rem; }
 } /* @layer legacy */
+
+/* ---------------------------------------------------------------------------
+   /admin (app/admin/page.tsx)
+   --------------------------------------------------------------------------- */
+.admin-section { margin-top: var(--s5); }
+.admin-section h2 { font-family: "IBM Plex Serif", Georgia, serif; font-size: var(--t-xl); margin: 0 0 var(--s2); }
+.admin-section > p { max-width: 75ch; line-height: 1.6; }

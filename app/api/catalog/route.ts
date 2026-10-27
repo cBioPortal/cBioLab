@@ -2,8 +2,7 @@ import { STUDY, withoutFailedQueries } from "../../../lib/ch";
 import { studyRouting, restrictedStudies } from "../../../lib/federation";
 import { catalogFor } from "../../../lib/study-catalog.ts";
 import { peerForStudy, remoteCatalog } from "../../../lib/federation-remote.ts";
-import { cacheLife } from "next/cache";
-import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
+import { pack, throughCache, dataVersion, resultEntry } from "../../../lib/next-cache.ts";
 
 export async function GET(req: Request) {
   try {
@@ -27,12 +26,12 @@ export async function GET(req: Request) {
 
 async function catalogEntry(study: string, _version: string): Promise<string> {
   "use cache: remote";
-  cacheLife("days");
+  resultEntry();
   return pack(await withoutFailedQueries(() => catalogFor(study)));
 }
 
 async function peerCatalogEntry(study: string, url: string, _version: string): Promise<string> {
   "use cache: remote";
-  cacheLife("days");
+  resultEntry();
   return pack(await withoutFailedQueries(() => remoteCatalog(study, url)));
 }

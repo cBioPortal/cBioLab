@@ -43,6 +43,29 @@ describe("which sign-ins a deployment offers", () => {
   });
 });
 
+describe("administrators", () => {
+  beforeEach(() => { reset(); process.env.AUTH_DEV_LOGIN = "1"; process.env.AUTH_SESSION_SECRET = "a".repeat(40); delete process.env.ADMIN_EMAILS; });
+  after(() => { process.env = { ...env }; });
+  const signedIn = (u = U) => req(auth.sessionCookie(req(), u).split(";")[0]);
+
+  test("are the signed-in users ADMIN_EMAILS names, whatever the case", () => {
+    process.env.ADMIN_EMAILS = "someone@example.org, ADA@example.org";
+    assert.equal(auth.isAdmin(U), true);
+    assert.deepEqual(auth.requireAdmin(signedIn()), U);
+    assert.equal(auth.isAdmin({ ...U, email: "bob@example.org" }), false);
+    assert.throws(() => auth.requireAdmin(signedIn({ ...U, email: "bob@example.org" })), (e) => e instanceof auth.AccessError && e.status === 403 && /bob@example.org is not an administrator/.test(e.message));
+  });
+  test("there are none without ADMIN_EMAILS, nobody signed in, or sign-in", () => {
+    assert.equal(auth.isAdmin(U), false);
+    assert.equal(auth.isAdmin(null), false);
+    assert.throws(() => auth.requireAdmin(signedIn()), /not an administrator/);
+    process.env.ADMIN_EMAILS = U.email;
+    assert.throws(() => auth.requireAdmin(req()), (e) => e instanceof auth.AccessError && e.status === 403);
+    delete process.env.AUTH_DEV_LOGIN;
+    assert.throws(() => auth.requireAdmin(req()), (e) => e instanceof auth.AccessError && e.status === 404);
+  });
+});
+
 describe("the session cookie", () => {
   beforeEach(() => { reset(); process.env.AUTH_DEV_LOGIN = "1"; process.env.AUTH_SESSION_SECRET = "a".repeat(40); });
   after(() => { process.env = { ...env }; });

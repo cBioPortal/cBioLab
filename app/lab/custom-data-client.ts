@@ -51,7 +51,7 @@ export function referencedDatasets(x: unknown): string[] {
 
 /** A document's pin: the name it uses -> a stored dataset at one version. */
 export interface UploadBinding { as: string; dataset: string; version: number }
-export interface SignedInUser { id: string; email: string; name: string | null }
+export interface SignedInUser { id: string; email: string; name: string | null; /** administers this deployment (/admin) */ admin?: boolean }
 /** How this deployment signs people in (lib/auth.ts): its provider's name, and the development sign-in. */
 export interface LoginOptions { oidc: string | null; dev: boolean }
 export interface ServerState {

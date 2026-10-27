@@ -1,11 +1,11 @@
 "use client";
-// Top-right "Sign in", or once signed in the account menu (who, and sign out), like
-// the portal's "Logged in as" menu. Signing in lets a
+// Top-right "Sign in", or once signed in the account menu (who, Admin for an administrator, and sign
+// out), like the portal's "Logged in as" menu. Signing in lets a
 // reader save and open their own cohorts and analyses and use custom data (lib/auth.ts). A
 // deployment offers its provider (Google, MSK…), the development sign-in, or both; with only a
 // provider the button goes straight there. Shown only where the deployment signs people in.
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, LogIn, LogOut, UserRound } from "lucide-react";
+import { ChevronDown, LogIn, LogOut, Settings, UserRound } from "lucide-react";
 import { loadCustomData, devSignIn, signInWithProvider, logOut, onLoginRequest, serverState } from "./custom-data-client.ts";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 import { Button } from "../_ui/button";
@@ -60,6 +60,7 @@ export default function LoginButton() {
                   <div className="meta">{server.user?.email}</div>
                 </div>
                 <MenuSeparator />
+                {server.user?.admin && <MenuItem asChild onClick={close}><a href="/admin" title="administer this deployment: clear the result cache"><Settings />Admin</a></MenuItem>}
                 <MenuItem onClick={() => { close(); void logOut(); }}><LogOut />Sign out</MenuItem>
               </>}
             </GearMenu></span>

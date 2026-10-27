@@ -9,6 +9,7 @@
 //   - a data import or a new OncoKB release: `dataVersion()` is an argument of every cached
 //     function, so new data means new keys
 //   - time: `cacheLife("days")` regenerates an entry a day after it was written
+//   - an administrator (/admin): every entry carries RESULT_TAG, which clearing the cache expires
 //
 // Only a value the function returns is stored. A thrown error, a refused request or a query the
 // reader abandoned is never cached, so every path that means "no answer" must throw. Each cached
@@ -27,11 +28,11 @@
 //
 // A cached function takes only serializable arguments and computes its answer itself, so each
 // route keeps its own small one (`catalogEntry`, `studiesEntry`, `exploreEntry`) beside the code
-// it caches, built from `pack`, `throughCache` and `dataVersion` here.
+// it caches, built from `pack`, `throughCache`, `dataVersion` and `resultEntry` here.
 //
 // Next-only: `next/cache` exists only under the Next runtime, so the stdio MCP server, the CLI
 // and the tests use the uncached engine directly.
-import { cacheLife } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { chQuery, directConnections, loopbackOnlyConn, connById, withoutFailedQueries, type ChConn } from "./ch.ts";
 import { oncokbPin } from "./annotation.ts";
@@ -91,6 +92,15 @@ export function dataVersion(): Promise<string> {
   return value;
 }
 
+/** Every cached result's tag, which clearing the cache from /admin expires. */
+export const RESULT_TAG = "results";
+
+/** The lifetime and tag of every cached result: called first in each `'use cache: remote'` body. */
+export function resultEntry(): void {
+  cacheLife("days");
+  cacheTag(RESULT_TAG);
+}
+
 /**
  * One cohort's size on one connection, by its compiled SQL — which already says everything that
  * decides it (definition, study, OncoKB pin, profiles). The page asks for a document's cohorts and
@@ -99,7 +109,7 @@ export function dataVersion(): Promise<string> {
  */
 async function countEntry(connId: string, sql: string, _version: string): Promise<string> {
   "use cache: remote";
-  cacheLife("days");
+  resultEntry();
   const conn = connById(connId);
   if (!conn) throw new Error("no connection '" + connId + "'");
   return pack(await withoutFailedQueries(async () =>
@@ -131,7 +141,7 @@ const RISK_FIT_CACHE_MAX_PATIENTS = 60_000;
  */
 async function riskFitEntry(args: RiskFitArgs, _version: string): Promise<string> {
   "use cache: remote";
-  cacheLife("days");
+  resultEntry();
   return pack(await withoutFailedQueries(() => riskFitDirect(args)));
 }
 export async function cachedRiskFit(a: RiskFitArgs & { patients: number }): Promise<RiskFit> {
@@ -146,7 +156,7 @@ const ROUTE_OPTS = { count: cachedCount, riskFit: cachedRiskFit };
 
 async function analysisEntry(doc: AnalysisDoc, oncoprint: "svg" | "spec", _version: string): Promise<string> {
   "use cache: remote";
-  cacheLife("days");
+  resultEntry();
   return pack(await withoutFailedQueries(() => runAnalysis(doc, { oncoprint, ...ROUTE_OPTS })));
 }
 export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg" | "spec" } = {}): Promise<AnalysisResult> {
@@ -158,7 +168,7 @@ export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg"
 
 async function contractEntry(spec: OncoprintSpec, provenance: boolean, _version: string): Promise<string> {
   "use cache: remote";
-  cacheLife("days");
+  resultEntry();
   return pack(await withoutFailedQueries(() => buildContract(spec, provenance ? { log: [], provenance } : {})));
 }
 /**

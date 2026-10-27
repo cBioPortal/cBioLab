@@ -3,8 +3,7 @@ import { studiesFor, type StudyRow } from "../../../lib/study-list.ts";
 import { peerMcpEntries, peerPatientKinds, remoteStudies } from "../../../lib/federation-remote.ts";
 import { instanceForStudy } from "../../../lib/federation.ts";
 import type { StudyAccess } from "../../../lib/view-coverage.ts";
-import { cacheLife } from "next/cache";
-import { pack, throughCache, dataVersion } from "../../../lib/next-cache.ts";
+import { pack, throughCache, dataVersion, resultEntry } from "../../../lib/next-cache.ts";
 import { connection } from "next/server";
 
 async function allStudies(): Promise<StudyRow[]> {
@@ -30,7 +29,7 @@ async function allStudies(): Promise<StudyRow[]> {
 }
 async function studiesEntry(_version: string): Promise<string> {
   "use cache: remote";
-  cacheLife("days");
+  resultEntry();
   return pack(await withoutFailedQueries(() => allStudies()));
 }
 /** what the reachable instances returned, when one of them did not answer */

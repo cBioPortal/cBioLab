@@ -159,6 +159,10 @@ changing first. The parts, and the one place each rule lives:
    - **Read through `throughCache(cached, direct)`.** A production build replaces the message of
      anything thrown inside a cached function, so when the cached call throws the direct one runs
      and reports the real error. It also covers a cache that cannot be read.
+   - **An administrator clears it at `/admin`** (signed-in users in `ADMIN_EMAILS`; account menu →
+     Admin): every `'use cache: remote'` body starts with `resultEntry()`, which tags it
+     `RESULT_TAG`, and the clear expires that tag — on Vercel for every instance, elsewhere for the
+     process that answers. A new cached function must call `resultEntry()` too, or a clear misses it.
    - **`RESULT_CACHE=off` turns it off.** `throughCache` then runs the direct call on every
      request, so a server answers everything cold — for measuring what a first reader waits for.
      Without a cache handler configured (anywhere but Vercel), the cache is the Node process's own
