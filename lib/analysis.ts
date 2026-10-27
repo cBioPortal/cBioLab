@@ -386,6 +386,8 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   const evalCohortDef = async (def: CohortDef): Promise<EvaledCohort> => {
     const studies = [];
     for (const s of cohortStudies(def, docStudy)) studies.push(await resolveStudy(s, docStudy));
+    // every study's profiles at once, rather than three queries for each
+    await studyProfilesMany(studies);
     const perStudy: Record<string, { sql: string; count: number; mode: string }> = {};
     // Every instance is asked for a COUNT, including the patient-level ones.
     // Cohort evaluation has no use for identities: the size is a count, and the

@@ -425,12 +425,24 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const fr = resolvers as Record<string, Resolver & FederatedPlotCapable>;
       const { xk, yk, shape, xLabel, yLabel } = await fr[sites[0]].plotAxisKinds(spec);
       if (shape === "waterfall") throw new Error("an ordered-cases axis (a waterfall) is not implemented yet; give both axes a source");
+      // a box's cases are read by every site against its own metadata, so an axis a site does not
+      // declare refuses the view before anything is counted
+      if (shape === "box") await Promise.all(sites.slice(1).map((s) => fr[s].plotAxisKinds(spec)));
       const label = { x: { label: xLabel, kind: xk }, y: { label: yLabel, kind: yk } };
       const scaleNote = sites.length + " studies pooled (" + sites.join(", ") + ")";
+      // Each site counts its own cases and their axes, whatever the shape. It needs nothing the
+      // figure's queries return, so it is asked for once their first round has answered — beside the
+      // second, rather than after it, and not at all for a view refused in the first. A failed count
+      // fails the view: dropping the coverage note would hide how many cases the figure leaves out.
+      let covsP: Promise<NonNullable<PlotData["coverage"]>[]> | undefined;
+      const startCoverage = () => {
+        if (!covsP) { covsP = Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk))); covsP.catch(() => {}); }
+      };
       let data: PlotData;
 
       if (shape === "scatter") {
         const extents = await Promise.all(sites.map((s) => fr[s].plotExtent(doc.cohorts[cn], spec, xk, yk)));
+        startCoverage();
         const have = extents.filter((e) => e.n > 0);
         const n = have.reduce((a, e) => a + e.n, 0);
         if (!n) { data = { shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" }; }
@@ -488,14 +500,16 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         const groups = poolBoxRows(await Promise.all(sites.map((s) => fr[s].plotBoxRows(doc.cohorts[cn], spec, xk, yk))));
         if (groups.length > CATEGORY_CAP)
           throw new Error("more than " + CATEGORY_CAP + " groups on the categorical axis; narrow the cohort or pick another attribute");
+        startCoverage();
         const n = groups.reduce((a, g) => a + g.n, 0);
         data = { shape, n, ...label, groups, overlay: "none",
           note: scaleNote + ". Counts and extremes per group sum exactly; the quartiles are a size-weighted" +
             " approximation across sites (it can shift where an outlier bar falls, never a count)." };
         // Points, unlike a density, just concatenate: each entitled site's own case-level
         // rows are already independent of any shared scale. A site that may not disclose
-        // cases contributes none, the same rule the oncoprint's columns follow.
-        if (pv.allPoints !== false) {
+        // cases contributes none, the same rule the oncoprint's columns follow. A site's points
+        // are at least its box's cases, so past the cap in all there is nothing to ask for.
+        if (pv.allPoints !== false && n <= POINTS_CAP) {
           const perSite = await peerSafe(sites.map((s) => resolvers[s]), () => Promise.all(sites.map((s) => {
             const rc = plotCasesOf(resolvers[s]);
             return rc ? rc.plotPoints(doc.cohorts[cn], spec) : Promise.resolve([]);
@@ -524,9 +538,9 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       }
 
       orderLevels(data, spec);
-      // each site counts its own cases and their axes; the sums are exact. A failed count fails the
-      // view: dropping the coverage note would hide how many cases the figure leaves out
-      const covs = await Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk)));
+      // the sites' coverage counts sum exactly
+      startCoverage();
+      const covs = await covsP!;
       data.coverage = covs.reduce<NonNullable<PlotData["coverage"]>>(
         (a, c) => ({ total: a.total + c.total, nx: a.nx + c.nx, ny: a.ny + c.ny, ...(c.multi != null || a.multi != null ? { multi: (a.multi || 0) + (c.multi || 0) } : {}) }),
         { total: 0, nx: 0, ny: 0 });

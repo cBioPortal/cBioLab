@@ -1750,11 +1750,14 @@ abstract class BaseResolver implements AggregateCapable {
     const done = async (d: PlotData): Promise<PlotData> => { const c = await coverage; return c ? { ...d, coverage: c } : d; };
 
     if (shape === "scatter") {
+      // the coefficients need no extent, so they are asked for beside it
+      const stP = this.runLogged<ChRow>("plot:stats", plotStatsSql(xSel, ySel, ctx.cohortSql), conn);
+      stP.catch(() => {});
       const c = await this.runLogged<ChRow>("plot:extent", plotCountSql(xSel, ySel, ctx.cohortSql, true), conn);
       const n = Number(c.data[0]?.n || 0);
       if (!n) return done({ shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" });
       const [st, bins] = await Promise.all([
-        this.runLogged<ChRow>("plot:stats", plotStatsSql(xSel, ySel, ctx.cohortSql), conn),
+        stP,
         this.runLogged<ChRow>("plot:bins", plotBinsSql(xSel, ySel, ctx.cohortSql, spec.bins), conn)
       ]);
       const r = st.data[0] || {};

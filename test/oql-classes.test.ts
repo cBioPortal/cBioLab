@@ -59,7 +59,7 @@ describe("uncalled mutations are read support, not alterations", () => {
     assert.match(leaf("APC: TRUNC_(1400-)"), /ifNull\(mutationStatus, ''\) AS mutation_status/);
   });
   test("the oncoprint's cells and VAF, and a plot's alteration axis, leave them out", () => {
-    assert.match(genomicEventsSql(["TP53"], "s1", "db"), /AND mutation_status != 'UNCALLED'/);
+    assert.match(genomicEventsSql(["TP53"], ["s1"], "db"), /AND mutation_status != 'UNCALLED'/);
     assert.match(vafSql(["TP53"], "s1", "db"), /molecularProfileId NOT LIKE '%uncalled%'/);
     assert.match(axisSelect({ source: "alteration", genes: ["TP53"] }, { study: "s1", db: "db", unit: "sample", cohortSql: "SELECT 1" }, "cat"),
       /AND mutation_status != 'UNCALLED'/);

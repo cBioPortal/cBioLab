@@ -86,18 +86,20 @@ async function syncedStudies(): Promise<string[]> {
   return _syncedStudies;
 }
 
-export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], study?: string | string[]): Promise<AnnotationIndex> {
+/**
+ * `eventRows` may still be on its way: the store is read without them, and only the mock that
+ * stands in for a missing store waits for them.
+ */
+export async function buildAnnotationIndex(eventRows: EvRow[] | Promise<EvRow[]>, genes: string[], study?: string | string[]): Promise<AnnotationIndex> {
   try {
-    const pin = process.env.ONCOKB_PIN ||
-      (await chQuery(
-        `SELECT oncokb_version FROM ${ANNOT_DB}.variant_annotation
-         GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1`)).data[0]?.oncokb_version;
+    const pin = await oncokbPin();
     if (!pin) throw new Error("annotation store is empty");
     const rows = await chQuery(
       `SELECT alteration_type AS t, hugo_gene_symbol AS gene, alteration, max(is_driver) AS is_driver
        FROM ${ANNOT_DB}.variant_annotation
        WHERE oncokb_version = ${sq(pin)} AND hugo_gene_symbol IN (${genes.map(sq).join(",")})
-       GROUP BY t, gene, alteration`);
+       GROUP BY t, gene, alteration
+       HAVING is_driver > 0`);
     // Nested by gene rather than one set of "type|gene|alteration" keys: isDriver runs once per
     // event — 800k times on a 400k-patient figure — and composing that key allocated a string
     // every time. Two lookups on short strings cost far less than one on a long fresh one.
@@ -137,6 +139,6 @@ export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], 
     // or availability problem, and nobody is waiting for the answer anyway.
     if (isAbortError(e)) throw e;
     // not licensed / store empty / db absent -> degrade loudly to the mock
-    return mockIndex(eventRows);
+    return mockIndex(await eventRows);
   }
 }

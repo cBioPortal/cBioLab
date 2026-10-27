@@ -812,6 +812,66 @@ What is left, measured at 128-551 studies:
   definition, which every pooled query then evaluates: 0.9s → 3.0s at 32 studies with an OQL
   draft when forced. No study on the primary connection is that large; the answers are the same.
 
+## 3e. OncoPrint and plots at scale (October 2026)
+
+Measured by calling the engine directly (no result cache) against the public warehouse, two or
+three alternating runs each against the code before; the warehouse is shared, so single runs move
+by up to 30% and only alternating pairs are compared. Every case listed returns a contract
+identical to the code before's (sha256 of the contract without its timings, 13 specs: heatmaps,
+VAF, a generic assay, Ward clustering, overlays, derived rows, merged and sample-level tracks,
+cohort groups, five refusals), and both oncoprint views of the analysis route render identically.
+
+In the browser the figure is not the cost: at 409k patients the binary contract decodes in under
+1 ms and draws in 45-107 ms (`/oncoprint-lab`, headless Chromium).
+
+| oncoprint | before | after |
+|---|---|---|
+| msk_impact_50k_2026, 48k patients, 10 genes | 1.4-1.9s | 1.3-1.5s (assembly 0.5-0.8s → 0.3-0.4s) |
+| 5 largest studies, 166k patients | 3.8-5.0s | 2.5-2.7s (assembly 2.1-2.6s → 0.6-0.7s) |
+| GENIE public + 5 largest, 409k patients | 10.8-13.9s | 7.5-8.2s (assembly 5.4-7.0s → 1.7-2.2s) |
+| 50 studies, 5 genes | 5.6-6.0s | 3.4-3.8s |
+| 312 studies, 242k patients, 5 genes | 14.7-17.4s (1,560 queries) | 4.5-5.6s |
+
+- **Assembly addressed every row by its column id**, a string-keyed hash lookup per row per
+  phase, on ids rebuilt as `study + "_" + pid` for every row of a multi-study figure (1.0-1.4 µs
+  each measured, against 0.33 for a plain id). `buildContract` now meets each id once, in a
+  per-study map, and hands `assembleIndexed` rows by column position; `assembleContract` keeps the
+  id-keyed interface (CLI, local tables, the Python conformance tests) as a thin adapter onto it.
+  The three hottest loops are functions of their own: inside one 400-line function V8 optimised
+  each loop on its own and threw the code away on reaching the next ("insufficient type feedback").
+- **Every study's fetches start together**: clinical tracks, heatmaps, overlays, derived rows and
+  the driver annotation no longer wait for the alterations, and the annotation reuses the cached
+  OncoKB release instead of asking for it again (126-232 ms) and reads only driver rows.
+- **The whole-study fetches are one statement per batch of studies** (`batchStudies`): small
+  studies share a statement up to 25,000 samples, a larger study keeps its own. One statement per
+  connection was measured slower for six of the largest studies (query phase 6.2s against 5.1-5.7s)
+  — §3c's finding again: separate statements spread across the cluster. Each study's sample count,
+  for this and nothing else, is cached for the process's life.
+- **Panel coverage** computes each panel's gene mask before joining samples, and joins only these
+  studies' samples: 195 → 86 ms at 48k patients, identical rows over 42 study × gene list × unit cases.
+
+Plots changed less. One study was already 0.35-0.85s at 52k samples. Across studies:
+
+- The pooled box plot fetched every study's points and then dropped them all when the total
+  passed the 10,000-point cap (11 studies, 150k samples: 11 queries for nothing). It now skips
+  them when the box's own count is past the cap, which is exact: a study's points are at least
+  its box's cases. That fetch was also, by accident, the only place every study's metadata was
+  checked against the axes; the check is now explicit and first, so a plot one study cannot answer
+  is refused in 0.7-1.2s instead of 3.2-6.2s at 312 studies.
+- Coverage counts run beside the second round of queries instead of after it; a single-study
+  scatter asks for its coefficients beside its extent.
+- The analysis loaded every study's profiles three queries at a time per study, and listed each
+  study's import date one query after another once the views were done: 312 queries, 3.1s, after
+  a 312-study plot had finished. Both are now one statement per connection (`studyProfilesMany`,
+  `studiesImported`).
+- **What is left is the plot's own query count**: four per study, 1,248 at 312 studies, 11-25s as the shared database's load moves.
+  Sent as one `UNION ALL` request per kind (built, measured, not shipped) they were as slow as
+  sending them one after another — 11 statements 600-700 ms against 160-250 ms eight at a time.
+  Two levers remain, neither taken here: `CLICKHOUSE_MAX_INFLIGHT=16` took that view from 19.4s
+  to 12.2s and 32 gained nothing more (a deployment setting: it is everyone's share of the
+  database); or a plot statement that reads many studies in one scan, which means compiling an
+  axis — clinical, OQL, profile, generic assay — for several studies at once, against invariant 3.
+
 ## 4. Time to display vs cbioportal.org
 
 Oncoprint, 5 genes, measured from navigation to the figure's pixels going stable

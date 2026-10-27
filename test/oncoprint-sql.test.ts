@@ -3,17 +3,36 @@
 // these pin the rules, so a later edit cannot quietly narrow them.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { columnFactsSql, coverageSql, assayHeatmapSql, normalizeSpec } from "../lib/oncoprint.ts";
+import { allColumnsSql, batchStudies, clinicalSql, columnFactsSql, coverageSql, genomicEventsSql, assayHeatmapSql, normalizeSpec } from "../lib/oncoprint.ts";
 import { assayTrackLabel, entityShortName } from "../lib/profile-names.ts";
 
 test("a gene cell is profiled by a mutation, copy number or structural variant panel, as in the portal", () => {
-  const sql = coverageSql(["TP53", "CDKN2A"], "s");
+  const sql = coverageSql(["TP53", "CDKN2A"], ["s"]);
   assert.match(sql, /alteration_type IN \('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT'\)/);
-  assert.match(sql, /pg\.gene IN \('TP53','CDKN2A'\)/, "and only for the genes that panel covers");
+  assert.match(sql, /gene_panel_to_gene_derived WHERE gene IN \('TP53','CDKN2A'\) GROUP BY gene_panel_id/, "and only for the genes that panel covers");
+  assert.match(sql, /JOIN pm ON pm\.gene_panel_id = sp\.gene_panel_id/, "each sample takes its own panels' masks");
+});
+
+test("whole-study fetches read several studies in one statement, each row led by its own study", () => {
+  for (const sql of [genomicEventsSql(["TP53"], ["s1", "s2"], "db"), coverageSql(["TP53"], ["s1", "s2"], "db"), columnFactsSql(["s1", "s2"], "db"),
+    clinicalSql(["SEX"], ["s1", "s2"], "db"), allColumnsSql(["s1", "s2"], "db"), clinicalSql(["SEX"], ["s1", "s2"], "db", "sample")]) {
+    assert.match(sql, /^(WITH[\s\S]*\n)?SELECT (DISTINCT )?\S*cancer_study_identifier AS s, replaceOne\(\S*_unique_id, concat\(\S*cancer_study_identifier, '_'\), ''\) AS pid/m,
+      "the study first, and each id stripped of its own study's prefix");
+    assert.match(sql, /cancer_study_identifier IN \('s1','s2'\)/);
+    assert.doesNotMatch(sql, /'s1_'|'s2_'/, "no one study's prefix is assumed");
+  }
+});
+
+test("studies are batched by size: small ones share a statement, a large one has its own, never across connections", () => {
+  const size: Record<string, number> = { big: 60_000, a: 10_000, b: 10_000, c: 10_000, d: 100, far: 100 };
+  const conn = (s: string) => s === "far" ? "c2" : "c1";
+  assert.deepEqual(batchStudies(["a", "big", "b", "c", "far", "d"], conn, (s) => size[s], 25_000), [["big"], ["a", "b"], ["c", "d"], ["far"]]);
+  assert.deepEqual(batchStudies(["only"], conn, () => 0), [["only"]]);
+  assert.deepEqual(batchStudies([], conn, () => 0), []);
 });
 
 test("column facts count every sample of a column, profiled or not, and type masks follow PROFILED_TYPES", () => {
-  const sql = columnFactsSql("s");
+  const sql = columnFactsSql(["s"]);
   assert.match(sql, /FROM \S*\.sample_derived sd\nLEFT JOIN/, "a column profiled for nothing still has a row");
   assert.match(sql, /uniqExact\(sd\.sample_unique_id\) AS samples/);
   assert.match(sql, /indexOf\(\['MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT','MRNA_EXPRESSION','PROTEIN_LEVEL'\]/);

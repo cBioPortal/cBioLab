@@ -13,15 +13,25 @@ const imported = new Map<string, { at: number; value: Promise<string | null> }>(
 
 /** When `study`'s data was last imported into the database `conn` reaches, or null if it can't tell. */
 export function studyImported(study: string, conn: ChConn): Promise<string | null> {
-  const key = conn.id + "|" + conn.db + "|" + study;
-  const hit = imported.get(key);
-  if (hit && Date.now() - hit.at < IMPORTED_TTL) return hit.value;
-  const value = chQuery<{ d: string }>("SELECT toString(max(import_date)) AS d FROM " + conn.db + ".cancer_study WHERE cancer_study_identifier = " + sq(study), conn)
-    .then((r) => (r.data[0]?.d || "").replace(/\.0+$/, "") || null)
-    .catch((e) => { if (isAbortError(e)) throw e; return null; });
-  imported.set(key, { at: Date.now(), value });
-  value.catch(() => { if (imported.get(key)?.value === value) imported.delete(key); });
-  return value;
+  return studiesImported([study], conn).get(study)!;
+}
+
+/** The same for several studies of one database, asked in one statement for those not already known. */
+export function studiesImported(studies: string[], conn: ChConn): Map<string, Promise<string | null>> {
+  const keyOf = (study: string) => conn.id + "|" + conn.db + "|" + study;
+  const todo = [...new Set(studies)].filter((s) => { const hit = imported.get(keyOf(s)); return !(hit && Date.now() - hit.at < IMPORTED_TTL); });
+  if (todo.length) {
+    const rows = chQuery<{ s: string; d: string }>("SELECT cancer_study_identifier AS s, toString(max(import_date)) AS d FROM " + conn.db + ".cancer_study\n" +
+      "WHERE cancer_study_identifier IN (" + todo.map(sq).join(",") + ") GROUP BY s", conn)
+      .then((r) => new Map(r.data.map((x) => [x.s, (x.d || "").replace(/\.0+$/, "") || null])));
+    for (const study of todo) {
+      const key = keyOf(study);
+      const value = rows.then((m) => m.get(study) ?? null).catch((e) => { if (isAbortError(e)) throw e; return null; });
+      imported.set(key, { at: Date.now(), value });
+      value.catch(() => { if (imported.get(key)?.value === value) imported.delete(key); });
+    }
+  }
+  return new Map(studies.map((s) => [s, imported.get(keyOf(s))!.value]));
 }
 
 /** What this instance reports about itself when it answers as a peer, for `study` if one is named. */
@@ -59,6 +69,16 @@ export function sourceIndex(studies: string[], resolvers: Record<string, Resolve
 /** Every source of a run, in the order its studies first appear, each with the studies it answered for. */
 export async function describeSources(studies: string[], resolvers: Record<string, Resolver>): Promise<AnalysisSource[]> {
   const out: AnalysisSource[] = [], byKey = new Map<string, AnalysisSource>();
+  // every local study's import date, one statement per database
+  const local = new Map<string, { conn: ChConn; studies: string[] }>();
+  for (const study of studies) {
+    const r = resolvers[study];
+    if (!r || peerProvenance(r)) continue;
+    const k = r.instance.conn.id + "|" + r.instance.conn.db;
+    (local.get(k) ?? local.set(k, { conn: r.instance.conn, studies: [] }).get(k)!).studies.push(study);
+  }
+  const importedAt = new Map<string, Promise<string | null>>();
+  for (const { conn, studies: ss } of local.values()) for (const [s, v] of studiesImported(ss, conn)) importedAt.set(s, v);
   for (const study of studies) {
     const r = resolvers[study];
     if (!r) continue;
@@ -75,7 +95,7 @@ export async function describeSources(studies: string[], resolvers: Record<strin
       out.push(src);
     }
     const when = peer ? (peer.reported?.study === study ? peer.reported.imported ?? null : null)
-      : await studyImported(study, r.instance.conn);
+      : await importedAt.get(study)!;
     src.studies.push({ study, imported: when });
   }
   return out;

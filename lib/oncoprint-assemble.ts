@@ -153,36 +153,77 @@ export interface AssembleInput {
   clusterRank?: Map<string, number>;
 }
 
-export function assembleContract(input: AssembleInput): Contract {
-  const t0 = Date.now();
-  const PROF = !!process.env.ONCOPRINT_PROFILE;
-  let tp = Date.now();
-  const phase = (name: string) => { if (PROF) { process.stderr.write("  " + name.padEnd(16) + (Date.now() - tp) + "ms\n"); tp = Date.now(); } };
-  const { groups, studies, events, coverage, isDriver, clinical, heatmap, derived, sort, lineGap } = input;
-  // the rows, and the flat symbol list whose order the coverage mask bits follow
-  const { tracks: geneTracks, symbols: geneSymbolList } = normalizeGeneTracks(input.genes);
-  const unit = input.unit === "sample" ? "sample" as const : "patient" as const;
-  const multi = studies.length > 1;
-  const studyOf = input.studyOf || new Map<string, string>();
-  const allPids = groups.flatMap((g) => g.pids);
-  if (!allPids.length) throw new Error("cohort is empty");
-  const pidIndex = new Map<string, number>(allPids.map((p, i) => [p, i]));
+/** What a driver call reads of an event: everything but the column it is in. */
+export type EventFacts = Omit<EventRow, "pid">;
 
-  // ---- gene-track cells --------------------------------------------------
-  // A merged row is the bitwise OR of its members, which makes it altered where any member is
-  // altered and profiled where any member was profiled — the union denominator, with no
-  // special case: the sentinel survives only where every member is unprofiled. A gene may
-  // appear in several rows (merged, and again on its own), so one symbol maps to a LIST.
-  const geneCells = new Map<string, Int32Array>(geneTracks.map((t) => [t.label, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
-  const rowsOfGene = new Map<string, Int32Array[]>();
-  for (const t of geneTracks) for (const m of t.members) {
-    const list = rowsOfGene.get(m);
-    if (list) list.push(geneCells.get(t.label)!); else rowsOfGene.set(m, [geneCells.get(t.label)!]);
-  }
-  const rowsByMaskBit = geneSymbolList.map((g) => rowsOfGene.get(g) ?? []);
+/**
+ * AssembleInput with every row addressed by its column's position in `columns` instead of by its
+ * column id. The database path builds this directly — it meets each id once, as the rows arrive,
+ * where a column id per row would cost a hash lookup per row per phase — and `assembleContract`
+ * turns any AssembleInput into it. Each per-column array has one entry per column, `undefined`
+ * where the column has no value.
+ */
+export interface IndexedInput extends Omit<AssembleInput, "groups" | "studyOf" | "events" | "coverage" | "profiled" | "samples" | "isDriver" |
+  "clinical" | "heatmap" | "overlays" | "derived" | "clusterRank"> {
+  /** every column id, the groups' in order; each appears once */
+  columns: string[];
+  /** consecutive runs of `columns` */
+  groups: { name: string; count: number }[];
+  /** each column's index in `studies`, when there is more than one */
+  columnStudy?: Int32Array;
+  events: (EventFacts & { col: number })[];
+  coverage: ({ col: number; genes: string[] } | { col: number; mask: number })[];
+  profiled?: { types: ProfiledType[]; masks: { col: number; mask: number }[] };
+  samples?: { col: number; n: number }[];
+  isDriver: (r: EventFacts) => boolean;
+  clinical: { attr: string; values: (string | undefined)[] }[];
+  /** per gene (an entity, for an assay), its value in each column */
+  heatmap: { profileType: string; genes: string[]; isVaf: boolean; assay?: boolean; values: Map<string, (number | undefined)[]> }[];
+  overlays?: { kind: "mrna" | "protein"; profileType: string; threshold: number; values: Map<string, (number | undefined)[]> }[];
+  /** per column, 1 when it is in the row's set */
+  derived: { label: string; cols: Uint8Array }[];
+  /** per column, its place in the engine's clustering */
+  clusterRank?: number[];
+}
+
+/** An AssembleInput keyed by column id, addressed by position; a row whose column is not drawn is dropped. */
+export function assembleContract(input: AssembleInput): Contract {
+  const { groups, studyOf, events, coverage, profiled, samples, isDriver, clinical, heatmap, overlays, derived, clusterRank, ...rest } = input;
+  const columns = groups.flatMap((g) => g.pids);
+  const at = new Map<string, number>(columns.map((p, i) => [p, i]));
+  const positioned = <T extends { pid: string }>(rows: T[]): (Omit<T, "pid"> & { col: number })[] => {
+    const out: (Omit<T, "pid"> & { col: number })[] = [];
+    for (const { pid, ...r } of rows) { const col = at.get(pid); if (col !== undefined) out.push({ ...r, col }); }
+    return out;
+  };
+  const perGene = (values: Map<string, number>, genes: string[]) =>
+    new Map(genes.map((g) => [g, columns.map((p) => values.get(p + "|" + g))]));
+  const studyIdx = new Map(input.studies.map((s, i) => [s, i]));
+  return assembleIndexed({
+    ...rest,
+    columns,
+    groups: groups.map((g) => ({ name: g.name, count: g.pids.length })),
+    ...(input.studies.length > 1 ? { columnStudy: Int32Array.from(columns, (p) => {
+      const st = studyOf?.get(p);
+      return st == null ? -1 : studyIdx.get(st)!;
+    }) } : {}),
+    events: positioned(events),
+    coverage: positioned(coverage) as IndexedInput["coverage"],
+    profiled: profiled && { types: profiled.types, masks: positioned(profiled.masks) },
+    samples: samples && positioned(samples),
+    isDriver: isDriver as (r: EventFacts) => boolean,
+    clinical: clinical.map(({ attr, values }) => ({ attr, values: columns.map((p) => values.get(p)) })),
+    heatmap: heatmap.map((h) => ({ ...h, values: perGene(h.values, h.genes) })),
+    overlays: overlays?.map((ov) => ({ ...ov, values: perGene(ov.values, normalizeGeneTracks(input.genes).symbols) })),
+    derived: derived.map((de) => ({ label: de.label, cols: Uint8Array.from(columns, (p) => de.pids.has(p) ? 1 : 0) })),
+    ...(clusterRank ? { clusterRank: columns.map((p) => clusterRank.get(p) ?? Number.MAX_SAFE_INTEGER) } : {})
+  });
+}
+
+/** a column's covered genes become profiled-unaltered (0) in every row they draw in */
+function markProfiled(coverage: IndexedInput["coverage"], rowsByMaskBit: Int32Array[][], rowsOfGene: Map<string, Int32Array[]>): void {
   for (const r of coverage) {
-    const i = pidIndex.get(r.pid);
-    if (i === undefined) continue;
+    const i = r.col;
     if ("mask" in r) {
       const m = r.mask;
       for (let gi = 0; gi < rowsByMaskBit.length; gi++)
@@ -191,28 +232,15 @@ export function assembleContract(input: AssembleInput): Contract {
       for (const g of r.genes) for (const cells of rowsOfGene.get(g) || []) if (cells[i] === NOT_PROFILED) cells[i] = 0;
     }
   }
-  // Hiding unknown significance drops the ALTERATION, not the cell's bits: a cell holding a
-  // driver amplification and a passenger missense keeps only the amplification, and a merged
-  // row's driver in one gene does not smuggle another gene's passenger through. What was
-  // dropped is counted so a caption can say so.
-  //
-  // Driver status is per glyph, as in the portal: SV_DRIVER for the structural variant,
-  // MUT_DRIVER for the mutation band, and DRIVER for "some alteration here is a driver" (the
-  // driver %, the sort). The portal ranks every driver mutation above every VUS one whatever
-  // the class, so a VUS mutation's class is held aside and joins the cell only where no driver
-  // mutation does — a VUS truncation beside a driver missense shows as the driver missense.
-  //
-  // A call on a cell no panel covers — a gene its column's panels do not include (off-panel) —
-  // is not drawn: the cell stays NOT_PROFILED, and the gene's % does not count it, as cBioPortal's
-  // results view does (altered AND sequenced over sequenced). A merged row is profiled where any
-  // member is, so it can still draw a call its gene's own row leaves out. Every call left out of
-  // a row is counted, so the caption says so.
-  const hideVus = !!input.display?.hideVUS;
+}
+
+/** each event's bits into the rows its gene draws in, where a panel covers the cell; what was left out, counted */
+function placeEvents(events: IndexedInput["events"], rowsOfGene: Map<string, Int32Array[]>, isDriver: IndexedInput["isDriver"],
+  hideVus: boolean): { hiddenVus: number; offPanel: number } {
   let hiddenVus = 0, offPanel = 0;
   const vusMut = new Map<Int32Array, Uint16Array>();   // mutation class bits all sit below 1024
   for (const r of events) {
-    const i = pidIndex.get(r.pid);
-    if (i === undefined) continue;
+    const i = r.col;
     const rows = rowsOfGene.get(r.gene);
     if (!rows) continue;
     let bit = 0;
@@ -239,6 +267,102 @@ export function assembleContract(input: AssembleInput): Contract {
   }
   for (const [cells, held] of vusMut)
     for (let i = 0; i < cells.length; i++) if (held[i] && !(cells[i] & BITS.MUT_DRIVER)) cells[i] |= held[i];
+  return { hiddenVus, offPanel };
+}
+
+/** one clinical attribute's track over the columns: numeric bars, or up to eight categories and Other */
+function clinicalTrack(attr: string, val: (string | undefined)[], n: number): Track {
+  // numeric attribute (≥90% of present values parse, >10 distinct) -> continuous
+  // heat track: cells are the value scaled to 0..255 over the cohort's min..max
+  // one pass over the columns: how many have a value, how many parse, their range and
+  // distinct count. Never materialises a per-column array (a spread of 400k values throws).
+  let nPresent = 0, nNumeric = 0, min = Infinity, max = -Infinity;
+  const distinct = new Set<number>();
+  for (let i = 0; i < val.length; i++) {
+    const v = val[i];
+    if (v == null) continue;
+    nPresent++;
+    const x = Number(v);
+    if (!Number.isFinite(x)) continue;
+    nNumeric++;
+    if (x < min) min = x;
+    if (x > max) max = x;
+    if (distinct.size <= 11) distinct.add(x);
+  }
+  if (!nPresent) { // unknown attribute or none of these patients have it — say so
+    return { kind: "clinical", label: attr + " (no data)", categories: [], cells: new Int32Array(n).fill(-1) };
+  }
+  if (nNumeric >= 0.9 * nPresent && distinct.size > 10) {
+    // drawn as bars over the data's range, as the portal does; its fixed range for a fraction
+    // of the genome, and its log scale for mutation counts
+    const fraction = attr === "FRACTION_GENOME_ALTERED";
+    if (fraction) { min = Math.min(min, 0); max = Math.max(max, 1); }
+    const logScale = attr === "MUTATION_COUNT" && min >= 0;
+    const cells = new Int32Array(n).fill(-1);
+    for (let i = 0; i < val.length; i++) {
+      const v = val[i];
+      if (v == null) continue;
+      const x = Number(v);
+      if (Number.isFinite(x)) cells[i] = encodeNumeric(x, min, max, logScale);
+    }
+    return { kind: "clinical", numeric: true, bar: true, ...(logScale ? { logScale } : {}), label: attr, min, max, cells };
+  }
+  const counts = new Map<string, number>();
+  for (let i = 0; i < val.length; i++) { const v = val[i]; if (v != null) counts.set(v, (counts.get(v) || 0) + 1); }
+  const categories = [...counts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8).map((e) => e[0]);
+  const catIdx = new Map<string, number>(categories.map((c, i) => [c, i]));
+  const cells = new Int32Array(n).fill(-1);
+  for (let i = 0; i < val.length; i++) {
+    const v = val[i];
+    if (v != null) { const ci = catIdx.get(v); cells[i] = ci === undefined ? categories.length : ci; } // last = Other
+  }
+  const hasOther = [...counts.keys()].some((v) => !catIdx.has(v));
+  return { kind: "clinical", label: attr, categories: hasOther ? [...categories, "Other"] : categories, cells };
+}
+
+export function assembleIndexed(input: IndexedInput): Contract {
+  const t0 = Date.now();
+  const PROF = !!process.env.ONCOPRINT_PROFILE;
+  let tp = Date.now();
+  const phase = (name: string) => { if (PROF) { process.stderr.write("  " + name.padEnd(16) + (Date.now() - tp) + "ms\n"); tp = Date.now(); } };
+  const { groups, studies, events, coverage, isDriver, clinical, heatmap, derived, sort, lineGap } = input;
+  // the rows, and the flat symbol list whose order the coverage mask bits follow
+  const { tracks: geneTracks, symbols: geneSymbolList } = normalizeGeneTracks(input.genes);
+  const unit = input.unit === "sample" ? "sample" as const : "patient" as const;
+  const multi = studies.length > 1;
+  const allPids = input.columns;
+  if (!allPids.length) throw new Error("cohort is empty");
+
+  // ---- gene-track cells --------------------------------------------------
+  // A merged row is the bitwise OR of its members, which makes it altered where any member is
+  // altered and profiled where any member was profiled — the union denominator, with no
+  // special case: the sentinel survives only where every member is unprofiled. A gene may
+  // appear in several rows (merged, and again on its own), so one symbol maps to a LIST.
+  const geneCells = new Map<string, Int32Array>(geneTracks.map((t) => [t.label, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
+  const rowsOfGene = new Map<string, Int32Array[]>();
+  for (const t of geneTracks) for (const m of t.members) {
+    const list = rowsOfGene.get(m);
+    if (list) list.push(geneCells.get(t.label)!); else rowsOfGene.set(m, [geneCells.get(t.label)!]);
+  }
+  const rowsByMaskBit = geneSymbolList.map((g) => rowsOfGene.get(g) ?? []);
+  markProfiled(coverage, rowsByMaskBit, rowsOfGene);
+  // Hiding unknown significance drops the ALTERATION, not the cell's bits: a cell holding a
+  // driver amplification and a passenger missense keeps only the amplification, and a merged
+  // row's driver in one gene does not smuggle another gene's passenger through. What was
+  // dropped is counted so a caption can say so.
+  //
+  // Driver status is per glyph, as in the portal: SV_DRIVER for the structural variant,
+  // MUT_DRIVER for the mutation band, and DRIVER for "some alteration here is a driver" (the
+  // driver %, the sort). The portal ranks every driver mutation above every VUS one whatever
+  // the class, so a VUS mutation's class is held aside and joins the cell only where no driver
+  // mutation does — a VUS truncation beside a driver missense shows as the driver missense.
+  //
+  // A call on a cell no panel covers — a gene its column's panels do not include (off-panel) —
+  // is not drawn: the cell stays NOT_PROFILED, and the gene's % does not count it, as cBioPortal's
+  // results view does (altered AND sequenced over sequenced). A merged row is profiled where any
+  // member is, so it can still draw a call its gene's own row leaves out. Every call left out of
+  // a row is counted, so the caption says so.
+  const { hiddenVus, offPanel } = placeEvents(events, rowsOfGene, isDriver, !!input.display?.hideVUS);
 
   phase("gene cells");
 
@@ -249,7 +373,7 @@ export function assembleContract(input: AssembleInput): Contract {
     for (const t of geneTracks) {
       const cells = geneCells.get(t.label)!;
       for (const gene of t.members) for (let i = 0; i < allPids.length; i++) {
-        const v = ov.values.get(allPids[i] + "|" + gene);
+        const v = ov.values.get(gene)?.[i];
         if (v === undefined) continue;
         if (v >= ov.threshold) cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | hi;
         else if (v <= -ov.threshold) cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | lo;
@@ -262,14 +386,12 @@ export function assembleContract(input: AssembleInput): Contract {
   if (multi) {
     // synthetic per-column provenance track; also the honest caveat that clinical
     // vocabularies below it are merged by attribute name, not harmonized
-    const catIdx = new Map<string, number>(studies.map((s, i) => [s, i]));
-    const cells = new Int32Array(allPids.length).fill(-1);
-    allPids.forEach((p, i) => { const s = studyOf.get(p); if (s != null) cells[i] = catIdx.get(s)!; });
+    const cells = input.columnStudy ? Int32Array.from(input.columnStudy) : new Int32Array(allPids.length).fill(-1);
     clinTracks.push({ kind: "clinical", label: STUDY_TRACK, categories: studies.slice(), cells });
   }
   if (input.samples && unit === "patient") {
     const n = new Int32Array(allPids.length);
-    for (const r of input.samples) { const i = pidIndex.get(r.pid); if (i !== undefined) n[i] = r.n; }
+    for (const r of input.samples) n[r.col] = r.n;
     let max = 0;
     for (let i = 0; i < n.length; i++) if (n[i] > max) max = n[i];
     if (max > 1) {
@@ -280,7 +402,7 @@ export function assembleContract(input: AssembleInput): Contract {
   }
   if (input.profiled) {
     const mask = new Int32Array(allPids.length);
-    for (const r of input.profiled.masks) { const i = pidIndex.get(r.pid); if (i !== undefined) mask[i] |= r.mask; }
+    for (const r of input.profiled.masks) mask[r.col] |= r.mask;
     const rows: Track[] = [];
     for (const type of input.profiled.types) {
       const bit = 1 << PROFILED_TYPES.findIndex(([t]) => t === type);
@@ -292,61 +414,7 @@ export function assembleContract(input: AssembleInput): Contract {
     }
     clinTracks.push(...rows.sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true })));
   }
-  for (const { attr, values: valByPid } of clinical) {
-    // One string-keyed lookup per column, then three passes over a positional array. The map
-    // is keyed by column id, and at 400k columns three passes over it was the single most
-    // expensive phase of assembly.
-    const val: (string | undefined)[] = new Array(allPids.length);
-    for (let i = 0; i < allPids.length; i++) val[i] = valByPid.get(allPids[i]);
-    // numeric attribute (≥90% of present values parse, >10 distinct) -> continuous
-    // heat track: cells are the value scaled to 0..255 over the cohort's min..max
-    // one pass over the columns: how many have a value, how many parse, their range and
-    // distinct count. Never materialises a per-column array (a spread of 400k values throws).
-    let nPresent = 0, nNumeric = 0, min = Infinity, max = -Infinity;
-    const distinct = new Set<number>();
-    for (let i = 0; i < val.length; i++) {
-      const v = val[i];
-      if (v == null) continue;
-      nPresent++;
-      const x = Number(v);
-      if (!Number.isFinite(x)) continue;
-      nNumeric++;
-      if (x < min) min = x;
-      if (x > max) max = x;
-      if (distinct.size <= 11) distinct.add(x);
-    }
-    if (!nPresent) { // unknown attribute or none of these patients have it — say so
-      clinTracks.push({ kind: "clinical", label: attr + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
-      continue;
-    }
-    if (nNumeric >= 0.9 * nPresent && distinct.size > 10) {
-      // drawn as bars over the data's range, as the portal does; its fixed range for a fraction
-      // of the genome, and its log scale for mutation counts
-      const fraction = attr === "FRACTION_GENOME_ALTERED";
-      if (fraction) { min = Math.min(min, 0); max = Math.max(max, 1); }
-      const logScale = attr === "MUTATION_COUNT" && min >= 0;
-      const cells = new Int32Array(allPids.length).fill(-1);
-      for (let i = 0; i < val.length; i++) {
-        const v = val[i];
-        if (v == null) continue;
-        const x = Number(v);
-        if (Number.isFinite(x)) cells[i] = encodeNumeric(x, min, max, logScale);
-      }
-      clinTracks.push({ kind: "clinical", numeric: true, bar: true, ...(logScale ? { logScale } : {}), label: attr, min, max, cells });
-      continue;
-    }
-    const counts = new Map<string, number>();
-    for (let i = 0; i < val.length; i++) { const v = val[i]; if (v != null) counts.set(v, (counts.get(v) || 0) + 1); }
-    const categories = [...counts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8).map((e) => e[0]);
-    const catIdx = new Map<string, number>(categories.map((c, i) => [c, i]));
-    const cells = new Int32Array(allPids.length).fill(-1);
-    for (let i = 0; i < val.length; i++) {
-      const v = val[i];
-      if (v != null) { const ci = catIdx.get(v); cells[i] = ci === undefined ? categories.length : ci; } // last = Other
-    }
-    const hasOther = [...counts.keys()].some((v) => !catIdx.has(v));
-    clinTracks.push({ kind: "clinical", label: attr, categories: hasOther ? [...categories, "Other"] : categories, cells });
-  }
+  for (const { attr, values } of clinical) clinTracks.push(clinicalTrack(attr, values, allPids.length));
 
   phase("clinical");
   // ---- heatmap tracks (continuous molecular-profile values per gene) ----
@@ -364,8 +432,9 @@ export function assembleContract(input: AssembleInput): Contract {
       const ref = (input.zReference || {})[h.profileType + "|" + gene];
       const usingRef = !!(ref && ref.sd > 0);
       const tx = (v: number) => usingRef ? (v - ref!.mean) / ref!.sd : v;
+      const byCol = h.values.get(gene) || [];
       const vals: number[] = [];
-      for (const p of allPids) { const v = h.values.get(p + "|" + gene); if (v !== undefined) vals.push(tx(v)); }
+      for (let i = 0; i < allPids.length; i++) { const v = byCol[i]; if (v !== undefined) vals.push(tx(v)); }
       if (!vals.length) {
         heatTracks.push({ kind: "clinical", label: label + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
         continue;
@@ -380,10 +449,10 @@ export function assembleContract(input: AssembleInput): Contract {
       }
       const span = max - min || 1;
       const cells = new Int32Array(allPids.length).fill(-1);
-      allPids.forEach((p, i) => {
-        const v = h.values.get(p + "|" + gene);
+      for (let i = 0; i < allPids.length; i++) {
+        const v = byCol[i];
         if (v !== undefined) cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span);
-      });
+      }
       heatTracks.push({ kind: "heatmap", numeric: true, label, gene, profileType: h.profileType,
         note: usingRef
           ? "z-scored against " + ref!.n.toLocaleString() + " patients pooled from " + ref!.studies.length +
@@ -399,8 +468,7 @@ export function assembleContract(input: AssembleInput): Contract {
   // ---- derived-event tracks (cohort-DSL expressions as phenotypes) ------
   const devTracks: Track[] = [];
   for (const de of derived) {
-    const cells = new Int32Array(allPids.length);
-    allPids.forEach((p, i) => { cells[i] = de.pids.has(p) ? 1 : 0; });
+    const cells = Int32Array.from(de.cols);
     devTracks.push({ kind: "derivedEvent", label: String(de.label || "derived event").slice(0, 60), cells });
   }
 
@@ -463,8 +531,7 @@ export function assembleContract(input: AssembleInput): Contract {
     if (s.track === "cluster") {
       const rank = input.clusterRank;
       if (!rank) throw new Error("sort: 'cluster' needs a clustered profile — use \"cluster:<profileType>\"");
-      const at = (i: number): number => rank.get(allPids[i]) ?? Number.MAX_SAFE_INTEGER;
-      return (x: number, y: number) => sign * (at(x) - at(y));
+      return (x: number, y: number) => sign * (rank[x] - rank[y]);
     }
     const t = sortableTracks.get(s.track);
     if (!t) throw new Error("sort: '" + s.track + "' is not a track in this oncoprint — sortable: genomic, id, cluster:<profileType>" +
@@ -477,7 +544,7 @@ export function assembleContract(input: AssembleInput): Contract {
   let cursor = 0;
   const groupRanges: GroupRange[] = [];
   for (const g of groups) {
-    const idxs = g.pids.map((p) => pidIndex.get(p)!);
+    const idxs = Array.from({ length: g.count }, (_, k) => cursor + k);
     idxs.sort((x, y) => {
       for (const c of cmps) { const r = c(x, y); if (r) return r; }
       return idRank[x] - idRank[y];
@@ -500,9 +567,11 @@ export function assembleContract(input: AssembleInput): Contract {
   // Shared by the pooled numbers below and the per-group breakdown: same formula, just
   // over a slice of columns instead of all of them.
   const geneCounts = (slice: number[]) => {
-    const profiled = slice.filter((c) => c !== NOT_PROFILED).length;
-    const altered = slice.filter((c) => c > 0 && (c & ALT)).length;
-    const driverAltered = slice.filter((c) => c > 0 && (c & ALT) && (c & BITS.DRIVER)).length;
+    let profiled = 0, altered = 0, driverAltered = 0;
+    for (const c of slice) {
+      if (c !== NOT_PROFILED) profiled++;
+      if (c > 0 && (c & ALT)) { altered++; if (c & BITS.DRIVER) driverAltered++; }
+    }
     return { profiled, altered, driverAltered,
       freqPct: profiled ? Math.round(1000 * altered / profiled) / 10 : null,
       driverPct: profiled ? Math.round(1000 * driverAltered / profiled) / 10 : null };
@@ -535,7 +604,7 @@ export function assembleContract(input: AssembleInput): Contract {
     study: multi ? studies.join(" + ") : studies[0], studies, unit,
     groups: groupRanges,
     columns,
-    tracks: tracks.map((t) => ({ ...t, cells: Array.from(t.cells as number[]) })),
+    tracks,
     conventions: { cna: "high-level only (±2)", notProfiled: "distinct cell state",
       frequencyDenominator: unit === "sample" ? "profiled samples" : "profiled patients",
       column: unit === "sample"
