@@ -2,7 +2,8 @@
 // cBioPortal's homepage flow: choose studies, then explore them (the lab's Explore, scoped to them)
 // or query them by gene (the gene query dialog, whose "Submit query" opens the Results page). The
 // homepage holds it full width and keeps the selection in its URL; the Results page's "Modify
-// query" opens it with what the page queried, the dialog starting from the page's genes.
+// query" opens it in a dialog with what the page queried, the gene dialog starting from the page's
+// genes, and without the way into Explore.
 import { useState } from "react";
 import { Dna, LayoutDashboard } from "lucide-react";
 import { Button } from "../_ui/button";
@@ -25,8 +26,10 @@ const analyzeHref = (id: string): string => "/lab?" + new URLSearchParams({ tab:
 /** Explore on one study with Custom data → Add data open (the lab reads `custom=add`) */
 const addDataHref = (id: string): string => "/lab?" + new URLSearchParams({ tab: "explore", study: id, custom: "add" }).toString();
 
-export function QueryFlow({ initial, onStudies, queryTitle, className }: {
+export function QueryFlow({ initial, onStudies, queryTitle, explore = true, className }: {
   initial: ResultsTarget;
+  /** offer "Explore selected studies" beside "Query by gene" */
+  explore?: boolean;
   /** the gene dialog's title when "Query by gene" opens it (the homepage's own wording) */
   queryTitle?: string;
   /** the selection as it changes, for a page that keeps it in its URL */
@@ -47,7 +50,7 @@ export function QueryFlow({ initial, onStudies, queryTitle, className }: {
     <section data-tw className={cn("rounded-lg border bg-card px-4.5 py-4", className)} aria-label="choose studies">
       <QueryGenesDialog target={asking} names={names} onClose={() => setAsking(null)} />
       <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-2.5">
-        <h2 className="m-0 text-lg font-semibold">Select studies to explore or query</h2>
+        <h2 className="m-0 text-lg font-semibold">{explore ? "Select studies to explore or query" : "Select studies to query"}</h2>
         <SelectionStats studies={studies} selected={chosen} loading={loading} onClear={() => choose([])} />
       </div>
       {filters.length > 0 && (
@@ -69,10 +72,10 @@ export function QueryFlow({ initial, onStudies, queryTitle, className }: {
         <div className="flex flex-wrap justify-center gap-2.5">
           <Button className="querybygene" disabled={!!queryWhy} title={queryWhy || "enter genes to query in the selected studies"}
             onClick={() => setAsking({ studies: chosen, filters, query: initial.query, title: queryTitle })}><Dna />Query by gene</Button>
-          <Button variant="outline" className="exploreselected" disabled={!chosen.length} asChild={!!chosen.length}
+          {explore && <Button variant="outline" className="exploreselected" disabled={!chosen.length} asChild={!!chosen.length}
             title={chosen.length ? "open the selected studies' summary in Explore" + (filters.length ? " (the filters do not carry over)" : "") : "select at least one study"}>
             {chosen.length ? <a href={exploreHref(chosen)}><LayoutDashboard />Explore selected studies</a> : <><LayoutDashboard />Explore selected studies</>}
-          </Button>
+          </Button>}
         </div>
         <span aria-hidden="true" />
       </div>

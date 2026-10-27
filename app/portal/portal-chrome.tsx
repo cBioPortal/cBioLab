@@ -3,6 +3,8 @@
 // tabs (the study, the query, the groups and their sizes).
 import { SeriesSwatch } from "../lab/view-chrome.tsx";
 import { Badge } from "../_ui/badge";
+import { Button } from "../_ui/button";
+import { Pencil } from "lucide-react";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
 
 /** one group's swatch, name and size; the swatch is the colour the figures draw it in */
@@ -21,16 +23,18 @@ function GroupChip({ name, i, n }: { name: string; i: number; n?: number }) {
  * genes), the headline answer beside it, and the groups every tab compares — with what the page
  * left out for this study, so a missing tab is never silent.
  */
-export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes, groups, counts, left, stat, action, children }: {
+export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes, onEditGenes, groups, counts, left, stat, action, children }: {
   eyebrow: string; title: string;
   /** the study id, or the ids summarised; `studyTitle` lists them all */
   study: string; studyTitle?: string; detail?: React.ReactNode; genes?: string[];
+  /** opens the gene query on the page's own genes (the Results page) */
+  onEditGenes?: () => void;
   groups: string[]; counts: Record<string, number> | null; left: string[];
   /** the headline number, right of the title */
   stat?: { value: number; of: number; label: string } | null;
   /** a control over the whole page (the Results page's "Modify query"), at the end of the groups row */
   action?: React.ReactNode;
-  /** below the groups: the query form when it is open */
+  /** below the groups */
   children?: React.ReactNode;
 }) {
   return (
@@ -44,7 +48,8 @@ export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes
             {detail && <><span aria-hidden="true">·</span>{detail}</>}
             {genes && genes.length > 0 && <>
               <span aria-hidden="true">·</span>
-              <span className="inline-flex flex-wrap gap-1">{genes.map((g) => <Badge key={g} variant="outline" className="font-mono">{g}</Badge>)}</span>
+              <span className="inline-flex flex-wrap items-center gap-1">{genes.map((g) => <Badge key={g} variant="outline" className="font-mono">{g}</Badge>)}
+                {onEditGenes && <Button variant="ghost" size="icon-xs" className="editgenes" aria-label="edit genes" title="edit the query's genes" onClick={onEditGenes}><Pencil /></Button>}</span>
             </>}
           </div>
         </div>

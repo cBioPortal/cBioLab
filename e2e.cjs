@@ -1625,7 +1625,8 @@ async function main() {
 
   // The homepage, as cBioPortal's: choose studies (cancer types, filters, select all), then explore
   // them or query them by gene in a modal whose Submit opens the Results page; a row's icons act on
-  // that study alone, and the Results page's "Modify query" reopens the modal on its own genes.
+  // that study alone. On the Results page, "Modify query" opens the flow in a dialog, without Explore,
+  // whose gene query starts from the page's genes, and the pencil by the genes opens that query directly.
   {
     const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
     const page = await ctx.newPage();
@@ -1672,13 +1673,22 @@ async function main() {
       const q = new URL(page.url()).searchParams;
       await page.waitForFunction(() => /profiled patients altered/.test(document.body.innerText), null, { timeout: 240000 });
       await page.getByRole("button", { name: "Modify query" }).click();
-      await page.locator("button.querybygene").click();
+      const modify = page.locator("[role=dialog].modifyquerydialog");
+      await modify.locator("button.querybygene").click();
       const again = await dlg.locator("textarea").inputValue();
+      const modifyExplore = await modify.locator(".exploreselected").count();
+      await page.keyboard.press("Escape");
+      await dlg.waitFor({ state: "detached" });
+      await page.keyboard.press("Escape");
+      await modify.waitFor({ state: "detached" });
+      await page.locator("button.editgenes").click();
+      const pencilGenes = await dlg.locator("textarea").inputValue(), pencilTitle = await dlg.getByRole("heading").first().innerText();
       ok(name, res.status() === 200 && landed === "/" &&
         empty.disabled && /select at least one study/.test(empty.why || "") && byType < all && byData < all && picked >= 1 &&
         /^\/lab\?tab=explore&study=/.test(explore || "") && /^Query genes in /.test(rowTitle) && rowTicked === 0 &&
-        title === "Select genes to query:" && q.get("study") === "coadread_tcga_pub" && q.get("genes") === "KRAS: MUT\nBRAF" && again === "KRAS: MUT\nBRAF",
-        JSON.stringify({ status: res.status(), landed, empty, rows: [all, byType, byData], picked, explore, rowTitle, rowTicked, title, results: [q.get("study"), q.get("genes")], again }));
+        title === "Select genes to query:" && q.get("study") === "coadread_tcga_pub" && q.get("genes") === "KRAS: MUT\nBRAF" && again === "KRAS: MUT\nBRAF" &&
+        modifyExplore === 0 && pencilGenes === "KRAS: MUT\nBRAF" && pencilTitle === "Edit genes",
+        JSON.stringify({ status: res.status(), landed, empty, rows: [all, byType, byData], picked, explore, rowTitle, rowTicked, title, results: [q.get("study"), q.get("genes")], again, modifyExplore, pencilGenes, pencilTitle }));
     } catch (e) {
       ok(name, false, String(e.message).split("\n")[0].slice(0, 200));
     }

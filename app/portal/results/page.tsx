@@ -20,8 +20,9 @@ import { usePublicEnv } from "../../_env/public-env-context.tsx";
 import { fmtInt } from "../../../lib/chart/format.ts";
 import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
 import { SiteHeader } from "../../_ui/site-header.tsx";
-import { RESULTS_MAX_GENES, readResultsTarget, studiesProblem } from "../query-editor.tsx";
+import { QueryGenesDialog, RESULTS_MAX_GENES, readResultsTarget, studiesProblem } from "../query-editor.tsx";
 import { QueryFlow } from "../../_home/query-flow.tsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../_ui/dialog";
 import { checkGeneQuery } from "../../../lib/gene-query.ts";
 import { resultsMaxStudies, crossStudyExpression, expressionAcross, isExpressionProfile, isExpressionType } from "../../../lib/results-settings.ts";
 
@@ -49,7 +50,8 @@ export default function ResultsPage() {
     : null, [known, studies, filters, check, genes, queryError, across]);
   const page = usePageDoc(fresh, linked);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [modifying, setModifying] = useState(false);
+  const [editingGenes, setEditingGenes] = useState(false);
   const shell = (body: React.ReactNode) => <><SiteHeader page="query results" /><main className="analysis-main">{body}</main></>;
   // a query that is not one yet, or cannot be read, opens the homepage's flow at the step it needs
   const flow = (note?: string | null) => shell(<>
@@ -73,9 +75,10 @@ export default function ResultsPage() {
     <PortalSummary eyebrow="Query results" title={known ? known.name : studies.length === 1 ? studies[0] : studies.length + " studies"} study={ids}
       studyTitle={studies.map((s) => s + (known?.names[s] ? " — " + known.names[s] : "")).join("\n")} genes={check.entries.map((e) => e.text)}
       detail={known && <span className="tabular-nums">{filters.length ? fmtInt(known.patients) + " patients after filters" : fmtInt(known.samples) + " samples · " + fmtInt(known.patients) + " patients"}</span>}
+      onEditGenes={() => setEditingGenes(true)}
       groups={Object.keys(fresh?.doc.cohorts || {})} counts={counts} left={fresh?.left || []}
       stat={altered != null && profiled ? { value: altered, of: profiled, label: "of " + fmtInt(profiled) + " profiled patients altered in " + (check.entries.length === 1 ? check.entries[0].text : "any of the " + check.entries.length + " query lines") } : null}
-      action={<Button variant="outline" size="sm" className={TB} aria-expanded={editing} onClick={() => setEditing((e) => !e)}><Pencil />Modify query</Button>}>
+      action={<Button variant="outline" size="sm" className={TB} aria-haspopup="dialog" onClick={() => setModifying(true)}><Pencil />Modify query</Button>}>
       {filters.length > 0 && (
         <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">
           <span className="font-semibold tracking-[0.12em] text-muted-foreground uppercase">Filters</span>
@@ -89,7 +92,15 @@ export default function ResultsPage() {
         </p>
       ) : null}
     </PortalSummary>
-    {editing && <QueryFlow initial={target} className="mb-4" />}
+    <QueryGenesDialog target={editingGenes ? { studies, filters, query: target.query, title: "Edit genes" } : null}
+      names={new Map(Object.entries(known?.names || {}))} onClose={() => setEditingGenes(false)} />
+    <Dialog open={modifying} onOpenChange={setModifying}>
+      <DialogContent aria-describedby={undefined}
+        className="modifyquerydialog flex h-[90vh] w-[94vw] max-w-[94vw] flex-col gap-3 overflow-auto p-6 sm:max-w-[94vw]">
+        <DialogHeader><DialogTitle className="text-base">Modify query</DialogTitle></DialogHeader>
+        {modifying && <QueryFlow initial={target} explore={false} />}
+      </DialogContent>
+    </Dialog>
     {page.note && <p className="note">{page.note}</p>}
     {!ready
       ? <PortalLoading />
