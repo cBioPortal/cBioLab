@@ -25,6 +25,16 @@ optional.
 | `STUDY_ALLOW_RESTRICTED` | — | `1`: also serve studies named `…-consortium` or `private`, which are otherwise never routed. Only for a deployment entitled to them |
 | `AGGREGATE_ONLY_INSTANCES` / `AGGREGATE_ONLY_STUDIES` | — | connection ids (`a`, `b`) or study ids treated as aggregate-only: their patients are never listed, and views that need them are not drawn over them |
 
+### Local mode (`npm run local`)
+
+The launcher (`scripts/local.ts`, [`LOCAL.md`](LOCAL.md)) sets these itself, along with
+`CLICKHOUSE_*` for the database it starts and `RESULT_CACHE=off`; nothing needs to be configured.
+
+| var | default | meaning |
+|---|---|---|
+| `CBIOLAB_LOCAL` | — | `1`: this instance owns its database and may write to it — the import page and `/api/import` exist, and the header links to them. Only the launcher sets it |
+| `CBIOLAB_DATA` | `~/.cbiolab` | where local mode keeps the ClickHouse binary and data, the app's Postgres, downloaded studies and uploads |
+
 ## Federation
 
 One analysis can draw on studies in more than one cBioPortal database, and the prototype offers

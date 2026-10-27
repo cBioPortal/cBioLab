@@ -33,6 +33,10 @@ for the area you are changing first. The parts most changes touch:
   A kind's queries go through `viewAggregate`/`viewMeta` (`lib/federation-views.ts`) or its own
   `sql.ts`; **don't add a method per view to the resolver interfaces in `lib/federation.ts`**.
 - **Table views** supply a `RowSource`; `lib/table-query.ts` does the rest. Never build these per view.
+- **Local mode and the importer** — `npm run local` (`scripts/local.ts`) starts a private ClickHouse
+  and the app; `lib/importer/` turns a study folder into cBioPortal's base tables by the legacy
+  importer's rules, then runs cBioPortal's own `populate_derived_tables.sql`; `/import` and
+  `/api/import` exist only with `CBIOLAB_LOCAL=1`. [`docs/LOCAL.md`](docs/LOCAL.md).
 - **Agents** — WebMCP tools `lib/webmcp.ts` / `app/lab/agent-tools.ts`; MCP server `mcp/tools.ts`.
   **Federation is not MCP**: peers talk through `lib/federation-api.ts` at `/api/federation/v1/<op>`;
   never register a federation op as an MCP tool. **The chat sidebar is the app's only model call and

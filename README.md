@@ -22,6 +22,12 @@ relations, guards, derived treatment-line events, semantics, and worked examples
 msk_chord_2024 counts. It is generated from `lib/dsl-reference.ts`, which MCP clients also read
 through the `describe_dsl` tool.
 
+## Your own data: local mode
+
+`npm run local` runs cBioLab on your computer against a private database and opens an import
+page: drop a study folder (or its files), name a folder, or fetch any datahub study by id. No
+credentials needed. See [`docs/LOCAL.md`](docs/LOCAL.md).
+
 ## Environment variables
 
 Every setting is in **[`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md)**, grouped by what it controls:
