@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 
 // The commit being built, for the method records views carry (lib/build-info.ts). Vercel
@@ -27,6 +28,9 @@ const nextConfig = (phase) => ({
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // `'use cache: remote'` (lib/next-cache.ts) needs Cache Components
   cacheComponents: true,
+  // with REDIS_URL, `'use cache: remote'` is kept in Redis, shared by every replica and kept across
+  // restarts; unset, Vercel's Runtime Cache on Vercel and process memory anywhere else
+  cacheHandlers: process.env.REDIS_URL ? { remote: fileURLToPath(new URL("./lib/redis-cache-handler.ts", import.meta.url)) } : undefined,
   // hosts besides localhost that may load `next dev`'s scripts and HMR socket (e.g. a tailnet
   // proxy in front of a dev server); comma-separated, dev only
   allowedDevOrigins: (process.env.ALLOWED_DEV_ORIGINS || "").split(",").map((h) => h.trim()).filter(Boolean),

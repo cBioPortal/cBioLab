@@ -131,6 +131,9 @@ see the security notes below.
 | var | default | meaning |
 |---|---|---|
 | `RESULT_CACHE` | on | `off`: answer every request directly, bypassing the result cache, to measure what a first reader waits for |
+| `REDIS_URL` | — | `redis://[user:pass@]host:6379[/db]` (`rediss://` for TLS): keep the result cache in Redis (`lib/redis-cache-handler.ts`), shared by every replica and kept across restarts. Unset, it is Vercel's Runtime Cache on Vercel and each process's memory elsewhere; set on Vercel, Redis replaces Runtime Cache. Redis down or slow is a miss, never a failed request |
+| `REDIS_CACHE_PREFIX` | `cbiolab:` | prepended to every key, for several deployments sharing one Redis (keys already differ by build) |
+| `REDIS_CACHE_TIMEOUT_MS` | `2000` | the longest one Redis command may take before the request answers uncached |
 | `CLICKHOUSE_MAX_INFLIGHT` | `8` | ClickHouse queries in flight at once per process; the rest queue (`docs/PERFORMANCE.md`) |
 | `EXPLORE_COHORT_EXTERNAL_LIMIT` | `50000` | the most patient ids Explore ships to ClickHouse for one draft cohort |
 | `ONCOPRINT_CLUSTER_LIMIT` | `4000` | the most columns an oncoprint clusters (`cluster:<profile>` sort) |

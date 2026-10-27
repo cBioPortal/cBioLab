@@ -1,7 +1,8 @@
 // Shared result cache for the Next.js routes, on `'use cache: remote'`.
 //
 // On Vercel the remote handler is Runtime Cache: one store per region, shared by every function
-// instance. Anywhere else (`next dev`, the tailnet server) it falls back to process memory.
+// instance. With `REDIS_URL` set it is Redis (lib/redis-cache-handler.ts), shared by every replica.
+// Anywhere else (`next dev`, the tailnet server) it falls back to process memory.
 //
 // Invalidation, in the order it happens:
 //   - a deploy: Next puts the build/deployment id in every key, so a new deploy cannot read

@@ -163,6 +163,9 @@ changing first. The parts, and the one place each rule lives:
      request, so a server answers everything cold — for measuring what a first reader waits for.
      Without a cache handler configured (anywhere but Vercel), the cache is the Node process's own
      50 MB LRU (`cacheMaxMemorySize`): lost on restart, and not shared between replicas.
+   - **`REDIS_URL` puts it in Redis** (`lib/redis-cache-handler.ts`, registered as the `remote`
+     handler in `next.config.mjs`): shared by replicas, kept across restarts, same lifetimes. A Redis
+     that is down or slow (`REDIS_CACHE_TIMEOUT_MS`) is a miss, so `throughCache` runs direct.
    - **Arguments are the key.** A cached function takes only serializable arguments and computes
      everything else itself; a function passed in cannot be called. Anything that changes the
      answer must be an argument.
