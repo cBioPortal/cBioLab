@@ -347,6 +347,29 @@ async function postToDatabase(conn: ChConn, query: string, externals: ChStatemen
 }
 
 /**
+ * A statement that writes, for local mode's importer (lib/importer/) and nothing else: the app's
+ * reads go through `post`. Sent with `body` as its data (an INSERT's rows) when there is one, to
+ * the connection's database, and through the same loopback check as every read. Not queued with
+ * the reads, and never retried: a write sent twice is not the same as a write sent once.
+ */
+export async function chWrite(sql: string, conn: ChConn, body?: BodyInit, settings: Record<string, string> = {}): Promise<string> {
+  assertNotLoopbackDirect(sql, conn);
+  if (!conn.url || !conn.user || !conn.password || !conn.db)
+    throw new Error("ClickHouse instance '" + conn.id + "' is missing configuration (url/password/db)");
+  const params = new URLSearchParams({ database: conn.db, ...settings });
+  if (body !== undefined) params.set("query", sql);
+  const res = await fetch(conn.url.replace(/\/+$/, "") + "/?" + params.toString(), {
+    method: "POST",
+    headers: { Authorization: "Basic " + Buffer.from(conn.user + ":" + conn.password).toString("base64") },
+    body: body === undefined ? sql : body,
+    cache: "no-store"
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error("ClickHouse error [" + conn.id + "]: " + chException(text).slice(0, 800));
+  return text;
+}
+
+/**
  * Columnar result: `FORMAT JSONCompact` gives rows as arrays, which is ~45% fewer bytes and
  * ~35% less time than the object form on a million-row fetch, and leaves the caller free to
  * read by index instead of allocating an object per row. Used by the oncoprint's hot queries.

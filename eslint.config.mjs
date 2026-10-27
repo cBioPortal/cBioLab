@@ -47,7 +47,7 @@ const kindBoundary = {
 
 export default tseslint.config(
   {
-    ignores: [".next/**", ".next-gate/**", "node_modules/**", "python/**", "docs/**", "next-env.d.ts"],
+    ignores: [".next/**", ".next-gate/**", ".next-local/**", "node_modules/**", "python/**", "docs/**", "next-env.d.ts"],
   },
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
