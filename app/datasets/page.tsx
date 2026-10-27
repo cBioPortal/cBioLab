@@ -3,7 +3,7 @@
 import { connection } from "next/server";
 import { allDatasets, type DatasetRow } from "../../lib/datasets.ts";
 import { withoutFailedQueries } from "../../lib/ch.ts";
-import { pack, throughCache, dataVersion, resultEntry } from "../../lib/next-cache.ts";
+import { pack, throughCache, cacheVersion, resultEntry } from "../../lib/next-cache.ts";
 import { DatasetsTable } from "./DatasetsTable.tsx";
 import { PageTools } from "../_agent/PageTools.tsx";
 
@@ -21,7 +21,7 @@ async function datasetsEntry(_version: string): Promise<string> {
 export default async function DatasetsPage() {
   await connection();
   const { rows, unreachable, overMcp = [] } = await throughCache<{ rows: DatasetRow[]; unreachable: string[]; overMcp?: string[] }>(
-    async () => datasetsEntry(await dataVersion()), allDatasets);
+    async () => datasetsEntry(await cacheVersion()), allDatasets);
   const sum = (k: keyof DatasetRow) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
   return (
     <main className="repro-page ds-page">

@@ -3,7 +3,7 @@ import { studiesFor, type StudyRow } from "../../../lib/study-list.ts";
 import { peerMcpEntries, peerPatientKinds, remoteStudies } from "../../../lib/federation-remote.ts";
 import { instanceForStudy } from "../../../lib/federation.ts";
 import type { StudyAccess } from "../../../lib/view-coverage.ts";
-import { pack, throughCache, dataVersion, resultEntry } from "../../../lib/next-cache.ts";
+import { pack, throughCache, cacheVersion, resultEntry } from "../../../lib/next-cache.ts";
 import { connection } from "next/server";
 
 async function allStudies(): Promise<StudyRow[]> {
@@ -39,7 +39,7 @@ export async function GET() {
   await connection();
   try {
     let studies: StudyRow[];
-    try { studies = await throughCache(async () => studiesEntry(await dataVersion()), allStudies); }
+    try { studies = await throughCache(async () => studiesEntry(await cacheVersion()), allStudies); }
     catch (e) { if (!(e instanceof Partial)) throw e; studies = e.rows; }
     return Response.json({ studies: await withAccess(studies) });
   } catch (e) {

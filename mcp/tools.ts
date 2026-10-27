@@ -31,6 +31,7 @@ import { encodeUrlJson } from "../lib/url-json.ts";
 import type { OncoprintSpec } from "../lib/views/oncoprint/types.ts";
 import { validateAxis, type PlotAxis, type PlotRequest, type AxisKind, type PointRank, type SparseCells, type Whiskers } from "../lib/plot.ts";
 import { resolveAxes } from "../lib/plot-profile.ts";
+import { setting } from "../lib/settings.ts";
 
 // ---------- shared zod fragments (the tools' input schemas) ----------
 const zSelector = z.object({
@@ -220,7 +221,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
         // above, so disclosing what we ran restores end-to-end provenance for the
         // caller. A deployment that treats its schema as sensitive sets
         // FEDERATION_HIDE_SQL=1 and the caller degrades gracefully.
-        const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
+        const hideSql = setting("FEDERATION_HIDE_SQL") === "1";
         const cohortSql = hideSql ? null : res.cohortSql(cohort);
         const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, survivalEndpoints: endpointList, ...(lollipopCounts ? { lollipopCounts } : {}), ...(spans ? { timelineSpan: spans } : {}), ...(courseCounts ? { eventCourse: courseCounts } : {}), ...(flows ? { treatmentSequence: flows } : {}), ...(keys ? { sequenceKeys: keys } : {}), cohortSql, queries: hideSql ? null : res.queries, oncokbPin: pin };
         return {
@@ -290,7 +291,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           case "highlightBox": need(hl, "highlight"); need(k, "kinds"); result = await res.plotHighlightBoxRows(args.cohort, hl, spec, k!.xk, k!.yk); break;
           default: throw new Error("unknown op");
         }
-        const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
+        const hideSql = setting("FEDERATION_HIDE_SQL") === "1";
         return {
           content: [{ type: "text" as const, text: "plot " + args.op + " for " + s + " (aggregates; no patient identifiers returned)" }],
           structuredContent: { study: s, op: args.op, result, cohortSql: hideSql || args.op === "axisKinds" ? null : res.cohortSql(args.cohort), queries: hideSql ? null : res.queries, source: await peerSource(s) }
@@ -326,7 +327,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
   // (PEER_TABLES) — for a study this instance holds at patient level itself. The coordinator must
   // accept the same kind (PEER_MCP_PATIENT_LEVEL); see docs/DATA-BOUNDARY.md. There is no caller
   // authentication yet: anyone who can reach this endpoint can read what it discloses.
-  if ((process.env.MCP_DISCLOSE_PATIENTS || "").trim()) {
+  if ((setting("MCP_DISCLOSE_PATIENTS") || "").trim()) {
     const held = async (study: string, kind: PatientKind): Promise<{ s: string; res: PatientLevelResolver }> => {
       // the rules are checked on the study as asked, before anything is read, and again as resolved
       const refuse = (x: string) => new Error(x.slice(0, 120) + " is not a study this instance discloses " + PATIENT_KIND_NAMES[kind] + " of");
@@ -413,7 +414,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
             if (!patient || !PATIENT_ID.test(patient)) throw new Error("rank needs a patient id");
             out = { rank: await res.rowsRank(tag, src, q, defaults, s, patient) };
           } else out = { rows: (await res.rowsPage(tag, src, q, defaults, limit || 25, offset || 0)).rows };
-          const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
+          const hideSql = setting("FEDERATION_HIDE_SQL") === "1";
           return {
             content: [{ type: "text" as const, text: `${table} rows for ${s} (${mode}) — patient-level, disclosed under MCP_DISCLOSE_PATIENTS (${PATIENT_KIND_NAMES[PEER_TABLES[table]]})` }],
             structuredContent: { table, ...out, ...(annotated ? { oncokbPin: pin } : {}), queries: hideSql ? null : res.queries, source: await peerSource(s) }
@@ -434,7 +435,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
           const { s, res } = await held(study, "timeline");
           const t = await res.patientTimeline(patient);
           if (!t.events.length && !t.samples.length) throw new Error(patient + " has no record in " + s);
-          const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
+          const hideSql = setting("FEDERATION_HIDE_SQL") === "1";
           return {
             content: [{ type: "text" as const, text: `timeline of ${patient} (${s}): ${t.events.length} events, ${t.samples.length} samples — patient-level, disclosed under MCP_DISCLOSE_PATIENTS` }],
             structuredContent: { study: s, patient, events: t.events, samples: t.samples, queries: hideSql ? null : res.queries, source: await peerSource(s) }
@@ -485,7 +486,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
             if (!args.highlight || !args.kinds) throw new Error("highlightPoints needs highlight and kinds");
             points = await res.plotHighlightPoints(args.cohort, args.highlight, spec, args.kinds.xk, args.kinds.yk, cap);
           }
-          const hideSql = process.env.FEDERATION_HIDE_SQL === "1";
+          const hideSql = setting("FEDERATION_HIDE_SQL") === "1";
           return {
             content: [{ type: "text" as const, text: "plot " + args.op + " for " + s + " — patient-level, disclosed under MCP_DISCLOSE_PATIENTS (" + PATIENT_KIND_NAMES.plot + ")" }],
             structuredContent: { study: s, op: args.op, points, queries: hideSql ? null : res.queries, source: await peerSource(s) }

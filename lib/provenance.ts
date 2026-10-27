@@ -6,6 +6,7 @@ import { chQuery, isAbortError, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { BUILD_INFO } from "./build-info.ts";
 import { studyRouting, type Resolver } from "./federation.ts";
+import { setting } from "./settings.ts";
 import type { AnalysisSource, PeerSource } from "./types.ts";
 
 const IMPORTED_TTL = 5 * 60_000;
@@ -27,7 +28,7 @@ export function studyImported(study: string, conn: ChConn): Promise<string | nul
 /** What this instance reports about itself when it answers as a peer, for `study` if one is named. */
 export async function peerSource(study?: string): Promise<PeerSource> {
   const conn = study ? (await studyRouting()).get(study) : undefined;
-  const base = { name: conn?.label || process.env.CLICKHOUSE_LABEL || "primary", build: BUILD_INFO.label };
+  const base = { name: conn?.label || setting("CLICKHOUSE_LABEL") || "primary", build: BUILD_INFO.label };
   return conn && study ? { ...base, study, imported: await studyImported(study, conn) } : base;
 }
 

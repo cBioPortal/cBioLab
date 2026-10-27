@@ -11,8 +11,8 @@
 // signed with AUTH_SESSION_SECRET (HMAC-SHA256). Requests are decided from the cookie alone, so a
 // disabled user keeps their session until it expires (SESSION_DAYS); signing in again is refused.
 //
-// Administrators (/admin: clearing the result cache) are the signed-in users whose email is in
-// ADMIN_EMAILS. With the development sign-in anyone can claim an
+// Administrators (/admin: the result cache and the federation settings, lib/settings.ts) are the
+// signed-in users whose email is in ADMIN_EMAILS. With the development sign-in anyone can claim an
 // address, so there it is a convenience, not a guard; it is refused on Vercel production.
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 

@@ -9,7 +9,9 @@
 //   - a data import or a new OncoKB release: `dataVersion()` is an argument of every cached
 //     function, so new data means new keys
 //   - time: `cacheLife("days")` regenerates an entry a day after it was written
-//   - an administrator (/admin): every entry carries RESULT_TAG, which clearing the cache expires
+//   - an administrator (/admin): a changed federation setting or a cleared cache changes
+//     `settingsFingerprint()` (lib/settings.ts), which `cacheVersion()` adds to every key, so every
+//     process stops reading the old entries; a clear also expires them through RESULT_TAG
 //
 // Only a value the function returns is stored. A thrown error, a refused request or a query the
 // reader abandoned is never cached, so every path that means "no answer" must throw. Each cached
@@ -28,7 +30,7 @@
 //
 // A cached function takes only serializable arguments and computes its answer itself, so each
 // route keeps its own small one (`catalogEntry`, `studiesEntry`, `exploreEntry`) beside the code
-// it caches, built from `pack`, `throughCache`, `dataVersion` and `resultEntry` here.
+// it caches, built from `pack`, `throughCache`, `cacheVersion` and `resultEntry` here.
 //
 // Next-only: `next/cache` exists only under the Next runtime, so the stdio MCP server, the CLI
 // and the tests use the uncached engine directly.
@@ -43,6 +45,7 @@ import { hasIdSets } from "./id-sets.ts";
 import { riskFitDirect, type RiskFit, type RiskFitArgs } from "./views/riskmodel/run.ts";
 import type { AnalysisDoc, AnalysisResult, Contract } from "./types.ts";
 import type { OncoprintSpec } from "./views/oncoprint/types.ts";
+import { onSettingsChange, refreshSettings, settingsFingerprint } from "./settings.ts";
 
 type Json = unknown;
 
@@ -91,6 +94,8 @@ export function dataVersion(): Promise<string> {
   value.catch(() => { if (versionMemo?.value === value) versionMemo = null; });
   return value;
 }
+// a cleared cache or a changed setting asks the databases again
+onSettingsChange("data-version", () => { versionMemo = null; });
 
 /** Every cached result's tag, which clearing the cache from /admin expires. */
 export const RESULT_TAG = "results";
@@ -99,6 +104,16 @@ export const RESULT_TAG = "results";
 export function resultEntry(): void {
   cacheLife("days");
   cacheTag(RESULT_TAG);
+}
+
+/**
+ * What every cached result is keyed by besides its own arguments: the data (`dataVersion`) and the
+ * administrator's settings and last cache clear (lib/settings.ts).
+ */
+export async function cacheVersion(): Promise<string> {
+  await refreshSettings();
+  const data = await dataVersion(), s = settingsFingerprint();
+  return s ? data + "|settings@" + s : data;
 }
 
 /**
@@ -121,7 +136,7 @@ async function countDirect(conn: ChConn, sql: string): Promise<number> {
 export async function cachedCount(conn: ChConn, sql: string): Promise<number> {
   // a statement over uploaded data belongs to its uploader, never to the shared cache
   if (hasCustomData() || hasIdSets()) return countDirect(conn, sql);
-  return throughCache(async () => countEntry(conn.id, sql, await dataVersion()), () => countDirect(conn, sql));
+  return throughCache(async () => countEntry(conn.id, sql, await cacheVersion()), () => countDirect(conn, sql));
 }
 
 /**
@@ -148,7 +163,7 @@ export async function cachedRiskFit(a: RiskFitArgs & { patients: number }): Prom
   const { patients, ...args } = a;
   // a fit over uploaded data belongs to its uploader, never to the shared cache
   if (hasCustomData() || hasIdSets() || patients > RISK_FIT_CACHE_MAX_PATIENTS) return riskFitDirect(args);
-  return throughCache(async () => riskFitEntry(args, await dataVersion()), () => riskFitDirect(args));
+  return throughCache(async () => riskFitEntry(args, await cacheVersion()), () => riskFitDirect(args));
 }
 
 /** What the routes run a document with: the cached count and fit. */
@@ -163,7 +178,7 @@ export async function cachedAnalysis(doc: AnalysisDoc, opts: { oncoprint?: "svg"
   const oncoprint = opts.oncoprint ?? "svg";
   // an answer that depends on uploaded data belongs to its uploader, never to the shared cache
   if (hasCustomData() || hasIdSets()) return runAnalysis(doc, { oncoprint });
-  return throughCache(async () => analysisEntry(doc, oncoprint, await dataVersion()), () => runAnalysis(doc, { oncoprint, ...ROUTE_OPTS }));
+  return throughCache(async () => analysisEntry(doc, oncoprint, await cacheVersion()), () => runAnalysis(doc, { oncoprint, ...ROUTE_OPTS }));
 }
 
 async function contractEntry(spec: OncoprintSpec, provenance: boolean, _version: string): Promise<string> {
@@ -179,5 +194,5 @@ export async function cachedContract(spec: OncoprintSpec, opts: { provenance?: b
   const provenance = !!opts.provenance;
   const direct = () => buildContract(spec, provenance ? { log: [], provenance } : {});
   if (hasCustomData() || hasIdSets()) return direct();
-  return throughCache(async () => contractEntry(spec, provenance, await dataVersion()), direct);
+  return throughCache(async () => contractEntry(spec, provenance, await cacheVersion()), direct);
 }

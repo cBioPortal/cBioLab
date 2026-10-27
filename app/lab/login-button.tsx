@@ -60,7 +60,7 @@ export default function LoginButton() {
                   <div className="meta">{server.user?.email}</div>
                 </div>
                 <MenuSeparator />
-                {server.user?.admin && <MenuItem asChild onClick={close}><a href="/admin" title="administer this deployment: clear the result cache"><Settings />Admin</a></MenuItem>}
+                {server.user?.admin && <MenuItem asChild onClick={close}><a href="/admin" title="clear the result cache, see and change the federation settings"><Settings />Admin</a></MenuItem>}
                 <MenuItem onClick={() => { close(); void logOut(); }}><LogOut />Sign out</MenuItem>
               </>}
             </GearMenu></span>

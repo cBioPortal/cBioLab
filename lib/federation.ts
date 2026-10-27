@@ -59,6 +59,7 @@ import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
 import { finiteSql } from "./sql-number.ts";
 import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type CohortSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
+import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -169,9 +170,9 @@ export interface PairCounts {
  * entitled to the data; add ids to STUDY_DENY to exclude more.
  */
 export function isRestrictedStudy(id: string, name = ""): boolean {
-  const extra = (process.env.STUDY_DENY || "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+  const extra = (setting("STUDY_DENY") || "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
   if (extra.includes(id)) return true;
-  if (process.env.STUDY_ALLOW_RESTRICTED === "1") return false;
+  if (setting("STUDY_ALLOW_RESTRICTED") === "1") return false;
   // GENIE's convention is a version SUFFIX: "v3.1-consortium" vs "v2.0-public".
   // Match that, not the bare word — several public studies are named after a
   // consortium (GLASS, A5, Pediatric Preclinical Testing) and must not be hidden.
@@ -188,7 +189,11 @@ let _routing: Map<string, ChConn> | null = null;
 export const routingCollisions: string[] = [];
 /** ids withheld by policy — used to explain refusals rather than say "unknown" */
 export const restrictedStudies = new Set<string>();
+// the routing reads the settings (which studies are withheld, which connection is a simulated peer)
+onSettingsChange("study-routing", () => { _routing = null; _routingEpoch++; routingCollisions.length = 0; restrictedStudies.clear(); });
+let _routingEpoch = 0;
 export async function studyRouting(): Promise<Map<string, ChConn>> {
+  await refreshSettings();
   if (_routing) return _routing;
   // One build at a time, shared by every caller that arrives while it runs: a cold request asks
   // for hundreds of studies' routes at once, and each starting its own build sent hundreds of
@@ -199,6 +204,7 @@ export async function studyRouting(): Promise<Map<string, ChConn>> {
 let _routingBuild: Promise<Map<string, ChConn>> | null = null;
 
 async function buildRouting(): Promise<Map<string, ChConn>> {
+  const epoch = _routingEpoch;
   const map = new Map<string, ChConn>();
   let complete = true;
   for (const conn of connections()) {
@@ -225,17 +231,19 @@ async function buildRouting(): Promise<Map<string, ChConn>> {
   }
   // Only a complete answer is worth remembering; a partial one would outlive the outage that
   // produced it, and a transient failure would look permanent.
+  // nor is one built under settings that have since changed
+  if (epoch !== _routingEpoch) complete = false;
   if (complete) _routing = map;
   return map;
 }
 
 /** Instances the deployment treats as aggregate-only (prototype switch). */
 function aggregateOnlyIds(): string[] {
-  return (process.env.AGGREGATE_ONLY_INSTANCES || "").split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+  return (setting("AGGREGATE_ONLY_INSTANCES") || "").split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
 }
 /** Studies forced aggregate-only regardless of instance (finer-grained switch). */
 function aggregateOnlyStudies(): string[] {
-  return (process.env.AGGREGATE_ONLY_STUDIES || "").split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+  return (setting("AGGREGATE_ONLY_STUDIES") || "").split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
 }
 
 /**
