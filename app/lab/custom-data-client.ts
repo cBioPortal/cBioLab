@@ -62,6 +62,8 @@ export interface ServerState {
   user: SignedInUser | null;
   options: LoginOptions;
   datasets: DatasetMeta[]; error?: string; /** false until the server has answered once */ loaded?: boolean;
+  /** the last check of whether this deployment signs people in failed, so `enabled` is not known */
+  authError?: string;
 }
 
 let server: ServerState = { enabled: false, unlocked: false, user: null, options: { oidc: null, dev: false }, datasets: [] };
@@ -69,16 +71,25 @@ export function serverState(): ServerState { return server; }
 
 /** Ask the server what it holds; quietly "not enabled" where it has no such store. */
 export async function loadServerData(): Promise<void> {
+  let st: { enabled: boolean; user: SignedInUser | null; options: LoginOptions };
   try {
-    const st = await (await fetch("/api/auth")).json() as { enabled: boolean; user: SignedInUser | null; options: LoginOptions };
-    let datasets: DatasetMeta[] = [];
-    if (st.user) {
+    const res = await fetch("/api/auth");
+    if (!res.ok) throw new Error("the sign-in check answered " + res.status + " " + res.statusText);
+    st = await res.json();
+  } catch (e) {
+    // not knowing is not "this deployment has no sign-in": the button stays, and says why
+    server = { ...server, authError: String((e as Error)?.message || e), loaded: true };
+    emit();
+    return;
+  }
+  server = { enabled: !!st.enabled, unlocked: !!st.user, user: st.user, options: st.options, datasets: [], loaded: true };
+  if (st.user) {
+    try {
       const j = await (await fetch("/api/custom-data/datasets")).json();
       if (j.error) throw new Error(j.error);
-      datasets = j.datasets;
-    }
-    server = { enabled: !!st.enabled, unlocked: !!st.user, user: st.user, options: st.options, datasets, loaded: true };
-  } catch (e) { server = { ...server, error: String((e as Error)?.message || e), loaded: true }; }
+      server = { ...server, datasets: j.datasets };
+    } catch (e) { server = { ...server, error: String((e as Error)?.message || e) }; }
+  }
   emit();
 }
 

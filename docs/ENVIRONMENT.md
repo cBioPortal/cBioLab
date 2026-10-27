@@ -101,7 +101,7 @@ see the security notes below.
 | `AUTH_URL` | the request's own origin | this site's public origin, for the sign-in callback when it sits behind a proxy |
 | `AUTH_SESSION_SECRET` | one per process (dev only) | signs the session cookie; 32+ characters, required with `AUTH_OIDC_ISSUER` |
 | `AUTH_DEV_LOGIN` | — | `1`: the development sign-in (any email, no password). Refused on Vercel production |
-| `DATABASE_URL` (or `SUPABASE_DB_URL`) | an in-process Postgres | the Postgres for saved cohorts and analyses, campaigns and custom data, as the app's role `cohort_lab_app`: `npm run db:app-role -- <file>` gives it a new password and writes this URL to the file |
+| `DATABASE_URL` (or `SUPABASE_DB_URL`) | an in-process Postgres | the Postgres for saved cohorts and analyses, campaigns and custom data, as the app's role `cohort_lab_app`: `npm run db:app-role -- <file>` gives it a new password and writes this URL to the file. On Vercel, use Supabase's pooler (`<role>.<project>@aws-0-<region>.pooler.supabase.com:6543`), never the direct `db.<project>.supabase.co`: that host is IPv6-only, Vercel functions reach only IPv4, and every query fails with `getaddrinfo ENOTFOUND`. Give `db:app-role` a pooler `MIGRATION_DATABASE_URL` and the URL it writes is the pooler's |
 | `MIGRATION_DATABASE_URL` | `DATABASE_URL` | the same Postgres as its tables' owner, for `npm run db:migrate` (run before deploying code that needs a new migration) and `db:app-role`. Never set on the deployment |
 | `PGLITE_DIR` | `.data/pglite` under `next dev`, else memory | where the in-process Postgres keeps its files when `DATABASE_URL` is unset |
 

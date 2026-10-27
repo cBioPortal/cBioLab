@@ -3,10 +3,11 @@
 // out), like the portal's "Logged in as" menu. Signing in lets a
 // reader save and open their own cohorts and analyses and use custom data (lib/auth.ts). A
 // deployment offers its provider (Google, MSK…), the development sign-in, or both; with only a
-// provider the button goes straight there. Shown only where the deployment signs people in.
+// provider the button goes straight there. Shown only where the deployment signs people in, and
+// where the check of that failed: it then asks again when clicked, and says why if it still can't.
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, LogIn, LogOut, Settings, UserRound } from "lucide-react";
-import { loadCustomData, devSignIn, signInWithProvider, logOut, onLoginRequest, serverState } from "./custom-data-client.ts";
+import { loadCustomData, loadServerData, devSignIn, signInWithProvider, logOut, onLoginRequest, serverState } from "./custom-data-client.ts";
 import { useCustomDataState } from "./custom-data-panel.tsx";
 import { Button } from "../_ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
@@ -21,9 +22,12 @@ export default function LoginButton() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const showDialog = useCallback((why: string | null = null) => { setErr(why); setEmail(""); setShown(true); }, []);
-  const open = useCallback(() => {
-    const { options } = serverState();
-    if (options.oidc && !options.dev) signInWithProvider();
+  const open = useCallback(async () => {
+    if (serverState().authError) await loadServerData();
+    const { enabled, authError, options } = serverState();
+    if (authError) showDialog("Could not check how this site signs you in: " + authError);
+    else if (!enabled) return;
+    else if (options.oidc && !options.dev) signInWithProvider();
     else showDialog();
   }, [showDialog]);
   // whether this deployment signs people in, and who is signed in here (once per page); a sign-in
@@ -36,9 +40,9 @@ export default function LoginButton() {
       history.replaceState(history.state, "", u.pathname + u.search + u.hash);
       showDialog(why);
     }
-    return onLoginRequest(open);
+    return onLoginRequest(() => void open());
   }, [open, showDialog]);
-  if (!server.enabled) return null;
+  if (!server.enabled && !server.authError) return null;
 
   const submit = async () => {
     setBusy(true); setErr(null);
@@ -64,7 +68,7 @@ export default function LoginButton() {
                 <MenuItem onClick={() => { close(); void logOut(); }}><LogOut />Sign out</MenuItem>
               </>}
             </GearMenu></span>
-        : <Button variant="outline" size="sm" className={TB} onClick={open} title="sign in to save cohorts and analyses and use custom data"><LogIn />Sign in</Button>}
+        : <Button variant="outline" size="sm" className={TB} onClick={() => void open()} title="sign in to save cohorts and analyses and use custom data"><LogIn />Sign in</Button>}
       <Dialog open={shown} onOpenChange={setShown}>
         <DialogContent className="logindialog sm:max-w-sm">
           <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="flex flex-col gap-3">
