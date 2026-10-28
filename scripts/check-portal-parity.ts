@@ -481,6 +481,18 @@ for (const [st, gene] of [["msk_chord_2024", "RTEL1-TNFRSF6B"], ["nsclc_ctdx_msk
   }
 }
 
+// 12. a value spelled as missing ("N/A", "nan", any case) is no value, as in the portal's study view
+// (its isAttributeValueNA): filtering an attribute to NA selects the samples that hold one.
+// brca_mbcproject_wagle_2017 DX_PERCENT_PR has 64 "N/A" patients; prostate_pcbm_swiss_2019 CGA
+// "nan" samples.
+for (const [st, attr] of [["brca_mbcproject_wagle_2017", "DX_PERCENT_PR"], ["prostate_pcbm_swiss_2019", "CGA"]] as const) {
+  const draft = { all: [{ not: { kind: "clinical", attribute: attr, op: "!=", value: "" } }] } as CohortDef;
+  const portalSamples = await api<PortalSample[]>("/filtered-samples/fetch", { studyIds: [st], clinicalDataFilters: [{ attributeId: attr, values: [{ value: "NA" }] }] });
+  const cohortSql = compileCohortDef(draft, { study: st, db: DB, oncokbPin: await oncokbPin(), ...(await studyProfiles(st)) });
+  const ours = Number((await chQuery<{ n: string }>("SELECT count() AS n FROM (" + memberSamplesSql(cohortSql) + ")", PRIMARY)).data[0].n);
+  record({ study: st, group: "selection (missing spellings)", what: "samples with " + attr + " = NA", ours: String(ours), portal: String(portalSamples.length), agree: ours === portalSamples.length && ours > 0 });
+}
+
 // 8. uncalled mutations are not alterations
 {
   const study = "glioma_msk_2018", { profiles } = await studyProfiles(study);

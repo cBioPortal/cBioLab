@@ -8,7 +8,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS 
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
     AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
@@ -49,7 +50,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS 
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
     AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
@@ -101,7 +103,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS 
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
     AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
@@ -163,7 +166,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS 
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
     AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
@@ -203,7 +207,8 @@ det AS (
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid, if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL), NULL) AS months,
          if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))[1])), NULL) = 1, 1, 0) AS dead, replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM det) AS detected
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM sides WHERE side = 'b')
   GROUP BY pid
@@ -216,7 +221,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS 
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
     AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
@@ -248,7 +254,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS 
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
     AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
@@ -292,7 +299,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS 
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
     AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
@@ -315,7 +323,8 @@ det AS (
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid, if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL), NULL) AS months,
          if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))[1])), NULL) = 1, 1, 0) AS dead, replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM det) AS detected
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM sides WHERE side = 'b')
   GROUP BY pid

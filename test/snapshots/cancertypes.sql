@@ -11,7 +11,8 @@ samp AS (
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 grp AS (
-  SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS g, any(attribute_value) AS label FROM snapshot_db.clinical_data_derived
+  SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS g, any(attribute_value) AS label FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name = 'CANCER_TYPE'
     AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid
 ),
@@ -67,7 +68,8 @@ SELECT ifNull(grp.g, '') AS grp, uniqExact(samp.puid) AS samples,
        uniqExactIf(samp.puid, has(prof.types, 'STRUCTURAL_VARIANT')) AS sv
 FROM samp LEFT JOIN prof ON prof.suid = samp.suid
 LEFT JOIN (
-  SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS g FROM snapshot_db.clinical_data_derived
+  SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS g FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name = 'CANCER_TYPE'
     AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid
 ) grp ON grp.suid = samp.suid

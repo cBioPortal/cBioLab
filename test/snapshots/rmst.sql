@@ -3,10 +3,12 @@
 (SELECT replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') AS pid, replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND (('sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) < 10) OR ('patient', replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) < 10)))
 
@@ -15,10 +17,12 @@
 (SELECT replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') AS pid, replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND (('sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) >= 10) OR ('patient', replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) >= 10)))
 
@@ -26,17 +30,20 @@
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') AS pid, replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND (('sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) < 10) OR ('patient', replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) < 10)))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') AS pid,
          anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018' AND type='patient'
     AND attribute_name IN ('OS_MONTHS','OS_STATUS')
     AND replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') IN (SELECT pid FROM cohort)
@@ -50,17 +57,20 @@ GROUP BY m, ev ORDER BY m
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') AS pid, replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND (('sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) >= 10) OR ('patient', replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) >= 10)))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') AS pid,
          anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018' AND type='patient'
     AND attribute_name IN ('OS_MONTHS','OS_STATUS')
     AND replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') IN (SELECT pid FROM cohort)
@@ -74,17 +84,20 @@ GROUP BY m, ev ORDER BY m
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') AS pid, replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND (('sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) < 10) OR ('patient', replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) < 10)))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') AS pid,
          anyIf(attribute_value, attribute_name = 'OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018' AND type = 'patient'
     AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') IN (SELECT pid FROM cohort)
@@ -98,17 +111,20 @@ FROM os
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') AS pid, replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND (('sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) >= 10) OR ('patient', replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'tmb_mskcc_2018_', ''), replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018'
     AND attribute_name = 'TMB_NONSYNONYMOUS' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) >= 10)))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') AS pid,
          anyIf(attribute_value, attribute_name = 'OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'tmb_mskcc_2018' AND type = 'patient'
     AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'tmb_mskcc_2018_', '') IN (SELECT pid FROM cohort)

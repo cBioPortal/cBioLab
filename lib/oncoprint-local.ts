@@ -10,6 +10,7 @@
 import { normalizeDisplay, type AssembleInput, type EventRow, type SortKey } from "./oncoprint-assemble.ts";
 import { geneSymbols, type GeneTrackSpec } from "./gene-tracks.ts";
 import type { DisplaySpec } from "./types.ts";
+import { CLINICAL_MISSING_VALUES } from "./event-names.ts";
 
 export type Table = Record<string, string>[];
 
@@ -68,7 +69,7 @@ export function clinicalFromTable(rows: Table): { attr: string; values: Map<stri
   return attrs.map((raw) => {
     const attr = raw.replace(/\((number|string|lognumber)\)\s*$/i, "").trim();
     const values = new Map<string, string>();
-    for (const r of rows) { const v = r[raw]; if (v != null && v !== "" && v.toUpperCase() !== "NA") values.set(r[id], v); }
+    for (const r of rows) { const v = r[raw]; if (v != null && !CLINICAL_MISSING_VALUES.includes(v.trim().toLowerCase())) values.set(r[id], v); }
     return { attr, values };
   });
 }

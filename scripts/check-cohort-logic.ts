@@ -225,6 +225,8 @@ async function rawStudy(study: string, attrs: string[], genes: string[]): Promis
 /** a clinical value as the DSL compares it: case and surrounding spaces folded */
 const fold = (v: string) => v.trim().toLowerCase();
 /** a clinical value read as a number, or null when it is not a finite one */
+/** the spellings of "no value recorded" (cBioPortal's study view, isAttributeValueNA): never a match */
+const MISSING = ["", "na", "n/a", "nan"];
 const finite = (v: string) => { const x = v.trim() === "" ? NaN : Number(v); return Number.isFinite(x) ? x : null; };
 
 /**
@@ -259,7 +261,7 @@ function evalLeaf(raw: RawStudy, leaf: any): Set<string> {
       }
       return leaf.op === "=" ? fold(v) === fold(leaf.value) : fold(v) !== fold(leaf.value);
     };
-    const hits = rows.filter((r) => ok(r.value));
+    const hits = rows.filter((r) => !MISSING.includes(fold(r.value)) && ok(r.value));
     return or(new Set(hits.filter((r) => r.type === "sample").map((r) => r.sid).filter((s) => raw.base.has(s))),
       ofPatients(hits.filter((r) => r.type === "patient").map((r) => r.pid)));
   }

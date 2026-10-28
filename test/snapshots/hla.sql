@@ -27,7 +27,8 @@ gt AS (
     if(anyIf(v, k IN ('HLA-B2', 'HLA_B2', 'HLA_B2_ALLELE', 'HLA_B2_ALLELES')) != '', anyIf(v, k IN ('HLA-B2', 'HLA_B2', 'HLA_B2_ALLELE', 'HLA_B2_ALLELES')), splitByRegexp('\\s*[/,;]\\s*', anyIf(v, k IN ('HLA_B', 'HLA-B')))[2]),
     if(anyIf(v, k IN ('HLA-C1', 'HLA_C1', 'HLA_C1_ALLELE', 'HLA_C1_ALLELES')) != '', anyIf(v, k IN ('HLA-C1', 'HLA_C1', 'HLA_C1_ALLELE', 'HLA_C1_ALLELES')), splitByRegexp('\\s*[/,;]\\s*', anyIf(v, k IN ('HLA_C', 'HLA-C')))[1]),
     if(anyIf(v, k IN ('HLA-C2', 'HLA_C2', 'HLA_C2_ALLELE', 'HLA_C2_ALLELES')) != '', anyIf(v, k IN ('HLA-C2', 'HLA_C2', 'HLA_C2_ALLELE', 'HLA_C2_ALLELES')), splitByRegexp('\\s*[/,;]\\s*', anyIf(v, k IN ('HLA_C', 'HLA-C')))[2])] AS raw
-  FROM (SELECT replaceOne(patient_unique_id, 'mel_ucla_2016_', '') AS pid, attribute_name AS k, trimBoth(attribute_value) AS v FROM snapshot_db.clinical_data_derived
+  FROM (SELECT replaceOne(patient_unique_id, 'mel_ucla_2016_', '') AS pid, attribute_name AS k, trimBoth(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
     WHERE cancer_study_identifier = 'mel_ucla_2016' AND attribute_name IN ('HLA-A1', 'HLA_A1', 'HLA_A1_ALLELE', 'HLA_A1_ALLELES', 'HLA-A2', 'HLA_A2', 'HLA_A2_ALLELE', 'HLA_A2_ALLELES', 'HLA_A', 'HLA-A', 'HLA-B1', 'HLA_B1', 'HLA_B1_ALLELE', 'HLA_B1_ALLELES', 'HLA-B2', 'HLA_B2', 'HLA_B2_ALLELE', 'HLA_B2_ALLELES', 'HLA_B', 'HLA-B', 'HLA-C1', 'HLA_C1', 'HLA_C1_ALLELE', 'HLA_C1_ALLELES', 'HLA-C2', 'HLA_C2', 'HLA_C2_ALLELE', 'HLA_C2_ALLELES', 'HLA_C', 'HLA-C') AND trimBoth(attribute_value) != ''
       AND (type = 'sample' AND replaceOne(sample_unique_id, 'mel_ucla_2016_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'mel_ucla_2016_', '') IN (SELECT pid FROM cohort)))
   GROUP BY pid
@@ -40,7 +41,8 @@ keys AS (
 hom AS (SELECT pid, if(k[1] = '' OR k[2] = '', NULL, toUInt8(k[1] = k[2])) AS hA, if(k[3] = '' OR k[4] = '', NULL, toUInt8(k[3] = k[4])) AS hB, if(k[5] = '' OR k[6] = '', NULL, toUInt8(k[5] = k[6])) AS hC, toNullable(nf0) AS nf FROM keys),
 loh AS (
   SELECT replaceOne(patient_unique_id, 'mel_ucla_2016_', '') AS pid, toNullable(max(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Loss')), lowerUTF8(trimBoth('Yes')), lowerUTF8(trimBoth('LOH')), lowerUTF8(trimBoth('True'))))) AS loss
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'mel_ucla_2016' AND attribute_name IN ('HLA_A1_LOH', 'HLA_A2_LOH', 'HLA_B1_LOH', 'HLA_B2_LOH', 'HLA_C1_LOH', 'HLA_C2_LOH', 'HLA_LOH') AND trimBoth(attribute_value) != ''
     AND (type = 'sample' AND replaceOne(sample_unique_id, 'mel_ucla_2016_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'mel_ucla_2016_', '') IN (SELECT pid FROM cohort))
   GROUP BY pid
@@ -49,7 +51,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'mel_ucla_2016_', '') AS pid,
          if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'mel_ucla_2016' AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'mel_ucla_2016_', '') IN (SELECT pid FROM cohort)
   GROUP BY pid
@@ -68,7 +71,8 @@ gt AS (
     if(anyIf(v, k IN ('HLA-B2', 'HLA_B2', 'HLA_B2_ALLELE', 'HLA_B2_ALLELES')) != '', anyIf(v, k IN ('HLA-B2', 'HLA_B2', 'HLA_B2_ALLELE', 'HLA_B2_ALLELES')), splitByRegexp('\\s*[/,;]\\s*', anyIf(v, k IN ('HLA_B', 'HLA-B')))[2]),
     if(anyIf(v, k IN ('HLA-C1', 'HLA_C1', 'HLA_C1_ALLELE', 'HLA_C1_ALLELES')) != '', anyIf(v, k IN ('HLA-C1', 'HLA_C1', 'HLA_C1_ALLELE', 'HLA_C1_ALLELES')), splitByRegexp('\\s*[/,;]\\s*', anyIf(v, k IN ('HLA_C', 'HLA-C')))[1]),
     if(anyIf(v, k IN ('HLA-C2', 'HLA_C2', 'HLA_C2_ALLELE', 'HLA_C2_ALLELES')) != '', anyIf(v, k IN ('HLA-C2', 'HLA_C2', 'HLA_C2_ALLELE', 'HLA_C2_ALLELES')), splitByRegexp('\\s*[/,;]\\s*', anyIf(v, k IN ('HLA_C', 'HLA-C')))[2])] AS raw
-  FROM (SELECT replaceOne(patient_unique_id, 'skcm_dfci_2015_', '') AS pid, attribute_name AS k, trimBoth(attribute_value) AS v FROM snapshot_db.clinical_data_derived
+  FROM (SELECT replaceOne(patient_unique_id, 'skcm_dfci_2015_', '') AS pid, attribute_name AS k, trimBoth(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
     WHERE cancer_study_identifier = 'skcm_dfci_2015' AND attribute_name IN ('HLA-A1', 'HLA_A1', 'HLA_A1_ALLELE', 'HLA_A1_ALLELES', 'HLA-A2', 'HLA_A2', 'HLA_A2_ALLELE', 'HLA_A2_ALLELES', 'HLA_A', 'HLA-A', 'HLA-B1', 'HLA_B1', 'HLA_B1_ALLELE', 'HLA_B1_ALLELES', 'HLA-B2', 'HLA_B2', 'HLA_B2_ALLELE', 'HLA_B2_ALLELES', 'HLA_B', 'HLA-B', 'HLA-C1', 'HLA_C1', 'HLA_C1_ALLELE', 'HLA_C1_ALLELES', 'HLA-C2', 'HLA_C2', 'HLA_C2_ALLELE', 'HLA_C2_ALLELES', 'HLA_C', 'HLA-C') AND trimBoth(attribute_value) != ''
       AND (type = 'sample' AND replaceOne(sample_unique_id, 'skcm_dfci_2015_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'skcm_dfci_2015_', '') IN (SELECT pid FROM cohort)))
   GROUP BY pid
@@ -81,7 +85,8 @@ keys AS (
 hom AS (SELECT pid, if(k[1] = '' OR k[2] = '', NULL, toUInt8(k[1] = k[2])) AS hA, if(k[3] = '' OR k[4] = '', NULL, toUInt8(k[3] = k[4])) AS hB, if(k[5] = '' OR k[6] = '', NULL, toUInt8(k[5] = k[6])) AS hC, toNullable(nf0) AS nf FROM keys),
 loh AS (
   SELECT replaceOne(patient_unique_id, 'skcm_dfci_2015_', '') AS pid, toNullable(max(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Loss')), lowerUTF8(trimBoth('Yes')), lowerUTF8(trimBoth('LOH')), lowerUTF8(trimBoth('True'))))) AS loss
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'skcm_dfci_2015' AND attribute_name IN ('HLA_A1_LOH', 'HLA_A2_LOH', 'HLA_B1_LOH', 'HLA_B2_LOH', 'HLA_C1_LOH', 'HLA_C2_LOH', 'HLA_LOH') AND trimBoth(attribute_value) != ''
     AND (type = 'sample' AND replaceOne(sample_unique_id, 'skcm_dfci_2015_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'skcm_dfci_2015_', '') IN (SELECT pid FROM cohort))
   GROUP BY pid
@@ -90,7 +95,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'skcm_dfci_2015_', '') AS pid,
          if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'skcm_dfci_2015' AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'skcm_dfci_2015_', '') IN (SELECT pid FROM cohort)
   GROUP BY pid
@@ -109,7 +115,8 @@ gt AS (
     if(anyIf(v, k IN ('HLA-B2', 'HLA_B2', 'HLA_B2_ALLELE', 'HLA_B2_ALLELES')) != '', anyIf(v, k IN ('HLA-B2', 'HLA_B2', 'HLA_B2_ALLELE', 'HLA_B2_ALLELES')), splitByRegexp('\\s*[/,;]\\s*', anyIf(v, k IN ('HLA_B', 'HLA-B')))[2]),
     if(anyIf(v, k IN ('HLA-C1', 'HLA_C1', 'HLA_C1_ALLELE', 'HLA_C1_ALLELES')) != '', anyIf(v, k IN ('HLA-C1', 'HLA_C1', 'HLA_C1_ALLELE', 'HLA_C1_ALLELES')), splitByRegexp('\\s*[/,;]\\s*', anyIf(v, k IN ('HLA_C', 'HLA-C')))[1]),
     if(anyIf(v, k IN ('HLA-C2', 'HLA_C2', 'HLA_C2_ALLELE', 'HLA_C2_ALLELES')) != '', anyIf(v, k IN ('HLA-C2', 'HLA_C2', 'HLA_C2_ALLELE', 'HLA_C2_ALLELES')), splitByRegexp('\\s*[/,;]\\s*', anyIf(v, k IN ('HLA_C', 'HLA-C')))[2])] AS raw
-  FROM (SELECT replaceOne(patient_unique_id, 'skcm_mskcc_2014_', '') AS pid, attribute_name AS k, trimBoth(attribute_value) AS v FROM snapshot_db.clinical_data_derived
+  FROM (SELECT replaceOne(patient_unique_id, 'skcm_mskcc_2014_', '') AS pid, attribute_name AS k, trimBoth(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
     WHERE cancer_study_identifier = 'skcm_mskcc_2014' AND attribute_name IN ('HLA-A1', 'HLA_A1', 'HLA_A1_ALLELE', 'HLA_A1_ALLELES', 'HLA-A2', 'HLA_A2', 'HLA_A2_ALLELE', 'HLA_A2_ALLELES', 'HLA_A', 'HLA-A', 'HLA-B1', 'HLA_B1', 'HLA_B1_ALLELE', 'HLA_B1_ALLELES', 'HLA-B2', 'HLA_B2', 'HLA_B2_ALLELE', 'HLA_B2_ALLELES', 'HLA_B', 'HLA-B', 'HLA-C1', 'HLA_C1', 'HLA_C1_ALLELE', 'HLA_C1_ALLELES', 'HLA-C2', 'HLA_C2', 'HLA_C2_ALLELE', 'HLA_C2_ALLELES', 'HLA_C', 'HLA-C') AND trimBoth(attribute_value) != ''
       AND (type = 'sample' AND replaceOne(sample_unique_id, 'skcm_mskcc_2014_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'skcm_mskcc_2014_', '') IN (SELECT pid FROM cohort)))
   GROUP BY pid
@@ -122,7 +129,8 @@ keys AS (
 hom AS (SELECT pid, if(k[1] = '' OR k[2] = '', NULL, toUInt8(k[1] = k[2])) AS hA, if(k[3] = '' OR k[4] = '', NULL, toUInt8(k[3] = k[4])) AS hB, if(k[5] = '' OR k[6] = '', NULL, toUInt8(k[5] = k[6])) AS hC, toNullable(nf0) AS nf FROM keys),
 loh AS (
   SELECT replaceOne(patient_unique_id, 'skcm_mskcc_2014_', '') AS pid, toNullable(max(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Loss')), lowerUTF8(trimBoth('Yes')), lowerUTF8(trimBoth('LOH')), lowerUTF8(trimBoth('True'))))) AS loss
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'skcm_mskcc_2014' AND attribute_name IN ('HLA_A1_LOH', 'HLA_A2_LOH', 'HLA_B1_LOH', 'HLA_B2_LOH', 'HLA_C1_LOH', 'HLA_C2_LOH', 'HLA_LOH') AND trimBoth(attribute_value) != ''
     AND (type = 'sample' AND replaceOne(sample_unique_id, 'skcm_mskcc_2014_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'skcm_mskcc_2014_', '') IN (SELECT pid FROM cohort))
   GROUP BY pid
@@ -131,7 +139,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'skcm_mskcc_2014_', '') AS pid,
          if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'skcm_mskcc_2014' AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'skcm_mskcc_2014_', '') IN (SELECT pid FROM cohort)
   GROUP BY pid

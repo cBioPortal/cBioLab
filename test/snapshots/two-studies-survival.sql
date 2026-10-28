@@ -87,7 +87,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid,
          anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type='patient'
     AND attribute_name IN ('OS_MONTHS','OS_STATUS')
     AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
@@ -109,7 +110,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid,
          anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type='patient'
     AND attribute_name IN ('OS_MONTHS','OS_STATUS')
     AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
@@ -142,7 +144,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid,
          anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_met_2021' AND type='patient'
     AND attribute_name IN ('OS_MONTHS','OS_STATUS')
     AND replaceOne(patient_unique_id, 'msk_met_2021_', '') IN (SELECT pid FROM cohort)
@@ -164,7 +167,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid,
          anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_met_2021' AND type='patient'
     AND attribute_name IN ('OS_MONTHS','OS_STATUS')
     AND replaceOne(patient_unique_id, 'msk_met_2021_', '') IN (SELECT pid FROM cohort)
@@ -197,7 +201,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid,
          anyIf(attribute_value, attribute_name = 'OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'patient'
     AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
@@ -219,7 +224,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid,
          anyIf(attribute_value, attribute_name = 'OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'patient'
     AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
@@ -252,7 +258,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid,
          anyIf(attribute_value, attribute_name = 'OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_met_2021' AND type = 'patient'
     AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'msk_met_2021_', '') IN (SELECT pid FROM cohort)
@@ -274,7 +281,8 @@ os AS (
   SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid,
          anyIf(attribute_value, attribute_name = 'OS_MONTHS') AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_met_2021' AND type = 'patient'
     AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'msk_met_2021_', '') IN (SELECT pid FROM cohort)
