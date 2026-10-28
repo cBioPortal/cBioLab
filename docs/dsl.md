@@ -38,9 +38,9 @@ cohortDef := { "all": [clause × 0-8],         // ANDed (intersection of samples
                "notes"?:   "<prose>",         // the analyst's own note on this cohort; never compiled
                "from"?:    { "saved": "<id>", "name": "<name>", "hash": "<sha256>", "savedAt"?: "<when>" },  // set by the page: the saved cohort this was copied from, and the hash of what was copied; never compiled
                "splits"?:  { "<name>": splitDef },  // divisions of this cohort into arms that add up to it
-               "lock"?:    { "set": "<id set>", "n": N, "nSamples"?: N, "at": "<ISO time>", "dataVersion"?: "…", "oncokbPin"?: "…",
-                             "children"?: { "<split> / <arm>": { "set", "part": "arm:<split> / <arm>", "n" } } } }
-                                              // frozen to the patients it selected at "at" — see "Locked cohorts" below
+               "lock"?:    { "set": "<id set>", "n": N, "nPatients": N, "at": "<ISO time>", "dataVersion"?: "…", "oncokbPin"?: "…",
+                             "children"?: { "<split> / <arm>": { "set", "part": "arm:<split> / <arm>", "n", "nPatients" } } } }
+                                              // frozen to the samples it selected at "at" — see "Locked cohorts" below
 splitDef  := { "arms": [ { "name": "<label>", "where": clause, "splits"?: {…} } × 1-8 ],  // tested in order; first match wins; an arm may be split again
                "other"?: "<label>",            // the remainder's name, default "Other"
                "otherSplits"?: {…},            // splits of the remainder
@@ -145,17 +145,16 @@ cohort is refused before any request is made, the same guarantee `docs/DATA-BOUN
 describes for every other identifier-bearing path.
 
 **Locked cohorts.** A cohort can be frozen to the patients its definition selects at one moment,
-so an analysis stops drifting as patients are added to the data: `lock` names the stored id set
-holding those patients, when it was taken, the data version and OncoKB release then, and, under
-`children`, each split arm by name. The lock is ONE set: beside the patients it keeps, as named
-parts, their samples (`"samples"`, `nSamples` of them) and each arm's patients (`part`:
+so an analysis stops drifting as samples are added to the data: `lock` names the stored id set
+holding those samples (`n` of them, from `nPatients` patients), when it was taken, the data
+version and OncoKB release then, and, under `children`, each split arm by name. The lock is ONE
+sample-level set: beside the samples it keeps, as named parts, each arm's samples (`part`:
 `"arm:<split> / <arm>"`). The engine
 evaluates the set, not the definition; the definition stays as the record of how the cohort was
 made, and is still run beside the set, so the result's `cohorts[name].lock` says how far the
-data has moved: what the definition selects `now`, who it would add (`entered`) or drop
-(`left`), how many frozen patients the data still holds (`present` of `n`), and how many
-samples those patients have that they did not have then (`newSamples` — a lock freezes
-patients, and views read every sample of them). A split arm added after the lock is evaluated
+data has moved, in samples: what the definition selects `now`, which samples it would add
+(`entered` — a new sample it selects is one of these) or drop (`left`), and how many frozen
+samples the data still holds (`present` of `n`). A split arm added after the lock is evaluated
 inside the frozen cohort, so arms still add up to it. The document's `locked` says every cohort
 was locked at once, one moment for all. Locks are taken by `POST /api/lock` (`{doc, cohorts?}`,
 every cohort when none are named) or the page — a cohort's menu, or "Lock all cohorts" — and need a

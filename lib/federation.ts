@@ -2158,10 +2158,10 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * How far the data has moved from a locked cohort (lib/cohort-lock.ts): counts only, but over the
    * frozen patients' ids, so patient-level only, as members() is.
    */
-  async lockDrift(locked: CohortDef, live: CohortDef): Promise<{ present: number; now: number; entered: number; left: number; newSamples: number; sql: string }> {
+  async lockDrift(locked: CohortDef, live: CohortDef): Promise<{ present: number; now: number; entered: number; left: number; sql: string }> {
     const sql = lockDriftSql(this.cohortSql(locked), this.cohortSql(live), this.study, this.instance.conn.db);
     const r = (await this.runLogged<ChRow>("lock: drift since locked", sql, this.instance.conn)).data[0];
-    return { present: Number(r.present), now: Number(r.now), entered: Number(r.entered), left: Number(r.left), newSamples: Number(r.newSamples), sql };
+    return { present: Number(r.present), now: Number(r.now), entered: Number(r.entered), left: Number(r.left), sql };
   }
 
   /**

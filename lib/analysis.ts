@@ -430,14 +430,13 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     if (!cohorts[name] || !live) continue;
     const liveDef = live.cohorts[name];
     const d: LockDrift = { cohort: l.cohort, at: l.lock.at, ...(l.lock.dataVersion ? { dataVersion: l.lock.dataVersion } : {}),
-      n: l.members.n, present: 0, now: 0, entered: 0, left: 0, newSamples: 0 };
+      n: l.members.n, present: 0, now: 0, entered: 0, left: 0 };
     try {
       for (const s of cohorts[name].studies) {
         const res = resolvers[s];
         if (!(res instanceof PatientLevelResolver)) throw new Error(s + " is not held at patient level here");
         const r = await res.lockDrift(doc.cohorts[name], liveDef);
         d.present += r.present; d.now += r.now; d.entered += r.entered; d.left += r.left;
-        d.newSamples += r.newSamples;
       }
     } catch (e) { d.error = "how far the data has moved could not be measured: " + ((e as Error)?.message || e); }
     drift[name] = d;

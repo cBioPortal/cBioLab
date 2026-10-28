@@ -518,18 +518,15 @@ export function memberSamplesSql(cohortSql: string): PatientSql {
 
 /**
  * How far the data has moved from a locked cohort, in `study`, in samples: of the frozen samples
- * (`lockedSql`) how many the data still holds, what the definition (`liveSql`) selects now, which it
- * would add and which it would drop, and how many samples the frozen patients have that the lock
- * does not hold.
+ * (`lockedSql`) how many the data still holds, what the definition (`liveSql`) selects now, and
+ * which it would add and which it would drop — a new sample the definition selects is one it adds.
  */
 export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string): AggregateSql {
   return aggregateSql("WITH locked AS (" + lockedSql + "),\n     live AS (" + liveSql + ")\n" +
     "SELECT (SELECT uniqExact(sid) FROM locked) AS present,\n" +
     "       (SELECT uniqExact(sid) FROM live) AS now,\n" +
     "       (SELECT uniqExact(sid) FROM live WHERE sid NOT IN (SELECT sid FROM locked)) AS entered,\n" +
-    "       (SELECT uniqExact(sid) FROM locked WHERE sid NOT IN (SELECT sid FROM live)) AS left,\n" +
-    "       (SELECT count() FROM (" + baseSamplesSql(study, db) + ")\n" +
-    "         WHERE " + inCohortPatients("pid", "locked") + " AND sid NOT IN (SELECT sid FROM locked)) AS newSamples");
+    "       (SELECT uniqExact(sid) FROM locked WHERE sid NOT IN (SELECT sid FROM live)) AS left");
 }
 
 // The salt is part of what every held-out result means: changing it reshuffles every

@@ -74,11 +74,11 @@ describe("a locked cohort compiled anywhere", () => {
     const ext = await sets(() => JSON.stringify(idSetExternalsFor("SELECT id FROM " + idSetTableName(P, "s1", "arm:sex / Female"), "a")));
     assert.deepEqual(JSON.parse(ext).map((e: { data: string }) => e.data), ["S-2\n"], "only that arm's samples are uploaded");
   });
-  test("the drift query measures the frozen samples against the definition's, and the frozen patients' samples the lock does not hold", () => {
+  test("the drift query measures the frozen samples against the definition's", () => {
     const sql = lockDriftSql("SELECT 'P-1' AS pid, 'S-1' AS sid", "SELECT 'P-9' AS pid, 'S-9' AS sid", "s1", "db");
     assert.match(sql, /uniqExact\(sid\) FROM live WHERE sid NOT IN \(SELECT sid FROM locked\)\) AS entered/);
     assert.match(sql, /uniqExact\(sid\) FROM locked WHERE sid NOT IN \(SELECT sid FROM live\)\) AS left/);
-    assert.match(sql, /WHERE pid IN \(SELECT pid FROM locked\) AND sid NOT IN \(SELECT sid FROM locked\)\) AS newSamples/);
+    assert.doesNotMatch(sql, /newSamples/);
   });
 });
 

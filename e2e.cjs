@@ -1359,7 +1359,8 @@ async function main() {
       await dlg.getByRole("button", { name: "+ add cut" }).click();
       const added = await dlg.locator("input[type=number]").count();
       ok("risk model: the dialog's handles step by a percentile and a cut can be added, with no request",
-        JSON.stringify(moved) === JSON.stringify(["33", "70"]) && added === 3 && requests === 0 && /Risk group 4 of 4/.test(await shares()), JSON.stringify(moved) + ", " + added + " cuts, " + requests + " requests");
+        // three steps from 67 reach at least 70: a step is at least one whole percentile, more where tied scores share one
+        moved[0] === "33" && Number.isInteger(Number(moved[1])) && Number(moved[1]) >= 70 && added === 3 && requests === 0 && /Risk group 4 of 4/.test(await shares()), JSON.stringify(moved) + ", " + added + " cuts, " + requests + " requests");
       await dlg.getByRole("button", { name: "Top 20%" }).click();
       ok("risk model: a preset previews its shares", /Low risk 80%.*High risk 20%/.test(await shares()), await shares());
       const t0 = Date.now();
@@ -2023,7 +2024,7 @@ async function main() {
       await sp.waitForFunction(() => document.querySelectorAll(".lockdrift").length === 2, null, { timeout: 180000 });
       const d = await docOf();
       const k = d.cohorts["KRAS NSCLC"].lock || {};
-      steps.locked = !!d.locked?.at && /^[0-9a-f-]{36}$/.test(k.set || "") && k.nSamples > 0 && !k.samples && k.at === d.locked.at && d.cohorts.EGFR.lock?.at === d.locked.at;
+      steps.locked = !!d.locked?.at && /^[0-9a-f-]{36}$/.test(k.set || "") && k.n > 0 && k.nPatients > 0 && k.n >= k.nPatients && k.at === d.locked.at && d.cohorts.EGFR.lock?.at === d.locked.at;
       // its arms are parts of its one set, not sets of their own: one row per locked cohort
       steps.arms = Object.entries(k.children || {}).some(([c, m]) => c.startsWith("g12c / ") && m.set === k.set && m.part === "arm:" + c);
       steps.oneRowEach = ((await (await ctx.request.get(BASE + "/api/id-sets")).json()).sets || []).length === setsBefore + 2;

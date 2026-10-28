@@ -582,8 +582,6 @@ export interface LockDrift {
   now: number;
   entered: number;
   left: number;
-  /** samples the frozen patients have now that the lock does not hold (whether or not the definition would select them) */
-  newSamples: number;
   /** why the movement could not be measured (the frozen patients still answered) */
   error?: string;
 }
