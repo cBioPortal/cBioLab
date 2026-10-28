@@ -1,5 +1,6 @@
 // The instability view's SQL: what its runner (run.ts) asks each participant's database for.
-import { GENOME_CHROMS, CHROM_LENGTHS, pidOf } from "../../federation-views.ts";
+import { GENOME_CHROMS, CHROM_LENGTHS } from "../../federation-views.ts";
+import { inCohortSamples, bareSampleId } from "../../cohort2.ts";
 import { sq } from "../../compiler.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
@@ -60,7 +61,7 @@ function instabilityCtes(cohortSql: string, study: string, db: string, o: Instab
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
     "  SELECT internal_id AS sid FROM " + db + ".sample_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) + "\n" +
     "),\n" +
     "seg AS (\n" +
     "  SELECT s.sample_id AS sid, multiIf(s.chr IN ('23', 'X', 'chrX'), 'X', replaceOne(s.chr, 'chr', '')) AS chrom,\n" +

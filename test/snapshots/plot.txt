@@ -1,7 +1,7 @@
 Analysis over brca_tcga_pan_can_atlas_2018 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- all samples: 1,084 patients — all patients in the study
+- all samples: 1,084 patients — all samples in the study
 
 Plot (box): ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM) by ERBB2: Putative copy-number alterations from GISTIC — 1,068 samples.
   Shallow deletion: median -0.66 (IQR -0.95–-0.41, whiskers -1.77–0.35, n=260)

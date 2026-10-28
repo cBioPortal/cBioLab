@@ -161,7 +161,7 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "Every entity of “" + profileName + "” (" + pt + ") compared across the cohorts, one value per " + unit.replace(/s$/, "") + " as the study recorded it" +
-      (unit === "samples" ? ", from every sample of each cohort's patients" : "") + ". " +
+      (unit === "samples" ? ", from each cohort's own samples" : ", from the patients owning each cohort's samples") + ". " +
       (isCat
         ? "Values NA or blank mean not called and are left out (" + missing.toLocaleString("en-US") + " of them), not treated as a category. Each entity is tested with a " + test + " on its counts, no continuity correction; the χ² approximation is thin where a value is rare. "
         : "Values that are not numbers (a limit such as \">8\", or NA) are left out (" + missing.toLocaleString("en-US") + " of them). Each entity is tested with " + test +

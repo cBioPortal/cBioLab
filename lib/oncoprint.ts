@@ -4,7 +4,7 @@
 //   conventions: {lineGap} }
 // Contract: sorted columns, typed cells (bitmask for gene tracks, NOT_PROFILED = -1),
 //   panel-aware track frequencies, group ranges. The renderer does zero data logic.
-import { chQuery, chQueryRows, DB, STUDY, PRIMARY, type ChConn } from "./ch.ts";
+import { chQuery, chQueryRows, DB, STUDY, PRIMARY, ensureChContext, registerChExternal, type ChConn } from "./ch.ts";
 import { compileCohort, sq } from "./compiler.ts";
 import type { CohortDef, Contract, ChRow } from "./types.ts";
 
@@ -20,7 +20,7 @@ export const PIDS_SQL: unique symbol = Symbol("pidsSql");
  */
 export type PidsCarrier = CohortDef & { [PIDS_SQL]?: string | Record<string, string> };
 import { buildAnnotationIndex, oncokbPin } from "./annotation.ts";
-import { compileCohortDef } from "./cohort2.ts";
+import { compileCohortDef, baseSamplesSql } from "./cohort2.ts";
 import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
 
 import { PROFILED_TYPES, type ProfiledType } from "./profile-names.ts";
@@ -35,74 +35,100 @@ export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
 
 /**
- * Columns for a cohort. A cohort is always a set of PATIENTS — that is what the DSL selects —
- * so sample mode wraps it: the columns are every sample of those patients, including samples
- * on which the cohort's own criterion was never measured. The portal does the same, and the
- * contract says so in its conventions.
+ * Columns for a cohort. A cohort is a set of SAMPLES (rows `(pid, sid)`): sample columns are
+ * exactly its samples, patient columns their owners. A patient column's cells are built from
+ * those samples only (columnSamplesSql), never from the patient's samples outside the cohort.
  */
 export function cohortColumnsSql(dsl: PidsCarrier | null | undefined, study: string, db: string, unit: Unit, pin?: string | null): string {
-  const pids = cohortPatientsSql(dsl, study, db, pin);
-  if (unit === "patient") return pids;
-  const prefix = study + "_";
-  return "SELECT DISTINCT replaceOne(sd.sample_unique_id, " + sq(prefix) + ", '') AS pid\n" +
-    "FROM " + db + ".sample_derived sd\n" +
-    "WHERE sd.cancer_study_identifier = " + sq(study) + "\n" +
-    "  AND replaceOne(sd.patient_unique_id, " + sq(prefix) + ", '') IN (\n" + pids + "\n)\n" +
-    "ORDER BY pid";
+  return columnsOfSql(cohortRowsSql(dsl, study, db, pin), unit);
 }
+/** a cohort's `(pid, sid)` rows as the column ids of `unit`, in the column `pid` the contract reads */
+const columnsOfSql = (rowsSql: string, unit: Unit): string =>
+  "SELECT DISTINCT " + (unit === "sample" ? "sid AS pid" : "pid") + " FROM (\n" + rowsSql + "\n) ORDER BY pid";
 
 /**
- * A cohort's columns as SQL. `pin` is the OncoKB release an `OQL ... DRIVER` clause joins
+ * A cohort's `(pid, sid)` rows as SQL. `pin` is the OncoKB release an `OQL ... DRIVER` clause joins
  * against: the analysis layer resolves it once and passes it down, and so must this engine —
  * a spec that travels to a client and comes back carries the DEFINITION, not the compiled SQL,
  * so it is recompiled here and would otherwise be refused for want of a pin.
  */
-export function cohortPatientsSql(dsl: PidsCarrier | null | undefined, study: string = STUDY, db: string = DB, pin?: string | null): string {
+export function cohortRowsSql(dsl: PidsCarrier | null | undefined, study: string = STUDY, db: string = DB, pin?: string | null): string {
   const pre = dsl?.[PIDS_SQL];
   if (typeof pre === "string") return pre;
-  // SQL for a cohort's stable_ids (null dsl = every patient with a sample).
+  // null dsl = every sample of the study.
   // DSL v2 definition ({all: [...]}) — the analysis document's cohort language,
   // including an explicit sample/patient list ({kind:"sampleList"|"patientList"}).
   if (dsl && Array.isArray((dsl as { all?: unknown }).all)) return compileCohortDef(dsl as CohortDef, { study, db, oncokbPin: pin });
-  if (!dsl) {
-    return "SELECT DISTINCT replaceOne(patient_unique_id, " + sq(study + "_") + ", '') AS pid\n" +
-      "FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study) + " ORDER BY pid";
-  }
+  if (!dsl) return baseSamplesSql(study, db);
+  // a v1 timeline expression selects patients: every sample of each
   const { patientsSql } = compileCohort({
     db, study, a: dsl.a!, b: dsl.b, rel: dsl.rel,
     priorGuard: !!dsl.priorGuard, lineGap: dsl.lineGap, patientsLimit: 1000000
   });
-  return patientsSql;
+  return baseSamplesSql(study, db) + "\n    AND " + "replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM (\n" + patientsSql + "\n))";
 }
 
-async function cohortPatients(dsl: PidsCarrier | null | undefined, study: string,
-  log?: ContractOpts["log"], label = "oncoprint:columns", db: string = DB, unit: Unit = "patient", pin?: string | null,
-  conn: ChConn = PRIMARY): Promise<string[]> {
-  const sql = cohortColumnsSql(dsl, study, db, unit, pin);
+/**
+ * The bare sample ids patient columns are built from, as a subquery: each group's cohort
+ * `(pid, sid)` rows, a patient taking the samples of the FIRST group it lands in (the group its
+ * column is drawn in). null when every sample of the study counts (no cohort).
+ */
+function columnSamplesSql(groupRows: string[] | null): string | null {
+  if (!groupRows || !groupRows.length) return null;
+  return groupRows.map((g, i) => "SELECT sid FROM (\n" + g + "\n)" + (i === 0 ? "" :
+    " WHERE pid NOT IN (" + groupRows.slice(0, i).map((e) => "SELECT pid FROM (\n" + e + "\n)").join(" UNION ALL ") + ")"))
+    .join("\nUNION ALL\n");
+}
+/** a row's sample (`col`, a qualified sample id) is one the columns are built from */
+const fromColumnSamples = (col: string, study: string, samples?: string | null): string =>
+  samples ? "\n  AND replaceOne(" + col + ", " + sq(study + "_") + ", '') IN (" + samples + ")" : "";
+
+/** A cohort's column ids (cohortRowsSql's rows, as `unit`), the query logged as `label`. */
+async function cohortColumns(rowsSql: string, study: string,
+  log?: ContractOpts["log"], label = "oncoprint:columns", unit: Unit = "patient",
+  conn: ChConn = PRIMARY): Promise<ColumnRows> {
+  const sql = columnRowsSql(rowsSql, unit);
   const entry = { label, sql, study } as { label: string; sql: string; ms?: number; study?: string };
   if (log) log.push(entry);
   const r = await chQueryRows(sql, conn);
   entry.ms = r._ms;
-  return r.rows.map((x) => x[0] as string);
+  return columnRows(r.rows);
+}
+
+/** a cohort's columns, in order, and each column's samples in the cohort */
+interface ColumnRows { pids: string[]; samples: Map<string, string[]> }
+/** a cohort's `(pid, sid)` rows as (column id, sample) pairs, ordered by column: the columns and the samples they are built from, in one read */
+const columnRowsSql = (rowsSql: string, unit: Unit): string =>
+  "SELECT DISTINCT " + (unit === "sample" ? "sid AS pid" : "pid") + ", sid FROM (\n" + rowsSql + "\n) ORDER BY pid, sid";
+function columnRows(rows: unknown[][]): ColumnRows {
+  const samples = new Map<string, string[]>();
+  for (const [p, sid] of rows) {
+    const list = samples.get(p as string);
+    if (list) list.push(sid as string); else samples.set(p as string, [sid as string]);
+  }
+  return { pids: [...samples.keys()], samples };
 }
 
 /**
  * `unit` decides what a column is. Everything below is stored per SAMPLE; patient mode is the
  * one that has to collapse — which is why sample mode removes joins rather than adding them.
+ * Each builder's optional `samples` (columnSamplesSql) narrows the rows to the samples the
+ * columns are built from, so a patient column collapses only its samples in the cohort.
  */
 export type Unit = "patient" | "sample";
 /** the id column for a unit, stripped of the study prefix that qualifies it in the warehouse */
 const idCol = (unit: Unit, prefix: string, alias = ""): string =>
   "replaceOne(" + alias + (unit === "sample" ? "sample_unique_id" : "patient_unique_id") + ", " + sq(prefix) + ", '')";
 
-export function genomicEventsSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient"): string {
+export function genomicEventsSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
   const puidPrefix = study + "_";
   return "SELECT " + idCol(unit, puidPrefix) + " AS pid,\n" +
     "       hugo_gene_symbol AS gene, variant_type AS vt, mutation_type AS mt,\n" +
     "       mutation_variant AS mv, cna_alteration AS cna\n" +
     "FROM " + db + ".genomic_event_derived\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
-    "  AND mutation_status != 'UNCALLED'"; // read support, not a call (lib/oql.ts specCond)
+    "  AND mutation_status != 'UNCALLED'" + // read support, not a call (lib/oql.ts specCond)
+    fromColumnSamples("sample_unique_id", study, samples);
 }
 
 /**
@@ -112,7 +138,7 @@ export function genomicEventsSql(genes: string[], study: string = STUDY, db: str
  * the one the other views' denominators use). An integer per patient instead of an array of gene names —
  * at 400k patients that is the difference between a few megabytes and a few hundred kilobytes.
  */
-export function coverageSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient"): string {
+export function coverageSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
   const puidPrefix = study + "_";
   const list = "[" + genes.map(sq).join(",") + "]";
   // panels are recorded per sample; patient mode joins out to the patient, sample mode does not
@@ -121,7 +147,8 @@ export function coverageSql(genes: string[], study: string = STUDY, db: string =
     "FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + genes.map(sq).join(",") + ")\n" +
     (unit === "sample" ? "" : "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n") +
-    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
+    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')" +
+    fromColumnSamples("sp.sample_unique_id", study, samples) + "\n" +
     "GROUP BY pid";
 }
 
@@ -130,7 +157,7 @@ export function coverageSql(genes: string[], study: string = STUDY, db: string =
  * some sample of the column is in a profile of that type whatever its genes — the portal's
  * "# Samples per Patient" and "Profiled for <type>" rows, from one scan.
  */
-export function columnFactsSql(study: string = STUDY, db: string = DB, unit: Unit = "patient"): string {
+export function columnFactsSql(study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
   const puidPrefix = study + "_";
   const types = PROFILED_TYPES.map(([t]) => sq(t)).join(",");
   return "SELECT " + idCol(unit, puidPrefix, "sd.") + " AS pid,\n" +
@@ -139,11 +166,11 @@ export function columnFactsSql(study: string = STUDY, db: string = DB, unit: Uni
     "FROM " + db + ".sample_derived sd\n" +
     "LEFT JOIN (SELECT sample_unique_id, alteration_type FROM " + db + ".sample_to_gene_panel_derived\n" +
     "           WHERE cancer_study_identifier = " + sq(study) + " AND alteration_type IN (" + types + ")) sp ON sp.sample_unique_id = sd.sample_unique_id\n" +
-    "WHERE sd.cancer_study_identifier = " + sq(study) + "\n" +
+    "WHERE sd.cancer_study_identifier = " + sq(study) + fromColumnSamples("sd.sample_unique_id", study, samples) + "\n" +
     "GROUP BY pid";
 }
 
-export function clinicalSql(attrs: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient"): string {
+export function clinicalSql(attrs: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
   const puidPrefix = study + "_";
   const inAttrs = "attribute_name IN (" + attrs.map(sq).join(",") + ") AND attribute_value != ''";
   if (unit === "sample")
@@ -157,12 +184,13 @@ export function clinicalSql(attrs: string[], study: string = STUDY, db: string =
       "WHERE cd.cancer_study_identifier = " + sq(study) + " AND cd." + inAttrs + "\n" +
       "GROUP BY pid, k";
   // patient-level rows win; sample-level attributes (e.g. CANCER_TYPE in MSK studies)
-  // fall back to one of the patient's sample values via argMax
+  // fall back to one of the patient's sample values (of its samples in the cohort) via argMax
   return "SELECT replaceOne(patient_unique_id, " + sq(puidPrefix) + ", '') AS pid,\n" +
     "       attribute_name AS k, argMax(attribute_value, type = 'patient') AS v\n" +
     "FROM " + clinicalTable(db, attrs) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + "\n" +
-    "  AND " + inAttrs + "\n" +
+    "  AND " + inAttrs +
+    (samples ? "\n  AND (type = 'patient' OR replaceOne(sample_unique_id, " + sq(puidPrefix) + ", '') IN (" + samples + "))" : "") + "\n" +
     "GROUP BY pid, k";
 }
 
@@ -202,18 +230,19 @@ async function vafAvailable(study: string, db: string = DB, conn: ChConn = PRIMA
   _vafCache.set(key, ok);
   return ok;
 }
-export function vafSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient"): string {
+export function vafSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
   return "SELECT " + (unit === "sample" ? "sampleId" : "patientId") + " AS pid, `GENE.hugoGeneSymbol` AS gene,\n" +
     "       max(tumorAltCount / (tumorAltCount + tumorRefCount)) AS v\n" +
     "FROM " + db + ".mutation_derived\n" +
     "WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND tumorAltCount > 0 AND tumorRefCount >= 0 AND molecularProfileId NOT LIKE '%uncalled%'\n" +
+    (samples ? "  AND sampleId IN (" + samples + ")\n" : "") +
     "GROUP BY pid, gene";
 }
 
 // patient-level continuous values for heatmap tracks (columns are patients, so
 // multi-sample patients get the mean across their samples — stated in the label)
-export function heatmapSql(profileType: string, genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient"): string {
+export function heatmapSql(profileType: string, genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
   // values are stored per sample; only patient mode has to average them
   return "SELECT " + (unit === "sample" ? "replaceOne(ga.sample_unique_id, " + sq(study + "_") + ", '')" : "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')") + " AS pid,\n" +
     "       ga.hugo_gene_symbol AS gene, avg(" + finiteSql("ga.alteration_value") + ") AS v\n" +
@@ -221,14 +250,14 @@ export function heatmapSql(profileType: string, genes: string[], study: string =
     (unit === "sample" ? "" : "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n") +
     "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
     "  AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
-    "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL\n" +
+    "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL" + fromColumnSamples("ga.sample_unique_id", study, samples) + "\n" +
     "GROUP BY pid, gene";
 }
 
 // A generic-assay profile's values for heatmap tracks, one row per (column, entity): a column's
 // samples averaged in patient mode, and a patient-level assay's value given to each of the
 // patient's samples in sample mode. Values that are not numbers are left out.
-export function assayHeatmapSql(profileType: string, entities: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", patientLevel = false): string {
+export function assayHeatmapSql(profileType: string, entities: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", patientLevel = false, samples?: string | null): string {
   const strip = (col: string) => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
   const sampleLevel = unit === "sample" && patientLevel;
   return "SELECT " + (unit === "sample" ? strip(sampleLevel ? "sd.sample_unique_id" : "g.sample_unique_id") : strip("g.patient_unique_id")) + " AS pid,\n" +
@@ -237,7 +266,9 @@ export function assayHeatmapSql(profileType: string, entities: string[], study: 
     (sampleLevel ? "JOIN " + db + ".sample_derived sd ON sd.patient_unique_id = g.patient_unique_id\n" : "") +
     "WHERE g.profile_type = " + sq(profileType) + " AND g.profile_stable_id = " + sq(study + "_" + profileType) + "\n" +
     "  AND g.entity_stable_id IN (" + entities.map(sq).join(",") + ")\n" +
-    "  AND " + finiteSql("g.value") + " IS NOT NULL\n" +
+    "  AND " + finiteSql("g.value") + " IS NOT NULL" +
+    // a patient-level row (the patient in both id columns) has no sample to test
+    (samples && !patientLevel ? fromColumnSamples("g.sample_unique_id", study, samples) : "") + "\n" +
     "GROUP BY pid, gene";
 }
 
@@ -293,17 +324,21 @@ export function specToQueries(spec: OncoprintSpec, pin?: string | null) {
   const { genes, clinical, derivedEvents, lineGap, unit } = normalizeSpec(spec);
   const queries: { label: string; sql: string }[] = [];
   const gb = spec.layout && spec.layout.groupBy;
+  let groupRows: string[] | null = null;
   if (gb && gb.kind === "cohorts" && Array.isArray(gb.groups) && gb.groups.length) {
-    for (const g of gb.groups.slice(0, 4))
-      queries.push({ label: "column group \u201c" + (g.name || "group") + "\u201d \u2014 cohort " + unit + "s", sql: cohortColumnsSql({ ...g.dsl, lineGap }, study, DB, unit, pin) });
+    groupRows = gb.groups.slice(0, 4).map((g) => cohortRowsSql({ ...g.dsl, lineGap }, study, DB, pin));
+    gb.groups.slice(0, 4).forEach((g, i) =>
+      queries.push({ label: "column group \u201c" + (g.name || "group") + "\u201d \u2014 cohort " + unit + "s", sql: columnsOfSql(groupRows![i], unit) }));
   } else {
+    if (spec.cohort) groupRows = [cohortRowsSql({ ...spec.cohort.dsl, lineGap }, study, DB, pin)];
     queries.push({ label: spec.cohort ? "cohort " + unit + "s" : "all study " + unit + "s",
       sql: cohortColumnsSql(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, DB, unit, pin) });
   }
-  queries.push({ label: "genomic events (mutations, CNA, SV) for the gene tracks", sql: genomicEventsSql(genes, study, DB, unit) });
-  queries.push({ label: "panel coverage (mutation, copy number and structural variant panels) \u2014 the NOT_PROFILED cell source and frequency denominators", sql: coverageSql(genes, study, DB, unit) });
-  queries.push({ label: "samples per column and the alteration types it was profiled for \u2014 the \u201c# Samples per Patient\u201d and \u201cProfiled for\u201d rows", sql: columnFactsSql(study, DB, unit) });
-  if (clinical.length) queries.push({ label: "clinical attribute tracks", sql: clinicalSql(clinical, study, DB, unit) });
+  const samples = unit === "patient" ? columnSamplesSql(groupRows) : null;
+  queries.push({ label: "genomic events (mutations, CNA, SV) for the gene tracks", sql: genomicEventsSql(genes, study, DB, unit, samples) });
+  queries.push({ label: "panel coverage (mutation, copy number and structural variant panels) \u2014 the NOT_PROFILED cell source and frequency denominators", sql: coverageSql(genes, study, DB, unit, samples) });
+  queries.push({ label: "samples per column and the alteration types it was profiled for \u2014 the \u201c# Samples per Patient\u201d and \u201cProfiled for\u201d rows", sql: columnFactsSql(study, DB, unit, samples) });
+  if (clinical.length) queries.push({ label: "clinical attribute tracks", sql: clinicalSql(clinical, study, DB, unit, samples) });
   for (const de of derivedEvents)
     queries.push({ label: "derived-event track \u201c" + (de.label || "derived event") + "\u201d \u2014 cohort-DSL patients", sql: cohortColumnsSql({ ...de.expression, lineGap }, study, DB, unit, pin) });
   return { genes, clinical, lineGap, queries };
@@ -316,7 +351,29 @@ export interface ContractOpts {
   provenance?: boolean;
 }
 
-export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}): Promise<Contract> {
+export function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}): Promise<Contract> {
+  // a request context carries the resolved column samples (columnSamplesIn) to every query
+  return ensureChContext(() => buildContractIn(spec, opts));
+}
+
+/** the most column samples shipped as an external table; past it the queries read the definition */
+const COLUMN_SAMPLES_EXTERNAL_LIMIT = 200_000;
+
+/**
+ * A study's column samples, already read off the column fetch, shipped with every later query as
+ * an external table, so the cohort definitions — a timeline cohort is a heavy query — are evaluated
+ * once, not inside each of the contract's data queries. The definition itself (columnSamplesSql)
+ * when there is no request context to hold the table, or the list is too large to ship.
+ */
+function columnSamplesIn(study: string, sids: string[], groupRows: string[]): string | null {
+  const table = "_op_samples_" + study.replace(/[^A-Za-z0-9_]/g, "_");
+  if (sids.length <= COLUMN_SAMPLES_EXTERNAL_LIMIT && registerChExternal(
+    { name: table, structure: "sid String", data: sids.length ? sids.map((x) => x.replace(/[\t\n\\]/g, "")).join("\n") + "\n" : "" }))
+    return "SELECT sid FROM " + table;
+  return columnSamplesSql(groupRows);
+}
+
+async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise<Contract> {
   const t0 = Date.now();
   assertCustomDataPresent(spec);
   // Record a query the same way the resolvers do: pushed before the await and
@@ -361,31 +418,42 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   if (unit === "sample" && derivedEvents.length)
     throw new Error("cohort rows are patient-level: a cohort selects patients, so drawing one per sample would repeat a patient's answer across their samples. Drop the rows or switch columns back to patients.");
 
-  // ---- columns: groups of patients --------------------------------------
-  let groups: { name: string; pids: string[] }[]; // [{name, pids: [columnId]}] — a patient lands in its first matching group
+  // ---- columns: groups of patients or samples ----------------------------
+  let groups: { name: string; pids: string[] }[]; // [{name, pids: [columnId]}] — a column lands in its first matching group
   const studyOf = new Map<string, string>(); // columnId -> study (avoids prefix-ambiguity parsing)
+  // each study's cohort rows per column group, in group order: what patient columns are built from
+  const rowsByStudy = new Map<string, string[]>(studies.map((s) => [s, []]));
+  // each study's samples its patient columns are built from: a column's samples in the group it is drawn in
+  const columnSamples = new Map<string, string[]>(studies.map((s) => [s, []]));
   const gb = spec.layout && spec.layout.groupBy;
   if (gb && gb.kind === "cohorts" && Array.isArray(gb.groups) && gb.groups.length) {
     groups = [];
     const seen = new Set<string>();
     for (const g of gb.groups.slice(0, 4)) {
       const v = (g.dsl as PidsCarrier | undefined)?.[PIDS_SQL];
-      const raw: string[] = [];
+      let per: { s: string; cols: ColumnRows }[];
       if (v && typeof v === "object") {
         // federated group: {study: sql} map from analysis.js — fetch per study in
         // parallel, merge in study order (deterministic column order)
-        const fetched = await Promise.all(studies.filter((s) => typeof (v as Record<string, string>)[s] === "string").map(async (s) =>
-          ({ s, r: await lqRows("oncoprint:columns", "SELECT pid FROM (\n" + (v as Record<string, string>)[s] + "\n)", s) })));
-        for (const { s, r } of fetched)
-          for (const x of r.rows) { const id = qual(s, x[0] as string); raw.push(id); studyOf.set(id, s); }
+        const held = studies.filter((s) => typeof (v as Record<string, string>)[s] === "string");
+        for (const s of held) rowsByStudy.get(s)!.push((v as Record<string, string>)[s]);
+        per = await Promise.all(held.map(async (s) =>
+          ({ s, cols: columnRows((await lqRows("oncoprint:columns", columnRowsSql((v as Record<string, string>)[s], unit), s)).rows) })));
       } else {
         // no pre-compiled SQL: compile the definition against each study in turn
-        const per = await Promise.all(studies.map(async (s) =>
-          ({ s, pids: await cohortPatients({ ...g.dsl, lineGap }, s, opts.log, "oncoprint:columns", dbOf(s), unit, pin, connOf(s)) })));
-        for (const { s, pids } of per) for (const p of pids) { const id = qual(s, p); raw.push(id); studyOf.set(id, s); }
+        per = await Promise.all(studies.map(async (s) => {
+          const rows = cohortRowsSql({ ...g.dsl, lineGap }, s, dbOf(s), pin);
+          rowsByStudy.get(s)!.push(rows);
+          return { s, cols: await cohortColumns(rows, s, opts.log, "oncoprint:columns", unit, connOf(s)) };
+        }));
       }
-      const pids = raw.filter(p => !seen.has(p));
-      pids.forEach(p => seen.add(p));
+      const pids: string[] = [];
+      for (const { s, cols } of per) for (const p of cols.pids) {
+        const id = qual(s, p);
+        if (seen.has(id)) continue;
+        seen.add(id); pids.push(id); studyOf.set(id, s);
+        columnSamples.get(s)!.push(...cols.samples.get(p)!);
+      }
       groups.push({ name: g.name || "group " + (groups.length + 1), pids });
     }
   } else if (multi) {
@@ -396,11 +464,23 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
     const pids: string[] = [];
     for (const { s, r } of fetched) for (const x of r.rows) { const id = qual(s, x[0] as string); pids.push(id); studyOf.set(id, s); }
     groups = [{ name: "all patients", pids }];
+  } else if (spec.cohort) {
+    const rows = cohortRowsSql({ ...spec.cohort.dsl, lineGap }, study, dbOf(study), pin);
+    rowsByStudy.get(study)!.push(rows);
+    const cols = await cohortColumns(rows, study, opts.log, "oncoprint:columns", unit, connOf(study));
+    for (const p of cols.pids) { studyOf.set(p, study); columnSamples.get(study)!.push(...cols.samples.get(p)!); }
+    groups = [{ name: "cohort", pids: cols.pids }];
   } else {
-    const pids = await cohortPatients(spec.cohort ? { ...spec.cohort.dsl, lineGap } : null, study, opts.log, "oncoprint:columns", dbOf(study), unit, pin, connOf(study));
+    // every column of the study, each built from all of its samples: no sample to carry
+    const pids = (await lqRows("oncoprint:columns", cohortColumnsSql(null, study, dbOf(study), unit, pin), study)).rows.map((x) => x[0] as string);
     for (const p of pids) studyOf.set(p, study);
     groups = [{ name: "cohort", pids }];
   }
+  // Patient columns collapse their samples IN THE COHORT only; sample columns are those samples
+  // already, so their rows need no narrowing. Read off the column fetch, so no cohort is
+  // evaluated again; no cohort at all means every sample counts.
+  const samplesOf = (s: string): string | null =>
+    unit === "patient" && rowsByStudy.get(s)!.length ? columnSamplesIn(s, columnSamples.get(s)!, rowsByStudy.get(s)!) : null;
   const allPids = groups.flatMap(g => g.pids);
   if (!allPids.length) throw new Error("cohort is empty");
 
@@ -410,9 +490,9 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   const profiledMasks: { pid: string; mask: number }[] = [];
   const samplesPer: { pid: string; n: number }[] = [];
   const evFetched = await Promise.all(studies.map(s =>
-    Promise.all([lqRows("oncoprint:alterations", genomicEventsSql(genes, s, dbOf(s), unit), s),
-                 lqRows("oncoprint:coverage", coverageSql(genes, s, dbOf(s), unit), s),
-                 lqRows("oncoprint:profiledTypes", columnFactsSql(s, dbOf(s), unit), s)]).then(([e, c, p]) => ({ s, e, c, p }))));
+    Promise.all([lqRows("oncoprint:alterations", genomicEventsSql(genes, s, dbOf(s), unit, samplesOf(s)), s),
+                 lqRows("oncoprint:coverage", coverageSql(genes, s, dbOf(s), unit, samplesOf(s)), s),
+                 lqRows("oncoprint:profiledTypes", columnFactsSql(s, dbOf(s), unit, samplesOf(s)), s)]).then(([e, c, p]) => ({ s, e, c, p }))));
   for (const { s, e, c, p } of evFetched) {
     const pref = multi ? s + "_" : "";
     // column order is the SELECT's: pid, gene, vt, mt, mv, cna
@@ -438,7 +518,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   if (clinical.length) {
     const byAttr = new Map<string, Map<string, string>>(clinical.map((a) => [a, new Map<string, string>()]));
     const cdFetched = await Promise.all(studies.map(async (s) =>
-      ({ s, r: await lqRows("oncoprint:clinicalTracks", clinicalSql(clinical, s, dbOf(s), unit), s) })));
+      ({ s, r: await lqRows("oncoprint:clinicalTracks", clinicalSql(clinical, s, dbOf(s), unit, samplesOf(s)), s) })));
     // rows are (pid, k, v); bucket straight into per-attribute maps, no intermediate array
     for (const { s, r } of cdFetched) {
       const pref = multi ? s + "_" : "";
@@ -460,7 +540,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
       const okStudies = studies.filter((_, i) => assays[i]);
       const values = new Map<string, number>();
       const fetched = await Promise.all(okStudies.map(async (s) =>
-        ({ s, r: await lqRows("oncoprint:assay heatmap", assayHeatmapSql(h.profileType, h.genes, s, dbOf(s), unit, !!assays[studies.indexOf(s)]!.patientLevel), s) })));
+        ({ s, r: await lqRows("oncoprint:assay heatmap", assayHeatmapSql(h.profileType, h.genes, s, dbOf(s), unit, !!assays[studies.indexOf(s)]!.patientLevel, samplesOf(s)), s) })));
       for (const { s, r } of fetched)
         for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
       heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf: false, assay: true, values });
@@ -479,7 +559,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
             .map(([pt]) => ", " + pt + " (generic assay: name its entities)").join("") + ")");
     const values = new Map<string, number>(); // columnId|gene -> value
     const hFetched = await Promise.all(okStudies.map(async (s) =>
-      ({ s, r: await lqRows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s), unit) : heatmapSql(h.profileType, h.genes, s, dbOf(s), unit), s) })));
+      ({ s, r: await lqRows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s), unit, samplesOf(s)) : heatmapSql(h.profileType, h.genes, s, dbOf(s), unit, samplesOf(s)), s) })));
     for (const { s, r } of hFetched)
       for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
     heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf, values });
@@ -523,7 +603,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
         " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0]), connOf(studies[0])))].join(", ") || "none") + ")");
     const values = new Map<string, number>();
     const fetched = await Promise.all(okStudies.map(async (s) =>
-      ({ s, r: await lqRows("oncoprint:overlay " + ov.kind, heatmapSql(ov.profileType, genes, s, dbOf(s), unit), s) })));
+      ({ s, r: await lqRows("oncoprint:overlay " + ov.kind, heatmapSql(ov.profileType, genes, s, dbOf(s), unit, samplesOf(s)), s) })));
     for (const { s, r } of fetched)
       for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
     overlaysIn.push({ kind: ov.kind, profileType: ov.profileType, threshold: ov.threshold, values });
@@ -533,7 +613,7 @@ export async function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}
   const derivedIn: AssembleInput["derived"] = [];
   const derivedConn = derivedEvents.length ? conns.get(study) || await patientLevelConn(study, "derived-event rows list patients") : null;
   for (const de of derivedEvents)
-    derivedIn.push({ label: de.label, pids: new Set<string>(await cohortPatients({ ...de.expression, lineGap }, study, opts.log, "oncoprint:derivedEvent", derivedConn!.db, unit, pin, derivedConn!)) });
+    derivedIn.push({ label: de.label, pids: new Set<string>((await cohortColumns(cohortRowsSql({ ...de.expression, lineGap }, study, derivedConn!.db, pin), study, opts.log, "oncoprint:derivedEvent", unit, derivedConn!)).pids) });
 
   const queryMs = Date.now() - t0;
   const tAsm = Date.now();

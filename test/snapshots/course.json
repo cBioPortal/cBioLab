@@ -3,13 +3,15 @@
   "cohorts": {
     "TP53 mut": {
       "count": 13105,
+      "samples": 13124,
       "text": "OQL[TP53: MUT]",
       "studies": [
         "msk_chord_2024"
       ]
     },
     "TP53 wt": {
-      "count": 11594,
+      "count": 11642,
+      "samples": 11664,
       "text": "NOT OQL[TP53:] AND profiled for TP53 MUTATION",
       "studies": [
         "msk_chord_2024"
@@ -305,127 +307,127 @@
           "points": [
             {
               "t": -12,
-              "atRisk": 2781,
+              "atRisk": 2796,
               "n": 0,
               "pct": 0
             },
             {
               "t": -9,
-              "atRisk": 3088,
+              "atRisk": 3104,
               "n": 0,
               "pct": 0
             },
             {
               "t": -6,
-              "atRisk": 4019,
+              "atRisk": 4040,
               "n": 0,
               "pct": 0
             },
             {
               "t": -3,
-              "atRisk": 10608,
+              "atRisk": 10654,
               "n": 0,
               "pct": 0
             },
             {
               "t": 0,
-              "atRisk": 11044,
-              "n": 11044,
+              "atRisk": 11092,
+              "n": 11092,
               "pct": 100
             },
             {
               "t": 3,
-              "atRisk": 10727,
-              "n": 7609,
-              "pct": 70.9
+              "atRisk": 10775,
+              "n": 7646,
+              "pct": 71
             },
             {
               "t": 6,
-              "atRisk": 10417,
-              "n": 6317,
+              "atRisk": 10463,
+              "n": 6343,
               "pct": 60.6
             },
             {
               "t": 9,
-              "atRisk": 10054,
-              "n": 5596,
-              "pct": 55.7
+              "atRisk": 10099,
+              "n": 5613,
+              "pct": 55.6
             },
             {
               "t": 12,
-              "atRisk": 9629,
-              "n": 5149,
-              "pct": 53.5
+              "atRisk": 9673,
+              "n": 5170,
+              "pct": 53.4
             },
             {
               "t": 15,
-              "atRisk": 9230,
-              "n": 4811,
+              "atRisk": 9273,
+              "n": 4828,
               "pct": 52.1
             },
             {
               "t": 18,
-              "atRisk": 8779,
-              "n": 4481,
+              "atRisk": 8822,
+              "n": 4495,
               "pct": 51
             },
             {
               "t": 21,
-              "atRisk": 8393,
-              "n": 4251,
+              "atRisk": 8435,
+              "n": 4265,
               "pct": 50.6
             },
             {
               "t": 24,
-              "atRisk": 8010,
-              "n": 3965,
-              "pct": 49.5
+              "atRisk": 8051,
+              "n": 3981,
+              "pct": 49.4
             },
             {
               "t": 27,
-              "atRisk": 7602,
-              "n": 3765,
+              "atRisk": 7641,
+              "n": 3783,
               "pct": 49.5
             },
             {
               "t": 30,
-              "atRisk": 7245,
-              "n": 3528,
+              "atRisk": 7284,
+              "n": 3547,
               "pct": 48.7
             },
             {
               "t": 33,
-              "atRisk": 6904,
-              "n": 3353,
-              "pct": 48.6
+              "atRisk": 6941,
+              "n": 3369,
+              "pct": 48.5
             },
             {
               "t": 36,
-              "atRisk": 6568,
-              "n": 3150,
+              "atRisk": 6604,
+              "n": 3167,
               "pct": 48
             },
             {
               "t": 39,
-              "atRisk": 6287,
-              "n": 3030,
+              "atRisk": 6322,
+              "n": 3048,
               "pct": 48.2
             },
             {
               "t": 42,
-              "atRisk": 5995,
-              "n": 2894,
+              "atRisk": 6025,
+              "n": 2909,
               "pct": 48.3
             },
             {
               "t": 45,
-              "atRisk": 5696,
-              "n": 2754,
-              "pct": 48.3
+              "atRisk": 5725,
+              "n": 2769,
+              "pct": 48.4
             },
             {
               "…": "5 more",
-              "sha256": "c19851a088b9d5c8"
+              "sha256": "6b95e0e3e0d5b471"
             }
           ]
         },
@@ -439,127 +441,127 @@
           "points": [
             {
               "t": -12,
-              "atRisk": 2781,
+              "atRisk": 2796,
               "n": 105,
               "pct": 3.8
             },
             {
               "t": -9,
-              "atRisk": 3088,
+              "atRisk": 3104,
               "n": 112,
               "pct": 3.6
             },
             {
               "t": -6,
-              "atRisk": 4019,
-              "n": 219,
+              "atRisk": 4040,
+              "n": 220,
               "pct": 5.4
             },
             {
               "t": -3,
-              "atRisk": 10608,
-              "n": 3584,
-              "pct": 33.8
+              "atRisk": 10654,
+              "n": 3607,
+              "pct": 33.9
             },
             {
               "t": 0,
-              "atRisk": 11044,
-              "n": 3439,
-              "pct": 31.1
+              "atRisk": 11092,
+              "n": 3460,
+              "pct": 31.2
             },
             {
               "t": 3,
-              "atRisk": 10727,
-              "n": 1695,
+              "atRisk": 10775,
+              "n": 1703,
               "pct": 15.8
             },
             {
               "t": 6,
-              "atRisk": 10417,
-              "n": 1127,
+              "atRisk": 10463,
+              "n": 1133,
               "pct": 10.8
             },
             {
               "t": 9,
-              "atRisk": 10054,
-              "n": 978,
-              "pct": 9.7
+              "atRisk": 10099,
+              "n": 985,
+              "pct": 9.8
             },
             {
               "t": 12,
-              "atRisk": 9629,
-              "n": 837,
+              "atRisk": 9673,
+              "n": 844,
               "pct": 8.7
             },
             {
               "t": 15,
-              "atRisk": 9230,
-              "n": 711,
+              "atRisk": 9273,
+              "n": 716,
               "pct": 7.7
             },
             {
               "t": 18,
-              "atRisk": 8779,
-              "n": 629,
+              "atRisk": 8822,
+              "n": 632,
               "pct": 7.2
             },
             {
               "t": 21,
-              "atRisk": 8393,
+              "atRisk": 8435,
               "n": 637,
               "pct": 7.6
             },
             {
               "t": 24,
-              "atRisk": 8010,
-              "n": 615,
+              "atRisk": 8051,
+              "n": 620,
               "pct": 7.7
             },
             {
               "t": 27,
-              "atRisk": 7602,
-              "n": 487,
+              "atRisk": 7641,
+              "n": 491,
               "pct": 6.4
             },
             {
               "t": 30,
-              "atRisk": 7245,
-              "n": 467,
+              "atRisk": 7284,
+              "n": 469,
               "pct": 6.4
             },
             {
               "t": 33,
-              "atRisk": 6904,
-              "n": 451,
+              "atRisk": 6941,
+              "n": 454,
               "pct": 6.5
             },
             {
               "t": 36,
-              "atRisk": 6568,
-              "n": 440,
-              "pct": 6.7
+              "atRisk": 6604,
+              "n": 449,
+              "pct": 6.8
             },
             {
               "t": 39,
-              "atRisk": 6287,
-              "n": 372,
-              "pct": 5.9
+              "atRisk": 6322,
+              "n": 379,
+              "pct": 6
             },
             {
               "t": 42,
-              "atRisk": 5995,
-              "n": 363,
+              "atRisk": 6025,
+              "n": 367,
               "pct": 6.1
             },
             {
               "t": 45,
-              "atRisk": 5696,
-              "n": 368,
+              "atRisk": 5725,
+              "n": 370,
               "pct": 6.5
             },
             {
               "…": "5 more",
-              "sha256": "8b83331b53b62db9"
+              "sha256": "080b82fc8980cbfa"
             }
           ]
         }
@@ -647,7 +649,7 @@
             "title": "Count patients per time bin",
             "detail": "The timelineSpan and eventCourse queries above. Per 3-month bin: the cohort's patients observable in it, and of those the ones in each event's state (or with the event in it). Counts only.",
             "scope": "TP53 wt · msk_chord_2024",
-            "rowsIn": 11594
+            "rowsIn": 11642
           },
           {
             "kind": "transform",
@@ -675,7 +677,7 @@
               ],
               [
                 "TP53 wt",
-                "11,594 in the cohort → 11,044 with the anchor event → 11,044 observable in the window"
+                "11,642 in the cohort → 11,092 with the anchor event → 11,092 observable in the window"
               ]
             ]
           },
@@ -773,7 +775,7 @@
           },
           "…": {
             "more": 180,
-            "sha256": "504ee14ebe1d1b66"
+            "sha256": "d840575ea79dbcfc"
           }
         }
       }

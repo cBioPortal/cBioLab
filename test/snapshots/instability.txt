@@ -1,19 +1,19 @@
 Analysis over msk_impact_50k_2026 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- Colorectal: 4,993 patients — CANCER_TYPE in [Colorectal Cancer] (any sample)
-- Breast: 5,803 patients — CANCER_TYPE in [Breast Cancer] (any sample)
-- Pancreatic: 2,729 patients — CANCER_TYPE in [Pancreatic Cancer] (any sample)
+- Colorectal: 4,993 patients — CANCER_TYPE in [Colorectal Cancer]
+- Breast: 5,803 patients — CANCER_TYPE in [Breast Cancer]
+- Pancreatic: 2,729 patients — CANCER_TYPE in [Pancreatic Cancer]
 
 Genomic instability (hg19 segments, threshold ±0.2, arm called past 50% of its length; 39 arms):
-  Colorectal: 5,390 samples scored; aneuploidy score median [IQR] 7 [2–12], FGA 15 [4–28]%
-    most often gained: 20q 60%, 13q 42%, 20p 31%, 8q 31%, 7p 29%
-    most often lost: 18q 53%, 18p 43%, 8p 39%, 17p 36%, 4q 26%
-  Breast: 6,906 samples scored; aneuploidy score median [IQR] 8 [3–14], FGA 22 [9–38]%
-    most often gained: 1q 45%, 8q 41%, 16p 27%, 20q 23%, 5p 14%
-    most often lost: 8p 41%, 17p 40%, 16q 39%, 11q 31%, 13q 31%
-  Pancreatic: 2,910 samples scored; aneuploidy score median [IQR] 2 [0–9], FGA 6 [0–22]%
+  Colorectal: 5,273 samples scored; aneuploidy score median [IQR] 7 [2–12], FGA 15 [4–28]%
+    most often gained: 20q 61%, 13q 43%, 20p 31%, 8q 31%, 7p 30%
+    most often lost: 18q 54%, 18p 44%, 8p 39%, 17p 36%, 4q 26%
+  Breast: 6,806 samples scored; aneuploidy score median [IQR] 8 [4–14], FGA 22 [9–38]%
+    most often gained: 1q 46%, 8q 41%, 16p 27%, 20q 23%, 5p 14%
+    most often lost: 8p 42%, 17p 40%, 16q 39%, 11q 31%, 13q 31%
+  Pancreatic: 2,850 samples scored; aneuploidy score median [IQR] 2 [0–9], FGA 6 [0–22]%
     most often gained: 20q 17%, 7p 15%, 12p 14%, 8q 14%, 19q 13%
     most often lost: 18q 32%, 17p 23%, 9p 22%, 6q 21%, 8p 19%
-  Kruskal–Wallis: aneuploidy score p=2.0e-163, FGA p=1.2e-222
-  CAVEAT (tell the user): From each sample's copy-number segments (hg19; autosomes only — X's log ratio mostly records sex), computed per sample in the database: FGA is the share of the sample's segmented length whose |segment mean| is at or past 0.2 (log2), counted in 1-point bins; an arm (p and q split at hg19's centromeres, from UCSC's cytoBand; the acrocentric p arms of 13, 14, 15, 21 and 22 left out, as Taylor et al. 2018 did) is gained or lost when more than 50% of its length is past ±0.2, and the aneuploidy score is how many of the 39 arms are. Colorectal: 5,390 samples scored of 5,395 (5,390 with segments; 5,354 with every arm covered); Breast: 6,906 samples scored of 6,907 (6,906 with segments; 6,685 with every arm covered); Pancreatic: 2,910 samples scored of 2,911 (2,910 with segments; 2,891 with every arm covered); an arm segments cover for less than 50% of its length is not called, which lowers that sample's score. Boxes are the quartiles, whiskers the 5th and 95th percentiles, read from the histograms; Kruskal–Wallis compares the cohorts' distributions (normal approximation with ties). Every sample of each patient counts. Panel-derived segments are noisy and purity is not corrected — a low-purity tumour's changes sit near 0 and read as stable — so these are relative measures within one assay, not absolute ploidy.
+  Kruskal–Wallis: aneuploidy score p=1.4e-159, FGA p=1.0e-218
+  CAVEAT (tell the user): From each sample's copy-number segments (hg19; autosomes only — X's log ratio mostly records sex), computed per sample in the database: FGA is the share of the sample's segmented length whose |segment mean| is at or past 0.2 (log2), counted in 1-point bins; an arm (p and q split at hg19's centromeres, from UCSC's cytoBand; the acrocentric p arms of 13, 14, 15, 21 and 22 left out, as Taylor et al. 2018 did) is gained or lost when more than 50% of its length is past ±0.2, and the aneuploidy score is how many of the 39 arms are. Colorectal: 5,273 samples scored of 5,277 (5,273 with segments; 5,237 with every arm covered); Breast: 6,806 samples scored of 6,807 (6,806 with segments; 6,587 with every arm covered); Pancreatic: 2,850 samples scored of 2,851 (2,850 with segments; 2,832 with every arm covered); an arm segments cover for less than 50% of its length is not called, which lowers that sample's score. Boxes are the quartiles, whiskers the 5th and 95th percentiles, read from the histograms; Kruskal–Wallis compares the cohorts' distributions (normal approximation with ties). Every sample of the cohort counts. Panel-derived segments are noisy and purity is not corrected — a low-purity tumour's changes sit near 0 and read as stable — so these are relative measures within one assay, not absolute ploidy.

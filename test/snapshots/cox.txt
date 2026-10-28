@@ -1,7 +1,7 @@
 Analysis over crc_apc_impact_2020 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- all patients: 471 patients — all patients in the study
+- all patients: 471 patients — all samples in the study
 
 Cox regression (OS, n=471, 311 events):
   TP53/KRAS/PIK3CA (any) mutation status: Mutated vs Not mutated: HR 0.72 (95% CI 0.47-1.10) p=0.1309

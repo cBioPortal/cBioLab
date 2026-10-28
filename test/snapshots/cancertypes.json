@@ -3,7 +3,8 @@
   "cohorts": {
     "all patients": {
       "count": 48179,
-      "text": "all patients in the study",
+      "samples": 54331,
+      "text": "all samples in the study",
       "studies": [
         "msk_impact_50k_2026"
       ]
@@ -1514,13 +1515,13 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Patients altered in at least one of 3 genes per CANCER_TYPE group, over the patients profiled for at least one of them (the union of their panels, as an oncoprint's merged row counts it). Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. A patient with more than one kind of alteration across the genes counts once, under \"multiple\". A patient counts in every group one of their samples falls in, profiled if any of those samples is, altered if any is. CANCER_TYPE is read per sample and folded on case and whitespace; samples with no value form their own group. Groups with fewer than 200 profiled patients are pooled into one bar rather than dropped. ",
+      "caveat": "Patients altered in at least one of 3 genes per CANCER_TYPE group, over the patients profiled for at least one of them (the union of their panels, as an oncoprint's merged row counts it). Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. A patient with more than one kind of alteration across the genes counts once, under \"multiple\". A patient counts in every group one of their samples in the cohort falls in, profiled if any of those samples is, altered if any is. CANCER_TYPE is read per sample and folded on case and whitespace; samples with no value form their own group. Groups with fewer than 200 profiled patients are pooled into one bar rather than dropped. ",
       "method": {
         "steps": [
           {
             "kind": "fetch",
             "title": "Count patients per CANCER_TYPE group",
-            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only, or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.",
+            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only, or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.",
             "scope": "all patients · msk_impact_50k_2026",
             "rowsOut": 67,
             "params": [

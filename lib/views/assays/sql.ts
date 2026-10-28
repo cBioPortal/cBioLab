@@ -1,5 +1,6 @@
 // The assays view's SQL: what its runner (run.ts) asks each participant's database for.
 import { sq } from "../../compiler.ts";
+import { assayInCohortSql } from "../../generic-assay.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /** Per entity, over the cohort's samples (or patients, for a patient-level assay): n, Σv and Σv² of
@@ -29,7 +30,7 @@ function assayRowsCte(cohortSql: string, study: string, db: string, profileType:
     "  SELECT entity_stable_id AS entity, value FROM " + db + ".generic_assay_data_derived\n" +
     "  WHERE profile_type = " + sq(profileType) + "\n" +
     "    AND profile_stable_id = " + sq(study + "_" + profileType) + "\n" +
-    "    AND patient_unique_id IN (SELECT concat(" + sq(study + "_") + ", pid) FROM cohort)\n" +
+    "    AND " + assayInCohortSql(study) + "\n" +
     ")"
   );
 }

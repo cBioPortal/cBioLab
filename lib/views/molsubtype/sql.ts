@@ -6,6 +6,13 @@ import { sq } from "../../compiler.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { driverJoin } from "../../federation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
+import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
+
+/** A clinical row of the cohort: a sample row by its sample, a patient row by its patient. */
+function inCohortClinical(study: string): string {
+  return "(type = 'sample' AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) +
+    " OR type = 'patient' AND " + inCohortPatients(pidOf("patient_unique_id", study)) + ")";
+}
 
 /** Patients per (class, why, group). Counts only. */
 export function molCountsSql(cohortSql: string, study: string, db: string, o: MolEndometrialOpts): AggregateSql {
@@ -22,7 +29,7 @@ export function molSurvivalSql(cohortSql: string, study: string, db: string, o: 
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     ")\n" +
     "SELECT cls.cls AS cls, round(os.months, 2) AS t, os.dead AS dead, count() AS n\n" +
@@ -36,7 +43,7 @@ export function molMsiAttributesSql(cohortSql: string, study: string, db: string
     "SELECT attribute_name AS attribute, uniqExact(" + pid + ") AS patients, uniqExact(attribute_value) AS nvalues, arraySort(groupUniqArray(8)(attribute_value)) AS examples\n" +
     "FROM " + clinicalTable(db, []) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND positionCaseInsensitive(attribute_name, 'MSI') > 0 AND trimBoth(attribute_value) != ''\n" +
-    "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  AND " + inCohortClinical(study) + "\n" +
     "GROUP BY attribute ORDER BY patients DESC");
 }
 
@@ -65,13 +72,15 @@ const MOL_TP53_CLASSES = ["Missense_Mutation", "Nonsense_Mutation", "Frame_Shift
 
 /**
  * `cls`: each cohort patient's endometrial molecular class — the TCGA / ProMisE / WHO 2020 hierarchy,
- * first match wins: 'POLEmut' (a POLE hotspot called in any sample), 'MMRd' (MSI-high in any sample),
- * 'p53abn' (an abnormal TP53 mutation), 'NSMP' (none of these) — and 'NC' (not classifiable) with
+ * first match wins: 'POLEmut' (a POLE hotspot called in any of its cohort samples), 'MMRd' (MSI-high in
+ * any of them), 'p53abn' (an abnormal TP53 mutation), 'NSMP' (none of these) — and 'NC' (not classifiable) with
  * `why` when an input the hierarchy needs before deciding is missing: not sequenced, not profiled for
- * POLE or TP53 (panel-aware), or no MSI value. Also `grp`, the `by` attribute per patient.
+ * POLE or TP53 (panel-aware), or no MSI value. Only the cohort's own samples are read. Also `grp`, the
+ * `by` attribute per patient.
  */
 function molEndometrialCtes(cohortSql: string, study: string, db: string, o: MolEndometrialOpts): string {
   const sdPid = pidOf("sd.patient_unique_id", study), gPid = pidOf("g.patient_unique_id", study), pid = pidOf("patient_unique_id", study);
+  const spSid = bareSampleId("sp.sample_unique_id", study), gSid = bareSampleId("g.sample_unique_id", study);
   const attr = orgAttr(o.msi.attribute);
   const hot = o.poleHotspots.map((h) => { if (!/^[A-Z][0-9]{1,5}[A-Z*]$/.test(h)) throw new Error("bad POLE hotspot '" + String(h).slice(0, 20) + "'"); return sq(h); }).join(", ");
   const v = clinicalValueFoldSql("attribute_value");
@@ -86,7 +95,7 @@ function molEndometrialCtes(cohortSql: string, study: string, db: string, o: Mol
     "  SELECT DISTINCT " + sdPid + " AS pid, toString(sp.gene_panel_id) AS panel\n" +
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
-    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED' AND " + sdPid + " IN (SELECT pid FROM cohort)\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED' AND " + inCohortSamples(spSid) + "\n" +
     "),\n" +
     "cov AS (\n" +
     "  SELECT pp.pid AS pid, max(pp.panel = 'WES' OR gp.gene = 'POLE') AS pole, max(pp.panel = 'WES' OR gp.gene = 'TP53') AS tp53\n" +
@@ -100,13 +109,13 @@ function molEndometrialCtes(cohortSql: string, study: string, db: string, o: Mol
     "  FROM " + db + ".genomic_event_derived g\n" + (o.p53Pin ? driverJoin(o.p53Pin) : "") +
     "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'\n" +
     "    AND lowerUTF8(g.mutation_status) != 'germline' AND NOT g.off_panel AND g.hugo_gene_symbol IN ('POLE', 'TP53')\n" +
-    "    AND " + gPid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(gSid) + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "msi AS (\n" +
     "  SELECT " + pid + " AS pid, max(" + msiState + ") AS m\n" +
     "  FROM " + clinicalTable(db, [attr]) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attr) + " AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attr) + " AND " + inCohortClinical(study) + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "cls AS (\n" +
@@ -121,9 +130,9 @@ function molEndometrialCtes(cohortSql: string, study: string, db: string, o: Mol
       ? "  SELECT " + pid + " AS pid, if(uniqExact(" + v + ") > 1, 'Multiple', any(trimBoth(attribute_value))) AS g\n" +
         "  FROM " + clinicalTable(db, [by]) + "\n" +
         "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(by) + " AND trimBoth(attribute_value) != ''\n" +
-        "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+        "    AND " + inCohortClinical(study) + "\n" +
         "  GROUP BY pid\n"
-      : "  SELECT pid, '' AS g FROM cohort\n") +
+      : "  SELECT DISTINCT pid, '' AS g FROM cohort\n") +
     ")"
   );
 }

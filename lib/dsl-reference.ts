@@ -60,11 +60,11 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "EGFR-mutant NSCLC": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
           { kind: "oql", q: "EGFR: MUT" }
         ] },
         "KRAS-mutant NSCLC": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
           { kind: "oql", q: "KRAS: MUT" }
         ] }
       },
@@ -85,11 +85,11 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "CRC, KRAS-mutant": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] },
           { kind: "oql", q: "KRAS: MUT" }
         ] },
         "CRC, KRAS wild-type": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] },
           { not: { kind: "oql", q: "KRAS:" } },
           { kind: "profiled", type: "MUTATION", gene: "KRAS" }
         ] }
@@ -245,22 +245,22 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "early failure (discovery)": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
           { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }], occurrence: "FIRST" },
             b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] }, rel: { type: "BEFORE", maxDays: 180 } },
           { kind: "split", part: "discovery" }] },
         "durable response (discovery)": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
           { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }], occurrence: "FIRST" },
             b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] }, rel: { type: "NOT_FOLLOWED_BY", withinDays: 365, observed: true } },
           { kind: "split", part: "discovery" }] },
         "early failure (validation)": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
           { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }], occurrence: "FIRST" },
             b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] }, rel: { type: "BEFORE", maxDays: 180 } },
           { kind: "split", part: "validation" }] },
         "durable response (validation)": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
           { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }], occurrence: "FIRST" },
             b: { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] }, rel: { type: "NOT_FOLLOWED_BY", withinDays: 365, observed: true } },
           { kind: "split", part: "validation" }] }
@@ -332,8 +332,8 @@ export const EXAMPLES: DslExample[] = [
       cohorts: {
         "CRC/PAAD without CDKN2A loss": { all: [
           { any: [
-            { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" },
-            { kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }
+            { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] },
+            { kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"] }
           ] },
           { not: { kind: "genomicData", gene: "CDKN2A", profileType: "cna", range: { lte: -2 } } }
         ] }
@@ -423,7 +423,7 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: {
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] },
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] },
         "KRAS G12C": { all: [{ kind: "oql", q: "KRAS: G12C" }] }
       },
       views: [
@@ -470,7 +470,7 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: {
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] }
       },
       views: [
         { kind: "plot", unit: "patient", cohorts: ["NSCLC"],
@@ -512,7 +512,7 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: {
-        "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] }
+        "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"] }] }
       },
       views: [{ kind: "oncoprint", cohorts: ["Pancreatic"],
         genes: [{ label: "TP53 pathway", genes: ["TP53", "MDM2", "MDM4"] }, "TP53", { label: "RAS", genes: ["KRAS", "NRAS", "HRAS"] }, "SMAD4", "CDKN2A"],
@@ -565,7 +565,7 @@ export const EXAMPLES: DslExample[] = [
       title: "NSCLC driver workup",
       notes: "Standard first pass at a driver panel: how often each gene is altered, whether the alterations travel together, and who carries them. Retarget by editing $genes.",
       cohorts: {
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] }
       },
       views: [
         { kind: "compare", cohorts: ["NSCLC"], genes: "$genes", note: "Frequencies first \u2014 the headline numbers." },
@@ -599,7 +599,7 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: {
-        "CRC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }] }
+        "CRC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] }] }
       },
       views: [{ kind: "hotspots", cohorts: ["CRC"], genes: ["KRAS", "BRAF", "PIK3CA", "TP53"], minCount: 3 }]
     }
@@ -638,7 +638,7 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: {
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] }
       },
       views: [{ kind: "cooccurrence", cohorts: ["NSCLC"], genes: ["EGFR", "KRAS", "TP53", "STK11", "KEAP1", "ALK"] }]
     }
@@ -696,7 +696,7 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: { "NSCLC": {
-        all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }],
+        all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }],
         splits: { "KRAS allele": { other: "KRAS wild-type", arms: [
           { name: "G12C", where: { kind: "oql", q: "KRAS: G12C" } },
           { name: "other KRAS", where: { kind: "oql", q: "KRAS: MUT" } }
@@ -741,8 +741,8 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "crc_apc_impact_2020",
       cohorts: {
-        "MSI-high": { all: [{ kind: "clinical", per: "sample", attribute: "MSI_TYPE", op: "=", value: "Instable" }] },
-        "MSS": { all: [{ kind: "clinical", per: "sample", attribute: "MSI_TYPE", op: "=", value: "Stable" }] }
+        "MSI-high": { all: [{ kind: "clinical", attribute: "MSI_TYPE", op: "=", value: "Instable" }] },
+        "MSS": { all: [{ kind: "clinical", attribute: "MSI_TYPE", op: "=", value: "Stable" }] }
       },
       views: [{ kind: "cox", cohorts: ["MSI-high", "MSS"], covariates: [{ source: "alteration", gene: "APC", by: "mutated" }], stratifyByCohort: true }]
     }
@@ -778,8 +778,8 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_impact_50k_2026",
       cohorts: {
-        "Early-onset CRC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }, { kind: "clinical", attribute: "AGE_AT_DX", op: "<", value: 50 }] },
-        "Average-onset CRC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }, { kind: "clinical", attribute: "AGE_AT_DX", op: ">=", value: 50 }] }
+        "Early-onset CRC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] }, { kind: "clinical", attribute: "AGE_AT_DX", op: "<", value: 50 }] },
+        "Average-onset CRC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] }, { kind: "clinical", attribute: "AGE_AT_DX", op: ">=", value: 50 }] }
       },
       views: [{ kind: "adjusted", cohorts: ["Early-onset CRC", "Average-onset CRC"], covariates: ["MSI_TYPE", "TMB_SCORE"] }]
     }
@@ -802,7 +802,7 @@ export const EXAMPLES: DslExample[] = [
     note: "Non-small cell lung cancer in MSK-CHORD. 2,898 of 7,809 patients (37.1%) carry none of the eleven drivers. Their tumours carry NF1 (12.4% against 5.0%), NFE2L2, KEAP1, RASA1, MAP2K1 and NRAS mutations more often — other routes into the same MAPK and oxidative-stress pathways — while RBM10 goes with the drivers.",
     doc: {
       study: "msk_chord_2024",
-      cohorts: { "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] } },
+      cohorts: { "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] } },
       views: [{ kind: "drivernegative", cohorts: ["NSCLC"] }]
     }
   },
@@ -824,7 +824,7 @@ export const EXAMPLES: DslExample[] = [
     note: "Non-small cell lung cancer in MSK-CHORD. EGFR-mutant tumours carry brain sites more often (OR 1.7) and gain them faster after sequencing: 32% by five years against 23%, Gray's p < 0.001; STK11, KEAP1 and SMARCA4 go with adrenal spread.",
     doc: {
       study: "msk_chord_2024",
-      cohorts: { "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] } },
+      cohorts: { "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] } },
       views: [{ kind: "organotropism", cohorts: ["NSCLC"], source: "timeline", genes: ["EGFR", "KRAS", "TP53", "STK11", "KEAP1", "SMARCA4"], incidence: { site: "CNS/Brain", gene: "EGFR" } }]
     }
   },
@@ -835,7 +835,7 @@ export const EXAMPLES: DslExample[] = [
     note: "2,373 endometrial cancers in MSK-IMPACT 50K; 196 have no MSI call. p53-abnormal tumours are 71% of classified patients of African ancestry against 34% of non-Ashkenazi European (as in Weigelt et al. on Black and White patients, PMID 37651310), and survival separates as published: POLE-ultramutated best, p53-abnormal worst (median 29.6 months).",
     doc: {
       study: "msk_impact_50k_2026",
-      cohorts: { "Endometrial": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Endometrial Cancer"], per: "sample" }] } },
+      cohorts: { "Endometrial": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Endometrial Cancer"] }] } },
       views: [{ kind: "molsubtype", cohorts: ["Endometrial"], by: "ANCESTRY_LABEL" }]
     }
   },
@@ -902,9 +902,9 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "crc_apc_impact_2020",
       cohorts: {
-        "stable": { all: [{ kind: "clinical", attribute: "MSI_TYPE", values: ["Stable"], per: "sample" }] },
-        "instable": { all: [{ kind: "clinical", attribute: "MSI_TYPE", values: ["Instable"], per: "sample" }] },
-        "indeterminate": { all: [{ kind: "clinical", attribute: "MSI_TYPE", values: ["Indeterminate", "Do not report"], per: "sample" }] }
+        "stable": { all: [{ kind: "clinical", attribute: "MSI_TYPE", values: ["Stable"] }] },
+        "instable": { all: [{ kind: "clinical", attribute: "MSI_TYPE", values: ["Instable"] }] },
+        "indeterminate": { all: [{ kind: "clinical", attribute: "MSI_TYPE", values: ["Indeterminate", "Do not report"] }] }
       },
       views: [{ kind: "survival", cohorts: ["stable", "instable", "indeterminate"] }]
     }
@@ -917,7 +917,7 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "sarcoma_msk_2022",
       cohorts: {
-        "Well-diff liposarcoma": { all: [{ kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Well-Differentiated Liposarcoma"], per: "sample" }] }
+        "Well-diff liposarcoma": { all: [{ kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Well-Differentiated Liposarcoma"] }] }
       },
       views: [{ kind: "compare", cohorts: ["Well-diff liposarcoma"], genes: ["MDM2", "TP53"] }]
     }
@@ -930,10 +930,10 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "breast_msk_2018",
       cohorts: {
-        "HR+/HER2-": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"], per: "sample" }] },
-        "TNBC": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["Triple Negative"], per: "sample" }] },
-        "HR+/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2+"], per: "sample" }] },
-        "HR-/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR-/HER2+"], per: "sample" }] }
+        "HR+/HER2-": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"] }] },
+        "TNBC": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["Triple Negative"] }] },
+        "HR+/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2+"] }] },
+        "HR-/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR-/HER2+"] }] }
       },
       views: [{ kind: "clinical", cohorts: ["HR+/HER2-", "TNBC", "HR+/HER2+", "HR-/HER2+"], attributes: ["TMB_NONSYNONYMOUS", "FRACTION_GENOME_ALTERED"] }]
     }
@@ -946,8 +946,8 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "ucec_msk_2018",
       cohorts: {
-        "MSI-H": { all: [{ kind: "clinical", attribute: "MSI_STATUS", values: ["MSI-H"], per: "sample" }] },
-        "MSS": { all: [{ kind: "clinical", attribute: "MSI_STATUS", values: ["MSS"], per: "sample" }] }
+        "MSI-H": { all: [{ kind: "clinical", attribute: "MSI_STATUS", values: ["MSI-H"] }] },
+        "MSS": { all: [{ kind: "clinical", attribute: "MSI_STATUS", values: ["MSS"] }] }
       },
       views: [{ kind: "survival", cohorts: ["MSI-H", "MSS"], endpoint: "PFS_1L", monthsAttribute: "PFS_MONTHS_FIRST_LINE_TX", statusAttribute: "PROGRESSION_STATUS" }]
     }
@@ -960,14 +960,14 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "tmb_mskcc_2018",
       cohorts: {
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] },
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] },
         "NSCLC high-TMB": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
-          { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", op: ">=", percentile: 0.8, percentileOf: "NSCLC", per: "sample" }
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
+          { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", op: ">=", percentile: 0.8, percentileOf: "NSCLC" }
         ] },
         "NSCLC low-TMB": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
-          { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", op: "<", percentile: 0.8, percentileOf: "NSCLC", per: "sample" }
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
+          { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", op: "<", percentile: 0.8, percentileOf: "NSCLC" }
         ] }
       },
       views: [{ kind: "survival", cohorts: ["NSCLC high-TMB", "NSCLC low-TMB"] }]
@@ -982,13 +982,13 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "LUAD KRAS G12C, immunotherapy": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Lung Adenocarcinoma"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Lung Adenocarcinoma"] },
           { kind: "oql", q: "KRAS: G12C" },
           { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } },
           { kind: "derived", metric: "followupMonths", range: { gte: 6 } }
         ] },
         "LUAD KRAS wild-type": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Lung Adenocarcinoma"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Lung Adenocarcinoma"] },
           { not: { kind: "oql", q: "KRAS" } }
         ] }
       },
@@ -1003,8 +1003,8 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_impact_50k_2026",
       cohorts: {
-        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }] },
-        "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"], per: "sample" }] }
+        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] }] },
+        "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"] }] }
       },
       views: [{ kind: "genome", cohorts: ["Colorectal", "Breast"], binMb: 2 }]
     }
@@ -1017,8 +1017,8 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: {
-        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }] },
-        "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] }
+        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] }] },
+        "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"] }] }
       },
       views: [{ kind: "pathways", cohorts: ["Colorectal", "Pancreatic"] }]
     }
@@ -1104,7 +1104,7 @@ export const EXAMPLES: DslExample[] = [
     note: "MSK-IMPACT non-small cell lung cancer, 1,680 samples. The oncogenic drivers stay exclusive (KRAS/EGFR 19 together against 170 expected, q≈1e-56), and so do EGFR with STK11 and KEAP1; STK11/KEAP1 co-occur. What moves is what the burden explains: Fisher calls EGFR/TP53 co-occurring (q≈2e-7) because both mark heavily altered tumours, while DISCOVER expects 300 together and sees 294 (q 0.45); KEAP1/TP53, null by Fisher, turns exclusive.",
     doc: {
       study: "msk_impact_2017",
-      cohorts: { "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] } },
+      cohorts: { "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] } },
       views: [{ kind: "exclusivity", cohorts: ["NSCLC"], genes: ["KRAS", "EGFR", "BRAF", "STK11", "KEAP1", "TP53"] }]
     }
   },
@@ -1116,9 +1116,9 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_impact_50k_2026",
       cohorts: {
-        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }] },
-        "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"], per: "sample" }] },
-        "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] }
+        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] }] },
+        "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"] }] },
+        "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"] }] }
       },
       views: [{ kind: "instability", cohorts: ["Colorectal", "Breast", "Pancreatic"] }]
     }
@@ -1142,8 +1142,8 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_impact_50k_2026",
       cohorts: {
-        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }] },
-        "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"], per: "sample" }] }
+        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] }] },
+        "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"] }] }
       },
       views: [{ kind: "clonality", cohorts: ["Colorectal", "Breast"], genes: ["TP53", "KRAS", "APC", "PIK3CA", "SMAD4", "CDH1", "GATA3"] }]
     }
@@ -1156,9 +1156,9 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: {
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] },
-        "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"], per: "sample" }] },
-        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }] }
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] },
+        "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"] }] },
+        "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] }] }
       },
       views: [{ kind: "incidence", cohorts: ["NSCLC", "Breast", "Colorectal"], event: { eventType: "Diagnosis", attrs: [{ key: "TUMOR_SITE", value: "CNS/Brain" }], label: "brain metastasis" } }]
     }
@@ -1172,11 +1172,11 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "NSCLC, KRAS mutant": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
           { kind: "oql", q: "KRAS: MUT" }
         ] },
         "NSCLC, KRAS wild-type": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
           { not: { kind: "oql", q: "KRAS:" } }, { kind: "profiled", type: "MUTATION", gene: "KRAS" }
         ] }
       },
@@ -1192,11 +1192,11 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "Colorectal, stage 1-3": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] },
           { kind: "clinical", attribute: "STAGE_HIGHEST_RECORDED", values: ["Stage 1-3"] }
         ] },
         "Colorectal, stage 4": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] },
           { kind: "clinical", attribute: "STAGE_HIGHEST_RECORDED", values: ["Stage 4"] }
         ] }
       },
@@ -1211,8 +1211,8 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "tmb_mskcc_2018",
       cohorts: {
-        "TMB < 10": { all: [{ kind: "clinical", attribute: "TMB_NONSYNONYMOUS", range: { lt: 10 }, per: "sample" }] },
-        "TMB ≥ 10": { all: [{ kind: "clinical", attribute: "TMB_NONSYNONYMOUS", range: { gte: 10 }, per: "sample" }] }
+        "TMB < 10": { all: [{ kind: "clinical", attribute: "TMB_NONSYNONYMOUS", range: { lt: 10 } }] },
+        "TMB ≥ 10": { all: [{ kind: "clinical", attribute: "TMB_NONSYNONYMOUS", range: { gte: 10 } }] }
       },
       views: [{ kind: "rmst", cohorts: ["TMB < 10", "TMB ≥ 10"], tau: 24, landmarkMonths: [0, 6, 12] }]
     }
@@ -1225,7 +1225,7 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: {
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] }
       },
       views: [{ kind: "predictive", cohorts: ["NSCLC"], exposure: { eventType: "Treatment", key: "SUBTYPE", value: "Immuno" }, genes: ["STK11", "KEAP1", "KRAS", "TP53", "EGFR", "SMARCA4"] }]
     }
@@ -1248,7 +1248,7 @@ export const EXAMPLES: DslExample[] = [
     note: "MSK-IMPACT 50K, non-small cell lung cancer (6,633 patients; 5,901 typed at all three loci). 22% are homozygous at one locus or more, about the share Chowell et al. report; in this cohort, not restricted to immunotherapy, homozygosity does not move overall survival (HR 1.02). HLA LOH, called in 30% of the 4,158 patients with a call, goes with shorter survival (median 32 against 48 months, HR 1.35, 1.31 adjusted for TMB) — tumour biology, not a treatment effect.",
     doc: {
       study: "msk_impact_50k_2026",
-      cohorts: { "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] } },
+      cohorts: { "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] } },
       views: [{ kind: "hla", cohorts: ["NSCLC"], covariates: ["TMB_SCORE"] }]
     }
   },
@@ -1272,11 +1272,11 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "Prostate, TP53 mutant": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Prostate Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Prostate Cancer"] },
           { kind: "oql", q: "TP53: MUT" }
         ] },
         "Prostate, TP53 wild-type": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Prostate Cancer"], per: "sample" },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Prostate Cancer"] },
           { not: { kind: "oql", q: "TP53" } }
         ] }
       },
@@ -1292,7 +1292,7 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_chord_2024",
       cohorts: {
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] }
       },
       views: [{ kind: "riskmodel", cohorts: ["NSCLC"], runs: 5,
         describe: { attributes: ["STAGE_HIGHEST_RECORDED", "GENDER", "SMOKING_PREDICTIONS_3_CLASSES", "CURRENT_AGE_DEID"], genes: ["KEAP1", "TP53", "ZFHX3"] } }]
@@ -1306,8 +1306,8 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_impact_2017",
       cohorts: {
-        "NSCLC (MSK-IMPACT 2017)": { studies: ["msk_impact_2017"], all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] },
-        "NSCLC (MSK-CHORD)": { studies: ["msk_chord_2024"], all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
+        "NSCLC (MSK-IMPACT 2017)": { studies: ["msk_impact_2017"], all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] },
+        "NSCLC (MSK-CHORD)": { studies: ["msk_chord_2024"], all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] }
       },
       views: [{ kind: "riskmodel", cohorts: ["NSCLC (MSK-IMPACT 2017)"], runs: 10, validateOn: "NSCLC (MSK-CHORD)" }]
     }
@@ -1322,7 +1322,7 @@ export const EXAMPLES: DslExample[] = [
       study: "luad_mskimpact_2021",
       cohorts: {
         "all patients": { all: [] },
-        "CNS met": { all: [{ kind: "clinical", attribute: "custom:luad-biopsy-site/BIOPSY_SITE", values: ["CNS met"], per: "sample" }] }
+        "CNS met": { all: [{ kind: "clinical", attribute: "custom:luad-biopsy-site/BIOPSY_SITE", values: ["CNS met"] }] }
       },
       views: [
         { kind: "oncoprint", unit: "sample", cohorts: ["all patients"], genes: ["EGFR", "KRAS", "TP53", "STK11", "KEAP1", "SMARCA4"],
@@ -1407,8 +1407,8 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "crc_hta11_htan_2021",
       cohorts: {
-        "Conventional adenoma": { all: [{ kind: "clinical", attribute: "POLYP_TYPE", values: ["AD"], per: "sample" }] },
-        "Serrated polyp": { all: [{ kind: "clinical", attribute: "POLYP_TYPE", values: ["SER"], per: "sample" }] }
+        "Conventional adenoma": { all: [{ kind: "clinical", attribute: "POLYP_TYPE", values: ["AD"] }] },
+        "Serrated polyp": { all: [{ kind: "clinical", attribute: "POLYP_TYPE", values: ["SER"] }] }
       },
       views: [
         { kind: "composition", cohorts: ["Conventional adenoma", "Serrated polyp"], unit: "sample",
@@ -1440,7 +1440,7 @@ export const EXAMPLES: DslExample[] = [
         "TP53 mutant": { all: [{ kind: "oql", q: "TP53: MUT" }] },
         "KRAS mutant": { all: [{ kind: "oql", q: "KRAS: MUT" }] },
         "Immunotherapy": { all: [{ kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } }] },
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] }
       },
       views: [{ kind: "overlap", cohorts: ["TP53 mutant", "KRAS mutant", "Immunotherapy", "NSCLC"] }]
     }
@@ -1454,11 +1454,11 @@ export const EXAMPLES: DslExample[] = [
       study: "msk_chord_2024",
       cohorts: {
         "Colorectal, MSS": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" },
-          { not: { kind: "clinical", attribute: "MSI_TYPE", values: ["Instable"], per: "sample" } }] },
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] },
+          { not: { kind: "clinical", attribute: "MSI_TYPE", values: ["Instable"] } }] },
         "Pancreatic, MSS": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" },
-          { not: { kind: "clinical", attribute: "MSI_TYPE", values: ["Instable"], per: "sample" } }] }
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"] },
+          { not: { kind: "clinical", attribute: "MSI_TYPE", values: ["Instable"] } }] }
       },
       views: [{ kind: "enrichment", cohorts: ["Colorectal, MSS", "Pancreatic, MSS"] }]
     }
@@ -1471,8 +1471,8 @@ export const EXAMPLES: DslExample[] = [
     doc: {
       study: "msk_impact_50k_2026",
       cohorts: {
-        "Melanoma": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Melanoma"], per: "sample" }] },
-        "Non-small cell lung": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] }
+        "Melanoma": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Melanoma"] }] },
+        "Non-small cell lung": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] }
       },
       views: [{ kind: "assays", cohorts: ["Melanoma", "Non-small cell lung"], profileType: "mutational_signatures_contribution_v2" }]
     }
@@ -1495,7 +1495,7 @@ export const EXAMPLES: DslExample[] = [
     note: "Pancreatic cancer in MSK-CHORD, sorted by age, highest first.",
     doc: {
       study: "msk_chord_2024",
-      cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] } },
+      cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"] }] } },
       views: [{ kind: "table", cohorts: ["Pancreatic"], sort: { column: "CURRENT_AGE_DEID", desc: true }, rows: 25 }]
     }
   },
@@ -1506,7 +1506,7 @@ export const EXAMPLES: DslExample[] = [
     note: "MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.",
     doc: {
       study: "msk_chord_2024",
-      cohorts: { "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"], per: "sample" }] } },
+      cohorts: { "Breast": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"] }] } },
       views: [{ kind: "timeline", cohorts: ["Breast"], patient: { study: "msk_chord_2024", id: "P-0000012" }, collapsed: ["treatment.Chemo"], sort: { column: "events", desc: true } },
                { kind: "alterations", cohorts: ["Breast"], patient: { study: "msk_chord_2024", id: "P-0000012" } }]
     }
@@ -1518,7 +1518,7 @@ export const EXAMPLES: DslExample[] = [
     note: "MSK-CHORD prostate cancer patients, those with the most structural variants first; P-0024249's tables, mutations kept to OncoKB-oncogenic calls.",
     doc: {
       study: "msk_chord_2024",
-      cohorts: { "Prostate": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Prostate Cancer"], per: "sample" }] } },
+      cohorts: { "Prostate": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Prostate Cancer"] }] } },
       views: [{ kind: "alterations", cohorts: ["Prostate"], patient: { study: "msk_chord_2024", id: "P-0024249" }, sort: { column: "sv", desc: true },
                mutations: { filters: { annotation: { op: "contains", value: "Oncogenic" } } } }]
     }
@@ -1530,7 +1530,7 @@ export const EXAMPLES: DslExample[] = [
     note: "MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.",
     doc: {
       study: "msk_chord_2024",
-      cohorts: { "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"], per: "sample" }] } },
+      cohorts: { "Colorectal": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Colorectal Cancer"] }] } },
       views: [{ kind: "mutations", cohorts: ["Colorectal"], gene: "KRAS", columns: ["sample", "proteinChange", "annotation", "vaf", "mutCount"],
         filters: { proteinChange: { op: "regex", value: "^G1[23]" }, vaf: { min: 0.2 } }, sort: { column: "vaf", desc: true } }]
     }
@@ -1578,7 +1578,7 @@ deflated (\`1.<base64url>\`, \`lib/url-json.ts\`) to keep links short.
 ## Cohort definitions
 
 \`\`\`
-cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient in the study
+cohortDef := { "all": [clause × 0-8],         // ANDed (intersection of samples); [] means every sample in the study
                "extends"?: "<cohort name>",   // splice that cohort's own "all" in AHEAD of this one's, resolved before anything is compiled
                "study"?:   "<id>",            // evaluate in another study
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
@@ -1586,16 +1586,27 @@ cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient 
                "notes"?:   "<prose>",         // the analyst's own note on this cohort; never compiled
                "from"?:    { "saved": "<id>", "name": "<name>", "hash": "<sha256>", "savedAt"?: "<when>" },  // set by the page: the saved cohort this was copied from, and the hash of what was copied; never compiled
                "splits"?:  { "<name>": splitDef },  // divisions of this cohort into arms that add up to it
-               "lock"?:    { "set": "<id set>", "n": N, "nSamples"?: N, "at": "<ISO time>", "dataVersion"?: "…", "oncokbPin"?: "…",
-                             "children"?: { "<split> / <arm>": { "set", "part": "arm:<split> / <arm>", "n" } } } }
-                                              // frozen to the patients it selected at "at" — see "Locked cohorts" below
+               "lock"?:    { "set": "<id set>", "n": N, "nPatients": N, "at": "<ISO time>", "dataVersion"?: "…", "oncokbPin"?: "…",
+                             "children"?: { "<split> / <arm>": { "set", "part": "arm:<split> / <arm>", "n", "nPatients" } } } }
+                                              // frozen to the samples it selected at "at" — see "Locked cohorts" below
 splitDef  := { "arms": [ { "name": "<label>", "where": clause, "splits"?: {…} } × 1-8 ],  // tested in order; first match wins; an arm may be split again
                "other"?: "<label>",            // the remainder's name, default "Other"
                "otherSplits"?: {…},            // splits of the remainder
                "notes"?: "<prose>" }
 clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
-                  | { "not": leaf | { "any": [leaf × 1-8] } }  // study base EXCEPT leaf, or EXCEPT the OR of several (De Morgan's, in one clause instead of one "not" per leaf)
+                  | { "not": leaf | { "any": [leaf × 1-8] } }  // the study's samples EXCEPT leaf, or EXCEPT the OR of several (De Morgan's, in one clause instead of one "not" per leaf)
 \`\`\`
+
+**A cohort is a set of samples, as on cBioPortal.** Every clause selects samples. A sample-level
+clause — a sample attribute, an OQL alteration (called in the sample that carries it), a sample
+list, \`profiled\`, \`genomicData\`, \`proteinPosition\`, \`caseList\` — selects the samples that
+match it; a patient-level clause — a patient attribute, a timeline \`event\`, \`derived\`, a patient
+list, the held-out \`split\` — selects every sample of the patients that match. \`all\`, \`any\` and
+\`not\` are intersection, union and complement over the study's samples. A cohort's patients are
+the owners of its samples: views drawn per patient (survival, timelines, Cox) use them, and views
+drawn per sample — and every gene frequency — use only the cohort's own samples, so a patient's
+other samples never count. "Non-small cell lung cancer" is the NSCLC samples, not every sample of
+patients who have one.
 
 **Cross-study semantics.** A cohort with \`studies\` is compiled per study (compilers are
 single-study by design); members are study-qualified patient ids. Patient overlap across studies
@@ -1657,7 +1668,7 @@ rather than silently ignoring what it does not understand.
 | kind | shape | meaning |
 |---|---|---|
 | \`oql\` | \`{"kind":"oql","q":"STK11: DRIVER"}\` | genomic status in cBioPortal OQL (see below) |
-| \`clinical\` | \`{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}\` | clinical attribute; predicate is \`values:[≤50]\` (OR), \`range:{gt,gte,lt,lte}\` (numeric via toFloat64OrNull), or \`op\`(\`= != > >= < <=\`)+\`value\`; \`per:"sample"\` = patient matches if ANY sample matches. \`op\`+\`percentile\` (0-1) resolves \`value\` LIVE from a percentile of the attribute's distribution instead of a literal number — e.g. \`{"op":">=","percentile":0.8}\` = "at or above the 80th percentile" ("top 20%"). \`percentileOf\`:"\<cohort name\>" scopes the reference population to another cohort in this document (e.g. "top 20% TMB **within NSCLC**", not the whole study); both the leaf's own cohort and, if given, \`percentileOf\`'s cohort must resolve to a single study, and \`percentileOf\` may not itself use \`percentile\` (no chaining). Resolved once, live, before compilation — the readback shows the resolved number and what it was a percentile of. **Custom data:** an attribute the reader uploaded is named \`custom:<dataset>/<COLUMN>\` (e.g. \`custom:brain-mets/MET_SITE\`) and works here and in every view exactly like the study's own — oncoprint \`clinical\` tracks, \`splitBy.attribute\`, \`clinical\` views, plot axes. Uploads are stored on the server, readable once logged in, and pinned by version in the document's \`uploads\`; a document naming a dataset the request cannot read is refused, never answered as if no patient had a value. Patient-level studies only |
+| \`clinical\` | \`{"kind":"clinical","attribute":A, ...predicate}\` | clinical attribute, matched at the level the study records it: a sample attribute selects the samples whose value matches, a patient attribute every sample of the patients whose value matches — so one clause over two studies, one recording the attribute per sample and the other per patient, matches each its own way, as cBioPortal does; predicate is \`values:[≤50]\` (OR), \`range:{gt,gte,lt,lte}\` (numeric via toFloat64OrNull), or \`op\`(\`= != > >= < <=\`)+\`value\`. A \`per\` key is refused. \`op\`+\`percentile\` (0-1) resolves \`value\` LIVE from a percentile of the attribute's distribution instead of a literal number — e.g. \`{"op":">=","percentile":0.8}\` = "at or above the 80th percentile" ("top 20%"). \`percentileOf\`:"\<cohort name\>" scopes the reference population to another cohort in this document (e.g. "top 20% TMB **within NSCLC**", not the whole study); both the leaf's own cohort and, if given, \`percentileOf\`'s cohort must resolve to a single study, and \`percentileOf\` may not itself use \`percentile\` (no chaining). Resolved once, live, before compilation — the readback shows the resolved number and what it was a percentile of. **Custom data:** an attribute the reader uploaded is named \`custom:<dataset>/<COLUMN>\` (e.g. \`custom:brain-mets/MET_SITE\`) and works here and in every view exactly like the study's own — oncoprint \`clinical\` tracks, \`splitBy.attribute\`, \`clinical\` views, plot axes. Uploads are stored on the server, readable once logged in, and pinned by version in the document's \`uploads\`; a document naming a dataset the request cannot read is refused, never answered as if no patient had a value. Patient-level studies only |
 | \`derived\` | \`{"kind":"derived","metric":"followupMonths"|"historyMonths"|"alteredGenes"|"lines"|"treatmentSpan","range":{gte?,gt?,lte?,lt?},"eventType"?,"lineGap"?:90,"lineClasses"?}\` | filters on a value computed from the **shape** of the data rather than a study's vocabulary. Event-type names and attribute keys are study-specific \u2014 this database spells one concept \`Treatment\` in 87 studies and \`TREATMENT\` in 10, and the key MSK-CHORD calls \`SUBTYPE\` exists in only 27 of 131 timeline studies \u2014 so these read dates and gene symbols instead and mean the same thing everywhere. \`followupMonths\`: how far the timeline runs past its own day 0. \`historyMonths\`: how much predates it. \`alteredGenes\`: distinct genes altered (panel size bounds it, so not comparable across studies with different panels). \`lines\` and \`treatmentSpan\` are the deliberate exception \u2014 they need \`eventType\` (which timeline event stands for "a therapy" here; Explore proposes one from the study's own catalog), because there is no vocabulary-free way to ask "how many lines of treatment". \`lines\`: the number of treatment lines, by the one line definition the \`sequence\` view and "Treatment line (derived)" share (systemic-therapy records of that event type, a \`lineGap\`-day gap; \`lineClasses\` \`"all"\` or a class list widens it). \`treatmentSpan\`: months from the first to the last record of that event type |
 | \`event\` | \`{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}\` | timeline sub-DSL (below) |
 | \`sampleList\` | \`{"kind":"sampleList","ids":["<study>:<id>", ...]}\` or \`{"kind":"sampleList","set":"<id set>"}\` | explicit, cross-study list of sample ids: inline in \`ids\` (up to about 200 KB of ids per study, roughly 10,000 — refused by name past that), or a **stored id set** named by \`set\`, of any size up to 250,000 (see below) |
@@ -1682,17 +1693,16 @@ cohort is refused before any request is made, the same guarantee \`docs/DATA-BOU
 describes for every other identifier-bearing path.
 
 **Locked cohorts.** A cohort can be frozen to the patients its definition selects at one moment,
-so an analysis stops drifting as patients are added to the data: \`lock\` names the stored id set
-holding those patients, when it was taken, the data version and OncoKB release then, and, under
-\`children\`, each split arm by name. The lock is ONE set: beside the patients it keeps, as named
-parts, their samples (\`"samples"\`, \`nSamples\` of them) and each arm's patients (\`part\`:
+so an analysis stops drifting as samples are added to the data: \`lock\` names the stored id set
+holding those samples (\`n\` of them, from \`nPatients\` patients), when it was taken, the data
+version and OncoKB release then, and, under \`children\`, each split arm by name. The lock is ONE
+sample-level set: beside the samples it keeps, as named parts, each arm's samples (\`part\`:
 \`"arm:<split> / <arm>"\`). The engine
 evaluates the set, not the definition; the definition stays as the record of how the cohort was
 made, and is still run beside the set, so the result's \`cohorts[name].lock\` says how far the
-data has moved: what the definition selects \`now\`, who it would add (\`entered\`) or drop
-(\`left\`), how many frozen patients the data still holds (\`present\` of \`n\`), and how many
-samples those patients have that they did not have then (\`newSamples\` — a lock freezes
-patients, and views read every sample of them). A split arm added after the lock is evaluated
+data has moved, in samples: what the definition selects \`now\`, which samples it would add
+(\`entered\` — a new sample it selects is one of these) or drop (\`left\`), and how many frozen
+samples the data still holds (\`present\` of \`n\`). A split arm added after the lock is evaluated
 inside the frozen cohort, so arms still add up to it. The document's \`locked\` says every cohort
 was locked at once, one moment for all. Locks are taken by \`POST /api/lock\` (\`{doc, cohorts?}\`,
 every cohort when none are named) or the page — a cohort's menu, or "Lock all cohorts" — and need a
@@ -2407,11 +2417,12 @@ Leaf kinds:
   internal underscore, since a bare id may contain one). A list the page saved on the server is
   {"kind":"sampleList"|"patientList","set":"<id>","label":"…","n":N}: keep such a clause as it is
   (copy it whole when reusing the cohort) — its ids are not in the document.
-- A cohort with "lock" is frozen to the patients it selected when locked: the engine evaluates the
-  lock, not "all". Leave "lock" as it is; editing "all" does not change who is in a locked cohort
+- A cohort with "lock" is frozen to the samples it selected when locked: the engine evaluates the
+  lock, not "all". Leave "lock" as it is; editing "all" does not change what is in a locked cohort
   (the result's cohorts[name].lock reports what "all" selects now). Remove "lock" to unlock it.
 - {"kind":"clinical",...} also supports "values":[...] (OR across values), "range":{"gte":60,"lt":80}
-  (numeric), and "per":"sample" (patient matches if ANY sample matches — say so when used).
+  (numeric). It matches at the level the study records the attribute (sample attribute: the
+  matching samples; patient attribute: every sample of the matching patients); never add "per".
   "op"+"percentile" (0-1, e.g. {"op":">=","percentile":0.8}) resolves "value" live from a
   percentile of the attribute's own distribution ("top 20%"); "percentileOf":"<cohort name>"
   scopes that to another cohort in this document instead of the whole study (e.g. top 20% TMB

@@ -156,7 +156,7 @@ function DatasetView({ d, clause, note }: { d: StoredDataset; clause?: CustomDat
         <p className="meta" style={{ margin: "var(--s3) 0 0" }}>
           {matching
             ? <><b>{matching.length.toLocaleString()}</b> of {d.rows.length.toLocaleString()} {d.level}s satisfy this clause
-                {d.level === "sample" ? <> — {matchedPatients.toLocaleString()} patients{clause.leaf.per === "sample" ? " (a patient matches if any sample does)" : ""}</> : null}
+                {d.level === "sample" ? <> — {matchedPatients.toLocaleString()} patients</> : null}
                 {clause.negated ? <> · the clause is negated, so the cohort <b>excludes</b> these</> : null}
                 {clause.cohort ? <> · &ldquo;{clause.cohort}&rdquo; may combine this with other clauses</> : null}</>
             : "this clause is resolved by the engine (a percentile), so its matching rows are not listed here"}

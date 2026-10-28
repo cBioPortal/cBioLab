@@ -1,7 +1,7 @@
 Analysis over brca_tcga_pan_can_atlas_2018 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- all patients: 1,084 patients — all patients in the study
+- all patients: 1,084 patients — all samples in the study
 
 Genes co-expressed with ESR1 (rna_seq_v2_mrna) in all patients; Spearman ρ, BH q over 20,057 genes; 15,572 at q<0.05:
  most positively correlated:
@@ -206,10 +206,10 @@ Genes co-expressed with ESR1 (rna_seq_v2_mrna) in all patients; Spearman ρ, BH 
   PDSS1: ρ -0.5456 (q=4.2e-83), r -0.3721, n=1082
   FABP7: ρ -0.5454 (q=5.2e-83), r -0.084, n=1082
   GAL: ρ -0.5445 (q=1.1e-82), r -0.1888, n=1082
-  CAVEAT (tell the user): ESR1 on “rna_seq_v2_mrna” against every gene on “rna_seq_v2_mrna”, over the patients in “all patients” with both values (a patient's samples averaged, as the heatmap takes them). Ranked by Spearman's ρ, as the portal ranks, with Pearson's r beside it; q is Benjamini–Hochberg over ρ's p across all 20,057 genes tested. A correlation is not a regulatory link: genes that rise together across a cohort often both track a third thing — a subtype, the tumour's purity, proliferation. 280 genes were not tested: fewer than 10 patients with both values, or no spread.
+  CAVEAT (tell the user): ESR1 on “rna_seq_v2_mrna” against every gene on “rna_seq_v2_mrna”, over the samples in “all patients” with both values, paired per sample as the portal's co-expression tab pairs them. Ranked by Spearman's ρ, as the portal ranks, with Pearson's r beside it; q is Benjamini–Hochberg over ρ's p across all 20,057 genes tested. A correlation is not a regulatory link: genes that rise together across a cohort often both track a third thing — a subtype, the tumour's purity, proliferation. 280 genes were not tested: fewer than 10 samples with both values, or no spread.
   METHOD:
-    - Sum every gene's values and ranks against ESR1's [all patients · brca_tcga_pan_can_atlas_2018] (1,084 → 20,338 rows): The correlates:moments query above. Per patient, ESR1 on “rna_seq_v2_mrna” and every gene on “rna_seq_v2_mrna” (a patient's samples averaged); per gene, over the patients with both: n, Σx, Σy, Σxy, Σx², Σy², and the same six over each value's average rank among those patients (ties share the mean of their ranks). Sums only.
-    - Pearson's r and Spearman's ρ per gene: r from the sums: (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); ρ is the same formula on the rank sums. Each p from t = r√((n − 2)/(1 − r²)) on n − 2 df, as scipy's pearsonr and spearmanr compute it. ESR1 against itself is left out. A gene with fewer than 10 patients, or no spread, is not tested.
+    - Sum every gene's values and ranks against ESR1's [all patients · brca_tcga_pan_can_atlas_2018] (1,084 → 20,338 rows): The correlates:moments query above. Per sample in the cohort, ESR1 on “rna_seq_v2_mrna” and every gene on “rna_seq_v2_mrna” (a patient-level assay's value paired with each of its patient's samples); per gene, over the samples with both: n, Σx, Σy, Σxy, Σx², Σy², and the same six over each value's average rank among those samples (ties share the mean of their ranks). Sums only.
+    - Pearson's r and Spearman's ρ per gene: r from the sums: (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); ρ is the same formula on the rank sums. Each p from t = r√((n − 2)/(1 − r²)) on n − 2 df, as scipy's pearsonr and spearmanr compute it. ESR1 against itself is left out. A gene with fewer than 10 samples, or no spread, is not tested.
         tested: 20,057
         not tested: 280
     - Benjamini–Hochberg over ρ: q-values over every gene tested, from ρ's p.

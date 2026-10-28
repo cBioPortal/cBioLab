@@ -3,6 +3,7 @@
   "cohorts": {
     "HRD-Dup": {
       "count": 16,
+      "samples": 32,
       "text": "CONSENSUS_SIGNATURE in [HRD-Dup]",
       "studies": [
         "msk_spectrum_tme_2022"
@@ -10,6 +11,7 @@
     },
     "HRD-Del": {
       "count": 6,
+      "samples": 12,
       "text": "CONSENSUS_SIGNATURE in [HRD-Del]",
       "studies": [
         "msk_spectrum_tme_2022"
@@ -17,6 +19,7 @@
     },
     "FBI": {
       "count": 14,
+      "samples": 28,
       "text": "CONSENSUS_SIGNATURE in [FBI]",
       "studies": [
         "msk_spectrum_tme_2022"

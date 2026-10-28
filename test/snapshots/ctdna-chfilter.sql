@@ -1,23 +1,23 @@
 -- cohort all patients
 -- msk_access_2021
-SELECT DISTINCT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid FROM snapshot_db.sample_derived
+SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_access_2021_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_access_2021'
 
 -- view 0 ctdna: ctdna:ch-removed:all patients · msk_access_2021
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_access_2021_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
-    AND replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 classed AS (
   SELECT sd.sample_unique_id AS suid, sd.patient_stable_id AS pid, sd.sample_stable_id AS sample,
          multiIf(sd.sample_unique_id IN (SELECT sample_unique_id FROM snapshot_db.sample_to_gene_panel_derived WHERE cancer_study_identifier = 'msk_access_2021' AND gene_panel_id IN ('ACCESS129')), 'b', cls.v IN (lowerUTF8(trimBoth('cfDNA')),lowerUTF8(trimBoth('ctDNA'))), 'b', cls.v IN (lowerUTF8(trimBoth('Tumor'))), 'a', '') AS side
   FROM snapshot_db.sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id
-  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND sd.patient_stable_id IN (SELECT pid FROM cohort)
+  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND replaceOne(sd.sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
 ),
 sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),
@@ -45,20 +45,20 @@ FROM chx INNER JOIN sides s ON s.suid = chx.suid
 GROUP BY gene HAVING calls > 0 ORDER BY calls DESC, gene LIMIT 40
 
 -- view 0 ctdna: ctdna:funnel:all patients · msk_access_2021
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_access_2021_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
-    AND replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 classed AS (
   SELECT sd.sample_unique_id AS suid, sd.patient_stable_id AS pid, sd.sample_stable_id AS sample,
          multiIf(sd.sample_unique_id IN (SELECT sample_unique_id FROM snapshot_db.sample_to_gene_panel_derived WHERE cancer_study_identifier = 'msk_access_2021' AND gene_panel_id IN ('ACCESS129')), 'b', cls.v IN (lowerUTF8(trimBoth('cfDNA')),lowerUTF8(trimBoth('ctDNA'))), 'b', cls.v IN (lowerUTF8(trimBoth('Tumor'))), 'a', '') AS side
   FROM snapshot_db.sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id
-  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND sd.patient_stable_id IN (SELECT pid FROM cohort)
+  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND replaceOne(sd.sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
 ),
 sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),
@@ -97,20 +97,20 @@ SELECT (SELECT uniqExactIf(pid, side = 'b') FROM classed) AS plasma_all, (SELECT
 FROM system.one
 
 -- view 0 ctdna: ctdna:genes:all patients · msk_access_2021
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_access_2021_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
-    AND replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 classed AS (
   SELECT sd.sample_unique_id AS suid, sd.patient_stable_id AS pid, sd.sample_stable_id AS sample,
          multiIf(sd.sample_unique_id IN (SELECT sample_unique_id FROM snapshot_db.sample_to_gene_panel_derived WHERE cancer_study_identifier = 'msk_access_2021' AND gene_panel_id IN ('ACCESS129')), 'b', cls.v IN (lowerUTF8(trimBoth('cfDNA')),lowerUTF8(trimBoth('ctDNA'))), 'b', cls.v IN (lowerUTF8(trimBoth('Tumor'))), 'a', '') AS side
   FROM snapshot_db.sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id
-  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND sd.patient_stable_id IN (SELECT pid FROM cohort)
+  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND replaceOne(sd.sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
 ),
 sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),
@@ -159,20 +159,20 @@ SELECT gene, count() AS pairs, countIf(aa AND ab) AS both, countIf(aa AND NOT ab
 FROM per WHERE pa AND pb GROUP BY gene HAVING both + a_only + b_only > 0
 
 -- view 0 ctdna: ctdna:survival:all patients · msk_access_2021
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_access_2021_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
-    AND replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 classed AS (
   SELECT sd.sample_unique_id AS suid, sd.patient_stable_id AS pid, sd.sample_stable_id AS sample,
          multiIf(sd.sample_unique_id IN (SELECT sample_unique_id FROM snapshot_db.sample_to_gene_panel_derived WHERE cancer_study_identifier = 'msk_access_2021' AND gene_panel_id IN ('ACCESS129')), 'b', cls.v IN (lowerUTF8(trimBoth('cfDNA')),lowerUTF8(trimBoth('ctDNA'))), 'b', cls.v IN (lowerUTF8(trimBoth('Tumor'))), 'a', '') AS side
   FROM snapshot_db.sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id
-  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND sd.patient_stable_id IN (SELECT pid FROM cohort)
+  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND replaceOne(sd.sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
 ),
 sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),
@@ -212,20 +212,20 @@ SELECT detected, round(months, 2) AS t, dead, count() AS n
 FROM os WHERE months IS NOT NULL AND months >= 0 GROUP BY detected, t, dead ORDER BY t
 
 -- view 0 ctdna: ctdna:unfiltered:funnel:all patients · msk_access_2021
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_access_2021_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
-    AND replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 classed AS (
   SELECT sd.sample_unique_id AS suid, sd.patient_stable_id AS pid, sd.sample_stable_id AS sample,
          multiIf(sd.sample_unique_id IN (SELECT sample_unique_id FROM snapshot_db.sample_to_gene_panel_derived WHERE cancer_study_identifier = 'msk_access_2021' AND gene_panel_id IN ('ACCESS129')), 'b', cls.v IN (lowerUTF8(trimBoth('cfDNA')),lowerUTF8(trimBoth('ctDNA'))), 'b', cls.v IN (lowerUTF8(trimBoth('Tumor'))), 'a', '') AS side
   FROM snapshot_db.sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id
-  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND sd.patient_stable_id IN (SELECT pid FROM cohort)
+  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND replaceOne(sd.sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
 ),
 sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),
@@ -244,20 +244,20 @@ SELECT (SELECT uniqExactIf(pid, side = 'b') FROM classed) AS plasma_all, (SELECT
 FROM system.one
 
 -- view 0 ctdna: ctdna:unfiltered:genes:all patients · msk_access_2021
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_access_2021_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
-    AND replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 classed AS (
   SELECT sd.sample_unique_id AS suid, sd.patient_stable_id AS pid, sd.sample_stable_id AS sample,
          multiIf(sd.sample_unique_id IN (SELECT sample_unique_id FROM snapshot_db.sample_to_gene_panel_derived WHERE cancer_study_identifier = 'msk_access_2021' AND gene_panel_id IN ('ACCESS129')), 'b', cls.v IN (lowerUTF8(trimBoth('cfDNA')),lowerUTF8(trimBoth('ctDNA'))), 'b', cls.v IN (lowerUTF8(trimBoth('Tumor'))), 'a', '') AS side
   FROM snapshot_db.sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id
-  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND sd.patient_stable_id IN (SELECT pid FROM cohort)
+  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND replaceOne(sd.sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
 ),
 sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),
@@ -288,20 +288,20 @@ SELECT gene, count() AS pairs, countIf(aa AND ab) AS both, countIf(aa AND NOT ab
 FROM per WHERE pa AND pb GROUP BY gene
 
 -- view 0 ctdna: ctdna:unfiltered:survival:all patients · msk_access_2021
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_access_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_access_2021_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_access_2021'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_access_2021' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
-    AND replaceOne(patient_unique_id, 'msk_access_2021_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 classed AS (
   SELECT sd.sample_unique_id AS suid, sd.patient_stable_id AS pid, sd.sample_stable_id AS sample,
          multiIf(sd.sample_unique_id IN (SELECT sample_unique_id FROM snapshot_db.sample_to_gene_panel_derived WHERE cancer_study_identifier = 'msk_access_2021' AND gene_panel_id IN ('ACCESS129')), 'b', cls.v IN (lowerUTF8(trimBoth('cfDNA')),lowerUTF8(trimBoth('ctDNA'))), 'b', cls.v IN (lowerUTF8(trimBoth('Tumor'))), 'a', '') AS side
   FROM snapshot_db.sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id
-  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND sd.patient_stable_id IN (SELECT pid FROM cohort)
+  WHERE sd.cancer_study_identifier = 'msk_access_2021' AND replaceOne(sd.sample_unique_id, 'msk_access_2021_', '') IN (SELECT sid FROM cohort)
 ),
 sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),

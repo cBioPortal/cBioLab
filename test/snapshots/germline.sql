@@ -1,6 +1,6 @@
 -- cohort mCRPC
 -- prad_su2c_2019
-SELECT DISTINCT replaceOne(patient_unique_id, 'prad_su2c_2019_', '') AS pid FROM snapshot_db.sample_derived
+SELECT replaceOne(patient_unique_id, 'prad_su2c_2019_', '') AS pid, replaceOne(sample_unique_id, 'prad_su2c_2019_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'prad_su2c_2019'
 
 -- view 0 germline: germline:ascn · prad_su2c_2019
@@ -9,21 +9,21 @@ JOIN snapshot_db.genetic_profile gp ON gp.genetic_profile_id = a.genetic_profile
 JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id ORDER BY study
 
 -- view 0 germline: germline:carriers:mCRPC · prad_su2c_2019
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'prad_su2c_2019_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'prad_su2c_2019_', '') AS pid, replaceOne(sample_unique_id, 'prad_su2c_2019_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'prad_su2c_2019')
 SELECT g.hugo_gene_symbol AS gene, uniqExact(replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '')) AS carriers
 FROM snapshot_db.genomic_event_derived g
 WHERE g.cancer_study_identifier = 'prad_su2c_2019' AND g.variant_type = 'mutation' AND lowerUTF8(trimBoth(g.mutation_status)) = 'germline'
-  AND replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+  AND replaceOne(g.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 GROUP BY gene ORDER BY carriers DESC, gene LIMIT 500
 
 -- view 0 germline: germline:counts:mCRPC · prad_su2c_2019
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'prad_su2c_2019_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'prad_su2c_2019_', '') AS pid, replaceOne(sample_unique_id, 'prad_su2c_2019_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'prad_su2c_2019'),
 mprofp AS (
   SELECT DISTINCT replaceOne(sd.patient_unique_id, 'prad_su2c_2019_', '') AS pid, toString(sp.gene_panel_id) AS panel
   FROM snapshot_db.sample_to_gene_panel_derived sp JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
-  WHERE sp.cancer_study_identifier = 'prad_su2c_2019' AND sp.alteration_type = 'MUTATION_EXTENDED' AND replaceOne(sd.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+  WHERE sp.cancer_study_identifier = 'prad_su2c_2019' AND sp.alteration_type = 'MUTATION_EXTENDED' AND replaceOne(sp.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 ),
 mprof AS (
   SELECT DISTINCT x.pid AS pid, gp.gene AS gene FROM mprofp x JOIN snapshot_db.gene_panel_to_gene_derived gp ON gp.gene_panel_id = x.panel WHERE gp.gene IN ('BRCA2', 'ATM', 'BRCA1', 'APC', 'CHEK2')
@@ -33,7 +33,7 @@ mprof AS (
 cprofp AS (
   SELECT DISTINCT replaceOne(sd.patient_unique_id, 'prad_su2c_2019_', '') AS pid, toString(sp.gene_panel_id) AS panel
   FROM snapshot_db.sample_to_gene_panel_derived sp JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
-  WHERE sp.cancer_study_identifier = 'prad_su2c_2019' AND sp.alteration_type = 'COPY_NUMBER_ALTERATION' AND replaceOne(sd.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+  WHERE sp.cancer_study_identifier = 'prad_su2c_2019' AND sp.alteration_type = 'COPY_NUMBER_ALTERATION' AND replaceOne(sp.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 ),
 cprof AS (
   SELECT DISTINCT x.pid AS pid, gp.gene AS gene FROM cprofp x JOIN snapshot_db.gene_panel_to_gene_derived gp ON gp.gene_panel_id = x.panel WHERE gp.gene IN ('BRCA2', 'ATM', 'BRCA1', 'APC', 'CHEK2')
@@ -43,17 +43,17 @@ cprof AS (
 germ AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') AS pid, g.hugo_gene_symbol AS gene FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'prad_su2c_2019' AND g.hugo_gene_symbol IN ('BRCA2', 'ATM', 'BRCA1', 'APC', 'CHEK2') AND g.variant_type = 'mutation' AND lowerUTF8(trimBoth(g.mutation_status)) = 'germline'
-    AND replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 ),
 som AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') AS pid, g.hugo_gene_symbol AS gene FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'prad_su2c_2019' AND g.hugo_gene_symbol IN ('BRCA2', 'ATM', 'BRCA1', 'APC', 'CHEK2') AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT (lowerUTF8(trimBoth(g.mutation_status)) = 'germline') AND NOT g.off_panel
-    AND replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 ),
 del AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') AS pid, g.hugo_gene_symbol AS gene FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'prad_su2c_2019' AND g.hugo_gene_symbol IN ('BRCA2', 'ATM', 'BRCA1', 'APC', 'CHEK2') AND g.variant_type = 'cna' AND g.cna_alteration <= -2 AND NOT g.off_panel
-    AND replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 ),
 base AS (SELECT pid, gene FROM mprof UNION DISTINCT SELECT pid, gene FROM germ),
 fl AS (
@@ -65,12 +65,12 @@ fl AS (
 SELECT gene, mp, carrier, som, cp, del, count() AS n FROM fl GROUP BY gene, mp, carrier, som, cp, del
 
 -- view 0 germline: germline:survival:mCRPC · prad_su2c_2019
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'prad_su2c_2019_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'prad_su2c_2019_', '') AS pid, replaceOne(sample_unique_id, 'prad_su2c_2019_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'prad_su2c_2019'),
 mprofp AS (
   SELECT DISTINCT replaceOne(sd.patient_unique_id, 'prad_su2c_2019_', '') AS pid, toString(sp.gene_panel_id) AS panel
   FROM snapshot_db.sample_to_gene_panel_derived sp JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
-  WHERE sp.cancer_study_identifier = 'prad_su2c_2019' AND sp.alteration_type = 'MUTATION_EXTENDED' AND replaceOne(sd.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+  WHERE sp.cancer_study_identifier = 'prad_su2c_2019' AND sp.alteration_type = 'MUTATION_EXTENDED' AND replaceOne(sp.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 ),
 mprof AS (
   SELECT DISTINCT x.pid AS pid, gp.gene AS gene FROM mprofp x JOIN snapshot_db.gene_panel_to_gene_derived gp ON gp.gene_panel_id = x.panel WHERE gp.gene IN ('BRCA2')
@@ -80,7 +80,7 @@ mprof AS (
 cprofp AS (
   SELECT DISTINCT replaceOne(sd.patient_unique_id, 'prad_su2c_2019_', '') AS pid, toString(sp.gene_panel_id) AS panel
   FROM snapshot_db.sample_to_gene_panel_derived sp JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
-  WHERE sp.cancer_study_identifier = 'prad_su2c_2019' AND sp.alteration_type = 'COPY_NUMBER_ALTERATION' AND replaceOne(sd.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+  WHERE sp.cancer_study_identifier = 'prad_su2c_2019' AND sp.alteration_type = 'COPY_NUMBER_ALTERATION' AND replaceOne(sp.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 ),
 cprof AS (
   SELECT DISTINCT x.pid AS pid, gp.gene AS gene FROM cprofp x JOIN snapshot_db.gene_panel_to_gene_derived gp ON gp.gene_panel_id = x.panel WHERE gp.gene IN ('BRCA2')
@@ -90,17 +90,17 @@ cprof AS (
 germ AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') AS pid, g.hugo_gene_symbol AS gene FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'prad_su2c_2019' AND g.hugo_gene_symbol IN ('BRCA2') AND g.variant_type = 'mutation' AND lowerUTF8(trimBoth(g.mutation_status)) = 'germline'
-    AND replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 ),
 som AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') AS pid, g.hugo_gene_symbol AS gene FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'prad_su2c_2019' AND g.hugo_gene_symbol IN ('BRCA2') AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT (lowerUTF8(trimBoth(g.mutation_status)) = 'germline') AND NOT g.off_panel
-    AND replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 ),
 del AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') AS pid, g.hugo_gene_symbol AS gene FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'prad_su2c_2019' AND g.hugo_gene_symbol IN ('BRCA2') AND g.variant_type = 'cna' AND g.cna_alteration <= -2 AND NOT g.off_panel
-    AND replaceOne(g.patient_unique_id, 'prad_su2c_2019_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'prad_su2c_2019_', '') IN (SELECT sid FROM cohort)
 ),
 base AS (SELECT pid, gene FROM mprof UNION DISTINCT SELECT pid, gene FROM germ),
 os AS (

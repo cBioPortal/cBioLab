@@ -96,11 +96,11 @@ export async function runActionability(view: ActionabilityView, ctx: ViewRun): P
     actionability: { pin, levels: ACTION_LEVELS, groupBy, top, pairBy, panels, storeTypes, ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
-    caveat: "Each patient's highest OncoKB therapeutic level (" + pin + ", the pinned store) over the alterations in any of their samples sequenced for mutations — called mutations and high-level copy-number calls" +
+    caveat: "Each patient's highest OncoKB therapeutic level (" + pin + ", the pinned store) over the alterations in any of their samples in the cohort sequenced for mutations — called mutations and high-level copy-number calls" +
       (storeTypes.includes("SV") ? ", and structural variants" : "; the store holds no level for structural variants at this pin, so a fusion is never counted") +
       " — and, separately, whether any alteration carries a resistance level (R1, R2). " +
       "The level is the store's highest for the alteration in ANY cancer type, not in the patient's own: an alteration actionable only elsewhere (PTEN or PIK3CA, level 1 with capivasertib in breast cancer, in any other cancer) counts here, so these shares are an upper bound on what is actionable for these patients. " +
-      "Denominator: patients with at least one sample sequenced for mutations — " + panels.map((p) => "“" + p.cohort + "”: " + p.sequenced.toLocaleString("en-US") + " of " + p.patients.toLocaleString("en-US")).join("; ") +
+      "Denominator: patients with at least one sample in the cohort sequenced for mutations — " + panels.map((p) => "“" + p.cohort + "”: " + p.sequenced.toLocaleString("en-US") + " of " + p.patients.toLocaleString("en-US")).join("; ") +
       ". Panel-aware in the only way a level can be: a gene their panel did not cover is unknown, not \"no actionable alteration\" — No level means none was found on the genes sequenced. " +
       (groupBy ? "Groups are " + groupBy + " per patient (" + MULTIPLE_LABEL + " when their samples disagree); the " + top + " largest are drawn and the rest pooled into Other" +
         (panels.some((p) => p.pooled) ? " (" + panels.filter((p) => p.pooled).map((p) => "“" + p.cohort + "”: " + p.pooled!.length + " groups").join("; ") + ")" : "") + ". " : "") +

@@ -3,7 +3,8 @@
   "cohorts": {
     "all patients": {
       "count": 471,
-      "text": "all patients in the study",
+      "samples": 471,
+      "text": "all samples in the study",
       "studies": [
         "crc_apc_impact_2020"
       ]

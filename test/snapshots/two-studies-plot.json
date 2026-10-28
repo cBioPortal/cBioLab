@@ -3,7 +3,8 @@
   "cohorts": {
     "Lung (TCGA)": {
       "count": 1053,
-      "text": "all patients in the study — across 2 studies",
+      "samples": 1053,
+      "text": "all samples in the study — across 2 studies",
       "studies": [
         "luad_tcga_pan_can_atlas_2018",
         "lusc_tcga_pan_can_atlas_2018"
@@ -11,6 +12,7 @@
     },
     "KRAS mut": {
       "count": 175,
+      "samples": 175,
       "text": "OQL[KRAS: MUT] — across 2 studies",
       "studies": [
         "luad_tcga_pan_can_atlas_2018",
@@ -19,6 +21,7 @@
     },
     "TP53 mut": {
       "count": 699,
+      "samples": 699,
       "text": "OQL[TP53: MUT] — across 2 studies",
       "studies": [
         "luad_tcga_pan_can_atlas_2018",

@@ -1,10 +1,10 @@
 -- cohort all patients
 -- lung_msk_pdx
-SELECT DISTINCT replaceOne(patient_unique_id, 'lung_msk_pdx_', '') AS pid FROM snapshot_db.sample_derived
+SELECT replaceOne(patient_unique_id, 'lung_msk_pdx_', '') AS pid, replaceOne(sample_unique_id, 'lung_msk_pdx_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'lung_msk_pdx'
 
 -- view 0 acquired: acquired:funnel:all patients · lung_msk_pdx
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'lung_msk_pdx_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'lung_msk_pdx_', '') AS pid, replaceOne(sample_unique_id, 'lung_msk_pdx_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'lung_msk_pdx'),
 anch AS (
   SELECT p.stable_id AS pid, min(ce.start_date) AS day
@@ -30,6 +30,7 @@ dated AS (
   SELECT tl.pid AS pid, sd.sample_unique_id AS suid, tl.day - anch.day AS rel
   FROM tl INNER JOIN anch ON anch.pid = tl.pid
   INNER JOIN snapshot_db.sample_derived sd ON sd.cancer_study_identifier = 'lung_msk_pdx' AND sd.sample_stable_id = tl.sample AND sd.patient_stable_id = tl.pid
+  WHERE sd.sample_stable_id IN (SELECT sid FROM cohort)
 ),
 pick AS (
   SELECT pid, countIf(rel <= 0) AS n_pre, countIf(rel >= 30) AS n_post,
@@ -49,7 +50,7 @@ SELECT (SELECT count() FROM anch) AS anchored, (SELECT uniqExact(pid) FROM tl) A
 FROM pick
 
 -- view 0 acquired: acquired:genes:all patients · lung_msk_pdx
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'lung_msk_pdx_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'lung_msk_pdx_', '') AS pid, replaceOne(sample_unique_id, 'lung_msk_pdx_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'lung_msk_pdx'),
 anch AS (
   SELECT p.stable_id AS pid, min(ce.start_date) AS day
@@ -75,6 +76,7 @@ dated AS (
   SELECT tl.pid AS pid, sd.sample_unique_id AS suid, tl.day - anch.day AS rel
   FROM tl INNER JOIN anch ON anch.pid = tl.pid
   INNER JOIN snapshot_db.sample_derived sd ON sd.cancer_study_identifier = 'lung_msk_pdx' AND sd.sample_stable_id = tl.sample AND sd.patient_stable_id = tl.pid
+  WHERE sd.sample_stable_id IN (SELECT sid FROM cohort)
 ),
 pick AS (
   SELECT pid, countIf(rel <= 0) AS n_pre, countIf(rel >= 30) AS n_post,

@@ -3,14 +3,16 @@
   "cohorts": {
     "Colorectal, stage 1-3": {
       "count": 3171,
-      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample) AND STAGE_HIGHEST_RECORDED in [Stage 1-3]",
+      "samples": 3171,
+      "text": "CANCER_TYPE in [Colorectal Cancer] AND STAGE_HIGHEST_RECORDED in [Stage 1-3]",
       "studies": [
         "msk_chord_2024"
       ]
     },
     "Colorectal, stage 4": {
       "count": 2372,
-      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample) AND STAGE_HIGHEST_RECORDED in [Stage 4]",
+      "samples": 2372,
+      "text": "CANCER_TYPE in [Colorectal Cancer] AND STAGE_HIGHEST_RECORDED in [Stage 4]",
       "studies": [
         "msk_chord_2024"
       ]

@@ -1,20 +1,30 @@
 -- cohort NSCLC
 -- msk_impact_2017
-(SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid
+(SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_2017_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_2017_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_2017_', ''), replaceOne(patient_unique_id, 'msk_impact_2017_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_2017' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_2017_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_2017_', ''), replaceOne(patient_unique_id, 'msk_impact_2017_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))
 
 -- view 0 exclusivity: exclusivity:columns:NSCLC · msk_impact_2017
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_2017_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_2017_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_2017_', ''), replaceOne(patient_unique_id, 'msk_impact_2017_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_2017' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_2017_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_2017_', ''), replaceOne(patient_unique_id, 'msk_impact_2017_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 sp AS (
   SELECT sample_unique_id AS suid, arrayStringConcat(arraySort(groupUniqArray(gene_panel_id)), '+') AS sig
   FROM snapshot_db.sample_to_gene_panel_derived
   WHERE cancer_study_identifier = 'msk_impact_2017' AND alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')
-    AND sample_unique_id IN (SELECT sample_unique_id FROM snapshot_db.sample_derived WHERE cancer_study_identifier = 'msk_impact_2017' AND patient_stable_id IN (SELECT pid FROM cohort))
+    AND replaceOne(sample_unique_id, 'msk_impact_2017_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 cov AS (
@@ -37,15 +47,20 @@ SELECT ifNull(strat.v, '') AS stratum, altc.gene AS gene, count() AS n
 FROM altc LEFT JOIN strat ON strat.suid = altc.suid GROUP BY stratum, gene
 
 -- view 0 exclusivity: exclusivity:coverage:NSCLC · msk_impact_2017
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_2017_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_2017_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_2017_', ''), replaceOne(patient_unique_id, 'msk_impact_2017_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_2017' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_2017_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_2017_', ''), replaceOne(patient_unique_id, 'msk_impact_2017_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 sp AS (
   SELECT sample_unique_id AS suid, arrayStringConcat(arraySort(groupUniqArray(gene_panel_id)), '+') AS sig
   FROM snapshot_db.sample_to_gene_panel_derived
   WHERE cancer_study_identifier = 'msk_impact_2017' AND alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')
-    AND sample_unique_id IN (SELECT sample_unique_id FROM snapshot_db.sample_derived WHERE cancer_study_identifier = 'msk_impact_2017' AND patient_stable_id IN (SELECT pid FROM cohort))
+    AND replaceOne(sample_unique_id, 'msk_impact_2017_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 cov AS (
@@ -67,15 +82,20 @@ strat AS (
 SELECT sig, gene FROM cov
 
 -- view 0 exclusivity: exclusivity:groups:NSCLC · msk_impact_2017
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_2017_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_2017_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_2017_', ''), replaceOne(patient_unique_id, 'msk_impact_2017_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_2017' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_2017_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_2017_', ''), replaceOne(patient_unique_id, 'msk_impact_2017_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_2017'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 sp AS (
   SELECT sample_unique_id AS suid, arrayStringConcat(arraySort(groupUniqArray(gene_panel_id)), '+') AS sig
   FROM snapshot_db.sample_to_gene_panel_derived
   WHERE cancer_study_identifier = 'msk_impact_2017' AND alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')
-    AND sample_unique_id IN (SELECT sample_unique_id FROM snapshot_db.sample_derived WHERE cancer_study_identifier = 'msk_impact_2017' AND patient_stable_id IN (SELECT pid FROM cohort))
+    AND replaceOne(sample_unique_id, 'msk_impact_2017_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 cov AS (

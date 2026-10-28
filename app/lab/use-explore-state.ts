@@ -328,7 +328,8 @@ export function useExploreState(page: ExplorePage) {
   const draftedAttrs = (): Set<string> => {
     const keys = new Set<string>();
     const walk = (cs: any[]) => { for (const c of cs || []) {
-      if (c?.kind === "clinical") keys.add((c.per === "sample" ? "sample" : "patient") + "|" + c.attribute);
+      // a clinical clause names no level: it filters the attribute's facet at either one
+      if (c?.kind === "clinical") for (const lvl of ["sample", "patient"]) keys.add(lvl + "|" + c.attribute);
       if (Array.isArray(c?.any)) walk(c.any);
       if (c?.not) walk([c.not]);
     } };
@@ -380,7 +381,7 @@ export function useExploreState(page: ExplorePage) {
     let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
     if (!d || !Array.isArray(d.all)) d = { all: [] };
     if (clause.kind === "clinical" && (clause.op === "=" || clause.values)) {
-      const same = d.all.find((c: any) => c.kind === "clinical" && c.attribute === clause.attribute && (c.per || "patient") === (clause.per || "patient") && (c.op === "=" || c.values));
+      const same = d.all.find((c: any) => c.kind === "clinical" && c.attribute === clause.attribute && (c.op === "=" || c.values));
       if (same) { // more values on the same attribute join its OR list
         const vals = new Set([...(same.values || []), ...(same.op === "=" ? [same.value] : []), ...(clause.values || [clause.value])]);
         delete same.op; delete same.value; same.values = [...vals];

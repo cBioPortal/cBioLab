@@ -100,7 +100,7 @@ export async function runAcquired(view: AcquiredView, ctx: ViewRun): Promise<Vie
       ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
-    caveat: "Patients with a sample dated on or before their first " + anchoredTo + (preWindowDays != null ? " (at most " + preWindowDays + " days before)" : "") +
+    caveat: "Patients with a sample in the cohort dated on or before their first " + anchoredTo + (preWindowDays != null ? " (at most " + preWindowDays + " days before)" : "") +
       " and another at least " + minGapDays + " days after it; each side is one sample — the last before and the first after — dated by its first " +
       sampleEvents.join("/") + " timeline event (attribute " + sampleKey + "). Funnel: " + panels.map((pn) => pn.cohort + " — " + pn.anchored.toLocaleString("en-US") + " started, " +
         pn.withPre.toLocaleString("en-US") + " with a sample before, " + pn.withPost.toLocaleString("en-US") + " with one after, " + plural(pn.patients, "patient") + " with both" +

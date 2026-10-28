@@ -3,21 +3,24 @@
   "cohorts": {
     "Colorectal": {
       "count": 4993,
-      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample)",
+      "samples": 5277,
+      "text": "CANCER_TYPE in [Colorectal Cancer]",
       "studies": [
         "msk_impact_50k_2026"
       ]
     },
     "Breast": {
       "count": 5803,
-      "text": "CANCER_TYPE in [Breast Cancer] (any sample)",
+      "samples": 6807,
+      "text": "CANCER_TYPE in [Breast Cancer]",
       "studies": [
         "msk_impact_50k_2026"
       ]
     },
     "Pancreatic": {
       "count": 2729,
-      "text": "CANCER_TYPE in [Pancreatic Cancer] (any sample)",
+      "samples": 2851,
+      "text": "CANCER_TYPE in [Pancreatic Cancer]",
       "studies": [
         "msk_impact_50k_2026"
       ]
@@ -65,59 +68,59 @@
         "panels": [
           {
             "cohort": "Colorectal",
-            "samples": 5395,
-            "segmented": 5390,
-            "allArms": 5354,
+            "samples": 5277,
+            "segmented": 5273,
+            "allArms": 5237,
             "score": [
-              879,
-              306,
-              360,
-              295,
-              266,
-              253,
-              252,
-              266,
-              293,
+              843,
+              298,
+              352,
+              291,
+              255,
+              243,
+              246,
+              264,
+              288,
+              270,
               272,
-              273,
               225,
-              218,
-              205,
-              152,
-              133,
-              125,
-              111,
-              95,
-              91,
+              217,
+              203,
+              149,
+              132,
+              121,
+              109,
+              92,
+              89,
               {
                 "…": "20 more",
-                "sha256": "124e4dfe3bd0ce59"
+                "sha256": "4c64b3dc87ea4ea6"
               }
             ],
             "fga": [
-              735,
-              218,
+              703,
+              214,
+              146,
               153,
-              153,
-              150,
+              148,
               169,
-              134,
-              119,
-              119,
-              129,
-              110,
-              127,
-              106,
-              119,
+              131,
+              116,
+              117,
+              122,
+              107,
+              123,
+              103,
+              117,
               112,
               126,
-              119,
-              116,
-              110,
+              113,
+              114,
+              107,
               112,
               {
                 "…": "81 more",
-                "sha256": "308a3d98e34f471c"
+                "sha256": "285fae4ec4300ba6"
               }
             ],
             "scoreSpread": {
@@ -126,207 +129,207 @@
               "median": 7,
               "q3": 12,
               "p95": 20,
-              "mean": 7.735
+              "mean": 7.778
             },
             "fgaSpread": {
               "p5": 0,
               "q1": 4,
               "median": 15,
               "q3": 28,
-              "p95": 51,
-              "mean": 18.28
+              "p95": 50.4,
+              "mean": 18.333
             },
             "arms": [
               {
                 "arm": "1p",
-                "measured": 5390,
-                "gain": 21,
-                "loss": 903
+                "measured": 5273,
+                "gain": 20,
+                "loss": 892
               },
               {
                 "arm": "1q",
-                "measured": 5390,
-                "gain": 432,
-                "loss": 172
+                "measured": 5273,
+                "gain": 418,
+                "loss": 167
               },
               {
                 "arm": "2p",
-                "measured": 5390,
-                "gain": 124,
-                "loss": 57
+                "measured": 5273,
+                "gain": 120,
+                "loss": 54
               },
               {
                 "arm": "2q",
-                "measured": 5390,
-                "gain": 98,
-                "loss": 69
+                "measured": 5273,
+                "gain": 95,
+                "loss": 66
               },
               {
                 "arm": "3p",
-                "measured": 5390,
-                "gain": 71,
-                "loss": 438
+                "measured": 5273,
+                "gain": 70,
+                "loss": 421
               },
               {
                 "arm": "3q",
-                "measured": 5390,
-                "gain": 168,
-                "loss": 199
+                "measured": 5273,
+                "gain": 157,
+                "loss": 194
               },
               {
                 "arm": "4p",
-                "measured": 5390,
-                "gain": 39,
-                "loss": 1327
+                "measured": 5273,
+                "gain": 35,
+                "loss": 1312
               },
               {
                 "arm": "4q",
-                "measured": 5390,
-                "gain": 11,
-                "loss": 1385
+                "measured": 5273,
+                "gain": 10,
+                "loss": 1368
               },
               {
                 "arm": "5p",
-                "measured": 5390,
-                "gain": 432,
-                "loss": 275
+                "measured": 5273,
+                "gain": 415,
+                "loss": 272
               },
               {
                 "arm": "5q",
-                "measured": 5390,
-                "gain": 72,
-                "loss": 656
+                "measured": 5273,
+                "gain": 70,
+                "loss": 641
               },
               {
                 "arm": "6p",
-                "measured": 5390,
-                "gain": 388,
-                "loss": 217
+                "measured": 5273,
+                "gain": 382,
+                "loss": 214
               },
               {
                 "arm": "6q",
-                "measured": 5390,
-                "gain": 174,
-                "loss": 344
+                "measured": 5273,
+                "gain": 172,
+                "loss": 329
               },
               {
                 "arm": "7p",
-                "measured": 5390,
-                "gain": 1580,
-                "loss": 21
+                "measured": 5273,
+                "gain": 1559,
+                "loss": 16
               },
               {
                 "arm": "7q",
-                "measured": 5390,
-                "gain": 1082,
-                "loss": 53
+                "measured": 5273,
+                "gain": 1065,
+                "loss": 47
               },
               {
                 "arm": "8p",
-                "measured": 5390,
-                "gain": 144,
-                "loss": 2107
+                "measured": 5273,
+                "gain": 139,
+                "loss": 2081
               },
               {
                 "arm": "8q",
-                "measured": 5390,
-                "gain": 1655,
-                "loss": 102
+                "measured": 5273,
+                "gain": 1624,
+                "loss": 101
               },
               {
                 "arm": "9p",
-                "measured": 5390,
-                "gain": 337,
-                "loss": 482
+                "measured": 5273,
+                "gain": 335,
+                "loss": 467
               },
               {
                 "arm": "9q",
-                "measured": 5390,
-                "gain": 282,
-                "loss": 346
+                "measured": 5273,
+                "gain": 280,
+                "loss": 333
               },
               {
                 "arm": "10p",
-                "measured": 5390,
-                "gain": 156,
-                "loss": 357
+                "measured": 5273,
+                "gain": 149,
+                "loss": 347
               },
               {
                 "arm": "10q",
-                "measured": 5390,
-                "gain": 42,
-                "loss": 512
+                "measured": 5273,
+                "gain": 36,
+                "loss": 497
               },
               {
                 "…": "19 more",
-                "sha256": "40023e8f11323158"
+                "sha256": "f7db176f60730bd6"
               }
             ]
           },
           {
             "cohort": "Breast",
-            "samples": 6907,
-            "segmented": 6906,
-            "allArms": 6685,
+            "samples": 6807,
+            "segmented": 6806,
+            "allArms": 6587,
             "score": [
-              716,
-              339,
-              357,
-              318,
-              357,
-              356,
-              360,
+              698,
+              334,
+              347,
+              315,
+              353,
+              352,
+              354,
               364,
-              378,
               373,
-              362,
-              304,
-              281,
-              255,
-              263,
-              220,
-              197,
-              165,
+              370,
+              358,
+              299,
+              278,
+              251,
+              258,
+              218,
+              193,
               163,
-              149,
+              161,
+              147,
               {
                 "…": "20 more",
-                "sha256": "15dcd02d2d62c93d"
+                "sha256": "99501a9e7df8dc4d"
               }
             ],
             "fga": [
-              520,
-              184,
+              505,
+              181,
+              124,
+              133,
               127,
-              134,
               130,
-              134,
-              147,
-              128,
-              159,
+              146,
+              123,
+              157,
               119,
-              122,
+              120,
               130,
-              153,
-              142,
-              127,
-              116,
+              152,
+              141,
+              126,
+              115,
               117,
-              118,
+              115,
               132,
-              148,
+              146,
               {
                 "…": "81 more",
-                "sha256": "1ec6dd810bea5aca"
+                "sha256": "cf2281939be30d4e"
               }
             ],
             "scoreSpread": {
               "p5": 0,
-              "q1": 3,
+              "q1": 4,
               "median": 8,
               "q3": 14,
               "p95": 22,
-              "mean": 9.174
+              "mean": 9.181
             },
             "fgaSpread": {
               "p5": 0,
@@ -334,190 +337,190 @@
               "median": 22,
               "q3": 38,
               "p95": 62,
-              "mean": 25.304
+              "mean": 25.333
             },
             "arms": [
               {
                 "arm": "1p",
-                "measured": 6906,
-                "gain": 183,
-                "loss": 1180
+                "measured": 6806,
+                "gain": 179,
+                "loss": 1173
               },
               {
                 "arm": "1q",
-                "measured": 6906,
-                "gain": 3139,
-                "loss": 44
+                "measured": 6806,
+                "gain": 3126,
+                "loss": 42
               },
               {
                 "arm": "2p",
-                "measured": 6906,
-                "gain": 248,
-                "loss": 377
+                "measured": 6806,
+                "gain": 241,
+                "loss": 370
               },
               {
                 "arm": "2q",
-                "measured": 6906,
-                "gain": 92,
-                "loss": 590
+                "measured": 6806,
+                "gain": 89,
+                "loss": 580
               },
               {
                 "arm": "3p",
-                "measured": 6906,
-                "gain": 144,
-                "loss": 1170
+                "measured": 6806,
+                "gain": 140,
+                "loss": 1144
               },
               {
                 "arm": "3q",
-                "measured": 6906,
-                "gain": 599,
-                "loss": 293
+                "measured": 6806,
+                "gain": 587,
+                "loss": 288
               },
               {
                 "arm": "4p",
-                "measured": 6904,
-                "gain": 119,
-                "loss": 1418
+                "measured": 6804,
+                "gain": 112,
+                "loss": 1402
               },
               {
                 "arm": "4q",
-                "measured": 6906,
-                "gain": 113,
-                "loss": 1235
+                "measured": 6806,
+                "gain": 108,
+                "loss": 1217
               },
               {
                 "arm": "5p",
-                "measured": 6906,
-                "gain": 964,
-                "loss": 436
+                "measured": 6806,
+                "gain": 947,
+                "loss": 430
               },
               {
                 "arm": "5q",
-                "measured": 6906,
-                "gain": 454,
-                "loss": 1010
+                "measured": 6806,
+                "gain": 453,
+                "loss": 994
               },
               {
                 "arm": "6p",
-                "measured": 6906,
-                "gain": 610,
-                "loss": 528
+                "measured": 6806,
+                "gain": 599,
+                "loss": 524
               },
               {
                 "arm": "6q",
-                "measured": 6906,
-                "gain": 284,
-                "loss": 1537
+                "measured": 6806,
+                "gain": 282,
+                "loss": 1521
               },
               {
                 "arm": "7p",
-                "measured": 6906,
-                "gain": 870,
-                "loss": 347
+                "measured": 6806,
+                "gain": 843,
+                "loss": 341
               },
               {
                 "arm": "7q",
-                "measured": 6906,
-                "gain": 598,
-                "loss": 586
+                "measured": 6806,
+                "gain": 574,
+                "loss": 580
               },
               {
                 "arm": "8p",
-                "measured": 6906,
-                "gain": 280,
-                "loss": 2857
+                "measured": 6806,
+                "gain": 277,
+                "loss": 2825
               },
               {
                 "arm": "8q",
-                "measured": 6906,
-                "gain": 2845,
-                "loss": 96
+                "measured": 6806,
+                "gain": 2824,
+                "loss": 90
               },
               {
                 "arm": "9p",
-                "measured": 6900,
-                "gain": 299,
-                "loss": 1709
+                "measured": 6800,
+                "gain": 296,
+                "loss": 1688
               },
               {
                 "arm": "9q",
-                "measured": 6906,
-                "gain": 175,
-                "loss": 1197
+                "measured": 6806,
+                "gain": 168,
+                "loss": 1186
               },
               {
                 "arm": "10p",
-                "measured": 6906,
-                "gain": 694,
-                "loss": 419
+                "measured": 6806,
+                "gain": 687,
+                "loss": 408
               },
               {
                 "arm": "10q",
-                "measured": 6906,
+                "measured": 6806,
                 "gain": 134,
-                "loss": 1026
+                "loss": 1009
               },
               {
                 "…": "19 more",
-                "sha256": "ee0a517fe2b474c1"
+                "sha256": "705b8e3361235434"
               }
             ]
           },
           {
             "cohort": "Pancreatic",
-            "samples": 2911,
-            "segmented": 2910,
-            "allArms": 2891,
+            "samples": 2851,
+            "segmented": 2850,
+            "allArms": 2832,
             "score": [
-              976,
-              284,
-              199,
-              140,
-              116,
-              116,
-              118,
+              953,
+              279,
+              195,
+              137,
               111,
-              94,
-              80,
+              114,
+              115,
+              107,
+              93,
+              78,
               73,
               61,
               59,
-              55,
+              54,
               41,
-              44,
+              43,
               37,
               23,
-              26,
+              24,
               16,
               {
                 "…": "20 more",
-                "sha256": "3d81a2ae726b9d09"
+                "sha256": "5e254d7211435b3f"
               }
             ],
             "fga": [
-              805,
-              231,
-              126,
-              94,
-              80,
+              787,
+              224,
+              125,
+              92,
+              78,
               75,
-              71,
-              58,
+              70,
+              57,
               51,
-              52,
-              48,
-              47,
-              48,
-              45,
+              49,
+              46,
+              46,
+              46,
               44,
-              45,
               43,
-              52,
-              27,
-              39,
+              45,
+              42,
+              51,
+              26,
+              38,
               {
                 "…": "81 more",
-                "sha256": "a6e1604d3f6358ac"
+                "sha256": "6ab0685bafc415f6"
               }
             ],
             "scoreSpread": {
@@ -526,7 +529,7 @@
               "median": 2,
               "q3": 9,
               "p95": 26,
-              "mean": 6.177
+              "mean": 6.198
             },
             "fgaSpread": {
               "p5": 0,
@@ -534,140 +537,140 @@
               "median": 6,
               "q3": 22,
               "p95": 68,
-              "mean": 15.68
+              "mean": 15.712
             },
             "arms": [
               {
                 "arm": "1p",
-                "measured": 2910,
-                "gain": 26,
-                "loss": 378
+                "measured": 2850,
+                "gain": 25,
+                "loss": 371
               },
               {
                 "arm": "1q",
-                "measured": 2910,
-                "gain": 355,
-                "loss": 135
+                "measured": 2850,
+                "gain": 351,
+                "loss": 130
               },
               {
                 "arm": "2p",
-                "measured": 2910,
-                "gain": 83,
-                "loss": 157
+                "measured": 2850,
+                "gain": 79,
+                "loss": 153
               },
               {
                 "arm": "2q",
-                "measured": 2910,
-                "gain": 97,
-                "loss": 141
+                "measured": 2850,
+                "gain": 95,
+                "loss": 137
               },
               {
                 "arm": "3p",
-                "measured": 2910,
-                "gain": 38,
-                "loss": 439
+                "measured": 2850,
+                "gain": 36,
+                "loss": 433
               },
               {
                 "arm": "3q",
-                "measured": 2910,
-                "gain": 215,
-                "loss": 201
+                "measured": 2850,
+                "gain": 214,
+                "loss": 195
               },
               {
                 "arm": "4p",
-                "measured": 2909,
-                "gain": 143,
-                "loss": 217
+                "measured": 2849,
+                "gain": 138,
+                "loss": 209
               },
               {
                 "arm": "4q",
-                "measured": 2910,
-                "gain": 107,
-                "loss": 275
+                "measured": 2850,
+                "gain": 102,
+                "loss": 269
               },
               {
                 "arm": "5p",
-                "measured": 2910,
-                "gain": 302,
-                "loss": 57
+                "measured": 2850,
+                "gain": 296,
+                "loss": 56
               },
               {
                 "arm": "5q",
-                "measured": 2910,
-                "gain": 181,
-                "loss": 140
+                "measured": 2850,
+                "gain": 178,
+                "loss": 136
               },
               {
                 "arm": "6p",
-                "measured": 2910,
-                "gain": 95,
-                "loss": 379
+                "measured": 2850,
+                "gain": 93,
+                "loss": 375
               },
               {
                 "arm": "6q",
-                "measured": 2910,
+                "measured": 2850,
                 "gain": 28,
-                "loss": 603
+                "loss": 594
               },
               {
                 "arm": "7p",
-                "measured": 2910,
-                "gain": 429,
-                "loss": 22
+                "measured": 2850,
+                "gain": 423,
+                "loss": 21
               },
               {
                 "arm": "7q",
-                "measured": 2910,
-                "gain": 269,
-                "loss": 87
+                "measured": 2850,
+                "gain": 267,
+                "loss": 86
               },
               {
                 "arm": "8p",
-                "measured": 2910,
-                "gain": 99,
-                "loss": 559
+                "measured": 2850,
+                "gain": 93,
+                "loss": 552
               },
               {
                 "arm": "8q",
-                "measured": 2910,
-                "gain": 411,
-                "loss": 123
+                "measured": 2850,
+                "gain": 398,
+                "loss": 121
               },
               {
                 "arm": "9p",
-                "measured": 2908,
+                "measured": 2848,
                 "gain": 90,
-                "loss": 649
+                "loss": 640
               },
               {
                 "arm": "9q",
-                "measured": 2910,
-                "gain": 138,
-                "loss": 331
+                "measured": 2850,
+                "gain": 136,
+                "loss": 328
               },
               {
                 "arm": "10p",
-                "measured": 2910,
-                "gain": 60,
-                "loss": 286
+                "measured": 2850,
+                "gain": 59,
+                "loss": 280
               },
               {
                 "arm": "10q",
-                "measured": 2910,
+                "measured": 2850,
                 "gain": 54,
-                "loss": 260
+                "loss": 256
               },
               {
                 "…": "19 more",
-                "sha256": "ceaab6b523b4834d"
+                "sha256": "6b1722ccff95333d"
               }
             ]
           }
         ],
         "test": {
           "name": "Kruskal–Wallis",
-          "scoreP": 1.975566934299693e-163,
-          "fgaP": 1.2451366250345867e-222
+          "scoreP": 1.3501897171079522e-159,
+          "fgaP": 1.0218123096393228e-218
         }
       },
       "participation": {
@@ -682,7 +685,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "From each sample's copy-number segments (hg19; autosomes only — X's log ratio mostly records sex), computed per sample in the database: FGA is the share of the sample's segmented length whose |segment mean| is at or past 0.2 (log2), counted in 1-point bins; an arm (p and q split at hg19's centromeres, from UCSC's cytoBand; the acrocentric p arms of 13, 14, 15, 21 and 22 left out, as Taylor et al. 2018 did) is gained or lost when more than 50% of its length is past ±0.2, and the aneuploidy score is how many of the 39 arms are. Colorectal: 5,390 samples scored of 5,395 (5,390 with segments; 5,354 with every arm covered); Breast: 6,906 samples scored of 6,907 (6,906 with segments; 6,685 with every arm covered); Pancreatic: 2,910 samples scored of 2,911 (2,910 with segments; 2,891 with every arm covered); an arm segments cover for less than 50% of its length is not called, which lowers that sample's score. Boxes are the quartiles, whiskers the 5th and 95th percentiles, read from the histograms; Kruskal–Wallis compares the cohorts' distributions (normal approximation with ties). Every sample of each patient counts. Panel-derived segments are noisy and purity is not corrected — a low-purity tumour's changes sit near 0 and read as stable — so these are relative measures within one assay, not absolute ploidy."
+      "caveat": "From each sample's copy-number segments (hg19; autosomes only — X's log ratio mostly records sex), computed per sample in the database: FGA is the share of the sample's segmented length whose |segment mean| is at or past 0.2 (log2), counted in 1-point bins; an arm (p and q split at hg19's centromeres, from UCSC's cytoBand; the acrocentric p arms of 13, 14, 15, 21 and 22 left out, as Taylor et al. 2018 did) is gained or lost when more than 50% of its length is past ±0.2, and the aneuploidy score is how many of the 39 arms are. Colorectal: 5,273 samples scored of 5,277 (5,273 with segments; 5,237 with every arm covered); Breast: 6,806 samples scored of 6,807 (6,806 with segments; 6,587 with every arm covered); Pancreatic: 2,850 samples scored of 2,851 (2,850 with segments; 2,832 with every arm covered); an arm segments cover for less than 50% of its length is not called, which lowers that sample's score. Boxes are the quartiles, whiskers the 5th and 95th percentiles, read from the histograms; Kruskal–Wallis compares the cohorts' distributions (normal approximation with ties). Every sample of the cohort counts. Panel-derived segments are noisy and purity is not corrected — a low-purity tumour's changes sit near 0 and read as stable — so these are relative measures within one assay, not absolute ploidy."
     }
   ]
 }

@@ -3,14 +3,16 @@
   "cohorts": {
     "LUAD KRAS G12C, immunotherapy": {
       "count": 279,
-      "text": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample) AND OQL[KRAS: G12C] AND has Immuno treatment AND followupMonths ≥ 6 months",
+      "samples": 279,
+      "text": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] AND OQL[KRAS: G12C] AND has Immuno treatment AND followupMonths ≥ 6 months",
       "studies": [
         "msk_chord_2024"
       ]
     },
     "LUAD KRAS wild-type": {
-      "count": 3976,
-      "text": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample) AND NOT OQL[KRAS]",
+      "count": 3984,
+      "samples": 3984,
+      "text": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] AND NOT OQL[KRAS]",
       "studies": [
         "msk_chord_2024"
       ]
@@ -29,7 +31,7 @@
           "base": 24950,
           "steps": [
             {
-              "label": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample)",
+              "label": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma]",
               "n": 5957,
               "excluded": 18993,
               "pctOfBase": 23.9
@@ -62,16 +64,16 @@
           "base": 24950,
           "steps": [
             {
-              "label": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample)",
+              "label": "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma]",
               "n": 5957,
               "excluded": 18993,
               "pctOfBase": 23.9
             },
             {
               "label": "NOT OQL[KRAS]",
-              "n": 3976,
-              "excluded": 1981,
-              "pctOfBase": 15.9
+              "n": 3984,
+              "excluded": 1973,
+              "pctOfBase": 16
             }
           ],
           "studies": [
@@ -105,7 +107,7 @@
                 "24,950"
               ],
               [
-                "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample)",
+                "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma]",
                 "5,957 (−18,993)"
               ],
               [
@@ -133,12 +135,12 @@
                 "24,950"
               ],
               [
-                "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample)",
+                "CANCER_TYPE_DETAILED in [Lung Adenocarcinoma]",
                 "5,957 (−18,993)"
               ],
               [
                 "NOT OQL[KRAS]",
-                "3,976 (−1,981)"
+                "3,984 (−1,973)"
               ]
             ]
           }

@@ -19,7 +19,7 @@ import { clinicalTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { parseOql, oqlCasesSql } from "./oql.ts";
 import { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP, ALTERATION_GENE_SET_CAP } from "./plot-oql.ts";
 import { oqlStatements } from "./oql-parse.ts";
-import { profiledCasesSql } from "./cohort2.ts";
+import { profiledCasesSql, inCohortSamples, inCohortPatients } from "./cohort2.ts";
 
 /** the alteration types a statement must be profiled in before "not matched" can mean "not altered" */
 const OQL_PROFILED_TYPES: Partial<Record<string, ("MUTATION" | "CNA" | "SV")[]>> = {
@@ -67,7 +67,7 @@ export type PlotAxis =
    * multi-gene query, "Unaltered" when it matches none and is profiled for every statement's gene,
    * "Not profiled" otherwise. `by: "statement"` gives each statement its own group, a case
    * matching two a group of the pair, three or more "3 or more lines", none "Unaltered" or "Not
-   * profiled" by the same rule. Per patient (any of its samples) or per sample, following the unit.
+   * profiled" by the same rule. Per patient (any of its samples in the cohort) or per sample, following the unit.
    */
   | { source: "alteration"; oql: string; by?: "any" | "statement" }
   | { source: "none" };
@@ -97,7 +97,7 @@ import { POINTS_CAP, POINT_RULE_N_MAX } from "./plot-layers.ts";
 export { isAbsent, jitterFor } from "./plot-draw.ts";
 import { isAbsent } from "./plot-draw.ts";
 import { finiteSql } from "./sql-number.ts";
-import { assayEntityRowsSql, ENTITY_RE } from "./generic-assay.ts";
+import { assayEntityRowsSql, assayInCohortSql, ENTITY_RE } from "./generic-assay.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql, cohortSubquery, type CohortSql } from "./sql-kinds.ts";
 /**
  * Over the points cap, a scatter cell holding at most this many cases is drawn as its cases
@@ -130,6 +130,7 @@ export function categoryColor(label: string, i = 0): string {
 }
 
 export interface AxisCtx {
+  /** `cohortSql` yields the cohort's (pid, sid): a sample plot draws its samples, a patient plot their owners */
   study: string; db?: string; unit: "patient" | "sample"; cohortSql: string;
   /** what an OQL axis's DRIVER and EXP/PROT terms need, as a cohort's OQL leaf does */
   oncokbPin?: string | null; profiles?: string[];
@@ -263,13 +264,17 @@ function logOf(a: PlotAxis, expr: string): string {
 
 export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): string {
   const db = ctx.db || DB, study = ctx.study, sample = ctx.unit === "sample";
-  const inCohort = (col: string) => strip(col, study) + " IN (SELECT pid FROM cohort)";
+  // A row keyed by sample is in the plot when its sample is one of the cohort's; a row keyed by
+  // patient when its patient owns one. In patient mode a patient's values therefore come from the
+  // cohort's samples only, never from the patient's other samples.
+  const sampleIn = (col: string) => inCohortSamples(strip(col, study));
+  const patientIn = (col: string) => inCohortPatients(strip(col, study));
 
   if (a.source === "clinical") {
     // Patient rows and sample rows both exist, and a case's own kind of row wins. In sample mode a
-    // patient's value repeats across that patient's samples. In patient mode the patient's samples
-    // are combined: a number is their mean, a category is the samples' common value, or "Multiple"
-    // when they differ (combineNote says so in the caption).
+    // patient's value repeats across that patient's samples in the cohort. In patient mode the
+    // patient's samples in the cohort are combined: a number is their mean, a category is the
+    // samples' common value, or "Multiple" when they differ (combineNote says so in the caption).
     // Only the study knows whether the attribute is a number, so the caller says which.
     const val = kind === "num" ? logOf(a, finiteSql("attribute_value")) : "attribute_value";
     const valCd = kind === "num" ? logOf(a, finiteSql("cd.attribute_value")) : "cd.attribute_value";
@@ -278,17 +283,18 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
       "1 AS pref\n" +
       "  FROM " + clinicalTable(db, [a.attribute]) + "\n" +
       "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(a.attribute) +
-      " AND attribute_value != ''" + defined(val) + "\n    AND type = " + (sample ? "'sample'" : "'patient'") + " AND " + inCohort("patient_unique_id");
+      " AND attribute_value != ''" + defined(val) + "\n    AND type = " + (sample ? "'sample'" : "'patient'") + " AND " +
+      (sample ? sampleIn("sample_unique_id") : patientIn("patient_unique_id"));
     const other = sample
       ? "SELECT " + strip("sd.sample_unique_id", study) + " AS id, " + valCd + " AS v, 0 AS pref\n" +
         "  FROM " + clinicalTable(db, [a.attribute]) + " cd\n" +
         "  JOIN " + db + ".sample_derived sd ON sd.patient_unique_id = cd.patient_unique_id\n" +
         "  WHERE cd.cancer_study_identifier = " + sq(study) + " AND cd.attribute_name = " + sq(a.attribute) +
-        " AND cd.attribute_value != ''" + defined(valCd) + "\n    AND cd.type = 'patient' AND " + inCohort("cd.patient_unique_id")
+        " AND cd.attribute_value != ''" + defined(valCd) + "\n    AND cd.type = 'patient' AND " + sampleIn("sd.sample_unique_id")
       : "SELECT " + strip("patient_unique_id", study) + " AS id, " + val + " AS v, 0 AS pref\n" +
         "  FROM " + clinicalTable(db, [a.attribute]) + "\n" +
         "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(a.attribute) +
-        " AND attribute_value != ''" + defined(val) + "\n    AND type = 'sample' AND " + inCohort("patient_unique_id");
+        " AND attribute_value != ''" + defined(val) + "\n    AND type = 'sample' AND " + sampleIn("sample_unique_id");
     const combined = kind === "num" ? "avgIf(v, pref = 0)"
       : "if(uniqExactIf(v, pref = 0) > 1, " + sq(MULTIPLE) + ", anyIf(v, pref = 0))";
     return "SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), " + combined + ") AS v FROM (\n" + own + "\n  UNION ALL\n" + other + "\n) GROUP BY id";
@@ -306,12 +312,12 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
       "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
       "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(a.profileType) +
       " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
-      "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL AND " + inCohort("sd.patient_unique_id") + ")\n" +
+      "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL AND " + sampleIn("ga.sample_unique_id") + ")\n" +
       "GROUP BY id";
   }
   if (a.source === "molecular") {
     const gene = String(a.gene).toUpperCase();
-    // patient mode averages a patient's samples, the same rule the oncoprint's heatmap uses; a
+    // patient mode averages a patient's samples in the cohort, the same rule the oncoprint's heatmap uses; a
     // value the log leaves undefined drops the case, so coverage counts it as having none
     const q = "SELECT " + strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study) + " AS id,\n" +
       "       " + logOf(a, sample ? "argMax(" + finiteSql("ga.alteration_value") + ", 1)" : "avg(" + finiteSql("ga.alteration_value") + ")") + " AS v\n" +
@@ -319,18 +325,19 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
       "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
       "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(a.profileType) +
       " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
-      "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL AND " + inCohort("sd.patient_unique_id") + "\n" +
+      "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL AND " + sampleIn("ga.sample_unique_id") + "\n" +
       "GROUP BY id";
     return a.log ? "SELECT id, v FROM (" + q + ") WHERE v IS NOT NULL" : q;
   }
 
   if (a.source === "assay") {
-    // A sample's own value; a patient-level profile's value is the patient's, shared by every sample.
-    // In patient mode a patient's samples combine as every axis combines them: a number is their
-    // mean, a category their common value or "Multiple".
-    const rows = assayEntityRowsSql({ db, study, profileType: a.profileType, entity: a.entity, numeric: !a.categorical, inCohort: inCohort("patient_unique_id") });
+    // A sample's own value; a patient-level profile's value is the patient's, shared by every sample
+    // of it in the cohort. In patient mode a patient's samples in the cohort combine as every axis
+    // combines them: a number is their mean, a category their common value or "Multiple".
+    const rows = assayEntityRowsSql({ db, study, profileType: a.profileType, entity: a.entity, numeric: !a.categorical, inCohort: assayInCohortSql(study) });
     const idCol = !sample ? strip("r.patient_unique_id", study) : a.patientLevel ? strip("sd.sample_unique_id", study) : strip("r.sample_unique_id", study);
-    const from = "FROM (\n" + rows + "\n) r" + (sample && a.patientLevel ? "\nJOIN " + db + ".sample_derived sd ON sd.patient_unique_id = r.patient_unique_id" : "");
+    const from = "FROM (\n" + rows + "\n) r" + (sample && a.patientLevel
+      ? "\nJOIN " + db + ".sample_derived sd ON sd.patient_unique_id = r.patient_unique_id\nWHERE " + sampleIn("sd.sample_unique_id") : "");
     if (a.categorical)
       return "SELECT " + idCol + " AS id, if(uniqExact(r.av) > 1, " + sq(MULTIPLE) + ", any(r.av)) AS v\n" + from + "\nGROUP BY id";
     const q = "SELECT " + idCol + " AS id, " + logOf(a, "avg(r.av)") + " AS v\n" + from + "\nGROUP BY id";
@@ -342,26 +349,34 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     // matched on its own, and a case it did not match is "Unaltered" only when it is profiled for
     // that statement's gene in every alteration type the statement asks about (panel-aware, as a
     // cohort split decides it); a sample whose panel omits the gene is never counted as wild type.
+    // Matching and profiling are decided per sample of the cohort; a patient (patient mode) is
+    // matched or profiled when any of its samples in the cohort is.
     // each statement names its group as typed, its gene in capitals
     const statements = oqlStatements(a.oql).map((st) => st.replace(/^[A-Za-z0-9.-]+/, (g) => g.toUpperCase()).replace(/\s+/g, " "));
     const idCol = strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study);
-    const o = { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study, db, unit: ctx.unit };
+    const sid = strip("sd.sample_unique_id", study);
+    const o = { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study, db, unit: "sample" as const };
     // the case column is `oql_case`, not `id`: ClickHouse would otherwise resolve `id` to another axis's alias
-    const matched = statements.map((st) => "oql_case IN (SELECT pid FROM (" + oqlCasesSql(st, o) + "))");
-    const profiled = statements.map((st) => {
+    // at unit "sample", oqlCasesSql's `pid` column holds sample ids
+    const matched = statements.map((st, i) => "max(" + sid + " IN (SELECT pid FROM (" + oqlCasesSql(st, o) + "))) AS m" + i);
+    const profCols: string[] = [];
+    const profiled = statements.map((st, i) => {
       const types = [...new Set(parseOql(st)[0].specs.flatMap((sp) => OQL_PROFILED_TYPES[sp.type] || []))];
       const gene = parseOql(st)[0].gene;
       // expression and protein thresholds read a value, not a panel: a case with no value is not matched, and not "not profiled"
-      return types.length ? types.map((t) => "oql_case IN (SELECT profiled_id FROM (" + profiledCasesSql(gene, t, { study, db, unit: ctx.unit }) + "))").join(" AND ") : "1";
+      return types.length ? types.map((t, j) => {
+        profCols.push("max(" + sid + " IN (SELECT profiled_id FROM (" + profiledCasesSql(gene, t, { study, db, unit: "sample" }) + "))) AS p" + i + "_" + j);
+        return "p" + i + "_" + j + " = 1";
+      }).join(" AND ") : "1";
     });
     const none = "if(" + profiled.map((p) => "(" + p + ")").join(" AND ") + ", " + sq(OQL_UNALTERED) + ", " + sq(OQL_NOT_PROFILED) + ")";
     const value = a.by === "statement"
       ? "multiIf(length(hit) = 0, " + none + ", length(hit) = 1, hit[1], length(hit) = 2, concat(hit[1], ' + ', hit[2]), " + sq(OQL_SEVERAL) + ")"
       : "if(length(hit) > 0, " + sq(OQL_ALTERED) + ", " + none + ")";
     return "SELECT oql_case AS id, " + value + " AS v FROM (\n" +
-      "SELECT oql_case, arrayFilter((l, m) -> m, [" + statements.map(sq).join(", ") + "], [" + matched.join(", ") + "]) AS hit FROM (\n" +
-      "SELECT DISTINCT " + idCol + " AS oql_case FROM " + db + ".sample_derived sd\n" +
-      "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + inCohort("sd.patient_unique_id") + "))";
+      "SELECT *, arrayFilter((l, m) -> m, [" + statements.map(sq).join(", ") + "], [" + statements.map((_, i) => "m" + i + " = 1").join(", ") + "]) AS hit FROM (\n" +
+      "SELECT " + idCol + " AS oql_case, " + [...matched, ...profCols].join(",\n  ") + "\nFROM " + db + ".sample_derived sd\n" +
+      "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + sampleIn("sd.sample_unique_id") + "\nGROUP BY oql_case))";
   }
   if (a.source === "alteration") {
     const genes = alterationGenes(a), by = a.by || "mutated";
@@ -386,13 +401,17 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     // every gene of the axis in that alteration type; otherwise it is "Not profiled", never counted
     // as wild type (the panel-aware rule). The case column is alt_case, not id, for the reason the
     // OQL axis's is oql_case.
+    // Profiling, like the alterations, is decided over the case's samples in the cohort: a patient
+    // is profiled for a gene when one of them is.
     const type = by === "cna" ? "CNA" as const : by === "sv" ? "SV" as const : "MUTATION" as const;
-    const profiled = genes.map((g) => "alt_case IN (SELECT profiled_id FROM (" + profiledCasesSql(g, type, { study, db, unit: ctx.unit }) + "))").join(" AND ");
+    const sid = strip("sd.sample_unique_id", study);
+    const profCols = genes.map((g, i) => "max(" + sid + " IN (SELECT profiled_id FROM (" + profiledCasesSql(g, type, { study, db, unit: "sample" }) + "))) AS p" + i);
+    const profiled = genes.map((_, i) => "p" + i + " = 1").join(" AND ");
     return "SELECT alt_case AS id, if(hits = 0 AND NOT (" + profiled + "), " + sq(OQL_NOT_PROFILED) + ", v0) AS v FROM (\n" +
-      "SELECT " + idCol + " AS alt_case, " + value + " AS v0, countIf(" + hit + ") AS hits\n" +
+      "SELECT " + idCol + " AS alt_case, " + value + " AS v0, countIf(" + hit + ") AS hits,\n  " + profCols.join(",\n  ") + "\n" +
       "FROM " + db + ".sample_derived sd\n" +
       "LEFT JOIN (\n     " + events + "\n) g ON g.sample_unique_id = sd.sample_unique_id\n" +
-      "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + inCohort("sd.patient_unique_id") + "\n" +
+      "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + sampleIn("sd.sample_unique_id") + "\n" +
       "GROUP BY alt_case)";
   }
   throw new Error("axis source '" + (a as { source: string }).source + "' cannot be selected");
@@ -431,17 +450,13 @@ export function plotCountSql(xSel: string, ySel: string, cohortSql: string, nume
  * and on which axis, reads as being about the whole cohort. Counts only; no id leaves.
  */
 export function plotCoverageSql(xSel: string, ySel: string, ctx: AxisCtx): AggregateSql {
-  const db = ctx.db || DB;
-  const universe = ctx.unit === "sample"
-    ? "SELECT DISTINCT " + strip("sample_unique_id", ctx.study) + " AS id FROM " + db + ".sample_derived\n" +
-      "  WHERE cancer_study_identifier = " + sq(ctx.study) + " AND " + strip("patient_unique_id", ctx.study) + " IN (SELECT pid FROM cohort)"
-    : "SELECT pid AS id FROM cohort";
+  // the cohort's samples, or (patient mode) their owners
+  const universe = ctx.unit === "sample" ? "SELECT DISTINCT sid AS id FROM cohort" : "SELECT DISTINCT pid AS id FROM cohort";
   return aggregateSql("WITH cohort AS (" + ctx.cohortSql + "),\n     cases AS (" + universe + "),\n" +
     "     xs AS (" + xSel + "),\n     ys AS (" + ySel + ")\n" +
     "SELECT count() AS total, countIf(id IN (SELECT id FROM xs)) AS nx, countIf(id IN (SELECT id FROM ys)) AS ny" +
-    (ctx.unit === "sample" ? "" : ",\n  (SELECT count() FROM (SELECT patient_unique_id FROM " + db + ".sample_derived\n" +
-      "    WHERE cancer_study_identifier = " + sq(ctx.study) + " AND " + strip("patient_unique_id", ctx.study) + " IN (SELECT pid FROM cohort)\n" +
-      "    GROUP BY patient_unique_id HAVING count() > 1)) AS multi") +
+    // patients with more than one sample IN THE COHORT: the ones whose samples a point combines
+    (ctx.unit === "sample" ? "" : ",\n  (SELECT count() FROM (SELECT pid FROM cohort GROUP BY pid HAVING uniqExact(sid) > 1)) AS multi") +
     " FROM cases");
 }
 
@@ -700,18 +715,21 @@ function outsideWhiskers(ws: Whiskers[]): string {
 }
 
 /**
- * The cases of a plotted cohort that are also in a highlight cohort: the plotted cohort's SQL
- * narrowed by the highlight's. A cohort expression like any other (it projects `pid`), so the
- * aggregate builders take it unchanged and a highlight is answered by the same queries as the
- * figure under it.
+ * The cases of a plotted cohort that are also in a highlight cohort: the plotted cohort's samples
+ * that are also the highlight's. A cohort expression like any other (it projects `(pid, sid)`), so
+ * the aggregate builders take it unchanged and a highlight is answered by the same queries as the
+ * figure under it — its patients, in patient mode, are the owners of those shared samples.
  */
 export function highlightCohortSql(cohortSql: string, highlightSql: string): CohortSql {
-  return cohortSubquery("SELECT pid FROM (" + cohortSql + ") WHERE pid IN (SELECT pid FROM (" + highlightSql + "))");
+  return cohortSubquery("SELECT pid, sid FROM (" + cohortSql + ") WHERE sid IN (SELECT sid FROM (" + highlightSql + "))");
 }
 
-/** how many patients of a highlight are in the plotted cohort — a count, so any participant may answer */
+/**
+ * How many of a highlight's cases are in the plotted cohort — counts, so any participant may
+ * answer: `n` patients (owners of the shared samples) and `ns` samples.
+ */
 export function plotHighlightCountSql(cohortSql: string, highlightSql: string): AggregateSql {
-  return aggregateSql("SELECT count() AS n FROM (" + highlightCohortSql(cohortSql, highlightSql) + ")");
+  return aggregateSql("SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (" + highlightCohortSql(cohortSql, highlightSql) + ")");
 }
 
 /**

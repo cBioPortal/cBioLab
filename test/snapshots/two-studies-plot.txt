@@ -1,7 +1,7 @@
 Analysis over luad_tcga_pan_can_atlas_2018 + lusc_tcga_pan_can_atlas_2018 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- Lung (TCGA): 1,053 patients — all patients in the study — across 2 studies
+- Lung (TCGA): 1,053 patients — all samples in the study — across 2 studies
 - KRAS mut: 175 patients — OQL[KRAS: MUT] — across 2 studies
 - TP53 mut: 699 patients — OQL[TP53: MUT] — across 2 studies
 

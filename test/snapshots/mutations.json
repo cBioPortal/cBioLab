@@ -3,7 +3,8 @@
   "cohorts": {
     "Colorectal": {
       "count": 5543,
-      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample)",
+      "samples": 5543,
+      "text": "CANCER_TYPE in [Colorectal Cancer]",
       "studies": [
         "msk_chord_2024"
       ]
@@ -164,31 +165,6 @@
               25398284,
               "C",
               "T",
-              "SOMATIC"
-            ]
-          },
-          {
-            "cohort": "Colorectal",
-            "study": "msk_chord_2024",
-            "patient": "P-0074217",
-            "sample": "P-0074217-T02-IM7",
-            "values": [
-              "P-0074217-T02-IM7",
-              "Large Cell Neuroendocrine Carcinoma",
-              "G12C",
-              "Oncogenic · Level 1",
-              "Missense_Mutation",
-              "Missense · Driver",
-              "SNP",
-              0.922,
-              665,
-              56,
-              3,
-              "12",
-              25398285,
-              25398285,
-              "C",
-              "A",
               "SOMATIC"
             ]
           },
@@ -643,8 +619,33 @@
             ]
           },
           {
+            "cohort": "Colorectal",
+            "study": "msk_chord_2024",
+            "patient": "P-0057012",
+            "sample": "P-0057012-T01-IM6",
+            "values": [
+              "P-0057012-T01-IM6",
+              "Colon Adenocarcinoma",
+              "G12V",
+              "Oncogenic · Level 1",
+              "Missense_Mutation",
+              "Missense · Driver",
+              "SNP",
+              0.72,
+              353,
+              137,
+              9,
+              "12",
+              25398284,
+              25398284,
+              "C",
+              "A",
+              "SOMATIC"
+            ]
+          },
+          {
             "…": "5 more",
-            "sha256": "a704ba8fc2fb562f"
+            "sha256": "ddd4acde1a124828"
           }
         ],
         "offset": 0,
@@ -653,12 +654,12 @@
           {
             "cohort": "Colorectal",
             "study": "msk_chord_2024",
-            "total": 1378,
-            "all": 2426
+            "total": 1373,
+            "all": 2410
           }
         ],
-        "total": 1378,
-        "all": 2426,
+        "total": 1373,
+        "all": 2410,
         "oncokbPin": "v7.5"
       },
       "participation": {
@@ -673,7 +674,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "Every KRAS mutation call in the cohort's samples, one row per call; uncalled mutations are left out, as the portal leaves them out. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level for the gene). Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. Showing 1,378 of 2,426 mutations: rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2. Sorted by Allele Freq (T) (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "Every KRAS mutation call in the cohort's samples, one row per call; uncalled mutations are left out, as the portal leaves them out. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level for the gene). Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. Showing 1,373 of 2,410 mutations: rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2. Sorted by Allele Freq (T) (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {
@@ -683,7 +684,7 @@
             "params": [
               [
                 "Colorectal · msk_chord_2024",
-                "1,378 of 2,426"
+                "1,373 of 2,410"
               ]
             ]
           },

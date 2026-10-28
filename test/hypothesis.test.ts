@@ -89,7 +89,7 @@ describe("withSplit restricts every cohort to one half", () => {
 
 const compareResult = (early: [number, number], durable: [number, number], p?: number): AnalysisResult => ({
   study: "s1", involvedStudies: ["s1"], oncokbPin: null, stats: { ms: 0 },
-  cohorts: { early: { count: early[1], text: "", studies: [], sql: "" }, durable: { count: durable[1], text: "", studies: [], sql: "" } },
+  cohorts: { early: { count: early[1], samples: early[1], text: "", studies: [], sql: "" }, durable: { count: durable[1], samples: durable[1], text: "", studies: [], sql: "" } },
   views: [{ kind: "compare", rows: [{ gene: "STK11", pAny: p, cells: [
     { cohort: "durable", profiled: durable[1], any: durable[0], driver: 0, anyPct: 100 * durable[0] / durable[1], driverPct: 0 } as any,
     { cohort: "early", profiled: early[1], any: early[0], driver: 0, anyPct: 100 * early[0] / early[1], driverPct: 0 } as any

@@ -3,14 +3,16 @@
   "cohorts": {
     "Colorectal": {
       "count": 4993,
-      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample)",
+      "samples": 5277,
+      "text": "CANCER_TYPE in [Colorectal Cancer]",
       "studies": [
         "msk_impact_50k_2026"
       ]
     },
     "Breast": {
       "count": 5803,
-      "text": "CANCER_TYPE in [Breast Cancer] (any sample)",
+      "samples": 6807,
+      "text": "CANCER_TYPE in [Breast Cancer]",
       "studies": [
         "msk_impact_50k_2026"
       ]
@@ -117,226 +119,226 @@
         "series": [
           {
             "cohort": "Colorectal",
-            "samples": 5395,
-            "segmented": 5390,
+            "samples": 5277,
+            "segmented": 5273,
             "profiled": [
-              829,
-              5254,
-              5310,
-              5310,
-              5120,
-              5327,
-              5336,
-              5338,
-              5320,
-              5327,
-              5358,
-              5127,
-              5228,
+              800,
+              5140,
+              5193,
+              5193,
+              5009,
+              5212,
+              5220,
+              5223,
+              5208,
+              5210,
               5241,
-              5216,
-              5175,
-              5173,
-              5173,
-              5259,
-              5275,
+              5020,
+              5123,
+              5134,
+              5105,
+              5061,
+              5061,
+              5061,
+              5145,
+              5160,
               {
                 "…": "1432 more",
-                "sha256": "c2218b32c5ea9c1e"
+                "sha256": "ff94981aa29bf5a0"
               }
             ],
             "gain": [
               18,
-              80,
-              72,
-              72,
-              58,
-              50,
+              77,
+              68,
+              68,
+              55,
+              48,
+              49,
+              53,
               52,
-              56,
+              53,
               54,
-              57,
+              66,
               58,
-              69,
-              59,
-              58,
-              22,
-              30,
-              31,
-              31,
-              78,
-              86,
+              55,
+              20,
+              27,
+              28,
+              28,
+              74,
+              81,
               {
                 "…": "1432 more",
-                "sha256": "9071064cfbef82a4"
+                "sha256": "db14f3fcfe784f84"
               }
             ],
             "loss": [
-              155,
-              1129,
-              1199,
-              1199,
+              154,
+              1118,
               1187,
-              1286,
+              1187,
+              1173,
               1269,
-              1260,
-              1280,
-              1298,
-              1325,
-              1303,
-              1512,
-              1514,
-              1249,
-              1040,
-              1018,
-              1018,
-              903,
-              902,
+              1251,
+              1241,
+              1263,
+              1281,
+              1308,
+              1288,
+              1497,
+              1499,
+              1237,
+              1029,
+              1008,
+              1008,
+              896,
+              895,
               {
                 "…": "1432 more",
-                "sha256": "05622f1b4e38b879"
+                "sha256": "507b248ddab1fe92"
               }
             ]
           },
           {
             "cohort": "Breast",
-            "samples": 6907,
-            "segmented": 6906,
+            "samples": 6807,
+            "segmented": 6806,
             "profiled": [
-              703,
-              6686,
-              6753,
-              6753,
-              6271,
-              6713,
-              6748,
-              6763,
-              6744,
-              6747,
-              6807,
-              6463,
-              6624,
-              6639,
+              687,
               6587,
-              6659,
-              6668,
-              6668,
-              6565,
-              6587,
+              6654,
+              6654,
+              6176,
+              6615,
+              6648,
+              6663,
+              6646,
+              6648,
+              6707,
+              6365,
+              6527,
+              6543,
+              6492,
+              6564,
+              6572,
+              6572,
+              6468,
+              6490,
               {
                 "…": "1432 more",
-                "sha256": "29fc7d02b1babbec"
+                "sha256": "c1bec95ab86aa0f1"
               }
             ],
             "gain": [
-              44,
+              43,
+              176,
+              164,
+              164,
+              135,
+              125,
+              134,
+              154,
               182,
-              170,
-              170,
-              141,
-              132,
-              141,
-              161,
-              188,
-              186,
-              188,
-              177,
-              174,
-              175,
+              181,
+              183,
               172,
-              217,
-              225,
-              225,
-              353,
-              365,
+              169,
+              170,
+              167,
+              211,
+              219,
+              219,
+              345,
+              357,
               {
                 "…": "1432 more",
-                "sha256": "b24536dbd6cbad97"
+                "sha256": "517817e4d531ac4a"
               }
             ],
             "loss": [
-              201,
-              1846,
-              1906,
-              1906,
-              1680,
-              1902,
-              1872,
-              1850,
-              1841,
-              1809,
-              1824,
-              1760,
-              2008,
-              2014,
-              1608,
-              1429,
-              1416,
-              1416,
-              1161,
-              1157,
+              199,
+              1830,
+              1890,
+              1890,
+              1665,
+              1886,
+              1855,
+              1833,
+              1825,
+              1792,
+              1806,
+              1742,
+              1986,
+              1993,
+              1593,
+              1418,
+              1405,
+              1405,
+              1153,
+              1149,
               {
                 "…": "1432 more",
-                "sha256": "d31a3cab65c7e604"
+                "sha256": "f50f9f821145cd59"
               }
             ]
           }
         ],
         "test": {
           "gainQ": [
-            0.00008545878862445828,
-            0.000009030934919032,
-            0.000007052613800163918,
-            0.000007052613800163918,
-            0.000006424362049596166,
-            0.000004690200061493557,
-            0.0000010266350704572462,
-            3.284080897211836e-8,
-            1.8154049214540513e-12,
-            2.3540693323143305e-11,
-            2.9957787840506274e-11,
-            2.1876619846395273e-7,
-            4.1811661928362945e-9,
-            1.7981085382803662e-9,
-            3.822800792218554e-23,
-            7.054747659995672e-27,
-            7.025354497705347e-28,
-            7.025354497705347e-28,
-            1.7450212124036932e-31,
-            2.2841786286715866e-30,
+            0.00013857701388469529,
+            0.000015038321512135077,
+            0.000006263559240229919,
+            0.000006263559240229919,
+            0.000010823569210316881,
+            0.00001206963408450285,
+            0.0000023209622183853554,
+            7.523625783040514e-8,
+            5.138037068545577e-12,
+            1.3824562616116555e-11,
+            1.819935089838703e-11,
+            2.7347546734714915e-7,
+            1.3160528855869052e-8,
+            1.4470662736600051e-9,
+            4.611830570516084e-23,
+            2.8003986990867617e-27,
+            2.85329509785664e-28,
+            2.85329509785664e-28,
+            2.38149178083511e-31,
+            1.5516404892140651e-30,
             {
               "…": "1432 more",
-              "sha256": "28986f17dabb26fb"
+              "sha256": "025f29fe15eee07b"
             }
           ],
           "lossQ": [
-            0.000007013609127477512,
-            2.243524316793396e-14,
-            2.790086852777875e-12,
-            2.790086852777875e-12,
-            0.000014166292192959972,
-            3.08684191056184e-7,
-            0.0000011271795899166522,
-            0.0000036741504423566186,
-            0.00007628596613207397,
-            0.002904360074218777,
-            0.012386926935199553,
-            0.03344282841782284,
-            0.11136786598644766,
-            0.09922195566989905,
-            0.5770901208813335,
-            0.08021141405862506,
-            0.04465757638582967,
-            0.04465757638582967,
-            0.500573996127623,
-            0.5297453577870423,
+            0.000018364622145734516,
+            1.1134531648315087e-13,
+            1.1997405872759043e-11,
+            1.1997405872759043e-11,
+            0.000024728048494667674,
+            4.965505587474613e-7,
+            0.0000017820947360969129,
+            0.000005139037409306052,
+            0.0001051547648606557,
+            0.004401641676720445,
+            0.018683066059527003,
+            0.04636263883450825,
+            0.173475023695019,
+            0.15592645874926928,
+            0.7302256346412402,
+            0.10952731791280797,
+            0.06316222431523122,
+            0.06316222431523122,
+            0.5945315087945757,
+            0.6457916644442214,
             {
               "…": "1432 more",
-              "sha256": "693b40669105adf0"
+              "sha256": "993d48358718118c"
             }
           ],
-          "significantGain": 1255,
-          "significantLoss": 1217
+          "significantGain": 1249,
+          "significantLoss": 1208
         }
       },
       "participation": {
@@ -351,7 +353,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Share of each cohort's segmented SAMPLES (not patients: a patient with two segmented samples counts twice) gained (log2 segment mean ≥ 0.2) or lost (≤ −0.2) in each 2 Mb bin, hg19. Each bin's denominator is the samples whose segmentation covers it; a bin takes the value of the segment over its midpoint, so an event narrower than 2 Mb can be missed — use a smaller binMb to find it. 12,296 of 12,302 samples have segments. Thresholds on a log ratio are not purity- or ploidy-corrected: a low-purity tumour's real loss can sit inside ±0.2. Chromosome X is not drawn (includeX: true adds it). Per-bin two-sided Fisher tests, Benjamini–Hochberg across bins separately for gains and losses; adjacent bins are not independent, so read a run of significant bins as one region, not many findings.",
+      "caveat": "Share of each cohort's segmented SAMPLES (not patients: a patient with two segmented samples counts twice) gained (log2 segment mean ≥ 0.2) or lost (≤ −0.2) in each 2 Mb bin, hg19. Each bin's denominator is the samples whose segmentation covers it; a bin takes the value of the segment over its midpoint, so an event narrower than 2 Mb can be missed — use a smaller binMb to find it. 12,079 of 12,084 samples have segments. Thresholds on a log ratio are not purity- or ploidy-corrected: a low-purity tumour's real loss can sit inside ±0.2. Chromosome X is not drawn (includeX: true adds it). Per-bin two-sided Fisher tests, Benjamini–Hochberg across bins separately for gains and losses; adjacent bins are not independent, so read a run of significant bins as one region, not many findings.",
       "method": {
         "steps": [
           {
@@ -375,11 +377,11 @@
             "params": [
               [
                 "Colorectal",
-                "5,390 of 5,395 samples segmented"
+                "5,273 of 5,277 samples segmented"
               ],
               [
                 "Breast",
-                "6,906 of 6,907 samples segmented"
+                "6,806 of 6,807 samples segmented"
               ]
             ]
           },
@@ -405,68 +407,68 @@
         "verification": "Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
         "check": {
           "genome:1:0:gain_q": {
-            "v": 0.00008545878862445828
+            "v": 0.00013857701388469529
           },
           "genome:1:0:loss_q": {
-            "v": 0.000007013609127477512
+            "v": 0.000018364622145734516
           },
           "genome:1:1:gain_q": {
-            "v": 0.000009030934919032
+            "v": 0.000015038321512135077
           },
           "genome:1:1:loss_q": {
-            "v": 2.243524316793396e-14
+            "v": 1.1134531648315087e-13
           },
           "genome:1:2:gain_q": {
-            "v": 0.000007052613800163918
+            "v": 0.000006263559240229919
           },
           "genome:1:2:loss_q": {
-            "v": 2.790086852777875e-12
+            "v": 1.1997405872759043e-11
           },
           "genome:1:3:gain_q": {
-            "v": 0.000007052613800163918
+            "v": 0.000006263559240229919
           },
           "genome:1:3:loss_q": {
-            "v": 2.790086852777875e-12
+            "v": 1.1997405872759043e-11
           },
           "genome:1:4:gain_q": {
-            "v": 0.000006424362049596166
+            "v": 0.000010823569210316881
           },
           "genome:1:4:loss_q": {
-            "v": 0.000014166292192959972
+            "v": 0.000024728048494667674
           },
           "genome:1:5:gain_q": {
-            "v": 0.000004690200061493557
+            "v": 0.00001206963408450285
           },
           "genome:1:5:loss_q": {
-            "v": 3.08684191056184e-7
+            "v": 4.965505587474613e-7
           },
           "genome:1:6:gain_q": {
-            "v": 0.0000010266350704572462
+            "v": 0.0000023209622183853554
           },
           "genome:1:6:loss_q": {
-            "v": 0.0000011271795899166522
+            "v": 0.0000017820947360969129
           },
           "genome:1:7:gain_q": {
-            "v": 3.284080897211836e-8
+            "v": 7.523625783040514e-8
           },
           "genome:1:7:loss_q": {
-            "v": 0.0000036741504423566186
+            "v": 0.000005139037409306052
           },
           "genome:1:8:gain_q": {
-            "v": 1.8154049214540513e-12
+            "v": 5.138037068545577e-12
           },
           "genome:1:8:loss_q": {
-            "v": 0.00007628596613207397
+            "v": 0.0001051547648606557
           },
           "genome:1:9:gain_q": {
-            "v": 2.3540693323143305e-11
+            "v": 1.3824562616116555e-11
           },
           "genome:1:9:loss_q": {
-            "v": 0.002904360074218777
+            "v": 0.004401641676720445
           },
           "…": {
             "more": 2752,
-            "sha256": "14aedf4afb06c134"
+            "sha256": "06b0d4be37f3b285"
           }
         }
       }

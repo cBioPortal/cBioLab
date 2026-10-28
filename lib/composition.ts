@@ -10,6 +10,7 @@ import { sq } from "./compiler.ts";
 import { axisSelect } from "./plot.ts";
 import { ATTR_NAME_RE } from "./custom-data.ts";
 import { finiteSql } from "./sql-number.ts";
+import { assayInCohortSql } from "./generic-assay.ts";
 import { patientSql, type PatientSql } from "./sql-kinds.ts";
 
 /** the most parts one figure can tell apart: the categorical palette, then its tints */
@@ -63,7 +64,7 @@ export function partsSql(s: CompositionSource, study: string, db: string, cohort
       "  FROM " + db + ".generic_assay_data_derived\n" +
       "  WHERE profile_type = " + sq(s.profileType!) + " AND profile_stable_id = " + sq(study + "_" + s.profileType) + "\n" +
       "    AND entity_stable_id IN (" + s.parts.map(sq).join(",") + ")\n" +
-      "    AND patient_unique_id IN (SELECT concat(" + sq(study + "_") + ", pid) FROM cohort)\n" +
+      "    AND " + assayInCohortSql(study) + "\n" +
       ") WHERE isFinite(ifNull(val, nan)) GROUP BY id, c";
   }
   const ctx = { study, db, unit: s.unit, cohortSql };

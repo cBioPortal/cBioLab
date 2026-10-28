@@ -5,7 +5,7 @@ import { BUILD_COMMIT } from "../../build-info.ts";
 export interface CorrelatesTrace {
   gene: string; profileType: string; otherProfile: string; cohort: string;
   minN: number; multi: boolean; tested: number; untested: number;
-  perSite: { study: string; genes: number; patients: number }[];
+  perSite: { study: string; genes: number; samples: number }[];
   /** per study and gene: the six sums on values, and the same six on average ranks */
   sums: { study: string; gene: string; n: number; sx: number; sy: number; sxy: number; sxx: number; syy: number;
     rsx: number; rsy: number; rsxy: number; rsxx: number; rsyy: number }[];
@@ -17,14 +17,14 @@ export function correlatesMethod(t: CorrelatesTrace): MethodRecord {
   const same = t.profileType === t.otherProfile;
   const steps: MethodStep[] = t.perSite.map((s) => ({
     kind: "fetch" as const, title: "Sum every gene's values and ranks against " + t.gene + "'s",
-    detail: "The correlates:moments query above. Per patient, " + t.gene + " on “" + t.profileType + "” and every gene on “" + t.otherProfile +
-      "” (a patient's samples averaged); per gene, over the patients with both: n, Σx, Σy, Σxy, Σx², Σy², and the same six over each value's average rank among those patients (ties share the mean of their ranks). Sums only.",
-    scope: t.cohort + " · " + s.study, rowsIn: s.patients, rowsOut: s.genes,
+    detail: "The correlates:moments query above. Per sample in the cohort, " + t.gene + " on “" + t.profileType + "” and every gene on “" + t.otherProfile +
+      "” (a patient-level assay's value paired with each of its patient's samples); per gene, over the samples with both: n, Σx, Σy, Σxy, Σx², Σy², and the same six over each value's average rank among those samples (ties share the mean of their ranks). Sums only.",
+    scope: t.cohort + " · " + s.study, rowsIn: s.samples, rowsOut: s.genes,
   }));
   steps.push({ kind: "statistic", title: "Pearson's r and Spearman's ρ per gene",
     detail: "r from the sums: (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); ρ is the same formula on the rank sums. Each p from t = r√((n − 2)/(1 − r²)) on n − 2 df, as scipy's pearsonr and spearmanr compute it." +
       (t.multi ? " Across studies, r pools the sums (exact); ρ is each study's, combined by Fisher z with weight n − 3 and a normal p, because ranks do not add." : "") +
-      (same ? " " + t.gene + " against itself is left out." : "") + " A gene with fewer than " + t.minN + " patients, or no spread, is not tested.",
+      (same ? " " + t.gene + " against itself is left out." : "") + " A gene with fewer than " + t.minN + " samples, or no spread, is not tested.",
     params: [["tested", t.tested.toLocaleString("en-US")], ["not tested", t.untested.toLocaleString("en-US")]] });
   steps.push({ kind: "statistic", title: "Benjamini–Hochberg over ρ", detail: "q-values over every gene tested, from ρ's p." });
   const python = [

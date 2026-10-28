@@ -6,6 +6,7 @@ import { sq } from "../../compiler.ts";
 import { clinicalValueFoldSql, foldedEqualsSql, foldedInSql } from "../../event-names.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
+import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
 
 /** Per gene, among patients with plasma and tissue both profiled for it: as pairedCountsSql (a = tissue, b = plasma). */
 export function ctdnaCountsSql(cohortSql: string, study: string, db: string, genes: string[] | null, o: CtdnaSides,
@@ -90,7 +91,7 @@ export interface CtdnaSides {
 
 /**
  * The cohort's samples classed plasma ('b') or tissue ('a'), as a `ps` CTE of the patients with
- * both; `sides` keeps every classed sample, for questions about plasma alone. With `withinDays`,
+ * both among the cohort's samples; `sides` keeps every classed sample, for questions about plasma alone. With `withinDays`,
  * a sample is kept only when the timeline dates it and a sample of the other kind within that
  * many days (`dated` and `near` say how many).
  */
@@ -104,7 +105,7 @@ function ctdnaSidesCtes(cohortSql: string, study: string, db: string, o: CtdnaSi
     "  SELECT sample_unique_id AS suid, any(" + fold("attribute_value") + ") AS v\n" +
     "  FROM " + clinicalTable(db, [o.attribute]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(o.attribute) + "\n" +
-    "    AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) + "\n" +
     "  GROUP BY suid\n" +
     "),\n" +
     "classed AS (\n" +
@@ -113,7 +114,7 @@ function ctdnaSidesCtes(cohortSql: string, study: string, db: string, o: CtdnaSi
       " AND gene_panel_id IN (" + o.plasmaPanels.map(sq).join(",") + ")), 'b', " : "") +
     "cls.v IN (" + lit(o.plasma) + "), 'b', cls.v IN (" + lit(o.tissue) + "), 'a', '') AS side\n" +
     "  FROM " + db + ".sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id\n" +
-    "  WHERE sd.cancer_study_identifier = " + sq(study) + " AND sd.patient_stable_id IN (SELECT pid FROM cohort)\n" +
+    "  WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + inCohortSamples(bareSampleId("sd.sample_unique_id", study)) + "\n" +
     "),\n" +
     (dated
       ? "tl AS (\n" +
@@ -123,7 +124,7 @@ function ctdnaSidesCtes(cohortSql: string, study: string, db: string, o: CtdnaSi
         "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
         "  JOIN " + db + ".clinical_event_data d ON d.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("d.key", o.sampleKey) + "\n" +
         "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedInSql("ce.event_type", o.sampleEvents) + "\n" +
-        "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+        "    AND " + inCohortPatients("p.stable_id") + "\n" +
         "  GROUP BY pid, sample\n" +
         "),\n" +
         "dated AS (SELECT c.suid AS suid, c.pid AS pid, c.side AS side, tl.day AS day FROM classed c INNER JOIN tl ON tl.pid = c.pid AND tl.sample = c.sample WHERE c.side != ''),\n" +

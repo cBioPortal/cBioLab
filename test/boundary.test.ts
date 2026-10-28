@@ -24,7 +24,7 @@ import {
   carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
   geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, clinicalHistogramSql, attributeQuantileSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
-  lollipopChangesSql, lollipopTypesSql, lollipopTotalsSql, cohortSampleCountSql,
+  lollipopChangesSql, lollipopTypesSql, lollipopTotalsSql, cohortSampleCountSql, cohortSizesSql,
   timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, coxRowsSql, logisticRowsSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
@@ -342,7 +342,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "clinicalCountsSql": () => clinicalCountsSql(cohortSql, ["SEX", "CANCER_TYPE"], "x", "db"),
     "clinicalMomentsSql": () => clinicalMomentsSql(cohortSql, ["CURRENT_AGE_DEID"], "x", "db"),
     "clinicalHistogramSql": () => clinicalHistogramSql(cohortSql, ["CURRENT_AGE_DEID"], "x", "db"),
-    "attributeQuantileSql": () => attributeQuantileSql(cohortSql, "TMB_NONSYNONYMOUS", "patient", 0.8, "x", "db"),
+    "attributeQuantileSql": () => attributeQuantileSql(cohortSql, "TMB_NONSYNONYMOUS", 0.8, "x", "db"),
     "momentPairsSql": () => momentPairsSql(cohortSql, [["ERBB2", "GRB7"]], "rna_seq_v2_mrna_median_Zscores", "x", "db"),
     "variantCountsSql": () => variantCountsSql(cohortSql, ["KRAS", "BRAF"], "x", 1, "db"),
     "variantCountsSql:suppressed": () => variantCountsSql(cohortSql, ["KRAS"], "x", 5, "db"),
@@ -351,7 +351,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "lollipopChangesSql:suppressed-unannotated": () => lollipopChangesSql(cohortSql, ["KRAS"], "x", 5, null, "db"),
     "lollipopTypesSql": () => lollipopTypesSql(cohortSql, ["KRAS"], "x", 3, "v7.5", "db"),
     "lollipopTotalsSql": () => lollipopTotalsSql(cohortSql, ["KRAS"], "x", "db"),
-    "cohortSampleCountSql": () => cohortSampleCountSql(cohortSql, "x", "db"),
+    "cohortSampleCountSql": () => cohortSampleCountSql(cohortSql),
+    "cohortSizesSql": () => cohortSizesSql(cohortSql),
     "profileMomentsSql": () => profileMomentsSql(cohortSql, ["ERBB2"], "rna_seq_v2_mrna_median_Zscores", "x", "db"),
     "timelineSpanSql": () => timelineSpanSql(cohortSql, "x", "db"),
     // A course aligned on an event, and one aligned on the study's own day 0 —

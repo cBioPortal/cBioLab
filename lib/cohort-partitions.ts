@@ -66,8 +66,8 @@ function leafEvaluability(leaf: Leaf): Evaluability {
   }
   if (kind === "proteinPosition") return { leaves: [{ kind: "profiled", type: "MUTATION", gene: (leaf as { gene: string }).gene }], unchecked: [] };
   if (kind === "clinical") {
-    const c = leaf as { attribute: string; per?: "patient" | "sample" };
-    return { leaves: [{ kind: "clinical", attribute: c.attribute, ...(c.per === "sample" ? { per: "sample" as const } : {}), op: "!=", value: "" }], unchecked: [] };
+    const c = leaf as { attribute: string };
+    return { leaves: [{ kind: "clinical", attribute: c.attribute, op: "!=", value: "" }], unchecked: [] };
   }
   // Membership facts (a list, a case list, a profiling status, the held-out half) are known for
   // every patient. Measurements and timelines are not, and this engine has no "was measured"

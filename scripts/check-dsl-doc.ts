@@ -55,7 +55,7 @@ export function checkDocs(runs: ExampleRun[]): number {
       const children = new Set(Object.values(r.splits || {}).flatMap((p) => p.children.map((c) => c.name)));
       const bad = Object.entries(r.cohorts).filter(([nm, c]) => !c.count && !children.has(nm)).map(([nm]) => nm);
       const leaky = Object.entries(r.splits || {}).filter(([, p]) => !p.conserved)
-        .map(([nm, p]) => nm + " (" + n(p.sum) + " of " + n(p.parentCount) + ")");
+        .map(([nm, p]) => nm + " (" + n(p.sum) + " of " + n(p.parentSamples) + " samples)");
       const viewErr = r.views.find(v => v.error);
       const actual: Record<string, number> = {};
       for (const [nm, c] of Object.entries(r.cohorts)) actual[nm] = c.count;

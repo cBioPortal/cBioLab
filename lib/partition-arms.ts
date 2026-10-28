@@ -23,7 +23,7 @@ export function chooseArmValues(values: ValueCount[], maxArms = SPLIT_BY_DEFAULT
 }
 
 /** A partition of `of` with one arm per chosen value of a categorical attribute. */
-export function partitionFromValues(of: string, attribute: string, per: "patient" | "sample", values: ValueCount[],
+export function partitionFromValues(of: string, attribute: string, values: ValueCount[],
   opts: { maxArms?: number; minCount?: number } = {}): { def: PartitionDef; pooled: string[] } {
   const minCount = opts.minCount ?? SPLIT_BY_DEFAULT_MIN_COUNT;
   const { own, pooled } = chooseArmValues(values, opts.maxArms, minCount);
@@ -31,7 +31,7 @@ export function partitionFromValues(of: string, attribute: string, per: "patient
     throw new Error("no value of " + attribute + " is held by at least " + minCount + " patients in “" + of + "” — nothing to split on");
   const arms: PartitionArm[] = own.map((x) => ({
     name: armLabel(x.v),
-    where: { kind: "clinical", attribute, ...(per === "sample" ? { per } : {}), values: [x.v] }
+    where: { kind: "clinical", attribute, values: [x.v] }
   }));
   return {
     def: { of, split: attribute, arms, source: { attribute, minCount, ...(pooled.length ? { otherValues: pooled.slice(0, 50).map((x) => x.v) } : {}) } },
@@ -98,8 +98,7 @@ export function mergeArms(def: PartitionDef, i: number, j: number): PartitionDef
   const leaves = [...leavesOf(a.where)!, ...leavesOf(b.where)!];
   // two values of one clinical attribute stay one leaf, as a facet's multi-value pick does
   const clin = leaves.every((l) => (l as { kind?: string }).kind === "clinical" && Array.isArray((l as { values?: unknown[] }).values)
-    && (l as { attribute: string }).attribute === (leaves[0] as { attribute: string }).attribute
-    && ((l as { per?: string }).per || "patient") === ((leaves[0] as { per?: string }).per || "patient"));
+    && (l as { attribute: string }).attribute === (leaves[0] as { attribute: string }).attribute);
   const where: Clause = clin
     ? { ...(leaves[0] as Leaf & object), values: leaves.flatMap((l) => (l as { values: (string | number)[] }).values) } as Leaf
     : leaves.length === 1 ? leaves[0] : { any: leaves };
@@ -154,7 +153,7 @@ function rangeLabel(r: { gt?: number; gte?: number; lt?: number; lte?: number })
 }
 
 export type ChartKey =
-  | { kind: "clinical"; attribute: string; per?: "patient" | "sample" }
+  | { kind: "clinical"; attribute: string }
   /** a gene table: the OQL entries of one alteration kind (": MUT", ": AMP"/": HOMDEL", ": FUSION") */
   | { kind: "genes"; specs: string[] }
   /** one generic-assay entity's chart */
@@ -169,13 +168,11 @@ function chartSelection(draft: { all: Clause[] }, chart: ChartKey): { rest: Clau
   const arms: PartitionArm[] = [];
   for (const c of draft.all) {
     const l = c as Record<string, any>;
-    if (chart.kind === "clinical" && l.kind === "clinical" && l.attribute === chart.attribute
-      && (l.per || "patient") === (chart.per || "patient")) {
-      const per = l.per === "sample" ? { per: "sample" as const } : {};
+    if (chart.kind === "clinical" && l.kind === "clinical" && l.attribute === chart.attribute) {
       if (Array.isArray(l.values)) for (const v of l.values)
-        arms.push({ name: armLabel(String(v)), where: { kind: "clinical", attribute: l.attribute, ...per, values: [v] } });
+        arms.push({ name: armLabel(String(v)), where: { kind: "clinical", attribute: l.attribute, values: [v] } });
       else if (l.op === "=" && l.value != null)
-        arms.push({ name: armLabel(String(l.value)), where: { kind: "clinical", attribute: l.attribute, ...per, values: [l.value] } });
+        arms.push({ name: armLabel(String(l.value)), where: { kind: "clinical", attribute: l.attribute, values: [l.value] } });
       else if (l.range) arms.push({ name: armLabel(rangeLabel(l.range)), where: c });
       else if (l.op) arms.push({ name: armLabel(l.op + " " + l.value), where: c });
       else rest.push(c);

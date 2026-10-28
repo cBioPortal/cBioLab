@@ -56,9 +56,16 @@ shortcut that gives a plausible wrong number), the trap is named.
 - **Analysis document** — `{study, cohorts, views}`: everything a result depends on, so a link to it
   reproduces the result (invariant 9). Older documents are upgraded in one place,
   `lib/doc-version.ts`.
-- **Cohort** — a set of patients, defined by clauses (`lib/cohort2.ts`): `{all:[...]}`, `{any:[...]}`,
-  `{not:...}` over leaves (OQL, clinical values, timeline events, id lists, profiled-for, …). A
-  cohort can `extends` another.
+- **Cohort** — a set of samples, as on cBioPortal, defined by clauses (`lib/cohort2.ts`):
+  `{all:[...]}`, `{any:[...]}`, `{not:...}` over leaves (OQL, clinical values, timeline events, id
+  lists, profiled-for, …) — intersection, union and complement over the study's samples. A
+  sample-level leaf (a sample attribute, an alteration, a sample list) selects the samples that match;
+  a patient-level one (a patient attribute, an event, a patient list) every sample of the patients
+  that match. A clinical attribute is matched at the level its study records it, so one clause can be
+  sample-level in one study and patient-level in another. The cohort's **patients** are the owners of
+  its samples. A table keyed by sample joins on the cohort's samples (`inCohortSamples`), one keyed by
+  patient on its patients (`inCohortPatients`) — the one rule, so a patient's other samples never
+  reach a sample count or a gene frequency. A cohort can `extends` another.
 - **Split / arm** — a cohort divided into disjoint child cohorts that add up to it (arms, decided
   first match wins). A patient whose arm cannot be decided (not profiled, no value recorded) goes
   to a named "Not profiled" / "No … recorded" child, never to wild-type or Other

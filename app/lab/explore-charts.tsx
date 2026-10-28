@@ -98,8 +98,8 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
           {res && res.plot && res.plot.data && res.plot.data.shape === "scatter" && res.plot.data.grid &&
             <Density data={res.plot.data} onSelect={(x0, x1, y0, y1) => addClauses([
               // the x axis is log10(count + 1): back to whole counts, the box's inside edges
-              { kind: "clinical", attribute: X_ATTR, range: { gte: Math.ceil(10 ** x0 - 1 - 1e-9), lte: Math.floor(10 ** x1 - 1 + 1e-9) }, per: "sample" },
-              { kind: "clinical", attribute: Y_ATTR, range: { gte: y0, lte: y1 }, per: "sample" }])} />}
+              { kind: "clinical", attribute: X_ATTR, range: { gte: Math.ceil(10 ** x0 - 1 - 1e-9), lte: Math.floor(10 ** x1 - 1 + 1e-9) } },
+              { kind: "clinical", attribute: Y_ATTR, range: { gte: y0, lte: y1 } }])} />}
           {res && res.plot && res.plot.error && <p className="note">{res.plot.error}</p>}
           {stale && <div className="xc-wait"><span className="spinner" /> {res ? "updating…" : "loading…"}</div>}
         </div>

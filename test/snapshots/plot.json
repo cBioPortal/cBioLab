@@ -3,7 +3,8 @@
   "cohorts": {
     "all samples": {
       "count": 1084,
-      "text": "all patients in the study",
+      "samples": 1084,
+      "text": "all samples in the study",
       "studies": [
         "brca_tcga_pan_can_atlas_2018"
       ]

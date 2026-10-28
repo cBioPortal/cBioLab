@@ -3,7 +3,8 @@
   "cohorts": {
     "Prostate": {
       "count": 3211,
-      "text": "CANCER_TYPE in [Prostate Cancer] (any sample)",
+      "samples": 3211,
+      "text": "CANCER_TYPE in [Prostate Cancer]",
       "studies": [
         "msk_chord_2024"
       ]

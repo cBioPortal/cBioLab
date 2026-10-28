@@ -3,7 +3,8 @@
   "cohorts": {
     "all patients": {
       "count": 48179,
-      "text": "all patients in the study",
+      "samples": 54331,
+      "text": "all samples in the study",
       "studies": [
         "msk_impact_50k_2026"
       ]
@@ -141,13 +142,13 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Within patients with samples on both sides, Primary and Metastasis (SAMPLE_TYPE = Primary vs Metastasis; all patients: 2,278 patients), per gene, among those profiled for it on BOTH sides by each side's own panels: an OncoKB driver (v7.5) on both sides, on the Primary side only, or the Metastasis side only; a patient with several samples on a side counts as altered there if any is. Concordance is both ÷ altered anywhere. The exact McNemar test asks whether discordance runs one way; q is Benjamini–Hochberg across the genes of each cohort. A sample's SAMPLE_TYPE records where the tissue came from, not when it was taken, so Metastasis-only is not the same as \"acquired later\"; and patients sampled twice are a selected group, typically with longer or harder disease courses.",
+      "caveat": "Within patients with samples on both sides, Primary and Metastasis (SAMPLE_TYPE = Primary vs Metastasis; all patients: 2,278 patients), per gene, among those profiled for it on BOTH sides by each side's own panels: an OncoKB driver (v7.5) on both sides, on the Primary side only, or the Metastasis side only; a patient with several samples on a side counts as altered there if any is. Both sides are the cohort's own samples, so a cohort that selects one kind of sample has no pairs. Concordance is both ÷ altered anywhere. The exact McNemar test asks whether discordance runs one way; q is Benjamini–Hochberg across the genes of each cohort. A sample's SAMPLE_TYPE records where the tissue came from, not when it was taken, so Metastasis-only is not the same as \"acquired later\"; and patients sampled twice are a selected group, typically with longer or harder disease courses.",
       "method": {
         "steps": [
           {
             "kind": "fetch",
             "title": "Count each gene's state in paired samples",
-            "detail": "The paired:patients and paired:genes queries above. Patients with both a SAMPLE_TYPE = Primary sample (Primary) and a SAMPLE_TYPE = Metastasis sample (Metastasis); per gene, among those profiled for it on both sides by each side's own panels: altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) on both sides, on the Primary side only, or the Metastasis side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
+            "detail": "The paired:patients and paired:genes queries above. Patients with both, among the cohort's samples, a SAMPLE_TYPE = Primary sample (Primary) and a SAMPLE_TYPE = Metastasis sample (Metastasis); per gene, among those profiled for it on both sides by each side's own panels: altered (an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5)) on both sides, on the Primary side only, or the Metastasis side only. A patient with several samples on one side counts as altered there if any is. Counts only.",
             "scope": "all patients · msk_impact_50k_2026",
             "rowsIn": 48179
           },

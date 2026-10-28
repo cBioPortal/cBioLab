@@ -46,7 +46,7 @@ function fake(mode: "patient-level" | "aggregate-only", calls: Call[], data: () 
 }
 
 const evaluated = (studies: string[], count: number): EvaluatedCohort =>
-  ({ studies, perStudy: Object.fromEntries(studies.map((s) => [s, { sql: "", count, mode: "patient-level" }])), count, text: "" });
+  ({ studies, perStudy: Object.fromEntries(studies.map((s) => [s, { sql: "", count, samples: count, mode: "patient-level" }])), count, samples: count, text: "" });
 
 async function run(resolver: Record<string, unknown>, view: Record<string, unknown> = {}): Promise<ViewResultOf<"plot">> {
   const c = {

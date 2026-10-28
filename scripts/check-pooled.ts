@@ -43,7 +43,7 @@ const STUDIES = [
 const GENES = ["TP53", "FAT4", "ZFHX3", "EWSR1", "TIMM8B"];
 const IN = STUDIES.map(sq).join(",");
 /** the draft, and the same patients written by hand */
-const FEMALE: CohortDef = { all: [{ kind: "clinical", attribute: "SEX", per: "patient", op: "=", value: "Female" }] };
+const FEMALE: CohortDef = { all: [{ kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] };
 const FEMALE_SQL = `SELECT patient_unique_id FROM ${DB}.clinical_data_derived WHERE cancer_study_identifier IN (${IN})
   AND type = 'patient' AND attribute_name = 'SEX' AND lowerUTF8(trimBoth(attribute_value)) = 'female'`;
 

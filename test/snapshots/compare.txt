@@ -1,7 +1,7 @@
 Analysis over sarcoma_msk_2022 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- Well-diff liposarcoma: 444 patients — CANCER_TYPE_DETAILED in [Well-Differentiated Liposarcoma] (any sample)
+- Well-diff liposarcoma: 444 patients — CANCER_TYPE_DETAILED in [Well-Differentiated Liposarcoma]
 
 Compare (driver%/any%, panel-aware denominators; annotation OncoKB v7.5 (pinned)):
   MDM2: Well-diff liposarcoma 0%/0%

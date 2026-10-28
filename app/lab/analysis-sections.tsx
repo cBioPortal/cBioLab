@@ -300,8 +300,8 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
 }
 
 /**
- * A locked cohort's lock, and how far the data has moved since: what its definition would select
- * now, who that would add or drop, frozen patients no longer in the data, and their new samples.
+ * A locked cohort's lock, and how far the data has moved since, in samples: what its definition
+ * would select now, which samples that would add or drop, and frozen samples no longer in the data.
  */
 function LockLine({ lock, drift }: { lock: CohortLock; drift?: LockDrift }) {
   const nf = (x: number) => x.toLocaleString();
@@ -310,8 +310,7 @@ function LockLine({ lock, drift }: { lock: CohortLock; drift?: LockDrift }) {
     if (drift.entered || drift.left)
       parts.push("its definition now selects " + nf(drift.now) + (drift.entered ? " (+" + nf(drift.entered) + " new" : " (") +
         (drift.entered && drift.left ? ", " : "") + (drift.left ? "−" + nf(drift.left) + " no longer" : "") + ")");
-    if (drift.present < drift.n) parts.push(nf(drift.n - drift.present) + " of the locked patients are no longer in the data");
-    if (drift.newSamples) parts.push(nf(drift.newSamples) + " new sample" + (drift.newSamples === 1 ? "" : "s") + " of these patients, which views include");
+    if (drift.present < drift.n) parts.push(nf(drift.n - drift.present) + " of the locked samples are no longer in the data");
   }
   return (
     <p className="lockline m-0 mb-1.5 flex flex-wrap items-baseline gap-x-2 text-sm text-muted-foreground"

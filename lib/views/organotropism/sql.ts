@@ -5,26 +5,34 @@ import { sq } from "../../compiler.ts";
 import { foldedEqualsSql, clinicalValueFoldSql, nameFoldSql } from "../../event-names.ts";
 import { driverJoin } from "../../federation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
+import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
+
+/** A clinical row of the cohort: a sample row by its sample, a patient row by its patient (`alias` the table's, if any). */
+function inCohortClinical(study: string, alias = ""): string {
+  const a = alias ? alias + "." : "";
+  return "(" + a + "type = 'sample' AND " + inCohortSamples(bareSampleId(a + "sample_unique_id", study)) +
+    " OR " + a + "type = 'patient' AND " + inCohortPatients(pidOf(a + "patient_unique_id", study)) + ")";
+}
 
 /** Which site sources the cohort's patients carry: patients with a flag attribute (and how many
- *  flags), with a site on the timeline, and with a biopsy-site value. Counts only. */
+ *  flags), with a site on the timeline, and with a biopsy-site value on one of the cohort's samples. Counts only. */
 export function orgSourcesSql(cohortSql: string, study: string, db: string, o: { prefix: string; eventType: string; key: string; attribute: string }): AggregateSql {
   const pid = pidOf("patient_unique_id", study), prefix = orgAttr(o.prefix), attr = orgAttr(o.attribute);
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT\n" +
     "  (SELECT uniqExact(" + pid + ") FROM " + clinicalTable(db, []) + " WHERE cancer_study_identifier = " + sq(study) +
-    " AND startsWith(attribute_name, " + sq(prefix) + ") AND " + pid + " IN (SELECT pid FROM cohort)) AS flag_patients,\n" +
+    " AND startsWith(attribute_name, " + sq(prefix) + ") AND " + inCohortClinical(study) + ") AS flag_patients,\n" +
     "  (SELECT uniqExact(attribute_name) FROM " + clinicalTable(db, []) + " WHERE cancer_study_identifier = " + sq(study) +
-    " AND startsWith(attribute_name, " + sq(prefix) + ") AND " + pid + " IN (SELECT pid FROM cohort)) AS flags,\n" +
+    " AND startsWith(attribute_name, " + sq(prefix) + ") AND " + inCohortClinical(study) + ") AS flags,\n" +
     "  (SELECT uniqExact(p.stable_id) FROM " + db + ".clinical_event ce\n" +
     "     JOIN " + db + ".clinical_event_data d ON d.clinical_event_id = ce.clinical_event_id\n" +
     "     JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "     JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "   WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", o.eventType) + " AND " + foldedEqualsSql("d.key", o.key) +
-    " AND trimBoth(d.value) != '' AND p.stable_id IN (SELECT pid FROM cohort)) AS timeline_patients,\n" +
+    " AND trimBoth(d.value) != '' AND " + inCohortPatients("p.stable_id") + ") AS timeline_patients,\n" +
     "  (SELECT uniqExact(" + pid + ") FROM " + clinicalTable(db, [attr]) + " WHERE cancer_study_identifier = " + sq(study) +
-    " AND attribute_name = " + sq(attr) + " AND trimBoth(attribute_value) != '' AND " + pid + " IN (SELECT pid FROM cohort)) AS sample_patients\n" +
+    " AND attribute_name = " + sq(attr) + " AND trimBoth(attribute_value) != '' AND " + inCohortClinical(study) + ") AS sample_patients\n" +
     "FROM system.one"
   ));
 }
@@ -38,7 +46,7 @@ export function orgSitesSql(cohortSql: string, study: string, db: string, src: O
   ));
 }
 
-/** Sample source: the biopsy-site values that ORG_SITE_MAP sends to "Other", with their patients. Counts only. */
+/** Sample source: the biopsy-site values of the cohort's samples that ORG_SITE_MAP sends to "Other", with their patients. Counts only. */
 export function orgOtherValuesSql(cohortSql: string, study: string, db: string, attribute: string): AggregateSql {
   const pid = pidOf("patient_unique_id", study), attr = orgAttr(attribute);
   return aggregateSql((
@@ -46,12 +54,12 @@ export function orgOtherValuesSql(cohortSql: string, study: string, db: string, 
     "SELECT trimBoth(attribute_value) AS value, uniqExact(" + pid + ") AS patients\n" +
     "FROM " + clinicalTable(db, [attr]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attr) + " AND trimBoth(attribute_value) != ''\n" +
-    "  AND " + pid + " IN (SELECT pid FROM cohort) AND " + orgSiteMapExpr("attribute_value") + " = 'Other'\n" +
+    "  AND " + inCohortClinical(study) + " AND " + orgSiteMapExpr("attribute_value") + " = 'Other'\n" +
     "GROUP BY value ORDER BY patients DESC, value LIMIT 30"
   ));
 }
 
-/** The cohort's most altered genes (patients with the alteration on a covering panel), at most `limit`. Counts only. */
+/** The cohort's most altered genes (patients with the alteration on a covering panel in one of the cohort's samples), at most `limit`. Counts only. */
 export function orgTopGenesSql(cohortSql: string, study: string, db: string, g: Omit<OrgGenes, "genes">, limit: number): AggregateSql {
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" + orgGeneCtes(study, db, { ...g, genes: null }) + "\n" +
@@ -62,8 +70,8 @@ export function orgTopGenesSql(cohortSql: string, study: string, db: string, g: 
 /**
  * Per (site, gene, stratum): the patients evaluable for the site AND profiled for the gene, those
  * of them with a metastasis there, those altered, and those both — the four margins of one 2×2
- * per stratum (a patient's `stratifyBy` value; "Multiple" when their samples disagree, '' when none
- * is recorded). Counts only.
+ * per stratum (a patient's `stratifyBy` value; "Multiple" when their samples in the cohort disagree,
+ * '' when none is recorded). Counts only.
  */
 export function orgCountsSql(cohortSql: string, study: string, db: string, src: OrgSource, g: OrgGenes & { genes: string[] }, stratifyBy: string | null): AggregateSql {
   const pid = pidOf("patient_unique_id", study);
@@ -75,9 +83,9 @@ export function orgCountsSql(cohortSql: string, study: string, db: string, src: 
       ? "  SELECT " + pid + " AS pid, if(uniqExact(" + clinicalValueFoldSql("attribute_value") + ") > 1, 'Multiple', any(trimBoth(attribute_value))) AS s\n" +
         "  FROM " + clinicalTable(db, [strat]) + "\n" +
         "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(strat) + " AND trimBoth(attribute_value) != ''\n" +
-        "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+        "    AND " + inCohortClinical(study) + "\n" +
         "  GROUP BY pid\n"
-      : "  SELECT pid, '' AS s FROM cohort\n") +
+      : "  SELECT DISTINCT pid, '' AS s FROM cohort\n") +
     ")\n" +
     "SELECT ps.site AS site, prof.gene AS gene, st.s AS stratum, count() AS n, sum(ps.has) AS with_site,\n" +
     "       countIf(alt.pid != '') AS altered, countIf(ps.has = 1 AND alt.pid != '') AS both\n" +
@@ -91,10 +99,11 @@ export function orgCountsSql(cohortSql: string, study: string, db: string, src: 
 /**
  * Cumulative incidence of the first timeline site event (src's event type, key = `siteValue`) with
  * death competing, for the cohort's patients profiled for `gene` and altered in it (`altered`) or
- * not: incidenceCountsSql over that half of the cohort. Counts only.
+ * not, both read from the cohort's own samples: incidenceCountsSql over that half of the cohort
+ * (its samples of those patients). Counts only.
  */
 export function orgIncidenceSql(cohortSql: string, study: string, db: string, src: OrgSource, g: OrgGenes & { genes: [string] }, altered: boolean, siteValue: string): AggregateSql {
-  const half = "SELECT pid FROM (" + cohortSql + ") WHERE pid IN (\n  WITH cohort AS (" + cohortSql + "),\n" + orgGeneCtes(study, db, g) + "\n" +
+  const half = "SELECT pid, sid FROM (" + cohortSql + ") WHERE pid IN (\n  WITH cohort AS (" + cohortSql + "),\n" + orgGeneCtes(study, db, g) + "\n" +
     "  SELECT pid FROM prof)\n  AND pid " + (altered ? "" : "NOT ") + "IN (\n  WITH cohort AS (" + cohortSql + "),\n" + orgGeneCtes(study, db, g) + "\n  SELECT pid FROM alt)";
   return aggregateSql(incidenceCountsSql(half, study, db, { eventType: src.eventType || "Diagnosis", attrs: [{ key: src.key || "TUMOR_SITE", value: siteValue }] }, null));
 }
@@ -146,8 +155,9 @@ const ORG_YES = "('yes', 'y', 'true', '1')", ORG_NO = "('no', 'n', 'false', '0')
 /**
  * `ps`: one row per (patient, site) the source can speak to, `has` 1 when the patient has a
  * metastasis there; `sl`: each site's label. Flags: a patient is evaluable for a site when its
- * flag is recorded Yes or No. Timeline: a patient with any site recorded is evaluable for every
- * site seen. Sample: every cohort patient is evaluable; a site is one a sample was taken from.
+ * flag is recorded Yes or No (on the patient, or on one of its samples in the cohort). Timeline: a
+ * patient with any site recorded is evaluable for every site seen. Sample: every cohort patient is
+ * evaluable; a site is one of the cohort's samples was taken from.
  */
 function orgSiteCtes(study: string, db: string, src: OrgSource): string {
   const pid = pidOf("patient_unique_id", study);
@@ -160,7 +170,7 @@ function orgSiteCtes(study: string, db: string, src: OrgSource): string {
       "         max(" + clinicalValueFoldSql("attribute_value") + " IN " + ORG_YES + " OR " + clinicalValueFoldSql("attribute_value") + " IN " + ORG_NO + ") AS known\n" +
       "  FROM " + clinicalTable(db, []) + "\n" +
       "  WHERE cancer_study_identifier = " + sq(study) + " AND startsWith(attribute_name, " + sq(prefix) + ") AND length(attribute_name) > " + prefix.length + "\n" +
-      "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+      "    AND " + inCohortClinical(study) + "\n" +
       "  GROUP BY pid, site\n" +
       "),\n" +
       "ps AS (SELECT pid, site, toUInt8(has) AS has FROM fl WHERE known),\n" +
@@ -177,7 +187,7 @@ function orgSiteCtes(study: string, db: string, src: OrgSource): string {
       "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
       "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", src.eventType || "Diagnosis") + "\n" +
       "    AND " + foldedEqualsSql("d.key", src.key || "TUMOR_SITE") + " AND trimBoth(d.value) != ''\n" +
-      "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+      "    AND " + inCohortPatients("p.stable_id") + "\n" +
       "),\n" +
       "ev AS (SELECT DISTINCT pid, site FROM evr),\n" +
       "sl AS (SELECT site, min(raw) AS label FROM evr GROUP BY site),\n" +
@@ -193,7 +203,7 @@ function orgSiteCtes(study: string, db: string, src: OrgSource): string {
     "  SELECT DISTINCT " + pid + " AS pid, " + orgSiteMapExpr("attribute_value") + " AS site\n" +
     "  FROM " + clinicalTable(db, [attr]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attr) + " AND trimBoth(attribute_value) != ''\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortClinical(study) + "\n" +
     "),\n" +
     "sl AS (SELECT DISTINCT site, site AS label FROM sm),\n" +
     "ps AS (\n" +
@@ -205,11 +215,13 @@ function orgSiteCtes(study: string, db: string, src: OrgSource): string {
 
 export interface OrgGenes { genes: string[] | null; alteration: EnrichAlteration; driverPin: string | null }
 
-/** `prof` (patient, gene) for every listed gene a patient's panel covers for the alteration type (whole-exome
- *  covers all); `alt` the same pairs with the alteration called on a covering panel (OncoKB drivers only with
- *  driverPin). Without a gene list, `alt` holds every gene. Both read `cohort`. */
+/** `prof` (patient, gene) for every listed gene the panel of one of the patient's cohort samples covers for the
+ *  alteration type (whole-exome covers all); `alt` the same pairs with the alteration called on a covering panel
+ *  in one of those samples (OncoKB drivers only with driverPin). Without a gene list, `alt` holds every gene.
+ *  Both read `cohort`'s samples only. */
 function orgGeneCtes(study: string, db: string, g: OrgGenes): string {
   const sdPid = pidOf("sd.patient_unique_id", study), gPid = pidOf("g.patient_unique_id", study);
+  const spSid = bareSampleId("sp.sample_unique_id", study), gSid = bareSampleId("g.sample_unique_id", study);
   const list = g.genes ? geneList(g.genes) : null;
   return (
     "pp AS (\n" +
@@ -217,7 +229,7 @@ function orgGeneCtes(study: string, db: string, g: OrgGenes): string {
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = " + sq(ENRICH_PANEL_TYPE[g.alteration]) + "\n" +
-    "    AND " + sdPid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(spSid) + "\n" +
     "),\n" +
     (list
       ? "prof AS (\n" +
@@ -231,7 +243,7 @@ function orgGeneCtes(study: string, db: string, g: OrgGenes): string {
     "  FROM " + db + ".genomic_event_derived g\n" + (g.driverPin ? driverJoin(g.driverPin) : "") +
     "  WHERE g.cancer_study_identifier = " + sq(study) + " AND " + enrichEventCond(g.alteration) + " AND NOT g.off_panel\n" +
     (list ? "    AND g.hugo_gene_symbol IN (" + list + ")\n" : "") + (g.driverPin ? "    AND ann.is_driver\n" : "") +
-    "    AND " + gPid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(gSid) + "\n" +
     ")"
   );
 }

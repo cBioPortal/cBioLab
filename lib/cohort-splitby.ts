@@ -28,6 +28,7 @@ export interface SplitByValue { v: string; n: number }
 /** what the caller's live lookup reports back for one attribute within the base cohort */
 export interface AttributeDistribution {
   kind: "cat" | "num";
+  /** the level the study records the attribute at, and so the unit its value counts are in */
   per: "patient" | "sample";
   values?: SplitByValue[];
   /** set when the site itself refused to answer (e.g. over its own distinct-value cap) rather
@@ -170,7 +171,7 @@ export async function resolveSplitBy(
 
   const otherValues = pooled.map((x) => x.v);
 
-  const clause = (v: string): ClinicalLeaf => ({ kind: "clinical", attribute, per: dist.per, op: "=", value: v });
+  const clause = (v: string): ClinicalLeaf => ({ kind: "clinical", attribute, op: "=", value: v });
   const baseAll = baseDef.all || [];
   const nameFor = (label: string) => splitBy.cohort + " — " + attributeLabel(attribute, "short") + ": " + label;
   const arms: SplitByArm[] = ownValues.map((x) => ({ name: nameFor(x.v), def: { ...baseDef, all: [...baseAll, clause(x.v)] } }));
@@ -182,7 +183,7 @@ export async function resolveSplitBy(
       // never silently folds in a patient with no recorded value at all (that patient belongs
       // in no arm, same as the base histogram never counted them as a value in the first place).
       def: { ...baseDef, all: [...baseAll,
-        { kind: "clinical", attribute, per: dist.per, op: "!=", value: "" },
+        { kind: "clinical", attribute, op: "!=", value: "" },
         { not: { any: ownValues.map((x) => clause(x.v)) } }
       ] }
     });

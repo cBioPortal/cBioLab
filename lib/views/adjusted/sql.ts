@@ -5,17 +5,25 @@ import { sq } from "../../compiler.ts";
 import { driverJoin } from "../../federation.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { patientSql, type PatientSql } from "../../sql-kinds.ts";
+import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
+
+/** A clinical row of the cohort: a sample row by its sample, a patient row by its patient. */
+function inCohortClinical(study: string): string {
+  return "(type = 'sample' AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) +
+    " OR type = 'patient' AND " + inCohortPatients(pidOf("patient_unique_id", study)) + ")";
+}
 
 /**
- * One row per patient of the cohort with a mutation panel: the panels their samples were sequenced
- * on, the genes mutated in them (called mutations only; OncoKB drivers only with `driverPin`), and
- * each covariate's value as c0, c1, … (the patient's, or the first sample's). Values only: the
+ * One row per patient of the cohort with a mutation panel: the panels their cohort samples were
+ * sequenced on, the genes mutated in those samples (called mutations only; OncoKB drivers only with
+ * `driverPin`), and each covariate's value as c0, c1, … (the patient's, or its first cohort sample's). Values only: the
  * patient id joins the CTEs and is never returned. Run only through PatientLevelResolver.viewRows.
  */
 export function adjustedRowsSql(cohortSql: string, study: string, db: string, o: { covariates: string[]; driverPin?: string | null }): PatientSql {
   const { covariates, driverPin = null } = o;
   for (const a of covariates) if (!/^[A-Za-z0-9_:/.-]{1,128}$/.test(a)) throw new Error("bad attribute name '" + String(a).slice(0, 40) + "'");
   const pid = pidOf("patient_unique_id", study), sdPid = pidOf("sd.patient_unique_id", study), gPid = pidOf("g.patient_unique_id", study);
+  const spSid = bareSampleId("sp.sample_unique_id", study), gSid = bareSampleId("g.sample_unique_id", study);
   return patientSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "panels AS (\n" +
@@ -23,7 +31,7 @@ export function adjustedRowsSql(cohortSql: string, study: string, db: string, o:
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
-    "    AND " + sdPid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(spSid) + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "mut AS (\n" +
@@ -32,7 +40,7 @@ export function adjustedRowsSql(cohortSql: string, study: string, db: string, o:
     (driverPin ? driverJoin(driverPin) : "") +
     "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'\n" +
     (driverPin ? "    AND ann.is_driver = 1\n" : "") +
-    "    AND " + gPid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(gSid) + "\n" +
     "  GROUP BY pid\n" +
     ")" +
     (covariates.length ?
@@ -41,7 +49,7 @@ export function adjustedRowsSql(cohortSql: string, study: string, db: string, o:
       covariates.map((a, k) => "         argMinIf(attribute_value, sample_unique_id, attribute_name = " + sq(a) + ") AS a" + k).join(",\n") + "\n" +
       "  FROM " + clinicalTable(db, covariates) + "\n" +
       "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name IN (" + covariates.map(sq).join(",") + ") AND trimBoth(attribute_value) != ''\n" +
-      "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+      "    AND " + inCohortClinical(study) + "\n" +
       "  GROUP BY pid\n" +
       ")" : "") + "\n" +
     "SELECT panels.panels AS panels, mut.genes AS genes" + covariates.map((_, k) => ", attrs.a" + k + " AS c" + k).join("") + "\n" +

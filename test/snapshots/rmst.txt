@@ -1,8 +1,8 @@
 Analysis over tmb_mskcc_2018 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- TMB < 10: 1,201 patients — TMB_NONSYNONYMOUS lt 10 (any sample)
-- TMB ≥ 10: 460 patients — TMB_NONSYNONYMOUS gte 10 (any sample)
+- TMB < 10: 1,201 patients — TMB_NONSYNONYMOUS lt 10
+- TMB ≥ 10: 460 patients — TMB_NONSYNONYMOUS gte 10
 
 Restricted mean survival time, OS:
   from the start, tau=24 months:

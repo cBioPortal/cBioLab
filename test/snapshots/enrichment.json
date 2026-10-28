@@ -3,14 +3,16 @@
   "cohorts": {
     "Colorectal, MSS": {
       "count": 4957,
-      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample) AND NOT MSI_TYPE in [Instable] (any sample)",
+      "samples": 4957,
+      "text": "CANCER_TYPE in [Colorectal Cancer] AND NOT MSI_TYPE in [Instable]",
       "studies": [
         "msk_chord_2024"
       ]
     },
     "Pancreatic, MSS": {
-      "count": 3095,
-      "text": "CANCER_TYPE in [Pancreatic Cancer] (any sample) AND NOT MSI_TYPE in [Instable] (any sample)",
+      "count": 3097,
+      "samples": 3097,
+      "text": "CANCER_TYPE in [Pancreatic Cancer] AND NOT MSI_TYPE in [Instable]",
       "studies": [
         "msk_chord_2024"
       ]
@@ -32,7 +34,7 @@
         ],
         "tested": 494,
         "untested": 8,
-        "significant": 316,
+        "significant": 328,
         "minAltered": 5,
         "test": "two-sided Fisher's exact test",
         "rows": [
@@ -41,18 +43,18 @@
             "cells": [
               {
                 "cohort": "Colorectal, MSS",
-                "altered": 3815,
-                "profiled": 4986,
-                "pct": 76.5
+                "altered": 3813,
+                "profiled": 4957,
+                "pct": 76.9
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 45,
-                "profiled": 3117,
-                "pct": 1.4
+                "altered": 39,
+                "profiled": 3097,
+                "pct": 1.3
               }
             ],
-            "log2Ratio": 5.727889517526085,
+            "log2Ratio": 5.932712721068203,
             "p": 0,
             "q": 0,
             "enrichedIn": "Colorectal, MSS",
@@ -63,20 +65,20 @@
             "cells": [
               {
                 "cohort": "Colorectal, MSS",
-                "altered": 2178,
-                "profiled": 4986,
+                "altered": 2167,
+                "profiled": 4957,
                 "pct": 43.7
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 2518,
-                "profiled": 3117,
-                "pct": 80.8
+                "altered": 2507,
+                "profiled": 3097,
+                "pct": 80.9
               }
             ],
-            "log2Ratio": -0.8869990568682424,
-            "p": 1.5404597664259493e-250,
-            "q": 3.804935623072094e-248,
+            "log2Ratio": -0.8888587185359295,
+            "p": 3.3890878095288153e-251,
+            "q": 8.371046889536174e-249,
             "enrichedIn": "Pancreatic, MSS",
             "cytoband": "12p12.1"
           },
@@ -85,22 +87,44 @@
             "cells": [
               {
                 "cohort": "Colorectal, MSS",
-                "altered": 52,
-                "profiled": 4986,
+                "altered": 49,
+                "profiled": 4957,
                 "pct": 1
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 629,
-                "profiled": 3117,
+                "altered": 627,
+                "profiled": 3097,
                 "pct": 20.2
               }
             ],
-            "log2Ratio": -4.27420121660433,
-            "p": 5.002627218146018e-211,
-            "q": 8.237659485880442e-209,
+            "log2Ratio": -4.356207664482494,
+            "p": 3.284288823108772e-213,
+            "q": 5.408128928719111e-211,
             "enrichedIn": "Pancreatic, MSS",
             "cytoband": "9p21.3"
+          },
+          {
+            "gene": "PIK3CA",
+            "cells": [
+              {
+                "cohort": "Colorectal, MSS",
+                "altered": 875,
+                "profiled": 4957,
+                "pct": 17.7
+              },
+              {
+                "cohort": "Pancreatic, MSS",
+                "altered": 66,
+                "profiled": 3097,
+                "pct": 2.1
+              }
+            ],
+            "log2Ratio": 3.050149211565574,
+            "p": 5.573498114286534e-121,
+            "q": 6.883270171143869e-119,
+            "enrichedIn": "Colorectal, MSS",
+            "cytoband": "3q26.32"
           },
           {
             "gene": "TCF7L2",
@@ -108,43 +132,21 @@
               {
                 "cohort": "Colorectal, MSS",
                 "altered": 547,
-                "profiled": 4806,
-                "pct": 11.4
+                "profiled": 4777,
+                "pct": 11.5
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 3,
-                "profiled": 3083,
+                "altered": 2,
+                "profiled": 3064,
                 "pct": 0.1
               }
             ],
-            "log2Ratio": 6.869932763048709,
-            "p": 1.3769916760974181e-117,
-            "q": 1.7005847199803115e-115,
+            "log2Ratio": 7.454708443246248,
+            "p": 1.9957721923475326e-119,
+            "q": 1.9718229260393623e-117,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "10q25.2-q25.3"
-          },
-          {
-            "gene": "PIK3CA",
-            "cells": [
-              {
-                "cohort": "Colorectal, MSS",
-                "altered": 876,
-                "profiled": 4986,
-                "pct": 17.6
-              },
-              {
-                "cohort": "Pancreatic, MSS",
-                "altered": 71,
-                "profiled": 3117,
-                "pct": 2.3
-              }
-            ],
-            "log2Ratio": 2.9473152122303587,
-            "p": 1.9289791968532027e-117,
-            "q": 1.9058314464909642e-115,
-            "enrichedIn": "Colorectal, MSS",
-            "cytoband": "3q26.32"
           },
           {
             "gene": "FBXW7",
@@ -152,19 +154,19 @@
               {
                 "cohort": "Colorectal, MSS",
                 "altered": 635,
-                "profiled": 4986,
-                "pct": 12.7
+                "profiled": 4957,
+                "pct": 12.8
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 34,
-                "profiled": 3117,
-                "pct": 1.1
+                "altered": 32,
+                "profiled": 3097,
+                "pct": 1
               }
             ],
-            "log2Ratio": 3.545425212543056,
-            "p": 1.7529225317192021e-97,
-            "q": 1.4432395511154764e-95,
+            "log2Ratio": 3.6320169058638645,
+            "p": 2.6807419470934915e-99,
+            "q": 2.2071442031069745e-97,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "4q31.3"
           },
@@ -173,20 +175,20 @@
             "cells": [
               {
                 "cohort": "Colorectal, MSS",
-                "altered": 470,
-                "profiled": 4986,
-                "pct": 9.4
+                "altered": 469,
+                "profiled": 4957,
+                "pct": 9.5
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 25,
-                "profiled": 3117,
-                "pct": 0.8
+                "altered": 23,
+                "profiled": 3097,
+                "pct": 0.7
               }
             ],
-            "log2Ratio": 3.554936028924142,
-            "p": 2.450019178878529e-71,
-            "q": 1.729013534808562e-69,
+            "log2Ratio": 3.6712862806627,
+            "p": 7.392002898686707e-73,
+            "q": 5.2166420456446185e-71,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "17q24.3"
           },
@@ -195,20 +197,20 @@
             "cells": [
               {
                 "cohort": "Colorectal, MSS",
-                "altered": 373,
-                "profiled": 4986,
+                "altered": 371,
+                "profiled": 4957,
                 "pct": 7.5
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 41,
-                "profiled": 3117,
+                "altered": 40,
+                "profiled": 3097,
                 "pct": 1.3
               }
             ],
-            "log2Ratio": 2.507755087771021,
-            "p": 6.782245235505447e-41,
-            "q": 4.188036432924613e-39,
+            "log2Ratio": 2.534751405937777,
+            "p": 3.455118066593093e-41,
+            "q": 2.1335354061212348e-39,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "7q34"
           },
@@ -217,20 +219,20 @@
             "cells": [
               {
                 "cohort": "Colorectal, MSS",
-                "altered": 281,
-                "profiled": 4986,
+                "altered": 280,
+                "profiled": 4957,
                 "pct": 5.6
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 26,
-                "profiled": 3117,
+                "altered": 24,
+                "profiled": 3097,
                 "pct": 0.8
               }
             ],
-            "log2Ratio": 2.7562618742137013,
-            "p": 5.62219558260204e-34,
-            "q": 3.085960686450453e-32,
+            "log2Ratio": 2.8657246404281467,
+            "p": 3.991429699491581e-35,
+            "q": 2.1908514128320455e-33,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "Xq11.2"
           },
@@ -239,20 +241,20 @@
             "cells": [
               {
                 "cohort": "Colorectal, MSS",
-                "altered": 211,
-                "profiled": 4986,
+                "altered": 210,
+                "profiled": 4957,
                 "pct": 4.2
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 12,
-                "profiled": 3117,
-                "pct": 0.4
+                "altered": 9,
+                "profiled": 3097,
+                "pct": 0.3
               }
             ],
-            "log2Ratio": 3.4584119601198964,
-            "p": 2.540614676524035e-31,
-            "q": 1.2550636502028733e-29,
+            "log2Ratio": 3.8657246404281467,
+            "p": 7.772332731975096e-34,
+            "q": 3.839532369595697e-32,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "18q21.1"
           },
@@ -262,19 +264,19 @@
               {
                 "cohort": "Colorectal, MSS",
                 "altered": 25,
-                "profiled": 4986,
+                "profiled": 4957,
                 "pct": 0.5
               },
               {
                 "cohort": "Pancreatic, MSS",
                 "altered": 128,
-                "profiled": 3117,
+                "profiled": 3097,
                 "pct": 4.1
               }
             ],
-            "log2Ratio": -3.033868538091408,
-            "p": 6.645167976593638e-31,
-            "q": 2.9842845276702335e-29,
+            "log2Ratio": -3.0347396860209392,
+            "p": 6.489772996605343e-31,
+            "q": 2.9144980548391263e-29,
             "enrichedIn": "Pancreatic, MSS",
             "cytoband": "11q13"
           },
@@ -283,20 +285,20 @@
             "cells": [
               {
                 "cohort": "Colorectal, MSS",
-                "altered": 3890,
-                "profiled": 4986,
-                "pct": 78
+                "altered": 3877,
+                "profiled": 4957,
+                "pct": 78.2
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 2077,
-                "profiled": 3117,
-                "pct": 66.6
+                "altered": 2072,
+                "profiled": 3097,
+                "pct": 66.9
               }
             ],
-            "log2Ratio": 0.2275442111627738,
-            "p": 3.0091713010296207e-29,
-            "q": 1.2387755189238605e-27,
+            "log2Ratio": 0.22532085626896317,
+            "p": 8.169594904934612e-29,
+            "q": 3.363149902531415e-27,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "17p13.1"
           },
@@ -306,43 +308,21 @@
               {
                 "cohort": "Colorectal, MSS",
                 "altered": 269,
-                "profiled": 4986,
+                "profiled": 4957,
                 "pct": 5.4
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 34,
-                "profiled": 3117,
+                "altered": 33,
+                "profiled": 3097,
                 "pct": 1.1
               }
             ],
-            "log2Ratio": 2.306274793440152,
-            "p": 5.607452607065859e-27,
-            "q": 2.1308319906850266e-25,
+            "log2Ratio": 2.348472367402507,
+            "p": 2.0279504087077926e-27,
+            "q": 7.706211553089612e-26,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "3p22.1"
-          },
-          {
-            "gene": "NRAS",
-            "cells": [
-              {
-                "cohort": "Colorectal, MSS",
-                "altered": 196,
-                "profiled": 4986,
-                "pct": 3.9
-              },
-              {
-                "cohort": "Pancreatic, MSS",
-                "altered": 16,
-                "profiled": 3117,
-                "pct": 0.5
-              }
-            ],
-            "log2Ratio": 2.9369851162490757,
-            "p": 2.4892795700759333e-25,
-            "q": 8.783600768696509e-24,
-            "enrichedIn": "Colorectal, MSS",
-            "cytoband": "1p13.2"
           },
           {
             "gene": "PIK3R1",
@@ -350,41 +330,63 @@
               {
                 "cohort": "Colorectal, MSS",
                 "altered": 178,
-                "profiled": 4986,
+                "profiled": 4957,
                 "pct": 3.6
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 12,
-                "profiled": 3117,
+                "altered": 11,
+                "profiled": 3097,
                 "pct": 0.4
               }
             ],
-            "log2Ratio": 3.213046202379109,
-            "p": 5.980441658811169e-25,
-            "q": 1.969558786301812e-23,
+            "log2Ratio": 3.3377059365334367,
+            "p": 1.380315980681615e-25,
+            "q": 4.870543531833699e-24,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "5q13.1"
+          },
+          {
+            "gene": "NRAS",
+            "cells": [
+              {
+                "cohort": "Colorectal, MSS",
+                "altered": 196,
+                "profiled": 4957,
+                "pct": 4
+              },
+              {
+                "cohort": "Pancreatic, MSS",
+                "altered": 16,
+                "profiled": 3097,
+                "pct": 0.5
+              }
+            ],
+            "log2Ratio": 2.9361139683195443,
+            "p": 2.5070217710352286e-25,
+            "q": 8.256458365942686e-24,
+            "enrichedIn": "Colorectal, MSS",
+            "cytoband": "1p13.2"
           },
           {
             "gene": "PTPRT",
             "cells": [
               {
                 "cohort": "Colorectal, MSS",
-                "altered": 315,
-                "profiled": 4986,
+                "altered": 313,
+                "profiled": 4957,
                 "pct": 6.3
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 58,
-                "profiled": 3117,
-                "pct": 1.9
+                "altered": 57,
+                "profiled": 3097,
+                "pct": 1.8
               }
             ],
-            "log2Ratio": 1.763502295393574,
-            "p": 6.702501782682423e-23,
-            "q": 2.069397425403198e-21,
+            "log2Ratio": 1.7785329569722128,
+            "p": 4.524844013431579e-23,
+            "q": 1.3970455891470001e-21,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "20q12-q13.11"
           },
@@ -394,65 +396,65 @@
               {
                 "cohort": "Colorectal, MSS",
                 "altered": 261,
-                "profiled": 4986,
-                "pct": 5.2
+                "profiled": 4957,
+                "pct": 5.3
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 49,
-                "profiled": 3117,
-                "pct": 1.6
+                "altered": 48,
+                "profiled": 3097,
+                "pct": 1.5
               }
             ],
-            "log2Ratio": 1.7354714245885434,
-            "p": 7.921758421211957e-19,
-            "q": 2.301969800046298e-17,
+            "log2Ratio": 1.7643476200530648,
+            "p": 3.586950453464018e-19,
+            "q": 1.0423256023595439e-17,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "19p13.3"
-          },
-          {
-            "gene": "EPHA3",
-            "cells": [
-              {
-                "cohort": "Colorectal, MSS",
-                "altered": 176,
-                "profiled": 4986,
-                "pct": 3.5
-              },
-              {
-                "cohort": "Pancreatic, MSS",
-                "altered": 24,
-                "profiled": 3117,
-                "pct": 0.8
-              }
-            ],
-            "log2Ratio": 2.196744390050008,
-            "p": 4.382324854638452e-17,
-            "q": 1.2027047101063309e-15,
-            "enrichedIn": "Colorectal, MSS",
-            "cytoband": "3p11.1"
           },
           {
             "gene": "CARD11",
             "cells": [
               {
                 "cohort": "Colorectal, MSS",
-                "altered": 166,
-                "profiled": 4986,
+                "altered": 165,
+                "profiled": 4957,
                 "pct": 3.3
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 22,
-                "profiled": 3117,
+                "altered": 21,
+                "profiled": 3097,
                 "pct": 0.7
               }
             ],
-            "log2Ratio": 2.2378830848434945,
-            "p": 2.1477477286643954e-16,
-            "q": 5.5841440945274275e-15,
+            "log2Ratio": 2.2954089156713917,
+            "p": 7.7657514349014e-17,
+            "q": 2.131267338245162e-15,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "7p22.2"
+          },
+          {
+            "gene": "EPHA3",
+            "cells": [
+              {
+                "cohort": "Colorectal, MSS",
+                "altered": 171,
+                "profiled": 4957,
+                "pct": 3.4
+              },
+              {
+                "cohort": "Pancreatic, MSS",
+                "altered": 23,
+                "profiled": 3097,
+                "pct": 0.7
+              }
+            ],
+            "log2Ratio": 2.215694683033221,
+            "p": 9.62724480717449e-17,
+            "q": 2.5030836498653673e-15,
+            "enrichedIn": "Colorectal, MSS",
+            "cytoband": "3p11.1"
           },
           {
             "gene": "GRIN2A",
@@ -460,25 +462,25 @@
               {
                 "cohort": "Colorectal, MSS",
                 "altered": 188,
-                "profiled": 4986,
+                "profiled": 4957,
                 "pct": 3.8
               },
               {
                 "cohort": "Pancreatic, MSS",
-                "altered": 30,
-                "profiled": 3117,
-                "pct": 1
+                "altered": 29,
+                "profiled": 3097,
+                "pct": 0.9
               }
             ],
-            "log2Ratio": 1.9699735282029862,
-            "p": 5.309858446960977e-16,
-            "q": 1.3115350363993611e-14,
+            "log2Ratio": 2.0180119807544017,
+            "p": 2.241849673908303e-16,
+            "q": 5.5373686945535084e-15,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "16p13.2"
           },
           {
             "…": "280 more",
-            "sha256": "5e8d6b42f8f2c356"
+            "sha256": "39dc8d59f8f1d5bc"
           }
         ],
         "grid": {
@@ -488,44 +490,44 @@
           "ny": 50,
           "cells": [
             [
-              44,
+              45,
               0,
-              30
-            ],
-            [
-              46,
-              0,
-              12
+              23
             ],
             [
               47,
               0,
-              8
+              7
             ],
             [
-              45,
+              44,
               0,
-              17
-            ],
-            [
-              42,
-              0,
-              31
-            ],
-            [
-              41,
-              0,
-              27
-            ],
-            [
-              51,
-              0,
-              4
+              32
             ],
             [
               43,
               0,
-              26
+              33
+            ],
+            [
+              46,
+              0,
+              9
+            ],
+            [
+              42,
+              0,
+              24
+            ],
+            [
+              49,
+              0,
+              5
+            ],
+            [
+              35,
+              0,
+              1
             ],
             [
               48,
@@ -533,9 +535,14 @@
               3
             ],
             [
-              36,
+              37,
               0,
-              1
+              4
+            ],
+            [
+              51,
+              0,
+              5
             ],
             [
               33,
@@ -545,12 +552,17 @@
             [
               79,
               0,
-              3
+              4
+            ],
+            [
+              41,
+              0,
+              20
             ],
             [
               50,
               0,
-              1
+              2
             ],
             [
               38,
@@ -558,19 +570,9 @@
               4
             ],
             [
-              49,
-              0,
-              4
-            ],
-            [
               39,
               0,
-              9
-            ],
-            [
-              37,
-              0,
-              3
+              7
             ],
             [
               40,
@@ -583,8 +585,8 @@
           "APC",
           "KRAS",
           "CDKN2A",
-          "TCF7L2",
           "PIK3CA",
+          "TCF7L2",
           "FBXW7",
           "SOX9",
           "BRAF",
@@ -627,7 +629,7 @@
             "title": "Count altered and profiled samples per gene",
             "detail": "The enrichment queries above: per gene, samples with a mutation; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.",
             "scope": "Pancreatic, MSS · msk_chord_2024",
-            "rowsOut": 487,
+            "rowsOut": 483,
             "params": [
               [
                 "whole-exome samples",
@@ -676,59 +678,59 @@
             "v": 0
           },
           "enrichment:KRAS:p": {
-            "v": 1.5404597664259493e-250
+            "v": 3.3890878095288153e-251
           },
           "enrichment:KRAS:q": {
-            "v": 3.804935623072094e-248
+            "v": 8.371046889536174e-249
           },
           "enrichment:CDKN2A:p": {
-            "v": 5.002627218146018e-211
+            "v": 3.284288823108772e-213
           },
           "enrichment:CDKN2A:q": {
-            "v": 8.237659485880442e-209
-          },
-          "enrichment:TCF7L2:p": {
-            "v": 1.3769916760974181e-117
-          },
-          "enrichment:TCF7L2:q": {
-            "v": 1.7005847199803115e-115
+            "v": 5.408128928719111e-211
           },
           "enrichment:PIK3CA:p": {
-            "v": 1.9289791968532027e-117
+            "v": 5.573498114286534e-121
           },
           "enrichment:PIK3CA:q": {
-            "v": 1.9058314464909642e-115
+            "v": 6.883270171143869e-119
+          },
+          "enrichment:TCF7L2:p": {
+            "v": 1.9957721923475326e-119
+          },
+          "enrichment:TCF7L2:q": {
+            "v": 1.9718229260393623e-117
           },
           "enrichment:FBXW7:p": {
-            "v": 1.7529225317192021e-97
+            "v": 2.6807419470934915e-99
           },
           "enrichment:FBXW7:q": {
-            "v": 1.4432395511154764e-95
+            "v": 2.2071442031069745e-97
           },
           "enrichment:SOX9:p": {
-            "v": 2.450019178878529e-71
+            "v": 7.392002898686707e-73
           },
           "enrichment:SOX9:q": {
-            "v": 1.729013534808562e-69
+            "v": 5.2166420456446185e-71
           },
           "enrichment:BRAF:p": {
-            "v": 6.782245235505447e-41
+            "v": 3.455118066593093e-41
           },
           "enrichment:BRAF:q": {
-            "v": 4.188036432924613e-39
+            "v": 2.1335354061212348e-39
           },
           "enrichment:AMER1:p": {
-            "v": 5.62219558260204e-34
+            "v": 3.991429699491581e-35
           },
           "enrichment:AMER1:q": {
-            "v": 3.085960686450453e-32
+            "v": 2.1908514128320455e-33
           },
           "enrichment:SMAD2:p": {
-            "v": 2.540614676524035e-31
+            "v": 7.772332731975096e-34
           },
           "…": {
             "more": 61,
-            "sha256": "1b96d5efa60a3d06"
+            "sha256": "d9fb8db24dff2919"
           }
         }
       }

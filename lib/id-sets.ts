@@ -29,14 +29,10 @@ export interface LoadedIdSet {
   level: IdSetLevel;
   count: number;
   perStudy: Record<string, string[]>;
-  /** a lock's other lists in the same set: "samples" (sample ids), "arm:<split> / <arm>" (patient ids) */
+  /** a lock's other lists in the same set, at the set's own level: "arm:<split> / <arm>" */
   parts?: Record<string, Record<string, string[]>>;
 }
 
-/** The level of a set's part: the set's own for its main list, samples for "samples", patients for an arm. */
-function partLevel(s: LoadedIdSet, part: string): IdSetLevel {
-  return !part ? s.level : part === "samples" ? "sample" : "patient";
-}
 const membersOf = (s: LoadedIdSet, part: string): Record<string, string[]> | undefined => part ? s.parts?.[part] : s.perStudy;
 
 interface IdSetCtx {
@@ -99,7 +95,7 @@ export function idSetIfLoaded(set: string): LoadedIdSet | null {
 export function idSetTable(set: string, study: string, level: IdSetLevel, part = ""): string | null {
   const s = loadedIdSet(set);
   if (part && !s.parts?.[part]) throw new Error("stored id set “" + s.name + "” has no part “" + part + "”");
-  const l = partLevel(s, part);
+  const l = s.level; // a lock's arms are held at the level of its main list
   if (l !== level)
     throw new Error("stored id set “" + s.name + "”" + (part ? " (" + part + ")" : "") + " holds " + l + " ids; name it in a " + l + "List clause, not a " + level + "List");
   return membersOf(s, part)?.[study]?.length ? idSetTableName(set, study, part) : null;
@@ -135,11 +131,11 @@ export function idSetRefsIn(x: unknown): string[] {
       if (typeof o.set !== "string" || !ID_SET_UUID.test(o.set)) throw new Error(o.kind + " clause: set must be a stored id set's id (a uuid), got " + JSON.stringify(o.set));
       out.add(o.set);
     }
-    // a locked cohort's frozen patients and samples, and each locked arm's (lib/cohort-lock.ts)
+    // a locked cohort's frozen samples, and each locked arm's (lib/cohort-lock.ts)
     if (o.lock && typeof o.lock === "object") {
-      const l = o.lock as { set?: unknown; samples?: unknown; children?: Record<string, { set?: unknown; samples?: unknown }> };
+      const l = o.lock as { set?: unknown; children?: Record<string, { set?: unknown }> };
       for (const m of [l, ...Object.values(l.children && typeof l.children === "object" ? l.children : {})])
-        for (const x of [m?.set, m?.samples]) if (typeof x === "string" && ID_SET_UUID.test(x)) out.add(x);
+        if (typeof m?.set === "string" && ID_SET_UUID.test(m.set)) out.add(m.set);
     }
     Object.values(v).forEach(walk);
   };

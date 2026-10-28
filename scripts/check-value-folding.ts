@@ -22,10 +22,10 @@ import { chQuery, connById } from "../lib/ch.ts";
 import { canonicalClinicalValue } from "../lib/event-names.ts";
 
 const CASES = [
-  { conn: "a", study: "breast_msk_2025", attr: "GENDER", per: "patient", spellings: ["Female", "FEMALE"] },
-  { conn: "a", study: "breast_msk_2025", attr: "RACE", per: "patient", spellings: ["White", "WHITE"] },
-  { conn: "a", study: "msk_chord_2024", attr: "METASTATIC_SITE", per: "sample", spellings: ["Lymph Node", "Lymph node"] },
-  { conn: "b", study: "genie_public", attr: "DEAD", per: "patient", spellings: ["False", "FALSE"] }
+  { conn: "a", study: "breast_msk_2025", attr: "GENDER", spellings: ["Female", "FEMALE"] },
+  { conn: "a", study: "breast_msk_2025", attr: "RACE", spellings: ["White", "WHITE"] },
+  { conn: "a", study: "msk_chord_2024", attr: "METASTATIC_SITE", spellings: ["Lymph Node", "Lymph node"] },
+  { conn: "b", study: "genie_public", attr: "DEAD", spellings: ["False", "FALSE"] }
 ] as const;
 
 let failures = 0;
@@ -44,12 +44,12 @@ for (const c of CASES) {
   const truth = Number((await chQuery<{ n: string }>(
     `SELECT uniqExact(patient_unique_id) AS n FROM ${db}.clinical_data_derived\n` +
     `WHERE cancer_study_identifier = '${c.study}' AND attribute_name = '${c.attr}'\n` +
-    `  AND type = '${c.per}' AND lowerUTF8(trimBoth(attribute_value)) = '${folded}'`, conn)).data[0].n);
+    `  AND lowerUTF8(trimBoth(attribute_value)) = '${folded}'`, conn)).data[0].n);
 
   const sizes: number[] = [];
   for (const spelling of c.spellings) {
     const sql = compileCohortDef(
-      { all: [{ kind: "clinical", attribute: c.attr, op: "=", value: spelling, ...(c.per === "sample" ? { per: "sample" } : {}) }] } as never,
+      { all: [{ kind: "clinical", attribute: c.attr, op: "=", value: spelling }] } as never,
       { study: c.study, db });
     sizes.push(Number((await chQuery<{ n: string }>(`SELECT uniqExact(pid) AS n FROM (${sql})`, conn)).data[0].n));
   }

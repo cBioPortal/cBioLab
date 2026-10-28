@@ -3,7 +3,8 @@
   "cohorts": {
     "all patients": {
       "count": 1084,
-      "text": "all patients in the study",
+      "samples": 1084,
+      "text": "all samples in the study",
       "studies": [
         "brca_tcga_pan_can_atlas_2018"
       ]
@@ -536,13 +537,13 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "ESR1 on “rna_seq_v2_mrna” against every gene on “rna_seq_v2_mrna”, over the patients in “all patients” with both values (a patient's samples averaged, as the heatmap takes them). Ranked by Spearman's ρ, as the portal ranks, with Pearson's r beside it; q is Benjamini–Hochberg over ρ's p across all 20,057 genes tested. A correlation is not a regulatory link: genes that rise together across a cohort often both track a third thing — a subtype, the tumour's purity, proliferation. 280 genes were not tested: fewer than 10 patients with both values, or no spread.",
+      "caveat": "ESR1 on “rna_seq_v2_mrna” against every gene on “rna_seq_v2_mrna”, over the samples in “all patients” with both values, paired per sample as the portal's co-expression tab pairs them. Ranked by Spearman's ρ, as the portal ranks, with Pearson's r beside it; q is Benjamini–Hochberg over ρ's p across all 20,057 genes tested. A correlation is not a regulatory link: genes that rise together across a cohort often both track a third thing — a subtype, the tumour's purity, proliferation. 280 genes were not tested: fewer than 10 samples with both values, or no spread.",
       "method": {
         "steps": [
           {
             "kind": "fetch",
             "title": "Sum every gene's values and ranks against ESR1's",
-            "detail": "The correlates:moments query above. Per patient, ESR1 on “rna_seq_v2_mrna” and every gene on “rna_seq_v2_mrna” (a patient's samples averaged); per gene, over the patients with both: n, Σx, Σy, Σxy, Σx², Σy², and the same six over each value's average rank among those patients (ties share the mean of their ranks). Sums only.",
+            "detail": "The correlates:moments query above. Per sample in the cohort, ESR1 on “rna_seq_v2_mrna” and every gene on “rna_seq_v2_mrna” (a patient-level assay's value paired with each of its patient's samples); per gene, over the samples with both: n, Σx, Σy, Σxy, Σx², Σy², and the same six over each value's average rank among those samples (ties share the mean of their ranks). Sums only.",
             "scope": "all patients · brca_tcga_pan_can_atlas_2018",
             "rowsIn": 1084,
             "rowsOut": 20338
@@ -550,7 +551,7 @@
           {
             "kind": "statistic",
             "title": "Pearson's r and Spearman's ρ per gene",
-            "detail": "r from the sums: (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); ρ is the same formula on the rank sums. Each p from t = r√((n − 2)/(1 − r²)) on n − 2 df, as scipy's pearsonr and spearmanr compute it. ESR1 against itself is left out. A gene with fewer than 10 patients, or no spread, is not tested.",
+            "detail": "r from the sums: (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); ρ is the same formula on the rank sums. Each p from t = r√((n − 2)/(1 − r²)) on n − 2 df, as scipy's pearsonr and spearmanr compute it. ESR1 against itself is left out. A gene with fewer than 10 samples, or no spread, is not tested.",
             "params": [
               [
                 "tested",

@@ -51,7 +51,7 @@ function fake(mode: "patient-level" | "aggregate-only", calls: Calls, o: {
 }
 
 const evaluated = (studies: string[], count: number): EvaluatedCohort =>
-  ({ studies, perStudy: Object.fromEntries(studies.map((s) => [s, { sql: "", count, mode: "patient-level" }])), count, text: "" });
+  ({ studies, perStudy: Object.fromEntries(studies.map((s) => [s, { sql: "", count, samples: count, mode: "patient-level" }])), count, samples: count, text: "" });
 
 function run(resolvers: Record<string, unknown>, opts: {
   points?: unknown; plotStudies?: string[]; hl?: Record<string, EvaluatedCohort>; extra?: Record<string, unknown>;
@@ -297,12 +297,12 @@ describe("layers together", () => {
 
 describe("the SQL a point layer adds", () => {
   const ctx = { study: "x", db: "db", unit: "sample" as const, cohortSql: "SELECT pid FROM p" };
-  test("a highlight narrows the plotted cohort; it never widens it", () => {
-    const sql = highlightCohortSql("SELECT pid FROM plotted", "SELECT pid FROM hl");
-    assert.match(sql, /^SELECT pid FROM \(SELECT pid FROM plotted\) WHERE pid IN \(SELECT pid FROM \(SELECT pid FROM hl\)\)$/);
+  test("a highlight narrows the plotted cohort's samples; it never widens them", () => {
+    const sql = highlightCohortSql("SELECT pid, sid FROM plotted", "SELECT pid, sid FROM hl");
+    assert.equal(sql, "SELECT pid, sid FROM (SELECT pid, sid FROM plotted) WHERE sid IN (SELECT sid FROM (SELECT pid, sid FROM hl))");
   });
-  test("its count is a count", () => {
-    assert.match(plotHighlightCountSql("SELECT pid FROM a", "SELECT pid FROM b"), /^SELECT count\(\) AS n FROM /);
+  test("its count is patients and samples", () => {
+    assert.match(plotHighlightCountSql("SELECT pid, sid FROM a", "SELECT pid, sid FROM b"), /^SELECT uniqExact\(pid\) AS n, uniqExact\(sid\) AS ns FROM /);
   });
   test("a ranked layer takes n from each end, per group on a box, and the fit's residual on a scatter", () => {
     const x = axisSelect({ source: "clinical", attribute: "AGE" }, ctx, "num");

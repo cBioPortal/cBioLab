@@ -1,9 +1,9 @@
 Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- NSCLC: 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)
-- Breast: 5,368 patients — CANCER_TYPE in [Breast Cancer] (any sample)
-- Colorectal: 5,543 patients — CANCER_TYPE in [Colorectal Cancer] (any sample)
+- NSCLC: 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer]
+- Breast: 5,368 patients — CANCER_TYPE in [Breast Cancer]
+- Colorectal: 5,543 patients — CANCER_TYPE in [Colorectal Cancer]
 
 Cumulative incidence of brain metastasis, death competing (Aalen-Johansen):
   NSCLC: n=6,457, 1406 events, 1967 died first, 3084 censored; not at risk: 1352 already had it, 0 before observation, 0 no anchor, 0 no follow-up

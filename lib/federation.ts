@@ -23,7 +23,7 @@ import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, Loop
 import { sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
-import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql } from "./cohort2.ts";
+import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql, inCohortSamples, inCohortPatients, bareSampleId } from "./cohort2.ts";
 import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotOutlierPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
@@ -51,7 +51,7 @@ const num = (v: unknown): number | null => { if (v == null || v === "") return n
 /** a plot's coverage row: the cohort's cases, each axis's, and (patient mode) the patients with several samples */
 const coverageOf = (row: Record<string, unknown>): NonNullable<PlotData["coverage"]> =>
   ({ total: Number(row.total || 0), nx: Number(row.nx || 0), ny: Number(row.ny || 0), ...(row.multi != null ? { multi: Number(row.multi) } : {}) });
-import type { CohortDef, CompileCtx, ChRow, ChResult, PatientTimeline } from "./types.ts";
+import type { CohortDef, CohortSizes, CompileCtx, ChRow, ChResult, PatientTimeline } from "./types.ts";
 import type { StudyAccess } from "./view-coverage.ts";
 import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } from "./patient-timeline.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
@@ -154,7 +154,7 @@ export interface AttrStats {
   /** set when THIS site declines to describe it, with the reason */
   skipped?: string;
 }
-/** One gene pair's 2x2 among patients profiled for BOTH genes. Counts only. */
+/** One gene pair's 2x2 among samples profiled for BOTH genes. Counts only. */
 export interface PairCounts {
   a: string; b: string;
   both: number; onlyA: number; onlyB: number; neither: number; profiled: number;
@@ -288,6 +288,18 @@ export async function instanceForStudy(study: string): Promise<Instance> {
 // patient-level resolver benefits from the same pushdown.
 // ---------------------------------------------------------------------------
 
+/** a `*_unique_id` column of this study as a bare id */
+const bareId = (col: string, study: string): string => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
+
+/**
+ * A clinical_data_derived row of the cohort: a sample row by its sample (the cohort's own samples,
+ * never a patient's others), a patient row by its patient (the owners of the cohort's samples).
+ */
+export function inCohortClinical(study: string, alias = ""): string {
+  return "((" + alias + "type = 'sample' AND " + inCohortSamples(bareSampleId(alias + "sample_unique_id", study)) + ")" +
+    " OR (" + alias + "type = 'patient' AND " + inCohortPatients(bareId(alias + "patient_unique_id", study)) + "))";
+}
+
 /** high-level CNA only, matching the oncoprint/compare convention (±2) */
 export const ALTERED_COND = "(g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)";
 
@@ -303,7 +315,8 @@ export function driverJoin(pin: string): string {
 }
 
 /**
- * Per-gene (profiled, altered, driver) counts for one cohort in one study, BOTH combined (vtype
+ * Per-gene (profiled, altered, driver) counts of the cohort's SAMPLES in one study, as cBioPortal's
+ * gene tables count them, BOTH combined (vtype
  * = 'any', matching the oncoprint's "any alteration" convention) and split per alteration type
  * (vtype = 'mutation' | 'cna' | 'structural_variant') — computed entirely in the database,
  * counts only, no ids.
@@ -315,63 +328,62 @@ export function driverJoin(pin: string): string {
  * since it can only ever say "altered" or "not altered", never "never checked".
  */
 export function geneCountsSql(cohortSql: string, genes: string[], study: string, pin: string | null, db: string = DB): AggregateSql {
-  const pid = "replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '')";
-  const covPid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
+  const sid = bareSampleId("g.sample_unique_id", study);
+  const covSid = bareSampleId("sp.sample_unique_id", study);
   const geneList = genes.map(sq).join(",");
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "altered AS (\n" +
-    "  SELECT g.hugo_gene_symbol AS gene, " + pid + " AS pid, g.variant_type AS vtype,\n" +
+    "  SELECT g.hugo_gene_symbol AS gene, " + sid + " AS sid, g.variant_type AS vtype,\n" +
     (pin ? "         max(ann.is_driver) AS is_driver\n" : "         0 AS is_driver\n") +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (pin ? driverJoin(pin) : "") +
     "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
     "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
-    "  GROUP BY gene, pid, vtype\n" +
+    "    AND " + inCohortSamples(sid) + "\n" +
+    "  GROUP BY gene, sid, vtype\n" +
     "),\n" +
     "covered AS (\n" +
-    "  SELECT DISTINCT pg.gene AS gene, " + covPid + " AS pid,\n" +
+    "  SELECT DISTINCT pg.gene AS gene, " + covSid + " AS sid,\n" +
     "         multiIf(sp.alteration_type = 'MUTATION_EXTENDED', 'mutation',\n" +
     "                 sp.alteration_type = 'COPY_NUMBER_ALTERATION', 'cna', 'structural_variant') AS vtype\n" +
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
-    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + "\n" +
     "    AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
-    "    AND " + covPid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(covSid) + "\n" +
     "),\n" +
     "raw AS (\n" +
-    "  SELECT gene, pid, vtype, max(is_alt) AS is_alt, max(is_drv) AS is_drv\n" +
+    "  SELECT gene, sid, vtype, max(is_alt) AS is_alt, max(is_drv) AS is_drv\n" +
     "  FROM (\n" +
-    "    SELECT gene, pid, vtype, 1 AS is_alt, is_driver > 0 AS is_drv FROM altered\n" +
+    "    SELECT gene, sid, vtype, 1 AS is_alt, is_driver > 0 AS is_drv FROM altered\n" +
     "    UNION ALL\n" +
-    "    SELECT gene, pid, vtype, 0 AS is_alt, 0 AS is_drv FROM covered\n" +
+    "    SELECT gene, sid, vtype, 0 AS is_alt, 0 AS is_drv FROM covered\n" +
     "  )\n" +
-    "  GROUP BY gene, pid, vtype\n" +
+    "  GROUP BY gene, sid, vtype\n" +
     "),\n" +
-    "perPatient AS (\n" +
-    "  SELECT gene, pid, max(is_alt) AS is_alt, max(is_drv) AS is_drv\n" +
-    "  FROM raw GROUP BY gene, pid\n" +
+    "perSample AS (\n" +
+    "  SELECT gene, sid, max(is_alt) AS is_alt, max(is_drv) AS is_drv\n" +
+    "  FROM raw GROUP BY gene, sid\n" +
     ")\n" +
     "SELECT gene, vtype,\n" +
-    "       uniqExact(pid) AS profiled, uniqExactIf(pid, is_alt = 1) AS altered, uniqExactIf(pid, is_drv = 1) AS driver\n" +
+    "       uniqExact(sid) AS profiled, uniqExactIf(sid, is_alt = 1) AS altered, uniqExactIf(sid, is_drv = 1) AS driver\n" +
     "FROM raw GROUP BY gene, vtype\n" +
     "UNION ALL\n" +
     "SELECT gene, 'any' AS vtype,\n" +
-    "       uniqExact(pid) AS profiled, uniqExactIf(pid, is_alt = 1) AS altered, uniqExactIf(pid, is_drv = 1) AS driver\n" +
-    "FROM perPatient GROUP BY gene"
+    "       uniqExact(sid) AS profiled, uniqExactIf(sid, is_alt = 1) AS altered, uniqExactIf(sid, is_drv = 1) AS driver\n" +
+    "FROM perSample GROUP BY gene"
   ));
 }
 
 /**
- * Per-PAIR 2x2 counts for one cohort in one study: of the patients profiled for
- * both genes, how many carry both alterations, one, or neither.
+ * Per-PAIR 2x2 counts for one cohort in one study: of the cohort's samples profiled for
+ * both genes, how many carry both alterations, one, or neither (cBioPortal counts samples).
  *
  * Returns four counts per pair and nothing else — which is the whole privacy
- * argument in one line. The alternative shape (a per-patient alteration bitmask,
+ * argument in one line. The alternative shape (a per-sample alteration bitmask,
  * which would answer every pair at once and be cheaper) is deliberately NOT used:
- * a bitmask row with n=1 is one patient's complete genomic profile.
+ * a bitmask row with n=1 is one sample's complete genomic profile.
  *
  * "Profiled for both" is computed here, against this study's own panels, because
  * only this instance knows what its panels cover. That is also why a federated
@@ -380,35 +392,34 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
 export function pairCountsSql(cohortSql: string, pairs: [string, string][], study: string, db: string = DB): AggregateSql {
   const genes = [...new Set(pairs.flat())];
   const geneList = genes.map(sq).join(",");
-  const pid = "replaceOne(g.patient_unique_id, " + sq(study + "_") + ", '')";
-  const covPid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
+  const sid = bareSampleId("g.sample_unique_id", study);
+  const covSid = bareSampleId("sp.sample_unique_id", study);
   const arrA = "[" + pairs.map((p) => sq(p[0])).join(",") + "]";
   const arrB = "[" + pairs.map((p) => sq(p[1])).join(",") + "]";
   const bothCov = "has(cov, ga) AND has(cov, gb)";
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "altered AS (\n" +
-    "  SELECT DISTINCT g.hugo_gene_symbol AS gene, " + pid + " AS pid\n" +
+    "  SELECT DISTINCT g.hugo_gene_symbol AS gene, " + sid + " AS sid\n" +
     "  FROM " + db + ".genomic_event_derived g\n" +
     "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
     "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(sid) + "\n" +
     "),\n" +
     "covered AS (\n" +
-    "  SELECT DISTINCT pg.gene AS gene, " + covPid + " AS pid\n" +
+    "  SELECT DISTINCT pg.gene AS gene, " + covSid + " AS sid\n" +
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
-    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
-    "    AND " + covPid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(covSid) + "\n" +
     "),\n" +
-    // one row per patient carrying the two gene sets it belongs to
+    // one row per sample carrying the two gene sets it belongs to
     "pp AS (\n" +
-    "  SELECT pid,\n" +
+    "  SELECT sid,\n" +
     "         groupUniqArrayIf(gene, k = 1) AS alt,\n" +
     "         groupUniqArrayIf(gene, k = 0) AS cov\n" +
-    "  FROM (SELECT gene, pid, 1 AS k FROM altered UNION ALL SELECT gene, pid, 0 AS k FROM covered)\n" +
-    "  GROUP BY pid\n" +
+    "  FROM (SELECT gene, sid, 1 AS k FROM altered UNION ALL SELECT gene, sid, 0 AS k FROM covered)\n" +
+    "  GROUP BY sid\n" +
     ")\n" +
     "SELECT ga, gb,\n" +
     "       countIf(" + bothCov + ") AS profiled,\n" +
@@ -431,7 +442,8 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
  * reference gets broader without anyone's values moving.
  */
 export function profileMomentsSql(cohortSql: string, genes: string[], profileType: string, study: string, db: string = DB): AggregateSql {
-  const pid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
+  const pid = bareId("sd.patient_unique_id", study);
+  // each patient's mean over its in-cohort samples, as the oncoprint's patient-mode heatmap takes them
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "vals AS (\n" +
@@ -442,7 +454,7 @@ export function profileMomentsSql(cohortSql: string, genes: string[], profileTyp
     "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
     "    AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
     "    AND " + finiteSql("ga.alteration_value") + " IS NOT NULL\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(bareSampleId("ga.sample_unique_id", study)) + "\n" +
     "  GROUP BY pid, gene\n" +
     ")\n" +
     "SELECT gene, count() AS n, sum(v) AS sx, sum(v * v) AS sxx FROM vals GROUP BY gene"
@@ -453,7 +465,8 @@ export function profileMomentsSql(cohortSql: string, genes: string[], profileTyp
 export const VARIANT_LIMIT = 100;
 
 /**
- * Per-protein-change patient counts for a gene — the lollipop's data.
+ * Per-protein-change patient counts for a gene — the lollipop's data: the patients with the change
+ * in one of the cohort's samples (a patient's samples outside the cohort do not count).
  *
  * NOTE that the codon is PARSED from the protein-change string (the schema has
  * no position column), so a variant whose change does not contain a number is
@@ -466,7 +479,7 @@ export const VARIANT_LIMIT = 100;
  * belongs — at the data holder, not at the coordinator.
  */
 export function variantCountsSql(cohortSql: string, genes: string[], study: string, minCount = 1, db: string = DB): AggregateSql {
-  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  const sid = bareSampleId("sample_unique_id", study);
   const floor = Math.max(1, Math.floor(minCount));
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
@@ -478,7 +491,7 @@ export function variantCountsSql(cohortSql: string, genes: string[], study: stri
     "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'mutation'\n" +
     "  AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND mutation_variant != ''\n" +
-    "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  AND " + inCohortSamples(sid) + "\n" +
     "GROUP BY gene, variant, pos\n" +
     "HAVING n >= " + floor + "\n" +
     "ORDER BY n DESC\n" +
@@ -490,7 +503,7 @@ export function variantCountsSql(cohortSql: string, genes: string[], study: stri
  * The lollipop's rows, counted the way cBioPortal's results-page mutation tab counts them
  * (react-mutation-mapper): one stem per codon — the stored proteinPosStart, never parsed from
  * the change string — whose height is the number of distinct (patient, protein change) pairs
- * there. The four builders below share this CTE. The suppression floor applies to a
+ * there, from the cohort's own samples only. The four builders below share this CTE. The suppression floor applies to a
  * (codon, change) pair's patient count, at the data holder, before anything leaves.
  */
 function lollipopCte(cohortSql: string, genes: string[], study: string, minCount: number, pin: string | null, db: string): string {
@@ -508,7 +521,7 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
     "           FROM " + db + ".mutation_derived\n" +
     "           WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
     "             AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''\n" +
-    "             AND patientId IN (SELECT pid FROM cohort)),\n" +
+    "             AND " + inCohortSamples("sampleId") + "),\n" +
     "     kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= " + floor + ")\n"
   );
 }
@@ -537,16 +550,19 @@ export function lollipopTotalsSql(cohortSql: string, genes: string[], study: str
     "       uniqExactIf(sid, status != 'GERMLINE') AS somatic_samples\n" +
     "FROM m GROUP BY gene");
 }
-/** Samples in the cohort — the somatic mutation frequency's denominator. */
-export function cohortSampleCountSql(cohortSql: string, study: string, db: string = DB): AggregateSql {
-  return aggregateSql("WITH cohort AS (" + cohortSql + ")\n" +
-    "SELECT uniqExact(sample_unique_id) AS n FROM " + db + ".sample_derived\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + " AND replaceOne(patient_unique_id, " + sq(study + "_") + ", '') IN (SELECT pid FROM cohort)");
+/** A compiled cohort's size: its patients (the owners of its samples) and its samples. */
+export function cohortSizesSql(cohortSql: string): AggregateSql {
+  return aggregateSql("SELECT uniqExact(pid) AS patients, uniqExact(sid) AS samples FROM (" + cohortSql + ")");
 }
 
-/** Patients carrying ANY mutation in each gene — the lollipop's denominator. */
+/** Samples in the cohort — the somatic mutation frequency's denominator. */
+export function cohortSampleCountSql(cohortSql: string): AggregateSql {
+  return aggregateSql("WITH cohort AS (" + cohortSql + ")\nSELECT uniqExact(sid) AS n FROM cohort");
+}
+
+/** Patients carrying ANY mutation in each gene in one of the cohort's samples — the lollipop's denominator. */
 export function geneMutationTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB): AggregateSql {
-  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
+  const sid = bareSampleId("sample_unique_id", study);
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT hugo_gene_symbol AS gene, uniqExact(patient_unique_id) AS n,\n" +
@@ -555,39 +571,38 @@ export function geneMutationTotalsSql(cohortSql: string, genes: string[], study:
     "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'mutation'\n" +
     "  AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND mutation_variant != ''\n" +
-    "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  AND " + inCohortSamples(sid) + "\n" +
     "GROUP BY gene"
   ));
 }
 
 /**
  * Six sums per gene pair from a continuous molecular profile: n, Sx, Sy, Sxy,
- * Sxx, Syy over the patients that have BOTH values.
+ * Sxx, Syy over the cohort's samples that have BOTH values.
  *
  * That is all a correlation depends on, so a site can join a co-expression
  * analysis without transmitting one expression value — and because the six sums
- * add, the federated correlation is exact rather than approximate. Values are
- * averaged per patient first, matching the oncoprint heatmap convention.
+ * add, the federated correlation is exact rather than approximate. Each sample is one
+ * observation, as on cBioPortal's co-expression tab (a sample's repeated rows are averaged).
  */
 export function momentPairsSql(cohortSql: string, pairs: [string, string][], profileType: string, study: string, db: string = DB): AggregateSql {
   const genes = [...new Set(pairs.flat())];
   const arrA = "[" + pairs.map((p) => sq(p[0])).join(",") + "]";
   const arrB = "[" + pairs.map((p) => sq(p[1])).join(",") + "]";
-  const pid = "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')";
+  const sid = bareSampleId("ga.sample_unique_id", study);
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "vals AS (\n" +
-    "  SELECT " + pid + " AS pid, ga.hugo_gene_symbol AS gene,\n" +
+    "  SELECT " + sid + " AS sid, ga.hugo_gene_symbol AS gene,\n" +
     "         avg(" + finiteSql("ga.alteration_value") + ") AS v\n" +
     "  FROM " + db + ".genetic_alteration_derived ga\n" +
-    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
     "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
     "    AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
     "    AND " + finiteSql("ga.alteration_value") + " IS NOT NULL\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
-    "  GROUP BY pid, gene\n" +
+    "    AND " + inCohortSamples(sid) + "\n" +
+    "  GROUP BY sid, gene\n" +
     "),\n" +
-    "pp AS (SELECT pid, groupArray(gene) AS gs, groupArray(v) AS vs FROM vals GROUP BY pid)\n" +
+    "pp AS (SELECT sid, groupArray(gene) AS gs, groupArray(v) AS vs FROM vals GROUP BY sid)\n" +
     "SELECT ga, gb, countIf(ok) AS n,\n" +
     "       sumIf(x, ok) AS sx, sumIf(y, ok) AS sy,\n" +
     "       sumIf(x * y, ok) AS sxy, sumIf(x * x, ok) AS sxx, sumIf(y * y, ok) AS syy\n" +
@@ -606,7 +621,8 @@ export function momentPairsSql(cohortSql: string, pairs: [string, string][], pro
 export const ATTR_VALUE_CAP = 200;
 
 /**
- * Per-value counts for CATEGORICAL clinical attributes in one cohort/study.
+ * Per-value counts for CATEGORICAL clinical attributes in one cohort/study: a sample attribute
+ * counts the cohort's samples, a patient attribute its patients.
  *
  * Returns the full value distribution up to ATTR_VALUE_CAP + 1 rows. It must be
  * complete: a chi-squared on a silently truncated contingency table is simply
@@ -614,7 +630,6 @@ export const ATTR_VALUE_CAP = 200;
  * testing a partial table.
  */
 export function clinicalCountsSql(cohortSql: string, attrs: string[], study: string, db: string = DB): AggregateSql {
-  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT attribute_name AS a, type AS per, attribute_value AS v,\n" +
@@ -623,7 +638,7 @@ export function clinicalCountsSql(cohortSql: string, attrs: string[], study: str
     "WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "  AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
     "  AND attribute_value != ''\n" +
-    "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  AND " + inCohortClinical(study) + "\n" +
     "GROUP BY a, per, v\n" +
     "ORDER BY n DESC\n" +
     "LIMIT " + (ATTR_VALUE_CAP + 1) + " BY a, per"
@@ -638,7 +653,6 @@ export function clinicalCountsSql(cohortSql: string, attrs: string[], study: str
  * No individual value is ever transmitted.
  */
 export function clinicalMomentsSql(cohortSql: string, attrs: string[], study: string, db: string = DB): AggregateSql {
-  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx\n" +
@@ -648,7 +662,7 @@ export function clinicalMomentsSql(cohortSql: string, attrs: string[], study: st
     "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "    AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
     "    AND attribute_value != ''\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortClinical(study) + "\n" +
     ")\n" +
     "WHERE x IS NOT NULL AND isFinite(x)\n" +
     "GROUP BY a, per"
@@ -670,7 +684,6 @@ export const HISTOGRAM_CAP = 20000;
  * histogramTruncated) rather than compute a quantile or a rank sum from a partial histogram.
  */
 export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: string, db: string = DB): AggregateSql {
-  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "     raw AS (\n" +
@@ -679,7 +692,7 @@ export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: 
     "       WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "         AND attribute_name IN (" + attrs.map(sq).join(",") + ")\n" +
     "         AND attribute_value != ''\n" +
-    "         AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "         AND " + inCohortClinical(study) + "\n" +
     "     )\n" +
     "SELECT a, per, x, count() AS n\n" +
     "FROM raw\n" +
@@ -692,21 +705,21 @@ export function clinicalHistogramSql(cohortSql: string, attrs: string[], study: 
 
 /**
  * One number: the exact p-th quantile of a numeric clinical attribute within one cohort, in one
- * study — the reference population for a percentile-based cohort cutoff (item 4 of the CRC/APC
+ * study, over its values at the level the study records it (the cohort's samples' values of a
+ * sample attribute, its patients' of a patient one) — the reference population for a percentile-based cohort cutoff (item 4 of the CRC/APC
  * roadmap's "features that would have helped", e.g. Samstein's "top 20% TMB per cancer type").
  * A single ClickHouse aggregate; no individual value leaves the database, only the resolved
  * threshold — same shape as every other aggregate here.
  */
-export function attributeQuantileSql(cohortSql: string, attribute: string, per: "patient" | "sample", p: number, study: string, db: string = DB): AggregateSql {
+export function attributeQuantileSql(cohortSql: string, attribute: string, p: number, study: string, db: string = DB): AggregateSql {
   if (!(p > 0 && p < 1)) throw new Error("attributeQuantileSql: p must be between 0 and 1 (exclusive), got " + p);
-  const pid = "replaceOne(patient_unique_id, " + sq(study + "_") + ", '')";
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT quantileExact(" + p + ")(" + finiteSql("attribute_value") + ") AS q\n" +
     "FROM " + clinicalTable(db, [attribute]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attribute) + "\n" +
-    "  AND type = " + sq(per) + " AND attribute_value != ''\n" +
-    "  AND " + pid + " IN (SELECT pid FROM cohort)"
+    "  AND attribute_value != ''\n" +
+    "  AND " + inCohortClinical(study)
   ));
 }
 
@@ -740,7 +753,7 @@ export function survivalCountsSql(cohortSql: string, study: string, db: string =
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     ")\n" +
     "SELECT " + finiteSql("months") + " AS m, if(status LIKE '1%', 1, 0) AS ev, count() AS n\n" +
@@ -785,7 +798,7 @@ export function anchoredSurvivalSql(
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "anch AS (\n" +
@@ -795,7 +808,7 @@ export function anchoredSurvivalSql(
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
     "    AND " + foldedEqualsSql("ce.event_type", anchor.eventType) + "\n" + attrCond +
-    "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients("p.stable_id") + "\n" +
     "  GROUP BY pid\n" +
     ")\n" +
     // offset = months from anchor to day 0; only anchors at or before day 0 make
@@ -855,7 +868,7 @@ export function coxRowsSql(
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     ")" + (covCtes ? ",\n" + covCtes : "") + "\n" +
     "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev" + (select ? ", " + select : "") + "\n" +
@@ -933,7 +946,7 @@ export function timelineSpanSql(cohortSql: string, study: string, db: string = D
     "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
-    "  AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "  AND " + inCohortPatients(pid) + "\n" +
     "GROUP BY et ORDER BY pts DESC"
   ));
 }
@@ -1003,7 +1016,7 @@ export function eventCourseSql(
     "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n";
+    "    AND " + inCohortPatients(pid) + "\n";
 
   // Anchor day per patient. Without an anchor every patient aligns on day 0,
   // which is only meaningful inside one study — the caller enforces that.
@@ -1069,7 +1082,7 @@ export function eventCourseSql(
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "  JOIN anch a ON a.pid = " + pid + "\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
     "    AND " + nameFoldSql("ce.event_type") + " IN (" + types.map((t) => nameFoldSql(sq(t))).join(", ") + ")\n" +
     ")\n" +
     // plus two counts the method record states: patients with an anchor, and those of them
@@ -1145,7 +1158,7 @@ export function sequenceSql(
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     // the one line definition every view and clause shares — lib/treatment-lines.ts
-    linesCtes({ db, study, patientFilter: pid + " IN (SELECT pid FROM cohort)", spec: lineSpec }).join(",\n") + ",\n" +
+    linesCtes({ db, study, patientFilter: inCohortPatients(pid), spec: lineSpec }).join(",\n") + ",\n" +
     // How long the study kept watching, from ANY event type plus OS follow-up.
     // This is what separates "we saw them not start another line" from "the
     // records simply stop" — see the fate expression below.
@@ -1163,7 +1176,7 @@ export function sequenceSql(
     "  JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "obs AS (\n" +
@@ -1217,7 +1230,7 @@ export function sequenceKeysSql(cohortSql: string, study: string, db: string, ev
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
     "  AND " + eventTypeMatchSql("ce.event_type", eventType) + "\n" +
-    "  AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+    "  AND " + inCohortPatients("p.stable_id") + "\n" +
     "GROUP BY k ORDER BY pts DESC, k LIMIT 25"
   ));
 }
@@ -1263,8 +1276,10 @@ const NO_IDS_MSG =
 export interface AggregateCapable {
   readonly instance: Instance;
   readonly study: string;
-  /** cohort size — a count, not a roster */
+  /** cohort size in patients (the owners of its samples) — a count, not a roster */
   count(def: CohortDef | null | undefined): Promise<number>;
+  /** cohort size in patients and in samples — counts, not a roster */
+  sizes(def: CohortDef | null | undefined): Promise<CohortSizes>;
   geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]>;
   survivalCounts(def: CohortDef | null | undefined, endpoint?: string, anchor?: SurvivalAnchor | null, columns?: EndpointColumns): Promise<SurvivalCount[]>;
   /** endpoints this participant can answer for; [] when it cannot say */
@@ -1283,7 +1298,7 @@ export interface AggregateCapable {
   attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean; topValues?: number }): Promise<AttrStats[]>;
   /** the p-th quantile of a numeric clinical attribute in this cohort — the reference population
    *  for a percentile-based cohort cutoff. null when the attribute has no values here. */
-  attributeQuantile(def: CohortDef | null | undefined, attribute: string, per: "patient" | "sample", p: number): Promise<number | null>;
+  attributeQuantile(def: CohortDef | null | undefined, attribute: string, p: number): Promise<number | null>;
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
   /** per-codon counts for the lollipop (see lollipopCte) — aggregates only */
@@ -1510,8 +1525,11 @@ abstract class BaseResolver implements AggregateCapable {
     return cohortSubquery(compileCohortDef(def, { ...this.ctx, study: this.study, db: this.instance.conn.db }));
   }
   async count(def: CohortDef | null | undefined): Promise<number> {
-    const r = await this.runQuiet<ChRow>(aggregateSql("SELECT count() AS n FROM (" + this.cohortSql(def) + ")"));
-    return Number(r.data[0].n);
+    return (await this.sizes(def)).patients;
+  }
+  async sizes(def: CohortDef | null | undefined): Promise<CohortSizes> {
+    const r = await this.runQuiet<ChRow>(aggregateSql(cohortSizesSql(this.cohortSql(def))));
+    return { patients: Number(r.data[0].patients), samples: Number(r.data[0].samples) };
   }
   async geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]> {
     if (!genes.length) return [];
@@ -1609,7 +1627,7 @@ abstract class BaseResolver implements AggregateCapable {
       this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db), conn),
       this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db), conn),
       this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db), conn),
-      this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort, this.study, db), conn)
+      this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn)
     ]);
     return {
       minCount, annotated: !!pin, cohortSamples: Number(cs.data[0]?.n || 0),
@@ -1703,9 +1721,9 @@ abstract class BaseResolver implements AggregateCapable {
     return out;
   }
 
-  async attributeQuantile(def: CohortDef | null | undefined, attribute: string, per: "patient" | "sample", p: number): Promise<number | null> {
+  async attributeQuantile(def: CohortDef | null | undefined, attribute: string, p: number): Promise<number | null> {
     const r = await this.runLogged<ChRow>("attributeQuantile",
-      attributeQuantileSql(this.cohortSql(def), attribute, per, p, this.study, this.instance.conn.db), this.instance.conn);
+      attributeQuantileSql(this.cohortSql(def), attribute, p, this.study, this.instance.conn.db), this.instance.conn);
     const v = r.data[0]?.q;
     return v == null || v === "" ? null : Number(v);
   }
@@ -2126,13 +2144,13 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   }
 
   async members(def: CohortDef | null | undefined): Promise<string[]> {
-    const r = await this.runPatientQuiet<ChRow>(patientSql("SELECT pid FROM (" + this.cohortSql(def) + ")"));
+    const r = await this.runPatientQuiet<ChRow>(patientSql("SELECT DISTINCT pid FROM (" + this.cohortSql(def) + ")"));
     return r.data.map((x) => x.pid);
   }
 
-  /** The samples of a cohort's patients, as bare ids: what locking a cohort records beside its patients. */
+  /** A cohort's samples, as bare ids: what locking a cohort records beside its patients. */
   async memberSamples(def: CohortDef | null | undefined): Promise<string[]> {
-    const r = await this.runPatientQuiet<ChRow>(memberSamplesSql(this.cohortSql(def), this.study, this.instance.conn.db));
+    const r = await this.runPatientQuiet<ChRow>(memberSamplesSql(this.cohortSql(def)));
     return r.data.map((x) => x.sid);
   }
 
@@ -2140,11 +2158,10 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * How far the data has moved from a locked cohort (lib/cohort-lock.ts): counts only, but over the
    * frozen patients' ids, so patient-level only, as members() is.
    */
-  async lockDrift(locked: CohortDef, live: CohortDef, samples: { set: string; part: string } | null): Promise<{ present: number; now: number; entered: number; left: number; newSamples: number | null; sql: string }> {
-    const sql = lockDriftSql(this.cohortSql(locked), this.cohortSql(live), this.study, this.instance.conn.db, samples);
+  async lockDrift(locked: CohortDef, live: CohortDef): Promise<{ present: number; now: number; entered: number; left: number; sql: string }> {
+    const sql = lockDriftSql(this.cohortSql(locked), this.cohortSql(live));
     const r = (await this.runLogged<ChRow>("lock: drift since locked", sql, this.instance.conn)).data[0];
-    const ns = Number(r.newSamples);
-    return { present: Number(r.present), now: Number(r.now), entered: Number(r.entered), left: Number(r.left), newSamples: ns < 0 ? null : ns, sql };
+    return { present: Number(r.present), now: Number(r.now), entered: Number(r.entered), left: Number(r.left), sql };
   }
 
   /**

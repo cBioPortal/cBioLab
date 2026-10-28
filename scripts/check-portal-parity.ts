@@ -46,7 +46,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildExplore, buildExploreFederated } from "../lib/explore.ts";
 import { studyProfiles } from "../lib/analysis.ts";
-import { compileCohortDef } from "../lib/cohort2.ts";
+import { compileCohortDef, memberSamplesSql } from "../lib/cohort2.ts";
+import { resolverFor } from "../lib/federation.ts";
 import { oqlCasesSql } from "../lib/oql.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
 import { oncokbPin } from "../lib/annotation.ts";
@@ -110,7 +111,7 @@ interface PortalSample { sampleId: string; patientId: string }
 
 async function oursCount(study: string, def: CohortDef, profiles: { profiles: string[]; gaProfiles: string[] }): Promise<number> {
   const sql = compileCohortDef(def, { study, db: DB, oncokbPin: await oncokbPin(), ...profiles });
-  return Number((await chQuery<{ n: string }>("SELECT count() AS n FROM (" + sql + ")", PRIMARY)).data[0].n);
+  return Number((await chQuery<{ n: string }>("SELECT uniqExact(pid) AS n FROM (" + sql + ")", PRIMARY)).data[0].n);
 }
 
 for (const study of STUDIES) {
@@ -193,7 +194,7 @@ for (const study of STUDIES) {
     const value = pc.values![pc.values!.length > 1 ? 1 : 0].v;
     const portal = await api<PortalSample[]>("/filtered-samples/fetch",
       { studyIds: [study], clinicalDataFilters: [{ attributeId: pc.attribute, values: [{ value }] }] });
-    const ours = await oursCount(study, { all: [{ kind: "clinical", per: pc.per, attribute: pc.attribute, op: "=", value }] }, profiles);
+    const ours = await oursCount(study, { all: [{ kind: "clinical", attribute: pc.attribute, op: "=", value }] }, profiles);
     const pn = new Set(portal.map((s) => s.patientId)).size;
     record({ study, group: "cohort", what: `patients with ${pc.attribute} = ${value}`, ours: String(ours), portal: String(pn), agree: ours === pn });
   }
@@ -285,7 +286,7 @@ const MIXED = ["utuc_mskcc_2015", "msk_impact_2017", "blca_tcga_pan_can_atlas_20
 const MIXED_SELECTIONS: { label: string; draft: CohortDef | null; filter: Record<string, unknown> }[] = [
   { label: "", draft: null, filter: { studyIds: MIXED } },
   { label: " · SEX = Female",
-    draft: { all: [{ kind: "clinical", attribute: "SEX", per: "patient", op: "=", value: "Female" }] },
+    draft: { all: [{ kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] },
     filter: { studyIds: MIXED, clinicalDataFilters: [{ attributeId: "SEX", values: [{ value: "Female" }] }] } },
 ];
 const mixedProfiles = new Map();
@@ -322,6 +323,111 @@ for (const { label: filterLabel, draft, filter } of MIXED_SELECTIONS) {
       portal: wrong.length ? wrong.slice(0, 5).map((r) => { const p = byKey.get(r.gene + "|" + (r.cna ?? "")); return p ? portalGene(p) : "absent"; }).join(", ") : "all agree",
       agree: !!rows?.length && !wrong.length });
   }
+}
+
+// 9. selections of samples: a sample-level clause selects the samples that match it, not every
+// sample of the patients owning one, so a patient's other samples are not in the cohort's sizes or
+// gene frequencies. Compared through both paths that count genes: Explore's gene tables and the
+// views' per-gene counts (Resolver.geneCounts).
+const SAMPLE_SELECTIONS: { study: string; label: string; draft: CohortDef; filter: Record<string, unknown> }[] = [
+  { study: "msk_chord_2024", label: "CANCER_TYPE = Non-Small Cell Lung Cancer",
+    draft: { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] } as CohortDef,
+    filter: { clinicalDataFilters: [{ attributeId: "CANCER_TYPE", values: [{ value: "Non-Small Cell Lung Cancer" }] }] } },
+  { study: "msk_impact_2017", label: "SAMPLE_TYPE = Primary",
+    draft: { all: [{ kind: "clinical", attribute: "SAMPLE_TYPE", values: ["Primary"] }] } as CohortDef,
+    filter: { clinicalDataFilters: [{ attributeId: "SAMPLE_TYPE", values: [{ value: "Primary" }] }] } },
+  // a sample clause and a patient clause together: the patient clause keeps every sample of its patients
+  { study: "msk_impact_2017", label: "SAMPLE_TYPE = Metastasis · SEX = Female",
+    draft: { all: [{ kind: "clinical", attribute: "SAMPLE_TYPE", values: ["Metastasis"] },
+      { kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] } as CohortDef,
+    filter: { clinicalDataFilters: [{ attributeId: "SAMPLE_TYPE", values: [{ value: "Metastasis" }] },
+      { attributeId: "SEX", values: [{ value: "Female" }] }] } },
+  // a grade recorded per sample, which changes between a patient's primary and recurrence
+  { study: "difg_glass_2019", label: "GRADE = IV",
+    draft: { all: [{ kind: "clinical", attribute: "GRADE", values: ["IV"] }] } as CohortDef,
+    filter: { clinicalDataFilters: [{ attributeId: "GRADE", values: [{ value: "IV" }] }] } },
+  // an alteration is called per sample: the samples carrying it, not their patients' others
+  { study: "msk_impact_2017", label: "OQL \"TP53: MUT\"",
+    draft: { all: [{ kind: "oql", q: "TP53: MUT" }] } as CohortDef,
+    filter: { geneFilters: [{ molecularProfileIds: ["msk_impact_2017_mutations"], geneQueries: [[{ hugoGeneSymbol: "TP53", entrezGeneId: 0,
+      alterations: [], includeDriver: true, includeVUS: true, includeUnknownOncogenicity: true, tiersBooleanMap: {}, includeUnknownTier: true,
+      includeGermline: true, includeSomatic: true, includeUnknownStatus: true }]] }] } },
+];
+for (const sel of SAMPLE_SELECTIONS) {
+  const study = sel.study + " · " + sel.label;
+  const profiles = await studyProfiles(sel.study);
+  const filter = { studyIds: [sel.study], ...sel.filter };
+  const portalSamples = await api<PortalSample[]>("/filtered-samples/fetch", filter);
+  const portalPatients = new Set(portalSamples.map((s) => s.patientId)).size;
+
+  // the cohort as the views see it: its patients, and the samples a sample-unit view draws
+  const cohortSql = compileCohortDef(sel.draft, { study: sel.study, db: DB, oncokbPin: await oncokbPin(), ...profiles });
+  const oursPatients = Number((await chQuery<{ n: string }>("SELECT uniqExact(pid) AS n FROM (" + cohortSql + ")", PRIMARY)).data[0].n);
+  const oursSamples = Number((await chQuery<{ n: string }>("SELECT count() AS n FROM (" + memberSamplesSql(cohortSql) + ")", PRIMARY)).data[0].n);
+  record({ study, group: "selection", what: "patients (the cohort)", ours: String(oursPatients), portal: String(portalPatients), agree: oursPatients === portalPatients });
+  record({ study, group: "selection", what: "samples (the cohort)", ours: String(oursSamples), portal: String(portalSamples.length), agree: oursSamples === portalSamples.length });
+
+  // Explore under the same selection
+  const ex = await buildExplore({ study: sel.study, draft: sel.draft, ...profiles });
+  record({ study, group: "selection", what: "samples (Explore)", ours: String(ex.totals?.samples), portal: String(portalSamples.length), agree: ex.totals?.samples === portalSamples.length });
+  const tables: [string, GeneTableRow[] | undefined, string][] = [
+    ["mutations", ex.mutatedGenes, "/mutated-genes/fetch"],
+    ["copy number", ex.cnaGenes, "/cna-genes/fetch"],
+  ];
+  const portalTables = new Map<string, PortalGene[]>();
+  for (const [label, rows, path] of tables) {
+    const portal = await api<PortalGene[]>(path, filter);
+    portalTables.set(label, portal);
+    const byKey = new Map(portal.map((g) => [g.hugoGeneSymbol + "|" + (g.alteration ?? ""), g]));
+    const what = (r: GeneTableRow) => r.gene + (r.cna === 2 ? " amplified" : r.cna === -2 ? " deleted" : "");
+    const agrees = (r: GeneTableRow) => { const p = byKey.get(r.gene + "|" + (r.cna ?? "")); return !!p && oursGene(r) === portalGene(p); };
+    const wrong = (rows || []).filter((r) => !agrees(r));
+    record({ study, group: label + " (Explore)", what: `every row of the table (${(rows || []).length})`,
+      ours: wrong.length ? wrong.length + " differ: " + wrong.slice(0, 5).map((r) => what(r) + " " + oursGene(r)).join(", ") : "all agree",
+      portal: wrong.length ? wrong.slice(0, 5).map((r) => { const p = byKey.get(r.gene + "|" + (r.cna ?? "")); return p ? portalGene(p) : "absent"; }).join(", ") : "all agree",
+      agree: (!!rows?.length || !portal.length) && !wrong.length });
+  }
+
+  // the views' per-gene counts, for the portal's leading genes: altered on a covering panel / profiled
+  const portalMut = [...portalTables.get("mutations")!].sort((a, b) => b.numberOfAlteredCases - a.numberOfAlteredCases).slice(0, TOP_GENES);
+  const resolver = await resolverFor(sel.study, { oncokbPin: await oncokbPin(), ...profiles });
+  const counts = new Map((await resolver.geneCounts(sel.draft, portalMut.map((g) => g.hugoGeneSymbol))).map((c) => [c.gene, c]));
+  for (const p of portalMut) {
+    const c = counts.get(p.hugoGeneSymbol)?.byType.mutation;
+    const ours = c ? `${c.altered}/${c.profiled}` : "absent", theirs = `${p.numberOfAlteredCasesOnPanel}/${p.numberOfProfiledCases}`;
+    record({ study, group: "mutations (views)", what: p.hugoGeneSymbol, ours, portal: theirs, agree: ours === theirs });
+  }
+}
+
+// 10. one clause over studies that record its attribute at different levels: GRADE is a sample
+// attribute in pancan_pcawg_2020 and a patient attribute in lihc_tcga, so the same clause selects
+// the matching samples in one and every sample of the matching patients in the other.
+{
+  const studies = ["pancan_pcawg_2020", "lihc_tcga"];
+  const draft = { all: [{ kind: "clinical", attribute: "GRADE", values: ["G3"] }] } as CohortDef;
+  const filter = { studyIds: studies, clinicalDataFilters: [{ attributeId: "GRADE", values: [{ value: "G3" }] }] };
+  const label = studies.join(" + ") + " · GRADE = G3";
+  const portalSamples = await api<(PortalSample & { studyId: string })[]>("/filtered-samples/fetch", filter);
+  const mixedProfiles = new Map();
+  for (const st of studies) {
+    const profiles = await studyProfiles(st);
+    mixedProfiles.set(st, profiles);
+    const cohortSql = compileCohortDef(draft, { study: st, db: DB, oncokbPin: await oncokbPin(), ...profiles });
+    const ours = Number((await chQuery<{ n: string }>("SELECT count() AS n FROM (" + memberSamplesSql(cohortSql) + ")", PRIMARY)).data[0].n);
+    const theirs = portalSamples.filter((x) => x.studyId === st).length;
+    record({ study: label, group: "selection", what: `samples in ${st}`, ours: String(ours), portal: String(theirs), agree: ours === theirs });
+  }
+  const ex = await buildExploreFederated({ studies, profilesByStudy: mixedProfiles, draft });
+  const portalPatients = new Set(portalSamples.map((x) => x.studyId + ":" + x.patientId)).size;
+  record({ study: label, group: "selection", what: "patients (Explore)", ours: String(ex.totals?.patients), portal: String(portalPatients), agree: ex.totals?.patients === portalPatients });
+  record({ study: label, group: "selection", what: "samples (Explore)", ours: String(ex.totals?.samples), portal: String(portalSamples.length), agree: ex.totals?.samples === portalSamples.length });
+  const portal = await api<PortalGene[]>("/mutated-genes/fetch", filter);
+  const byKey = new Map(portal.map((g) => [g.hugoGeneSymbol, g]));
+  const wrong = (ex.mutatedGenes || []).filter((r) => { const p = byKey.get(r.gene); return !p || oursGene(r) !== portalGene(p); });
+  record({ study: label, group: "mutations (Explore)", what: `every row of the table (${(ex.mutatedGenes || []).length})`,
+    ours: wrong.length ? wrong.length + " differ: " + wrong.slice(0, 5).map((r) => r.gene + " " + oursGene(r)).join(", ") : "all agree",
+    portal: wrong.length ? wrong.slice(0, 5).map((r) => { const p = byKey.get(r.gene); return p ? portalGene(p) : "absent"; }).join(", ") : "all agree",
+    agree: !!ex.mutatedGenes?.length && !wrong.length });
 }
 
 // 8. uncalled mutations are not alterations

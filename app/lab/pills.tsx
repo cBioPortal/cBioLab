@@ -72,7 +72,7 @@ function leafText(leaf: any) {
       // percentile request itself.
       ? `${leaf.op} ${Math.round(leaf.percentile * 100)}th percentile${leaf.percentileOf ? " of " + leaf.percentileOf : ""}`
       : `${leaf.op} ${leaf.value}`);
-    return `${attributeLabel(String(leaf.attribute ?? ""), "short")} ${bits.join(" ")}` + (leaf.per === "sample" ? " ·any sample" : "");
+    return `${attributeLabel(String(leaf.attribute ?? ""), "short")} ${bits.join(" ")}`;
   }
   if (k === "derived") {
     // Without this a derived leaf fell through to the clinical branch, which

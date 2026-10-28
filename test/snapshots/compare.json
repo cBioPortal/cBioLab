@@ -3,7 +3,8 @@
   "cohorts": {
     "Well-diff liposarcoma": {
       "count": 444,
-      "text": "CANCER_TYPE_DETAILED in [Well-Differentiated Liposarcoma] (any sample)",
+      "samples": 444,
+      "text": "CANCER_TYPE_DETAILED in [Well-Differentiated Liposarcoma]",
       "studies": [
         "sarcoma_msk_2022"
       ]

@@ -1,11 +1,11 @@
 Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- NSCLC, KRAS mutant: 2,194 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample) AND OQL[KRAS: MUT]
-- NSCLC, KRAS wild-type: 5,540 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample) AND NOT OQL[KRAS:] AND profiled for KRAS MUTATION
+- NSCLC, KRAS mutant: 2,183 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] AND OQL[KRAS: MUT]
+- NSCLC, KRAS wild-type: 5,551 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] AND NOT OQL[KRAS:] AND profiled for KRAS MUTATION
 
 Treatment endpoint: real-world progression-free survival from first Treatment [SUBTYPE=Immuno] (Kaplan-Meier):
-  NSCLC, KRAS mutant: n=873, 778 events, median 2.6 mo (95% CI 2.2 mo–2.7 mo); 981 of 2194 anchored; left out 1213 without the anchor, 0 without follow-up
-  NSCLC, KRAS wild-type: n=1,476, 1305 events, median 2.6 mo (95% CI 2.4 mo–2.8 mo); 1651 of 5540 anchored; left out 3889 without the anchor, 0 without follow-up
-  log-rank chi2=0.00 (1 df), p=0.9764
+  NSCLC, KRAS mutant: n=869, 774 events, median 2.6 mo (95% CI 2.2 mo–2.7 mo); 977 of 2183 anchored; left out 1206 without the anchor, 0 without follow-up
+  NSCLC, KRAS wild-type: n=1,480, 1309 events, median 2.6 mo (95% CI 2.4 mo–2.8 mo); 1655 of 5551 anchored; left out 3896 without the anchor, 0 without follow-up
+  log-rank chi2=0.00 (1 df), p=0.9923
   CAVEAT (tell the user): Real-world progression-free survival: from the start of the first Treatment [SUBTYPE=Immuno] record to the first Diagnosis event after it with PROGRESSION in Y / Yes, or death. Progression read from the record (in MSK-CHORD, from notes by NLP) is only as complete as that recording; events on the anchor's own day are not counted. Censored at the last follow-up, which is OS_MONTHS × 30.4375 days on the timeline's clock; death is OS_STATUS 1:DECEASED. That OS_MONTHS counts from the timeline's day 0 was checked on these patients: 0 of 2,632 anchored patients have a timeline event more than 31 days past it (a study above 5% is refused). Left truncation as in the survival view: a patient whose anchor falls before day 0 enters the risk set at day 0. Left out: 5102 cohort patients with no Treatment [SUBTYPE=Immuno] record, 0 with no follow-up after it, and 283 anchored before day 0 whose endpoint also came before it, so were never at risk. Medians with 95% intervals from the Greenwood band on the log scale. 2-group log-rank (1 df). Treated patients are not randomised: the cohorts can differ in who was offered the treatment, when, and how sick they were, so a difference here is an association. Each site sends only (entry, time, event) counts.

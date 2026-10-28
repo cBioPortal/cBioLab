@@ -1,9 +1,9 @@
 Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- Pancreatic: 3,109 patients — CANCER_TYPE in [Pancreatic Cancer] (any sample)
+- Pancreatic: 3,109 patients — CANCER_TYPE in [Pancreatic Cancer]
 
-Clinical data table (one row per sample): 3,134 rows; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
+Clinical data table (one row per sample): 3,109 rows; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	patient	sample	CANCER_TYPE	CLINICAL_GROUP	CLINICAL_SUMMARY	DIAGNOSIS_DESCRIPTION	ICD_O_HISTOLOGY_DESCRIPTION	PATHOLOGICAL_GROUP	CANCER_TYPE_DETAILED	OS_STATUS	SAMPLE_TYPE	RACE	GENDER	STAGE_HIGHEST_RECORDED	ETHNICITY	MSI_TYPE	GENE_PANEL	CURRENT_AGE_DEID	SMOKING_PREDICTIONS_3_CLASSES	SOMATIC_STATUS	SAMPLE_CLASS	PRIOR_MED_TO_MSK	GLEASON_HIGHEST_REPORTED	HISTORY_OF_PDL1	NUM_ICDO_DX	MUTATION_COUNT	FRACTION_GENOME_ALTERED	SAMPLE_COUNT	TMB_NONSYNONYMOUS	GLEASON_SAMPLE_LEVEL	GLEASON_FIRST_REPORTED	HER2	HR	MSI_COMMENT	MSI_SCORE	METASTATIC_SITE	ONCOTREE_CODE	OS_MONTHS	PRIMARY_SITE	PDL1_POSITIVE	SAMPLE_COVERAGE	TUMOR_PURITY	ADRENAL_GLANDS	BONE	CNS_BRAIN	INTRA_ABDOMINAL	LIVER	LUNG	LYMPH_NODES	OTHER	PLEURA	REPRODUCTIVE_ORGANS
   Pancreatic	P-0006018	P-0006018-T01-IM5	Pancreatic Cancer	2A	Regional,Extension and Nodes	Pancreas	Blastoma, Nos	2B	Pancreatic Neuroendocrine Tumor	0:LIVING	Metastasis	White	Female	Stage 1-3	Non-Spanish; Non-Hispanic	Stable	IMPACT410	89	Unknown	Matched	Tumor	Unknown			2	2	0.7416	1	1.957439395						0.6	Liver	PANET	0.032876676	Pancreas		564	90	Yes	No	No	Yes	Yes	No	Yes	Yes	No	No
   Pancreatic	P-0006930	P-0006930-T01-IM5	Pancreatic Cancer	1A	Regional,Direct Extension	Pancreas	Adenocarcinoma, Nos	2A	Pancreatic Adenocarcinoma	0:LIVING	Primary	White	Female	Stage 1-3	Unknown whether Spanish or not	Stable	IMPACT410	89	Never	Matched	Tumor	Unknown			1	5	0.1124	1	6.851037883						0		PAAD	11.99998685	Pancreas		1030	10	No	No	No	No	No	Yes	No	Yes	No	No
@@ -30,10 +30,10 @@ Clinical data table (one row per sample): 3,134 rows; the first 25, tab-separate
   Pancreatic	P-0044512	P-0044512-T01-IM6	Pancreatic Cancer	1B	Regional Both 2 and 3	Pancreas	Infiltrating Duct Carcinoma	2B	Pancreatic Adenocarcinoma	1:DECEASED	Primary	White	Female	Stage 1-3	Non-Spanish; Non-Hispanic	Stable	IMPACT468	89	Never	Matched	Tumor	No prior medications			1	3	0.044	1	2.594094285					MICROSATELLITE STABLE (MSS). See MSI note below.	0		PAAD	45.00816985	Pancreas		632	10	No	No	No	Yes	Yes	Yes	No	Yes	No	No
   Pancreatic	P-0046434	P-0046434-T01-IM6	Pancreatic Cancer	3	Regional,Direct Extension	Pancreas	Adenocarcinoma, Nos		Pancreatic Adenocarcinoma	1:DECEASED	Metastasis	White	Male	Stage 1-3	Unknown whether Spanish or not	Stable	IMPACT468	89	Never	Matched	Tumor	Unknown			1	5	0.0461	1	4.323490475					MICROSATELLITE STABLE (MSS). See MSI note below.	0.06	Liver	PAAD	7.956155664	Pancreas		474	10	No	No	No	No	Yes	Yes	No	Yes	No	No
   Pancreatic	P-0048987	P-0048987-T01-IM6	Pancreatic Cancer		Localized	Pancreas	Infiltrating Duct Carcinoma	1A	Pancreatic Adenocarcinoma	0:LIVING	Primary	White	Male	Stage 1-3	Non-Spanish; Non-Hispanic	Stable	IMPACT468	89	Former/Current Smoker	Matched	Tumor	Unknown	6		2	4	0.002	1	3.45879238		6			MICROSATELLITE STABLE (MSS). See MSI note below.	0		PAAD	46.8821404	Pancreas		626	20	No	No	No	No	Yes	No	No	Yes	No	No
-  … 3,109 more rows
-  CAVEAT (tell the user): One row per sample of each cohort's patients, carrying its patient's attributes too, with 50 attributes as each study recorded them — vocabularies are not harmonized across studies. 3,134 samples. Sorted by Current Age (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
+  … 3,084 more rows
+  CAVEAT (tell the user): One row per sample of each cohort's patients, carrying its patient's attributes too, with 50 attributes as each study recorded them — vocabularies are not harmonized across studies. 3,109 samples. Sorted by Current Age (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
   METHOD:
     - Count the samples per cohort and study: The table:counts query above: every sample of each cohort's patients (from the study's sample list, so a sample with no sample attribute still has a row), each with the value of each of the 50 attributes as recorded — blank where none was.
-        Pancreatic · msk_chord_2024: 3,134
+        Pancreatic · msk_chord_2024: 3,109
     - Sort them together and take one page: The table:rows query above: the samples of every cohort and study combined in one query, sorted by Current Age descending with missing values last, then patient and sample id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset.
     A listing: no statistic is computed, so there is no script — the queries are the numbers.

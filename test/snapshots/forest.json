@@ -3,7 +3,8 @@
   "cohorts": {
     "all patients": {
       "count": 48179,
-      "text": "all patients in the study",
+      "samples": 54331,
+      "text": "all samples in the study",
       "studies": [
         "msk_impact_50k_2026"
       ]

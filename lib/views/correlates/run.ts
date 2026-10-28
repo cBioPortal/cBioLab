@@ -69,7 +69,7 @@ export async function runCorrelates(view: CorrelatesView, ctx: ViewRun): Promise
       perStudy.set(g, [...(perStudy.get(g) || []), { study: st, m, rk }]);
     }
   }));
-  if (!pooled.size) return refuse("correlates", ctx, "no patient in “" + cn + "” has a value for " + gene + " on “" + pt + "”" + (excluded.length ? " in the studies that hold it" : ""));
+  if (!pooled.size) return refuse("correlates", ctx, "no sample in “" + cn + "” has a value for " + gene + " on “" + pt + "”" + (excluded.length ? " in the studies that hold it" : ""));
   const multi = holders.length > 1;
   const tested: CorrelatesGene[] = [];
   let untested = 0;
@@ -82,7 +82,7 @@ export async function runCorrelates(view: CorrelatesView, ctx: ViewRun): Promise
     if (m.n < minN || rho == null || pr.r == null) { untested++; continue; }
     tested.push({ gene: g, n: m.n, rho, rhoP, q: 1, r: pr.r, p: pr.p });
   }
-  if (!tested.length) return refuse("correlates", ctx, "no gene had at least " + minN + " patients with a value for both it and " + gene + ", and any spread");
+  if (!tested.length) return refuse("correlates", ctx, "no gene had at least " + minN + " samples with a value for both it and " + gene + ", and any spread");
   benjaminiHochberg(tested.map((g) => g.rhoP)).forEach((q, i) => { tested[i].q = q; });
   tested.sort((a, b) => b.rho! - a.rho! || a.gene.localeCompare(b.gene));
   const positive = tested.filter((g) => g.rho! > 0).slice(0, show);
@@ -107,16 +107,16 @@ export async function runCorrelates(view: CorrelatesView, ctx: ViewRun): Promise
     correlates: { gene, profileType: pt, otherProfile: other, ...(otherIsAssay ? { otherIsAssay: true } : {}), cohort: cn, tested: tested.length, untested, significant, minN, rhoFrom: multi ? "meta" : "rank",
       positive, negative, histogram, ...(excluded.length ? { excluded } : {}) },
     method: correlatesMethod({ gene, profileType: pt, otherProfile: other, cohort: cn, minN, multi, tested: tested.length, untested,
-      perSite: holders.map((st) => ({ study: st, genes: rows.filter((r) => r.study === st).length, patients: cohorts[cn].perStudy[st]?.count || 0 })),
+      perSite: holders.map((st) => ({ study: st, genes: rows.filter((r) => r.study === st).length, samples: cohorts[cn].perStudy[st]?.samples || 0 })),
       sums: rows.map((r) => ({ study: r.study, gene: r.gene, ...r.m, rsx: r.rk.sx, rsy: r.rk.sy, rsxy: r.rk.sxy, rsxx: r.rk.sxx, rsyy: r.rk.syy })),
       results: reported.map((g) => ({ gene: g.gene, rho: g.rho!, rhoP: g.rhoP, q: g.q, r: g.r!, p: g.p })) }),
     participation: ctx.participationFor(cohorts[cn].studies, false),
     ...(cohorts[cn].studies.length > 1 ? { studies: cohorts[cn].studies } : {}),
-    caveat: gene + " on “" + pt + "” against every " + (otherIsAssay ? "entity of the generic assay" : "gene on") + " “" + other + "”, over the patients in “" + cn + "” with both values (a patient's samples averaged, as the heatmap takes them). " +
+    caveat: gene + " on “" + pt + "” against every " + (otherIsAssay ? "entity of the generic assay" : "gene on") + " “" + other + "”, over the samples in “" + cn + "” with both values, paired per sample as the portal's co-expression tab pairs them. " +
       "Ranked by Spearman's ρ, as the portal ranks, with Pearson's r beside it; q is Benjamini–Hochberg over ρ's p across all " + tested.length.toLocaleString("en-US") + " " + noun + " tested. " +
       (multi ? "Pearson's r pools every study's sums (exact); ρ is each study's own, combined by Fisher z weighted by size, since ranks do not add across studies. " : "") +
       "A correlation is not a regulatory link: genes that rise together across a cohort often both track a third thing — a subtype, the tumour's purity, proliferation. " +
-      untested.toLocaleString("en-US") + " " + noun + " were not tested: fewer than " + minN + " patients with both values, or no spread." +
+      untested.toLocaleString("en-US") + " " + noun + " were not tested: fewer than " + minN + " samples with both values, or no spread." +
       (excluded.length ? " Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
   };
 }

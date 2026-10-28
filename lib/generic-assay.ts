@@ -20,7 +20,7 @@ export const ENTITY_RE = /^[A-Za-z0-9_.:;()+\-/ ]{1,120}$/;
  * profile, the patient, which the table stores in both id columns), the patient, and the value as
  * a finite number (`numeric`) or as its trimmed text with the "not called" values left out. A value
  * that is not a number (a limit like ">8", NA) has no row in the numeric form. Cohort-restricted
- * by `inCohort`, a condition on `patient_unique_id`.
+ * by `inCohort`, a condition on the row (assayInCohortSql is the cohort test).
  */
 export function assayEntityRowsSql(o: { db: string; study: string; profileType: string; entity: string; numeric: boolean; inCohort: string }): string {
   const v = o.numeric ? finiteSql("value") : "trimBoth(value)";
@@ -30,6 +30,19 @@ export function assayEntityRowsSql(o: { db: string; study: string; profileType: 
     " AND profile_stable_id = " + sq(o.study + "_" + o.profileType) + "\n" +
     "    AND " + (o.numeric ? v + " IS NOT NULL" : v + " NOT IN (" + ASSAY_MISSING_VALUES.map(sq).join(", ") + ")") +
     " AND " + o.inCohort;
+}
+
+/**
+ * Whether a generic_assay_data_derived row (column names unqualified, or prefixed by `alias`) is in
+ * the cohort CTE `cte`: a sample-level row by its sample, a patient-level row (the patient in both
+ * id columns) by its patient. The same test as cohort2.ts's inCohortSamples / inCohortPatients, which
+ * this module cannot import and stay browser-safe.
+ */
+export function assayInCohortSql(study: string, cte = "cohort", alias = ""): string {
+  const col = (c: string) => "replaceOne(" + alias + c + ", " + sq(study + "_") + ", '')";
+  return "if(ifNull(" + alias + "patient_level, 0) = 1, " +
+    col("patient_unique_id") + " IN (SELECT pid FROM " + cte + "), " +
+    col("sample_unique_id") + " IN (SELECT sid FROM " + cte + "))";
 }
 
 /** at most this many entities come back from one search */
@@ -58,14 +71,17 @@ export function assayEntitySearchSql(study: string, db: string, profileType: str
     "ORDER BY " + exact + "length(e.entity), e.entity LIMIT " + Math.max(1, Math.min(200, Math.floor(limit))));
 }
 
-/** One entity's rows of the study's profile for the cohort's patients, as a CTE pair (cohort, rows). */
+/**
+ * One entity's rows of the study's profile for the cohort, as a CTE pair (cohort, rows): a row per
+ * in-cohort sample, or per in-cohort patient for a patient-level profile — `id` names that case.
+ */
 function cohortRowsCte(cohortSql: string, study: string, db: string, profileType: string, entity: string): string {
   return "WITH cohort AS (" + cohortSql + "),\n" +
     "rows AS (\n" +
-    "  SELECT patient_unique_id AS id, value, datatype FROM " + db + ".generic_assay_data_derived\n" +
+    "  SELECT sample_unique_id AS id, value, datatype FROM " + db + ".generic_assay_data_derived\n" +
     "  WHERE profile_type = " + sq(profileType) + " AND profile_stable_id = " + sq(study + "_" + profileType) + "\n" +
     "    AND entity_stable_id = " + sq(entity) + "\n" +
-    "    AND patient_unique_id IN (SELECT concat(" + sq(study + "_") + ", pid) FROM cohort)\n" +
+    "    AND " + assayInCohortSql(study) + "\n" +
     ")\n";
 }
 
@@ -76,7 +92,7 @@ export function assayCohortMedianSql(cohortSql: string, study: string, db: strin
     "       quantileExactIf(0.5)(" + finiteSql("value") + ", " + finiteSql("value") + " IS NOT NULL) AS median FROM rows");
 }
 
-/** Each value of one categorical entity over the cohort, with how many of its patients take it; "not called" left out. */
+/** Each value of one categorical entity over the cohort, with how many of its cases (samples, or patients for a patient-level profile) take it; "not called" left out. */
 export function assayCohortValuesSql(cohortSql: string, study: string, db: string, profileType: string, entity: string): AggregateSql {
   return aggregateSql(cohortRowsCte(cohortSql, study, db, profileType, entity) +
     "SELECT trimBoth(value) AS v, uniqExact(id) AS n FROM rows\n" +

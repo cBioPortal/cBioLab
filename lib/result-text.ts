@@ -59,8 +59,8 @@ export function analysisText(document: AnalysisDoc, r: AnalysisResult): string[]
     out.push(`Split "${p.split}" of "${p.of}" (${p.parentCount.toLocaleString()} patients; arms tested in order, first match wins):\n` +
       p.children.map((c) => `  - ${c.label}${c.role === "other" ? " [remainder]" : c.role === "notEvaluable" ? " [not evaluable — not compared]" : ""}: ` +
         `${c.count.toLocaleString()}${pct(c.count)} — cohort "${c.name}"`).join("\n") +
-      (p.conserved ? `\n  The children add up to the parent (${p.sum.toLocaleString()}).`
-        : `\n  WARNING (tell the user): the children add up to ${p.sum.toLocaleString()}, not the parent's ${p.parentCount.toLocaleString()}.`) +
+      (p.conserved ? `\n  The children's samples add up to the parent's (${p.sum.toLocaleString()}).`
+        : `\n  WARNING (tell the user): the children's samples add up to ${p.sum.toLocaleString()}, not the parent's ${p.parentSamples.toLocaleString()}.`) +
       (p.unchecked.length ? `\n  CAVEAT (tell the user): whether a patient can be tested for ${p.unchecked.join(", ")} is not checked, so the remainder may hold patients with no data for it.` : ""));
   }
   for (const v of r.views) {

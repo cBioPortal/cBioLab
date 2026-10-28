@@ -1,7 +1,7 @@
 Analysis over msk_impact_50k_2026 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- all patients: 48,179 patients — all patients in the study
+- all patients: 48,179 patients — all samples in the study
 
 Cancer types summary: KRAS, NRAS, HRAS by CANCER_TYPE (any alteration; samples profiled for at least one gene):
   all patients: 10,796 of 48,179 profiled samples altered
@@ -34,9 +34,9 @@ Cancer types summary: KRAS, NRAS, HRAS by CANCER_TYPE (any alteration; samples p
     Gastrointestinal Stromal Tumor: 1.7% (9/520; mutation 2, amp 0, deep del 6, SV 0, multiple 1)
     Renal Cell Carcinoma: 1.6% (18/1107; mutation 17, amp 0, deep del 0, SV 0, multiple 1)
     38 smaller groups: 13.6% (250/1842; mutation 231, amp 8, deep del 8, SV 0, multiple 3)
-  CAVEAT (tell the user): Patients altered in at least one of 3 genes per CANCER_TYPE group, over the patients profiled for at least one of them (the union of their panels, as an oncoprint's merged row counts it). Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. A patient with more than one kind of alteration across the genes counts once, under "multiple". A patient counts in every group one of their samples falls in, profiled if any of those samples is, altered if any is. CANCER_TYPE is read per sample and folded on case and whitespace; samples with no value form their own group. Groups with fewer than 200 profiled patients are pooled into one bar rather than dropped. 
+  CAVEAT (tell the user): Patients altered in at least one of 3 genes per CANCER_TYPE group, over the patients profiled for at least one of them (the union of their panels, as an oncoprint's merged row counts it). Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. A patient with more than one kind of alteration across the genes counts once, under "multiple". A patient counts in every group one of their samples in the cohort falls in, profiled if any of those samples is, altered if any is. CANCER_TYPE is read per sample and folded on case and whitespace; samples with no value form their own group. Groups with fewer than 200 profiled patients are pooled into one bar rather than dropped. 
   METHOD:
-    - Count patients per CANCER_TYPE group [all patients · msk_impact_50k_2026]: The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only, or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.
+    - Count patients per CANCER_TYPE group [all patients · msk_impact_50k_2026]: The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only, or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.
         genes: KRAS, NRAS, HRAS
         profiled patients: 48,892
     - Pool the small groups [all patients]: 38 groups with fewer than 200 profiled patients drawn as one pooled bar; 28 drawn on their own.

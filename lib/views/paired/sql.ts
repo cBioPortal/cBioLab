@@ -4,9 +4,10 @@ import { clinicalValueFoldSql } from "../../event-names.ts";
 import { sq } from "../../compiler.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
+import { inCohortSamples, bareSampleId } from "../../cohort2.ts";
 
 /**
- * Per gene, among patients with a sample on each side AND profiled for the gene on each side
+ * Per gene, among patients with a cohort sample on each side AND profiled for the gene on each side
  * (by that side's own panels — a gene one side never assayed says nothing about concordance):
  * altered on both sides, on side a only, on side b only. A patient with several samples on a
  * side is altered on that side if any of them is. Counts only.
@@ -20,7 +21,7 @@ export function pairedCountsSql(cohortSql: string, study: string, db: string, ge
   return aggregateSql(pairedSidesCtes(cohortSql, study, db, by) + ",\n" + sideCountsTail(study, db, genes, pin, measure));
 }
 
-/** How many of the cohort's patients have a sample on each side, and how many samples each side holds. */
+/** How many of the cohort's patients have a cohort sample on each side, and how many samples each side holds. */
 export function pairedPatientsSql(cohortSql: string, study: string, db: string, by: PairBy): AggregateSql {
   return aggregateSql((
     pairedSidesCtes(cohortSql, study, db, by) + "\n" +
@@ -36,7 +37,8 @@ export interface PairBy { attribute: string; a: string[]; b: string[] }
 /**
  * The cohort's samples split into side 'a' and side 'b' by a SAMPLE-level attribute (folded on
  * case and whitespace in both the data and the values, the one fold every clinical predicate
- * uses), restricted to patients with at least one sample on each side.
+ * uses), restricted to patients with at least one sample on each side. Both sides are the cohort's
+ * own samples: a cohort is a set of samples, so a pair is two samples of one patient that are both in it.
  */
 function pairedSidesCtes(cohortSql: string, study: string, db: string, by: PairBy): string {
   const fold = (x: string) => clinicalValueFoldSql(x);
@@ -48,7 +50,7 @@ function pairedSidesCtes(cohortSql: string, study: string, db: string, by: PairB
     "         multiIf(" + fold("attribute_value") + " IN (" + lit(by.a) + "), 'a', " + fold("attribute_value") + " IN (" + lit(by.b) + "), 'b', '') AS side\n" +
     "  FROM " + clinicalTable(db, [by.attribute]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(by.attribute) + "\n" +
-    "    AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) + "\n" +
     "),\n" +
     "paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),\n" +
     "ps AS (SELECT suid, pid, side FROM sides WHERE side != '' AND pid IN (SELECT pid FROM paired))"

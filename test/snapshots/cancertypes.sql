@@ -1,14 +1,14 @@
 -- cohort all patients
 -- msk_impact_50k_2026
-SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid FROM snapshot_db.sample_derived
+SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
 
 -- view 0 cancertypes: cancertypes:all patients · msk_impact_50k_2026
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'),
 samp AS (
   SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 grp AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS g, any(attribute_value) AS label FROM snapshot_db.clinical_data_derived
@@ -52,11 +52,11 @@ SELECT g AS grp, gene, any(label) AS label, count() AS profiled,
 FROM uu GROUP BY grp, gene
 
 -- view 0 cancertypes: cancertypes:samples:all patients · msk_impact_50k_2026
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'),
 samp AS (
   SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 prof AS (
   SELECT sample_unique_id AS suid, groupUniqArray(alteration_type) AS types FROM snapshot_db.sample_to_gene_panel_derived

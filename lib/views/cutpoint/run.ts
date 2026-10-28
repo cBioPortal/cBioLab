@@ -176,8 +176,8 @@ export async function runCutpoint(view: CutpointView, ctx: ViewRun): Promise<Vie
       " (at most " + CUT_MAX_CANDIDATES + ", evenly spaced) — by the maximally selected standardized log-rank statistic (Lausen & Schumacher; R maxstat). " +
       "The corrected p is from " + permutations + " permutations of the marker over the patients (seed " + seed + "): the share whose own best cut does as well. High is " + attribute + " > " + Number(overall.cut.toPrecision(4)) +
       " (" + pct(1 - overall.lowShare) + " of patients). " +
-      (assay ? attribute + " (" + assay.entity + " of " + assay.profileType + ") is the value of the patient's first sample with one, by sample id; "
-        : attribute + " is the patient's value, or for a sample attribute the value of the patient's first sample by sample id; ") + noValue + " patients with a survival time and no numeric value are left out. " +
+      (assay ? attribute + " (" + assay.entity + " of " + assay.profileType + ") is the patient's value, or that of the patient's first cohort sample with one, by sample id; "
+        : attribute + " is the patient's value, or for a sample attribute the value of the patient's first cohort sample by sample id; ") + noValue + " patients with a survival time and no numeric value are left out. " +
       "The status '1:…' is an event, anything else censored; times from each study's own baseline" + (ctx.vStudies.length > 1 ? ", pooled across " + ctx.vStudies.length + " studies without harmonizing baselines or panels (a panel-dependent marker such as TMB is not comparable across panels)" : "") + ". " +
       (result.strata ? "Per " + stratifyBy + ": the largest " + CUT_MAX_STRATA + " values with at least " + minStratum + " patients each get their own scan and permutation test (same seed); " +
         result.strata.omitted.values + " other values (" + result.strata.omitted.patients + " patients) are not scanned. Each stratum's cut is as optimistic as the overall one. " : "") +

@@ -3,7 +3,8 @@
   "cohorts": {
     "melanoma on checkpoint blockade": {
       "count": 212,
-      "text": "all patients in the study — across 3 studies",
+      "samples": 212,
+      "text": "all samples in the study — across 3 studies",
       "studies": [
         "skcm_dfci_2015",
         "skcm_mskcc_2014",
@@ -353,7 +354,7 @@
         "skcm_mskcc_2014",
         "mel_ucla_2016"
       ],
-      "caveat": "A locus is homozygous when its two alleles match at the protein level (2 fields, e.g. A*02:01); homozygosity is counted over patients typed at all three class I loci (HLA-A, -B, -C). melanoma on checkpoint blockade: 212 patients fully typed of 212 patients, 22.2% homozygous at ≥1 locus; HLA LOH in 0 patients of 0 with a call (—). HLA LOH is any of HLA_A1_LOH/HLA_A2_LOH/HLA_B1_LOH/HLA_B2_LOH/HLA_C1_LOH/HLA_C2_LOH/HLA_LOH = Loss/Yes/LOH/True in any of the patient's samples; a patient with no call in any sample is left out of that split, and a homozygous locus cannot show LOH (LOHHLA calls only heterozygous loci), so the LOH split is not independent of the genotype. OS is as each study records it, from its own origin, which is a checkpoint-blockade start only in a study of treated patients that measures from it (the melanoma immunotherapy studies do; MSK-IMPACT measures from diagnosis or sequencing). Chowell et al. report worse survival with homozygosity in patients treated with checkpoint blockade, so in a cohort not restricted to them this reads prognosis, not response. Hazard ratios are Cox (Efron ties), exposed against not, stratified by study, with the log-rank test stratified the same way; no covariates: the HR is unadjusted, and tumour mutational burden and cancer type are known to confound it. HLA supertypes and evolutionary divergence (HED) are not computed. Pooled across 3 studies whose typing methods and resolutions differ. Computed from per-patient rows inside each patient-level study."
+      "caveat": "A locus is homozygous when its two alleles match at the protein level (2 fields, e.g. A*02:01); homozygosity is counted over patients typed at all three class I loci (HLA-A, -B, -C). melanoma on checkpoint blockade: 212 patients fully typed of 212 patients, 22.2% homozygous at ≥1 locus; HLA LOH in 0 patients of 0 with a call (—). HLA LOH is any of HLA_A1_LOH/HLA_A2_LOH/HLA_B1_LOH/HLA_B2_LOH/HLA_C1_LOH/HLA_C2_LOH/HLA_LOH = Loss/Yes/LOH/True in any of the patient's samples in the cohort; a patient with no call in any of them is left out of that split, and a homozygous locus cannot show LOH (LOHHLA calls only heterozygous loci), so the LOH split is not independent of the genotype. OS is as each study records it, from its own origin, which is a checkpoint-blockade start only in a study of treated patients that measures from it (the melanoma immunotherapy studies do; MSK-IMPACT measures from diagnosis or sequencing). Chowell et al. report worse survival with homozygosity in patients treated with checkpoint blockade, so in a cohort not restricted to them this reads prognosis, not response. Hazard ratios are Cox (Efron ties), exposed against not, stratified by study, with the log-rank test stratified the same way; no covariates: the HR is unadjusted, and tumour mutational burden and cancer type are known to confound it. HLA supertypes and evolutionary divergence (HED) are not computed. Pooled across 3 studies whose typing methods and resolutions differ. Computed from per-patient rows inside each patient-level study."
     }
   ]
 }

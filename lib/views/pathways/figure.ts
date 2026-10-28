@@ -62,7 +62,7 @@ export function pathwaysSvg(v: DrawnResultOf<"pathways">, o: SvgOpts): string {
 
   const out: string[] = [];
   out.push(label(PAD, 12, "pathway", { size: FS.small, fill: p.muted, maxW: nameW }));
-  out.push(label(BAR_X, 12, "patients with ≥1 member " + (res.measure === "driver" ? "driver" : "altered"),
+  out.push(label(BAR_X, 12, "samples with ≥1 member " + (res.measure === "driver" ? "driver" : "altered"),
     { size: FS.small, fill: p.muted, maxW: TILE_X - BAR_X - 8 }));
   out.push(label(TILE_X, 12, "most-altered members (% per cohort" + (k === 2 ? ", ★ q < 0.05" : "") + ")",
     { size: FS.small, fill: p.muted, maxW: room }));

@@ -11,7 +11,7 @@
 // Note what this type does NOT have: members(). A remote peer is aggregate-only
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
-import type { CohortDef, ExploreResult } from "./types.ts";
+import type { CohortDef, CohortSizes, ExploreResult } from "./types.ts";
 import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
 import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers } from "./plot.ts";
 import type { Moments } from "./stats.ts";
@@ -29,7 +29,8 @@ import { cohortSubquery, type CohortSql } from "./sql-kinds.ts";
 import { setting } from "./settings.ts";
 
 interface RemoteAggregates {
-  study: string; instance: string; count: number;
+  /** `count` is the cohort's patients; `samples` its samples (absent from a peer on older code) */
+  study: string; instance: string; count: number; samples?: number;
   geneCounts: GeneCounts[]; survivalCounts: SurvivalCount[]; survivalEndpoints?: string[] | null; pairCounts: PairCounts[]; attributeStats: AttrStats[]; pairMoments: PairMoments[]; variantCounts: VariantReport; lollipopCounts?: LollipopReport; profileMoments: ProfileMoments[];
   timelineSpan?: TimelineSpan[] | null; eventCourse?: CourseCount[] | null;
   treatmentSequence?: SequenceFlow[] | null;
@@ -261,10 +262,16 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
       throw new Error("this cohort contains an explicit sample or patient list, which is not sent to remote peer " + this.instance.label);
   }
   async count(def: CohortDef | null | undefined): Promise<number> {
+    return (await this.sizes(def)).patients;
+  }
+  async sizes(def: CohortDef | null | undefined): Promise<CohortSizes> {
     this.guard(def);
     const r = await this.call("federated_aggregates", { study: this.study, cohort: def || {} });
     this.remember(r);
-    return r.count;
+    // a peer on an older build counts a cohort as patients only; refuse by name rather than guess its samples
+    if (typeof r.samples !== "number")
+      throw new Error("peer " + this.study + " does not report a cohort's samples (it predates cohorts of samples); update that instance");
+    return { patients: r.count, samples: r.samples };
   }
   async geneCounts(def: CohortDef | null | undefined, genes: string[]): Promise<GeneCounts[]> {
     this.guard(def);
@@ -369,7 +376,7 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
     return this.plotOp("highlightBox", def, spec, { highlight, kinds: { xk, yk } });
   }
 
-  async attributeQuantile(def: CohortDef | null | undefined, _attribute: string, _per: "patient" | "sample", _p: number): Promise<number | null> {
+  async attributeQuantile(def: CohortDef | null | undefined, _attribute: string, _p: number): Promise<number | null> {
     this.guard(def);
     throw new Error("a percentile-based cutoff is not supported against " + this.study + " yet: it is served by a remote peer, " +
       "and this needs its own MCP method rather than guessing at one");

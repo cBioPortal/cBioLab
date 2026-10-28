@@ -3,14 +3,16 @@
   "cohorts": {
     "MSI-H": {
       "count": 28,
-      "text": "MSI_STATUS in [MSI-H] (any sample)",
+      "samples": 28,
+      "text": "MSI_STATUS in [MSI-H]",
       "studies": [
         "ucec_msk_2018"
       ]
     },
     "MSS": {
       "count": 148,
-      "text": "MSI_STATUS in [MSS] (any sample)",
+      "samples": 154,
+      "text": "MSI_STATUS in [MSS]",
       "studies": [
         "ucec_msk_2018"
       ]

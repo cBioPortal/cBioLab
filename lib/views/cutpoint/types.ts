@@ -4,9 +4,9 @@ import type { KmCurve } from "../../types.ts";
 export interface CutpointView {
   note?: string;
   kind: "cutpoint"; cohorts?: string[];
-  /** the numeric marker (default TMB_NONSYNONYMOUS): the patient's value, or a sample attribute's value on the patient's first sample */
+  /** the numeric marker (default TMB_NONSYNONYMOUS): the patient's value, or a sample attribute's value on the patient's first cohort sample */
   attribute?: string;
-  /** a generic-assay entity as the marker instead (a signature, an immune score): the value of the patient's first sample with one */
+  /** a generic-assay entity as the marker instead (a signature, an immune score): the patient's value, or that of the patient's first cohort sample with one */
   assay?: { profileType: string; entity: string };
   endpoint?: string; monthsAttribute?: string; statusAttribute?: string;
   /** permutations of the marker for the corrected p (default 1000, 100 to 5000), and their seed (default 1) */

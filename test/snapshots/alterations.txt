@@ -1,7 +1,7 @@
 Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- Prostate: 3,211 patients — CANCER_TYPE in [Prostate Cancer] (any sample)
+- Prostate: 3,211 patients — CANCER_TYPE in [Prostate Cancer]
 
 Patient alterations — patients to choose from: 3,211; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	patient	source	samples	mutations	cna	sv

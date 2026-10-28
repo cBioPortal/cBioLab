@@ -1,6 +1,7 @@
 // The acquired view's SQL: what its runner (run.ts) asks each participant's database for.
 import { sideCountsTail } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
+import { inCohortPatients, inCohortSamples } from "../../cohort2.ts";
 import { foldedEqualsSql, foldedInSql } from "../../event-names.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
@@ -39,7 +40,7 @@ export interface AcquiredSides {
 }
 
 /**
- * The cohort's patients with a dated sample on each side of a treatment start, as a `ps` CTE (one
+ * The cohort's patients with a dated sample of the cohort on each side of a treatment start, as a `ps` CTE (one
  * sample per side: 'a' the last on or before the anchor, 'b' the first at least minGapDays after;
  * ties on a day broken by sample id, so the pick is deterministic). A sample's day is the first
  * timeline event of the given types naming it, matched to the study's samples by stable id.
@@ -58,7 +59,7 @@ function acquiredSidesCtes(cohortSql: string, study: string, db: string, o: Acqu
     "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", a.eventType) + "\n" +
     (a.key ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE " +
       foldedEqualsSql("key", a.key) + " AND " + foldedEqualsSql("value", String(a.value ?? "")) + ")\n" : "") +
-    "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients("p.stable_id") + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "tl AS (\n" +
@@ -68,13 +69,15 @@ function acquiredSidesCtes(cohortSql: string, study: string, db: string, o: Acqu
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "  JOIN " + db + ".clinical_event_data d ON d.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("d.key", o.sampleKey) + "\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedInSql("ce.event_type", o.sampleEvents) + "\n" +
-    "    AND p.stable_id IN (SELECT pid FROM anch)\n" +
+    "    AND " + inCohortPatients("p.stable_id", "anch") + "\n" +
     "  GROUP BY pid, sample\n" +
     "),\n" +
     "dated AS (\n" +
     "  SELECT tl.pid AS pid, sd.sample_unique_id AS suid, tl.day - anch.day AS rel\n" +
     "  FROM tl INNER JOIN anch ON anch.pid = tl.pid\n" +
     "  INNER JOIN " + db + ".sample_derived sd ON sd.cancer_study_identifier = " + sq(study) + " AND sd.sample_stable_id = tl.sample AND sd.patient_stable_id = tl.pid\n" +
+    // only the cohort's own samples can be a side: a cohort of primaries pairs no metastasis
+    "  WHERE " + inCohortSamples("sd.sample_stable_id") + "\n" +
     "),\n" +
     "pick AS (\n" +
     "  SELECT pid, countIf(" + preCond + ") AS n_pre, countIf(" + postCond + ") AS n_post,\n" +
