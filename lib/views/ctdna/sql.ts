@@ -1,6 +1,6 @@
 // The ctdna view's SQL: what its runner (run.ts) asks each participant's database for.
+import { survivalMonthsSql, survivalEventSql } from "../../survival-sql.ts";
 import { sideCountsTail, pidOf } from "../../federation-views.ts";
-import { finiteSql } from "../../sql-number.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { sq } from "../../compiler.ts";
 import { clinicalValueFoldSql, foldedEqualsSql, foldedInSql } from "../../event-names.ts";
@@ -46,8 +46,8 @@ export function ctdnaSurvivalSql(cohortSql: string, study: string, db: string, o
     ctdnaSidesCtes(cohortSql, study, db, o) + ",\n" +
     ctdnaDetectedCte(study, db, pin, measure, chKeep(o, "s.side")) + ",\n" +
     "os AS (\n" +
-    "  SELECT " + pid + " AS pid, " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
-    "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead, " + pid + " IN (SELECT pid FROM det) AS detected\n" +
+    "  SELECT " + pid + " AS pid, " + survivalMonthsSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')", "anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS months,\n" +
+    "         " + survivalEventSql("anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS dead, " + pid + " IN (SELECT pid FROM det) AS detected\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
     "    AND " + pid + " IN (SELECT pid FROM sides WHERE side = 'b')\n" +

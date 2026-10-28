@@ -29,7 +29,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid,
-         if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), NULL) AS months,
+         if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status,
          cityHash64(concat('cohort-lab-split-v1:msk_chord_2024:', replaceOne(patient_unique_id, 'msk_chord_2024_', ''))) % 2 AS half
   FROM snapshot_db.clinical_data_derived
@@ -65,7 +65,7 @@ anch AS (
     AND p.stable_id IN (SELECT pid FROM cohort)
   GROUP BY pid
 )
-SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes, anch.hit AS anchored, round(anch.day / 30.4375, 4) AS anchor_months
+SELECT os.months AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), NULL) = 1, 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes, anch.hit AS anchored, round(anch.day / 30.4375, 4) AS anchor_months
 FROM os
   LEFT JOIN panels ON panels.pid = os.pid
   LEFT JOIN mut ON mut.pid = os.pid

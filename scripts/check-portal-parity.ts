@@ -443,6 +443,37 @@ for (const [st, gene] of [["msk_chord_2024", "RTEL1-TNFRSF6B"], ["nsclc_ctdx_msk
     agree: !!ex.mutatedGenes?.length && !wrong.length });
 }
 
+// 11. who enters a survival curve: the portal's frontend (getPatientSurvivals) keeps a patient only
+// with both a status and a months value, neither a missing marker, months a number of at least 0,
+// and reads "1:<label>" as the event. Restated here from the portal's own patient data, not from
+// lib/survival-sql.ts. hgsoc_tcga_gdc has one patient with months but no status; aml_ohsu_2022 many.
+{
+  const NULLS = new Set(["[not applicable]", "[not available]", "[pending]", "[discrepancy]", "[completed]", "[null]", "", "na"]);
+  const missing = (v: string | undefined) => v === undefined || NULLS.has(v.trim().toLowerCase());
+  for (const st of ["hgsoc_tcga_gdc", "aml_ohsu_2022"]) {
+    const rows = await api<{ patientId: string; clinicalAttributeId: string; value: string }[]>(
+      "/studies/" + st + "/clinical-data?clinicalDataType=PATIENT&projection=SUMMARY&pageSize=10000000");
+    const byPatient = new Map<string, Record<string, string>>();
+    for (const r of rows) if (r.clinicalAttributeId === "OS_MONTHS" || r.clinicalAttributeId === "OS_STATUS")
+      byPatient.set(r.patientId, { ...byPatient.get(r.patientId), [r.clinicalAttributeId]: r.value });
+    // the portal's survival charts draw the patients owning a selected sample; its patient data also holds patients with none
+    const withSample = new Set((await api<{ patientId: string }[]>("/studies/" + st + "/samples?pageSize=10000000")).map((x) => x.patientId));
+    let n = 0, events = 0;
+    for (const [p, v] of byPatient) {
+      if (!withSample.has(p)) continue;
+      if (missing(v.OS_STATUS) || missing(v.OS_MONTHS) || Number.isNaN(Number(v.OS_MONTHS)) || Number(v.OS_MONTHS) < 0) continue;
+      n++;
+      const parts = v.OS_STATUS.split(":").map((t) => t.trim());
+      if (parts.length === 2 && parts[0] === "1") events++;
+    }
+    const resolver = await resolverFor(st, { oncokbPin: await oncokbPin(), ...(await studyProfiles(st)) });
+    const ours = await resolver.survivalCounts(null, "OS");
+    const oursN = ours.reduce((a, r) => a + r.n, 0), oursEv = ours.reduce((a, r) => a + r.event * r.n, 0);
+    record({ study: st, group: "survival", what: "patients in the OS curve", ours: String(oursN), portal: String(n), agree: oursN === n });
+    record({ study: st, group: "survival", what: "deaths in the OS curve", ours: String(oursEv), portal: String(events), agree: oursEv === events });
+  }
+}
+
 // 8. uncalled mutations are not alterations
 {
   const study = "glioma_msk_2018", { profiles } = await studyProfiles(study);

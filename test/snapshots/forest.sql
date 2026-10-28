@@ -9,7 +9,7 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'),
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid,
-         if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), NULL) AS months,
+         if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type='patient'
@@ -49,7 +49,7 @@ SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS id, attribut
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
 )
-SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, c0.v AS c0, c1.v AS c1
+SELECT os.months AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), NULL) = 1, 1, 0) AS ev, c0.v AS c0, c1.v AS c1
 FROM os
   INNER JOIN c0 ON c0.id = os.pid
   INNER JOIN c1 ON c1.id = os.pid
@@ -61,7 +61,7 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'),
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid,
-         if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), NULL) AS months,
+         if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type='patient'
@@ -103,7 +103,7 @@ SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS id, attribut
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
 )
-SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, c0.v AS c0, c1.v AS c1
+SELECT os.months AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), NULL) = 1, 1, 0) AS ev, c0.v AS c0, c1.v AS c1
 FROM os
   INNER JOIN c0 ON c0.id = os.pid
   INNER JOIN c1 ON c1.id = os.pid

@@ -47,7 +47,7 @@ loh AS (
 ),
 os AS (
   SELECT replaceOne(patient_unique_id, 'mel_ucla_2016_', '') AS pid,
-         if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')), NULL) AS months,
+         if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'mel_ucla_2016' AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
@@ -55,7 +55,7 @@ os AS (
   GROUP BY pid
 )
 SELECT hom.hA AS hA, hom.hB AS hB, hom.hC AS hC, hom.nf AS nf, loh.loss AS loss,
-       if(os.months >= 0, os.months, NULL) AS m, if(os.status LIKE '1%', 1, 0) AS ev
+       if(os.months >= 0, os.months, NULL) AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), NULL) = 1, 1, 0) AS ev
 FROM (SELECT DISTINCT pid FROM cohort) c LEFT JOIN hom ON hom.pid = c.pid LEFT JOIN loh ON loh.pid = c.pid LEFT JOIN os ON os.pid = c.pid
 
 -- view 0 hla: hla:rows:melanoma on checkpoint blockade · skcm_dfci_2015
@@ -88,7 +88,7 @@ loh AS (
 ),
 os AS (
   SELECT replaceOne(patient_unique_id, 'skcm_dfci_2015_', '') AS pid,
-         if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')), NULL) AS months,
+         if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'skcm_dfci_2015' AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
@@ -96,7 +96,7 @@ os AS (
   GROUP BY pid
 )
 SELECT hom.hA AS hA, hom.hB AS hB, hom.hC AS hC, hom.nf AS nf, loh.loss AS loss,
-       if(os.months >= 0, os.months, NULL) AS m, if(os.status LIKE '1%', 1, 0) AS ev
+       if(os.months >= 0, os.months, NULL) AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), NULL) = 1, 1, 0) AS ev
 FROM (SELECT DISTINCT pid FROM cohort) c LEFT JOIN hom ON hom.pid = c.pid LEFT JOIN loh ON loh.pid = c.pid LEFT JOIN os ON os.pid = c.pid
 
 -- view 0 hla: hla:rows:melanoma on checkpoint blockade · skcm_mskcc_2014
@@ -129,7 +129,7 @@ loh AS (
 ),
 os AS (
   SELECT replaceOne(patient_unique_id, 'skcm_mskcc_2014_', '') AS pid,
-         if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')), NULL) AS months,
+         if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'skcm_mskcc_2014' AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
@@ -137,5 +137,5 @@ os AS (
   GROUP BY pid
 )
 SELECT hom.hA AS hA, hom.hB AS hB, hom.hC AS hC, hom.nf AS nf, loh.loss AS loss,
-       if(os.months >= 0, os.months, NULL) AS m, if(os.status LIKE '1%', 1, 0) AS ev
+       if(os.months >= 0, os.months, NULL) AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), NULL) = 1, 1, 0) AS ev
 FROM (SELECT DISTINCT pid FROM cohort) c LEFT JOIN hom ON hom.pid = c.pid LEFT JOIN loh ON loh.pid = c.pid LEFT JOIN os ON os.pid = c.pid

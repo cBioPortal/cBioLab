@@ -9,7 +9,7 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'),
 os AS (
   SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid,
-         if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), NULL) AS months,
+         if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020' AND type='patient'
@@ -48,7 +48,7 @@ LEFT JOIN (
 WHERE sd.cancer_study_identifier = 'crc_apc_impact_2020' AND replaceOne(sd.sample_unique_id, 'crc_apc_impact_2020_', '') IN (SELECT sid FROM cohort)
 GROUP BY alt_case)
 )
-SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, c0.v AS c0
+SELECT os.months AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), NULL) = 1, 1, 0) AS ev, c0.v AS c0
 FROM os
   INNER JOIN c0 ON c0.id = os.pid
 WHERE os.months IS NOT NULL
@@ -59,7 +59,7 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'),
 os AS (
   SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid,
-         if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), NULL) AS months,
+         if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020' AND type='patient'
@@ -100,7 +100,7 @@ WHERE sd.cancer_study_identifier = 'crc_apc_impact_2020' AND replaceOne(sd.sampl
 GROUP BY alt_case)
 ) WHERE v != 'Not profiled'
 )
-SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, c0.v AS c0
+SELECT os.months AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), NULL) = 1, 1, 0) AS ev, c0.v AS c0
 FROM os
   INNER JOIN c0 ON c0.id = os.pid
 WHERE os.months IS NOT NULL

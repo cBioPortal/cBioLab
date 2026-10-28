@@ -18,6 +18,10 @@ shortcut that gives a plausible wrong number), the trap is named.
   a view over several says so.
 - **Survival endpoint** — a pair `<X>_MONTHS` / `<X>_STATUS` (overall survival is `OS_*`). A study
   with no such pair cannot fit survival or Cox (`noSurvivalWhy` in `app/lab/use-view-options.ts`).
+  A patient enters a survival analysis only with both a status and a months value (neither a missing
+  marker such as `NA` or `[Not Available]`) and months at least 0, as on cBioPortal: months with no
+  status is left out, never censored. The event is a status coded 1 (`1:DECEASED`, or a bare `1`).
+  One rule for every view: `lib/survival-sql.ts`.
 - **Molecular profile** — one kind of measurement for a study: mutations, copy number (CNA),
   structural variants (SV), mRNA expression (and its z-scores), protein, methylation, or a
   **generic assay** (mutational signatures, arm-level copy number, cell-type fractions: any per-case
