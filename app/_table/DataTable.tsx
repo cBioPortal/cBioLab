@@ -248,8 +248,8 @@ function FilterMenu({ col, current, vi, docJson, table, onApply }: {
       <span className="meta">or pick values{list ? " — " + list.values.length.toLocaleString() + (list.truncated ? "+ (the most frequent)" : "") + " in the rows kept" : ""}</span>
       {list && list.values.length > 8 && <Input type="search" className={FIELD} value={find} placeholder="find a value" onChange={(e) => setFind(e.target.value)} aria-label="find a value" />}
       <div className="row">
-        <Button type="button" variant="link" size="inline" disabled={!list} title={list ? undefined : "waiting for the column's values"} onClick={() => { setPicked(null); setText(""); }}>all</Button>
-        <Button type="button" variant="link" size="inline" disabled={!list} title={list ? undefined : "waiting for the column's values"} onClick={() => { setPicked(new Set()); setText(""); }}>none</Button>
+        <Button type="button" variant="link" size="inline" disabled={!list} data-tip={list ? undefined : "waiting for the column's values"} onClick={() => { setPicked(null); setText(""); }}>all</Button>
+        <Button type="button" variant="link" size="inline" disabled={!list} data-tip={list ? undefined : "waiting for the column's values"} onClick={() => { setPicked(new Set()); setText(""); }}>none</Button>
       </div>
       <div className="dt-values">
         {!list && <ValuesState s={vals} what="values" />}
@@ -414,7 +414,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
         <span className="dt-anchor">
           <Button type="button" variant="outline" size="sm" className={cn(TB, "aria-expanded:border-primary aria-expanded:bg-accent aria-expanded:text-accent-foreground")}
             aria-expanded={menu === "\x01columns"} onClick={() => setMenu(menu === "\x01columns" ? null : "\x01columns")}
-            title="choose the columns shown"><Columns3 />columns ({shownIdx.length}/{t.columns.length})</Button>
+            data-tip="choose the columns shown"><Columns3 />columns ({shownIdx.length}/{t.columns.length})</Button>
           <Popover open={menu === "\x01columns"} onClose={() => setMenu(null)} align="right">
             <ColumnsMenu columns={t.columns} shown={shownIds} onShown={(ids) => set({ columns: ids }, true)} />
           </Popover>
@@ -422,7 +422,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
         <form method="post" action="/api/table" target="_blank" onSubmit={download}>
           <input type="hidden" name="payload" />
           <Button variant="outline" size="sm" className={TB} type="submit" disabled={updating || !docJson || !t.total}
-            title={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download"
+            data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download"
               : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}><Download />download CSV ({t.total.toLocaleString()})</Button>
         </form>
       </div>
@@ -450,12 +450,12 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                 return (
                   <th key={c.id} className={c.numeric ? "num" : undefined} aria-sort={sorted ? (q.sort!.desc ? "descending" : "ascending") : "none"}>
                     <span className="dt-th">
-                      <button type="button" className="dt-sort" onClick={() => sortBy(c)} title="sort the whole table by this column, across every page">
+                      <button type="button" className="dt-sort" onClick={() => sortBy(c)} data-tip="sort the whole table by this column, across every page">
                         {c.name}{sorted ? (q.sort!.desc ? " ▾" : " ▴") : ""}
                       </button>
                       <span className="dt-anchor">
                         <button type="button" className={"dt-funnel" + (fon ? " on" : "")} aria-label={"filter " + c.name}
-                          title={fon ? "filtered: " + filterText(q.filters![c.id]) : "filter this column"} onClick={() => setMenu(menu === c.id ? null : c.id)}>
+                          data-tip={fon ? "filtered: " + filterText(q.filters![c.id]) : "filter this column"} onClick={() => setMenu(menu === c.id ? null : c.id)}>
                           <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M1 1.5h10L7.2 6.2V10L4.8 11V6.2z" fill="currentColor" /></svg>
                         </button>
                         <Popover open={menu === c.id} onClose={() => setMenu(null)} align={c.numeric ? "right" : "left"}>

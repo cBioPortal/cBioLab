@@ -55,17 +55,17 @@ export function PatientNav({ shown, position, total, updating, go, first, openLi
   return (
     <div className="viewtb tl-nav">
       <div className="tbz">
-        <Button type="button" variant="outline" size="sm" className={TB} disabled={updating || !pos?.prev} title={"the patient before this one in the list" + who(pos?.prev) + " — or press ←"}
+        <Button type="button" variant="outline" size="sm" className={TB} disabled={updating || !pos?.prev} data-tip={"the patient before this one in the list" + who(pos?.prev) + " — or press ←"}
           onClick={() => go(pos?.prev)}><ChevronLeft />prev</Button>
         <span className="tl-pos">
           {shown && pos ? <>patient <b>{(pos.index + 1).toLocaleString()}</b> of {total.toLocaleString()}</>
             : shown ? <>{shown} is not in the list as filtered</>
             : <>no patients</>}
         </span>
-        <Button type="button" variant="outline" size="sm" className={TB} disabled={updating || !pos?.next} title={"the patient after this one in the list" + who(pos?.next) + " — or press →"}
+        <Button type="button" variant="outline" size="sm" className={TB} disabled={updating || !pos?.next} data-tip={"the patient after this one in the list" + who(pos?.next) + " — or press →"}
           onClick={() => go(pos?.next)}>next<ChevronRight /></Button>
-        {shown && !pos && <Button type="button" variant="outline" size="sm" className={TB} disabled={updating || !total} onClick={first} title="show the list's first patient">go to the first patient</Button>}
-        <Button type="button" variant="outline" size="sm" className={TB} onClick={openList} title={"the cohort's patients: search, filter, sort, download, and click one to " + what}><List />List/Search</Button>
+        {shown && !pos && <Button type="button" variant="outline" size="sm" className={TB} disabled={updating || !total} onClick={first} data-tip="show the list's first patient">go to the first patient</Button>}
+        <Button type="button" variant="outline" size="sm" className={TB} onClick={openList} data-tip={"the cohort's patients: search, filter, sort, download, and click one to " + what}><List />List/Search</Button>
       </div>
     </div>
   );

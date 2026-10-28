@@ -141,7 +141,7 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       await page.goto(BASE + "/lab?tab=analysis", { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => window.cohortLab && window.cohortLab.call, null, { timeout: 120000 });
       await tool("analysis_load_example", { title: "Genomic status via OQL, compared" });
-      const wsBtn = page.locator("button[title*='save this analysis'], button[title*='” — ']").first();
+      const wsBtn = page.locator("button[data-tip*='save this analysis'], button[data-tip*='” — ']").first();
       await wsBtn.waitFor({ timeout: 120000 });
       for (let i = 0; i < 400 && await wsBtn.isDisabled(); i++) await page.waitForTimeout(300);
       await wsBtn.click();
@@ -149,7 +149,7 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       const startsEmpty = (await open("wsdialog").locator("input").first().inputValue()) === "" && await open("wsdialog").locator("button[type=submit]").isDisabled();
       await open("wsdialog").locator("input").first().fill("e2e workspace");
       await open("wsdialog").locator("button[type=submit]").click();
-      await page.waitForFunction(() => /saved \d{4}/.test(document.querySelector("button[title*='” — ']")?.title || ""), null, { timeout: 60000 }).catch(() => {});
+      await page.waitForFunction(() => /saved \d{4}/.test(document.querySelector("button[data-tip*='” — ']")?.dataset.tip || ""), null, { timeout: 60000 }).catch(() => {});
       await wsBtn.click();
       await open("wsdialog").waitFor();
       const reopened = (await open("wsdialog").locator("input").first().inputValue()) === "e2e workspace" && /saved \d{4}/.test(await open("wsdialog").locator(".meta").first().innerText());
@@ -191,7 +191,7 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       await page.waitForFunction(() => window.cohortLab && window.cohortLab.call, null, { timeout: 120000 });
       await tool("explore_select_studies", { studies: ["msk_chord_2024"] });
       // nothing uploaded yet, so Custom data opens on adding one
-      await page.locator('button[title^="upload your own annotations"]').click();
+      await page.locator('button[data-tip^="upload your own annotations"]').click();
       await page.locator("textarea.customdata-text").fill("PATIENT_ID\tGROUP\nP-0000012\tA\nP-0000015\tB\nNOT_A_PATIENT\tC\n");
       await page.locator("[role=dialog].customdatamanager button", { hasText: "Check ids" }).click();
       const said = await page.waitForFunction(() => {

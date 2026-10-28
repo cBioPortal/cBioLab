@@ -11,12 +11,12 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="how many fields of the allele name must match for a locus to count as homozygous">
+        <label className="tbfield" data-tip="how many fields of the allele name must match for a locus to count as homozygous">
           resolution <OptionSelect value={String(spec.resolution ?? 2)} disabled={busy} onValueChange={(v) => patch({ resolution: v === "full" ? "full" : v === "1" ? 1 : undefined })}>
             <option value="1">1 field (A*02)</option><option value="2">2 fields (A*02:01)</option><option value="full">full</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" title="a numeric attribute the adjusted hazard ratio adds (e.g. tumour mutational burden)">
+        <label className="tbfield" data-tip="a numeric attribute the adjusted hazard ratio adds (e.g. tumour mutational burden)">
           adjust for <OptionSelect value={cov} disabled={busy} onValueChange={(v) => patch({ covariates: v ? [v] : undefined })}>
             <option value="">(unadjusted)</option>
             {cov && !nums.includes(cov) && <option value={cov}>{cov}</option>}

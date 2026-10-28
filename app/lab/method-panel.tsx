@@ -100,7 +100,7 @@ export function MethodPanel({ method, source }: { method: MethodRecord; source?:
           <div className="provhead">
             <Button variant="outline" size="sm" className={TB} onClick={copy} disabled={!python}>{copied ? <Check /> : <Copy />}{copied ? "copied" : "copy"}</Button>
             {source && <Button variant="outline" size="sm" className={TB} onClick={download} disabled={nb.busy}
-              title="A Jupyter notebook with this script, the data it reads and a check against these numbers. Opens in JupyterLab, VS Code or Colab.">
+              data-tip="A Jupyter notebook with this script, the data it reads and a check against these numbers. Opens in JupyterLab, VS Code or Colab.">
               {nb.busy ? <LoaderCircle className="animate-spin" /> : <Download />}{nb.busy ? "building notebook…" : "download as notebook (.ipynb)"}</Button>}
             {nb.error && <span className="meta" role="alert">{nb.error}</span>}
           </div>

@@ -61,12 +61,12 @@ export function Participation({ p }: { p?: ViewParticipation }) {
   return (
     <span className="partwrap">
       <span className={"partbadge " + (p.requiresPatientLevel ? "pl" : "agg")}
-        title={methodTitle + "\n\n" + srcTitle}>
+        data-tip={methodTitle + "\n\n" + srcTitle}>
         <i aria-hidden="true" />{method}
       </span>
       {srcLabel && (
         <span className="partbadge src"
-          title={srcTitle + "\n\nNo patient identifier left " +
+          data-tip={srcTitle + "\n\nNo patient identifier left " +
             restricted.map(x => x.study).join(", ") + "."}>
           {srcLabel}
         </span>
@@ -88,7 +88,7 @@ function QueryField({ mode, value, shown, placeholder, max, title, description, 
   const [open, setOpen] = useState(false);
   return <>
     <button type="button" disabled={busy} aria-haspopup="dialog" aria-label={title + (shown ? ": " + shown : "")}
-      title={(shown || placeholder) + " — click to choose"}
+      data-tip={(shown || placeholder) + " — click to choose"}
       className={cn(FIELD, "flex min-w-0 items-center gap-1.5 rounded-md border border-input px-1.5 text-left shadow-xs outline-none",
         "hover:border-primary focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50", className)}
       onClick={() => setOpen(true)}
@@ -173,7 +173,7 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
   groups.push({ label: "Across genes", items: [{ value: "oql", label: "OQL query" }] });
   const dataPicker = loading && !catalog.length && !attrs.length ? <Waiting what="profiles" /> : (
     <Select value={data} onValueChange={choose} disabled={busy}>
-      <SelectTrigger size="sm" aria-label={side + " data"} title={current ? current.name : "what this axis measures"}
+      <SelectTrigger size="sm" aria-label={side + " data"} data-tip={current ? current.name : "what this axis measures"}
         className={cn("h-ctl gap-1 bg-card px-2 text-md data-[size=sm]:h-ctl [&_svg:not([class*='size-'])]:size-3.5 [&>span]:truncate", w)}>
         <SelectValue />
       </SelectTrigger>
@@ -184,7 +184,7 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
         {groups.map((g, gi) => (
           <SelectGroup key={g.label} className={cn(gi > 0 && "mt-1.5")}>
             <SelectLabel className="px-2 pt-1 pb-0.5 text-md font-semibold text-foreground">{g.label}</SelectLabel>
-            {g.items.map((i) => <SelectItem key={i.value} value={i.value} disabled={!!i.disabled} title={i.disabled || i.label} className="pl-6 text-md">{i.label}</SelectItem>)}
+            {g.items.map((i) => <SelectItem key={i.value} value={i.value} disabled={!!i.disabled} data-tip={i.disabled || i.label} className="pl-6 text-md">{i.label}</SelectItem>)}
           </SelectGroup>
         ))}
       </SelectContent>
@@ -286,7 +286,7 @@ export function SplitByNote({ v }: { v: any }) {
     bits.push(sb.overlapCount.toLocaleString() + " patient" + (sb.overlapCount === 1 ? "" : "s") +
       " counted toward more than one arm — split arms aren't a strict partition, so this can happen even outside “Other”");
   if (!bits.length) return null;
-  return <p className="viewnote" title={"split “" + sb.cohort + "” by " + label}>{bits.join(" · ")}</p>;
+  return <p className="viewnote" data-tip={"split “" + sb.cohort + "” by " + label}>{bits.join(" · ")}</p>;
 }
 
 /**
@@ -313,7 +313,7 @@ export function PickMenu({ label, title, options, chosen, onChange, min, max, bu
           const on = chosen.includes(o.value);
           const stuck = on ? (min != null && chosen.length <= min) : (max != null && chosen.length >= max);
           return (
-            <label key={o.value} className="flex cursor-pointer items-center gap-2 py-1 text-md" title={stuck ? (on ? "a view needs at least " + min : "at most " + max) : undefined}>
+            <label key={o.value} className="flex cursor-pointer items-center gap-2 py-1 text-md" data-tip={stuck ? (on ? "a view needs at least " + min : "at most " + max) : undefined}>
               <Checkbox checked={on} disabled={busy || stuck} onCheckedChange={() => toggle(o.value)} />
               <span>{o.label}{o.hint && <span className="meta"> — {o.hint}</span>}</span>
             </label>
@@ -378,7 +378,7 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, onAdd, menuId
     const kids = o.kind === "split" ? nodes.filter((x) => x.kind === "arm" && x.name.startsWith(o.name + " / ") && x.depth === o.depth + 1) : [];
     return (
       <div key={o.name} className={"cpick " + o.kind + (implied ? " implied" : "") + (on ? " on" : "")} style={{ paddingLeft: (0.5 + o.depth * 1.15) + "rem" }}>
-        <label title={o.blocked && !on ? o.blocked : last ? "a view draws at least one — tick another to switch" : full ? "this view draws at most " + max
+        <label data-tip={o.blocked && !on ? o.blocked : last ? "a view draws at least one — tick another to switch" : full ? "this view draws at most " + max
             : implied ? "drawn as part of the split — click to draw only this group"
             : replaces ? (mine ? "a view draws one split's groups or whole cohorts — this replaces what is ticked"
               : "a view draws whole cohorts or one split's groups — this replaces “" + current + "”") : o.name}>
@@ -395,7 +395,7 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, onAdd, menuId
         {o.kind === "split" && single ? <span />
           : o.kind === "split"
           ? <button type="button" className="cpick-open" aria-expanded={open.has(o.name)}
-              title={open.has(o.name) ? "hide its groups" : "pick single groups"}
+              data-tip={open.has(o.name) ? "hide its groups" : "pick single groups"}
               onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(o.name)) n.delete(o.name); else n.add(o.name); return n; })}>
               {open.has(o.name) ? "▾" : "▸"}
             </button>
@@ -413,7 +413,7 @@ export function CohortPicker({ nodes, chosen, max, busy, onChange, onAdd, menuId
         {single ? <p className="cpick-foot">This view draws one cohort — pick one, or one group of a split.</p>
           : splits.length > 0 && <p className="cpick-foot">A view draws whole cohorts, or the groups of one split — not both. Choosing one replaces the other.</p>}
         {onAdd && <Button type="button" variant="link" size="inline" className="mx-2.5 mt-1 self-start text-md" disabled={busy}
-          title="add a cohort from your library, or build one in Explore"
+          data-tip="add a cohort from your library, or build one in Explore"
           onClick={() => { close(); onAdd(); }}><Plus />add a cohort…</Button>}
       </>}
     </GearMenu>
@@ -438,7 +438,7 @@ export function DrawnCohorts({ drawn, nodes }: { drawn: string[]; nodes: CohortN
       <span className="vc-label">Showing</span>
       {owner && <span className="vc-split"><strong>{parent!.split(" / ").join(" › ")}</strong> by {owner.label}:</span>}
       {drawn.map((n, i) => (
-        <span key={n} className="vc-item" title={n}>{swatch(i)}
+        <span key={n} className="vc-item" data-tip={n}>{swatch(i)}
           {owner ? (byName.get(n)?.label ?? n.slice(owner.name.length + 3)) : <strong>{byName.get(n)?.label ?? n}</strong>}
         </span>
       ))}
@@ -457,7 +457,7 @@ export function CohortStudies({ ids, names }: { ids: string[]; names: Map<string
   const title = (more ? ids.length.toLocaleString() + " studies:\n" : "") +
     ids.map((id) => names.get(id) ? id + " — " + names.get(id) : id).join("\n");
   return (
-    <div className="cohortbox-studies meta" title={title}>
+    <div className="cohortbox-studies meta" data-tip={title}>
       <span className="cohortbox-study">{names.get(ids[0]) || ids[0]}</span>
       {more > 0 && <span className="cohortbox-more">+{more.toLocaleString()} more {more === 1 ? "study" : "studies"}</span>}
     </div>
@@ -485,7 +485,7 @@ export function AnalysisSources({ sources, names }: { sources?: AnalysisSource[]
           s.answeredAt ? "first answered " + new Date(s.answeredAt).toLocaleString() : null
         ].filter(Boolean).join(", ") : "this deployment's own database" + (s.build ? ", build " + s.build : "");
         return (
-          <span key={i} title={s.label + " — " + peer + "\n" + s.studies.map((x) => x.study + ": imported " + (x.imported || "unknown")).join("\n")}>
+          <span key={i} data-tip={s.label + " — " + peer + "\n" + s.studies.map((x) => x.study + ": imported " + (x.imported || "unknown")).join("\n")}>
             {i > 0 && " · "}<strong className="font-medium text-foreground">{s.label}</strong>
             {" "}({s.remote ? "via federation" + (s.reportedName && s.reportedName !== s.label ? ", calls itself “" + s.reportedName + "”" : "") : "local"}) — {studies(s)}
           </span>
@@ -605,27 +605,27 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
       wide={splitting} onOpenChange={(o) => { if (!o) setSplitting(false); }}>
       {(close) => <>
         {save && !splitting && <>
-          <MenuItem disabled={busy || saving} title={save.title}
+          <MenuItem disabled={busy || saving} data-tip={save.title}
             onClick={async () => { setSaving(true); try { await save.onSave(); close(); } finally { setSaving(false); } }}>
             <Save />{save.label}{saving && <span className="spinner ml-1.5" />}</MenuItem>
           <MenuSeparator />
         </>}
         {split && (splitting ? <>{split(() => { close(); setSplitting(false); })}<MenuSeparator /></> : <>
-          <MenuItem disabled={busy} title="divide this cohort into arms that never overlap and add up to it"
+          <MenuItem disabled={busy} data-tip="divide this cohort into arms that never overlap and add up to it"
             onClick={() => setSplitting(true)}><Split />{splitCount ? "split another way…" : "split into arms…"}</MenuItem>
           <MenuSeparator />
         </>)}
         {lock && !splitting && <>
           {lock.locked
-            ? <MenuItem disabled={busy} title="follow the definition again: patients who match it from now on join, and those who stop matching leave"
+            ? <MenuItem disabled={busy} data-tip="follow the definition again: patients who match it from now on join, and those who stop matching leave"
                 onClick={() => { close(); lock.onUnlock(); }}><LockOpen />unlock</MenuItem>
-            : <MenuItem disabled={busy || locking} title="freeze this cohort, and its split arms, to the patients it selects now, so it stays the same as patients are added to the data"
+            : <MenuItem disabled={busy || locking} data-tip="freeze this cohort, and its split arms, to the patients it selects now, so it stays the same as patients are added to the data"
                 onClick={async () => { setLocking(true); try { await lock.onLock(); close(); } finally { setLocking(false); } }}>
                 <Lock />lock to these patients{locking && <span className="spinner ml-1.5" />}</MenuItem>}
           <MenuSeparator />
         </>}
         {cells && onCells && !splitting && <>
-          <MenuItem disabled={busy} title={"open this cohort's patients' cells in Cell Explorer: " + cells.label}
+          <MenuItem disabled={busy} data-tip={"open this cohort's patients' cells in Cell Explorer: " + cells.label}
             onClick={() => { close(); void onCells(); }}><ExternalLink />open cells in Cell Explorer</MenuItem>
           <MenuSeparator />
         </>}
@@ -633,7 +633,7 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
           <MenuItem disabled={busy} onClick={() => { close(); onEdit(); }}><Pencil />edit…</MenuItem>
           <MenuSeparator />
         </>}
-        <MenuItem className="text-destructive hover:text-destructive" disabled={busy} title="remove it from the analysis and from every view that draws it"
+        <MenuItem className="text-destructive hover:text-destructive" disabled={busy} data-tip="remove it from the analysis and from every view that draws it"
           onClick={() => { close(); onRemove(); }}><Trash2 />remove from analysis</MenuItem>
       </>}
     </GearMenu>
@@ -645,13 +645,13 @@ export function CohortEditMenu({ busy, canEdit, onEdit, onRemove, split, splitCo
 function PreviewBadge({ kind }: { kind: unknown }) {
   const pending = previewPending(kind);
   if (!pending) return null;
-  return <Badge variant="outline" className="border-mark bg-mark-soft text-foreground" title={"Preview view: " + pending}>Preview</Badge>;
+  return <Badge variant="outline" className="border-mark bg-mark-soft text-foreground" data-tip={"Preview view: " + pending}>Preview</Badge>;
 }
 
 export function Latency({ v }: { v: any }) {
   if (v.ms == null) return null;
   return (
-    <span className="lat" title={
+    <span className="lat" data-tip={
       "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
       (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
       {v.ms.toLocaleString()}ms

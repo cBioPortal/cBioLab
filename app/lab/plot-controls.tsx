@@ -27,7 +27,7 @@ function LogToggle({ spec, side, numeric, busy, update }: { spec: any; side: "x"
   const axis = spec[side];
   if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular" && axis.source !== "assay" && axis.source !== "profile")) return null;
   return (
-    <label className="chk text-md text-foreground" title="draw this axis on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out">
+    <label className="chk text-md text-foreground" data-tip="draw this axis on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out">
       <Checkbox checked={!!axis.log} disabled={busy}
         onCheckedChange={(c) => update((vv) => {
           const a = { ...vv[side] };
@@ -60,7 +60,7 @@ function LayerCount({ n, all, busy, onCommit }: { n?: number; all?: string; busy
     if (draft && Number.isFinite(v) && v >= 1 && v <= POINT_RULE_N_MAX && v !== n) onCommit(v); else setDraft(n == null ? "" : String(n));
   };
   return <Input className={cn(FIELD, "h-6 w-12 px-1 text-sm")} value={draft} disabled={busy} inputMode="numeric" placeholder={all ? "all" : undefined}
-    aria-label="how many cases" title={"how many cases (1–" + POINT_RULE_N_MAX + ")" + (all ? "; empty for " + all : "")}
+    aria-label="how many cases" data-tip={"how many cases (1–" + POINT_RULE_N_MAX + ")" + (all ? "; empty for " + all : "")}
     onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ""))} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); }} />;
 }
 
@@ -98,18 +98,18 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
           : res?.of ? "The " + res.n.toLocaleString() + " most extreme of " + res.of.toLocaleString() + "." : null;
         return <div key={i} className="flex flex-col gap-0.5">
         <div className="plot-layer flex min-h-ctl items-center gap-1 rounded-sm border bg-card py-0.5 pr-0.5 pl-1.5 text-sm"
-          title={i ? "drawn under the layers above it: a case they share is theirs" : "drawn first: a case it shares with a later layer is its own"}>
+          data-tip={i ? "drawn under the layers above it: a case they share is theirs" : "drawn first: a case it shares with a later layer is its own"}>
           <span className="size-2.5 flex-none rounded-full" style={{ background: LAYER_COLORS[i] }} />
-          <span className="min-w-0 flex-1 truncate" title={"cohort" in l ? l.cohort : layerLabel(l, axisName)}>{"cohort" in l ? l.cohort : layerLabel(l, axisName)}</span>
+          <span className="min-w-0 flex-1 truncate" data-tip={"cohort" in l ? l.cohort : layerLabel(l, axisName)}>{"cohort" in l ? l.cohort : layerLabel(l, axisName)}</span>
           {"rule" in l && (l.rule !== "outliers" || plot?.shape === "box") && (
             <LayerCount n={l.rule === "outliers" ? l.n : l.n ?? POINT_RULE_N} busy={busy}
               all={l.rule === "outliers" ? "as many as the figure draws, shared between the groups" : undefined}
               onCommit={(n) => onChange(layers.map((x, j) => j !== i ? x : n == null ? { rule: "outliers" } : { ...x, n } as PointLayerSpec))} />
           )}
           {i > 0 && <Button type="button" variant="ghost" size="icon-xs" className="size-5 text-muted-foreground" disabled={busy}
-            aria-label="draw this layer before the one above it" title="draw this layer before the one above it" onClick={() => move(i)}><ArrowUp /></Button>}
+            aria-label="draw this layer before the one above it" data-tip="draw this layer before the one above it" onClick={() => move(i)}><ArrowUp /></Button>}
           <Button type="button" variant="ghost" size="icon-xs" className="size-5 text-muted-foreground" disabled={busy}
-            aria-label={"remove the layer " + ("cohort" in l ? l.cohort : layerLabel(l, axisName))} title="remove this layer"
+            aria-label={"remove the layer " + ("cohort" in l ? l.cohort : layerLabel(l, axisName))} data-tip="remove this layer"
             onClick={() => onChange(layers.filter((_, j) => j !== i))}><X /></Button>
         </div>
         {layerNote && <p className="plot-layer-why m-0 pl-1.5 text-sm text-muted-foreground">{layerNote}</p>}
@@ -159,7 +159,7 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
   const chip = (k: string, color: string, text: string) => {
     const shown = !hidden.includes(k);
     return <Button key={k} type="button" variant="outline" size="xs" className={cn(CHIP, "h-ctl gap-1.5", !shown && "text-muted-foreground line-through")} aria-pressed={shown}
-      title={shown ? "hide " + text + " (Esc shows everything)" : "show " + text} onClick={() => toggle(k)}>
+      data-tip={shown ? "hide " + text + " (Esc shows everything)" : "show " + text} onClick={() => toggle(k)}>
       <span className="size-2.5 flex-none rounded-full" style={{ background: color, opacity: shown ? 1 : 0.35 }} />{text}
     </Button>;
   };
@@ -194,7 +194,7 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
           </AxisBlock>
           {/* a box drawn as the document says has nothing to swap: its categories are already across */}
           <Button variant="link" size="inline" className="plot-swap self-center text-md" disabled={busy || boxDrawn}
-            title={boxDrawn ? "a box plot is always drawn by category across, which this one already is — nothing to swap"
+            data-tip={boxDrawn ? "a box plot is always drawn by category across, which this one already is — nothing to swap"
               : "put the horizontal axis's definition on the vertical axis, and the vertical one's on the horizontal"}
             onClick={() => update((vv) => ({ ...vv, x: vv.y, y: vv.x }))}><ArrowUp />Swap axes<ArrowDown /></Button>
           <AxisBlock title="Vertical axis">
@@ -213,9 +213,9 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
                 <span className="axfield-name text-sm font-semibold text-foreground">Draw each {unit} as</span>
                 <div className="plot-drawas flex" role="group" aria-label={"draw each " + unit + " as"}>
                   <Button type="button" variant="outline" size="sm" className={SEG} aria-pressed={asPoints} disabled={busy || !!pointsWhy}
-                    title={"every " + unit + " as a point, up to " + CAP} onClick={() => drawAs(true)}>Points</Button>
+                    data-tip={"every " + unit + " as a point, up to " + CAP} onClick={() => drawAs(true)}>Points</Button>
                   <Button type="button" variant="outline" size="sm" className={SEG} aria-pressed={!asPoints} disabled={busy}
-                    title="a shaded density per group or grid cell, the highlights below drawn over it" onClick={() => drawAs(false)}>Density</Button>
+                    data-tip="a shaded density per group or grid cell, the highlights below drawn over it" onClick={() => drawAs(false)}>Density</Button>
                 </div>
                 {pointsWhy && <p className="plot-drawas-why m-0 text-sm text-muted-foreground">{pointsWhy}</p>}
               </div>
@@ -223,7 +223,7 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
             {plot?.shape !== "table" && (
               <div className="axfield flex flex-col gap-1">
                 <span className="axfield-name text-sm font-semibold text-foreground"
-                  title="Highlight groups of cases as coloured points over the plot. A case in more than one layer takes the colour of the first.">Highlight</span>
+                  data-tip="Highlight groups of cases as coloured points over the plot. A case in more than one layer takes the colour of the first.">Highlight</span>
                 <PointLayers layers={layers} plot={plot} cohortOptions={cohortOptions} axisName={axisName} busy={busy}
                   onChange={(next) => update((vv) => ({ ...vv, points: next }))} />
               </div>
@@ -238,7 +238,7 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
               have no per-case colour, so the controls appear only with a box on screen */}
           {(plot?.shape === "box" || drawn.length > 0) && <div className="viewtb mt-0 mb-2.5">
             {plot?.shape === "box" && <><div className="tbz">
-              <span className="tbl" title="colours each group's violin and points by a category">colour samples by</span>
+              <span className="tbl" data-tip="colours each group's violin and points by a category">colour samples by</span>
               <AxisPicker side="fill" axis={spec.colorBy} allowNone categorical attrs={attrs} catalog={catalog} loading={loading} busy={busy}
                 onChange={(a) => update((vv) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
             </div>
@@ -247,7 +247,7 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
                 onChange={(a) => update((vv) => { const n = { ...vv }; if (a) n.ringBy = a; else delete n.ringBy; return n; })} />
             </div></>}
             {drawn.length > 0 && <div className="tbz plot-solo">
-              <span className="tbl" title="this browser only: hide or show the plotted cases and each layer; Esc shows everything">show</span>
+              <span className="tbl" data-tip="this browser only: hide or show the plotted cases and each layer; Esc shows everything">show</span>
               {chip("base", LAYER_BASE, "all " + unit + "s (" + plot!.n.toLocaleString() + ")")}
               {drawn.map((l) => chip(String(l.i), l.color, l.label + " (" + l.n.toLocaleString() + ")"))}
             </div>}

@@ -11,7 +11,7 @@ function CooccurrenceCard({ ctx, v, vi }: CardProps) {
   return <>
     {v.kind === "cooccurrence" && v.pairs && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi), 1)} sub="pairwise, among patients profiled for both genes" {...placement(ctx, vi)}
-        actions={<Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>} />
+        actions={<Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} data-tip="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>} />
       {v.note && <p className="note">{v.note}</p>}
       <div className="vscroll">
         <table className="vtable">
@@ -31,7 +31,7 @@ function CooccurrenceCard({ ctx, v, vi }: CardProps) {
             const pShown = r.pStratified ?? r.p;
             return (
             <tr key={r.a + "|" + r.b} className="ruled"
-              title={"profiled for both: " + r.profiled.toLocaleString() +
+              data-tip={"profiled for both: " + r.profiled.toLocaleString() +
                 (r.pStratified != null ? "  ·  stratified over " + r.strata + " studies (CMH); pooled Fisher p=" + r.p.toExponential(1) : "")}>
               <td className="bold">{r.a} / {r.b}</td>
               <td className="r tnum">{r.both.toLocaleString()}</td>

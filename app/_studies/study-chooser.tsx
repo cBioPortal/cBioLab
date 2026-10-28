@@ -82,7 +82,7 @@ export function StudyChooser({ studies, loading, error, onRetry, selected, onCha
             const tooMany = addAllLimit != null && new Set([...selected, ...ids]).size > addAllLimit;
             return (
               <Button key={label} variant="outline" size="xs" className={CHIP} disabled={!ids.length || tooMany}
-                title={tooMany ? "this would select more than " + addAllLimit + " studies" : why}
+                data-tip={tooMany ? "this would select more than " + addAllLimit + " studies" : why}
                 onClick={() => union(ids)}>{label} ({ids.length})</Button>
             );
           })}

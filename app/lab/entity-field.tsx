@@ -51,7 +51,7 @@ export function EntityField({ study, profile, value, busy, className, side, plac
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setQ(""); setAsked(""); } }}>
       <PopoverTrigger asChild>
-        <button type="button" disabled={busy} aria-label={side + " entity"} title={(value ? shown + (shown !== value ? " (" + value + ")" : "") : "choose what this axis reads") + " — click to search"}
+        <button type="button" disabled={busy} aria-label={side + " entity"} data-tip={(value ? shown + (shown !== value ? " (" + value + ")" : "") : "choose what this axis reads") + " — click to search"}
           className={cn(FIELD, "flex min-w-0 items-center gap-1.5 rounded-md border border-input px-1.5 text-left shadow-xs outline-none",
             "hover:border-primary focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50", className)}>
           <span className={cn("min-w-0 flex-1 truncate", !value && "text-muted-foreground")}>{value ? shown : placeholder}</span>

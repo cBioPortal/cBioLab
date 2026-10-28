@@ -101,7 +101,7 @@ function GroupCard({ me, id, onGone, onChanged }: { me: string; id: string; onGo
           <tr key={m.id}>
             <td className="border-b px-2 py-1">{m.name ? <>{m.name} <span className={META}>{m.email}</span></> : m.email}
               {m.id === me && <span className={META}> (you)</span>}
-              {!m.signedIn && <span className={META} title="added by email; they become a member when they first sign in"> · not signed in yet</span>}</td>
+              {!m.signedIn && <span className={META} data-tip="added by email; they become a member when they first sign in"> · not signed in yet</span>}</td>
             <td className="border-b px-2 py-1">{m.role}</td>
             <td className="border-b px-2 py-1 text-right whitespace-nowrap">
               <span className="inline-flex gap-2.5">

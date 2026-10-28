@@ -44,12 +44,12 @@ export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes
           <div className="text-sm font-semibold tracking-[0.12em] text-muted-foreground uppercase">{eyebrow}</div>
           <h2 className="mt-1 mb-1.5 font-serif text-xl font-semibold">{title}</h2>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-md text-muted-foreground">
-            <span className="font-mono text-sm" title={studyTitle}>{study}</span>
+            <span className="font-mono text-sm" data-tip={studyTitle}>{study}</span>
             {detail && <><span aria-hidden="true">·</span>{detail}</>}
             {genes && genes.length > 0 && <>
               <span aria-hidden="true">·</span>
               <span className="inline-flex flex-wrap items-center gap-1">{genes.map((g) => <Badge key={g} variant="outline" className="font-mono">{g}</Badge>)}
-                {onEditGenes && <Button variant="ghost" size="icon-xs" className="editgenes" aria-label="edit genes" title="edit the query's genes" onClick={onEditGenes}><Pencil /></Button>}</span>
+                {onEditGenes && <Button variant="ghost" size="icon-xs" className="editgenes" aria-label="edit genes" data-tip="edit the query's genes" onClick={onEditGenes}><Pencil /></Button>}</span>
             </>}
           </div>
         </div>
@@ -69,7 +69,7 @@ export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes
         <span className="text-sm font-semibold tracking-[0.12em] text-muted-foreground uppercase">Groups</span>
         {groups.length ? groups.map((n, i) => <GroupChip key={n} name={n} i={i} n={counts?.[n]} />) : <span className="skeleton h-7 w-48" />}
         <span className="ml-auto flex flex-wrap items-center justify-end gap-2.5">
-          {left.length > 0 && <span className="text-sm text-muted-foreground" title="tabs this page leaves out for this study">not shown: {left.join("; ")}</span>}
+          {left.length > 0 && <span className="text-sm text-muted-foreground" data-tip="tabs this page leaves out for this study">not shown: {left.join("; ")}</span>}
           {action}
         </span>
       </div>

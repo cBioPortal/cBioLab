@@ -18,7 +18,7 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="a row per sample, carrying its patient's attributes too, or a row per patient with patient attributes only">
+        <label className="tbfield" data-tip="a row per sample, carrying its patient's attributes too, or a row per patient with patient attributes only">
           rows per <OptionSelect value={spec.unit === "patient" ? "patient" : "sample"} disabled={busy}
             onValueChange={(v) => patch({ unit: v === "patient" ? "patient" : undefined, sort: undefined, filters: undefined, columns: undefined, attributes: undefined, search: undefined })}>
             <option value="sample">sample</option><option value="patient">patient</option>

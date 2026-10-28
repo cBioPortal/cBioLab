@@ -80,7 +80,7 @@ export default function AdminPage() {
             {report.cacheCleared ? <>Last cleared {when(report.cacheCleared.at)}{report.cacheCleared.by && <> by {report.cacheCleared.by}</>}.</> : "Not cleared from here yet."}
           </p>
           <Button variant="outline" size="sm" className={TB} onClick={clearCache} disabled={!!busy || !!report.unavailable}
-            title={report.unavailable ? "unavailable: " + report.unavailable : "clear every cached result, on every server"}>
+            data-tip={report.unavailable ? "unavailable: " + report.unavailable : "clear every cached result, on every server"}>
             {busy === "cache" ? <Loader2 className="animate-spin" /> : <Trash2 />}Clear the cache
           </Button>
         </section>
@@ -178,7 +178,7 @@ function SettingLine({ row, busy, onSave, onReset }: {
           <Button variant="ghost" size="sm" className={TB} onClick={() => setEditing(true)} disabled={busy}
             aria-label={"edit " + row.name}>edit</Button>
           {row.override && <Button variant="ghost" size="sm" className={TB} onClick={onReset} disabled={busy}
-            title={"remove the override; " + row.name + " is the environment's again"}>
+            data-tip={"remove the override; " + row.name + " is the environment's again"}>
             {busy ? <Loader2 className="animate-spin" /> : <RotateCcw />}revert</Button>}
         </div>}
         {row.editable && editing && <form className="flex flex-wrap items-center gap-2"

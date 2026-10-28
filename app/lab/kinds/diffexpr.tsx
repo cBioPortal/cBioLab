@@ -10,17 +10,17 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="the molecular profile both cohorts are compared on">
+        <label className="tbfield" data-tip="the molecular profile both cohorts are compared on">
           profile <OptionSelect value={spec.profileType || ""} disabled={busy} onValueChange={(v) => patch({ profileType: v, log2: undefined })}>
             {!c.profiles.includes(spec.profileType) && <option value={spec.profileType || ""}>{spec.profileType || "choose…"}</option>}
             {c.profiles.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
           </OptionSelect>
         </label>
-        <label className="chk" title="compare log2(v + 1) instead of the stored value; on by default for a non-z-score RNA-seq profile">
+        <label className="chk" data-tip="compare log2(v + 1) instead of the stored value; on by default for a non-z-score RNA-seq profile">
           <Checkbox checked={c.v.diffexpr ? !!c.v.diffexpr.log2 : spec.log2 === true} disabled={busy}
             onCheckedChange={(on) => patch({ log2: (on === true) })} /> log2
         </label>
-        <label className="chk" title="preranked GSEA against the 50 MSigDB Hallmark sets; untick to draw the volcano alone">
+        <label className="chk" data-tip="preranked GSEA against the 50 MSigDB Hallmark sets; untick to draw the volcano alone">
           <Checkbox checked={!(Array.isArray(spec.geneSets) && spec.geneSets.length === 0)} disabled={busy}
             onCheckedChange={(on) => patch({ geneSets: (on === true) ? undefined : [] })} /> enrichment
         </label>

@@ -13,19 +13,19 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">progression</span>
-        <label className="tbfield" title="the timeline event that records progression">
+        <label className="tbfield" data-tip="the timeline event that records progression">
           event <OptionSelect value={et} disabled={busy} onValueChange={(v) => patch({ progression: { ...pr, eventType: v } })}>
             {!types.includes(et) && <option value={et}>{et}</option>}
             {types.map((t) => <option key={t} value={t}>{t}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="the event's attribute that says progression (values Y / Yes by default)">
+        <label className="tbfield" data-tip="the event's attribute that says progression (values Y / Yes by default)">
           key <DraftInput value={pr.key || "PROGRESSION"} disabled={busy} width="8rem" placeholder="PROGRESSION"
             onCommit={(t) => patch({ progression: { ...pr, key: t.trim() || "PROGRESSION" } })} />
         </label>
       </div>
       <div className="tbz"><span className="tbl">day 0</span>
-        <label className="tbfield" title="patients whose first progression is on or before day 0">
+        <label className="tbfield" data-tip="patients whose first progression is on or before day 0">
           progressed by then <OptionSelect value={spec.prevalent === "exclude" ? "exclude" : "include"} disabled={busy} onValueChange={(v) => patch({ prevalent: v })}>
             <option value="include">start progressed</option>
             <option value="exclude">left out</option>

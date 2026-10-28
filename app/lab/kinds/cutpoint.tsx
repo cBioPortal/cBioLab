@@ -24,7 +24,7 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="the numeric marker whose cut-point is searched: a clinical attribute, or one entity of a generic assay">
+        <label className="tbfield" data-tip="the numeric marker whose cut-point is searched: a clinical attribute, or one entity of a generic assay">
           marker <OptionSelect value={marker} disabled={busy} onValueChange={choose}>
             {!spec.assay && !nums.includes(attr) && <option value={attr}>{attr}</option>}
             {spec.assay && !assay && <option value={marker}>{spec.assay.profileType}</option>}
@@ -32,18 +32,18 @@ function Controls({ c }: { c: KindCardCtx }) {
             {assays.map((p) => <option key={p.profile} value={"assay:" + p.profile}>{p.name} (generic assay)</option>)}
           </OptionSelect>
         </label>
-        {spec.assay && <span className="tbfield" title="the entity of the generic assay whose value is the marker">
+        {spec.assay && <span className="tbfield" data-tip="the entity of the generic assay whose value is the marker">
           entity <EntityField study={assay?.study || ""} profile={spec.assay.profileType} value={String(spec.assay.entity || "")} busy={busy}
             side="marker" className="w-44" onPick={(e) => patch({ assay: { profileType: spec.assay.profileType, entity: e } })} />
         </span>}
-        <label className="tbfield" title="a cut-point per value of this attribute (its largest values), as a table">
+        <label className="tbfield" data-tip="a cut-point per value of this attribute (its largest values), as a table">
           per <OptionSelect value={spec.stratifyBy || ""} disabled={busy} onValueChange={(v) => patch({ stratifyBy: v || undefined })}>
             <option value="">(no strata)</option>
             {spec.stratifyBy && !cats.includes(spec.stratifyBy) && <option value={spec.stratifyBy}>{spec.stratifyBy}</option>}
             {cats.map((a) => <option key={a} value={a}>{a}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="seeded permutations of the marker for the corrected p">
+        <label className="tbfield" data-tip="seeded permutations of the marker for the corrected p">
           permutations <OptionSelect value={String(spec.permutations ?? 1000)} disabled={busy} onValueChange={(v) => patch({ permutations: Number(v) })}>
             {[200, 1000, 2000, 5000].map((n) => <option key={n} value={n}>{n}</option>)}
           </OptionSelect>

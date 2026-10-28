@@ -45,18 +45,18 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="which alteration to compare across every gene">
+        <label className="tbfield" data-tip="which alteration to compare across every gene">
           alteration <OptionSelect value={spec.alteration || "mutation"} disabled={busy} onValueChange={(v) => patch({ alteration: v === "mutation" ? undefined : v })}>
             <option value="mutation">mutation</option><option value="cna">amp or deep deletion</option><option value="amp">amplification</option>
             <option value="homdel">deep deletion</option><option value="sv">structural variant</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" title="count every alteration, or only OncoKB drivers">
+        <label className="tbfield" data-tip="count every alteration, or only OncoKB drivers">
           count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
             <option value="any">any</option><option value="driver">drivers</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" title="genes altered in fewer samples than this across the cohorts are counted but not tested">
+        <label className="tbfield" data-tip="genes altered in fewer samples than this across the cohorts are counted but not tested">
           test genes altered in ≥ <OptionSelect value={String(spec.minAltered ?? 5)} disabled={busy} onValueChange={(v) => patch({ minAltered: Number(v) })}>
             {[1, 5, 10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
           </OptionSelect>

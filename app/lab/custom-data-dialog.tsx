@@ -123,7 +123,7 @@ function DatasetView({ d, clause, note }: { d: StoredDataset; clause?: CustomDat
         <h4 style={{ margin: 0 }}>{d.name}</h4>
         <code className="meta">custom:{d.id}</code>
         <span className="spacer" />
-        <Button variant="outline" size="sm" className={TB} onClick={download} title="download as a tab-separated file you can upload again"><Download />Export</Button>
+        <Button variant="outline" size="sm" className={TB} onClick={download} data-tip="download as a tab-separated file you can upload again"><Download />Export</Button>
       </div>
       {note}
       <p className="meta" style={{ margin: "var(--s1) 0 var(--s3)" }}>

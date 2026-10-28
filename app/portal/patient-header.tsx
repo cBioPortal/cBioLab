@@ -87,7 +87,7 @@ function HoverCard({ title, fields, children }: { title: string; fields: Field[]
         onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
         <div className="mb-1.5 font-mono text-sm font-semibold">{title}</div>
         <table className="text-sm"><tbody>
-          {fields.map((f) => <tr key={f.id}><th className="pr-3 text-left align-top font-medium text-muted-foreground" title={f.id}>{f.name}</th><td>{f.value}</td></tr>)}
+          {fields.map((f) => <tr key={f.id}><th className="pr-3 text-left align-top font-medium text-muted-foreground" data-tip={f.id}>{f.name}</th><td>{f.value}</td></tr>)}
         </tbody></table>
       </PopoverContent>
     </Popover>

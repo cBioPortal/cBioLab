@@ -12,19 +12,19 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="a patient attribute to cross the subtypes with">
+        <label className="tbfield" data-tip="a patient attribute to cross the subtypes with">
           by <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ by: v || undefined })}>
             <option value="">nothing</option>
             {by && !cats.includes(by) && <option value={by}>{by}</option>}
             {cats.map((a) => <option key={a} value={a}>{a}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="an abnormal p53: an OncoKB-driver TP53 mutation, or any protein-changing one">
+        <label className="tbfield" data-tip="an abnormal p53: an OncoKB-driver TP53 mutation, or any protein-changing one">
           p53 <OptionSelect value={spec.p53 === "nonsynonymous" ? "nonsynonymous" : "driver"} disabled={busy} onValueChange={(v) => patch({ p53: v === "driver" ? undefined : v })}>
             <option value="driver">OncoKB driver</option><option value="nonsynonymous">any protein-changing</option>
           </OptionSelect>
         </label>
-        <label className="chk" title="draw overall survival by subtype">
+        <label className="chk" data-tip="draw overall survival by subtype">
           <Checkbox checked={spec.survival !== false} disabled={busy} onCheckedChange={(x) => patch({ survival: x === true ? undefined : false })} /> OS by subtype
         </label>
       </div>

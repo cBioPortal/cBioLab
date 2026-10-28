@@ -59,7 +59,7 @@ export function PickRow({ className, picks, k, on, disabled, title, label, child
   children: React.ReactNode;
 }) {
   return (
-    <label className={cn(className, on && "on", disabled && "is-static")} title={title}>
+    <label className={cn(className, on && "on", disabled && "is-static")} data-tip={title}>
       <Checkbox checked={picks.has(k)} disabled={disabled} onCheckedChange={() => picks.toggle(k)} aria-label={label} />
       {children}
     </label>
@@ -80,7 +80,7 @@ export function PickBar({ picks, onApply, why, action = "Apply filter", hint }: 
       <span className="meta">{n.toLocaleString()} checked{why ? " · " + why : ""}</span>
       <span className="spacer" />
       <Button variant="ghost" size="xs" onClick={picks.clear}>Clear</Button>
-      <Button size="xs" disabled={!!why} title={hint} onClick={() => { onApply(picks.picked); picks.clear(); }}>{action}</Button>
+      <Button size="xs" disabled={!!why} data-tip={hint} onClick={() => { onApply(picks.picked); picks.clear(); }}>{action}</Button>
     </div>
   );
 }

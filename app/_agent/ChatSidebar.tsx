@@ -129,10 +129,10 @@ function ChatPanel({ info }: { info: ChatInfo }) {
       <div className="flex h-12 shrink-0 items-center gap-1.5 border-b px-2.5">
         <MessageSquareIcon className="size-4 text-primary" />
         <span className="text-md font-medium">Assistant</span>
-        <span className="truncate text-xs text-muted-foreground" title="The model behind this assistant">{info.model}</span>
+        <span className="truncate text-xs text-muted-foreground" data-tip="The model behind this assistant">{info.model}</span>
         <span className="flex-1" />
-        <Button variant="ghost" size="icon-sm" onClick={newChat} title="New conversation" aria-label="New conversation"><SquarePenIcon /></Button>
-        <Button variant="ghost" size="icon-sm" onClick={() => setOpen(false)} title="Close" aria-label="Close the assistant"><XIcon /></Button>
+        <Button variant="ghost" size="icon-sm" onClick={newChat} data-tip="New conversation" aria-label="New conversation"><SquarePenIcon /></Button>
+        <Button variant="ghost" size="icon-sm" onClick={() => setOpen(false)} data-tip="Close" aria-label="Close the assistant"><XIcon /></Button>
       </div>
 
       <Conversation>

@@ -15,28 +15,28 @@ function Controls({ c }: { c: KindCardCtx }) {
         <span className="tbfield">
           <DraftInput value={spec.test || ""} disabled={busy} width="7rem" title="the lab test, as its timeline attribute names it (e.g. PSA, CEA, CA_19-9)" onCommit={(t) => patch({ test: t.trim() })} />
         </span>
-        <label className="tbfield" title="a responder's best fall from baseline, in percent">
+        <label className="tbfield" data-tip="a responder's best fall from baseline, in percent">
           responder <OptionSelect value={String(spec.responseDrop ?? 50)} disabled={busy} onValueChange={(v) => patch({ responseDrop: Number(v) })}>
             {[30, 50, 90].map((d) => <option key={d} value={d}>fell ≥{d}%</option>)}
           </OptionSelect>
         </label>
       </div>
       <div className="tbz"><span className="tbl">clock</span>
-        <label className="tbfield" title="the treatment start the course is read from">
+        <label className="tbfield" data-tip="the treatment start the course is read from">
           from first <OptionSelect value={an.eventType || ""} disabled={busy} onValueChange={(v) => patch({ anchor: { ...an, eventType: v } })}>
             {!types.includes(an.eventType) && <option value={an.eventType || ""}>{an.eventType || "choose…"}</option>}
             {types.map((t) => <option key={t} value={t}>{t}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="only anchor events with this attribute (e.g. SUBTYPE); empty for any">
+        <label className="tbfield" data-tip="only anchor events with this attribute (e.g. SUBTYPE); empty for any">
           where <DraftInput value={an.key || ""} disabled={busy} width="6rem" placeholder="attribute"
             onCommit={(t) => patch({ anchor: { eventType: an.eventType, ...(t.trim() ? { key: t.trim(), value: an.value || "" } : {}) } })} />
         </label>
-        <label className="tbfield" title="the value that attribute must take (e.g. Hormone)">
+        <label className="tbfield" data-tip="the value that attribute must take (e.g. Hormone)">
           = <DraftInput value={an.value || ""} disabled={busy} width="6rem" placeholder="value"
             onCommit={(t) => patch({ anchor: { ...an, value: t } })} />
         </label>
-        <label className="tbfield" title="how far after the start to follow">
+        <label className="tbfield" data-tip="how far after the start to follow">
           to <OptionSelect value={String(spec.toWeeks ?? 52)} disabled={busy} onValueChange={(v) => patch({ toWeeks: Number(v) })}>
             {[12, 26, 52, 104].map((w) => <option key={w} value={w}>{w} weeks</option>)}
           </OptionSelect>

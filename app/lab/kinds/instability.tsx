@@ -10,17 +10,17 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="the |log2 segment mean| at or past which a segment counts as gained or lost">
+        <label className="tbfield" data-tip="the |log2 segment mean| at or past which a segment counts as gained or lost">
           threshold <OptionSelect value={String(spec.threshold ?? 0.2)} disabled={busy} onValueChange={(v) => patch({ threshold: v === "0.2" ? undefined : Number(v) })}>
             {[...new Set([0.1, 0.2, 0.3, 0.5, Number(spec.threshold ?? 0.2)])].sort((x, y) => x - y).map((t) => <option key={t} value={t}>±{t}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="an arm is gained or lost when more than this share of its length is past the threshold">
+        <label className="tbfield" data-tip="an arm is gained or lost when more than this share of its length is past the threshold">
           arm call <OptionSelect value={String(spec.armShare ?? 0.5)} disabled={busy} onValueChange={(v) => patch({ armShare: v === "0.5" ? undefined : Number(v) })}>
             {[...new Set([0.5, 0.75, 0.8, Number(spec.armShare ?? 0.5)])].sort((x, y) => x - y).map((t) => <option key={t} value={t}>&gt;{Math.round(t * 100)}% of arm</option>)}
           </OptionSelect>
         </label>
-        <label className="chk" title="chromosome X's log ratio mostly records sex against the reference, so it is off by default">
+        <label className="chk" data-tip="chromosome X's log ratio mostly records sex against the reference, so it is off by default">
           <Checkbox checked={spec.includeX === true} disabled={busy} onCheckedChange={(on) => patch({ includeX: (on === true) || undefined })} /> chrX
         </label>
       </div>

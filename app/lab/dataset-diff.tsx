@@ -119,7 +119,7 @@ export function DatasetDiffView({ diff, before, after, version }: { diff: Datase
         <div className="ml-auto grid content-end justify-items-end gap-1 text-sm text-muted-foreground">
           <span>{fmt(diff.cases.before)} → {fmt(diff.cases.after)} {level}s · {fmt(c.values)} value{c.values === 1 ? "" : "s"} differ</span>
           <Button variant="link" size="inline" className="text-sm" onClick={download}
-            title="every change, one per line: cases, columns, then values with before and after"><Download className="size-3.5" />download every change (.tsv)</Button>
+            data-tip="every change, one per line: cases, columns, then values with before and after"><Download className="size-3.5" />download every change (.tsv)</Button>
         </div>
       </div>
 
@@ -151,7 +151,7 @@ export function DatasetDiffView({ diff, before, after, version }: { diff: Datase
               <tr key={r.key} className={cn("cd-diff-row border-b border-border/60 last:border-0",
                 r.kind === "removed" && "bg-destructive/5", r.kind === "added" && "bg-ok-soft/50")} data-kind={r.kind}>
                 <td className={cn("px-2 py-1 text-center font-mono font-semibold", r.kind === "removed" ? "text-destructive" : r.kind === "added" ? "text-ok" : "text-mark")}
-                  title={r.kind === "removed" ? "removed" : r.kind === "added" ? "added" : "values changed"}>
+                  data-tip={r.kind === "removed" ? "removed" : r.kind === "added" ? "added" : "values changed"}>
                   {r.kind === "removed" ? "−" : r.kind === "added" ? "+" : "~"}</td>
                 <td className={cn("px-2 py-1 font-mono whitespace-nowrap", r.kind === "removed" && "text-destructive line-through")}>{r.key}</td>
                 {r.cells.map((cell, i) => {

@@ -190,7 +190,7 @@ export function GeneQueryEditor({ mode, value, onChange, onSubmit, min = 1, max 
                   {found.sets.length > 0 && <div className="mt-1 border-t px-2 pt-1.5 pb-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Gene sets</div>}
                   {found.sets.map((s) => (
                     <button key={s.name} type="button" role="option" aria-selected={false} disabled={s.size > 30} onClick={() => addSet(s.name)}
-                      title={s.size > 30 ? "has " + s.size + " genes; a query takes at most 30" : "add its " + s.size + " genes"}
+                      data-tip={s.size > 30 ? "has " + s.size + " genes; a query takes at most 30" : "add its " + s.size + " genes"}
                       className="flex w-full items-baseline gap-2 rounded-sm border-0 bg-transparent px-2 py-1 text-left hover:bg-accent disabled:opacity-50 disabled:hover:bg-transparent">
                       <span className="min-w-0 truncate font-mono text-sm">{s.name}</span>
                       <span className="ml-auto shrink-0 text-sm text-muted-foreground tabular-nums">{s.size} genes</span>
@@ -272,7 +272,7 @@ export function GeneQueryEditor({ mode, value, onChange, onSubmit, min = 1, max 
                 <div className="flex flex-col gap-1">
                   {OQL_HELP.map((h) => (
                     <button key={h.q} type="button" onClick={() => setText((t) => (t.trim() ? t.replace(/\s+$/, "") + "\n" : "") + h.q)}
-                      title="add this line to the query" className="rounded-sm border-0 bg-transparent px-1.5 py-1 text-left hover:bg-accent">
+                      data-tip="add this line to the query" className="rounded-sm border-0 bg-transparent px-1.5 py-1 text-left hover:bg-accent">
                       <code className="block font-mono text-sm font-medium">{h.q}</code>
                       <span className="block text-xs text-muted-foreground">{h.means}</span>
                     </button>
@@ -308,11 +308,11 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
       <GeneQueryEditor mode={mode} value={value} min={min} max={max} groups={groups} onChange={setStatus} onSubmit={apply}
         sideClass="max-h-[max(10rem,calc(88vh-15rem))]" />
       <DialogFooter className="sticky -bottom-6 -mx-6 -mb-6 items-center gap-2 border-t bg-card px-6 py-3">
-        <span className="text-sm text-muted-foreground" title={status?.problems.join("\n")}>
+        <span className="text-sm text-muted-foreground" data-tip={status?.problems.join("\n")}>
           {status?.pending ? "checking symbols…" : status?.problems.length ? status.problems.length + " to fix" : ""}
         </span>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-        <Button onClick={apply} disabled={blocked} title={blocked ? (status?.pending ? "waiting for the symbols to be checked" : status?.problems.join("\n")) : applyLabel.toLowerCase() + " (⌘/Ctrl+Enter)"}>{applyLabel}</Button>
+        <Button onClick={apply} disabled={blocked} data-tip={blocked ? (status?.pending ? "waiting for the symbols to be checked" : status?.problems.join("\n")) : applyLabel.toLowerCase() + " (⌘/Ctrl+Enter)"}>{applyLabel}</Button>
       </DialogFooter>
     </DialogContent>
   );
@@ -324,7 +324,7 @@ function ListOf({ items, empty, onUse, onRemove }: { items: GeneList[]; empty: s
     <ul className="m-0 flex list-none flex-col gap-1 p-0">
       {items.map((l) => (
         <li key={l.name ?? l.at} className="group flex items-start gap-1 rounded-sm hover:bg-accent">
-          <button type="button" className="min-w-0 flex-1 border-0 bg-transparent px-1.5 py-1 text-left" onClick={() => onUse(l.text)} title={"use this query:\n" + l.text}>
+          <button type="button" className="min-w-0 flex-1 border-0 bg-transparent px-1.5 py-1 text-left" onClick={() => onUse(l.text)} data-tip={"use this query:\n" + l.text}>
             {l.name && <span className="block text-sm font-medium">{l.name}</span>}
             <code className="line-clamp-2 block font-mono text-xs break-all text-muted-foreground">{l.text.replace(/\n/g, "; ")}</code>
           </button>

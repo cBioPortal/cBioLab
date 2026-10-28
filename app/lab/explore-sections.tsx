@@ -122,7 +122,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               {/* the counts arrive with the facets; until then a placeholder holds their
                   place, so the header neither shows a wrong number nor jumps */}
               {exStudies.length > 0 && (exploreBusy || !explore?.totals) &&
-                <span className="skeleton skeleton-counts" title={selPts ? "counting… (the selected studies hold " + selPts.toLocaleString() + " patients before deduplication)" : "counting…"} />}
+                <span className="skeleton skeleton-counts" data-tip={selPts ? "counting… (the selected studies hold " + selPts.toLocaleString() + " patients before deduplication)" : "counting…"} />}
             </span></h2>
             {/* One chip per study is fine for a handful and unreadable for
                 560 — the header became a wall of identifiers that pushed
@@ -137,16 +137,16 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               return (
                 <span className={"studychips" + (studyChipsOpen ? " open" : "")}>
                   {shown.map(id => (
-                    <span key={id} className="qchip" title={nameOf(id)}>
+                    <span key={id} className="qchip" data-tip={nameOf(id)}>
                       {id}
                       <Button variant="ghost" size="icon-xs" className={CHIP_X}
-                        title={"remove " + id + " from the selection"} aria-label={"remove " + id}
+                        data-tip={"remove " + id + " from the selection"} aria-label={"remove " + id}
                         onClick={() => toggle(id)}><X /></Button>
                     </span>
                   ))}
                   {over > 1 && (
                     <button className="qchip morechip" onClick={() => setStudyChipsOpen(!studyChipsOpen)}
-                      title={studyChipsOpen ? "collapse the list" : exStudies.map(nameOf).join("\n")}>
+                      data-tip={studyChipsOpen ? "collapse the list" : exStudies.map(nameOf).join("\n")}>
                       {studyChipsOpen ? "show fewer" : "+" + over.toLocaleString() + " more"}
                     </button>
                   )}
@@ -155,12 +155,12 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
             })()}
             <span className="spacer" />
             {!addMode && <Button onClick={analyzeDraft} disabled={!ready}
-              title={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
+              data-tip={ready ? "start a fresh analysis of this cohort (replaces the current document)" : "select a study first"}>
               Analyze
             </Button>}
             {!addMode && <Button variant="outline" className="querygenes" disabled={!!queryWhy}
               onClick={() => setQueryFor({ studies: exStudies, filters: selectionFilters })}
-              title={queryWhy || "query genes in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " studies") +
+              data-tip={queryWhy || "query genes in " + (exStudies.length === 1 ? exStudies[0] : exStudies.length + " studies") +
                 (selectionFilters.length ? ", within your " + selectionFilters.length + " filter" + (selectionFilters.length === 1 ? "" : "s") : "") +
                 ", and open the results — oncoprint, mutations, survival…"}>
               <Dna />Query genes…
@@ -181,7 +181,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               </span>
               <span className="spacer" />
               <Button size="sm" disabled={!dirty || !staged.length} onClick={applyStaged}
-                title={staged.length ? "run the facets for these " + staged.length + " studies" : "stage at least one study"}>
+                data-tip={staged.length ? "run the facets for these " + staged.length + " studies" : "stage at least one study"}>
                 Submit
               </Button>
             </div>
@@ -235,11 +235,11 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
             {/* editing a saved cohort, its bar above saves the filters over it */}
             {!addMode?.editing && <>
               <Button variant="outline" size="sm" onClick={openSaveDialog} disabled={!ready}
-                title={ready ? "keep this definition on the Saved tab without running anything" : "select a study first"}>
+                data-tip={ready ? "keep this definition on the Saved tab without running anything" : "select a study first"}>
                 <Save />Save as a Cohort
               </Button>
               <Button variant="outline" size="sm" onClick={saveDraftAsFeature} disabled={!ready}
-                title={ready ? "freeze who matches these filters into a yes/no custom attribute you can chart, split and filter on" : "select a study first"}>
+                data-tip={ready ? "freeze who matches these filters into a yes/no custom attribute you can chart, split and filter on" : "select a study first"}>
                 <Tag />Save as feature
               </Button>
             </>}
@@ -302,10 +302,10 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                         <td>
                           {c.displayName || c.attribute}
                           {partial && (
-                            <span className="meta" title={"carried by " + (c.studyCount ?? 1) + " of " + exStudies.length + " selected studies, not all of them"}> *</span>
+                            <span className="meta" data-tip={"carried by " + (c.studyCount ?? 1) + " of " + exStudies.length + " selected studies, not all of them"}> *</span>
                           )}
                         </td>
-                        {showDataset && <td className="meta" title={c.description}>{(c.attribute || "").replace(/^custom:/, "").split("/")[0]}</td>}
+                        {showDataset && <td className="meta" data-tip={c.description}>{(c.attribute || "").replace(/^custom:/, "").split("/")[0]}</td>}
                         <td className="meta">{c.kind === "num" ? "numeric" : "categorical"}</td>
                         <td className="meta">{c.per === "sample" ? "sample" : "patient"}</td>
                       </tr>
@@ -351,7 +351,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
               </p>
               <div className="row baseline">
                 <Input type="search" className={SEARCH} placeholder="find an attribute" value={clinFilter}
-                  title="narrows this checklist by attribute name" autoFocus
+                  data-tip="narrows this checklist by attribute name" autoFocus
                   onChange={e => setClinFilter(e.target.value)} />
                 <span className="meta">{checkedOf(builtin)} of {builtin.length} checked</span>
                 <Button variant="link" size="inline" onClick={() => setAll(builtin, true)}>check all</Button>
@@ -393,7 +393,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
             {geneCharts.map(g => (
               <span key={g} className="qchip mr-1">
                 {g}
-                <Button variant="ghost" size="icon-xs" className={CHIP_X} title={"stop charting " + g} aria-label={"stop charting " + g}
+                <Button variant="ghost" size="icon-xs" className={CHIP_X} data-tip={"stop charting " + g} aria-label={"stop charting " + g}
                   onClick={() => unchartGene(g)}><X /></Button>
               </span>
             ))}
@@ -471,7 +471,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                         options={[30, 60, 90, 120, 180].map(g => [String(g), g + " days"] as const)} />
                     </div>
                   )}
-                  <label className="chk" title="restricts the first event to patients with no treatment recorded before it">
+                  <label className="chk" data-tip="restricts the first event to patients with no treatment recorded before it">
                     <Checkbox checked={seq.priorGuard}
                       onCheckedChange={v => setSeq(s => ({ ...s, priorGuard: v === true }))} />
                     treatment-naive before the first event
@@ -506,7 +506,7 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
                 const tx = treatmentEventType();
                 return TREATMENT_DERIVED_KINDS.map((k) => (
                   <label key={k.metric} className="chk"
-                    title={tx ? "based on '" + tx.label + "' events" : "this study records no treatment-like timeline events, so this can't be derived here"}>
+                    data-tip={tx ? "based on '" + tx.label + "' events" : "this study records no treatment-like timeline events, so this can't be derived here"}>
                     <Checkbox checked={derivedOn(k.metric)} disabled={!tx}
                       onCheckedChange={() => toggleDerived(k.metric)} />
                     {tx ? k.label(tx.label) : k.label("a treatment event")}
@@ -537,14 +537,14 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
                     its total is the draft-minus-itself total. Say so, exactly
                     as the clinical facets do, rather than show a number that
                     cannot be reconciled with the draft. */}
-                <div className="facettitle" title={d.note}>
+                <div className="facettitle" data-tip={d.note}>
                   {d.label} <span className="meta">· {d.covered.toLocaleString()} patients
                     {(d as any).disjunctive ? " · not narrowed by its own filter" : ""}</span>
                 </div>
                 <div className="vallist">
                   {d.buckets.map(b => (
                     <button key={b.label} className={picked(b) ? "valrow on" : "valrow"}
-                      title={d.note + " — click to filter"}
+                      data-tip={d.note + " — click to filter"}
                       onClick={() => addClause({ kind: "derived", metric: d.metric,
                         ...(dEventType ? { eventType: dEventType } : {}), ...(dLineGap != null ? { lineGap: dLineGap } : {}),
                         range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
@@ -634,9 +634,9 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           const unit = c.per === "sample" ? " samples" : " patients";
           return (
             <div
- className="facettitle"                title={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
+ className="facettitle"                data-tip={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
                 .filter(Boolean).join(" — ") || undefined}>
-              {isCustomAttr(c.attribute) && <span className="customtag" title={c.description}>custom</span>}
+              {isCustomAttr(c.attribute) && <span className="customtag" data-tip={c.description}>custom</span>}
               {c.displayName || c.attribute}{" "}
               <span className="meta">
                 {(c.per === "sample" ? "· sample-level · " : "· ") + shown.toLocaleString() + unit}
@@ -722,15 +722,14 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
               <svg viewBox="0 0 72 72" className="pie" role="img" aria-label={c.attribute + " distribution"}>
                 {arcs.map((a: any, i: number) => (
                   <path key={i} d={a.path} fill={a.color} className={isSel(a.v) ? "slice on" : "slice"}
-                    onClick={() => addClause(clause(a.v))}>
-                    <title>{a.v.v + " — " + a.v.n.toLocaleString() + " (" + Math.round(1000 * a.frac) / 10 + "%)"}</title>
-                  </path>
+                    onClick={() => addClause(clause(a.v))}
+                    data-tip={a.v.v + " — " + a.v.n.toLocaleString() + " (" + Math.round(1000 * a.frac) / 10 + "%)"} />
                 ))}
               </svg>
               <div className="pielegend">
                 {arcs.map((a: any, i: number) => (
                   <button key={i} className={isSel(a.v) ? "pikey on" : "pikey"} onClick={() => addClause(clause(a.v))}
-                    title={"click to filter to " + a.v.v}>
+                    data-tip={"click to filter to " + a.v.v}>
                     <span className="swatch" style={{ background: a.color }} />
                     <span className="pname">{a.v.v}</span>
                     <span className="pn">{a.v.n.toLocaleString()}</span>
@@ -752,7 +751,7 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           return (
             <Histogram ticks={c.bins.map(tick)} na={c.naCount ? "NA " + fmtInt(c.naCount) : null}>
               {c.bins.map((b: any, i: number) => (
-                <button key={i} className="hbar" title={label(b) + " · " + fmtInt(b.count) + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"}
+                <button key={i} className="hbar" data-tip={label(b) + " · " + fmtInt(b.count) + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"} aria-label={label(b) + " · " + fmtInt(b.count) + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"}
                   onClick={() => addClause(clauseFor(b))}>
                   <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
                 </button>
@@ -792,7 +791,7 @@ function AssayChartPicker({ ctx }: { ctx: ExploreCtx }) {
       {assayCharts.map((c) => (
         <span key={c.profileType + "|" + c.entity} className="qchip mr-1 mt-1.5">
           {entityShortName(c.entity, c.profileType)}<span className="meta"> · {profiles.find((p) => p.profile === c.profileType)?.name || c.profileType}</span>
-          <Button variant="ghost" size="icon-xs" className={CHIP_X} title={"stop charting " + c.entity} aria-label={"stop charting " + c.entity}
+          <Button variant="ghost" size="icon-xs" className={CHIP_X} data-tip={"stop charting " + c.entity} aria-label={"stop charting " + c.entity}
             onClick={() => unchartAssay(c.profileType, c.entity)}><X /></Button>
         </span>
       ))}
@@ -821,7 +820,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
   return (
     <div data-assayfacet={f.profileType + "|" + f.entity} className="card">
       <div className="facettitle flex items-center gap-1">
-        <span className="min-w-0 flex-1 truncate" title={f.entity}>{title}</span>
+        <span className="min-w-0 flex-1 truncate" data-tip={f.entity}>{title}</span>
         <ChartMenu label={title} actions={addMode || exStudies.length > 1 ? [] : f.kind === "cat" ? [
           splitChecked(checked.length, "value of " + title, () => splitDraftByPicks({ kind: "assay", profileType: f.profileType, entity: f.entity },
             checked.map((v) => ({ name: armLabel(v), where: { ...base, values: [v] } as Leaf })), title))] : [
@@ -830,7 +829,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
               ? ": above / at or below its median within the selection" : ": one arm per value with at least 10 patients, the rest in Other") +
               "; patients with no value get their own arm",
             onClick: () => void splitDraftBy({ assay: { profileType: f.profileType, entity: f.entity } }, title) }]} />
-        <Button variant="ghost" size="icon-xs" title="stop charting this" aria-label={"stop charting " + f.entity}
+        <Button variant="ghost" size="icon-xs" data-tip="stop charting this" aria-label={"stop charting " + f.entity}
           onClick={() => unchartAssay(f.profileType, f.entity)}><X /></Button>
       </div>
       <span className="meta">patients · {fmtInt(f.measured)} of {fmtInt(f.total)} with a value{f.disjunctive ? " · counted without its own filter" : ""}{why}</span>
@@ -850,7 +849,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
           <Histogram ticks={f.bins.map(tick)} na={f.total > f.measured ? "NA " + fmtInt(f.total - f.measured) : null}>
             {f.bins.map((b, i) => (
               <button key={i} className="hbar" disabled={!clickable}
-                title={label(b) + " · " + fmtInt(b.count) + " patients" + (clickable ? " — click to filter" : why)}
+                data-tip={label(b) + " · " + fmtInt(b.count) + " patients" + (clickable ? " — click to filter" : why)} aria-label={label(b) + " · " + fmtInt(b.count) + " patients"}
                 onClick={() => addClause({ ...base, range: range(b) })}>
                 <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
               </button>
@@ -1012,7 +1011,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
         <h2 className="flush">{meta.title}</h2>
         <span className="spacer" />
         <Input type="search" className="h-7 w-24 text-md md:text-md" placeholder="find gene" value={geneFilter[kind] || ""}
-          title={"filters the " + all.length + " genes loaded for this table, not all " + (meta.total || all.length)}
+          data-tip={"filters the " + all.length + " genes loaded for this table, not all " + (meta.total || all.length)}
           onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
         {(() => {
           const chart: ChartKey = { kind: "genes", specs: kind === "mutated" ? [": MUT"] : kind === "cna" ? [": AMP", ": HOMDEL"] : [": FUSION"] };
@@ -1042,16 +1041,16 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
             <PickRow className={"generow gk-" + kind} picks={picks} k={rowKey(g)} label={meta.oql(g)} title={meta.oql(g)}>
               <span className="gname">{g.gene}</span>
               {kind === "cna" ? <>
-                <span className="gcyto" title={g.cytoband || undefined}>{g.cytoband || ""}</span>
+                <span className="gcyto" data-tip={g.cytoband || undefined}>{g.cytoband || ""}</span>
                 <span className={"cnatag " + (g.cna === 2 ? "amp" : "del")}>{g.cna === 2 ? "AMP" : "HOMDEL"}</span>
               </> : (
-                <span className="gnum" title={g.events.toLocaleString() + " events across " + g.altered.toLocaleString() + " samples"}>{g.events.toLocaleString()}</span>
+                <span className="gnum" data-tip={g.events.toLocaleString() + " events across " + g.altered.toLocaleString() + " samples"}>{g.events.toLocaleString()}</span>
               )}
-              <span className="gnum" title={g.altered.toLocaleString() + " samples altered in " + g.gene + (off > 0 ? ", " + off.toLocaleString() +
+              <span className="gnum" data-tip={g.altered.toLocaleString() + " samples altered in " + g.gene + (off > 0 ? ", " + off.toLocaleString() +
                 " of them by a call their panel does not cover (off-panel): counted here, as cBioPortal's \"#\" does, but not in the frequency" : "")}>
                 {g.altered.toLocaleString()}
               </span>
-              <span className="gnum" title={onPanel.toLocaleString() + " altered of " + g.profiled.toLocaleString() + " samples profiled for " + g.gene +
+              <span className="gnum" data-tip={onPanel.toLocaleString() + " altered of " + g.profiled.toLocaleString() + " samples profiled for " + g.gene +
                 " — a sample whose panel omits " + g.gene + " is not profiled for it, not wild-type"}>
                 {g.freqPct != null ? fmtPct(g.freqPct) : "—"}
               </span>

@@ -163,7 +163,7 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
             <div className="card excard" key={ex.title}>
               <h3>{ex.title}{views.some(isNewKind) && <NewMark />}</h3>
               <div className="extags small">
-                {views.map(k => <span key={k} className="vkind" title="a view this example draws">{k}</span>)}
+                {views.map(k => <span key={k} className="vkind" data-tip="a view this example draws">{k}</span>)}
                 {topics.map(t => <span key={t} className="extag is-static">{t}</span>)}
               </div>
               {ex.demonstrates && <p className="exdem">{ex.demonstrates}</p>}
@@ -173,7 +173,7 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
               </p> : null}
               <p className="exnote">{ex.note}</p>
               <div className="exmeta">
-                <span title={studies.join(", ")}>
+                <span data-tip={studies.join(", ")}>
                   {studies.length === 1 ? studies[0] : studies.length + " studies"}
                 </span>
                 <span>{cohortNames.length} cohort{cohortNames.length === 1 ? "" : "s"}: {cohortNames.join(", ")}</span>
@@ -183,7 +183,7 @@ export function ExamplesTab({ tag, onTag, query, onQuery, busy, onRun, link, els
                 <pre className="exjson">{JSON.stringify(ex.doc, null, 2)}</pre>
               </details>
               <div className="row exactions">
-                <Button size="sm" onClick={() => run(ex)} disabled={busy || !!runWhy} title={runWhy || undefined}>
+                <Button size="sm" onClick={() => run(ex)} disabled={busy || !!runWhy} data-tip={runWhy || undefined}>
                   {elsewhere ? <ExternalLink /> : <Play />}Run{elsewhere && " on " + hostOf(elsewhere)}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => copy(ex)}>
@@ -245,7 +245,7 @@ function ExampleCohorts({ examples, evals, study, canSave, onPreview, onAnalyze,
               <Button variant="link" size="inline" onClick={() => onPreview(ex)}>preview</Button>
               <Button variant="link" size="inline" onClick={() => onAnalyze(ex)}>analyze</Button>
               <Button variant="link" size="inline" onClick={() => onSave(ex)}
-                title={canSave ? "save it to your library" : "sign in to save it to your library"}>save to library</Button>
+                data-tip={canSave ? "save it to your library" : "sign in to save it to your library"}>save to library</Button>
             </div>
             {ev && ev.error && <div className="error">{ev.error}</div>}
             <div className="listrow-body"><CohortPills def={ex.def} /></div>

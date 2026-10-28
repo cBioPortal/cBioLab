@@ -40,10 +40,10 @@ export function RiskTable1Button({ vi, spec, m, busy, attrs, docJson, onPatch }:
   const why = !m ? "waiting for the model: Table 1 describes its risk groups" : !docJson ? "no document to run Table 1 from" : null;
   return <>
     <Button variant="outline" size="sm" className={TB + " risktable1btn"} disabled={busy || !!why}
-      title={why ?? "who is in each risk group: clinical values and mutation rates, the groups side by side"} onClick={() => setOpen(true)}>
+      data-tip={why ?? "who is in each risk group: clinical values and mutation rates, the groups side by side"} onClick={() => setOpen(true)}>
       table 1
     </Button>
-    {spec.describe && <span className="text-sm text-muted-foreground" title="this view's document names Table 1's rows, so a link reproduces it">· in the document</span>}
+    {spec.describe && <span className="text-sm text-muted-foreground" data-tip="this view's document names Table 1's rows, so a link reproduces it">· in the document</span>}
     {open && m && docJson && <RiskTable1Dialog vi={vi} saved={spec.describe} m={m} attrs={attrs} docJson={docJson}
       onPatch={onPatch} onClose={() => setOpen(false)} />}
   </>;
@@ -119,7 +119,7 @@ function RiskTable1Dialog({ vi, saved, m, attrs, docJson, onPatch, onClose }: {
               onChange={(e) => setGene(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addGenes(); } }} />
             <Button type="button" variant="outline" size="sm" className={TB} disabled={!gene.trim() || !listsKnown} onClick={addGenes}>add</Button>
             <Button type="button" variant="outline" size="sm" className={TB} disabled={!draft.attributes && !draft.genes}
-              title="the study's leading attributes and the genes the model kept most often" onClick={() => { setNote(""); setDraft({}); }}>defaults</Button>
+              data-tip="the study's leading attributes and the genes the model kept most often" onClick={() => { setNote(""); setDraft({}); }}>defaults</Button>
           </div>
         </div>
         {genes.length > 0 && <div className="flex flex-wrap items-center gap-1.5" aria-label="genes">
@@ -137,11 +137,11 @@ function RiskTable1Dialog({ vi, saved, m, attrs, docJson, onPatch, onClose }: {
         </div>
         {table && <Table1Notes t={table} />}
         <DialogFooter className="items-center">
-          {saved && <Button type="button" variant="ghost" className="mr-auto risktable1remove" title="Table 1 stays a dialog of this page, not part of the document"
+          {saved && <Button type="button" variant="ghost" className="mr-auto risktable1remove" data-tip="Table 1 stays a dialog of this page, not part of the document"
             onClick={() => onPatch({ describe: undefined })}>Remove from document</Button>}
           <Button type="button" variant="ghost" onClick={onClose}>Close</Button>
           <Button type="button" className="risktable1add" disabled={!table || loading || inDoc}
-            title={inDoc ? "the document names these rows" : "write these rows into the view, so the link and the figure's caption carry Table 1"}
+            data-tip={inDoc ? "the document names these rows" : "write these rows into the view, so the link and the figure's caption carry Table 1"}
             onClick={() => table && onPatch({ describe: table.describe })}>{inDoc ? "In the document" : saved ? "Update document" : "Add to document"}</Button>
         </DialogFooter>
       </DialogContent>
@@ -159,10 +159,10 @@ function Table1Grid({ t, focus, onFocus }: { t: RiskTable1; focus: number | null
   const col = (gi: number) => cn("px-2 py-1 text-right tabular-nums", gi === focus && "bg-accent/60");
   const share = (n: number, of: number) => of ? fmtPct(100 * n / of) : "–";
   const stat = (r: Exclude<RiskTable1Row, { kind: "skipped" }>) => <>
-    <td className="px-2 py-1 text-right tabular-nums">{r.p == null ? <span className="text-muted-foreground" title={r.untested}>not tested</span> : pDigits(r.p)}</td>
+    <td className="px-2 py-1 text-right tabular-nums">{r.p == null ? <span className="text-muted-foreground" data-tip={r.untested}>not tested</span> : pDigits(r.p)}</td>
     <td className="px-2 py-1 text-right font-semibold tabular-nums">{r.q == null ? "—" : pDigits(r.q)}</td>
-    <td className="px-2 py-1 text-sm text-muted-foreground">{r.role && <i title={ROLE_TITLE[r.role]}>{r.role}</i>}
-      {r.kind !== "num" && r.minExpected != null && r.minExpected < 5 && <span title="the smallest expected count is under 5, where χ² is a poor approximation"> sparse</span>}</td>
+    <td className="px-2 py-1 text-sm text-muted-foreground">{r.role && <i data-tip={ROLE_TITLE[r.role]}>{r.role}</i>}
+      {r.kind !== "num" && r.minExpected != null && r.minExpected < 5 && <span data-tip="the smallest expected count is under 5, where χ² is a poor approximation"> sparse</span>}</td>
   </>;
   const lines: React.ReactNode[] = [];
   for (const r of t.rows) {
@@ -173,8 +173,8 @@ function Table1Grid({ t, focus, onFocus }: { t: RiskTable1; focus: number | null
     }
     if (r.kind === "gene") {
       lines.push(<tr key={"g:" + r.name} className="border-t border-border">
-        <th scope="row" className="px-2 py-1 text-left font-semibold" title={"patients with " + r.name + " mutated (" + (t.measure === "driver" ? "OncoKB drivers" : "any mutation") + ") over those whose panels cover it"}>{r.name} <span className="font-normal text-muted-foreground">mutated</span></th>
-        {r.perGroup.map((c, gi) => <td key={gi} className={col(gi)} title={c.notProfiled ? fmtInt(c.notProfiled) + " not profiled: their panels do not cover " + r.name : undefined}>
+        <th scope="row" className="px-2 py-1 text-left font-semibold" data-tip={"patients with " + r.name + " mutated (" + (t.measure === "driver" ? "OncoKB drivers" : "any mutation") + ") over those whose panels cover it"}>{r.name} <span className="font-normal text-muted-foreground">mutated</span></th>
+        {r.perGroup.map((c, gi) => <td key={gi} className={col(gi)} data-tip={c.notProfiled ? fmtInt(c.notProfiled) + " not profiled: their panels do not cover " + r.name : undefined}>
           {fmtInt(c.altered)}/{fmtInt(c.profiled)} ({share(c.altered, c.profiled)}){c.notProfiled > 0 && <span className="text-muted-foreground"> · {fmtInt(c.notProfiled)} n.p.</span>}</td>)}
         {stat(r)}</tr>);
       continue;
@@ -182,7 +182,7 @@ function Table1Grid({ t, focus, onFocus }: { t: RiskTable1; focus: number | null
     if (r.kind === "num") {
       lines.push(<tr key={"n:" + r.name} className="border-t border-border">
         <th scope="row" className="px-2 py-1 text-left font-semibold">{r.name} <span className="font-normal text-muted-foreground">median [IQR]</span></th>
-        {r.perGroup.map((c, gi) => <td key={gi} className={col(gi)} title={fmtInt(c.n) + " with a value" + (c.missing ? ", " + fmtInt(c.missing) + " without" : "")}>
+        {r.perGroup.map((c, gi) => <td key={gi} className={col(gi)} data-tip={fmtInt(c.n) + " with a value" + (c.missing ? ", " + fmtInt(c.missing) + " without" : "")}>
           {c.median == null ? "–" : fmtNum(c.median) + " [" + fmtNum(c.q1!) + "–" + fmtNum(c.q3!) + "]"}</td>)}
         {stat(r)}</tr>);
       continue;
@@ -192,7 +192,7 @@ function Table1Grid({ t, focus, onFocus }: { t: RiskTable1; focus: number | null
     const rest = r.levels.slice(shown.length);
     lines.push(<tr key={"c:" + r.name} className="border-t border-border">
       <th scope="row" className="px-2 pt-1 text-left font-semibold" colSpan={t.groups.length + 1}>{r.name}
-        {r.multiValued > 0 && <span className="font-normal text-muted-foreground" title="counted under their first sample's value"> · {fmtInt(r.multiValued)} with samples that differ</span>}</th>
+        {r.multiValued > 0 && <span className="font-normal text-muted-foreground" data-tip="counted under their first sample's value"> · {fmtInt(r.multiValued)} with samples that differ</span>}</th>
       {stat(r)}</tr>);
     const level = (key: string, label: React.ReactNode, counts: number[]) => <tr key={key}>
       <td className="py-0.5 pr-2 pl-5 text-sm">{label}</td>
@@ -208,7 +208,7 @@ function Table1Grid({ t, focus, onFocus }: { t: RiskTable1; focus: number | null
         <tr>
           <th scope="col" className="px-2 py-1 text-left">Row</th>
           {t.groups.map((g, gi) => <th key={g.name} scope="col" className={cn("px-2 py-1 text-right", gi === focus && "bg-accent/60")}>
-            <Button variant="link" size="inline" className="font-semibold text-foreground" title={gi === focus ? "unmark this group's column" : "mark this group's column"} onClick={() => onFocus(gi)}>{g.name}</Button>
+            <Button variant="link" size="inline" className="font-semibold text-foreground" data-tip={gi === focus ? "unmark this group's column" : "mark this group's column"} onClick={() => onFocus(gi)}>{g.name}</Button>
             <div className="font-normal text-muted-foreground">{fmtInt(g.n)} patients</div></th>)}
           <th scope="col" className="px-2 py-1 text-right">p</th>
           <th scope="col" className="px-2 py-1 text-right">q</th>

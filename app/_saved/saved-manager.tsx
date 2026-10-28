@@ -55,7 +55,7 @@ export function SavedDialog({ tab, note, onTab, onClose }: { tab: SavedTab | nul
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base"><Bookmark className="size-4" />Your saved work
             <a className="mr-8 ml-auto text-sm font-normal text-link" href={"/saved?tab=" + (tab ?? "cohorts")} target="_blank" rel="noreferrer"
-              title="this manager as a page of its own, in a new tab">open as a page</a></DialogTitle>
+              data-tip="this manager as a page of its own, in a new tab">open as a page</a></DialogTitle>
         </DialogHeader>
         {tab && <SavedManager tab={tab} onTab={onTab} note={note} />}
       </DialogContent>

@@ -101,7 +101,7 @@ function AddArm({ busy, onAdd }: { busy?: boolean; onAdd: (q: string) => void })
     <form className="partadd" onSubmit={(e) => { e.preventDefault(); if (q.trim()) { onAdd(q.trim()); setQ(""); } }}>
       <Input className={FIELD} value={q} onChange={(e) => setQ(e.target.value)} placeholder="add an arm: OQL, e.g. KRAS: G12D" spellCheck={false} />
       <Button variant="outline" size="sm" className={TB} type="submit" disabled={busy || !q.trim()}
-        title="added as the FIRST arm, so a broader arm below cannot take its patients; move it with ↑ ↓"><Plus />add arm</Button>
+        data-tip="added as the FIRST arm, so a broader arm below cannot take its patients; move it with ↑ ↓"><Plus />add arm</Button>
     </form>
   );
 }
@@ -112,7 +112,7 @@ function RowName({ label, editable, busy, onRename }: { label: string; editable:
   const [draft, setDraft] = useState(label);
   if (!editable) return <>{label}</>;
   if (!editing)
-    return <button type="button" className="partrename" disabled={busy} title="rename" onClick={() => { setDraft(label); setEditing(true); }}>{label}</button>;
+    return <button type="button" className="partrename" disabled={busy} data-tip="rename" onClick={() => { setDraft(label); setEditing(true); }}>{label}</button>;
   const commit = () => { setEditing(false); if (draft.trim() && draft.trim() !== label) onRename(draft.trim()); };
   return <input className="partrenameinput" autoFocus value={draft} maxLength={80}
     onChange={(e) => setDraft(e.target.value)} onBlur={commit}
@@ -155,9 +155,9 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
   return (
     <div className={"partbox" + (depth ? " nested" : "")} data-partition={name}>
       <div className="parthead">
-        <span className="partname" title={"split “" + name + "”: arms tested in order, the first match wins"}>⑂ {def.split || name}</span>
+        <span className="partname" data-tip={"split “" + name + "”: arms tested in order, the first match wins"}>⑂ {def.split || name}</span>
         <span className="meta">splits “{def.of}”{res ? " · " + res.parentCount.toLocaleString() + " patients" : ""}</span>
-        <Button variant="ghost" size="icon-xs" className="partrm ml-auto text-muted-foreground" disabled={busy} title="remove this split (and any split nested under it)"
+        <Button variant="ghost" size="icon-xs" className="partrm ml-auto text-muted-foreground" disabled={busy} data-tip="remove this split (and any split nested under it)"
           aria-label="remove this split" onClick={() => onRemove(name)}><X /></Button>
       </div>
       <div className="partrows" role="table">
@@ -167,30 +167,30 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
           const nested = nestedUnder(c.name);
           return (
             <div key={c.name}>
-              <div className={"partrow " + c.role} role="row" title={cohortText(c.name) || c.name}>
+              <div className={"partrow " + c.role} role="row" data-tip={cohortText(c.name) || c.name}>
                 <span className="partmark" aria-hidden="true">{ROLE_MARK[c.role]}</span>
                 <span className="partlabel">
                   <RowName label={c.label} editable={c.role !== "notEvaluable"} busy={busy} onRename={(to) => onRename(name, c.label, to)} />
                   {c.role === "other" && <span className="meta"> · no arm matched</span>}
                   {c.role === "notEvaluable" && <span className="meta"> · not compared</span>}
                   {c.role === "arm" && c.count === 0 && i > 0 &&
-                    <span className="meta" title="arms are tested in order: an earlier arm already took every patient this one matches, or nobody matches it"> · empty — an earlier arm may take its patients</span>}
+                    <span className="meta" data-tip="arms are tested in order: an earlier arm already took every patient this one matches, or nobody matches it"> · empty — an earlier arm may take its patients</span>}
                 </span>
                 <span className="partcount">{c.count == null ? <span className="spinner" /> : c.count.toLocaleString()}</span>
-                <span className="partbar" aria-hidden="true" title={p == null ? "" : p.toFixed(1) + "% of “" + def.of + "”"}>
+                <span className="partbar" aria-hidden="true" data-tip={p == null ? "" : p.toFixed(1) + "% of “" + def.of + "”"}>
                   {p != null && <span style={{ width: Math.max(p, p > 0 ? 1.5 : 0) + "%" }} />}
                 </span>
                 <span className="partacts">
                   {i >= 0 && <>
-                    <Button variant="ghost" size="icon-xs" disabled={busy || i === 0} title="test this arm earlier" aria-label="move this arm up"
+                    <Button variant="ghost" size="icon-xs" disabled={busy || i === 0} data-tip="test this arm earlier" aria-label="move this arm up"
                       onClick={() => onChange(name, moveArm(def, i, i - 1))}><ArrowUp /></Button>
-                    <Button variant="ghost" size="icon-xs" disabled={busy || i === def.arms.length - 1} title="test this arm later" aria-label="move this arm down"
+                    <Button variant="ghost" size="icon-xs" disabled={busy || i === def.arms.length - 1} data-tip="test this arm later" aria-label="move this arm down"
                       onClick={() => onChange(name, moveArm(def, i, i + 1))}><ArrowDown /></Button>
                     <Button variant="ghost" size="icon-xs" disabled={busy || !canMergeArms(def, i, i + 1)} aria-label="merge with the next arm"
-                      title={i === def.arms.length - 1 ? "the last arm has no next arm to merge with" : "merge with the next arm: one arm matching either"}
+                      data-tip={i === def.arms.length - 1 ? "the last arm has no next arm to merge with" : "merge with the next arm: one arm matching either"}
                       onClick={() => onChange(name, mergeArms(def, i, i + 1))}><Merge /></Button>
                     <Button variant="ghost" size="icon-xs" disabled={busy || def.arms.length < 2} aria-label="remove this arm"
-                      title={def.arms.length < 2 ? "a split needs at least one arm — remove the split instead" : "remove this arm: its patients move to a later arm or Other"}
+                      data-tip={def.arms.length < 2 ? "a split needs at least one arm — remove the split instead" : "remove this arm: its patients move to a later arm or Other"}
                       onClick={() => onChange(name, removeArm(def, i))}><Minus /></Button>
                   </>}
                   {c.role !== "notEvaluable" && !nested.length &&
@@ -225,11 +225,11 @@ export function ChartMenu({ actions, label }: { actions: ChartAction[]; label: s
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon-xs" className="chartgear" title={"actions for " + label} aria-label={"actions for " + label}><Ellipsis /></Button>
+        <Button variant="outline" size="icon-xs" className="chartgear" data-tip={"actions for " + label} aria-label={"actions for " + label}><Ellipsis /></Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
         {actions.map((a) => (
-          <DropdownMenuItem key={a.label} disabled={a.disabled} title={a.title} onSelect={a.onClick}>
+          <DropdownMenuItem key={a.label} disabled={a.disabled} data-tip={a.title} onSelect={a.onClick}>
             {a.working && <LoaderCircle className="animate-spin" />}{a.label}
           </DropdownMenuItem>
         ))}

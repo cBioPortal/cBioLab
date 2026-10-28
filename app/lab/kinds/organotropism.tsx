@@ -13,21 +13,21 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="where the metastatic sites come from: per-organ DMETS_DX_ flags, tumour sites on the timeline, or the biopsy site of metastasis samples">
+        <label className="tbfield" data-tip="where the metastatic sites come from: per-organ DMETS_DX_ flags, tumour sites on the timeline, or the biopsy site of metastasis samples">
           sites <OptionSelect value={spec.source || "auto"} disabled={busy} onValueChange={(v) => patch({ source: v === "auto" ? undefined : v })}>
             <option value="auto">auto</option><option value="flags">per-organ flags</option><option value="timeline">timeline</option><option value="sample">biopsy site</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" title="genes, comma-separated (at most 20); empty for the most altered">
+        <label className="tbfield" data-tip="genes, comma-separated (at most 20); empty for the most altered">
           genes <DraftInput value={genes.join(", ")} disabled={busy} width="14rem" placeholder={"top " + (spec.top ?? 12) + " altered"}
             onCommit={(t) => { const l = t.split(/[,\s]+/).map((x) => x.trim().toUpperCase()).filter(Boolean); patch({ genes: l.length ? l : undefined }); }} />
         </label>
-        <label className="tbfield" title="count every alteration, or only OncoKB drivers">
+        <label className="tbfield" data-tip="count every alteration, or only OncoKB drivers">
           count <OptionSelect value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onValueChange={(v) => patch({ measure: v === "any" ? "any" : undefined })}>
             <option value="driver">drivers</option><option value="any">any</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" title="the covariate the 2×2 tables are stratified by (Cochran–Mantel–Haenszel)">
+        <label className="tbfield" data-tip="the covariate the 2×2 tables are stratified by (Cochran–Mantel–Haenszel)">
           within <OptionSelect value={strat} disabled={busy} onValueChange={(v) => patch({ stratifyBy: v === "" ? null : v === "CANCER_TYPE" ? undefined : v })}>
             <option value="">no strata</option>
             {!cats.includes("CANCER_TYPE") && <option value="CANCER_TYPE">CANCER_TYPE</option>}

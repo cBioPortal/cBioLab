@@ -12,7 +12,7 @@ export function ErrorAlert({ children, onUndo }: { children: ReactNode; onUndo?:
       {onUndo ? <span className="min-w-0 flex-1">{children}</span> : children}
       {onUndo && (
         <Button variant="outline" className={cn(TB, "undo-error shrink-0 whitespace-nowrap")} onClick={onUndo}
-          title="put the analysis back as it was before the last change (Ctrl/⌘-Z)"><Undo2 />Undo last change</Button>
+          data-tip="put the analysis back as it was before the last change (Ctrl/⌘-Z)"><Undo2 />Undo last change</Button>
       )}
     </div>
   );

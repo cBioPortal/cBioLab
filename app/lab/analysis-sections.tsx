@@ -194,18 +194,18 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
             Cohorts in this analysis <span className="plain meta">— add one from a view</span>{busy && <span className="spinner" />}
             <span className="ml-auto flex items-center gap-2 text-sm font-normal normal-case tracking-normal">
             <Button variant="outline" size="sm" className={cn(TB, "fromlist")} disabled={busy} onClick={() => setFromList(true)}
-              title="add a cohort made from a pasted list of sample or patient ids to this analysis"><Plus />From a list of ids…</Button>
+              data-tip="add a cohort made from a pasted list of sample or patient ids to this analysis"><Plus />From a list of ids…</Button>
             {names.length > 0 && <span className="analysislock flex items-center gap-2">
               {doc.locked
                 ? <>
-                    <span className="inline-flex items-center gap-1 text-muted-foreground" title={"every cohort, and its split arms, frozen at once to the patients it selected then" +
+                    <span className="inline-flex items-center gap-1 text-muted-foreground" data-tip={"every cohort, and its split arms, frozen at once to the patients it selected then" +
                       (doc.locked.dataVersion ? "\ndata version then: " + doc.locked.dataVersion : "")}>
                       <Lock className="size-3.5" />locked {lockDate(doc.locked.at)}</span>
                     <Button variant="link" size="inline" className="text-sm" disabled={busy} onClick={unlockAll}
-                      title="every cohort follows its definition again">unlock all</Button>
+                      data-tip="every cohort follows its definition again">unlock all</Button>
                   </>
                 : <Button variant="outline" size="sm" className={cn(TB, "lockall")} disabled={busy || lockingAll} onClick={() => void lockAll()}
-                    title="freeze every cohort, and its split arms, at this moment to the patients it selects now, so the analysis stays the same as patients are added to the data">
+                    data-tip="freeze every cohort, and its split arms, at this moment to the patients it selects now, so the analysis stays the same as patients are added to the data">
                     {lockingAll ? <span className="spinner" /> : <Lock />}Lock all cohorts</Button>}
             </span>}
             </span>
@@ -244,11 +244,11 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                     {doc.cohorts?.[n] && <CohortPills def={doc.cohorts[n]} onCustomData={showClauseData(n)} />}
                     {doc.cohorts?.[n]?.notes && <p className="note">{doc.cohorts[n].notes}</p>}
                     <div className="cohortbox-foot">
-                      <span className={"cohortsum-views" + (views.length ? "" : " unused")} title={views.join(", ")}>
+                      <span className={"cohortsum-views" + (views.length ? "" : " unused")} data-tip={views.join(", ")}>
                         {views.length ? "in " + views.join(", ") : "in no view"}
                       </span>
                       {src && <button className={"srcbadge" + (src.state === "changed" ? " changed" : "")} aria-expanded={open} onClick={toggle}
-                        title={src.state === "changed" ? "your saved cohort “" + src.srcName + "” has changed since this one was linked to it — open to compare and update"
+                        data-tip={src.state === "changed" ? "your saved cohort “" + src.srcName + "” has changed since this one was linked to it — open to compare and update"
                           : src.state === "deleted" ? "linked to a saved cohort “" + src.from.name + "” that has since been deleted"
                           : "linked to your saved cohort “" + (src.srcName || src.from.name) + "” (#" + shortHash(src.from.hash) + ") — open for details"}>
                         {src.state === "changed" ? "saved version changed" : src.state === "deleted" ? "source deleted" : "in library"}</button>}
@@ -256,17 +256,17 @@ export function CohortColumn({ ctx }: { ctx: AnalysisCtx }) {
                     {open && src && (
                       <div className="cohortsrc meta">
                         <span>Linked to your saved cohort <strong>“{src.from.name}”</strong>{src.from.savedAt ? " (saved " + src.from.savedAt + ")" : ""}
-                          {" "}· definition <code title={src.from.hash}>#{shortHash(src.from.hash)}</code>.</span>
+                          {" "}· definition <code data-tip={src.from.hash}>#{shortHash(src.from.hash)}</code>.</span>
                         {src.state === "unknown" && <span> {loggedIn ? "Checking the saved cohort…" : "Sign in to compare it with the saved cohort."}</span>}
                         {src.state === "deleted" && <span> That saved cohort has since been deleted; this one is unaffected.</span>}
                         {(src.state === "current" || src.state === "changed") && src.srcName !== src.from.name && <span> It is now named “{src.srcName}”.</span>}
                         {src.state === "current" && !src.edited && <span> The saved cohort is unchanged.</span>}
                         {src.edited && <span> This one has been edited here since (now <code>#{shortHash(cohortHash(doc.cohorts![n]))}</code>).</span>}
-                        {src.state === "changed" && <span className="cohortsrc-changed"> The saved cohort has changed since (now <code title={src.now}>#{shortHash(src.now!)}</code>, saved {src.src!.savedAt}).</span>}
+                        {src.state === "changed" && <span className="cohortsrc-changed"> The saved cohort has changed since (now <code data-tip={src.now}>#{shortHash(src.now!)}</code>, saved {src.src!.savedAt}).</span>}
                         {(src.state === "changed" || (src.state === "current" && src.edited)) && <>
                           {src.state === "changed" && <div className="cohortsrc-new"><span className="meta">The saved version:</span> <CohortPills def={src.src!.def} /></div>}
                           <Button variant="outline" size="sm" className="h-ctl" disabled={busy} onClick={() => updateFromSaved(n)}
-                            title={"replace this cohort's definition with the saved cohort's; every view drawing “" + n + "” re-runs"}>
+                            data-tip={"replace this cohort's definition with the saved cohort's; every view drawing “" + n + "” re-runs"}>
                             {src.state === "changed" ? "Update to the saved version" : "Revert to the saved version"}</Button>
                         </>}
                       </div>
@@ -314,7 +314,7 @@ function LockLine({ lock, drift }: { lock: CohortLock; drift?: LockDrift }) {
   }
   return (
     <p className="lockline m-0 mb-1.5 flex flex-wrap items-baseline gap-x-2 text-sm text-muted-foreground"
-      title={"frozen " + lock.at + (lock.dataVersion ? "\ndata version then: " + lock.dataVersion : "") + (lock.oncokbPin ? "\nOncoKB " + lock.oncokbPin : "")}>
+      data-tip={"frozen " + lock.at + (lock.dataVersion ? "\ndata version then: " + lock.dataVersion : "") + (lock.oncokbPin ? "\nOncoKB " + lock.oncokbPin : "")}>
       <span className="inline-flex items-center gap-1 text-foreground"><Lock className="size-3.5" />locked {lockDate(lock.at)}</span>
       {!drift ? null
         : drift.error ? <span className="text-destructive">{drift.error}</span>
@@ -347,7 +347,7 @@ export function DocDialog({ ctx }: { ctx: AnalysisCtx }) {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button disabled={busy} onClick={applyText}>{busy ? <LoaderCircle className="animate-spin" /> : <Play />}{busy ? "Running…" : "Run document"}</Button>
         {doc.cohorts && Object.keys(doc.cohorts).length > 0 &&
-          <Button variant="outline" disabled={busy} title="empty the document — removes all cohorts and views" onClick={clearAnalysis}>Clear analysis</Button>}
+          <Button variant="outline" disabled={busy} data-tip="empty the document — removes all cohorts and views" onClick={clearAnalysis}>Clear analysis</Button>}
         {result && <span className="text-sm text-muted-foreground">{result.stats.ms}ms · OncoKB {result.oncokbPin}</span>}
       </div>
       <p className="mt-3 text-md text-muted-foreground">Views: <code>{`{"kind":"compare","genes":[…]}`}</code> · <code>{`{"kind":"survival"}`}</code> · <code>{`{"kind":"oncoprint","genes":[…],"clinical":[attrs…]}`}</code></p>
@@ -389,17 +389,17 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
                 own label stays fixed. */}
             {(docHistory.canUndo || docHistory.canRedo) && <>
               <Button variant="outline" size="sm" className="undo-doc" disabled={!docHistory.canUndo} onClick={docHistory.undo}
-                title={docHistory.canUndo ? "undo the last change to this analysis (Ctrl/⌘-Z, or the browser's Back)" : "nothing to undo: this is the analysis as opened"}>
+                data-tip={docHistory.canUndo ? "undo the last change to this analysis (Ctrl/⌘-Z, or the browser's Back)" : "nothing to undo: this is the analysis as opened"}>
                 <Undo2 />Undo
               </Button>
               <Button variant="outline" size="sm" className="redo-doc" disabled={!docHistory.canRedo} onClick={docHistory.redo}
-                title={docHistory.canRedo ? "redo the change just undone (Shift-Ctrl/⌘-Z)" : "nothing to redo"}>
+                data-tip={docHistory.canRedo ? "redo the change just undone (Shift-Ctrl/⌘-Z)" : "nothing to redo"}>
                 <Redo2 />Redo
               </Button>
             </>}
             {((doc.views || []).length > 0 || doc.title || doc.params || doc.notes) && (
               <Button variant="outline" size="sm" disabled={busy} onClick={openWorkspaceSave}
-                title={doc.title
+                data-tip={doc.title
                   ? "“" + doc.title + "” — " + (spaces[doc.title] && sameJson(spaces[doc.title].doc, doc)
                       ? "saved " + spaces[doc.title].savedAt : "unsaved changes")
                   : "save this analysis as a named, reopenable workspace"}>
@@ -411,13 +411,13 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
               const used = referencedDatasets(doc);
               return used.length > 0 && (
                 <Button variant="link" size="inline" className="text-md" onClick={() => setCdFocus({ datasets: used })}
-                  title="the uploads this analysis names, as stored in this browser">
+                  data-tip="the uploads this analysis names, as stored in this browser">
                   custom data ({used.length})
                 </Button>
               );
             })()}
             <Button variant="link" size="inline" className="text-md" onClick={() => docDialog.current?.showModal()}
-              title="open the document's raw JSON — edit it, run it, or view generated SQL">
+              data-tip="open the document's raw JSON — edit it, run it, or view generated SQL">
               <Braces />show document json
             </Button>
           </div>
@@ -440,7 +440,7 @@ export function ViewColumn({ ctx }: { ctx: AnalysisCtx }) {
         <div className="card addview">
           <div className="row center g2">
             <Button size="sm" className="addview-open" disabled={full}
-              title={full ? FULL : "choose a view — survival, an oncoprint, a gene comparison — then its cohorts"}
+              data-tip={full ? FULL : "choose a view — survival, an oncoprint, a gene comparison — then its cohorts"}
               onClick={() => setAddOpen(true)}><Plus />Add view</Button>
             <span className="meta">{(doc.views || []).length} of 6 in this document</span>
           </div>

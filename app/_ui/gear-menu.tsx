@@ -43,7 +43,7 @@ export function GearMenu({ menuId, menuStore, label, title, ariaLabel, className
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" title={title} aria-label={ariaLabel} data-menu-id={menuId}
+        <Button variant="outline" size="sm" data-tip={title} aria-label={ariaLabel} data-menu-id={menuId}
           className={cn("h-ctl gap-1 px-2 text-md font-normal shadow-none data-[state=open]:border-primary data-[state=open]:bg-accent data-[state=open]:text-accent-foreground", className)}>
           {label}
         </Button>

@@ -36,7 +36,7 @@ export function AddDataDialog({ initial, onAdded, onClose }: { initial: string[]
               Its ids are matched against the studies it belongs to.</p>
             <div className="flex flex-wrap items-center gap-1.5">
               <b className="text-md">Studies</b>
-              {studies.map((id) => <RemoveBadge key={id} label={"remove " + id} title={name(id)} onClick={() => setStudies((s) => s.filter((x) => x !== id))}>{id}</RemoveBadge>)}
+              {studies.map((id) => <RemoveBadge key={id} label={"remove " + id} data-tip={name(id)} onClick={() => setStudies((s) => s.filter((x) => x !== id))}>{id}</RemoveBadge>)}
               <label className="relative flex items-center">
                 <Search className="pointer-events-none absolute left-2 size-3.5 text-muted-foreground" />
                 <Input value={q} onChange={(e) => setQ(e.target.value)} aria-label="find a study" className="h-ctl w-72 pl-7 text-md md:text-md"
@@ -64,7 +64,7 @@ export function AddDataDialog({ initial, onAdded, onClose }: { initial: string[]
           </div>
         </div>
         <div data-tw className="flex justify-end border-t border-border bg-muted/40 px-6 py-3">
-          <Button variant="outline" className="cd-cancel" onClick={onClose} title="close without adding anything">Cancel</Button>
+          <Button variant="outline" className="cd-cancel" onClick={onClose} data-tip="close without adding anything">Cancel</Button>
         </div>
       </DialogContent>
     </Dialog>
