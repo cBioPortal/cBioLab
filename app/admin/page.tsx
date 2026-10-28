@@ -9,6 +9,8 @@ import { Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { SiteHeader } from "../_ui/site-header.tsx";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../_ui/select";
+import { Checkbox } from "../_ui/checkbox";
 import { ErrorAlert } from "../_ui/error-alert.tsx";
 import { TB } from "../_ui/toolbar.ts";
 import type { SettingGroup, SettingRow, SettingsReport } from "../../lib/settings.ts";
@@ -181,8 +183,7 @@ function SettingLine({ row, busy, onSave, onReset }: {
         </div>}
         {row.editable && editing && <form className="flex flex-wrap items-center gap-2"
           onSubmit={(e) => { e.preventDefault(); void onSave(draft).then((ok) => { if (ok) setEditing(false); }); }}>
-          <Input value={draft} onChange={(e) => setDraft(e.target.value)} aria-label={row.name} autoFocus
-            className="h-8 min-w-60 flex-1 font-mono text-sm" />
+          <Field row={row} draft={draft} setDraft={setDraft} />
           <Button type="submit" size="sm" className={TB} disabled={busy}>{busy && <Loader2 className="animate-spin" />}save</Button>
           <Button type="button" variant="ghost" size="sm" className={TB} onClick={() => { setDraft(current); setEditing(false); }}>cancel</Button>
         </form>}
@@ -190,4 +191,37 @@ function SettingLine({ row, busy, onSave, onReset }: {
       </td>
     </tr>
   );
+}
+
+// a Select item's value may not be empty, and "off"/"none" is the empty value
+const EMPTY = "\u0000empty";
+
+/** The draft's editor: one of the setting's choices, any number of them, or free text. */
+function Field({ row, draft, setDraft }: { row: SettingRow; draft: string; setDraft: (v: string) => void }) {
+  if (row.choices && row.multi) {
+    const picked = new Set(draft.split(/[,\s]+/).filter(Boolean));
+    const toggle = (v: string, on: boolean) =>
+      setDraft(row.choices!.filter((c) => (c.value === v ? on : picked.has(c.value))).map((c) => c.value).join(","));
+    return <fieldset className="flex flex-1 flex-wrap items-center gap-x-4 gap-y-1" aria-label={row.name}>
+      {row.choices.map((c) => (
+        <label key={c.value} className="flex items-center gap-2 text-sm">
+          <Checkbox checked={picked.has(c.value)} onCheckedChange={(on) => toggle(c.value, on === true)} />{c.label}
+        </label>
+      ))}
+      {picked.size === 0 && <span className="meta">none</span>}
+    </fieldset>;
+  }
+  if (row.choices) {
+    const known = row.choices.some((c) => c.value === draft);
+    return <Select value={known ? draft || EMPTY : undefined} onValueChange={(v) => setDraft(v === EMPTY ? "" : v)}>
+      <SelectTrigger size="sm" className="min-w-60 flex-1" aria-label={row.name}>
+        <SelectValue placeholder={draft ? "not a choice: " + draft : "choose"} />
+      </SelectTrigger>
+      <SelectContent>
+        {row.choices.map((c) => <SelectItem key={c.value} value={c.value || EMPTY}>{c.label}</SelectItem>)}
+      </SelectContent>
+    </Select>;
+  }
+  return <Input value={draft} onChange={(e) => setDraft(e.target.value)} aria-label={row.name} autoFocus
+    className="h-8 min-w-60 flex-1 font-mono text-sm" />;
 }

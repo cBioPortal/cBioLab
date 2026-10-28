@@ -42,9 +42,16 @@ export interface SettingSpec {
   secret?: boolean;
   /** throws, naming the problem, on a value the app could not use */
   check?: (v: string) => void;
+  /** every value it can take, when they are few: /admin offers them to pick from */
+  choices?: readonly SettingChoice[];
+  /** with `choices`: any number of them, as a comma-separated list */
+  multi?: boolean;
 }
+export interface SettingChoice { value: string; label: string }
 
 const list = (v: string) => v.split(/[,\s]+/).filter(Boolean);
+const ON_OFF: readonly SettingChoice[] = [{ value: "", label: "off" }, { value: "1", label: "on (1)" }];
+const CONNECTIONS: readonly SettingChoice[] = [{ value: "a", label: "a, the primary warehouse" }, { value: "b", label: "b, the second warehouse" }];
 const label = (v: string) => { if (v.length > 120) throw new Error("a label is at most 120 characters"); };
 
 export const SETTINGS: readonly SettingSpec[] = [
@@ -65,7 +72,7 @@ export const SETTINGS: readonly SettingSpec[] = [
   },
   { name: "PEER_LABEL", group: "peers", editable: true, check: label, help: "how results and captions name a FEDERATION_PEERS peer" },
   {
-    name: "LOOPBACK_PEER", group: "peers", editable: true,
+    name: "LOOPBACK_PEER", group: "peers", editable: true, choices: [{ value: "", label: "none" }, ...CONNECTIONS],
     help: "a connection id (e.g. b, the second warehouse) this app serves to itself through its own federation API as a simulated peer",
     check: (v) => { if (v.trim() && !/^[ab]$/.test(v.trim())) throw new Error("LOOPBACK_PEER names a connection: a or b"); },
   },
@@ -83,12 +90,12 @@ export const SETTINGS: readonly SettingSpec[] = [
     check: (v) => { parseRules(v, "FEDERATION_DISCLOSE_PATIENTS"); },
   },
   {
-    name: "FEDERATION_HIDE_SQL", group: "peers", editable: true,
+    name: "FEDERATION_HIDE_SQL", group: "peers", editable: true, choices: ON_OFF,
     help: "1 keeps this instance's compiled SQL out of what it answers peers",
     check: (v) => { if (v !== "" && v !== "1") throw new Error("FEDERATION_HIDE_SQL is 1 or empty"); },
   },
   {
-    name: "AGGREGATE_ONLY_INSTANCES", group: "access", editable: true,
+    name: "AGGREGATE_ONLY_INSTANCES", group: "access", editable: true, choices: CONNECTIONS, multi: true,
     help: "connection ids (a, b) treated as aggregate-only: never asked for a patient id",
     check: (v) => { for (const id of list(v)) if (!/^[ab]$/.test(id)) throw new Error("'" + id.slice(0, 40) + "' is not a connection id (a or b)"); },
   },
@@ -103,7 +110,7 @@ export const SETTINGS: readonly SettingSpec[] = [
     check: (v) => { for (const id of list(v)) if (!/^[A-Za-z0-9._-]{1,120}$/.test(id)) throw new Error("'" + id.slice(0, 80) + "' is not a study id"); },
   },
   {
-    name: "STUDY_ALLOW_RESTRICTED", group: "access", editable: true,
+    name: "STUDY_ALLOW_RESTRICTED", group: "access", editable: true, choices: ON_OFF,
     help: "1 routes consortium- and institution-restricted studies, which are otherwise unreachable",
     check: (v) => { if (v !== "" && v !== "1") throw new Error("STUDY_ALLOW_RESTRICTED is 1 or empty"); },
   },
@@ -194,6 +201,7 @@ async function load(): Promise<void> {
 
 export interface SettingRow {
   name: string; group: SettingGroup; help: string; editable: boolean; secret: boolean;
+  choices: readonly SettingChoice[] | null; multi: boolean;
   /** the environment's value (null for a secret: `envSet` says whether there is one) */
   env: string | null; envSet: boolean;
   /** the administrator's override, when there is one */
@@ -213,10 +221,14 @@ export interface SettingsReport {
 export async function settingsReport(): Promise<SettingsReport> {
   await refreshSettings(true);
   const o = state.overrides;
+  const databases = describeConnections(), connLabel = new Map(databases.map((d) => [d.id, d.id + ", " + d.label]));
+  // a connection id is offered under the name this deployment gives that connection
+  const named = (cs: readonly SettingChoice[] | undefined) => cs?.map((c) => ({ ...c, label: connLabel.get(c.value) ?? c.label })) ?? null;
   const rows = SETTINGS.map((s): SettingRow => {
     const env = process.env[s.name];
     const ov = s.editable ? o?.get(s.name) ?? null : null;
     return { name: s.name, group: s.group, help: s.help, editable: s.editable && !state.unavailable, secret: !!s.secret,
+      choices: named(s.choices), multi: !!s.multi,
       env: s.secret ? null : env ?? null, envSet: !!env, override: ov };
   });
   const cleared = o?.get(CACHE_CLEARED);
@@ -227,7 +239,7 @@ export async function settingsReport(): Promise<SettingsReport> {
       " order by l.id desc limit 50")).map((r) => ({ name: r.name, old: r.old_value, new: r.new_value, at: new Date(r.changed_at).toISOString(), by: r.email }));
   }
   const by = cleared?.by ? log.find((l) => l.name === CACHE_CLEARED)?.by ?? null : null;
-  return { databases: describeConnections(), rows, unavailable: state.unavailable, cacheCleared: cleared ? { at: cleared.value, by } : null, log };
+  return { databases, rows, unavailable: state.unavailable, cacheCleared: cleared ? { at: cleared.value, by } : null, log };
 }
 
 async function write(name: string, value: string | null, by: string): Promise<void> {
