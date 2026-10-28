@@ -108,3 +108,20 @@ FROM os
   INNER JOIN c0 ON c0.id = os.pid
   INNER JOIN c1 ON c1.id = os.pid
 WHERE os.months IS NOT NULL
+
+-- view 0 forest: survivalLeftOut:OS_MONTHS · msk_impact_50k_2026
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'),
+os AS (
+  SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid,
+         anyIf(attribute_value, attribute_name = 'OS_MONTHS') AS months,
+         anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'patient'
+    AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
+    AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  GROUP BY pid
+)
+SELECT countIf(lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(months)), nan)), toFloat64OrNull(trimBoth(months)), NULL) >= 0 AND NOT lowerUTF8(trimBoth(ifNull(status, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na')) AS no_status,
+       countIf(lowerUTF8(trimBoth(ifNull(status, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND NOT (lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(months)), nan)), toFloat64OrNull(trimBoth(months)), NULL) >= 0)) AS no_time
+FROM os

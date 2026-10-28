@@ -104,3 +104,20 @@ SELECT os.months AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByCha
 FROM os
   INNER JOIN c0 ON c0.id = os.pid
 WHERE os.months IS NOT NULL
+
+-- view 0 cox: survivalLeftOut:OS_MONTHS · crc_apc_impact_2020
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'crc_apc_impact_2020'),
+os AS (
+  SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid,
+         anyIf(attribute_value, attribute_name = 'OS_MONTHS') AS months,
+         anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'crc_apc_impact_2020' AND type = 'patient'
+    AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
+    AND replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') IN (SELECT pid FROM cohort)
+  GROUP BY pid
+)
+SELECT countIf(lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(months)), nan)), toFloat64OrNull(trimBoth(months)), NULL) >= 0 AND NOT lowerUTF8(trimBoth(ifNull(status, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na')) AS no_status,
+       countIf(lowerUTF8(trimBoth(ifNull(status, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND NOT (lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(months)), nan)), toFloat64OrNull(trimBoth(months)), NULL) >= 0)) AS no_time
+FROM os

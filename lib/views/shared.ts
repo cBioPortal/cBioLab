@@ -1,6 +1,7 @@
 // Helpers several view runners share: limits, which participants can answer a view aggregate,
 // refusals, and lookups more than one view makes.
 import { plainResult, type ViewResult, type ViewKind } from "../types.ts";
+import { survivalLeftOutSql } from "../survival-queries.ts";
 import { hasViewAggregates, type Resolver, type ViewAggregateCapable } from "../federation.ts";
 import { geneCytobandsSql } from "../federation-views.ts";
 import type { ViewRun } from "./run.ts";
@@ -110,4 +111,47 @@ export async function askEachSite<R, T>(ctx: ViewRun, resolvers: Record<string, 
   const sites = ctx.vNames.flatMap((cohort) => ctx.cohorts[cohort].studies.filter((st) => resolvers[st]).map((study) => ({ cohort, study })));
   const answers = await Promise.all(sites.map((s) => ask(s.cohort, s.study, resolvers[s.study])));
   return sites.map((s, i) => ({ ...s, answer: answers[i] }));
+}
+
+/** a cohort whose left-out patients reach this share of it is drawn from incomplete follow-up, and the caveat says so */
+export const LEFT_OUT_WARN_SHARE = 0.1;
+
+/** the endpoint columns a view names: monthsAttribute/statusAttribute, else <endpoint>_MONTHS/_STATUS (default OS); null when malformed, which the runner refuses */
+export function endpointColumnsOf(view: { endpoint?: unknown; monthsAttribute?: unknown; statusAttribute?: unknown }): { months: string; status: string } | null {
+  if (view.monthsAttribute != null || view.statusAttribute != null) {
+    const months = String(view.monthsAttribute || "").trim(), status = String(view.statusAttribute || "").trim();
+    return ATTR_NAME.test(months) && ATTR_NAME.test(status) ? { months, status } : null;
+  }
+  const endpoint = String(view.endpoint || "OS").toUpperCase().trim();
+  return /^[A-Z][A-Z0-9_]{0,39}$/.test(endpoint) ? { months: endpoint + "_MONTHS", status: endpoint + "_STATUS" } : null;
+}
+
+/**
+ * The opening of a survival view's caveat: per cohort, the patients a survival analysis leaves out
+ * for want of half an endpoint (lib/survival-sql.ts) — a usable time but no status, a status but no
+ * usable time — with a warning when they reach LEFT_OUT_WARN_SHARE of the cohort. cBioPortal leaves
+ * them out silently. A participant without view aggregates (a remote peer) is named as unknown.
+ * Empty when there are none.
+ */
+export async function survivalLeftOutCaveat(ctx: ViewRun, months: string, status: string): Promise<string> {
+  const totals = new Map(ctx.vNames.map((n) => [n, { noStatus: 0, noTime: 0 }]));
+  const unknown = new Set<string>();
+  for (const { cohort: n, study: st, answer } of await askEachSite(ctx, ctx.resolvers, (n, _st, r) => hasViewAggregates(r)
+    ? r.viewAggregate("survivalLeftOut:" + months, ctx.doc.cohorts[n], (cs, s, d) => survivalLeftOutSql(cs, s, d, months, status))
+    : Promise.resolve(null))) {
+    if (!answer) { unknown.add(st); continue; }
+    const t = totals.get(n)!;
+    t.noStatus += Number(answer[0]?.no_status || 0); t.noTime += Number(answer[0]?.no_time || 0);
+  }
+  const pl = (k: number) => k.toLocaleString("en-US") + " patient" + (k === 1 ? "" : "s");
+  const per = ctx.vNames.filter((n) => totals.get(n)!.noStatus || totals.get(n)!.noTime).map((n) => {
+    const { noStatus, noTime } = totals.get(n)!;
+    const share = (noStatus + noTime) / Math.max(1, ctx.cohorts[n].count);
+    return "“" + n + "”: " + [...(noStatus ? [pl(noStatus) + " with a time but no status"] : []), ...(noTime ? [pl(noTime) + " with a status but no usable time"] : [])].join(" and ") +
+      (share >= LEFT_OUT_WARN_SHARE ? " (" + Math.round(100 * share) + "% of the cohort: the survival analysis is drawn from incomplete follow-up, and is biased if the missing are sicker or healthier than the rest)" : "");
+  });
+  return (per.length
+    ? "Left out of the survival analysis (" + months + " / " + status + "), as on cBioPortal — a patient enters only with both a status and a time of at least 0, so a missing status is never read as censored: " + per.join("; ") + ". "
+    : "") +
+    (unknown.size ? "Not known for " + [...unknown].join(", ") + ", which send only their counts: how many of their patients lack a status or a time. " : "");
 }

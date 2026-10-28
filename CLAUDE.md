@@ -46,7 +46,9 @@ changing first. The parts, and the one place each rule lives:
 - **Patient views** (`timeline`, `alterations`) — one patient at a time, navigator
   `app/lab/patient-nav.tsx`; opt-in patient-level federation through `lib/disclosure.ts` (kinds
   `timeline`, `alterations`, and `plot` for a plot's cases).
-- **THE one place for:** timeline event-name folding — `lib/event-names.ts`; a treatment line —
+- **THE one place for:** timeline event-name folding — `lib/event-names.ts`; who enters a survival
+  analysis and what is an event — `lib/survival-sql.ts` (its queries `lib/survival-queries.ts`, and every
+  view reading an endpoint names who it leaves out, `reportsLeftOut` in `lib/views/index.ts`); a treatment line —
   `lib/treatment-lines.ts`; template parameters — `lib/params.ts`; splits — `lib/partition-arms.ts`
   and `lib/cohort-partitions.ts`; upgrading an older document — `lib/doc-version.ts`; a setting
   reaching the browser — `lib/public-env.ts`; a page's request — `app/lab/api.ts` with

@@ -47,7 +47,8 @@ import { pathToFileURL } from "node:url";
 import { buildExplore, buildExploreFederated } from "../lib/explore.ts";
 import { studyProfiles } from "../lib/analysis.ts";
 import { compileCohortDef, memberSamplesSql } from "../lib/cohort2.ts";
-import { resolverFor } from "../lib/federation.ts";
+import { resolverFor, hasViewAggregates } from "../lib/federation.ts";
+import { survivalLeftOutSql } from "../lib/survival-queries.ts";
 import { oqlCasesSql } from "../lib/oql.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
 import { oncokbPin } from "../lib/annotation.ts";
@@ -458,9 +459,10 @@ for (const [st, gene] of [["msk_chord_2024", "RTEL1-TNFRSF6B"], ["nsclc_ctdx_msk
       byPatient.set(r.patientId, { ...byPatient.get(r.patientId), [r.clinicalAttributeId]: r.value });
     // the portal's survival charts draw the patients owning a selected sample; its patient data also holds patients with none
     const withSample = new Set((await api<{ patientId: string }[]>("/studies/" + st + "/samples?pageSize=10000000")).map((x) => x.patientId));
-    let n = 0, events = 0;
+    let n = 0, events = 0, noStatus = 0;
     for (const [p, v] of byPatient) {
       if (!withSample.has(p)) continue;
+      if (missing(v.OS_STATUS) && !missing(v.OS_MONTHS) && !Number.isNaN(Number(v.OS_MONTHS)) && Number(v.OS_MONTHS) >= 0) noStatus++;
       if (missing(v.OS_STATUS) || missing(v.OS_MONTHS) || Number.isNaN(Number(v.OS_MONTHS)) || Number(v.OS_MONTHS) < 0) continue;
       n++;
       const parts = v.OS_STATUS.split(":").map((t) => t.trim());
@@ -471,6 +473,11 @@ for (const [st, gene] of [["msk_chord_2024", "RTEL1-TNFRSF6B"], ["nsclc_ctdx_msk
     const oursN = ours.reduce((a, r) => a + r.n, 0), oursEv = ours.reduce((a, r) => a + r.event * r.n, 0);
     record({ study: st, group: "survival", what: "patients in the OS curve", ours: String(oursN), portal: String(n), agree: oursN === n });
     record({ study: st, group: "survival", what: "deaths in the OS curve", ours: String(oursEv), portal: String(events), agree: oursEv === events });
+    // the survival view names the patients the portal leaves out silently: a time but no status
+    if (!hasViewAggregates(resolver)) throw new Error(st + ": the primary warehouse's resolver has no view aggregates");
+    const lo = await resolver.viewAggregate("survivalLeftOut:OS", null, (cs, s2, d) => survivalLeftOutSql(cs, s2, d, "OS_MONTHS", "OS_STATUS"));
+    const oursLo = Number(lo[0]?.no_status || 0);
+    record({ study: st, group: "survival", what: "patients left out: a time but no status", ours: String(oursLo), portal: String(noStatus), agree: oursLo === noStatus });
   }
 }
 
