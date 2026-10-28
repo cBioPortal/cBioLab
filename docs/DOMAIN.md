@@ -87,7 +87,7 @@ shortcut that gives a plausible wrong number), the trap is named.
 ## Who holds the data
 
 - **Participant / instance** — a database the app reads: the primary warehouse, a secondary one, or
-  an MCP **peer** (another deployment answering over MCP).
+  a federation **peer** (another deployment answering through its federation API).
 - **Patient-level / aggregate-only** — a patient-level participant may return patient ids to an
   entitled caller; an aggregate-only one returns counts and sums, never ids. The guarantee is a
   missing method, not a flag (invariant 10, `docs/DATA-BOUNDARY.md`). A view is drawn over every

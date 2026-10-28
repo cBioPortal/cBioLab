@@ -1,5 +1,5 @@
 // Whether a view can be drawn over every study its cohorts span. A federated participant answers
-// some views only in part — a remote MCP peer serves no patient rows and none of the aggregates in
+// some views only in part — a remote federation peer serves no patient rows and none of the aggregates in
 // lib/federation-views.ts, an aggregate-only instance no patient rows — and a view drawn without
 // one study's patients is a picture of a different cohort than the one it names. So such a view
 // is not drawn: the engine refuses it (lib/analysis.ts) and the page does not offer it
@@ -13,7 +13,7 @@ export interface StudyAccess {
   instance: string;
   /** its patients may be listed by any view */
   patientLevel: boolean;
-  /** a remote MCP peer (the simulated one included) */
+  /** a remote federation peer (the simulated one included) */
   remote: boolean;
   /** the patient-level kinds of data a remote peer shares with this app (lib/disclosure.ts) */
   shares: string[];

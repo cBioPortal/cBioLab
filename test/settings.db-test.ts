@@ -9,7 +9,7 @@ process.env.PEER_LABEL = "from the environment";
 process.env.CLICKHOUSE_PASSWORD = "env-secret";
 process.env.CLICKHOUSE_URL = "https://user:env-secret@warehouse.invalid:8443";
 process.env.LOOPBACK_PEER_TOKEN = "t".repeat(40);
-for (const k of ["PEER_MCP", "STUDY_DENY", "MCP_DISCLOSE_PATIENTS", "VERCEL_ENV"]) delete process.env[k];
+for (const k of ["FEDERATION_PEERS", "STUDY_DENY", "FEDERATION_DISCLOSE_PATIENTS", "VERCEL_ENV"]) delete process.env[k];
 
 const { startPostgres } = await import("./support/postgres.ts");
 const { userForEmail } = await import("../lib/users.ts");
@@ -51,28 +51,28 @@ describe("overrides", () => {
   test("credentials and unknown settings are refused", async () => {
     await assert.rejects(settings.setSetting("CLICKHOUSE_PASSWORD", "x", admin), /credentials/);
     await assert.rejects(settings.setSetting("CLICKHOUSE2_URL", "http://elsewhere.invalid", admin), /credentials/);
-    await assert.rejects(settings.setSetting("LOOPBACK_PEER_URL", "http://elsewhere.invalid/api/mcp", admin), /cannot be changed here/);
+    await assert.rejects(settings.setSetting("LOOPBACK_PEER_URL", "http://elsewhere.invalid/api/federation/v1", admin), /cannot be changed here/);
     await assert.rejects(settings.setSetting("ANTHROPIC_API_KEY", "x", admin), /no setting/);
   });
 
   test("a value the app could not use is refused, naming what is wrong", async () => {
-    await assert.rejects(settings.setSetting("MCP_DISCLOSE_PATIENTS", "genie_public:everything", admin), /unknown kind 'everything'/);
-    await assert.rejects(settings.setSetting("PEER_MCP", "genie_public", admin), /not study=URL/);
-    await assert.rejects(settings.setSetting("PEER_MCP", "genie_public=file:///etc/passwd", admin), /http\(s\)/);
+    await assert.rejects(settings.setSetting("FEDERATION_DISCLOSE_PATIENTS", "genie_public:everything", admin), /unknown kind 'everything'/);
+    await assert.rejects(settings.setSetting("FEDERATION_PEERS", "genie_public", admin), /not study=URL/);
+    await assert.rejects(settings.setSetting("FEDERATION_PEERS", "genie_public=file:///etc/passwd", admin), /http\(s\)/);
     await assert.rejects(settings.setSetting("LOOPBACK_PEER", "c", admin), /a or b/);
     await assert.rejects(settings.setSetting("STUDY_ALLOW_RESTRICTED", "yes", admin), /1 or empty/);
-    const n = (await db.query<{ n: number }>("select count(*)::int as n from app_setting where name in ('MCP_DISCLOSE_PATIENTS','PEER_MCP','LOOPBACK_PEER')")).rows[0].n;
+    const n = (await db.query<{ n: number }>("select count(*)::int as n from app_setting where name in ('FEDERATION_DISCLOSE_PATIENTS','FEDERATION_PEERS','LOOPBACK_PEER')")).rows[0].n;
     assert.equal(n, 0);
   });
 
   test("the rules federation reads come from the override", async () => {
-    await settings.setSetting("PEER_MCP_PATIENT_LEVEL", "genie_public:timeline", admin);
+    await settings.setSetting("FEDERATION_ACCEPT_PATIENT_LEVEL", "genie_public:timeline", admin);
     assert.deepEqual([...acceptedFromPeers().get("genie_public")!], ["timeline"]);
     await settings.setSetting("STUDY_DENY", "brca_tcga", admin);
     assert.equal(isRestrictedStudy("brca_tcga", "Breast"), true);
     await settings.setSetting("STUDY_DENY", null, admin);
     assert.equal(isRestrictedStudy("brca_tcga", "Breast"), false);
-    await settings.setSetting("PEER_MCP_PATIENT_LEVEL", null, admin);
+    await settings.setSetting("FEDERATION_ACCEPT_PATIENT_LEVEL", null, admin);
   });
 
   test("the fingerprint moves with every change and with a cache clear", async () => {

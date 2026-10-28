@@ -28,43 +28,44 @@ optional.
 ## Federation
 
 One analysis can draw on studies in more than one cBioPortal database, and the prototype offers
-that **over MCP**. Either one deployment holds both databases and serves the second to itself as
-a simulated peer (`LOOPBACK_PEER`: the public portal, dev servers, the gate), or a second
-instance holds it and this one reaches it at its `/api/mcp` (`PEER_MCP`). See the README's
+that through a **federation API** between cbio-lab instances (`/api/federation/v1`, separate from
+the agents' `/api/mcp`). Either one deployment holds both databases and serves the second to
+itself as a simulated peer (`LOOPBACK_PEER`: the public portal, dev servers, the gate), or a
+second instance holds it and this one reaches it at its `/api/federation/v1` (`FEDERATION_PEERS`). See the README's
 Federation section for what each supports, and `docs/DATA-BOUNDARY.md` for the rules.
 
 | var | where | meaning |
 |---|---|---|
 | `CLICKHOUSE2_URL`, `CLICKHOUSE2_USER`, `CLICKHOUSE2_PASSWORD`, `CLICKHOUSE2_DB`, `CLICKHOUSE2_LABEL` | the deployment holding both databases | the second database (connection id `b`). On its own it is queried directly; with `LOOPBACK_PEER=b` only through the simulated peer |
-| `LOOPBACK_PEER` | same | `b`: serve the second database to this app as a simulated peer over MCP |
-| `LOOPBACK_PEER_URL` | same | this deployment's own MCP endpoint, e.g. `https://cbiolab.vercel.app/api/mcp`. Unset, `http://127.0.0.1:$PORT/api/mcp` (needs `PORT`) |
+| `LOOPBACK_PEER` | same | `b`: serve the second database to this app as a simulated peer, through its own federation API |
+| `LOOPBACK_PEER_URL` | same | this deployment's own federation API, e.g. `https://cbiolab.vercel.app/api/federation/v1`. Unset, `http://127.0.0.1:$PORT/api/federation/v1` (needs `PORT`) |
 | `LOOPBACK_PEER_TOKEN` | same, required where several processes serve the app (Vercel) | a secret of 32+ characters (`openssl rand -hex 24`) that marks the app's calls to itself. Unset, each process makes its own, which works for a single `next dev`/`next start` process only |
-| `LOOPBACK_PEER_LABEL` | same | optional: how the peer's studies are labelled, e.g. `GENIE (via MCP)` (default `<CLICKHOUSE2_LABEL> (simulated peer)`) |
-| `PEER_MCP` | a coordinator using a separate peer | which studies a peer serves: `study=url` pairs, comma-separated, e.g. `genie_public=http://peer:3000/api/mcp,nsclc_public_genie_bpc=http://peer:3000/api/mcp`. Only the studies listed are taken from that peer |
-| `PEER_LABEL` | same | optional: how those studies are labelled (default `peer via MCP`) |
-| `MCP_DISCLOSE_PATIENTS` | the peer (for a simulated peer: the deployment) | opt-in patient-level federation, what the peer sends: rules `study:kind+kind`, comma-separated, `*` for every study. Kinds: `timeline`, `alterations`, `plot` (a plot's cases; its aggregates cross without a rule) (a bare study means `timeline`). Unset, the peer sends aggregates only |
-| `PEER_MCP_PATIENT_LEVEL` | the coordinator (for a simulated peer: the deployment) | the same rules, for what this app accepts. Patient-level data crosses only where both sides allow the study and kind |
+| `LOOPBACK_PEER_LABEL` | same | optional: how the peer's studies are labelled, e.g. `GENIE (federated)` (default `<CLICKHOUSE2_LABEL> (simulated peer)`) |
+| `FEDERATION_PEERS` | a coordinator using a separate peer | which studies a peer serves: `study=url` pairs, comma-separated, e.g. `genie_public=http://peer:3000/api/federation/v1,nsclc_public_genie_bpc=http://peer:3000/api/federation/v1`. Only the studies listed are taken from that peer |
+| `PEER_LABEL` | same | optional: how those studies are labelled (default `federated peer`) |
+| `FEDERATION_DISCLOSE_PATIENTS` | the peer (for a simulated peer: the deployment) | opt-in patient-level federation, what the peer sends: rules `study:kind+kind`, comma-separated, `*` for every study. Kinds: `timeline`, `alterations`, `plot` (a plot's cases; its aggregates cross without a rule) (a bare study means `timeline`). Unset, the peer sends aggregates only |
+| `FEDERATION_ACCEPT_PATIENT_LEVEL` | the coordinator (for a simulated peer: the deployment) | the same rules, for what this app accepts. Patient-level data crosses only where both sides allow the study and kind |
 | `FEDERATION_HIDE_SQL` | the peer | `1`: do not send the SQL it ran back with its answers (provenance then stops at the peer) |
 
-### The public portal (Vercel), over MCP
+### The public portal (Vercel), as its own simulated peer
 
 Keep `CLICKHOUSE2_*` and add, for **Production** only (a preview deployment would otherwise call
 production's endpoint):
 
 ```
 LOOPBACK_PEER=b
-LOOPBACK_PEER_URL=https://cbiolab.vercel.app/api/mcp
+LOOPBACK_PEER_URL=https://cbiolab.vercel.app/api/federation/v1
 LOOPBACK_PEER_TOKEN=<openssl rand -hex 24, marked Sensitive>
-LOOPBACK_PEER_LABEL=GENIE (via MCP)
-MCP_DISCLOSE_PATIENTS=*:timeline+alterations
-PEER_MCP_PATIENT_LEVEL=*:timeline+alterations
+LOOPBACK_PEER_LABEL=GENIE (federated)
+FEDERATION_DISCLOSE_PATIENTS=*:timeline+alterations
+FEDERATION_ACCEPT_PATIENT_LEVEL=*:timeline+alterations
 ```
 
 To let plots draw the peer's cases as points as well as its density, add `+plot` to both of the
 last two lines (`*:timeline+alterations+plot`); without it a plot over a peer's study is its
 density, and the caption says the peer shares no cases.
 
-Then redeploy. The study picker labels the second database's studies `GENIE (via MCP)`, and a
+Then redeploy. The study picker labels the second database's studies `GENIE (federated)`, and a
 view's "how these numbers were computed" marks the queries that ran on the peer. Without the last
 two lines the peer is aggregate-only: the timeline and alterations views are not drawn over its
 studies either.
@@ -74,7 +75,7 @@ studies either.
 `scripts/session-setup.sh` turns the simulated peer on in each session's `serve-<port>.sh`:
 
 ```
-export PORT=<port> LOOPBACK_PEER=b MCP_DISCLOSE_PATIENTS='*:timeline+alterations' PEER_MCP_PATIENT_LEVEL='*:timeline+alterations'
+export PORT=<port> LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations' FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations'
 ```
 
 These go in the serve script, **not** `.env.local`: `scripts/gate.sh` builds and serves from the
@@ -85,10 +86,10 @@ its loopback calls to the dev server. The gate runs its own federation stage
 ### A separate peer
 
 Run a second instance whose `CLICKHOUSE_*` is the other database (and no `CLICKHOUSE2_*`,
-`PEER_MCP` or `LOOPBACK_PEER` of its own), with `MCP_DISCLOSE_PATIENTS` if it shares patient-level
-data. On this instance, remove `CLICKHOUSE2_*` and set `PEER_MCP` (and `PEER_LABEL`,
-`PEER_MCP_PATIENT_LEVEL`). The study list and each study's catalog then come from the peer
-(`federated_studies`, `federated_catalog`). Bind the peer where only this instance can reach it:
+`FEDERATION_PEERS` or `LOOPBACK_PEER` of its own), with `FEDERATION_DISCLOSE_PATIENTS` if it shares
+patient-level data. On this instance, remove `CLICKHOUSE2_*` and set `FEDERATION_PEERS` (and
+`PEER_LABEL`, `FEDERATION_ACCEPT_PATIENT_LEVEL`). The study list and each study's catalog then come
+from the peer (its `studies` and `catalog` ops). Bind the peer where only this instance can reach it:
 see the security notes below.
 
 ## Sign-in and saved data

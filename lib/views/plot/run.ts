@@ -228,7 +228,7 @@ async function cohortLayer(name: string, base: { label: string; color: string },
   const hSites = sites.filter((s) => hc.studies.includes(s));
   const head = { kind: "cohort" as const, ...base, name, patients: hc.count };
   const unable = hSites.filter((s) => !hasFederatedPlot(c.resolvers[s]));
-  if (unable.length) return { layer: { ...head, inPlot: 0, n: 0, shown: "none", why: unable.join(", ") + " cannot answer a cohort layer (a remote peer over MCP, most likely)" } };
+  if (unable.length) return { layer: { ...head, inPlot: 0, n: 0, shown: "none", why: unable.join(", ") + " cannot answer a cohort layer (a remote federation peer, most likely)" } };
   const inPlot = (await Promise.all(hSites.map((s) => fr[s].plotHighlightCount(def, hDef)))).reduce((a, n) => a + n, 0);
   if (data.shape === "table") return { layer: { ...head, inPlot, n: 0, shown: "none", why: TABLE_WHY } };
   if (!inPlot || !data.n) return { layer: { ...head, inPlot, n: 0, shown: "none" } };
@@ -415,12 +415,12 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       // Federated: each site answers a smaller, self-contained question (its own extent, its
       // own bin counts against a shared grid, its own six sums, its own contingency cells or
       // box quartiles) and this pools them — the same division of labour co-expression's
-      // pairMoments already uses. A participant that cannot answer these yet (a remote MCP
+      // pairMoments already uses. A participant that cannot answer these yet (a remote federation
       // peer, today) is named rather than silently skipped.
       const missing = sites.filter((s) => !hasFederatedPlot(resolvers[s]));
       if (missing.length) {
         return untimed({ kind: "plot", error: "a federated plot needs every participant to support it, and " +
-          missing.join(", ") + " does not yet (a remote peer over MCP, most likely)." });
+          missing.join(", ") + " does not yet (a remote federation peer, most likely)." });
       }
       const fr = resolvers as Record<string, Resolver & FederatedPlotCapable>;
       const { xk, yk, shape, xLabel, yLabel } = await fr[sites[0]].plotAxisKinds(spec);

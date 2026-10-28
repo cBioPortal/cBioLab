@@ -1,6 +1,6 @@
 import { directConnections, withoutFailedQueries } from "../../../lib/ch.ts";
 import { studiesFor, type StudyRow } from "../../../lib/study-list.ts";
-import { peerMcpEntries, peerPatientKinds, remoteStudies } from "../../../lib/federation-remote.ts";
+import { federationPeers, peerPatientKinds, remoteStudies } from "../../../lib/federation-remote.ts";
 import { instanceForStudy } from "../../../lib/federation.ts";
 import type { StudyAccess } from "../../../lib/view-coverage.ts";
 import { pack, throughCache, cacheVersion, resultEntry } from "../../../lib/next-cache.ts";
@@ -13,8 +13,8 @@ async function allStudies(): Promise<StudyRow[]> {
       studiesFor(c).catch(() => { failed++; return [] as StudyRow[]; }))),   // one bad peer must not empty the catalog
     remoteStudies()]);
   failed += remote.failed.length;
-  // a study PEER_MCP routes to a peer is the peer's, as it is for the analysis engine
-  const peerHeld = peerMcpEntries();
+  // a study FEDERATION_PEERS routes to a peer is the peer's, as it is for the analysis engine
+  const peerHeld = federationPeers();
   const seen = new Set<string>();
   const merged: StudyRow[] = [];
   for (const rows of [remote.rows, ...per]) for (const row of rows) {

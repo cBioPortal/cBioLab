@@ -76,7 +76,7 @@ export function dataVersion(): Promise<string> {
   if (versionMemo && Date.now() - versionMemo.at < 60_000) return versionMemo.value;
   const value = (async () => {
     const parts: string[] = [];
-    // not the simulated peer's database, which is read only over MCP: like a real peer's, its
+    // not the simulated peer's database, which is read only through the federation API: like a real peer's, its
     // reloads reach this cache when entries expire
     const peerDb = loopbackOnlyConn()?.db;
     for (const conn of directConnections()) {

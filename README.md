@@ -33,19 +33,22 @@ Settings → Environment Variables.
 ## Federation
 
 One analysis can draw on studies held by more than one cBioPortal database, and the prototype
-offers that **over MCP**: the database that holds a study answers aggregate queries (and, opted
-in, some patient-level ones) through its `/api/mcp`, and this app never queries it directly.
+offers that through a **federation API** between cbio-lab instances: the database that holds a
+study answers aggregate queries (and, opted in, some patient-level ones) through its
+`/api/federation/v1/<op>` (`lib/federation-api.ts`), and this app never queries it directly. The
+federation API is a protocol between servers of this codebase; it is separate from `/api/mcp`,
+which serves agents and offers none of it.
 `docs/DATA-BOUNDARY.md` is the design and its rules.
 
 There are two ways to run it:
 
 - **A simulated peer** (the public portal, dev servers, the gate): one deployment holds both
-  databases and serves the second one to itself over MCP (`LOOPBACK_PEER`). Every query on that
-  database runs only while the app is answering an MCP call as that peer; a direct query on it,
+  databases and serves the second one to itself through its own federation API (`LOOPBACK_PEER`).
+  Every query on that database runs only while the app is answering a federation call as that peer; a direct query on it,
   or one naming its database on the other connection, is refused (`lib/ch.ts`). It exercises
   the real protocol with no second deployment, but it is not separation: one process, one login.
 - **A separate peer**: a second cbio-lab instance whose own database is the other one, reached at
-  its `/api/mcp` (`PEER_MCP`). This instance then holds no connection to that database at all.
+  its `/api/federation/v1` (`FEDERATION_PEERS`). This instance then holds no connection to that database at all.
 
 Its settings, and how to set it up for the public portal, dev servers and a separate peer, are
 in [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md#federation).
@@ -55,7 +58,7 @@ in [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md#federation).
 Every view either draws over every patient of its cohorts or is not drawn and says why
 (`lib/view-coverage.ts`); the add-view buttons and cohort pickers are disabled with the reason.
 
-| | over MCP, aggregates | over MCP, patient-level (`timeline`, `alterations`, `plot` shared) |
+| | federated, aggregates | federated, patient-level (`timeline`, `alterations`, `plot` shared) |
 |---|---|---|
 | drawn | compare, survival, cooccurrence, coexpression, clinical, hotspots, attrition, course, sequence, plot (as density, no cases); Explore, study list, catalog | the same, plus timeline and alterations, and a plot's cases as points (`plot`) |
 | not drawn over the peer's studies | oncoprint, clinical data table, mutation table, cox, logistic, risk model, genome, pathways, enrichment, overlap, incidence, cancer types, clonality, paired, diffexpr, correlates, assays, labs, composition | the same |
@@ -67,15 +70,15 @@ study the database's own time dominates.
 ### Seeing it work
 
 Every federated call is logged at both ends (`lib/federation-log.ts`), in the server's output
-(on Vercel, the project's runtime logs) — the study and tool, never a patient:
+(on Vercel, the project's runtime logs) — the study and op, never a patient:
 
 ```
-[federation →] federated_aggregates study=nsclc_public_genie_bpc peer=https://cbiolab.vercel.app/api/mcp (this app, as its simulated peer) 214ms ok 0.9 kB
-[federation ←] federated_aggregates study=nsclc_public_genie_bpc caller=this app (answered as its simulated peer) 89ms HTTP 200 answered 1.1 kB
-[federation ←] federated_patient_timeline study=nsclc_public_genie_bpc (patient-level) caller=outside 461ms HTTP 200 REFUSED
+[federation →] aggregates study=nsclc_public_genie_bpc peer=https://cbiolab.vercel.app/api/federation/v1 (this app, as its simulated peer) 214ms ok 0.9 kB
+[federation ←] aggregates study=nsclc_public_genie_bpc caller=this app (answered as its simulated peer) 89ms HTTP 200 answered 1.1 kB
+[federation ←] patient-timeline study=nsclc_public_genie_bpc (patient-level) caller=outside 461ms HTTP 422 REFUSED
 ```
 
-`→` is this app asking a peer, `←` its `/api/mcp` answering; `caller=outside` is anyone else.
+`→` is this app asking a peer, `←` its `/api/federation/v1` answering; `caller=outside` is anyone else.
 
 The answer says so too. Every analysis result lists its `sources` — each database of this
 deployment and each peer, with the peer's address, the name and build it reports about itself, when
@@ -87,8 +90,8 @@ a query reached the simulated peer's database directly and was refused (`lib/ch.
 
 ### Security notes
 
-- **No caller authentication yet.** Anyone who can reach a peer's `/api/mcp` can call it. On a
-  simulated peer the patient-level tools answer only the app itself (the token); a separate peer
+- **No caller authentication yet.** Anyone who can reach a peer's `/api/federation/v1` can call
+  it. On a simulated peer the patient-level ops answer only the app itself (the token); a separate peer
   answers anyone, so it must not be reachable from outside.
 - The boundary is enforced by the coordinator: a peer's own `run_analysis`, `query_cohort` and
   web API answer patient-level for its own studies to any caller. Fine for public data; a peer
@@ -103,7 +106,8 @@ as a standalone Streamable HTTP server (default `127.0.0.1:3201/mcp`). Both serv
 `mcp/tools.ts` registers: the analysis tools (`describe_dsl`, `run_analysis`, `describe_study`,
 `query_cohort`, `derive_treatment_lines`, and `render_oncoprint`, which returns a PNG rendered
 server-side from the OncoprintSpec contract via `lib/oncoprint-svg.ts`), the campaign tools
-(`campaign_*`), and the `federated_*` tools another instance calls (see Federation, above). Tool schemas are the zod fragments in `mcp/tools.ts`, and
+(`campaign_*`). Federation between instances is not an MCP tool: it has its own API (see Federation,
+above). Tool schemas are the zod fragments in `mcp/tools.ts`, and
 results carry the semantic caveats (observability guard, prior-medication guard, panel-aware
 denominators) for the model to surface. Register in Claude Code:
 

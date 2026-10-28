@@ -38,7 +38,7 @@ export type ViewResolver = Resolver & ViewAggregateCapable;
 
 /**
  * Split the view's studies into those that can answer (every local participant) and those that
- * cannot (a remote MCP peer, which does not serve these aggregates yet). The second list is
+ * cannot (a remote federation peer, which does not serve these aggregates yet). The second list is
  * reported by the view, never silently dropped.
  */
 export function answering(ctx: ViewRun): { ok: Record<string, ViewResolver>; excluded: { study: string; reason: string }[] } {

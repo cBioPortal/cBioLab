@@ -102,7 +102,7 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
     caveat: (patient ? "" : "No patient to draw: the list is empty. ") +
       "The list is one row per patient of each cohort; event counts and days come from the study's timeline, in days from diagnosis as the study records them. " +
       (viaPeer.length ? "Patients of " + viaPeer.join(", ") + " come from " + [...new Set(viaPeer.map((st) => ctx.resolvers[st].instance.label))].join(", ") +
-        " over MCP: a peer whose rules and this instance's both allow patient timelines (its Source column says so); every view their rules do not name treats it as aggregate-only. " : "") +
+        " via federation: a peer whose rules and this instance's both allow patient timelines (its Source column says so); every view their rules do not name treats it as aggregate-only. " : "") +
       tableTail(r, q, columns, "patient", "with patients who have a timeline first, then by patient id", excluded, vNames.length > 1),
   };
 }

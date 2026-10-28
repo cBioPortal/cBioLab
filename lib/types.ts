@@ -491,7 +491,7 @@ export interface PatientTimeline {
   study: string; patient: string;
   events: PatientEvent[];
   samples: PatientSample[];
-  /** the instance that holds this patient: its label, and whether it answered over MCP */
+  /** the instance that holds this patient: its label, and whether it answered via federation */
   source: { label: string; remote?: boolean };
 }
 export interface TimelineResult extends TableRows<string | number | null> {
@@ -608,14 +608,14 @@ export interface Cmh {
  */
 /**
  * One place an analysis's data came from: a database of this deployment, or a peer it reached
- * over MCP, with the studies it answered for and what it reported about itself (lib/provenance.ts).
+ * through its federation API, with the studies it answered for and what it reported about itself (lib/provenance.ts).
  */
 export interface AnalysisSource {
   /** as this deployment names it */
   label: string;
-  /** a peer reached over MCP (the simulated one included) */
+  /** a peer reached through its federation API (the simulated one included) */
   remote: boolean;
-  /** that peer's MCP endpoint */
+  /** that peer's federation API */
   url?: string;
   /** what the peer calls itself, from its own answers — not this deployment's label for it */
   reportedName?: string;
@@ -746,7 +746,7 @@ export function plainResult(kind: ViewKind, fields: ViewResultCommon = {}): View
 }
 export interface AnalysisResult {
   study: string; involvedStudies: string[]; oncokbPin: string | null;
-  /** where the data came from: each database or MCP peer, and the studies it answered for */
+  /** where the data came from: each database or federation peer, and the studies it answered for */
   sources?: AnalysisSource[];
   /** the parameters this run resolved, and any declared but never referenced */
   params?: Record<string, unknown>;

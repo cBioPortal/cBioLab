@@ -100,16 +100,18 @@ The map of the code: what each part does, where it lives, and the one place each
   in the list's order (`rankSql`) and its neighbours — setting `patient`. The chosen `patient`, folded `collapsed`
   tracks and `expandGaps` are in the spec; the last two are drawn in the browser (`dataPart`).
   **Opt-in patient-level federation** serves this view, `alterations` and a plot's cases (`plot`;
-  a plot's aggregates cross for any peer through `federated_plot`), per study and kind of data:
-  rules (`lib/disclosure.ts`; `study:timeline+alterations+plot`, `*` for every study) in the peer's
-  `MCP_DISCLOSE_PATIENTS` register and gate `federated_patient_rows`/`federated_patient_timeline`, and
-  the same rules in the coordinator's `PEER_MCP_PATIENT_LEVEL` decide what it accepts — data crosses
+  a plot's aggregates cross for any peer through the federation API's `plot` op), per study and kind
+  of data: rules (`lib/disclosure.ts`; `study:timeline+alterations+plot`, `*` for every study) in the
+  peer's `FEDERATION_DISCLOSE_PATIENTS` add and gate the `patient-rows`/`patient-timeline`/`plot-cases`
+  ops (`lib/federation-api.ts`), and the same rules in the coordinator's
+  `FEDERATION_ACCEPT_PATIENT_LEVEL` decide what it accepts — data crosses
   only where both allow it. The coordinator reaches the peer through `RemotePatientResolver` /
   `RemoteTimelineResolver` (`patientRows()` names a table in `PEER_TABLES`, never SQL; aggregate-only
   for every other view); `runRows`' `remote` option pages a peer's rows beside local databases. A new
-  patient view joins by adding a kind, its tables to `PEER_TABLES` and the peer tool, and
+  patient view joins by adding a kind, its tables to `PEER_TABLES` and the peer's op, and
   `rowHolders(ctx, kind)`. `LOOPBACK_PEER=b` (`lib/loopback-peer.ts`) serves the second database
-  to the app itself as a simulated peer — one app, both databases, federation over real MCP calls;
+  to the app itself as a simulated peer — one app, both databases, federation over real HTTP calls
+  to its own `/api/federation/v1`;
   the gate runs `scripts/e2e-federation.cjs` that way. See `docs/DATA-BOUNDARY.md`.
 - **`lib/event-names.ts`** — **THE only place timeline event names are normalized.** Case-fold and
   trim, nothing else; measured to be complete for event types and attribute keys (zero residual
@@ -328,9 +330,12 @@ The map of the code: what each part does, where it lives, and the one place each
   tools in the route, no reading page state or calling the engine or an API directly. A capability
   it lacks is a new WebMCP tool, which every assistant then gets. Opening a page reloads it, so the conversation lives in
   `sessionStorage` and resumes on the new page's tools. No other route calls a model.
-- **`mcp/tools.ts`** — MCP registry: `describe_dsl`, `run_analysis`, `render_oncoprint` (+v1
+- **`mcp/tools.ts`** — MCP registry, for agents: `describe_dsl`, `run_analysis`, `render_oncoprint` (+v1
   event tools). MCP returns oncoprints as a static image rendered from the server SVG; the
-  interactive figure is the web app's, not a third renderer.
+  interactive figure is the web app's, not a third renderer. It serves no federation: that is
+  **`lib/federation-api.ts`**, the ops one cbio-lab instance answers another at
+  `/api/federation/v1/<op>` (`app/api/federation/v1/[op]/route.ts`), with
+  `lib/federation-remote.ts` as its client.
 - **`lib/dsl-reference.ts`** — **THE single source of truth for DSL documentation.**
 - **Hypothesis campaigns** (`/campaign`, MCP `campaign_*`) — this tool as the referee for an AI
   hypothesis generator. **`lib/hypothesis.ts`** (pure, browser-safe): a hypothesis is a document

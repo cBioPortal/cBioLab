@@ -61,14 +61,14 @@ async function exploreFor(body: any) {
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
   const profilesByStudy = await studyProfilesMany(studies);
   const routing = await studyRouting();
-  // Studies held by a remote peer are faceted over MCP; the rest locally.
+  // Studies held by a remote peer are faceted through their federation API; the rest locally.
   const peers = new Map((await Promise.all(studies.map(async (s) => [s, await peerForStudy(s)] as const))).filter(([, p]) => p) as [string, { url: string; label: string }][]);
   const remote = studies.filter((s) => peers.has(s));
   const local = studies.filter((s) => !remote.includes(s));
   const unreachable = local.filter((s) => !routing.has(s));
   if (unreachable.length)
     throw new Error("Explore cannot reach " + unreachable.join(", ") +
-      " — no local connection and no MCP peer configured for it. Deselect it to continue.");
+      " — no local connection and no federation peer configured for it. Deselect it to continue.");
   const connByStudy = new Map(studies.map((s) => [s, routing.get(s) || PRIMARY]));
   // An explicit patient list must not be compiled into SQL for an instance that
   // is not entitled to patient-level data — the ids would cross the boundary
@@ -90,7 +90,7 @@ async function exploreFor(body: any) {
   // genes the reader has asked to chart as their own alteration facet
   const geneCharts = Array.isArray(body.geneCharts) ? body.geneCharts.map(String).slice(0, 6) : undefined;
   // The derived facets to compute — none unless asked for. Local studies only for now: a remote
-  // peer answers over its own MCP tool, which does not accept this request, so it contributes none
+  // peer answers through its federation API, which does not accept this request, so it contributes none
   // of these facets rather than erroring (mergeExplore).
   const DERIVED = new Set(["followupMonths", "historyMonths", "alteredGenes", "lines", "treatmentSpan"]);
   const derived = Array.isArray(body.derived) ? body.derived

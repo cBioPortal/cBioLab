@@ -17,7 +17,7 @@ process.env.AGGREGATE_ONLY_INSTANCES = "b";
 process.env.AUTH_DEV_LOGIN = "1";
 process.env.AUTH_SESSION_SECRET = "request-boundary-test-secret-0123456789";
 process.env.ONCOKB_PIN = "v-test";
-for (const k of ["AGGREGATE_ONLY_STUDIES", "PEER_MCP_URL", "PEER_MCP_STUDIES", "LOOPBACK_PEER", "VERCEL_ENV"]) delete process.env[k];
+for (const k of ["AGGREGATE_ONLY_STUDIES", "FEDERATION_PEERS", "LOOPBACK_PEER", "VERCEL_ENV"]) delete process.env[k];
 
 const { startPostgres } = await import("./support/postgres.ts");
 const { setChTransport } = await import("../lib/ch.ts");

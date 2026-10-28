@@ -17,7 +17,7 @@
 // data rather than being unable to reach it. That is a faithful test of the
 // engine (merge math, capability negotiation, honest degradation) and a stub
 // for the transport — a real deployment swaps in a second connection
-// (data-level federation) or an MCP client to a remote cbio-lab
+// (data-level federation) or a federation API client to a remote cbio-lab
 // (document-level federation) behind the same interface.
 import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
@@ -166,7 +166,7 @@ export interface PairCounts {
  * "-public" counterparts, plus the private cohort). This deployment is a public
  * demo, so those are excluded — and excluded at the ROUTING layer, so no
  * surface can reach them: not the study picker, not a hand-written ?doc= link,
- * not an MCP call. Override with STUDY_ALLOW_RESTRICTED=1 in a deployment
+ * not a federation call. Override with STUDY_ALLOW_RESTRICTED=1 in a deployment
  * entitled to the data; add ids to STUDY_DENY to exclude more.
  */
 export function isRestrictedStudy(id: string, name = ""): boolean {
@@ -197,7 +197,7 @@ export async function studyRouting(): Promise<Map<string, ChConn>> {
   if (_routing) return _routing;
   // One build at a time, shared by every caller that arrives while it runs: a cold request asks
   // for hundreds of studies' routes at once, and each starting its own build sent hundreds of
-  // queries (and, with a simulated peer, hundreds of MCP calls) for one answer. The build answers
+  // queries (and, with a simulated peer, hundreds of federation calls) for one answer. The build answers
   // them all, so no one reader's cancellation stops it.
   return _routingBuild ??= withChContext({}, buildRouting).finally(() => { _routingBuild = null; });
 }
@@ -209,7 +209,7 @@ async function buildRouting(): Promise<Map<string, ChConn>> {
   let complete = true;
   for (const conn of connections()) {
     try {
-      // the simulated peer's studies are learned from it, over MCP, like a real peer's
+      // the simulated peer's studies are learned from it, through the federation API, like a real peer's
       const rows = conn.id === loopbackOnlyConn()?.id
         ? (await (await import("./federation-remote.ts")).loopbackStudies()).map(({ id, name }) => ({ id, name }))
         : (await chQuery<{ id: string; name: string }>(
@@ -1438,7 +1438,7 @@ export function studyAccess(r: Resolver): StudyAccess {
 /**
  * The per-site pieces a federated plot needs (see BaseResolver's "a federated plot" methods,
  * below) — available on every local participant, patient-level or aggregate-only alike, but not
- * yet on a remote MCP peer (RemoteAggregateResolver.plot() itself still refuses even a single
+ * yet on a remote federation peer (RemoteAggregateResolver.plot() itself still refuses even a single
  * study). Kept as its own capability interface rather than optional methods on AggregateCapable,
  * the same way PatientLevelCapable is kept separate from it: a caller should be told which
  * participants lack a capability, not find out from an undefined method call.
@@ -1471,7 +1471,7 @@ export interface FederatedPlotCapable {
 /**
  * The aggregates in lib/federation-views.ts, behind the view kinds in lib/views/ that query through
  * them (genome, pathways, enrichment, …). Every local participant has them,
- * aggregate-only included; a remote MCP peer does not yet, so those views name it as unable to
+ * aggregate-only included; a remote federation peer does not yet, so those views name it as unable to
  * answer rather than silently leaving its patients out.
  */
 export interface ViewAggregateCapable {
@@ -2312,7 +2312,7 @@ export class AggregateResolver extends BaseResolver {
 }
 
 export async function resolverFor(study: string, ctx: Partial<CompileCtx>): Promise<Resolver> {
-  // A peer reached over MCP takes precedence: its data is not ours to query.
+  // A peer reached through its federation API takes precedence: its data is not ours to query.
   const { peerForStudy, peerPatientKinds, RemoteAggregateResolver, RemotePatientResolver, RemoteTimelineResolver } = await import("./federation-remote.ts");
   const { kindsText } = await import("./disclosure.ts");
   const peer = await peerForStudy(study);

@@ -166,10 +166,10 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
         "Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. " +
         "Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. " +
         "Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. " +
-        (want && peerOf(ctx.resolvers[want.study]) ? want.id + "'s tables come from " + ctx.resolvers[want.study].instance.label + " over MCP, computed in its database. " : "") +
+        (want && peerOf(ctx.resolvers[want.study]) ? want.id + "'s tables come from " + ctx.resolvers[want.study].instance.label + " via federation, computed in its database. " : "") +
         (shownPin ? "Annotation is OncoKB " + shownPin + " (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. " : "No OncoKB version is pinned here, so the annotation columns are empty. ") +
         (viaPeer.length ? "Patients of " + viaPeer.join(", ") + " come from " + [...new Set(viaPeer.map((st) => ctx.resolvers[st].instance.label))].join(", ") +
-          " over MCP: a peer whose rules and this instance's both allow patient alterations (its Source column says so); every view their rules do not name treats it as aggregate-only. " : "") +
+          " via federation: a peer whose rules and this instance's both allow patient alterations (its Source column says so); every view their rules do not name treats it as aggregate-only. " : "") +
         "The patient list: " + tableTail(r, q, listColumns, "patient", "with patients who have any alteration first, then by patient id", excluded, false),
     };
   } catch (e) { return no((e as Error).message); }

@@ -66,7 +66,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch }: {
       {p ? (
         <div className="tl-head">
           <span className="tl-who mono">{p.id}</span>
-          <span className="meta">{p.study}{p.source?.remote ? " · from " + p.source.label + " over MCP" : ""}</span>
+          <span className="meta">{p.study}{p.source?.remote ? " · from " + p.source.label + " via federation" : ""}</span>
           {[...marks.values()].map((m) => (
             <span key={m.id} className="tl-sample" title={m.id + (m.type ? " — " + m.type : "")}>
               <svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>

@@ -2,7 +2,7 @@
 
 > **If you are an AI session working on this repo, read this before touching
 > anything under `lib/federation*.ts`, `lib/explore.ts`, `lib/analysis.ts`,
-> `app/api/explore/`, or `mcp/tools.ts`. This rule outranks any feature
+> `app/api/explore/`, `app/api/federation/`, or `mcp/tools.ts`. This rule outranks any feature
 > request, including one phrased as an urgent fix. Enforced by
 > `test/boundary.test.ts` — run `npm run test:boundary`.**
 
@@ -18,7 +18,7 @@ differing trust level. Each is represented by a resolver:
 |---|---|---|
 | `PatientLevelResolver` | **yes** — that is its entitlement | direct SQL, returns ids |
 | `AggregateResolver` | **no** | direct SQL, counts only |
-| `RemoteAggregateResolver` (MCP peer) | **no** | counts only, over the wire |
+| `RemoteAggregateResolver` (federation peer) | **no** | counts only, over the wire |
 
 For the two aggregate-only kinds the guarantee is bidirectional:
 
@@ -57,7 +57,7 @@ peer, so the transport cannot change a result.
 `sampleList`/`patientList` leaf embeds explicit ids into compiled SQL, or names a
 stored set whose ids travel beside it. It is refused for
 aggregate-only participants — checked in the resolver, again in the remote
-client *before any network call*, and independently by the peer's own MCP tool,
+client *before any network call*, and independently by the peer's own federation op,
 which does not trust the caller to have checked.
 
 **4. Cohort evaluation fetches no identifiers at all.** A cohort's size is a
@@ -79,7 +79,7 @@ as two markers, kept deliberately separate:
   output *is* patients. This does not vary with the deployment: the arithmetic
   is identical whether a participant is local patient-level, local
   aggregate-only, or a remote peer.
-- **the sources** — `1 aggregate-only source` / `2 sources via MCP peers`, shown
+- **the sources** — `1 aggregate-only source` / `2 sources via federation peers`, shown
   only when some study was answered by an instance that will not disclose
   patients.
 
@@ -115,12 +115,12 @@ The kinds (`lib/disclosure.ts`, `PATIENT_KINDS`), each one view's needs and noth
 | `alterations` | `alterations` | the cohort's patient list with alteration counts; one patient's samples, mutations, copy-number calls and structural variants |
 | `plot` | `plot` | the cases a plot draws as points, with their case ids: every case up to the points cap, the outliers past it, a ranked layer's extremes, a cohort layer's cases |
 
-A plot's **aggregates** cross for every peer, whatever its rules: `federated_plot` answers a whole
+A plot's **aggregates** cross for every peer, whatever its rules: the `plot` op answers a whole
 plot (density grid, quartiles, violin, contingency, coefficients) or one piece of a plot pooled
 across sites (extent, bin counts on a shared grid and extent, the six sums behind a correlation,
 box quartiles, a box's density bins over a shared range, contingency cells, coverage, a cohort layer's count, cells or quartiles), counts
 only, so a plot is drawn over a peer's study like any other aggregate view. Its **cases** are the
-`plot` kind: `federated_plot_cases`, registered with the other patient-level tools, answers them
+`plot` kind: the `plot-cases` op, served with the other patient-level ops, answers them
 only where the peer's rules disclose `plot` for the study, and the coordinator asks only where its
 rules accept it. Without both, the plot draws the peer's study as density and its caption says so;
 a peer that refuses mid-way leaves the density and names its reason, never failing the view.
@@ -132,10 +132,10 @@ ignored.
 
 | side | setting | effect |
 |---|---|---|
-| peer (data owner) | `MCP_DISCLOSE_PATIENTS=<rules>` | registers `federated_patient_rows` and `federated_patient_timeline`; without it the tools **do not exist**. Every call is checked against the rules — the study and the kind its table belongs to (`PEER_TABLES` in `lib/federation.ts`), before anything is read — and answers only for studies the peer holds itself at patient level (never a study it reaches through a peer of its own, never an aggregate-only one) |
-| coordinator | `PEER_MCP_PATIENT_LEVEL=<rules>` | the `PEER_MCP` peer for a study becomes a `RemotePatientResolver` carrying the kinds accepted for it — a `RemoteTimelineResolver` when they include `timeline` — instead of a `RemoteAggregateResolver` |
+| peer (data owner) | `FEDERATION_DISCLOSE_PATIENTS=<rules>` | adds the `patient-rows`, `patient-timeline` and `plot-cases` ops to its federation API (`lib/federation-api.ts`); without it the ops **do not exist** (404). Every call is checked against the rules — the study and the kind its table belongs to (`PEER_TABLES` in `lib/federation.ts`), before anything is read — and answers only for studies the peer holds itself at patient level (never a study it reaches through a peer of its own, never an aggregate-only one) |
+| coordinator | `FEDERATION_ACCEPT_PATIENT_LEVEL=<rules>` | the `FEDERATION_PEERS` peer for a study becomes a `RemotePatientResolver` carrying the kinds accepted for it — a `RemoteTimelineResolver` when they include `timeline` — instead of a `RemoteAggregateResolver` |
 
-Both settings, like the rest of federation's (`PEER_MCP`, `LOOPBACK_PEER`, `STUDY_DENY`,
+Both settings, like the rest of federation's (`FEDERATION_PEERS`, `LOOPBACK_PEER`, `STUDY_DENY`,
 `AGGREGATE_ONLY_*`…), can be overridden at run time by an administrator at `/admin`
 (`lib/settings.ts`): a value the setting's parser refuses is refused there, every change is logged
 with who made it, and the result cache is re-keyed so no answer computed under the old rules is
@@ -157,49 +157,50 @@ sends SQL: it names a table and the cohort *definitions*, and the peer builds an
 in its own database; an explicit id list in a cohort is still refused before the network is
 touched. The patient whose record is shown is the one identifier the coordinator sends, and that
 is the entitlement. Every list row carries its Source ("GENIE site (shares patient timelines and
-patient alterations)"), a peer's patient is marked "from … over MCP", and the view's caveat names
-the studies that came over MCP. A failed or refused peer call keeps the answer out of the result
+patient alterations)"), a peer's patient is marked "from … via federation", and the view's caveat names
+the studies that came via federation. A failed or refused peer call keeps the answer out of the result
 cache, as a failed query does. A peer names the table it answered with, and an answer for any other table is refused:
 a peer on a build from before named tables answers every call with the timeline's list.
 
 **A simulated peer — how the public deployment, dev servers and the gate federate.** Federation
-is offered over MCP; a second database is not queried directly. `LOOPBACK_PEER=<connection>` (e.g.
-`b`, the `CLICKHOUSE2_*` database) has one app serve one of its own databases to itself over MCP
+is offered through the federation API (`/api/federation/v1`); a second database is not queried
+directly. `LOOPBACK_PEER=<connection>` (e.g.
+`b`, the `CLICKHOUSE2_*` database) has one app serve one of its own databases to itself through that API
 (`lib/loopback-peer.ts`): the studies on that connection are reached through the remote resolvers
-at the app's own `/api/mcp` (`PORT` or `LOOPBACK_PEER_URL` names it), and the MCP side answers those
-calls — recognised by a token — from that connection alone, never routing them back to the peer.
+at the app's own `/api/federation/v1` (`PORT` or `LOOPBACK_PEER_URL` names it), and the federation
+route answers those calls — recognised by a token — from that connection alone, never routing them back to the peer.
 The token is `LOOPBACK_PEER_TOKEN` (32+ characters) where several processes serve the app, as on
 Vercel, where the call back lands on another function instance; otherwise each process makes its
-own. With it set, the disclosing tools answer only for that connection's studies, and only to the
+own. With it set, the disclosing ops answer only for that connection's studies, and only to the
 app itself: an outside caller gets no patient-level data of either database. The study list reads
 the connection directly and badges its studies as the peer's (`LOOPBACK_PEER_LABEL`). It does not
 simulate two processes with their own settings or credentials, or a peer on another build.
 `scripts/gate.sh` restarts its server this way and runs `scripts/e2e-federation.cjs` when a second
 database is configured.
 
-**A coordinator that holds none of a peer's databases** learns the peer's studies over MCP as
-well: `/api/studies` asks each `PEER_MCP` peer once (`federated_studies`) and lists only the
-studies `PEER_MCP` routes to it, and `/api/catalog` answers a peer-held study with the peer's
-`federated_catalog`. Both are counts and vocabulary — what the study picker and the cohort
-builder show for a local study — and name no patient. Every federation tool answers only for a
+**A coordinator that holds none of a peer's databases** learns the peer's studies through its federation
+API as well: `/api/studies` asks each `FEDERATION_PEERS` peer once (its `studies` op) and lists only
+the studies `FEDERATION_PEERS` routes to it, and `/api/catalog` answers a peer-held study with the
+peer's `catalog` op. Both are counts and vocabulary — what the study picker and the cohort
+builder show for a local study — and name no patient. Every federation op answers only for a
 study the instance holds in its own databases: one it reaches through a peer of its own is refused,
 never relayed and never looked up in its own database.
 
 **Not built yet, and required before pointing this at restricted data:** caller authentication.
-Today anyone who can reach a disclosing peer's `/api/mcp` can read what it discloses; the setting
+Today anyone who can reach a disclosing peer's `/api/federation/v1` can read what it discloses; the setting
 is a statement of intent, not access control. Per-caller tokens (or mTLS), checked by the peer
-before the tool runs, and an access log on the peer are the next step. Answers containing a
+before the op runs, and an access log on the peer are the next step. Answers containing a
 peer's patients also enter the coordinator's result cache (same trust boundary as its own).
 
 ## Federation: where it stands
 
-Three modes, of which the prototype offers the two over MCP:
+Three modes, of which the prototype offers the two through the federation API:
 
 | mode | set by | status |
 |---|---|---|
 | direct second database | `CLICKHOUSE2_*` alone | every view; not how federation is offered (only as the simulated peer's database) |
-| MCP, aggregates | `PEER_MCP`, or `LOOPBACK_PEER` | compare, survival, cooccurrence, coexpression, clinical, hotspots, attrition, course, sequence, Explore, study list, catalog. Not drawn over a peer's studies, and saying why: oncoprint, table, mutations, cox, logistic, riskmodel, plot, and every view on `viewAggregate`/`viewMeta` (genome, pathways, enrichment, overlap, incidence, cancertypes, clonality, paired, diffexpr, correlates, assays, labs, composition). Errors: percentile cut-offs |
-| MCP, patient-level | the above + `MCP_DISCLOSE_PATIENTS` / `PEER_MCP_PATIENT_LEVEL` | the aggregate set plus the `timeline` and `alterations` views; every other patient-level view is not drawn, as for an aggregate-only peer |
+| federation API, aggregates | `FEDERATION_PEERS`, or `LOOPBACK_PEER` | compare, survival, cooccurrence, coexpression, clinical, hotspots, attrition, course, sequence, Explore, study list, catalog. Not drawn over a peer's studies, and saying why: oncoprint, table, mutations, cox, logistic, riskmodel, plot, and every view on `viewAggregate`/`viewMeta` (genome, pathways, enrichment, overlap, incidence, cancertypes, clonality, paired, diffexpr, correlates, assays, labs, composition). Errors: percentile cut-offs |
+| federation API, patient-level | the above + `FEDERATION_DISCLOSE_PATIENTS` / `FEDERATION_ACCEPT_PATIENT_LEVEL` | the aggregate set plus the `timeline` and `alterations` views; every other patient-level view is not drawn, as for an aggregate-only peer |
 
 Known gaps, in the order they matter:
 
@@ -210,8 +211,8 @@ Known gaps, in the order they matter:
    small-cell suppression or defence against differencing.
 3. **Coverage:** a peer has no `viewAggregate`/`viewMeta`, pooled plot or percentile method, and
    patient-level federation has only two kinds.
-4. **Cost:** each MCP call opens a session (two requests, no reuse, no timeout), and the peer
-   recounts the cohort on every call. Measured on one machine (dev servers, loopback network,
+4. **Cost:** each federation call is one HTTP request (no connection reuse beyond the runtime's,
+   no timeout), and the peer recounts the cohort on every call. Measured on one machine (dev servers, loopback network,
    result cache off): +0.3–0.4 s per analysis for aggregate views on a small study, +2 s for the
    patient-level timeline and alterations (18 calls); on a large study the database dominates.
 
@@ -242,12 +243,13 @@ Known gaps, in the order they matter:
   has the method.
 - The opt-in mode: the rules parse as written (a bare study is the timeline alone; an unknown kind
   is refused); the coordinator builds a remote patient resolver only for a study
-  `PEER_MCP_PATIENT_LEVEL` names, carrying only the kinds named; that resolver has no patient-level
+  `FEDERATION_ACCEPT_PATIENT_LEVEL` names, carrying only the kinds named; that resolver has no patient-level
   method beyond `patientRows()` (and `patientTimeline()` with timelines) and is not
   `isPatientLevel`; it refuses a table of a kind not accepted, and an id-list cohort, before
-  `fetch`; a peer registers the disclosing tools only with `MCP_DISCLOSE_PATIENTS` set, and refuses
-  a study or kind its rules do not allow; and only the timeline and alterations views ask a peer
-  for rows (mutation-checked: removing the registration condition, or adding `members()` to the
+  `fetch`; a peer serves the disclosing ops only with `FEDERATION_DISCLOSE_PATIENTS` set, and refuses
+  a study or kind its rules do not allow; `/api/mcp` registers no federation op at all; and only
+  the timeline and alterations views ask a peer
+  for rows (mutation-checked: removing the condition on the patient-level ops, or adding `members()` to the
   resolver, fails the suite).
 - Source tripwires: no query in `lib/explore.ts` projects a bare identifier
   column, and `ExploreResult` exposes no field that could carry one.
@@ -332,7 +334,7 @@ suite fail. A test that cannot fail is decoration.
   `lib/access.ts`, their members are immutable (a trigger), deletion is a soft
   delete that a document naming the set reports, every read and write is logged
   (`id_set_access_log`), and answers that read one are never written to the
-  shared result cache (`hasIdSets()`). Without a signed-in request (MCP, a script,
+  shared result cache (`hasIdSets()`). Without a signed-in request (an MCP client, a script,
   a signed-out link) a set is not read at all, and the clause is refused by name.
   Covered by `test/id-sets.test.ts` and `idSetContract` in
   `test/support/store-contracts.ts`.

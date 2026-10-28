@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const study = (url.searchParams.get("study") || STUDY).replace(/[^A-Za-z0-9._-]/g, "");
-    // A study PEER_MCP routes to a peer is described by that peer, over MCP: its database is
+    // A study FEDERATION_PEERS routes to a peer is described by that peer, through its federation API: its database is
     // not this instance's to read.
     const peer = await peerForStudy(study);
     if (peer) return Response.json(await throughCache(async () => peerCatalogEntry(study, peer.url, await cacheVersion()), () => remoteCatalog(study, peer.url)));
