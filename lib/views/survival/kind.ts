@@ -8,7 +8,7 @@ export const survivalKind: ViewKindDef<"survival"> = {
   title: (v) => (v.endpoint || "OS") + " survival" + (v.anchoredTo ? " from " + v.anchoredTo : ""),
   text: (v, { out, pFmt }) => {
     out.push(`Survival (KM, ${v.endpoint || "OS"}${v.anchoredTo ? " from " + v.anchoredTo : ""}):\n` + v.curves.map((c) =>
-      `  ${c.cohort}: median ${c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n=${c.n}, ${c.events} events${c.missing ? ", " + c.missing + " missing OS" : ""}${c.noStatus ? ", " + c.noStatus + " with a time but no status left out" : ""}${c.noTime ? ", " + c.noTime + " with a status but no time left out" : ""}${c.unobserved ? ", " + c.unobserved + " with no follow-up after entry left out" : ""})`).join("\n") +
+      `  ${c.cohort}: median ${c.median ? c.median.toFixed(1) + "mo" : "not reached"} (n=${c.n}, ${c.events} events${c.missing ? ", " + c.missing + " missing OS" : ""}${c.unobserved ? ", " + c.unobserved + " with no follow-up after entry left out" : ""})`).join("\n") +
       (v.logrank ? `\n  log-rank p=${pFmt(v.logrank.p)}${v.logrank.strata > 1 ? " (stratified by study)" : ""}`
         : v.logrankK ? `\n  k-group log-rank p=${pFmt(v.logrankK.p)}` : "") +
       "\nCAVEAT (tell the user): " + v.caveat);

@@ -4,6 +4,7 @@
 // the outer SELECT returns counts, sums and grouping keys — never an identifier — so any
 // participant, aggregate-only included, can answer.
 import { survivalMonthsSql, survivalEventSql } from "./survival-sql.ts";
+import { osCte } from "./survival-queries.ts";
 import { sq } from "./compiler.ts";
 import { ALTERED_COND, driverJoin, inCohortClinical } from "./federation.ts";
 import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql, foldedInSql } from "./event-names.ts";
@@ -440,20 +441,6 @@ export function eventHasKv(db: string, alias: string, key: string, valueCond: st
 
 /** the progression event: its type, key and accepted values, and an optional probability floor */
 export interface ProgressionEvent { eventType: string; key: string; values: string[]; probabilityKey?: string; minProbability?: number }
-
-/** `os`: each cohort patient's OS_MONTHS (months) and whether OS_STATUS says deceased (dead) */
-export function osCte(study: string, db: string): string {
-  const pid = pidOf("patient_unique_id", study);
-  return "os AS (\n" +
-    "  SELECT " + pid + " AS pid,\n" +
-    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')", "anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS months,\n" +
-    "         " + survivalEventSql("anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS dead\n" +
-    "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
-    "    AND " + inCohortPatients(pid) + "\n" +
-    "  GROUP BY pid\n" +
-    ")";
-}
 
 /** `lastday`: each cohort patient's latest timeline day (a start or a stop) — the clock check's input */
 export function lastDayCte(study: string, db: string): string {

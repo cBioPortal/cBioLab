@@ -4,7 +4,8 @@
 // API's `catalog` op.
 import { chQuery, PORTAL } from "./ch.ts";
 import { catalogSqls, lineCatalogSqls, LINE_TYPE } from "./compiler.ts";
-import { survivalEndpointsSql, studyRouting } from "./federation.ts";
+import { studyRouting } from "./federation.ts";
+import { survivalEndpointsSql } from "./survival-queries.ts";
 
 export type StudyCatalog = Awaited<ReturnType<typeof catalogFor>>;
 

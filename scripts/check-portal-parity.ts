@@ -39,7 +39,6 @@
  * With RECORD=1 (npm run verify) it writes docs/verification/portal-parity.json, which /verification reads
  * (or REPORT_DIR/portal-parity.json when REPORT_DIR is set, as in CI).
  */
-import { survivalLeftOutSql } from "../lib/views/survival/sql.ts";
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -49,6 +48,7 @@ import { buildExplore, buildExploreFederated } from "../lib/explore.ts";
 import { studyProfiles } from "../lib/analysis.ts";
 import { compileCohortDef, memberSamplesSql } from "../lib/cohort2.ts";
 import { resolverFor, hasViewAggregates } from "../lib/federation.ts";
+import { survivalLeftOutSql } from "../lib/survival-queries.ts";
 import { oqlCasesSql } from "../lib/oql.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
 import { oncokbPin } from "../lib/annotation.ts";

@@ -1,6 +1,7 @@
 // Every view kind's runner, by kind.
 import { plainResult, type ViewResult, type ViewKind } from "../types.ts";
-import type { DocView, ViewRun, ViewRunner } from "./run.ts";
+import { Untimed, type DocView, type ViewRun, type ViewRunner } from "./run.ts";
+import { endpointColumnsOf, survivalLeftOutCaveat } from "./shared.ts";
 import { runCompare } from "./compare/run.ts";
 import { runSurvival } from "./survival/run.ts";
 import { runCox } from "./cox/run.ts";
@@ -63,11 +64,33 @@ function drawn<V>(run: (view: V, c: ViewRun) => Promise<ViewResult>): ViewRunner
   };
 }
 
+const OS = { months: "OS_MONTHS", status: "OS_STATUS" };
+/** a result that drew what `field` names (a survival or incidence panel some views draw only on request) */
+const drew = (field: string) => (r: ViewResult) => (r as unknown as Record<string, unknown>)[field] != null;
+
+/**
+ * A view that reads a survival endpoint: its caveat opens by naming, per cohort, the patients the
+ * endpoint leaves out for want of a status or a time (survivalLeftOutCaveat). Every such view is
+ * wrapped here, so none can report survival without it. `columns` reads the endpoint off the view;
+ * `when` says whether this result used it at all.
+ */
+function reportsLeftOut(run: ViewRunner, columns: (view: DocView) => { months: string; status: string } | null,
+  when: (r: ViewResult) => boolean = () => true): ViewRunner {
+  return async (view: DocView, c: ViewRun) => {
+    const r = await run(view, c);
+    if (r instanceof Untimed || r.error || !when(r)) return r;
+    const cols = columns(view);
+    const note = cols ? await survivalLeftOutCaveat(c, cols.months, cols.status) : "";
+    return note ? { ...r, caveat: note + (r.caveat || "") } as ViewResult : r;
+  };
+}
+const viewEndpoint = (view: DocView) => endpointColumnsOf(view as { endpoint?: unknown; monthsAttribute?: unknown; statusAttribute?: unknown });
+
 /** one runner per kind: a kind added to the View union without a runner is a type error here */
 const RUNNERS: Record<ViewKind, ViewRunner> = {
   compare: runCompare,
-  survival: runSurvival,
-  cox: runCox,
+  survival: reportsLeftOut(runSurvival, viewEndpoint),
+  cox: reportsLeftOut(runCox, viewEndpoint),
   logistic: runLogistic,
   course: runCourse,
   sequence: runSequence,
@@ -83,9 +106,9 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   diffexpr: drawn(runDiffexpr),
   paired: drawn(runPaired),
   clonality: drawn(runClonality),
-  incidence: drawn(runIncidence),
+  incidence: reportsLeftOut(drawn(runIncidence), () => OS),
   labs: drawn(runLabs),
-  riskmodel: drawn(runRiskmodel),
+  riskmodel: reportsLeftOut(drawn(runRiskmodel), viewEndpoint),
   cancertypes: drawn(runCancertypes),
   overlap: drawn(runOverlap),
   enrichment: drawn(runEnrichment),
@@ -97,22 +120,22 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   alterations: drawn(runAlterations),
   timeline: drawn(runTimeline),
   acquired: drawn(runAcquired),
-  ctdna: drawn(runCtdna),
+  ctdna: reportsLeftOut(drawn(runCtdna), () => OS, drew("survival")),
   exclusivity: drawn(runExclusivity),
-  txendpoints: drawn(runTxendpoints),
-  multistate: drawn(runMultistate),
-  rmst: drawn(runRmst),
-  predictive: drawn(runPredictive),
-  cutpoint: drawn(runCutpoint),
-  hla: drawn(runHla),
-  forest: drawn(runForest),
+  txendpoints: reportsLeftOut(drawn(runTxendpoints), () => OS),
+  multistate: reportsLeftOut(drawn(runMultistate), () => OS),
+  rmst: reportsLeftOut(drawn(runRmst), viewEndpoint),
+  predictive: reportsLeftOut(drawn(runPredictive), viewEndpoint),
+  cutpoint: reportsLeftOut(drawn(runCutpoint), viewEndpoint),
+  hla: reportsLeftOut(drawn(runHla), viewEndpoint),
+  forest: reportsLeftOut(drawn(runForest), viewEndpoint),
   adjusted: drawn(runAdjusted),
   instability: drawn(runInstability),
   actionability: drawn(runActionability),
   drivernegative: drawn(runDrivernegative),
-  organotropism: drawn(runOrganotropism),
-  molsubtype: drawn(runMolsubtype),
-  germline: drawn(runGermline),
+  organotropism: reportsLeftOut(drawn(runOrganotropism), () => OS, drew("incidence")),
+  molsubtype: reportsLeftOut(drawn(runMolsubtype), () => OS, drew("survival")),
+  germline: reportsLeftOut(drawn(runGermline), () => OS, drew("survival")),
 };
 
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */

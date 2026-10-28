@@ -412,7 +412,7 @@ SELECT if(lowerUTF8(trimBoth(ifNull(status, ''))) NOT IN ('[not applicable]', '[
 FROM os WHERE m IS NOT NULL
 GROUP BY m, ev ORDER BY m
 
--- view 1 survival: survivalLeftOut:OS · msk_chord_2024
+-- view 1 survival: survivalLeftOut:OS_MONTHS · msk_chord_2024
 WITH cohort AS (((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024')
 EXCEPT DISTINCT
@@ -445,7 +445,7 @@ SELECT countIf(lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]
        countIf(lowerUTF8(trimBoth(ifNull(status, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND NOT (lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(months)), nan)), toFloat64OrNull(trimBoth(months)), NULL) >= 0)) AS no_time
 FROM os
 
--- view 1 survival: survivalLeftOut:OS · msk_chord_2024
+-- view 1 survival: survivalLeftOut:OS_MONTHS · msk_chord_2024
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
@@ -467,7 +467,7 @@ SELECT countIf(lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]
        countIf(lowerUTF8(trimBoth(ifNull(status, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND NOT (lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(months)), nan)), toFloat64OrNull(trimBoth(months)), NULL) >= 0)) AS no_time
 FROM os
 
--- view 1 survival: survivalLeftOut:OS · msk_met_2021
+-- view 1 survival: survivalLeftOut:OS_MONTHS · msk_met_2021
 WITH cohort AS (((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_met_2021_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_met_2021')
 EXCEPT DISTINCT
@@ -500,7 +500,7 @@ SELECT countIf(lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]
        countIf(lowerUTF8(trimBoth(ifNull(status, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND NOT (lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(months)), nan)), toFloat64OrNull(trimBoth(months)), NULL) >= 0)) AS no_time
 FROM os
 
--- view 1 survival: survivalLeftOut:OS · msk_met_2021
+-- view 1 survival: survivalLeftOut:OS_MONTHS · msk_met_2021
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_met_2021_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid

@@ -70,7 +70,7 @@ SELECT if(lowerUTF8(trimBoth(ifNull(status, ''))) NOT IN ('[not applicable]', '[
 FROM os WHERE m IS NOT NULL
 GROUP BY m, ev ORDER BY m
 
--- view 0 survival: survivalLeftOut:PFS_1L · ucec_msk_2018
+-- view 0 survival: survivalLeftOut:PFS_MONTHS_FIRST_LINE_TX · ucec_msk_2018
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'ucec_msk_2018_', '') AS pid, replaceOne(sample_unique_id, 'ucec_msk_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'ucec_msk_2018'
     AND (('sample', replaceOne(sample_unique_id, 'ucec_msk_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'ucec_msk_2018_', ''), replaceOne(patient_unique_id, 'ucec_msk_2018_', '')) AS id
@@ -94,7 +94,7 @@ SELECT countIf(lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]
        countIf(lowerUTF8(trimBoth(ifNull(status, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND NOT (lowerUTF8(trimBoth(ifNull(months, ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(months)), nan)), toFloat64OrNull(trimBoth(months)), NULL) >= 0)) AS no_time
 FROM os
 
--- view 0 survival: survivalLeftOut:PFS_1L · ucec_msk_2018
+-- view 0 survival: survivalLeftOut:PFS_MONTHS_FIRST_LINE_TX · ucec_msk_2018
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'ucec_msk_2018_', '') AS pid, replaceOne(sample_unique_id, 'ucec_msk_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'ucec_msk_2018'
     AND (('sample', replaceOne(sample_unique_id, 'ucec_msk_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'ucec_msk_2018_', ''), replaceOne(patient_unique_id, 'ucec_msk_2018_', '')) AS id

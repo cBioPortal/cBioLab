@@ -22,13 +22,15 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
 import {
   carriesPatientIds, plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql,
-  geneCountsSql, survivalCountsSql, survivalEndpointsSql, anchoredSurvivalSql, pairCountsSql,
+  geneCountsSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, clinicalHistogramSql, attributeQuantileSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
   lollipopChangesSql, lollipopTypesSql, lollipopTotalsSql, cohortSampleCountSql, cohortSizesSql,
-  timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, coxRowsSql, logisticRowsSql,
+  timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, logisticRowsSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
+import * as survivalQueries from "../lib/survival-queries.ts";
+import { survivalCountsSql, survivalLeftOutSql, survivalEndpointsSql, anchoredSurvivalSql, coxRowsSql } from "../lib/survival-queries.ts";
 import { axisSelect, highlightCohortSql, plotPointsSql, plotScatterPointsSql, plotRankedPointsSql } from "../lib/plot.ts";
 import { clinicalRowSource } from "../lib/clinical-table.ts";
 import { mutationRowSource } from "../lib/mutation-table.ts";
@@ -41,7 +43,7 @@ import type { Instance } from "../lib/federation.ts";
 import { PRIMARY, chQuery, connById, directConnections, assertNotLoopbackDirect } from "../lib/ch.ts";
 
 /**
- * Every aggregate SQL builder there is: lib/federation.ts's, and each view kind's own
+ * Every aggregate SQL builder there is: lib/federation.ts's, lib/survival-queries.ts's, and each view kind's own
  * (lib/views/<kind>/sql.ts), found by reading the folder, so a new kind's SQL is swept by the
  * coverage test below without anyone registering it.
  */
@@ -50,7 +52,7 @@ for (const kind of readdirSync(new URL("../lib/views/", import.meta.url))) {
   const file = new URL("../lib/views/" + kind + "/sql.ts", import.meta.url);
   if (existsSync(file)) Object.assign(viewSql, await import(file.href));
 }
-const aggregates = { ...federation, ...viewSql } as typeof federation & Record<string, (...args: any[]) => string>;
+const aggregates = { ...federation, ...survivalQueries, ...viewSql } as typeof federation & typeof survivalQueries & Record<string, (...args: any[]) => string>;
 
 const AGG: Instance = { id: "peer", mode: "aggregate-only", label: "test peer", conn: PRIMARY };
 const PL: Instance = { id: "a", mode: "patient-level", label: "test primary", conn: PRIMARY };
@@ -464,7 +466,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // molsubtype: each patient's class stays in CTEs; patients are counted per class, group and survival time
     "molCountsSql": () => aggregates.molCountsSql(cohortSql, "x", "db", { poleHotspots: ["P286R", "V411L"], msi: { attribute: "MSI_TYPE", high: ["Instable"], stable: ["Stable"] }, p53Pin: "v7.5", by: "ANCESTRY_LABEL" }),
     "molCountsSql:score": () => aggregates.molCountsSql(cohortSql, "x", "db", { poleHotspots: ["P286R"], msi: { attribute: "MSI_SCORE", threshold: 10, stableBelow: 3 }, p53Pin: null, by: null }),
-    "survivalLeftOutSql": () => aggregates.survivalLeftOutSql(cohortSql, "x", "db", "OS_MONTHS", "OS_STATUS"),
+    "survivalLeftOutSql": () => survivalLeftOutSql(cohortSql, "x", "db", "OS_MONTHS", "OS_STATUS"),
     "molSurvivalSql": () => aggregates.molSurvivalSql(cohortSql, "x", "db", { poleHotspots: ["P286R"], msi: { attribute: "MSI_TYPE", high: ["Instable"], stable: ["Stable"] }, p53Pin: "v7.5", by: null }),
     "molMsiAttributesSql": () => aggregates.molMsiAttributesSql(cohortSql, "x", "db"),
     // germline: carriers, somatic hits and panels stay in CTEs; patients are counted per gene and combination

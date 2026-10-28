@@ -711,8 +711,7 @@
               "sha256": "65e42ce7c5247805"
             }
           ],
-          "missing": 57,
-          "noTime": 57
+          "missing": 57
         },
         {
           "cohort": "TP53 wt",
@@ -831,8 +830,7 @@
               "sha256": "08094fcca61fe41a"
             }
           ],
-          "missing": 57,
-          "noTime": 57
+          "missing": 57
         }
       ],
       "endpoint": "OS",
@@ -884,7 +882,7 @@
         "variance": 5236.4896,
         "strata": 1
       },
-      "caveat": "Left out of the curves and the test, as on cBioPortal (a patient enters only with both a status and a time of at least 0, so a missing status is never read as censored): “TP53 mut”: 57 patients with a status but no usable time; “TP53 wt”: 57 patients with a status but no usable time. OS from each study's own baseline (left truncation applies; baselines are NOT harmonized across studies) Status '0:...' treated as censored. The log-rank test is STRATIFIED by study (2 strata contributed events): each study is compared only against itself, so a difference in case mix between studies cannot masquerade as a difference between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer. Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary.",
+      "caveat": "Left out of the survival analysis (OS_MONTHS / OS_STATUS), as on cBioPortal — a patient enters only with both a status and a time of at least 0, so a missing status is never read as censored: “TP53 mut”: 57 patients with a status but no usable time; “TP53 wt”: 57 patients with a status but no usable time. OS from each study's own baseline (left truncation applies; baselines are NOT harmonized across studies) Status '0:...' treated as censored. The log-rank test is STRATIFIED by study (2 strata contributed events): each study is compared only against itself, so a difference in case mix between studies cannot masquerade as a difference between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer. Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary.",
       "method": {
         "steps": [
           {
