@@ -517,7 +517,7 @@ export function memberSamplesSql(cohortSql: string): PatientSql {
 }
 
 /**
- * How far the data has moved from a locked cohort, in `study`, in samples: of the frozen samples
+ * How far the data has moved from a locked cohort, in samples: of the frozen samples
  * (`lockedSql`) how many the data still holds, what the definition (`liveSql`) selects now, and
  * which it would add and which it would drop — a new sample the definition selects is one it adds.
  */
