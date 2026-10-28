@@ -260,6 +260,16 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
       values: disjValues.get(r.type + "|" + r.a) || valuesOf.get(r.type + "|" + r.a) || [],
       disjunctive: disjValues.has(r.type + "|" + r.a) || undefined
     })),
+    // A drafted attribute keeps its facet when the draft leaves no member with a value — its own NA
+    // filter, or a study whose values all lie outside the other studies' pick — with its values
+    // counted without its own clauses, as the portal draws it; otherwise that study's values would
+    // vanish from the merged facet.
+    ...[...disjValues].filter(([k, vals]) => vals.length && !cls.data.some((r) => r.type + "|" + r.a === k) &&
+        String(meta.get(k.slice(k.indexOf("|") + 1))?.datatype ?? "").toUpperCase() !== "NUMBER")
+      .map(([k, vals]): ClinicalFacet => ({
+        attribute: k.slice(k.indexOf("|") + 1), per: k.slice(0, k.indexOf("|")) as "patient" | "sample", kind: "cat",
+        patients: 0, distinct: vals.length, values: vals, disjunctive: true
+      })),
     ...numAttrs.map((r): ClinicalFacet => ({
       attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np),
       min: Number(r.mn), max: Number(r.mx), median: Number(r.md), naCount: Number(r.na)
@@ -946,13 +956,21 @@ interface Prefetched { totals: ChRow; meta: ChRow[]; cls: ChRow[]; catValues: Ch
  * draft MINUS its own clauses — otherwise a selected attribute collapses to its chosen value and
  * can never be OR-extended. Each such attribute, and the draft without it. Keyed by name alone: a
  * clinical clause matches the attribute at whatever level each study stores it, so it constrains
- * the sample-level and the patient-level facet of that name alike.
+ * the sample-level and the patient-level facet of that name alike. A negated clause on the
+ * attribute (`{not: {kind:"clinical", …}}`, its NA filter among them) is its own clause too.
  */
 function draftedClinical(draft: CohortDef | null | undefined): { attr: string; rest: CohortDef }[] {
   if (!draft || !Array.isArray(draft.all)) return [];
   const attrs = new Set<string>();
-  for (const c of draft.all) if (isClinicalLeaf(c)) attrs.add(c.attribute);
-  return [...attrs].map((attr) => ({ attr, rest: draftWithout(draft, (c) => isClinicalLeaf(c) && c.attribute === attr) }));
+  for (const c of draft.all) { const a = clinicalClauseAttr(c); if (a) attrs.add(a); }
+  return [...attrs].map((attr) => ({ attr, rest: draftWithout(draft, (c) => clinicalClauseAttr(c) === attr) }));
+}
+
+/** the attribute a top-level clause constrains: a clinical leaf's, or a negated clinical leaf's */
+function clinicalClauseAttr(c: NonNullable<CohortDef["all"]>[number]): string | null {
+  if (isClinicalLeaf(c)) return c.attribute;
+  const n = (c as { not?: unknown }).not;
+  return n && isClinicalLeaf(n as NonNullable<CohortDef["all"]>[number]) ? (n as { attribute: string }).attribute : null;
 }
 
 /**

@@ -493,6 +493,24 @@ for (const [st, attr] of [["brca_mbcproject_wagle_2017", "DX_PERCENT_PR"], ["pro
   record({ study: st, group: "selection (missing spellings)", what: "samples with " + attr + " = NA", ours: String(ours), portal: String(portalSamples.length), agree: ours === portalSamples.length && ours > 0 });
 }
 
+// 13. a drafted attribute's chart counts its values without its own clause (the portal's charts
+// are disjunctive), in every study of the selection: a study none of whose samples hold the picked
+// value still shows its values. TUMOR_TISSUE_SITE = Breast over breast + lung TCGA PanCan keeps
+// lung's "Lung"; the portal is asked per study, since its multi-study counts inflate
+// (findings: a study added doubles another's counts).
+{
+  const studies = ["brca_tcga_pan_can_atlas_2018", "luad_tcga_pan_can_atlas_2018"], attr = "TUMOR_TISSUE_SITE";
+  const ex = await buildExploreFederated({ studies, profilesByStudy: new Map(), draft: { all: [{ kind: "clinical", attribute: attr, values: ["Breast"] }] } as CohortDef });
+  const ours = new Map(((ex.clinical.find((c) => c.attribute === attr && c.kind === "cat") as CatFacet | undefined)?.values || []).map((v) => [v.v, v.n]));
+  const theirs = new Map<string, number>();
+  for (const st of studies)
+    for (const v of (await api<PortalCount[]>("/clinical-data-counts/fetch", { attributes: [{ attributeId: attr }], studyViewFilter: { studyIds: [st] } }))[0]?.counts || [])
+      if (v.value !== "NA") theirs.set(v.value, (theirs.get(v.value) || 0) + v.count);
+  for (const v of [...theirs.keys()].sort())
+    record({ study: studies.join(" + ") + " · " + attr + " = Breast", group: "clinical (drafted attribute)", what: attr + " = " + v,
+      ours: String(ours.get(v) ?? "absent"), portal: String(theirs.get(v)), agree: ours.get(v) === theirs.get(v) });
+}
+
 // 8. uncalled mutations are not alterations
 {
   const study = "glioma_msk_2018", { profiles } = await studyProfiles(study);
