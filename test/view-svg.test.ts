@@ -356,18 +356,18 @@ describe("plot point layers: subsets drawn over the plotted cohort", () => {
     stats: { pearson: 0.1, spearman: null, slope: 0.1, intercept: 1, pPearson: 0.5, pSpearman: null }, layers } as any });
   const hl = (o: any) => ({ kind: "cohort", name: "R", label: o.name || "R", color: LAYER_COLORS[0], patients: 2, inPlot: 2, n: 2, shown: "points", ...o });
 
-  test("the plotted cohort turns grey and each layer's points draw in its colour, with a key", () => {
+  test("the plotted cohort stays light blue and each layer's points draw in its colour, with a key", () => {
     const svg = viewToSvg(scatter([hl({ points: [{ id: "a", x: 10, y: 5 }, { id: "b", x: 90, y: 45 }] })]))!;
-    assert.match(svg, new RegExp('<rect [^>]*fill="' + LAYER_BASE + '"'), "the base density is grey");
+    assert.match(svg, new RegExp('<rect [^>]*fill="' + LAYER_BASE + '"'), "the base density is the plotted cohort's light blue");
     assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + LAYER_COLORS[0] + '" fill-opacity', "g")) || []).length, 2);
     assert.match(svg, />R \(2\)</, "the key names the layer and how many cases it holds");
     assert.match(svg, />point layers</);
     assert.doesNotMatch(svg, /stroke="#D55E00" stroke-width="1.5" stroke-dasharray/, "the fitted line leaves the first layer colour to the layer");
   });
 
-  test("without layers the figure is as it was", () => {
+  test("without layers the plotted cohort is the same light blue, with no key", () => {
     const svg = viewToSvg(scatter([]))!;
-    assert.doesNotMatch(svg, new RegExp(LAYER_BASE));
+    assert.match(svg, new RegExp('<rect [^>]*fill="' + LAYER_BASE + '"'));
     assert.doesNotMatch(svg, />point layers</);
   });
 
@@ -377,10 +377,10 @@ describe("plot point layers: subsets drawn over the plotted cohort", () => {
     assert.doesNotMatch(svg, new RegExp('<circle [^>]*fill="' + LAYER_COLORS[0] + '" fill-opacity'));
   });
 
-  test("a layer drawn as nothing gets no key entry, and leaves the plotted cohort its colour", () => {
+  test("a layer drawn as nothing gets no key entry, and the plotted cohort keeps its colour", () => {
     const svg = viewToSvg(scatter([hl({ shown: "none", n: 0 })]))!;
     assert.doesNotMatch(svg, />point layers</);
-    assert.doesNotMatch(svg, new RegExp(LAYER_BASE));
+    assert.match(svg, new RegExp('<rect [^>]*fill="' + LAYER_BASE + '"'));
   });
 
   test("a cohort's name is escaped wherever the figure prints it", () => {

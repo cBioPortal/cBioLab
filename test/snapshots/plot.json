@@ -302,9 +302,115 @@
             "kind": "outliers",
             "label": "outliers",
             "color": "#D55E00",
-            "n": 0,
-            "shown": "none",
-            "why": "at or under 10,000 cases there is no density for them to stand out of"
+            "n": 41,
+            "shown": "points",
+            "points": [
+              {
+                "id": "TCGA-A2-A4S1-01",
+                "g": "Shallow deletion",
+                "v": -3.8045
+              },
+              {
+                "id": "TCGA-OL-A5RZ-01",
+                "g": "Gain",
+                "v": 3.1795
+              },
+              {
+                "id": "TCGA-A1-A0SK-01",
+                "g": "Shallow deletion",
+                "v": -3.1583
+              },
+              {
+                "id": "TCGA-3C-AALI-01",
+                "g": "Gain",
+                "v": 3.0742
+              },
+              {
+                "id": "TCGA-EW-A1P0-01",
+                "g": "Diploid",
+                "v": -2.742
+              },
+              {
+                "id": "TCGA-A8-A09I-01",
+                "g": "Gain",
+                "v": 3.0344
+              },
+              {
+                "id": "TCGA-A2-A1G1-01",
+                "g": "Gain",
+                "v": 2.9676
+              },
+              {
+                "id": "TCGA-A7-A3RF-01",
+                "g": "Diploid",
+                "v": -2.3175
+              },
+              {
+                "id": "TCGA-C8-A1HJ-01",
+                "g": "Shallow deletion",
+                "v": -2.6429
+              },
+              {
+                "id": "TCGA-GI-A2C8-01",
+                "g": "Shallow deletion",
+                "v": -2.5033
+              },
+              {
+                "id": "TCGA-HN-A2NL-01",
+                "g": "Shallow deletion",
+                "v": -2.435
+              },
+              {
+                "id": "TCGA-A2-A25F-01",
+                "g": "Diploid",
+                "v": -1.9927000000000001
+              },
+              {
+                "id": "TCGA-AO-A0JC-01",
+                "g": "Diploid",
+                "v": -1.9742
+              },
+              {
+                "id": "TCGA-E2-A14N-01",
+                "g": "Diploid",
+                "v": -1.8512
+              },
+              {
+                "id": "TCGA-D8-A13Y-01",
+                "g": "Shallow deletion",
+                "v": -2.2046
+              },
+              {
+                "id": "TCGA-AO-A0JM-01",
+                "g": "Gain",
+                "v": 1.8451
+              },
+              {
+                "id": "TCGA-AC-A7VC-01",
+                "g": "Diploid",
+                "v": -1.6501000000000001
+              },
+              {
+                "id": "TCGA-D8-A27N-01",
+                "g": "Gain",
+                "v": 1.7668
+              },
+              {
+                "id": "TCGA-E9-A243-01",
+                "g": "Diploid",
+                "v": -1.6116000000000001
+              },
+              {
+                "id": "TCGA-C8-A1HG-01",
+                "g": "Gain",
+                "v": -1.5533000000000001
+              },
+              {
+                "…": "21 more",
+                "sha256": "be5f632d51e52e3a"
+              }
+            ],
+            "drawn": 41
           }
         ]
       },
@@ -326,7 +432,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "1,068 of 1,084 samples have a value on both axes (14 have no ERBB2: Putative copy-number alterations from GISTIC; 2 have no ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)); only those are drawn. Point layers — outliers: not drawn, at or under 10,000 cases there is no density for them to stand out of."
+      "note": "1,068 of 1,084 samples have a value on both axes (14 have no ERBB2: Putative copy-number alterations from GISTIC; 2 have no ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)); only those are drawn. Point layers — outliers: 41 values beyond the whiskers. The statistics are over the whole plotted cohort."
     },
     {
       "kind": "plot",
@@ -652,9 +758,91 @@
             "kind": "outliers",
             "label": "outliers",
             "color": "#D55E00",
-            "n": 0,
-            "shown": "none",
-            "why": "at or under 10,000 cases there is no density for them to stand out of"
+            "n": 16,
+            "shown": "points",
+            "points": [
+              {
+                "id": "TCGA-A8-A08C-01",
+                "g": "Not profiled",
+                "v": 0.6502
+              },
+              {
+                "id": "TCGA-BH-A1F8-01",
+                "g": "Not mutated",
+                "v": 0.9971
+              },
+              {
+                "id": "TCGA-D8-A1XU-01",
+                "g": "Not mutated",
+                "v": 0.9465
+              },
+              {
+                "id": "TCGA-HN-A2NL-01",
+                "g": "Not mutated",
+                "v": 0.9228
+              },
+              {
+                "id": "TCGA-EW-A1J6-01",
+                "g": "Not mutated",
+                "v": 0.9022
+              },
+              {
+                "id": "TCGA-D8-A1J8-01",
+                "g": "Not mutated",
+                "v": 0.8977
+              },
+              {
+                "id": "TCGA-BH-A0BA-01",
+                "g": "Not mutated",
+                "v": 0.8633
+              },
+              {
+                "id": "TCGA-E9-A243-01",
+                "g": "Multiple",
+                "v": 0.1011
+              },
+              {
+                "id": "TCGA-A8-A07Z-01",
+                "g": "Not mutated",
+                "v": 0.8203
+              },
+              {
+                "id": "TCGA-AR-A0TZ-01",
+                "g": "Not mutated",
+                "v": 0.8185
+              },
+              {
+                "id": "TCGA-3C-AAAU-01",
+                "g": "Not mutated",
+                "v": 0.7787
+              },
+              {
+                "id": "TCGA-A8-A06T-01",
+                "g": "Not mutated",
+                "v": 0.7708
+              },
+              {
+                "id": "TCGA-AO-A0J7-01",
+                "g": "Not mutated",
+                "v": 0.7671
+              },
+              {
+                "id": "TCGA-E2-A14O-01",
+                "g": "Not mutated",
+                "v": 0.7348
+              },
+              {
+                "id": "TCGA-A2-A0T2-01",
+                "g": "Missense",
+                "v": 0.9463
+              },
+              {
+                "id": "TCGA-EW-A1P8-01",
+                "g": "Missense",
+                "v": 0.9462
+              }
+            ],
+            "drawn": 16
           }
         ]
       },
@@ -676,7 +864,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: not drawn, at or under 10,000 cases there is no density for them to stand out of."
+      "note": "1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: 16 values beyond the whiskers. The statistics are over the whole plotted cohort."
     }
   ]
 }

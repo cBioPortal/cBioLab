@@ -4,7 +4,7 @@
 // what was asked of whom, and what was NOT.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { runPlot, pooledOutliers } from "../lib/views/plot/run.ts";
+import { runPlot, pooledOutliers, groupOutliers } from "../lib/views/plot/run.ts";
 import { POINTS_CAP, OUTLIER_CELL_MAX, sparseCellMax } from "../lib/plot.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { PlotData, ViewResultOf } from "../lib/types.ts";
@@ -15,12 +15,15 @@ const scatter = (n: number, bins: { bx: number; by: number; n: number }[]): Plot
   shape: "scatter", n, x: { label: "AGE", kind: "num" }, y: { label: "TMB", kind: "num" },
   extent: { ...EXTENT }, grid: [240, 160], bins,
   stats: { pearson: 0.1, spearman: 0.1, slope: 1, intercept: 0, pPearson: 0.5, pSpearman: 0.5 } });
+const box2 = (n: number): PlotData => ({ shape: "box", n, x: { label: "CANCER_TYPE", kind: "cat" }, y: { label: "TMB", kind: "num" },
+  groups: [{ g: "A", n: n - 10, lo: 0, hi: 1000, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 12 },
+    { g: "B", n: 10, lo: 0, hi: 200, q1: 20, median: 40, q3: 60, loWhisker: 0, hiWhisker: 120 }], overlay: "violin", violin: [] });
 const box = (n: number): PlotData => ({ shape: "box", n, x: { label: "CANCER_TYPE", kind: "cat" }, y: { label: "TMB", kind: "num" },
   groups: [{ g: "A", n, lo: 0, hi: 100, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 12 }], overlay: "violin", violin: [] });
 
 type Call = { m: string; cap?: number; extra?: unknown };
 function fake(mode: "patient-level" | "aggregate-only", calls: Call[], data: () => PlotData, answers: {
-  all?: unknown[] | null; outliers?: unknown[] | null; outlierTotal?: number;
+  all?: unknown[] | null; outliers?: unknown[] | null; outlierTotal?: number; ranked?: unknown[];
 } = {}) {
   const r: Record<string, unknown> = {
     instance: { mode, conn: { db: "db" }, label: mode },
@@ -40,6 +43,10 @@ function fake(mode: "patient-level" | "aggregate-only", calls: Call[], data: () 
       calls.push({ m: "boxOutliers", cap, extra: whiskers });
       const points = answers.outliers === undefined ? [{ id: "o1", g: "A", v: 90 }] : answers.outliers || [];
       return { points: points.slice(0, cap), total: answers.outlierTotal ?? points.length };
+    };
+    r.plotRankedPoints = async (_d: unknown, _s: unknown, _xk: unknown, _yk: unknown, rank: { n: number }) => {
+      calls.push({ m: "ranked", cap: rank.n });
+      return answers.ranked ?? [];
     };
   }
   return r;
@@ -125,12 +132,13 @@ describe("a scatter's points", () => {
 });
 
 describe("a box's points", () => {
-  test("at or under the cap every value is a point", async () => {
+  test("at or under the cap every value is a point, and the default outliers are marked among them", async () => {
     const calls: Call[] = [];
     const r = await run(fake("patient-level", calls, () => box(10)));
     assert.deepEqual(r.plot!.pointSet, { rule: "all", drawn: 1 });
-    assert.equal(r.plot!.overlay, "points");
-    assert.deepEqual(calls.map((c) => c.m), ["boxPoints"]);
+    assert.equal(r.plot!.overlay, "points", "every value stays drawn; the outliers are a layer over them");
+    assert.deepEqual(calls.map((c) => c.m), ["boxPoints", "boxOutliers"]);
+    assert.deepEqual([r.plot!.layers![0].kind, r.plot!.layers![0].shown], ["outliers", "points"]);
   });
 
   test("over the cap the values beyond each group's whiskers are points over the violin", async () => {
@@ -154,6 +162,47 @@ describe("a box's points", () => {
     assert.equal(l.points!.length, POINTS_CAP);
     assert.equal(l.of, 25000);
     assert.match(r.note!, new RegExp("outliers: the " + CAP + " most extreme of the 25,000 values beyond the whiskers"));
+  });
+
+  test("past the budget every group keeps its most extreme, not only the group with the wildest values", async () => {
+    const calls: Call[] = [];
+    // ranked overall, A's 10,000 would fill the budget and B (whiskers 0-120) would draw nothing
+    const most = Array.from({ length: POINTS_CAP }, (_, i) => ({ id: "a" + i, g: "A", v: 1000 - i / 100 }));
+    const ranked = [{ id: "b1", g: "B", v: 150 }, { id: "b2", g: "B", v: 130 }, { id: "b3", g: "B", v: 100 }, { id: "a0", g: "A", v: 1000 }];
+    const r = await run(fake("patient-level", calls, () => box2(POINTS_CAP * 3), { outliers: most, outlierTotal: 25000, ranked }));
+    assert.deepEqual(calls.map((c) => c.m), ["boxOutliers", "ranked"]);
+    const l = r.plot!.layers![0];
+    assert.equal(l.points!.length, POINTS_CAP, "still the most points a figure draws");
+    assert.deepEqual(l.points!.filter((p) => "g" in p && p.g === "B").map((p) => p.id), ["b1", "b2"], "B's two beyond its whiskers, not the one inside");
+    assert.equal(new Set(l.points!.map((p) => p.id)).size, POINTS_CAP, "a case in both answers is drawn once");
+    assert.equal(l.of, 25000);
+    assert.match(r.note!, /shared between the groups so each draws its own most extreme/);
+  });
+
+  test("outliers by number: each group's n most extreme, even at or under the cap, over every value", async () => {
+    const calls: Call[] = [];
+    const ranked = [{ id: "a1", g: "A", v: 90 }, { id: "a2", g: "A", v: 50 }, { id: "a3", g: "A", v: 20 }, { id: "a4", g: "A", v: 5 },
+      { id: "b1", g: "B", v: 150 }];
+    const r = await run(fake("patient-level", calls, () => box2(100), { ranked, outlierTotal: 7 }), { points: [{ rule: "outliers", n: 2 }] });
+    assert.deepEqual(calls.find((c) => c.m === "ranked")?.cap, 2, "asks each study for n per group");
+    assert.equal(r.plot!.overlay, "points", "every value is still drawn under the cap");
+    const l = r.plot!.layers![0];
+    assert.deepEqual(l.points!.map((p) => p.id).sort(), ["a1", "a2", "b1"]);
+    assert.equal(l.perGroup, 2);
+    assert.match(r.note!, /outliers, 2 per group: each group's 2 most extreme beyond the whiskers, 3 values of 7/);
+  });
+
+  test("groupOutliers: a small group keeps every outlier, the rest of the budget goes to the larger", () => {
+    const w = [{ g: "A", loWhisker: 0, hiWhisker: 10 }, { g: "B", loWhisker: 0, hiWhisker: 10 }, { g: "C", loWhisker: 0, hiWhisker: 10 }];
+    const pts = [...Array.from({ length: 8 }, (_, i) => ({ id: "a" + i, g: "A", v: 20 + i })),
+      ...Array.from({ length: 8 }, (_, i) => ({ id: "b" + i, g: "B", v: -1 - i })), { id: "c0", g: "C", v: 11 }, { id: "c1", g: "C", v: 5 }];
+    const r = groupOutliers(pts, pts.map((p) => "s\u0000" + p.id), w, () => 100, 7);
+    const per = (g: string) => r.points.filter((p) => p.g === g).map((p) => p.id);
+    assert.deepEqual(per("C"), ["c0"], "C's only outlier; 5 is inside its whiskers");
+    assert.deepEqual([per("A").length, per("B").length], [3, 3], "the 6 left split evenly");
+    assert.deepEqual(per("A"), ["a7", "a6", "a5"], "each group's most extreme");
+    assert.equal(r.trimmed, true);
+    assert.equal(groupOutliers(pts, pts.map((p) => p.id), w, () => 2, 100).points.length, 5, "the per-group limit");
   });
 
   test("pooled across studies: each site's most extreme, kept by how far beyond its own group's whiskers", () => {

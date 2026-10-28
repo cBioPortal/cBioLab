@@ -223,11 +223,23 @@ describe("rule layers", () => {
     assert.ok(!calls.some((x) => x.startsWith("ranked")));
   });
 
-  test("outliers wait for the density: at or under the cap there is none, whether or not every case is drawn", async () => {
+  test("a scatter's outliers wait for a crowded density: at or under the cap there are none, as points or as density", async () => {
     for (const extra of [{}, { allPoints: false }]) {
       const r = await run({ s: fake("patient-level", []) }, { points: [{ rule: "outliers" }], extra });
-      assert.deepEqual([r.plot!.layers![0].shown, r.plot!.layers![0].why],
-        ["none", "at or under " + CAP + " cases there is no density for them to stand out of"], JSON.stringify(extra));
+      assert.equal(r.plot!.layers![0].shown, "none", JSON.stringify(extra));
+      assert.match(r.plot!.layers![0].why!, new RegExp("^on a scatter, outliers are the cases in near-empty cells of a crowded density, and at 1,000 cases \\(at most " + CAP + "\\)"));
+    }
+  });
+
+  test("a box's outliers are drawn at any size, over every value or over the density", async () => {
+    for (const extra of [{}, { allPoints: false }]) {
+      const calls: Calls = [];
+      const f = fake("patient-level", calls, { data: box });
+      f.plotOutlierPoints = async (_d: unknown, _s: unknown, cap: number) => { calls.push("outliers cap=" + cap); return { points: [{ id: "P7", g: "A", v: 40 }], total: 1 }; };
+      const r = await run({ s: f }, { points: [{ rule: "outliers" }], extra });
+      const l = r.plot!.layers![0];
+      assert.deepEqual([l.shown, l.n, l.points!.map((p) => p.id)], ["points", 1, ["P7"]], JSON.stringify(extra));
+      assert.ok(calls.includes("outliers cap=" + POINTS_CAP));
     }
   });
 

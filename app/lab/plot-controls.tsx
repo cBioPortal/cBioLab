@@ -17,6 +17,9 @@ import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_BASE, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
 
 type Update = (fn: (view: any) => any) => void;
+/** one half of a two-way switch, the chosen half filled */
+const SEG = "h-ctl flex-1 rounded-none px-2 text-md font-normal first:rounded-l-md last:rounded-r-md [&+&]:-ml-px " +
+  "aria-pressed:border-link aria-pressed:bg-link aria-pressed:text-card aria-pressed:hover:bg-link/90 aria-pressed:hover:text-card";
 /** the points cap as the controls print it */
 const CAP = POINTS_CAP.toLocaleString("en-US");
 
@@ -47,15 +50,17 @@ function AxisBlock({ title, children }: { title: string; children: React.ReactNo
 }
 
 /** a ranked layer's count, typed in its chip and handed on when the field is left or Enter pressed */
-function LayerCount({ n, busy, onCommit }: { n: number; busy: boolean; onCommit: (n: number) => void }) {
-  const [draft, setDraft] = useState(String(n));
-  useEffect(() => setDraft(String(n)), [n]);
+function LayerCount({ n, all, busy, onCommit }: { n?: number; all?: string; busy: boolean; onCommit: (n: number | undefined) => void }) {
+  const [draft, setDraft] = useState(n == null ? "" : String(n));
+  useEffect(() => setDraft(n == null ? "" : String(n)), [n]);
   const commit = () => {
+    // an empty field is "all" where the layer has one
+    if (!draft && all) { if (n != null) onCommit(undefined); return; }
     const v = Math.round(Number(draft));
-    if (Number.isFinite(v) && v >= 1 && v <= POINT_RULE_N_MAX && v !== n) onCommit(v); else setDraft(String(n));
+    if (draft && Number.isFinite(v) && v >= 1 && v <= POINT_RULE_N_MAX && v !== n) onCommit(v); else setDraft(n == null ? "" : String(n));
   };
-  return <Input className={cn(FIELD, "h-6 w-12 px-1 text-sm")} value={draft} disabled={busy} inputMode="numeric"
-    aria-label="how many cases" title={"how many cases (1–" + POINT_RULE_N_MAX + ")"}
+  return <Input className={cn(FIELD, "h-6 w-12 px-1 text-sm")} value={draft} disabled={busy} inputMode="numeric" placeholder={all ? "all" : undefined}
+    aria-label="how many cases" title={"how many cases (1–" + POINT_RULE_N_MAX + ")" + (all ? "; empty for " + all : "")}
     onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ""))} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); }} />;
 }
 
@@ -96,8 +101,10 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
           title={i ? "drawn under the layers above it: a case they share is theirs" : "drawn first: a case it shares with a later layer is its own"}>
           <span className="size-2.5 flex-none rounded-full" style={{ background: LAYER_COLORS[i] }} />
           <span className="min-w-0 flex-1 truncate" title={"cohort" in l ? l.cohort : layerLabel(l, axisName)}>{"cohort" in l ? l.cohort : layerLabel(l, axisName)}</span>
-          {"rule" in l && l.rule !== "outliers" && (
-            <LayerCount n={l.n ?? POINT_RULE_N} busy={busy} onCommit={(n) => onChange(layers.map((x, j) => j === i ? { ...x, n } as PointLayerSpec : x))} />
+          {"rule" in l && (l.rule !== "outliers" || plot?.shape === "box") && (
+            <LayerCount n={l.rule === "outliers" ? l.n : l.n ?? POINT_RULE_N} busy={busy}
+              all={l.rule === "outliers" ? "as many as the figure draws, shared between the groups" : undefined}
+              onCommit={(n) => onChange(layers.map((x, j) => j !== i ? x : n == null ? { rule: "outliers" } : { ...x, n } as PointLayerSpec))} />
           )}
           {i > 0 && <Button type="button" variant="ghost" size="icon-xs" className="size-5 text-muted-foreground" disabled={busy}
             aria-label="draw this layer before the one above it" title="draw this layer before the one above it" onClick={() => move(i)}><ArrowUp /></Button>}
@@ -125,7 +132,7 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
   spec: any;
   /** the last result's plot: which shape is on screen, each axis's name and kind, how many cases it shows, its layers */
   plot?: { shape: string; n: number; x: { kind: string; label: string }; y: { kind: string; label: string }; coverage?: { total: number };
-    layers?: { label: string; color: string; n: number; shown: string; why?: string; of?: number }[] };
+    layers?: { label: string; color: string; n: number; shown: string; why?: string; of?: number }[]; pointSet?: { rule: string; why?: string } };
   attrs: { attribute: string; kind: string }[];
   /** the studies' profiles as they describe them, for each axis's Data picker */
   catalog: ProfileInfo[]; loading?: boolean; busy: boolean;
@@ -168,8 +175,15 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
     <LogToggle spec={spec} side={side} numeric={plot?.[side].kind === "num"} busy={busy} update={update} />
   </>;
   const total = plot?.coverage?.total;
-  // past the cap every case is density already, so the every-case switch has nothing to change
-  const overCap = !!plot && plot.n > POINTS_CAP;
+  // Points is a choice only where the cases can be drawn: past the cap, or where a study may not
+  // show them (a result asked for every case and got none), the plot is a density whatever the view says
+  const pointsWhy = !plot ? null
+    : plot.n > POINTS_CAP ? plot.n.toLocaleString() + " " + unit + "s, more than the " + CAP + " that can be drawn as points."
+    : spec.allPoints !== false && plot.n && plot.pointSet?.rule !== "all"
+      ? "Not drawn as points: " + (plot.pointSet?.why || "a study in it may not show individual cases") + "."
+    : null;
+  const asPoints = spec.allPoints !== false && !pointsWhy;
+  const drawAs = (points: boolean) => update((vv) => { const n = { ...vv }; if (points) delete n.allPoints; else n.allPoints = false; return n; });
   return (
     <div className="@container mt-2.5" data-tw>
       <div className="grid grid-cols-1 gap-4 @3xl:grid-cols-[16.5rem_minmax(0,1fr)]">
@@ -196,15 +210,20 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
             </div>
             {plot?.shape !== "table" && (
               <div className="axfield flex flex-col gap-1">
+                <span className="axfield-name text-sm font-semibold text-foreground">Draw each {unit} as</span>
+                <div className="plot-drawas flex" role="group" aria-label={"draw each " + unit + " as"}>
+                  <Button type="button" variant="outline" size="sm" className={SEG} aria-pressed={asPoints} disabled={busy || !!pointsWhy}
+                    title={"every " + unit + " as a point, up to " + CAP} onClick={() => drawAs(true)}>Points</Button>
+                  <Button type="button" variant="outline" size="sm" className={SEG} aria-pressed={!asPoints} disabled={busy}
+                    title="a shaded density per group or grid cell, the highlights below drawn over it" onClick={() => drawAs(false)}>Density</Button>
+                </div>
+                {pointsWhy && <p className="plot-drawas-why m-0 text-sm text-muted-foreground">{pointsWhy}</p>}
+              </div>
+            )}
+            {plot?.shape !== "table" && (
+              <div className="axfield flex flex-col gap-1">
                 <span className="axfield-name text-sm font-semibold text-foreground"
-                  title="Highlight groups of cases as coloured points over the plot. A case in more than one layer takes the colour of the first.">Points</span>
-                <label className="chk text-md text-foreground" title={overCap
-                  ? "This plot has " + plot!.n.toLocaleString() + " " + unit + "s, more than the " + CAP + " that can be drawn as points, so it is shown as a density."
-                  : "Draw every " + unit + " as a point (up to " + CAP + ", where the study allows it). Untick to show the density instead."}>
-                  <Checkbox checked={spec.allPoints !== false} disabled={busy || overCap}
-                    onCheckedChange={(c) => update((vv) => { const n = { ...vv }; if (c === true) delete n.allPoints; else n.allPoints = false; return n; })} />
-                  every {unit} (up to {CAP})
-                </label>
+                  title="Highlight groups of cases as coloured points over the plot. A case in more than one layer takes the colour of the first.">Highlight</span>
                 <PointLayers layers={layers} plot={plot} cohortOptions={cohortOptions} axisName={axisName} busy={busy}
                   onChange={(next) => update((vv) => ({ ...vv, points: next }))} />
               </div>

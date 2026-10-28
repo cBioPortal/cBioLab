@@ -873,8 +873,12 @@ export interface PlotLayer {
   groups?: PlotGroup[];
   /** a scatter's outliers: the cells holding at most this many cases, left unshaded under their points */
   cellMax?: number;
-  /** a box's outliers past the points budget: how many lie beyond the whiskers, of which the `n` most extreme are drawn */
+  /** a box's outliers when not all are drawn: how many lie beyond the whiskers, of which `n` are drawn, each group's most extreme */
   of?: number;
+  /** a box's outliers asked for by number: at most this many per group, its most extreme */
+  perGroup?: number;
+  /** a box's outliers: a group drew fewer than it had so that every group's fit in the points budget */
+  trimmed?: boolean;
 }
 
 export interface PlotRequest {

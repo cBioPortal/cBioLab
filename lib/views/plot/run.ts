@@ -261,8 +261,8 @@ async function cohortLayer(name: string, base: { label: string; color: string },
 }
 
 /**
- * A rule layer, from participants that may all show cases. Outliers apply where the plotted cohort
- * is density: a box's values beyond its whiskers, a single study's scatter's cases in sparse cells.
+ * A rule layer, from participants that may all show cases. Outliers are a box's values beyond its
+ * whiskers at any size, and a single study's crowded scatter's cases in sparse cells.
  * Extremes and trend ask each study for its own top `n` and keep the overall top `n`, which is exact.
  */
 async function ruleLayer(l: Exclude<PointLayerSpec, { cohort: string }>, base: { label: string; color: string }, data: PlotData,
@@ -273,23 +273,45 @@ async function ruleLayer(l: Exclude<PointLayerSpec, { cohort: string }>, base: {
   const tooMany = (n: number) => none(fmt(n) + " cases, more than the " + fmt(budget) + " points " + (budget === POINTS_CAP ? "a figure draws" : "the earlier layers left"));
   const entitled = sites.map((s) => plotCasesOf(fr[s])!);
   if (l.rule === "outliers") {
-    // outliers stand out of a density too large to draw as points; under the cap there is none
-    if (data.n <= POINTS_CAP) return none("at or under " + fmt(POINTS_CAP) + " cases there is no density for them to stand out of");
+    // a box's outliers are its values beyond the whiskers, at any size and whether its cases are
+    // points or density; a scatter's are the cases in sparse cells, which a grid only has when crowded
     if (data.shape === "box") {
       if (budget <= 0) return none("the earlier layers used every point the figure draws");
+      const whiskers = data.groups || [];
+      // each group's most extreme by value at either end, which holds its `n` most extreme outliers
+      const ranked = async (n: number) => gather(await Promise.all(entitled.map((r) =>
+        r.plotRankedPoints(def, spec, xk, yk, { by: xk === "num" ? "x" : "y", n }))), sites);
+      if (l.n != null) {
+        const total = (await Promise.all(entitled.map((r) => r.plotOutlierPoints(def, spec, 1, whiskers)))).reduce((a, p) => a + p.total, 0);
+        const n = l.n, c = await ranked(n);
+        const { points, keys, trimmed } = groupOutliers(c.points, c.keys, whiskers, () => n, budget);
+        return { layer: { kind, ...base, n: points.length, shown: "points", points, perGroup: l.n,
+          ...(total > points.length ? { of: total } : {}), ...(trimmed ? { trimmed } : {}) }, keys };
+      }
       // each site's most extreme `budget`, pooled into the overall most extreme `budget`: exact,
       // as the ranked layers are, and the caption says how many it left out
-      const whiskers = data.groups || [];
-      const { points, keys, total } = pooledOutliers(
+      const pooled = pooledOutliers(
         await Promise.all(entitled.map((r) => r.plotOutlierPoints(def, spec, budget, whiskers))), sites, whiskers, budget);
-      return { layer: { kind, ...base, n: points.length, shown: "points", points, ...(total > points.length ? { of: total } : {}) }, keys };
+      if (pooled.total <= budget) return { layer: { kind, ...base, n: pooled.points.length, shown: "points", points: pooled.points }, keys: pooled.keys };
+      // past the budget, ranked overall a group with milder outliers could draw none: each group's
+      // own most extreme join the overall ones, and the budget is shared out between the groups.
+      // Each group's candidates are exact as far as the longer of the two lists reaches into it.
+      const own = await ranked(POINT_RULE_N_MAX);
+      const reach = new Map<string, number>();
+      for (const p of pooled.points) reach.set(p.g, (reach.get(p.g) || 0) + 1);
+      const { points, keys } = groupOutliers([...pooled.points, ...own.points], [...pooled.keys, ...own.keys], whiskers,
+        (g) => Math.max(POINT_RULE_N_MAX, reach.get(g) || 0), budget);
+      return { layer: { kind, ...base, n: points.length, shown: "points", points, of: pooled.total }, keys };
     }
+    if (data.n <= POINTS_CAP) return none("on a scatter, outliers are the cases in near-empty cells of a crowded density, and at " + fmt(data.n) +
+      " cases (at most " + fmt(POINTS_CAP) + ") nearly every cell is near-empty; the trend layer marks the cases furthest from the fitted line instead");
+    const cap = Math.min(budget, l.n ?? budget);
     if (sites.length > 1) return none("a pooled scatter's sparse cells are known only after pooling, and no study can be asked for them yet");
     if (!data.bins || !data.grid || !data.extent) return none("the plot has no density to find sparse cells in");
-    const cellMax = sparseCellMax(data.bins, budget, OUTLIER_CELL_MAX);
-    if (!cellMax) return none("the cases alone in a cell are more than the " + fmt(budget) + " points left to draw");
-    const pts = await entitled[0].plotScatterPoints(def, spec, budget, { grid: data.grid, extent: data.extent, cellMax });
-    if (!pts) return none("the sparse cells hold more than " + fmt(budget) + " cases");
+    const cellMax = sparseCellMax(data.bins, cap, OUTLIER_CELL_MAX);
+    if (!cellMax) return none("the cases alone in a cell are more than the " + fmt(cap) + " points " + (cap < budget ? "the layer asks for" : "left to draw"));
+    const pts = await entitled[0].plotScatterPoints(def, spec, cap, { grid: data.grid, extent: data.extent, cellMax });
+    if (!pts) return none("the sparse cells hold more than " + fmt(cap) + " cases");
     const g = gather([pts], sites);
     return { layer: { kind, ...base, n: pts.length, shown: "points", points: pts, cellMax }, keys: g.keys };
   }
@@ -324,6 +346,39 @@ export function pooledOutliers(parts: { points: PlotPoint[]; total: number }[], 
     .sort((i, j) => ext(g.points[j]) - ext(g.points[i]) || (g.keys[i] < g.keys[j] ? -1 : 1)).slice(0, budget);
   return { points: order.map((i) => ({ id: g.points[i].id, g: g.points[i].g, v: g.points[i].v })), keys: order.map((i) => g.keys[i]),
     total: parts.reduce((a, p) => a + p.total, 0) };
+}
+
+/**
+ * A box's outliers chosen group by group: each group's candidates beyond its whiskers, furthest first
+ * (outlierExtremity, ties by study and case), at most `limit(group)` of them; then `budget` shared out,
+ * so a group with fewer than an even share keeps them all and the rest is split between the others.
+ * `trimmed` says a group drew fewer than its limit allowed. A case listed twice counts once.
+ */
+export function groupOutliers(points: HighlightPoint[], keys: string[], whiskers: Whiskers[], limit: (g: string) => number, budget: number):
+  { points: PlotPoint[]; keys: string[]; trimmed: boolean } {
+  const at = new Map(whiskers.map((w) => [w.g, w]));
+  const byGroup = new Map<string, { p: PlotPoint; k: string; e: number }[]>();
+  const seen = new Set<string>();
+  points.forEach((p, i) => {
+    if (!("g" in p) || seen.has(keys[i])) return;
+    const w = at.get(p.g);
+    const e = w ? outlierExtremity(p.v, w) : 0;
+    if (e <= 0) return;
+    seen.add(keys[i]);
+    (byGroup.get(p.g) ?? byGroup.set(p.g, []).get(p.g)!).push({ p: { id: p.id, g: p.g, v: p.v }, k: keys[i], e });
+  });
+  const groups = [...byGroup.entries()]
+    .map(([g, rs]) => rs.sort((a, b) => b.e - a.e || (a.k < b.k ? -1 : 1)).slice(0, limit(g)))
+    // smallest first, so a group under its share hands what it leaves on to the larger ones
+    .sort((a, b) => a.length - b.length || (a[0].p.g < b[0].p.g ? -1 : 1));
+  let left = Math.max(0, budget), trimmed = false;
+  const kept = groups.flatMap((rs, i) => {
+    const take = Math.min(rs.length, Math.ceil(left / (groups.length - i)));
+    left -= take;
+    if (take < rs.length) trimmed = true;
+    return rs.slice(0, take);
+  });
+  return { points: kept.map((r) => r.p), keys: kept.map((r) => r.k), trimmed };
 }
 
 /** each study's own top `n` pooled into the overall top `n` (per end, and per group on a box) */
@@ -361,10 +416,14 @@ function layerNote(ls: PlotLayer[], unit: "patient" | "sample"): string {
       return "“" + l.name + "”: " + where + ", " + drawn;
     }
     if (l.shown !== "points") return l.label + ": not drawn, " + (l.why || "nothing to draw");
+    const values = (n: number) => fmt(n) + " value" + (n === 1 ? "" : "s");
     const what = l.kind === "outliers"
       ? (l.cellMax ? cases(l.n) + " in cells holding at most " + l.cellMax + ", left unshaded under them"
-        : l.of ? "the " + fmt(l.n) + " most extreme of the " + fmt(l.of) + " values beyond the whiskers (the most points a figure draws)"
-        : fmt(l.n) + " value" + (l.n === 1 ? "" : "s") + " beyond the whiskers")
+        : l.perGroup ? "each group's " + fmt(l.perGroup) + " most extreme beyond the whiskers, " + values(l.n) +
+          (l.of ? " of " + fmt(l.of) : "") + (l.trimmed ? " (fewer in the largest groups, so every group fits in the points a figure draws)" : "")
+        : l.of ? "the " + fmt(l.n) + " most extreme of the " + fmt(l.of) + " values beyond the whiskers (the most points a figure draws, " +
+          "shared between the groups so each draws its own most extreme)"
+        : values(l.n) + " beyond the whiskers")
       : cases(l.n);
     return l.label + ": " + what + shared;
   };
@@ -403,7 +462,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       await basePoints(pv, r0, doc.cohorts[cn], spec, data, sites[0]);
       const ls = await pointLayers(pv, data, c, cn, sites, spec);
       if (ls.length) data.layers = ls;
-      if (ls.some((l) => l.kind === "outliers" && l.shown === "points" && data.shape === "box")) data.overlay = "violin";
+      if (data.n > POINTS_CAP && ls.some((l) => l.kind === "outliers" && l.shown === "points" && data.shape === "box")) data.overlay = "violin";
       // what the pair left out leads: cases missing either axis are not on the figure at all
       const pr: ViewResult = {
         kind: "plot", plot: data, cohorts: [cn], studies: sites,

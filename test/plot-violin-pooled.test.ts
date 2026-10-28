@@ -26,7 +26,10 @@ function site(mode: "patient-level" | "aggregate-only", rows: BoxRow[], bins: { 
       return bins;
     },
   };
-  if (mode === "patient-level") r.plotPoints = async () => rows.map((x, i) => ({ id: "P" + i, g: x.g, v: x.median }));
+  if (mode === "patient-level") {
+    r.plotPoints = async () => rows.map((x, i) => ({ id: "P" + i, g: x.g, v: x.median }));
+    r.plotOutlierPoints = async () => ({ points: [], total: 0 });
+  }
   return r;
 }
 
