@@ -1,9 +1,14 @@
 -- cohort Prostate
 -- msk_chord_2024
-(SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer'))))
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer'))))))
 
 -- view 0 alterations: alterations:cna:counts · msk_chord_2024
 WITH c AS (
@@ -59,10 +64,15 @@ ORDER BY gdrv DESC, gene, so, gene, cna
 LIMIT 25 OFFSET 0
 
 -- view 0 alterations: alterations:counts · msk_chord_2024
-WITH c0 AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer'))))))),
 sm0 AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, uniqExact(sample_unique_id) AS n FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM c0)
@@ -174,10 +184,15 @@ ORDER BY gdrv DESC, gene, so, pos ASC NULLS LAST, gene, chr, start, end, ref, va
 LIMIT 25 OFFSET 0
 
 -- view 0 alterations: alterations:rank · msk_chord_2024
-WITH c0 AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer'))))))),
 sm0 AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, uniqExact(sample_unique_id) AS n FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM c0)
@@ -216,10 +231,15 @@ WHERE 1)
 WHERE study = 'msk_chord_2024' AND patient = 'P-0024249' LIMIT 1
 
 -- view 0 alterations: alterations:rows · msk_chord_2024
-WITH c0 AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer'))))))),
 sm0 AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, uniqExact(sample_unique_id) AS n FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM c0)
@@ -259,10 +279,15 @@ ORDER BY CAST(sv AS Nullable(Float64)) DESC NULLS LAST, patient, ord
 LIMIT 25 OFFSET 0
 
 -- view 0 alterations: alterations:rows · msk_chord_2024
-WITH c0 AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Prostate Cancer'))))))),
 sm0 AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, uniqExact(sample_unique_id) AS n FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM c0)

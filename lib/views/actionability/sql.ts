@@ -1,13 +1,15 @@
 // The actionability view's SQL: what its runner (run.ts) asks each participant's database for.
 import { pidOf } from "../../federation-views.ts";
+import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { sq } from "../../compiler.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /**
- * Per group (a clinical attribute's value per patient — "Multiple" when their samples disagree,
- * "" when none is recorded — or one group without `groupBy`) and per pair of a patient's best
- * sensitive and resistance ranks over every sequenced sample: the number of patients. Counts only.
+ * Per group (a clinical attribute's value per patient — "Multiple" when their in-cohort samples
+ * disagree, "" when none is recorded — or one group without `groupBy`) and per pair of a patient's
+ * best sensitive and resistance ranks over their sequenced samples in the cohort: the number of
+ * patients (the owners of the cohort's sequenced samples). Counts only.
  */
 export function actionLevelsSql(cohortSql: string, study: string, db: string, pin: string, groupBy: string | null): AggregateSql {
   if (groupBy && !/^[A-Za-z0-9_:/.-]{1,128}$/.test(groupBy)) throw new Error("bad attribute name '" + String(groupBy).slice(0, 40) + "'");
@@ -24,7 +26,7 @@ export function actionLevelsSql(cohortSql: string, study: string, db: string, pi
       "  SELECT " + pid + " AS pid, if(uniqExact(attribute_value) > 1, 'Multiple', any(attribute_value)) AS g\n" +
       "  FROM " + clinicalTable(db, [groupBy]) + "\n" +
       "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(groupBy) + " AND trimBoth(attribute_value) != ''\n" +
-      "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+      "    AND if(type = 'sample', " + inCohortSamples(bareSampleId("sample_unique_id", study)) + ", " + inCohortPatients(pid) + ")\n" +
       "  GROUP BY pid\n" +
       ")" : "") + "\n" +
     "SELECT " + (groupBy ? "grp.g" : "''") + " AS grp, pl.s AS level, pl.r AS resistance, count() AS n\n" +
@@ -34,7 +36,7 @@ export function actionLevelsSql(cohortSql: string, study: string, db: string, pi
 }
 
 /**
- * Patients with a sequenced sample on each side of a sample attribute (e.g. SAMPLE_TYPE Primary
+ * Patients with a sequenced sample in the cohort on each side of a sample attribute (e.g. SAMPLE_TYPE Primary
  * against Metastasis, values matched case-insensitively): per pair of their best sensitive rank
  * on side a and on side b, the number of patients. Counts only.
  */
@@ -85,7 +87,7 @@ function actionCtes(cohortSql: string, study: string, db: string, pin: string): 
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
-    "    AND " + sdPid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(bareSampleId("sp.sample_unique_id", study)) + "\n" +
     "),\n" +
     "lv AS (\n" +
     "  SELECT g.sample_unique_id AS sid, min(" + rankOf("ann.highest_sensitive_level", SENSITIVE_LEVELS) + ") AS s,\n" +

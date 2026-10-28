@@ -30,7 +30,7 @@ deflated (`1.<base64url>`, `lib/url-json.ts`) to keep links short.
 ## Cohort definitions
 
 ```
-cohortDef := { "all": [clause × 0-8],         // ANDed; [] means every patient in the study
+cohortDef := { "all": [clause × 0-8],         // ANDed (intersection of samples); [] means every sample in the study
                "extends"?: "<cohort name>",   // splice that cohort's own "all" in AHEAD of this one's, resolved before anything is compiled
                "study"?:   "<id>",            // evaluate in another study
                "studies"?: ["<id>", ...],     // union across studies (federated, no count limit)
@@ -46,8 +46,19 @@ splitDef  := { "arms": [ { "name": "<label>", "where": clause, "splits"?: {…} 
                "otherSplits"?: {…},            // splits of the remainder
                "notes"?: "<prose>" }
 clause    := leaf | { "any": [leaf × 1-8] }   // OR (UNION DISTINCT)
-                  | { "not": leaf | { "any": [leaf × 1-8] } }  // study base EXCEPT leaf, or EXCEPT the OR of several (De Morgan's, in one clause instead of one "not" per leaf)
+                  | { "not": leaf | { "any": [leaf × 1-8] } }  // the study's samples EXCEPT leaf, or EXCEPT the OR of several (De Morgan's, in one clause instead of one "not" per leaf)
 ```
+
+**A cohort is a set of samples, as on cBioPortal.** Every clause selects samples. A sample-level
+clause — a sample attribute, an OQL alteration (called in the sample that carries it), a sample
+list, `profiled`, `genomicData`, `proteinPosition`, `caseList` — selects the samples that
+match it; a patient-level clause — a patient attribute, a timeline `event`, `derived`, a patient
+list, the held-out `split` — selects every sample of the patients that match. `all`, `any` and
+`not` are intersection, union and complement over the study's samples. A cohort's patients are
+the owners of its samples: views drawn per patient (survival, timelines, Cox) use them, and views
+drawn per sample — and every gene frequency — use only the cohort's own samples, so a patient's
+other samples never count. "Non-small cell lung cancer" is the NSCLC samples, not every sample of
+patients who have one.
 
 **Cross-study semantics.** A cohort with `studies` is compiled per study (compilers are
 single-study by design); members are study-qualified patient ids. Patient overlap across studies
@@ -109,7 +120,7 @@ rather than silently ignoring what it does not understand.
 | kind | shape | meaning |
 |---|---|---|
 | `oql` | `{"kind":"oql","q":"STK11: DRIVER"}` | genomic status in cBioPortal OQL (see below) |
-| `clinical` | `{"kind":"clinical","attribute":A, ...predicate, "per"?:"sample"}` | clinical attribute; predicate is `values:[≤50]` (OR), `range:{gt,gte,lt,lte}` (numeric via toFloat64OrNull), or `op`(`= != > >= < <=`)+`value`; `per:"sample"` = patient matches if ANY sample matches. `op`+`percentile` (0-1) resolves `value` LIVE from a percentile of the attribute's distribution instead of a literal number — e.g. `{"op":">=","percentile":0.8}` = "at or above the 80th percentile" ("top 20%"). `percentileOf`:"<cohort name>" scopes the reference population to another cohort in this document (e.g. "top 20% TMB **within NSCLC**", not the whole study); both the leaf's own cohort and, if given, `percentileOf`'s cohort must resolve to a single study, and `percentileOf` may not itself use `percentile` (no chaining). Resolved once, live, before compilation — the readback shows the resolved number and what it was a percentile of. **Custom data:** an attribute the reader uploaded is named `custom:<dataset>/<COLUMN>` (e.g. `custom:brain-mets/MET_SITE`) and works here and in every view exactly like the study's own — oncoprint `clinical` tracks, `splitBy.attribute`, `clinical` views, plot axes. Uploads are stored on the server, readable once logged in, and pinned by version in the document's `uploads`; a document naming a dataset the request cannot read is refused, never answered as if no patient had a value. Patient-level studies only |
+| `clinical` | `{"kind":"clinical","attribute":A, ...predicate}` | clinical attribute, matched at the level the study records it: a sample attribute selects the samples whose value matches, a patient attribute every sample of the patients whose value matches — so one clause over two studies, one recording the attribute per sample and the other per patient, matches each its own way, as cBioPortal does; predicate is `values:[≤50]` (OR), `range:{gt,gte,lt,lte}` (numeric via toFloat64OrNull), or `op`(`= != > >= < <=`)+`value`. A `per` key is refused. `op`+`percentile` (0-1) resolves `value` LIVE from a percentile of the attribute's distribution instead of a literal number — e.g. `{"op":">=","percentile":0.8}` = "at or above the 80th percentile" ("top 20%"). `percentileOf`:"<cohort name>" scopes the reference population to another cohort in this document (e.g. "top 20% TMB **within NSCLC**", not the whole study); both the leaf's own cohort and, if given, `percentileOf`'s cohort must resolve to a single study, and `percentileOf` may not itself use `percentile` (no chaining). Resolved once, live, before compilation — the readback shows the resolved number and what it was a percentile of. **Custom data:** an attribute the reader uploaded is named `custom:<dataset>/<COLUMN>` (e.g. `custom:brain-mets/MET_SITE`) and works here and in every view exactly like the study's own — oncoprint `clinical` tracks, `splitBy.attribute`, `clinical` views, plot axes. Uploads are stored on the server, readable once logged in, and pinned by version in the document's `uploads`; a document naming a dataset the request cannot read is refused, never answered as if no patient had a value. Patient-level studies only |
 | `derived` | `{"kind":"derived","metric":"followupMonths"|"historyMonths"|"alteredGenes"|"lines"|"treatmentSpan","range":{gte?,gt?,lte?,lt?},"eventType"?,"lineGap"?:90,"lineClasses"?}` | filters on a value computed from the **shape** of the data rather than a study's vocabulary. Event-type names and attribute keys are study-specific — this database spells one concept `Treatment` in 87 studies and `TREATMENT` in 10, and the key MSK-CHORD calls `SUBTYPE` exists in only 27 of 131 timeline studies — so these read dates and gene symbols instead and mean the same thing everywhere. `followupMonths`: how far the timeline runs past its own day 0. `historyMonths`: how much predates it. `alteredGenes`: distinct genes altered (panel size bounds it, so not comparable across studies with different panels). `lines` and `treatmentSpan` are the deliberate exception — they need `eventType` (which timeline event stands for "a therapy" here; Explore proposes one from the study's own catalog), because there is no vocabulary-free way to ask "how many lines of treatment". `lines`: the number of treatment lines, by the one line definition the `sequence` view and "Treatment line (derived)" share (systemic-therapy records of that event type, a `lineGap`-day gap; `lineClasses` `"all"` or a class list widens it). `treatmentSpan`: months from the first to the last record of that event type |
 | `event` | `{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}` | timeline sub-DSL (below) |
 | `sampleList` | `{"kind":"sampleList","ids":["<study>:<id>", ...]}` or `{"kind":"sampleList","set":"<id set>"}` | explicit, cross-study list of sample ids: inline in `ids` (up to about 200 KB of ids per study, roughly 10,000 — refused by name past that), or a **stored id set** named by `set`, of any size up to 250,000 (see below) |
@@ -663,8 +674,7 @@ EGFR-mutant versus KRAS-mutant lung adenocarcinoma — the two dominant, mutuall
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "oql",
@@ -679,8 +689,7 @@ EGFR-mutant versus KRAS-mutant lung adenocarcinoma — the two dominant, mutuall
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "oql",
@@ -758,8 +767,7 @@ Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "oql",
@@ -774,8 +782,7 @@ Colorectal cancer in MSK-CHORD. Lollipops for the canonical drivers (KRAS codon 
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "not": {
@@ -1387,8 +1394,7 @@ NSCLC patients who progressed within 180 days of first immunotherapy versus thos
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "event",
@@ -1429,8 +1435,7 @@ NSCLC patients who progressed within 180 days of first immunotherapy versus thos
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "event",
@@ -1472,8 +1477,7 @@ NSCLC patients who progressed within 180 days of first immunotherapy versus thos
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "event",
@@ -1514,8 +1518,7 @@ NSCLC patients who progressed within 180 days of first immunotherapy versus thos
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "event",
@@ -1817,16 +1820,14 @@ Colorectal or pancreatic patients (OR inside one clause), excluding CDKN2A deep 
               "attribute": "CANCER_TYPE",
               "values": [
                 "Colorectal Cancer"
-              ],
-              "per": "sample"
+              ]
             },
             {
               "kind": "clinical",
               "attribute": "CANCER_TYPE",
               "values": [
                 "Pancreatic Cancer"
-              ],
-              "per": "sample"
+              ]
             }
           ]
         },
@@ -2104,8 +2105,7 @@ Non-small cell lung cancer in MSK-CHORD (7,809 patients), with KRAS G12C highlig
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -2266,8 +2266,7 @@ Non-small cell lung cancer in MSK-CHORD (7,809 patients). The first view groups 
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -2394,8 +2393,7 @@ Pancreatic adenocarcinoma. The first row pools TP53, MDM2 and MDM4: it is altere
           "attribute": "CANCER_TYPE",
           "values": [
             "Pancreatic Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -2559,8 +2557,7 @@ The gene list appears once, in `params`, and every view refers to it as `$genes`
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -2656,8 +2653,7 @@ Hotspots in colorectal cancer, drawn the way cBioPortal's mutation tab draws the
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -2782,8 +2778,7 @@ Pairwise associations among lung cancer driver genes. Each site returns four cou
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -2970,8 +2965,7 @@ Non-small cell lung cancer split by KRAS allele: G12C first, then any other KRAS
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ],
       "splits": {
@@ -3120,7 +3114,6 @@ APC mutation status regressed on overall survival, separately in the MSI-high an
       "all": [
         {
           "kind": "clinical",
-          "per": "sample",
           "attribute": "MSI_TYPE",
           "op": "=",
           "value": "Instable"
@@ -3131,7 +3124,6 @@ APC mutation status regressed on overall survival, separately in the MSI-high an
       "all": [
         {
           "kind": "clinical",
-          "per": "sample",
           "attribute": "MSI_TYPE",
           "op": "=",
           "value": "Stable"
@@ -3237,8 +3229,7 @@ Colorectal cancers in MSK-IMPACT 50K diagnosed before 50 against at 50 or later.
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "clinical",
@@ -3255,8 +3246,7 @@ Colorectal cancers in MSK-IMPACT 50K diagnosed before 50 against at 50 or later.
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "clinical",
@@ -3323,8 +3313,7 @@ Non-small cell lung cancer in MSK-CHORD. 2,898 of 7,809 patients (37.1%) carry n
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -3378,8 +3367,7 @@ Non-small cell lung cancer in MSK-CHORD. EGFR-mutant tumours carry brain sites m
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -3423,8 +3411,7 @@ Non-small cell lung cancer in MSK-CHORD. EGFR-mutant tumours carry brain sites m
           "attribute": "CANCER_TYPE",
           "values": [
             "Endometrial Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -3590,8 +3577,7 @@ MSI status in three groups (stable / instable / indeterminate) instead of the us
           "attribute": "MSI_TYPE",
           "values": [
             "Stable"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -3602,8 +3588,7 @@ MSI status in three groups (stable / instable / indeterminate) instead of the us
           "attribute": "MSI_TYPE",
           "values": [
             "Instable"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -3615,8 +3600,7 @@ MSI status in three groups (stable / instable / indeterminate) instead of the us
           "values": [
             "Indeterminate",
             "Do not report"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -3649,8 +3633,7 @@ TP53 (a real mutation hotspot here) and MDM2 (never assayed for copy-number in t
           "attribute": "CANCER_TYPE_DETAILED",
           "values": [
             "Well-Differentiated Liposarcoma"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -3685,8 +3668,7 @@ Breast cancer's four receptor subtypes, compared on genomic instability (FRACTIO
           "attribute": "RECEPTOR_STATUS_PRIMARY",
           "values": [
             "HR+/HER2-"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -3697,8 +3679,7 @@ Breast cancer's four receptor subtypes, compared on genomic instability (FRACTIO
           "attribute": "RECEPTOR_STATUS_PRIMARY",
           "values": [
             "Triple Negative"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -3709,8 +3690,7 @@ Breast cancer's four receptor subtypes, compared on genomic instability (FRACTIO
           "attribute": "RECEPTOR_STATUS_PRIMARY",
           "values": [
             "HR+/HER2+"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -3721,8 +3701,7 @@ Breast cancer's four receptor subtypes, compared on genomic instability (FRACTIO
           "attribute": "RECEPTOR_STATUS_PRIMARY",
           "values": [
             "HR-/HER2+"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -3760,8 +3739,7 @@ MSI-H vs MSS endometrial cancer, progression-free survival from first-line treat
           "attribute": "MSI_STATUS",
           "values": [
             "MSI-H"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -3772,8 +3750,7 @@ MSI-H vs MSS endometrial cancer, progression-free survival from first-line treat
           "attribute": "MSI_STATUS",
           "values": [
             "MSS"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -3808,8 +3785,7 @@ tmb_mskcc_2018 is pan-cancer, so a plain percentile would mix histologies with v
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -3820,16 +3796,14 @@ tmb_mskcc_2018 is pan-cancer, so a plain percentile would mix histologies with v
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "clinical",
           "attribute": "TMB_NONSYNONYMOUS",
           "op": ">=",
           "percentile": 0.8,
-          "percentileOf": "NSCLC",
-          "per": "sample"
+          "percentileOf": "NSCLC"
         }
       ]
     },
@@ -3840,16 +3814,14 @@ tmb_mskcc_2018 is pan-cancer, so a plain percentile would mix histologies with v
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "clinical",
           "attribute": "TMB_NONSYNONYMOUS",
           "op": "<",
           "percentile": 0.8,
-          "percentileOf": "NSCLC",
-          "per": "sample"
+          "percentileOf": "NSCLC"
         }
       ]
     }
@@ -3881,8 +3853,7 @@ KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six mont
           "attribute": "CANCER_TYPE_DETAILED",
           "values": [
             "Lung Adenocarcinoma"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "oql",
@@ -3919,8 +3890,7 @@ KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six mont
           "attribute": "CANCER_TYPE_DETAILED",
           "values": [
             "Lung Adenocarcinoma"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "not": {
@@ -3958,8 +3928,7 @@ Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal 
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -3970,8 +3939,7 @@ Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal 
           "attribute": "CANCER_TYPE",
           "values": [
             "Breast Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -4004,8 +3972,7 @@ Colorectal and pancreatic cancer in MSK-CHORD. WNT separates them almost complet
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -4016,8 +3983,7 @@ Colorectal and pancreatic cancer in MSK-CHORD. WNT separates them almost complet
           "attribute": "CANCER_TYPE",
           "values": [
             "Pancreatic Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -4279,8 +4245,7 @@ MSK-IMPACT non-small cell lung cancer, 1,680 samples. The oncogenic drivers stay
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -4319,8 +4284,7 @@ MSK-IMPACT 50k: colorectal, breast and pancreatic cancer. Colorectal shows its t
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -4331,8 +4295,7 @@ MSK-IMPACT 50k: colorectal, breast and pancreatic cancer. Colorectal shows its t
           "attribute": "CANCER_TYPE",
           "values": [
             "Breast Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -4343,8 +4306,7 @@ MSK-IMPACT 50k: colorectal, breast and pancreatic cancer. Colorectal shows its t
           "attribute": "CANCER_TYPE",
           "values": [
             "Pancreatic Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -4404,8 +4366,7 @@ Colorectal against breast cancer. Tumour suppressors show the classic second hit
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -4416,8 +4377,7 @@ Colorectal against breast cancer. Tumour suppressors show the classic second hit
           "attribute": "CANCER_TYPE",
           "values": [
             "Breast Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -4458,8 +4418,7 @@ MSK-CHORD, from each patient's day 0, among those without a brain metastasis by 
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -4470,8 +4429,7 @@ MSK-CHORD, from each patient's day 0, among those without a brain metastasis by 
           "attribute": "CANCER_TYPE",
           "values": [
             "Breast Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -4482,8 +4440,7 @@ MSK-CHORD, from each patient's day 0, among those without a brain metastasis by 
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -4526,8 +4483,7 @@ MSK-CHORD non-small cell lung cancer, KRAS-mutant against KRAS wild-type (profil
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "oql",
@@ -4542,8 +4498,7 @@ MSK-CHORD non-small cell lung cancer, KRAS-mutant against KRAS wild-type (profil
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "not": {
@@ -4592,8 +4547,7 @@ MSK-CHORD colorectal cancer, highest recorded stage 1–3 against stage 4. Stage
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "clinical",
@@ -4611,8 +4565,7 @@ MSK-CHORD colorectal cancer, highest recorded stage 1–3 against stage 4. Stage
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "clinical",
@@ -4651,8 +4604,7 @@ Samstein et al.'s immunotherapy cohort (every patient treated with immune checkp
           "attribute": "TMB_NONSYNONYMOUS",
           "range": {
             "lt": 10
-          },
-          "per": "sample"
+          }
         }
       ]
     },
@@ -4663,8 +4615,7 @@ Samstein et al.'s immunotherapy cohort (every patient treated with immune checkp
           "attribute": "TMB_NONSYNONYMOUS",
           "range": {
             "gte": 10
-          },
-          "per": "sample"
+          }
         }
       ]
     }
@@ -4702,8 +4653,7 @@ MSK-CHORD non-small cell lung cancer, 7,809 patients, 2,666 with an immunotherap
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -4772,8 +4722,7 @@ MSK-IMPACT 50K, non-small cell lung cancer (6,633 patients; 5,901 typed at all t
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -4835,8 +4784,7 @@ Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a med
           "attribute": "CANCER_TYPE",
           "values": [
             "Prostate Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "kind": "oql",
@@ -4851,8 +4799,7 @@ Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a med
           "attribute": "CANCER_TYPE",
           "values": [
             "Prostate Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "not": {
@@ -4896,8 +4843,7 @@ Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 a
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -4945,8 +4891,7 @@ Fitted on the 1,440 non-small cell lung cancer patients of MSK-IMPACT 2017 (ten 
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -4960,8 +4905,7 @@ Fitted on the 1,440 non-small cell lung cancer patients of MSK-IMPACT 2017 (ten 
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -4999,8 +4943,7 @@ Runs on custom data: `luad-biopsy-site` (LUAD biopsy site (demo), 186 samples, c
           "attribute": "custom:luad-biopsy-site/BIOPSY_SITE",
           "values": [
             "CNS met"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -5276,8 +5219,7 @@ Runs on custom data: `hta11-sc-p` (HTAN Vanderbilt colorectal polyp scRNA-seq (C
           "attribute": "POLYP_TYPE",
           "values": [
             "AD"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -5288,8 +5230,7 @@ Runs on custom data: `hta11-sc-p` (HTAN Vanderbilt colorectal polyp scRNA-seq (C
           "attribute": "POLYP_TYPE",
           "values": [
             "SER"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -5407,8 +5348,7 @@ TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD.
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -5442,8 +5382,7 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "not": {
@@ -5451,8 +5390,7 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
             "attribute": "MSI_TYPE",
             "values": [
               "Instable"
-            ],
-            "per": "sample"
+            ]
           }
         }
       ]
@@ -5464,8 +5402,7 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
           "attribute": "CANCER_TYPE",
           "values": [
             "Pancreatic Cancer"
-          ],
-          "per": "sample"
+          ]
         },
         {
           "not": {
@@ -5473,8 +5410,7 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
             "attribute": "MSI_TYPE",
             "values": [
               "Instable"
-            ],
-            "per": "sample"
+            ]
           }
         }
       ]
@@ -5507,8 +5443,7 @@ Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature 
           "attribute": "CANCER_TYPE",
           "values": [
             "Melanoma"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     },
@@ -5519,8 +5454,7 @@ Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature 
           "attribute": "CANCER_TYPE",
           "values": [
             "Non-Small Cell Lung Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -5578,8 +5512,7 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
           "attribute": "CANCER_TYPE",
           "values": [
             "Pancreatic Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -5615,8 +5548,7 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
           "attribute": "CANCER_TYPE",
           "values": [
             "Breast Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -5668,8 +5600,7 @@ MSK-CHORD prostate cancer patients, those with the most structural variants firs
           "attribute": "CANCER_TYPE",
           "values": [
             "Prostate Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }
@@ -5716,8 +5647,7 @@ MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at 
           "attribute": "CANCER_TYPE",
           "values": [
             "Colorectal Cancer"
-          ],
-          "per": "sample"
+          ]
         }
       ]
     }

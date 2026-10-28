@@ -206,8 +206,8 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
         })}
       </div>
       {res && (res.conserved
-        ? <p className="partsum ok">= {res.sum.toLocaleString()}, all of “{def.of}”: every patient is in exactly one row</p>
-        : <p className="partsum bad">The rows add up to {res.sum.toLocaleString()}, not “{def.of}”’s {res.parentCount.toLocaleString()} — these groups are not a clean split; do not compare them until this is explained.</p>)}
+        ? <p className="partsum ok">= {res.sum.toLocaleString()} samples, all of “{def.of}”: every sample is in exactly one row</p>
+        : <p className="partsum bad">The rows add up to {res.sum.toLocaleString()} samples, not “{def.of}”’s {res.parentSamples.toLocaleString()} — these groups are not a clean split; do not compare them until this is explained.</p>)}
       {res && res.unchecked.length > 0 &&
         <p className="note">Not checked whether every patient has data for {res.unchecked.join(", ")}: “{def.other || "Other"}” may include patients with no data for it.</p>}
       {pooled.length > 0 &&

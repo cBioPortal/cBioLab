@@ -3,6 +3,7 @@
   "cohorts": {
     "Basal-like": {
       "count": 171,
+      "samples": 171,
       "text": "SUBTYPE in [BRCA_Basal]",
       "studies": [
         "brca_tcga_pan_can_atlas_2018"
@@ -10,6 +11,7 @@
     },
     "Luminal A": {
       "count": 499,
+      "samples": 499,
       "text": "SUBTYPE in [BRCA_LumA]",
       "studies": [
         "brca_tcga_pan_can_atlas_2018"
@@ -40,225 +42,225 @@
             "gene": "TTC36",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.7445479532163746,
-            "meanB": 0.40476012024048125,
-            "effect": -2.1493080734568557,
-            "t": -50.37553199579407,
-            "p": 8.091447449946383e-220,
-            "q": 1.6187749768362735e-215
+            "meanA": -1.7445479532163737,
+            "meanB": 0.40476012024048075,
+            "effect": -2.1493080734568544,
+            "t": -50.375531995793814,
+            "p": 8.091447449982316e-220,
+            "q": 1.618774976843462e-215
           },
           {
             "gene": "FSIP1",
             "nA": 171,
             "nB": 499,
             "meanA": -1.5407900584795324,
-            "meanB": 0.4491647294589174,
-            "effect": -1.9899547879384498,
-            "t": -49.8817137530346,
-            "p": 2.3035779855199614e-204,
-            "q": 2.3042690589156173e-200
+            "meanB": 0.4491647294589175,
+            "effect": -1.98995478793845,
+            "t": -49.881713753034575,
+            "p": 2.3035779855211427e-204,
+            "q": 2.304269058916799e-200
           },
           {
             "gene": "SRARP",
             "nA": 171,
             "nB": 499,
-            "meanA": -2.0564456140350877,
+            "meanA": -2.056445614035087,
             "meanB": 0.3802805611222444,
-            "effect": -2.4367261751573324,
-            "t": -52.58970630846896,
-            "p": 2.5912634421936607e-200,
-            "q": 1.7280272141508793e-196
+            "effect": -2.4367261751573315,
+            "t": -52.589706308468806,
+            "p": 2.5912634422014837e-200,
+            "q": 1.728027214156096e-196
           },
           {
             "gene": "DRAIC",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.702163742690057,
-            "meanB": 0.3915296593186371,
-            "effect": -2.0936934020086944,
-            "t": -49.2851470509609,
-            "p": 5.510248672884023e-190,
-            "q": 2.755950873742944e-186
+            "meanA": -1.7021637426900584,
+            "meanB": 0.391529659318637,
+            "effect": -2.0936934020086952,
+            "t": -49.28514705096115,
+            "p": 5.510248672861103e-190,
+            "q": 2.7559508737314804e-186
           },
           {
             "gene": "NAT1",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.3843912280701764,
-            "meanB": 0.5428809619238478,
-            "effect": -1.9272721899940244,
-            "t": -44.23467399694273,
-            "p": 2.7043279892748184e-182,
-            "q": 1.0820557150686404e-178
+            "meanA": -1.3843912280701751,
+            "meanB": 0.5428809619238473,
+            "effect": -1.9272721899940224,
+            "t": -44.23467399694228,
+            "p": 2.7043279892965445e-182,
+            "q": 1.0820557150773334e-178
           },
           {
             "gene": "MAPT-IT1",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.6838713450292397,
-            "meanB": 0.20232264529058128,
-            "effect": -1.886193990319821,
-            "t": -39.81370583703942,
-            "p": 2.0129532020700296e-175,
-            "q": 6.711856960102169e-172
+            "meanA": -1.6838713450292402,
+            "meanB": 0.20232264529058122,
+            "effect": -1.8861939903198215,
+            "t": -39.813705837039535,
+            "p": 2.012953202068773e-175,
+            "q": 6.711856960097978e-172
           },
           {
             "gene": "CT62",
             "nA": 171,
             "nB": 499,
-            "meanA": -2.0318602339181275,
-            "meanB": 0.41401743486973996,
-            "effect": -2.4458776687878676,
-            "t": -49.396461591675944,
-            "p": 6.399560110459782e-157,
-            "q": 1.8289942795694058e-153
+            "meanA": -2.0318602339181253,
+            "meanB": 0.41401743486973935,
+            "effect": -2.4458776687878645,
+            "t": -49.396461591675205,
+            "p": 6.399560110513753e-157,
+            "q": 1.8289942795848305e-153
           },
           {
             "gene": "SLC7A13",
             "nA": 171,
             "nB": 499,
             "meanA": -1.9130122807017553,
-            "meanB": 0.004921242484969956,
-            "effect": -1.9179335231867254,
-            "t": -35.5911269176747,
-            "p": 3.892473730008788e-156,
-            "q": 9.734103680319477e-153
+            "meanB": 0.004921242484969942,
+            "effect": -1.9179335231867252,
+            "t": -35.59112691767468,
+            "p": 3.892473730009011e-156,
+            "q": 9.734103680320035e-153
           },
           {
             "gene": "CYP2B7P",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.3962970760233921,
-            "meanB": 0.3789587174348692,
-            "effect": -1.7752557934582613,
-            "t": -37.209164655790794,
-            "p": 6.3502571936527e-150,
-            "q": 1.4115916157357323e-146
+            "meanA": -1.3962970760233915,
+            "meanB": 0.37895871743486925,
+            "effect": -1.7752557934582607,
+            "t": -37.209164655790694,
+            "p": 6.350257193661754e-150,
+            "q": 1.411591615737745e-146
           },
           {
             "gene": "TFF1",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.8730280701754394,
-            "meanB": 0.3680098196392785,
-            "effect": -2.241037889814718,
-            "t": -43.07647717317015,
-            "p": 5.061562842349789e-149,
-            "q": 1.0126162622404987e-145
+            "meanA": -1.8730280701754396,
+            "meanB": 0.36800981963927853,
+            "effect": -2.2410378898147183,
+            "t": -43.07647717317006,
+            "p": 5.06156284235556e-149,
+            "q": 1.0126162622416535e-145
           },
           {
             "gene": "NEK10",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.2707538011695902,
-            "meanB": 0.5132166332665333,
-            "effect": -1.7839704344361236,
-            "t": -36.314048270969685,
-            "p": 8.116747273958295e-147,
-            "q": 1.4762149632982698e-143
+            "meanA": -1.2707538011695905,
+            "meanB": 0.5132166332665336,
+            "effect": -1.783970434436124,
+            "t": -36.31404827096978,
+            "p": 8.11674727394396e-147,
+            "q": 1.4762149632956623e-143
           },
           {
             "gene": "ABCC8",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.9394450292397651,
-            "meanB": 0.3299863727454911,
-            "effect": -2.269431401985256,
-            "t": -40.45792875224126,
-            "p": 5.8722761644845026e-145,
-            "q": 9.790063078889746e-142
+            "meanA": -1.9394450292397662,
+            "meanB": 0.32998637274549114,
+            "effect": -2.2694314019852575,
+            "t": -40.45792875224148,
+            "p": 5.87227616446542e-145,
+            "q": 9.790063078857933e-142
           },
           {
             "gene": "MAPT-AS1",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.6475619883040897,
-            "meanB": 0.08925931863727461,
-            "effect": -1.7368213069413643,
-            "t": -34.46869324253705,
-            "p": 2.7982416787569205e-144,
-            "q": 4.3062786942469967e-141
+            "meanA": -1.6475619883040904,
+            "meanB": 0.08925931863727456,
+            "effect": -1.736821306941365,
+            "t": -34.4686932425371,
+            "p": 2.798241678756928e-144,
+            "q": 4.306278694247008e-141
           },
           {
             "gene": "ANKRD30A",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.9812163742690037,
-            "meanB": 0.27829458917835675,
-            "effect": -2.2595109634473602,
-            "t": -39.37280226605274,
-            "p": 5.063304961997455e-144,
-            "q": 7.235462790694364e-141
+            "meanA": -1.9812163742690039,
+            "meanB": 0.27829458917835664,
+            "effect": -2.2595109634473607,
+            "t": -39.372802266052844,
+            "p": 5.063304961990813e-144,
+            "q": 7.235462790684872e-141
           },
           {
             "gene": "BCL11A",
             "nA": 171,
             "nB": 499,
-            "meanA": 1.4358286549707602,
-            "meanB": -0.2880046092184371,
-            "effect": 1.7238332641891974,
-            "t": 37.17100854249844,
-            "p": 2.016245097781077e-142,
-            "q": 2.6891332950805486e-139
+            "meanA": 1.4358286549707597,
+            "meanB": -0.28800460921843696,
+            "effect": 1.7238332641891967,
+            "t": 37.17100854249826,
+            "p": 2.01624509778694e-142,
+            "q": 2.689133295088368e-139
           },
           {
             "gene": "TPSG1",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.373862573099413,
-            "meanB": 0.22565631262525054,
-            "effect": -1.5995188857246636,
-            "t": -33.611016475882394,
-            "p": 1.644677554818099e-141,
-            "q": 2.0564636976056803e-138
+            "meanA": -1.3738625730994132,
+            "meanB": 0.22565631262525057,
+            "effect": -1.5995188857246638,
+            "t": -33.61101647588246,
+            "p": 1.644677554817353e-141,
+            "q": 2.0564636976047478e-138
           },
           {
             "gene": "PGR",
             "nA": 171,
             "nB": 499,
             "meanA": -1.2939280701754385,
-            "meanB": 0.5647364729458908,
-            "effect": -1.8586645431213293,
-            "t": -38.20350861907161,
-            "p": 1.2738662408655656e-139,
-            "q": 1.499115765573912e-136
+            "meanB": 0.5647364729458928,
+            "effect": -1.8586645431213313,
+            "t": -38.20350861907165,
+            "p": 1.2738662408657868e-139,
+            "q": 1.4991157655741723e-136
           },
           {
             "gene": "CDCA7",
             "nA": 171,
             "nB": 499,
-            "meanA": 1.3095035087719302,
+            "meanA": 1.3095035087719298,
             "meanB": -0.5064813627254511,
-            "effect": 1.8159848714973812,
-            "t": 37.3944937933237,
-            "p": 1.9378342114067875e-139,
-            "q": 2.1537950685224553e-136
+            "effect": 1.8159848714973807,
+            "t": 37.39449379332356,
+            "p": 1.9378342114113162e-139,
+            "q": 2.1537950685274883e-136
           },
           {
             "gene": "SERPINA11",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.614418713450292,
-            "meanB": 0.43775290581162296,
-            "effect": -2.052171619261915,
-            "t": -37.83308873804711,
-            "p": 6.464638024473876e-138,
-            "q": 6.80692359566444e-135
+            "meanA": -1.6144187134502925,
+            "meanB": 0.43775290581162324,
+            "effect": -2.052171619261916,
+            "t": -37.833088738047195,
+            "p": 6.464638024466878e-138,
+            "q": 6.806923595657072e-135
           },
           {
             "gene": "SLC39A6",
             "nA": 171,
             "nB": 499,
-            "meanA": -1.2425690058479535,
-            "meanB": 0.4289593186372745,
+            "meanA": -1.2425690058479533,
+            "meanB": 0.4289593186372747,
             "effect": -1.671528324485228,
-            "t": -34.674209417030276,
-            "p": 2.069234735993648e-137,
-            "q": 2.069855506414446e-134
+            "t": -34.67420941703025,
+            "p": 2.0692347359947134e-137,
+            "q": 2.0698555064155116e-134
           },
           {
             "…": "1480 more",
-            "sha256": "522f517d2b7aef2f"
+            "sha256": "18632a4d08118c27"
           }
         ],
         "grid": {
@@ -389,7 +391,7 @@
             ],
             {
               "…": "148 more",
-              "sha256": "c1318f02f3b7bf13"
+              "sha256": "2ab56df1dbaceb9b"
             }
           ]
         },
@@ -2692,27 +2694,27 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Welch's t-test per gene on rna_seq_v2_mrna_median_all_sample_Zscores as stored, Basal-like minus Luminal A, each patient contributing the mean of their samples; computed from three running totals per gene and cohort, so it is exact across sites. 20,006 genes tested, 14 left out (fewer than 3 patients with a value in a cohort, or no variance); q is Benjamini–Hochberg across every gene tested. The 1500 most significant genes are drawn as points, the rest as density. Z-scores are standardised within each study, so a difference is in study-specific units. A t-test on thousands of patients finds tiny differences significant — read the effect, not only the q. Enrichment is preranked GSEA on the unrounded t (Subramanian et al. 2005, weight 1), significance from 1000 random sets of the same size drawn from the same ranking, seeded by the set's name so a shared link reproduces it; p = (b+1)/(m+1) over the same-sign nulls, q is Benjamini–Hochberg across the sets tested (not GSEA's own NES-based FDR). Gene-set permutation ignores gene–gene correlation, so it is anti-conservative next to phenotype permutation, which needs patient-level values. ",
+      "caveat": "Welch's t-test per gene on rna_seq_v2_mrna_median_all_sample_Zscores as stored, Basal-like minus Luminal A, each sample in the cohort one observation, as the portal's group comparison tests expression; computed from three running totals per gene and cohort, so it is exact across sites. 20,006 genes tested, 14 left out (fewer than 3 samples with a value in a cohort, or no variance); q is Benjamini–Hochberg across every gene tested. The 1500 most significant genes are drawn as points, the rest as density. Z-scores are standardised within each study, so a difference is in study-specific units. A t-test on thousands of samples finds tiny differences significant — read the effect, not only the q. Enrichment is preranked GSEA on the unrounded t (Subramanian et al. 2005, weight 1), significance from 1000 random sets of the same size drawn from the same ranking, seeded by the set's name so a shared link reproduces it; p = (b+1)/(m+1) over the same-sign nulls, q is Benjamini–Hochberg across the sets tested (not GSEA's own NES-based FDR). Gene-set permutation ignores gene–gene correlation, so it is anti-conservative next to phenotype permutation, which needs patient-level values. ",
       "method": {
         "steps": [
           {
             "kind": "fetch",
             "title": "Sum every gene's values",
-            "detail": "The diffexpr:moments query above, on “rna_seq_v2_mrna_median_all_sample_Zscores” as stored. Per gene, over the cohort's patients with a value (a patient with several samples contributes their average): n, Σv and Σv². Every gene in the profile, no individual value.",
+            "detail": "The diffexpr:moments query above, on “rna_seq_v2_mrna_median_all_sample_Zscores” as stored. Per gene, over the cohort's samples with a value: n, Σv and Σv². Every gene in the profile, no individual value.",
             "scope": "Basal-like · brca_tcga_pan_can_atlas_2018",
             "rowsIn": 171
           },
           {
             "kind": "fetch",
             "title": "Sum every gene's values",
-            "detail": "The diffexpr:moments query above, on “rna_seq_v2_mrna_median_all_sample_Zscores” as stored. Per gene, over the cohort's patients with a value (a patient with several samples contributes their average): n, Σv and Σv². Every gene in the profile, no individual value.",
+            "detail": "The diffexpr:moments query above, on “rna_seq_v2_mrna_median_all_sample_Zscores” as stored. Per gene, over the cohort's samples with a value: n, Σv and Σv². Every gene in the profile, no individual value.",
             "scope": "Luminal A · brca_tcga_pan_can_atlas_2018",
             "rowsIn": 499
           },
           {
             "kind": "transform",
             "title": "Leave out genes that cannot be tested",
-            "detail": "A gene with fewer than 3 patients with a value in either cohort, or with no variance (Var A + Var B ≤ 1e-9 · (1 + mean A² + mean B²) — judged to a tolerance, since a constant gene's variance from the sums is rounding noise).",
+            "detail": "A gene with fewer than 3 samples with a value in either cohort, or with no variance (Var A + Var B ≤ 1e-9 · (1 + mean A² + mean B²) — judged to a tolerance, since a constant gene's variance from the sums is rounding noise).",
             "rowsIn": 20020,
             "rowsOut": 20006
           },
@@ -2760,103 +2762,103 @@
             "abs": 0
           },
           "diffexpr:TTC36:p": {
-            "v": 8.091447449946383e-220,
+            "v": 8.091447449982316e-220,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:TTC36:q": {
-            "v": 1.6187749768362735e-215,
+            "v": 1.618774976843462e-215,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:FSIP1:p": {
-            "v": 2.3035779855199614e-204,
+            "v": 2.3035779855211427e-204,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:FSIP1:q": {
-            "v": 2.3042690589156173e-200,
+            "v": 2.304269058916799e-200,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:SRARP:p": {
-            "v": 2.5912634421936607e-200,
+            "v": 2.5912634422014837e-200,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:SRARP:q": {
-            "v": 1.7280272141508793e-196,
+            "v": 1.728027214156096e-196,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:DRAIC:p": {
-            "v": 5.510248672884023e-190,
+            "v": 5.510248672861103e-190,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:DRAIC:q": {
-            "v": 2.755950873742944e-186,
+            "v": 2.7559508737314804e-186,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:NAT1:p": {
-            "v": 2.7043279892748184e-182,
+            "v": 2.7043279892965445e-182,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:NAT1:q": {
-            "v": 1.0820557150686404e-178,
+            "v": 1.0820557150773334e-178,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:MAPT-IT1:p": {
-            "v": 2.0129532020700296e-175,
+            "v": 2.012953202068773e-175,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:MAPT-IT1:q": {
-            "v": 6.711856960102169e-172,
+            "v": 6.711856960097978e-172,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:CT62:p": {
-            "v": 6.399560110459782e-157,
+            "v": 6.399560110513753e-157,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:CT62:q": {
-            "v": 1.8289942795694058e-153,
+            "v": 1.8289942795848305e-153,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:SLC7A13:p": {
-            "v": 3.892473730008788e-156,
+            "v": 3.892473730009011e-156,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:SLC7A13:q": {
-            "v": 9.734103680319477e-153,
+            "v": 9.734103680320035e-153,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:CYP2B7P:p": {
-            "v": 6.3502571936527e-150,
+            "v": 6.350257193661754e-150,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:CYP2B7P:q": {
-            "v": 1.4115916157357323e-146,
+            "v": 1.411591615737745e-146,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:TFF1:p": {
-            "v": 5.061562842349789e-149,
+            "v": 5.06156284235556e-149,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "…": {
             "more": 3131,
-            "sha256": "baa736b72024a2de"
+            "sha256": "a0e9435cde599a20"
           }
         }
       }

@@ -1,11 +1,11 @@
 // Locking cohorts (lib/cohort-lock.ts): evaluate what each definition selects right now, and keep it
-// as stored id sets the cohort then names — its patients, their samples, and each of its split
-// arms' patients — with when, and against which data, it was done.
+// as a stored id set the cohort then names — its samples, and each of its split arms' samples —
+// with when, and against which data, it was done.
 //
 // Every cohort asked for is locked at one moment, so an analysis locked as a whole is one snapshot:
 // a data load between two cohorts' locks cannot leave them reflecting different data. A cohort
 // that is already locked is locked afresh from its definition. Patient-level studies only: a lock
-// lists patients.
+// lists samples.
 import { resolveDocCohorts, resolveStudy, studyProfiles } from "./analysis.ts";
 import { resolverFor, PatientLevelResolver } from "./federation.ts";
 import { cohortStudies } from "./view-coverage.ts";
@@ -60,14 +60,14 @@ export async function lockCohorts(principal: string, input: { doc: unknown; coho
     }
     return { study, res };
   };
-  /** one cohort's or arm's members now, per study: its patients, and their samples when asked */
-  const members = async (name: string, withSamples: boolean) => {
+  /** one cohort's or arm's members now, per study: its samples, and the patients they belong to */
+  const members = async (name: string) => {
     const def = doc.cohorts[name];
     const patients: Record<string, string[]> = {}, samples: Record<string, string[]> = {};
     for (const s of cohortStudies(def, docStudy)) {
       const { study, res } = await resolver(s);
       patients[study] = await res.members(def);
-      if (withSamples) samples[study] = await res.memberSamples(def);
+      samples[study] = await res.memberSamples(def);
     }
     return { patients, samples };
   };
@@ -75,22 +75,23 @@ export async function lockCohorts(principal: string, input: { doc: unknown; coho
 
   const locks: Record<string, CohortLock> = {};
   for (const name of names) {
-    // ONE stored set per locked cohort: its patients, and as parts their samples and each arm's patients
-    const top = await members(name, true);
-    const parts: Record<string, Record<string, string[]>> = { samples: top.samples };
+    // ONE stored set per locked cohort: its samples, and as parts each arm's samples
+    const top = await members(name);
+    const parts: Record<string, Record<string, string[]>> = {};
     const children: Record<string, LockedMembers> = {};
     // its split arms, at every depth: "<name> / <split> / <arm>[ / <split> / <arm> …]"
     for (const child of Object.keys(doc.cohorts).filter((n) => n.startsWith(name + " / ") && !authored.includes(n))) {
       const rel = child.slice(name.length + 3), part = "arm:" + rel;
-      parts[part] = (await members(child, false)).patients;
-      children[rel] = { set: "", part, n: size(parts[part]) };
+      const arm = await members(child);
+      parts[part] = arm.samples;
+      children[rel] = { set: "", part, n: size(arm.samples), nPatients: size(arm.patients) };
     }
     const set = await saveIdSet(principal, {
-      name: name + " — locked " + lockDate(at), level: "patient", perStudy: top.patients, parts,
-      source: { idsIn: size(top.patients), unmatched: 0, duplicates: 0, multiStudy: 0, lockOf: lockOf(name) },
+      name: name + " — locked " + lockDate(at), level: "sample", perStudy: top.samples, parts,
+      source: { idsIn: size(top.samples), unmatched: 0, duplicates: 0, multiStudy: 0, lockOf: lockOf(name) },
     }, { allowEmpty: true });
     for (const c of Object.values(children)) c.set = set.id;
-    locks[name] = { set: set.id, n: set.count, nSamples: set.parts?.samples ?? 0, at, dataVersion: version, oncokbPin: pin ?? null,
+    locks[name] = { set: set.id, n: set.count, nPatients: size(top.patients), at, dataVersion: version, oncokbPin: pin ?? null,
       ...(Object.keys(children).length ? { children } : {}) };
   }
   return { at, dataVersion: version, oncokbPin: pin ?? null, locks };

@@ -74,7 +74,7 @@ export async function runInstability(view: InstabilityView, ctx: ViewRun): Promi
   const scored = (pn: InstabilityPanel) => pn.score.reduce((s, x) => s + x, 0);
   if (!panels.some(scored))
     return refuse("instability", ctx, "no sample of " + (vNames.length === 1 ? "this cohort" : "these cohorts") + " has copy-number segments" +
-      (noSegments.length ? " (" + [...new Set(noSegments)].join(", ") + " has none for these patients)" : ""));
+      (noSegments.length ? " (" + [...new Set(noSegments)].join(", ") + " has none for these samples)" : ""));
   const drawn = panels.filter(scored);
   const hist = (xs: number[]) => xs.map((c, v) => ({ v, n: c })).filter((h) => h.n > 0);
   let test: { name: "Mann–Whitney U" | "Kruskal–Wallis"; scoreP: number; fgaP: number } | null = null;
@@ -94,9 +94,9 @@ export async function runInstability(view: InstabilityView, ctx: ViewRun): Promi
         pn.allArms.toLocaleString("en-US") + " with every arm covered)").join("; ") + "; an arm segments cover for less than " + Math.round(armShare * 100) + "% of its length is not called, which lowers that sample's score. " +
       "Boxes are the quartiles, whiskers the 5th and 95th percentiles, read from the histograms" +
       (test ? "; " + test.name + " compares the cohorts' distributions (normal approximation with ties)" : "") + ". " +
-      "Every sample of each patient counts. Panel-derived segments are noisy and purity is not corrected — a low-purity tumour's changes sit near 0 and read as stable — so these are relative measures within one assay, not absolute ploidy." +
+      "Every sample of the cohort counts. Panel-derived segments are noisy and purity is not corrected — a low-purity tumour's changes sit near 0 and read as stable — so these are relative measures within one assay, not absolute ploidy." +
       (multi ? " Pooled across " + ctx.vStudies.length + " studies, whose segmentations may differ." : "") +
-      (noSegments.length ? " No segments for these patients in: " + [...new Set(noSegments)].join(", ") + "." : "") +
+      (noSegments.length ? " No segments for these samples in: " + [...new Set(noSegments)].join(", ") + "." : "") +
       (excluded.length ? " Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
   };
 }

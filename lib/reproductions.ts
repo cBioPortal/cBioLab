@@ -65,7 +65,7 @@ export const REPRODUCTIONS: PaperReproduction[] = [
       title: "Mondaca & Walch 2020 — APC mutation pattern and survival",
       notes: "Mondaca, Walch et al., Gastroenterology 2020, \"Specific Mutations in APC, but Not Alterations in DNA Damage Response, Associate With Outcomes of Patients With Metastatic Colorectal Cancer.\" In N=430 MSS unresectable metastatic colorectal cancer, APC alteration PATTERN — not DNA-damage-response gene status — predicted survival. Reproduced here using the study's own APC_GROUPS attribute (N-terminal / C-terminal / Other / Unaltered, classified by mutation location), the same idea the paper itself uses, rather than a simple mutated-vs-not split.",
       cohorts: {
-        "MSS unresectable mCRC": { all: [{ kind: "clinical", per: "sample", attribute: "MSI_TYPE", op: "=", value: "Stable" }] }
+        "MSS unresectable mCRC": { all: [{ kind: "clinical", attribute: "MSI_TYPE", op: "=", value: "Stable" }] }
       },
       views: [
         { kind: "cox", endpoint: "OS", cohorts: ["MSS unresectable mCRC"],
@@ -89,14 +89,14 @@ export const REPRODUCTIONS: PaperReproduction[] = [
       title: "Samstein 2019 — TMB and immunotherapy survival",
       notes: "Samstein et al.'s central claim: within a cancer type, a top-percentile tumor mutational burden predicts better overall survival on immune checkpoint inhibitors. tmb_mskcc_2018 is pan-cancer, so the percentile is deliberately computed WITHIN the NSCLC cohort (percentileOf), not across the whole study — otherwise a rarely-hypermutated histology would need a much lower absolute TMB to count as \"high\" than the 80th-percentile NSCLC threshold this uses.",
       cohorts: {
-        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] },
+        "NSCLC": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] },
         "NSCLC high-TMB": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
-          { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", op: ">=", percentile: 0.8, percentileOf: "NSCLC", per: "sample" }
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
+          { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", op: ">=", percentile: 0.8, percentileOf: "NSCLC" }
         ] },
         "NSCLC low-TMB": { all: [
-          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" },
-          { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", op: "<", percentile: 0.8, percentileOf: "NSCLC", per: "sample" }
+          { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] },
+          { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", op: "<", percentile: 0.8, percentileOf: "NSCLC" }
         ] }
       },
       views: [{ kind: "survival", cohorts: ["NSCLC high-TMB", "NSCLC low-TMB"],
@@ -121,8 +121,8 @@ export const REPRODUCTIONS: PaperReproduction[] = [
       title: "Yaeger 2018 — metastatic CRC genomics",
       notes: "Yaeger et al.'s two central genomic associations in metastatic colorectal cancer: sidedness-linked driver-gene rates, and BRAF's link to peritoneal spread. Both cohorts below are built from the study's own PRIMARY_TUMOR_LOCATION and first-metastasis-site clinical attributes, not a derived proxy.",
       cohorts: {
-        "Right-sided": { all: [{ kind: "clinical", attribute: "PRIMARY_TUMOR_LOCATION", op: "=", value: "Right", per: "sample" }] },
-        "Left-sided": { all: [{ kind: "clinical", attribute: "PRIMARY_TUMOR_LOCATION", op: "=", value: "Left", per: "sample" }] },
+        "Right-sided": { all: [{ kind: "clinical", attribute: "PRIMARY_TUMOR_LOCATION", op: "=", value: "Right" }] },
+        "Left-sided": { all: [{ kind: "clinical", attribute: "PRIMARY_TUMOR_LOCATION", op: "=", value: "Left" }] },
         "BRAF-mutant": { all: [{ kind: "oql", q: "BRAF: MUT" }] },
         "BRAF-wildtype": { all: [{ not: { kind: "oql", q: "BRAF:" } }, { kind: "profiled", type: "MUTATION" }] }
       },
@@ -199,10 +199,10 @@ export const REPRODUCTIONS: PaperReproduction[] = [
         "Glioblastoma, IDH-wildtype": { all: [{ kind: "clinical", attribute: "WHO_CLASSIFICATION_OF_DX_TUMOR", values: ["Glioblastoma, IDH-wildtype"] }] },
         "Astrocytoma, enhancing": { all: [
           { kind: "clinical", attribute: "WHO_CLASSIFICATION_OF_DX_TUMOR", values: ["Diffuse astrocytoma, IDH-mutant", "Anaplastic astrocytoma, IDH-mutant", "Diffuse astrocytoma, IDH-wildtype", "Anaplastic astrocytoma, IDH-wildtype"] },
-          { kind: "clinical", attribute: "ENHANCING", values: ["Yes"], per: "sample" }] },
+          { kind: "clinical", attribute: "ENHANCING", values: ["Yes"] }] },
         "Astrocytoma, non-enhancing": { all: [
           { kind: "clinical", attribute: "WHO_CLASSIFICATION_OF_DX_TUMOR", values: ["Diffuse astrocytoma, IDH-mutant", "Anaplastic astrocytoma, IDH-mutant", "Diffuse astrocytoma, IDH-wildtype", "Anaplastic astrocytoma, IDH-wildtype"] },
-          { kind: "clinical", attribute: "ENHANCING", values: ["No"], per: "sample" }] },
+          { kind: "clinical", attribute: "ENHANCING", values: ["No"] }] },
         "All gliomas": { all: [] }
       },
       views: [
@@ -242,17 +242,17 @@ export const REPRODUCTIONS: PaperReproduction[] = [
       title: "Razavi 2018 — breast cancer receptor subtypes",
       notes: "Razavi et al.'s four-way receptor-subtype comparison. The FIRST time the survival half of this was attempted, it came back \"skipped: tested only for exactly 2 cohorts\" — the k-group generalization of the log-rank test didn't exist yet. It does now, which is what makes the survival comparison below complete rather than blocked. The endocrine-resistance half uses SAMPLE_SITE: this study records where each sample came from but not what treatment preceded it, so \"sampled after treatment\" (any site other than a treatment-naive primary) stands in for the paper's \"previously exposed to hormonal therapy\" — broader than the paper's definition, and said so in each view.",
       cohorts: {
-        "HR+/HER2-": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"], per: "sample" }] },
-        "TNBC": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["Triple Negative"], per: "sample" }] },
-        "HR+/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2+"], per: "sample" }] },
-        "HR-/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR-/HER2+"], per: "sample" }] },
+        "HR+/HER2-": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"] }] },
+        "TNBC": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["Triple Negative"] }] },
+        "HR+/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2+"] }] },
+        "HR-/HER2+": { all: [{ kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR-/HER2+"] }] },
         "HR+/HER2-, treatment-naive primary only": { all: [
-          { kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"], per: "sample" },
-          { kind: "clinical", attribute: "SAMPLE_SITE", values: ["Treatment Naive Primary"], per: "sample" },
-          { not: { kind: "clinical", attribute: "SAMPLE_SITE", values: RAZAVI_AFTER_TREATMENT_SITES, per: "sample" } }] },
+          { kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"] },
+          { kind: "clinical", attribute: "SAMPLE_SITE", values: ["Treatment Naive Primary"] },
+          { not: { kind: "clinical", attribute: "SAMPLE_SITE", values: RAZAVI_AFTER_TREATMENT_SITES } }] },
         "HR+/HER2-, sampled after treatment": { all: [
-          { kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"], per: "sample" },
-          { kind: "clinical", attribute: "SAMPLE_SITE", values: RAZAVI_AFTER_TREATMENT_SITES, per: "sample" }] }
+          { kind: "clinical", attribute: "RECEPTOR_STATUS_PRIMARY", values: ["HR+/HER2-"] },
+          { kind: "clinical", attribute: "SAMPLE_SITE", values: RAZAVI_AFTER_TREATMENT_SITES }] }
       },
       views: [
         { kind: "compare", genes: ["TP53", "PIK3CA", "CDH1", "GATA3", "ESR1"], cohorts: ["HR+/HER2-", "TNBC", "HR+/HER2+", "HR-/HER2+"],
@@ -285,9 +285,9 @@ export const REPRODUCTIONS: PaperReproduction[] = [
       title: "Stopsack 2022 — race and prostate cancer genomics",
       notes: "Stopsack et al.'s race comparison in prostate cancer. This reproduces the unstratified version of the paper's analysis; the paper's more careful version adjusts for disease stage first, which this DSL cannot express as a first-class operation (see the view's own note).",
       cohorts: {
-        "White": { all: [{ kind: "clinical", attribute: "RACE", values: ["White"], per: "patient" }] },
-        "Black": { all: [{ kind: "clinical", attribute: "RACE", values: ["Black"], per: "patient" }] },
-        "Asian": { all: [{ kind: "clinical", attribute: "RACE", values: ["Asian"], per: "patient" }] }
+        "White": { all: [{ kind: "clinical", attribute: "RACE", values: ["White"] }] },
+        "Black": { all: [{ kind: "clinical", attribute: "RACE", values: ["Black"] }] },
+        "Asian": { all: [{ kind: "clinical", attribute: "RACE", values: ["Asian"] }] }
       },
       views: [{ kind: "compare", cohorts: ["White", "Black", "Asian"], genes: ["FOXA1", "TP53"],
         note: "Reproduces the paper's race comparison: FOXA1 14.9% (White) / 16.4% (Black) / 30.2% (Asian), p=0.0044, and TP53 also differs significantly (29.7% / 19.4% / 34.9%, p=0.0119) — both match the paper's reported significance. What this view CANNOT show: the paper stratifies by disease stage before comparing race, since stage and race both plausibly affect alteration rate and are entangled in this cohort. There's no first-class \"compare A, holding B constant\" operation here — only defining one cohort per stage×race combination by hand, which stops scaling past two stratifying dimensions." }]
@@ -310,23 +310,23 @@ export const REPRODUCTIONS: PaperReproduction[] = [
       title: "Soumerai 2018 — endometrial molecular subtypes",
       notes: "Soumerai et al.'s molecular-subtype comparison (POLE-ultramutated / MSI-hypermutated / copy-number-high / copy-number-low, built here by precedence — POLE, then MSI, then copy-number cluster — from the study's own POLE_IMPACT, MSI_STATUS and SCNA_CLUSTER attributes, since no single attribute names this classification) and its prognostic claim. The prognostic half was originally entirely unreachable: ucec_msk_2018 declares no <X>_MONTHS/<X>_STATUS pair at all — its outcome lives in PFS_MONTHS_FIRST_LINE_TX/PROGRESSION_STATUS instead — so the usual endpoint-prefix shorthand found nothing until monthsAttribute/statusAttribute existed to name the real columns directly.",
       cohorts: {
-        "POLE": { all: [{ kind: "clinical", attribute: "POLE_IMPACT", op: "=", value: "Y", per: "patient" }] },
+        "POLE": { all: [{ kind: "clinical", attribute: "POLE_IMPACT", op: "=", value: "Y" }] },
         "MSI": { all: [
-          { kind: "clinical", attribute: "MSI_STATUS", op: "=", value: "MSI-H", per: "sample" },
-          { not: { kind: "clinical", attribute: "POLE_IMPACT", op: "=", value: "Y", per: "patient" } }
+          { kind: "clinical", attribute: "MSI_STATUS", op: "=", value: "MSI-H" },
+          { not: { kind: "clinical", attribute: "POLE_IMPACT", op: "=", value: "Y" } }
         ] },
         "CN-high": { all: [
-          { kind: "clinical", attribute: "SCNA_CLUSTER", op: "=", value: "A", per: "sample" },
-          { not: { kind: "clinical", attribute: "POLE_IMPACT", op: "=", value: "Y", per: "patient" } },
-          { not: { kind: "clinical", attribute: "MSI_STATUS", op: "=", value: "MSI-H", per: "sample" } }
+          { kind: "clinical", attribute: "SCNA_CLUSTER", op: "=", value: "A" },
+          { not: { kind: "clinical", attribute: "POLE_IMPACT", op: "=", value: "Y" } },
+          { not: { kind: "clinical", attribute: "MSI_STATUS", op: "=", value: "MSI-H" } }
         ] },
         "CN-low": { all: [
-          { kind: "clinical", attribute: "SCNA_CLUSTER", values: ["B", "C"], per: "sample" },
-          { not: { kind: "clinical", attribute: "POLE_IMPACT", op: "=", value: "Y", per: "patient" } },
-          { not: { kind: "clinical", attribute: "MSI_STATUS", op: "=", value: "MSI-H", per: "sample" } }
+          { kind: "clinical", attribute: "SCNA_CLUSTER", values: ["B", "C"] },
+          { not: { kind: "clinical", attribute: "POLE_IMPACT", op: "=", value: "Y" } },
+          { not: { kind: "clinical", attribute: "MSI_STATUS", op: "=", value: "MSI-H" } }
         ] },
-        "MSI-H (for survival)": { all: [{ kind: "clinical", attribute: "MSI_STATUS", values: ["MSI-H"], per: "sample" }] },
-        "MSS (for survival)": { all: [{ kind: "clinical", attribute: "MSI_STATUS", values: ["MSS"], per: "sample" }] }
+        "MSI-H (for survival)": { all: [{ kind: "clinical", attribute: "MSI_STATUS", values: ["MSI-H"] }] },
+        "MSS (for survival)": { all: [{ kind: "clinical", attribute: "MSI_STATUS", values: ["MSS"] }] }
       },
       views: [
         { kind: "clinical", attributes: ["TMB_NONSYNONYMOUS"], cohorts: ["POLE", "MSI", "CN-high", "CN-low"],
@@ -355,8 +355,8 @@ export const REPRODUCTIONS: PaperReproduction[] = [
       title: "Gounder 2022 — soft tissue and bone sarcoma",
       notes: "Gounder et al.'s histology-genomics comparison surfaced a real correctness bug in this tool: MDM2 amplification — well-differentiated liposarcoma's defining, near-universal alteration in the published literature — read as 0% altered here, because sarcoma_msk_2022 has no copy-number data at all, and the compare view's panel-aware denominator only checked per-gene panel coverage, not whether a WHOLE alteration type was ever assayed anywhere in the study. Fixed this session: the view now discloses a missing alteration type explicitly rather than silently reporting a false negative dressed as a real result.",
       cohorts: {
-        "Leiomyosarcoma": { all: [{ kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Leiomyosarcoma"], per: "sample" }] },
-        "Well-diff liposarcoma": { all: [{ kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Well-Differentiated Liposarcoma"], per: "sample" }] }
+        "Leiomyosarcoma": { all: [{ kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Leiomyosarcoma"] }] },
+        "Well-diff liposarcoma": { all: [{ kind: "clinical", attribute: "CANCER_TYPE_DETAILED", values: ["Well-Differentiated Liposarcoma"] }] }
       },
       views: [
         { kind: "compare", genes: ["TP53", "RB1", "MDM2"], cohorts: ["Leiomyosarcoma", "Well-diff liposarcoma"],

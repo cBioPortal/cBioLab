@@ -107,7 +107,8 @@ describe("the SQL each reading runs", () => {
   test("a gene's mutations, copy number or SVs: no such event is the wild-type answer only when the case is profiled for it", () => {
     for (const [by, type, label] of [["mutated", "MUTATION_EXTENDED", "Not mutated"], ["cna", "COPY_NUMBER_ALTERATION", "Neutral"], ["sv", "STRUCTURAL_VARIANT", "No structural variant"]] as const) {
       const sql = axisSelect({ source: "alteration", gene: "ERBB2", by }, ctx, "cat");
-      assert.match(sql, new RegExp("if\\(hits = 0 AND NOT \\(alt_case IN \\(SELECT profiled_id"), by);
+      assert.match(sql, /if\(hits = 0 AND NOT \(p0 = 1\), 'Not profiled', v0\) AS v/, by);
+      assert.match(sql, /max\(replaceOne\(sd\.sample_unique_id, 'x_', ''\) IN \(SELECT profiled_id/, by);
       assert.match(sql, new RegExp("alteration_type = '" + type + "'"), by);
       assert.match(sql, new RegExp("'" + label + "'"), by);
       assert.match(sql, /'Not profiled', v0\) AS v/, by);

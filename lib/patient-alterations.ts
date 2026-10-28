@@ -7,6 +7,7 @@ import { sq } from "./compiler.ts";
 import type { QueryColumn, RowSource } from "./table-query.ts";
 import type { TablePart } from "./mutation-table.ts";
 import { patientSamplesSql } from "./patient-timeline.ts";
+import { inCohortPatients } from "./cohort2.ts";
 
 /** The view's three tables, in the portal's order. */
 export const ALTERATION_TABLES = ["mutations", "cna", "sv"] as const;
@@ -239,8 +240,9 @@ export function alterationSource(table: AlterationTable, p: TablePart, patient: 
  * Every (cohort, study) part's patients, one row each, with how many samples they have and how many
  * rows each of the three tables would list for them — counted as the tables count (a variant, a
  * gene's call, an event, however many samples carry it). A patient with nothing called is listed:
- * the list is the cohort. Patients with any alteration first, then by patient id. All parts must
- * live in this database.
+ * the list is the cohort's patients, the owners of its samples. Like the patient's own tables, the
+ * counts cover all of a patient's samples, not only the cohort's. Patients with any alteration
+ * first, then by patient id. All parts must live in this database.
  */
 export function alterationPatientRowSource(parts: AlterationPart[], db: string): RowSource {
   if (!parts.length) throw new Error("alterationPatientRowSource needs at least one part");
@@ -251,19 +253,19 @@ export function alterationPatientRowSource(parts: AlterationPart[], db: string):
       "c" + i + " AS (" + p.cohortSql + "),\n" +
       "sm" + i + " AS (\n" +
       "  SELECT replaceOne(patient_unique_id, " + pre + ", '') AS pid, uniqExact(sample_unique_id) AS n FROM " + db + ".sample_derived\n" +
-      "  WHERE cancer_study_identifier = " + st + " AND replaceOne(patient_unique_id, " + pre + ", '') IN (SELECT pid FROM c" + i + ")\n" +
+      "  WHERE cancer_study_identifier = " + st + " AND " + inCohortPatients("replaceOne(patient_unique_id, " + pre + ", '')", "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n" +
       "mu" + i + " AS (\n" +
       "  SELECT patientId AS pid, uniqExact(tuple(`GENE.hugoGeneSymbol`, proteinChange, mutationType, variantType, chr, startPosition, endPosition, referenceAllele, tumorSeqAllele)) AS n\n" +
       "  FROM " + db + ".mutation_derived\n" +
-      "  WHERE studyId = " + st + " AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c" + i + ")\n" +
+      "  WHERE studyId = " + st + " AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortPatients("patientId", "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n" +
       "cn" + i + " AS (\n" +
       "  SELECT replaceOne(patient_unique_id, " + pre + ", '') AS pid, uniqExact(hugo_gene_symbol, cna_alteration) AS n FROM " + db + ".genomic_event_derived\n" +
       "  WHERE cancer_study_identifier = " + st + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2\n" +
-      "    AND replaceOne(patient_unique_id, " + pre + ", '') IN (SELECT pid FROM c" + i + ")\n" +
+      "    AND " + inCohortPatients("replaceOne(patient_unique_id, " + pre + ", '')", "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n" +
       "sv" + i + " AS (\n" +
@@ -272,7 +274,7 @@ export function alterationPatientRowSource(parts: AlterationPart[], db: string):
       "  JOIN " + db + ".sample s ON s.internal_id = sv.sample_id\n" +
       "  JOIN " + db + ".patient p ON p.internal_id = s.patient_id\n" +
       "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-      "  WHERE cs.cancer_study_identifier = " + st + " AND p.stable_id IN (SELECT pid FROM c" + i + ")\n" +
+      "  WHERE cs.cancer_study_identifier = " + st + " AND " + inCohortPatients("p.stable_id", "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n");
     rows.push(

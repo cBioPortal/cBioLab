@@ -59,8 +59,8 @@ setChTransport(async (st) => {
   const study = studies.find(([id]) => q.includes("'" + id + "'"));
   const sex = /attribute_name = 'SEX' AND [^\n]*'(Female|Male)'/.exec(q)?.[1];
   const members = study ? Object.entries(study[1].patients).filter(([, x]) => !sex || x.sex === sex) : [];
-  if (/^SELECT DISTINCT replaceOne\(sample_unique_id/.test(q)) return json(members.flatMap(([, x]) => x.samples.map((sid) => ({ sid }))));
-  if (/^SELECT pid FROM/.test(q)) return json(members.map(([pid]) => ({ pid })));
+  if (/^SELECT DISTINCT sid FROM/.test(q)) return json(members.flatMap(([, x]) => x.samples.map((sid) => ({ sid }))));
+  if (/^SELECT DISTINCT pid FROM/.test(q)) return json(members.map(([pid]) => ({ pid })));
   return json([]);
 });
 
@@ -172,17 +172,17 @@ describe("lockCohorts: what each cohort selects now, kept as a stored set", () =
     await assert.rejects(lockCohorts(alice.id, { doc: doc({ F: female }), cohorts: ["G"] }, dv), /no cohort “G” to lock; have F/);
   });
 
-  test("keeps the cohort's patients and their samples, with when and against what data", async () => {
+  test("keeps the cohort's samples, with how many patients they are, when and against what data", async () => {
     const before = await setCount();
     const r = await lockCohorts(alice.id, { doc: doc({ F: female, M: { all: [{ kind: "clinical", attribute: "SEX", values: ["Male"] }] } }), cohorts: ["F"] }, dv);
     assert.deepEqual(Object.keys(r.locks), ["F"], "only the cohort asked for");
     assert.equal(await setCount(), before + 1, "one set per locked cohort");
     const lock = r.locks.F;
-    assert.deepEqual({ n: lock.n, nSamples: lock.nSamples, dataVersion: lock.dataVersion, oncokbPin: lock.oncokbPin, at: lock.at },
-      { n: 2, nSamples: 3, dataVersion: "data-v1", oncokbPin: "v-test", at: r.at });
+    assert.deepEqual({ n: lock.n, nPatients: lock.nPatients, dataVersion: lock.dataVersion, oncokbPin: lock.oncokbPin, at: lock.at },
+      { n: 3, nPatients: 2, dataVersion: "data-v1", oncokbPin: "v-test", at: r.at });
     const stored = await readIdSet(alice.id, lock.set);
-    assert.deepEqual(stored.perStudy, { s_a: ["P1", "P2"] });
-    assert.deepEqual(stored.parts?.samples, { s_a: ["P1-T", "P2-M", "P2-T"] });
+    assert.deepEqual(stored.perStudy, { s_a: ["P1-T", "P2-M", "P2-T"] });
+    assert.equal(stored.meta.level, "sample");
     assert.equal(stored.meta.owner, alice.id);
   });
 
@@ -192,12 +192,12 @@ describe("lockCohorts: what each cohort selects now, kept as a stored set", () =
     const again = await lockCohorts(alice.id, { doc: doc({ F: { ...female, lock: first.locks.F } }) }, dv);
     assert.ok(!sent.some((s) => s.query.includes("_idset_")), "no statement read the earlier lock's set");
     assert.notEqual(again.locks.F.set, first.locks.F.set);
-    assert.equal(again.locks.F.n, 2);
+    assert.equal(again.locks.F.n, 3);
   });
 
   test("refuses a cohort over an aggregate-only study: a lock lists patients", async () => {
     await assert.rejects(lockCohorts(alice.id, { doc: { study: "s_b", cohorts: { F: female }, views: [] } }, dv),
       /not entitled to patient-level data \(s_b\)/);
-    assert.ok(!sent.some((s) => s.conn === "b" && /^SELECT pid FROM/.test(s.query)), "no member list was asked of instance b");
+    assert.ok(!sent.some((s) => s.conn === "b" && /^SELECT DISTINCT (pid|sid) FROM/.test(s.query)), "no member list was asked of instance b");
   });
 });

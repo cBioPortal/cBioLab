@@ -140,7 +140,7 @@ export async function runPaired(view: PairedView, ctx: ViewRun): Promise<ViewRes
     caveat: "Within patients with samples on both sides, " + aL + " and " + bL + " (" + sidesText + "; " +
       panels.map((pn) => pn.cohort + ": " + plural(pn.patients, "patient")).join("; ") + "), per gene, among those profiled for it on BOTH sides by each side's own panels: " +
       (measure === "driver" ? "an OncoKB driver (" + pin + ")" : "any alteration") + " on both sides, on the " + aL + " side only, or the " + bL + " side only; " +
-      "a patient with several samples on a side counts as altered there if any is. " +
+      "a patient with several samples on a side counts as altered there if any is. Both sides are the cohort's own samples, so a cohort that selects one kind of sample has no pairs. " +
       "Concordance is both ÷ altered anywhere. The exact McNemar test asks whether discordance runs one way; q is Benjamini–Hochberg across the genes of each cohort. " +
       (scan ? "Genes were not chosen in advance: every gene " + (measure === "driver" ? "with a driver " : "altered ") + "in some paired patient was tested (" +
         panels.map((pn) => pn.cohort + ": " + plural(pn.tested || 0, "gene") + " with a discordant patient").join("; ") + "), q is taken across all of them, and the " +

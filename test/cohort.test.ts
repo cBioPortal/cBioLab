@@ -1,18 +1,18 @@
 // Cohort-definition semantics that are easy to regress and expensive to get wrong.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { compileCohortDef, describeCohortDef, SPLIT_SALT } from "../lib/cohort2.ts";
+import { compileCohortDef, describeCohortDef, SPLIT_SALT, inCohortSamples, inCohortPatients, memberSamplesSql } from "../lib/cohort2.ts";
 
 const ctx = { study: "s1", db: "db" };
 
-describe("a cohort with no clauses is every patient in the study", () => {
+describe("a cohort with no clauses is every sample in the study", () => {
   test("{all: []} compiles to exactly what an absent definition compiles to", () => {
     assert.equal(compileCohortDef({ all: [] }, ctx), compileCohortDef(null, ctx),
       "the two spellings of 'no filter' must not diverge");
   });
   test("...and reads back as such, so it cannot pass for a filter that did nothing", () => {
-    assert.equal(describeCohortDef({ all: [] }), "all patients in the study");
-    assert.equal(describeCohortDef(null), "all patients in the study");
+    assert.equal(describeCohortDef({ all: [] }), "all samples in the study");
+    assert.equal(describeCohortDef(null), "all samples in the study");
   });
   test("the study base really is unfiltered SQL over that study", () => {
     const sql = compileCohortDef({ all: [] }, ctx);
@@ -36,11 +36,12 @@ describe("clause-count bounds are still enforced", () => {
 });
 
 describe("profiled: a gene list is its genes' clauses AND-ed, in one clause", () => {
-  // one gene's clause SQL, without the parentheses a compiled cohort puts around each clause
-  const one = (gene: string) => compileCohortDef({ all: [{ kind: "profiled", type: "MUTATION", gene }] }, ctx).slice(1, -1);
-  test("genes:[A,B] compiles to exactly A's clause INTERSECT B's", () => {
+  test("genes:[A,B] compiles to A's profiled samples INTERSECT B's", () => {
     const list = compileCohortDef({ all: [{ kind: "profiled", type: "MUTATION", genes: ["kras", "NRAS", "KRAS"] }] }, ctx);
-    assert.equal(list, "((" + one("KRAS") + ")\n  INTERSECT DISTINCT\n(" + one("NRAS") + "))", "upper-cased and deduplicated, each gene its own panel check");
+    assert.equal(list.match(/INTERSECT DISTINCT/g)?.length, 1, "deduplicated: two genes, one intersection");
+    assert.equal(list.match(/WHERE gene = 'KRAS'/g)?.length, 1, "upper-cased, its own panel check");
+    assert.equal(list.match(/WHERE gene = 'NRAS'/g)?.length, 1);
+    assert.doesNotMatch(list, /kras/);
   });
   test("it reads back naming every gene", () => {
     assert.match(describeCohortDef({ all: [{ kind: "profiled", type: "CNA", genes: ["KRAS", "NRAS"] }] }), /profiled for KRAS, NRAS CNA/);
@@ -134,12 +135,12 @@ describe("derived buckets OR into one scan", () => {
 });
 
 describe("proteinPosition: an N-/C-terminal split without a clinical attribute for it", () => {
-  test("compiles against mutation_derived's proteinPosStart, keyed by bare patientId", () => {
+  test("compiles against mutation_derived's proteinPosStart, keyed by bare sampleId", () => {
     const sql = compileCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: { lt: 1400 } }] }, ctx);
     assert.match(sql, /FROM db\.mutation_derived/);
     assert.match(sql, /`GENE\.hugoGeneSymbol` = 'APC'/);
     assert.match(sql, /proteinPosStart < 1400/);
-    assert.match(sql, /SELECT DISTINCT patientId AS pid/); // bare — no PID()/study-prefix stripping, unlike patient_unique_id tables
+    assert.match(sql, /SELECT DISTINCT sampleId AS sid/); // bare — no PID()/study-prefix stripping, unlike sample_unique_id tables
   });
   test("range can combine both ends", () => {
     const sql = compileCohortDef({ all: [{ kind: "proteinPosition", gene: "APC", range: { gte: 1400, lt: 1600 } }] }, ctx);
@@ -174,9 +175,9 @@ describe("split: a fixed, engine-owned held-out partition", () => {
   test("the two halves differ only in their bucket", () => {
     const d = compileCohortDef({ all: [{ kind: "split", part: "discovery" }] }, ctx);
     const v = compileCohortDef({ all: [{ kind: "split", part: "validation" }] }, ctx);
-    assert.match(d, /% 2 = 0\)$/);
-    assert.match(v, /% 2 = 1\)$/);
-    assert.equal(d.replace(/% 2 = 0\)$/, ""), v.replace(/% 2 = 1\)$/, ""));
+    assert.match(d, /% 2 = 0\)\)$/);
+    assert.match(v, /% 2 = 1\)\)$/);
+    assert.equal(d.replace(/% 2 = 0\)\)$/, ""), v.replace(/% 2 = 1\)\)$/, ""));
   });
   test("the hash is salted per study, inside the database", () => {
     const sql = compileCohortDef({ all: [{ kind: "split", part: "discovery" }] }, ctx);
@@ -206,5 +207,46 @@ describe("leaves read only their own study, not siblings named after it", () => 
       assert.match(sql, /cs\.cancer_study_identifier = 'brca_tcga'/, id);
     }
     assert.match(compileCohortDef({ all: [{ kind: "caseList", id: "brca_tcgaall" } as any] }, ctx), /sl\.stable_id = 'brca_tcga_brca_tcgaall'/);
+  });
+});
+
+describe("a cohort is a set of samples, as on cBioPortal", () => {
+  const sql = (def: unknown) => compileCohortDef(def as never, ctx);
+  const SID = "replaceOne(sample_unique_id, 's1_', '')", PID = "replaceOne(patient_unique_id, 's1_', '')";
+  test("every cohort is rows (pid, sid) of the study's samples", () => {
+    for (const def of [null, { all: [{ kind: "oql", q: "TP53: MUT" }] }, { all: [{ kind: "patientList", ids: ["s1:P1"] }] }, { all: [{ not: { kind: "oql", q: "TP53: MUT" } }] }])
+      assert.match(sql(def), new RegExp("^\\(*SELECT " + PID.replace(/[()]/g, "\\$&") + " AS pid, " + SID.replace(/[()]/g, "\\$&") + " AS sid FROM db\\.sample_derived"));
+  });
+  test("a sample-level leaf selects samples: an alteration is matched in the sample it was called in", () => {
+    const oql = sql({ all: [{ kind: "oql", q: "TP53: MUT" }] });
+    assert.ok(oql.includes(SID + " IN ("), "the study's samples filtered by sample id");
+    assert.match(oql, /replaceOne\(g\.sample_unique_id, 's1_', ''\)/, "the call's own sample, not its patient");
+    assert.doesNotMatch(oql, /g\.patient_unique_id/);
+    for (const leaf of [{ kind: "sampleList", ids: ["s1:S1"] }, { kind: "profiled", type: "MUTATION", gene: "KRAS" },
+      { kind: "genomicData", gene: "KRAS", profileType: "mrna", range: { gt: 1 } }, { kind: "proteinPosition", gene: "KRAS", range: { gte: 12, lte: 13 } }])
+      assert.ok(sql({ all: [leaf] }).includes(SID + " IN ("), JSON.stringify(leaf));
+  });
+  test("a patient-level leaf selects every sample of the matching patients", () => {
+    for (const leaf of [{ kind: "patientList", ids: ["s1:P1"] }, { kind: "split", part: "discovery" }])
+      assert.ok(sql({ all: [leaf] }).includes("AND " + PID + " IN ("), JSON.stringify(leaf));
+  });
+  test("a clinical attribute is matched at the level the study stores it: sample rows by sample, patient rows by patient", () => {
+    const c = sql({ all: [{ kind: "clinical", attribute: "GRADE", values: ["G3"] }] });
+    assert.ok(c.includes("('sample', " + SID + ") IN ("), "a sample row selects its sample");
+    assert.ok(c.includes("('patient', " + PID + ") IN ("), "a patient row selects all of its patient's samples");
+    assert.match(c, /SELECT DISTINCT type AS lvl, if\(type = 'sample'/);
+    assert.doesNotMatch(c, /AND type = '(sample|patient)'/, "no level is assumed for the study");
+  });
+  test("`per` is refused, by name: the level is each study's own", () => {
+    assert.throws(() => sql({ all: [{ kind: "clinical", attribute: "GRADE", values: ["G3"], per: "sample" }] }), /`per` was removed/);
+    assert.throws(() => sql({ all: [{ kind: "clinical", attribute: "SEX", op: "=", value: "Female", per: "patient" }] }), /`per` was removed/);
+  });
+  test("not is the complement over the study's samples", () => {
+    assert.match(sql({ all: [{ not: { kind: "oql", q: "TP53: MUT" } }] }), /^\(\(SELECT [^\n]* AS sid FROM db\.sample_derived\n {2}WHERE cancer_study_identifier = 's1'\)\nEXCEPT DISTINCT\n/);
+  });
+  test("the two joins: a sample-keyed table by sid, a patient-keyed one by pid", () => {
+    assert.equal(inCohortSamples("x.s"), "x.s IN (SELECT sid FROM cohort)");
+    assert.equal(inCohortPatients("x.p", "c2"), "x.p IN (SELECT pid FROM c2)");
+    assert.equal(memberSamplesSql("Q"), "SELECT DISTINCT sid FROM (Q)");
   });
 });

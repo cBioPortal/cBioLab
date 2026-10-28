@@ -23,9 +23,9 @@ export type ClinicalOp = "=" | "!=" | ">" | ">=" | "<" | "<=";
 export interface OqlLeaf { kind: "oql"; q: string }
 export interface ClinicalLeaf {
   kind: "clinical";
+  /** matched at the level the study records it: a sample attribute selects the matching samples,
+   *  a patient attribute every sample of the matching patients */
   attribute: string;
-  /** patient-level by default; "sample" = patient matches if ANY sample matches */
-  per?: "patient" | "sample";
   values?: (string | number)[];
   range?: ClinicalRange;
   op?: ClinicalOp;
@@ -73,32 +73,31 @@ export interface PatientListLeaf { kind: "patientList"; ids?: string[]; set?: st
  */
 export interface SplitLeaf { kind: "split"; part: "discovery" | "validation" }
 /**
- * The patients with a row in an upload: a value in any of its columns (blank cells are not
- * stored). `dataset` names the upload as its attributes do, "custom:<name>", pinned by the
+ * The samples with a row in an upload: a value in any of its columns (blank cells are not
+ * stored); a patient-level row selects every sample of its patient. `dataset` names the upload as its attributes do, "custom:<name>", pinned by the
  * document's `uploads` like any of its attributes.
  */
 export interface UploadLeaf { kind: "upload"; dataset: string }
 export interface GeneStateFacet {
   gene: string;
   type: "MUTATION" | "CNA";
-  /** always "patient": the unit the draft filter selects in */
-  per: "patient";
-  /** patients in the cohort, the base of the notProfiled slice */
+  /** always "sample": an alteration is called per sample, the unit the draft filter selects in */
+  per: "sample";
+  /** samples in the cohort, the base of the notProfiled slice */
   total: number;
-  /** patients with at least one sample on a panel covering this gene */
+  /** samples on a panel covering this gene */
   profiled: number;
   states: { state: "altered" | "amp" | "del" | "unaltered" | "notProfiled"; label: string; n: number }[];
   /**
-   * Patients with a call for this gene who are on NO panel covering it — a
+   * Samples with a call for this gene that are on NO panel covering it — a
    * source-data inconsistency, not a state a reader can select. genie_public has
-   * 7 for EGFR. They are counted in `notProfiled` (no panel of theirs covers
+   * 7 for EGFR. They are counted in `notProfiled` (their panel does not cover
    * the gene) and reported here so the contradiction is visible rather than
    * quietly folded into the altered slice, where it would break the partition.
    */
   alteredUnprofiled?: number;
   /**
-   * Patients counted in BOTH Amplified and Deleted — amplified in one sample,
-   * deleted in another. These four CNA states are selectable conditions, not a
+   * Samples counted in BOTH Amplified and Deleted. These four CNA states are selectable conditions, not a
    * partition, and this is by how much they over-sum. EGFR in genie_public has
    * exactly one.
    */
@@ -131,11 +130,11 @@ export interface GenomicDataLeaf {
 export interface GenericAssayLeaf {
   kind: "genericAssay"; profileType: string; entity: string;
   range?: ClinicalRange; values?: (string | number)[];
-  /** any value at all: the patient was measured for the entity (a split's "evaluable" condition) */
+  /** any value at all: the sample (or, for a patient-level profile, the patient) was measured for the entity (a split's "evaluable" condition) */
   measured?: boolean;
 }
 /**
- * A patient carries a mutation in `gene` whose protein position falls in
+ * A sample carries a mutation in `gene` whose protein position falls in
  * `range` — the stored proteinPosStart, same column the lollipop draws from,
  * never parsed from the change string. For splitting a cohort by where along
  * a protein a mutation falls (e.g. an N-terminal/C-terminal truncating-domain
@@ -144,12 +143,12 @@ export interface GenericAssayLeaf {
  * (`{"kind":"oql","q":"APC: TRUNC"}`) to also restrict by mutation type,
  * rather than this leaf growing a second, parallel type taxonomy.
  *
- * Not a partition: a patient with two separate qualifying mutations on
+ * Not a partition: a sample with two separate qualifying mutations on
  * either side of a cutoff matches BOTH an N-terminal and a C-terminal
  * leaf, the same way the CNA amp/del "overlap" is a real, disclosed
  * count rather than an error (see GeneStateFacet.overlap). Two
  * "disjoint" cohorts built from complementary ranges can both count
- * such a patient, so their sizes may not add up to the ungrouped total.
+ * such a sample, so their sizes may not add up to the ungrouped total.
  */
 export interface ProteinPositionLeaf {
   kind: "proteinPosition"; gene: string; range: ClinicalRange;
@@ -250,19 +249,17 @@ export interface CohortSource { saved: string; name: string; hash: string; saved
 
 /**
  * A cohort's (or a split arm's) members when it was locked, in a stored id set (lib/id-set-store.ts).
- * A lock is one set: the cohort's patients are its main list, and beside them, as named parts, the
- * patients' samples ("samples") and each arm's patients (`part`, "arm:<split> / <arm>").
+ * A lock is one sample-level set: the cohort's samples are its main list, and beside them, as named
+ * parts, each arm's samples (`part`, "arm:<split> / <arm>").
  */
 export interface LockedMembers {
-  /** the stored set holding the patients */
+  /** the stored set holding the samples */
   set: string;
   /** the part of `set` holding them, for an arm; absent for the cohort itself */
   part?: string;
+  /** samples frozen, and the patients they belong to */
   n: number;
-  /** how many samples those patients had then, kept in the set's "samples" part — what "new samples
-   *  since" is measured against. Locks made before parts name a separate sample-level set here. */
-  samples?: string;
-  nSamples?: number;
+  nPatients: number;
 }
 
 /**
@@ -562,8 +559,14 @@ export interface AnalysisDoc {
 }
 
 // ---------- results ---------------------------------------------------------
+/** A cohort's size: its patients (the owners of its samples) and its samples. */
+export interface CohortSizes { patients: number; samples: number }
 export interface CohortResult {
-  count: number; text: string; studies: string[]; sql: string;
+  /** patients: the owners of the cohort's samples */
+  count: number;
+  /** the cohort's samples */
+  samples: number;
+  text: string; studies: string[]; sql: string;
   /** for a locked cohort or arm: when, how many it froze, and how far the data has moved since */
   lock?: LockDrift;
 }
@@ -572,15 +575,15 @@ export interface LockDrift {
   cohort: string;
   at: string;
   dataVersion?: string;
-  /** patients frozen, and of those how many the data still holds */
+  /** samples frozen, and of those how many the data still holds */
   n: number;
   present: number;
-  /** what the definition selects now, and how that differs from the frozen patients */
+  /** what the definition selects now, in samples, and how that differs from the frozen samples */
   now: number;
   entered: number;
   left: number;
-  /** samples the frozen patients have now that they did not have when locked; null when not measured */
-  newSamples: number | null;
+  /** samples the frozen patients have now that the lock does not hold (whether or not the definition would select them) */
+  newSamples: number;
   /** why the movement could not be measured (the frozen patients still answered) */
   error?: string;
 }
@@ -688,7 +691,8 @@ export interface ViewResultCommon {
   splitBy?: {
     /** echoes exactly one of the view's own splitBy.attribute/gene/oql */
     attribute?: string; gene?: string; oql?: string[]; cohort: string;
-    arms: { name: string; count: number; text: string; sql: string }[];
+    /** `count` in patients, `samples` in samples */
+    arms: { name: string; count: number; samples: number; text: string; sql: string }[];
     /** raw values this split saw but pooled into "Other" rather than giving their own arm —
      *  because there were too many to fit `maxArms`, or too few patients to clear `minCount`
      *  (attribute mode), or matched none of the given queries (oql mode). Never set for gene
@@ -759,9 +763,11 @@ export interface AnalysisResult {
   stats: { ms: number };
 }
 export interface PartitionResult {
-  of: string; split: string; parentCount: number;
-  children: { name: string; label: string; role: "arm" | "other" | "notEvaluable"; count: number }[];
-  /** sum of the children's counts; equals parentCount when the split is exact */
+  /** the parent's patients and samples */
+  of: string; split: string; parentCount: number; parentSamples: number;
+  /** `count` in patients, `samples` in samples */
+  children: { name: string; label: string; role: "arm" | "other" | "notEvaluable"; count: number; samples: number }[];
+  /** sum of the children's samples; equals parentSamples when the split is exact (arms are disjoint in samples) */
   sum: number;
   conserved: boolean;
   /** arm conditions this engine cannot check evaluability for — Other may hold unknowns */

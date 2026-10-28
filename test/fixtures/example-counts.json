@@ -1,23 +1,23 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-10-23",
+  "generated": "2026-10-27",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
-      "EGFR-mutant NSCLC": 1893,
-      "KRAS-mutant NSCLC": 2194
+      "EGFR-mutant NSCLC": 1890,
+      "KRAS-mutant NSCLC": 2183
     },
     "One cohort, five ways: the colorectal hotspot workup": {
-      "CRC, KRAS-mutant": 2362,
-      "CRC, KRAS wild-type": 3134
+      "CRC, KRAS-mutant": 2355,
+      "CRC, KRAS wild-type": 3142
     },
     "Federated end to end: two studies, four views": {
       "TP53 mut": 25555,
-      "TP53 wt": 24627
+      "TP53 wt": 24675
     },
     "Genomic status via OQL, compared": {
       "STK11 driver": 1113,
-      "STK11 wt": 23592
+      "STK11 wt": 23601
     },
     "Multivariate Cox: gene status alongside a clinical covariate": {
       "all patients": 24950
@@ -52,7 +52,7 @@
       "PSA measured, never above 100": 3250
     },
     "any / not / genomicData": {
-      "CRC/PAAD without CDKN2A loss": 8140
+      "CRC/PAAD without CDKN2A loss": 8144
     },
     "Cross-study federation with an oncoprint": {
       "TP53-mut, CHORD+MET": 25555
@@ -92,14 +92,14 @@
     },
     "The clinical course: who is still on treatment, and when": {
       "TP53 mut": 13105,
-      "TP53 wt": 11594
+      "TP53 wt": 11642
     },
     "A reusable workup: one template, retargeted in a single edit": {
       "NSCLC": 7809
     },
     "What comes after what: lines of therapy, and what ending a path means": {
       "TP53 mut": 13105,
-      "TP53 wt": 11594
+      "TP53 wt": 11642
     },
     "Lollipop plot: mutations by protein position, with a suppression floor": {
       "CRC": 5543
@@ -109,18 +109,18 @@
     },
     "Clinical attributes compared between cohorts": {
       "TP53 mut": 13105,
-      "TP53 wt": 11594
+      "TP53 wt": 11642
     },
     "Co-occurrence and mutual exclusivity in NSCLC": {
       "NSCLC": 7809
     },
     "Survival from first chemotherapy, left-truncated": {
       "TP53 mut": 13105,
-      "TP53 wt": 11594
+      "TP53 wt": 11642
     },
     "Study-stratified survival across two studies": {
       "TP53 mut": 25555,
-      "TP53 wt": 24627
+      "TP53 wt": 24675
     },
     "extends: a nested cohort without repeating its parent's filter": {
       "APC-mutant": 325,
@@ -130,8 +130,8 @@
       "NSCLC": 7809,
       "NSCLC / KRAS allele / Not profiled: KRAS mutations": 0,
       "NSCLC / KRAS allele / G12C": 916,
-      "NSCLC / KRAS allele / other KRAS": 1278,
-      "NSCLC / KRAS allele / KRAS wild-type": 5615
+      "NSCLC / KRAS allele / other KRAS": 1267,
+      "NSCLC / KRAS allele / KRAS wild-type": 5626
     },
     "Median/IQR and a rank-sum test, single-study only": {
       "liver mets": 227,
@@ -209,7 +209,7 @@
     },
     "Cohort attrition: which criterion removed whom": {
       "LUAD KRAS G12C, immunotherapy": 279,
-      "LUAD KRAS wild-type": 3976
+      "LUAD KRAS wild-type": 3984
     },
     "Genome-wide copy number: colorectal against breast": {
       "Colorectal": 4993,
@@ -258,17 +258,17 @@
       "Breast": 5368,
       "Colorectal": 5543
     },
-    "Months of life gained on immunotherapy with a high tumour mutational burden, with landmarks": {
-      "TMB < 10": 1201,
-      "TMB ≥ 10": 460
+    "Real-world PFS on immunotherapy in lung cancer, by KRAS status": {
+      "NSCLC, KRAS mutant": 2183,
+      "NSCLC, KRAS wild-type": 5551
     },
     "From progression to death in colorectal cancer, by stage": {
       "Colorectal, stage 1-3": 3171,
       "Colorectal, stage 4": 2372
     },
-    "Real-world PFS on immunotherapy in lung cancer, by KRAS status": {
-      "NSCLC, KRAS mutant": 2194,
-      "NSCLC, KRAS wild-type": 5540
+    "Months of life gained on immunotherapy with a high tumour mutational burden, with landmarks": {
+      "TMB < 10": 1201,
+      "TMB ≥ 10": 460
     },
     "Which mutations change survival on immunotherapy in lung cancer?": {
       "NSCLC": 7809
@@ -283,8 +283,8 @@
       "melanoma on checkpoint blockade": 212
     },
     "PSA response to hormone therapy, by TP53 status": {
-      "Prostate, TP53 mutant": 849,
-      "Prostate, TP53 wild-type": 2284
+      "Prostate, TP53 mutant": 837,
+      "Prostate, TP53 wild-type": 2297
     },
     "A survival risk model from mutated genes in lung cancer": {
       "NSCLC": 7809
@@ -320,7 +320,7 @@
     },
     "Alteration enrichment: what separates colorectal from pancreatic tumours": {
       "Colorectal, MSS": 4957,
-      "Pancreatic, MSS": 3095
+      "Pancreatic, MSS": 3097
     },
     "Mutational signatures: what UV light and tobacco leave behind": {
       "Melanoma": 1706,

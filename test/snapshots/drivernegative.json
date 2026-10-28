@@ -3,7 +3,8 @@
   "cohorts": {
     "NSCLC": {
       "count": 7809,
-      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)",
+      "samples": 7809,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer]",
       "studies": [
         "msk_chord_2024"
       ]
@@ -34,192 +35,222 @@
         "minAltered": 5,
         "patients": 7809,
         "sequenced": 7809,
-        "positive": 4911,
-        "negative": 2898,
+        "positive": 4898,
+        "negative": 2911,
         "unprofiled": 0,
         "tested": 487,
         "untested": 7,
-        "significant": 95,
+        "significant": 103,
         "rows": [
-          {
-            "gene": "NF1",
-            "altered": [
-              358,
-              244
-            ],
-            "profiled": [
-              2898,
-              4911
-            ],
-            "log2Ratio": 1.3140376673397507,
-            "p": 5.951711756073328e-31,
-            "q": 2.8984836252077108e-28,
-            "cytoband": "17q11.2"
-          },
           {
             "gene": "KMT2D",
             "altered": [
               370,
-              259
+              251
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 1.2755324004681385,
-            "p": 1.2638262678950395e-30,
-            "q": 3.077416962324421e-28,
+            "log2Ratio": 1.3105158410067523,
+            "p": 7.930184481576199e-32,
+            "q": 2.4624026117151252e-29,
             "cytoband": "12q13.12"
+          },
+          {
+            "gene": "NF1",
+            "altered": [
+              360,
+              240
+            ],
+            "profiled": [
+              2911,
+              4898
+            ],
+            "log2Ratio": 1.3356404351623685,
+            "p": 1.0112536393080597e-31,
+            "q": 2.4624026117151252e-29,
+            "cytoband": "17q11.2"
           },
           {
             "gene": "RBM10",
             "altered": [
-              157,
-              630
+              158,
+              628
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": -1.2436280418572716,
-            "p": 7.874056406173726e-28,
-            "q": 1.2782218232688682e-25,
+            "log2Ratio": -1.2401620662733115,
+            "p": 8.526521385110937e-28,
+            "q": 1.3841386381830088e-25,
             "cytoband": "Xp11.3"
           },
           {
             "gene": "TP53",
             "altered": [
-              1709,
-              2311
+              1717,
+              2288
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 0.32559436484688875,
-            "p": 2.329362621384858e-24,
-            "q": 2.8359989915360645e-22,
+            "log2Ratio": 0.33648092166495686,
+            "p": 8.433020860998713e-26,
+            "q": 1.0267202898265933e-23,
             "cytoband": "17p13.1"
           },
           {
             "gene": "NFE2L2",
             "altered": [
               161,
-              77
+              76
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 1.8250895650580958,
-            "p": 4.372579799803402e-22,
-            "q": 4.258892725008514e-20,
+            "log2Ratio": 1.8336672991122438,
+            "p": 3.8375390978660617e-22,
+            "q": 3.737763081321544e-20,
             "cytoband": "2q31.2"
           },
           {
             "gene": "CDKN2A",
             "altered": [
-              295,
-              251
+              296,
+              247
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 0.9939868179368119,
-            "p": 1.024065950254084e-16,
-            "q": 8.312001962895649e-15,
+            "log2Ratio": 1.0117640684854847,
+            "p": 2.888418522445667e-17,
+            "q": 2.344433034051733e-15,
             "cytoband": "9p21.3"
           },
           {
             "gene": "RASA1",
             "altered": [
               124,
-              75
+              72
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 1.4863368475293746,
-            "p": 3.264817215176029e-13,
-            "q": 2.2713799768438944e-11,
+            "log2Ratio": 1.5349492433857752,
+            "p": 1.0832089367286241e-13,
+            "q": 7.536039316954857e-12,
             "cytoband": "5q14.3"
           },
           {
             "gene": "PTEN",
             "altered": [
               152,
-              107
+              104
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 1.2674197546808188,
-            "p": 1.1272190130278383e-12,
-            "q": 6.861945741806965e-11,
+            "log2Ratio": 1.2981657297437057,
+            "p": 3.475061123903411e-13,
+            "q": 2.1154434591762015e-11,
             "cytoband": "10q23.31"
           },
           {
             "gene": "KEAP1",
             "altered": [
-              469,
-              565
+              472,
+              561
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 0.49229628285120675,
-            "p": 5.973021165418496e-9,
-            "q": 3.2320681195097863e-7,
+            "log2Ratio": 0.5014640231942609,
+            "p": 3.231234854363358e-9,
+            "q": 1.748457082305506e-7,
             "cytoband": "19p13.2"
+          },
+          {
+            "gene": "MAP2K1",
+            "altered": [
+              53,
+              24
+            ],
+            "profiled": [
+              2911,
+              4898
+            ],
+            "log2Ratio": 1.8936358882832554,
+            "p": 1.9365251916808887e-8,
+            "q": 9.430877683485928e-7,
+            "cytoband": "15q22.31"
           },
           {
             "gene": "ARID1A",
             "altered": [
-              255,
-              279
+              257,
+              269
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 0.6311913526680507,
-            "p": 2.3386022541669852e-7,
-            "q": 0.000011388992977793218,
+            "log2Ratio": 0.6848401210784663,
+            "p": 2.4000209053632777e-8,
+            "q": 0.0000010625547099199239,
             "cytoband": "1p36.11"
           },
           {
             "gene": "ANKRD11",
             "altered": [
               98,
-              77
+              73
             ],
             "profiled": [
-              2758,
-              4726
+              2770,
+              4713
             ],
-            "log2Ratio": 1.1249204758801736,
-            "p": 2.762577497288062e-7,
-            "q": 0.000012230684010720783,
+            "log2Ratio": 1.1916449903139932,
+            "p": 5.52641980867281e-8,
+            "q": 0.0000022428053723530488,
             "cytoband": "16q24.3"
           },
           {
-            "gene": "MAP2K1",
+            "gene": "FBXW7",
             "altered": [
-              51,
-              27
+              94,
+              69
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 1.6784970674464075,
-            "p": 4.1111432266614836e-7,
-            "q": 0.000016684389594867856,
-            "cytoband": "15q22.31"
+            "log2Ratio": 1.1967423293406807,
+            "p": 1.1049701397048592e-7,
+            "q": 0.000004139388138740511,
+            "cytoband": "4q31.3"
+          },
+          {
+            "gene": "CASP8",
+            "altered": [
+              43,
+              19
+            ],
+            "profiled": [
+              2911,
+              4898
+            ],
+            "log2Ratio": 1.9290151756997247,
+            "p": 4.119653217679125e-7,
+            "q": 0.000014330507978640958,
+            "cytoband": "2q33.1"
           },
           {
             "gene": "U2AF1",
@@ -228,13 +259,28 @@
               134
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": -1.305129962819392,
-            "p": 5.698189101457044e-7,
-            "q": 0.000021346293018535232,
+            "log2Ratio": -1.3154112560165598,
+            "p": 5.475848606447246e-7,
+            "q": 0.00001737998959016686,
             "cytoband": "21q22.3"
+          },
+          {
+            "gene": "RB1",
+            "altered": [
+              198,
+              204
+            ],
+            "profiled": [
+              2911,
+              4898
+            ],
+            "log2Ratio": 0.7076092125493266,
+            "p": 5.710058181574328e-7,
+            "q": 0.00001737998959016686,
+            "cytoband": "13q14.2"
           },
           {
             "gene": "NRAS",
@@ -243,112 +289,67 @@
               24
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 1.6995586829742368,
-            "p": 0.000001289041170176372,
-            "q": 0.000044840217848278084,
+            "log2Ratio": 1.689277389777069,
+            "p": 0.00000141738485451397,
+            "q": 0.00004060390730284137,
             "cytoband": "1p13.2"
-          },
-          {
-            "gene": "CASP8",
-            "altered": [
-              43,
-              22
-            ],
-            "profiled": [
-              2898,
-              4911
-            ],
-            "log2Ratio": 1.7277923637031811,
-            "p": 0.0000020724852054888613,
-            "q": 0.00006728668633820503,
-            "cytoband": "2q33.1"
-          },
-          {
-            "gene": "RB1",
-            "altered": [
-              195,
-              208
-            ],
-            "profiled": [
-              2898,
-              4911
-            ],
-            "log2Ratio": 0.6678498232468988,
-            "p": 0.0000022507333049473305,
-            "q": 0.00006850669496933437,
-            "cytoband": "13q14.2"
-          },
-          {
-            "gene": "FBXW7",
-            "altered": [
-              94,
-              78
-            ],
-            "profiled": [
-              2898,
-              4911
-            ],
-            "log2Ratio": 1.0301458604537692,
-            "p": 0.0000029134996900037855,
-            "q": 0.00008346319700187314,
-            "cytoband": "4q31.3"
           },
           {
             "gene": "NOTCH1",
             "altered": [
-              141,
-              138
+              142,
+              135
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 0.7919861232590046,
-            "p": 0.000003624359538115457,
-            "q": 0.00009805906083679042,
+            "log2Ratio": 0.8236094568950635,
+            "p": 0.0000017875423706880156,
+            "q": 0.00004836295191805909,
             "cytoband": "9q34.3"
+          },
+          {
+            "gene": "KMT2C",
+            "altered": [
+              216,
+              236
+            ],
+            "profiled": [
+              2911,
+              4898
+            ],
+            "log2Ratio": 0.6229223872428398,
+            "p": 0.000002919451766796664,
+            "q": 0.00007483015844368291,
+            "cytoband": "7q36.1"
           },
           {
             "gene": "ERBB4",
             "altered": [
-              169,
-              181
+              170,
+              178
             ],
             "profiled": [
-              2898,
-              4911
+              2911,
+              4898
             ],
-            "log2Ratio": 0.6619927768373591,
-            "p": 0.000015604470491713567,
-            "q": 0.0003999672173402372,
+            "log2Ratio": 0.6843354396125166,
+            "p": 0.000006930515164070668,
+            "q": 0.00016875804424512078,
             "cytoband": "2q34"
           },
           {
-            "gene": "PREX2",
-            "altered": [
-              137,
-              139
-            ],
-            "profiled": [
-              2288,
-              3863
-            ],
-            "log2Ratio": 0.734725635690561,
-            "p": 0.000017971972562761606,
-            "q": 0.0004219679588711926,
-            "cytoband": "8q13.2"
-          },
-          {
             "…": "280 more",
-            "sha256": "ea5fac18e1aec3a4"
+            "sha256": "b14fd702a6501c54"
           }
         ],
         "labels": [
-          "NF1",
           "KMT2D",
+          "NF1",
           "RBM10",
           "TP53",
           "NFE2L2",
@@ -356,9 +357,9 @@
           "RASA1",
           "PTEN",
           "KEAP1",
+          "MAP2K1",
           "ARID1A",
-          "ANKRD11",
-          "MAP2K1"
+          "ANKRD11"
         ]
       },
       "participation": {
@@ -373,7 +374,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Of the 7,809 patients of “NSCLC” sequenced for mutations, 4,911 (62.9%) carry an OncoKB driver (v7.5) — a called mutation, a high-level copy-number call or a structural variant the store calls oncogenic or likely oncogenic — in EGFR, KRAS, ALK, ROS1, BRAF, MET, RET, ERBB2, NTRK1, NTRK2, NTRK3; 2,898 (37.1%) carry none and were sequenced on a panel covering every one of those genes (or whole-exome): the driver-negative group. 0 (0.0%) carry none but were not profiled for every listed gene, so are neither — kept out of both sides, never counted as driver-negative. Coverage is read from the mutation panels; a fusion driver is called only where the study reports structural variants. Then every other gene's mutation frequency is compared between driver-negative and driver-positive patients, in PATIENTS over the patients profiled for that gene (a panel that lists it, or whole-exome; an off-panel call counts as measured), two-sided Fisher's exact test, Benjamini–Hochberg q over the 487 genes tested; 7 altered genes were not tested (fewer than 5 altered patients, or not profiled in a group). The log ratio is log2 of the driver-negative share over the driver-positive one. Driver-positive tumours are often mutually exclusive with other drivers by biology, so a gene enriched in the driver-negative group is a candidate alternative driver, not a proven one; smoking history and tumour mutation burden also differ between the groups and are not adjusted for. "
+      "caveat": "Of the 7,809 patients of “NSCLC” sequenced for mutations, 4,898 (62.7%) carry an OncoKB driver (v7.5) — a called mutation, a high-level copy-number call or a structural variant the store calls oncogenic or likely oncogenic — in EGFR, KRAS, ALK, ROS1, BRAF, MET, RET, ERBB2, NTRK1, NTRK2, NTRK3; 2,911 (37.3%) carry none and were sequenced on a panel covering every one of those genes (or whole-exome): the driver-negative group. 0 (0.0%) carry none but were not profiled for every listed gene, so are neither — kept out of both sides, never counted as driver-negative. Coverage is read from the mutation panels and calls from the cohort's own samples only; a fusion driver is called only where the study reports structural variants. Then every other gene's mutation frequency is compared between driver-negative and driver-positive patients, in PATIENTS over the patients profiled for that gene (a panel that lists it, or whole-exome; an off-panel call counts as measured), two-sided Fisher's exact test, Benjamini–Hochberg q over the 487 genes tested; 7 altered genes were not tested (fewer than 5 altered patients, or not profiled in a group). The log ratio is log2 of the driver-negative share over the driver-positive one. Driver-positive tumours are often mutually exclusive with other drivers by biology, so a gene enriched in the driver-negative group is a candidate alternative driver, not a proven one; smoking history and tumour mutation burden also differ between the groups and are not adjusted for. "
     }
   ]
 }

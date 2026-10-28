@@ -180,9 +180,9 @@ export async function runMolsubtype(view: MolsubtypeView, ctx: ViewRun): Promise
       ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
-    caveat: cl.label + " (" + cl.citation + "), applied per patient over all their samples, in this order, first match wins: " +
-      "POLE-ultramutated — a somatic POLE exonuclease-domain hotspot called in any sample (" + POLE_HOTSPOTS.join(", ") + "; León-Castillo et al. 2020); " +
-      "else MMR-deficient — MSI-high in any sample by " + msi.label + " (from the MSI call, not mismatch-repair immunohistochemistry, which the warehouse does not hold); " +
+    caveat: cl.label + " (" + cl.citation + "), applied per patient over their samples in the cohort, in this order, first match wins: " +
+      "POLE-ultramutated — a somatic POLE exonuclease-domain hotspot called in any of those samples (" + POLE_HOTSPOTS.join(", ") + "; León-Castillo et al. 2020); " +
+      "else MMR-deficient — MSI-high in any of those samples by " + msi.label + " (from the MSI call, not mismatch-repair immunohistochemistry, which the warehouse does not hold); " +
       "else p53-abnormal — " + p53Word + " (a sequencing proxy for p53 immunohistochemistry); else NSMP. " +
       "A patient is “not classifiable”, never put in a subtype by guess, when an input the hierarchy needs before reaching their subtype is missing: not sequenced, not profiled for POLE or TP53 (panel-aware), or no MSI-high or stable call (an indeterminate or unreported MSI result counts as none) — " +
       (nc ? plural(nc, "patient") + " here (" + Object.entries(ncWhy).map(([w, c]) => w + " " + c.toLocaleString("en-US")).join(", ") + "), kept out of the shares, tests and curves. " : "none here. ") +

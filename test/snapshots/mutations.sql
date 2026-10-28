@@ -1,24 +1,34 @@
 -- cohort Colorectal
 -- msk_chord_2024
-(SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))
 
 -- view 0 mutations: mutations:counts · msk_chord_2024
 WITH ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
   FROM oncokb_annotation.variant_annotation WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
   GROUP BY alteration),
-c0 AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))),
 m0 AS (
   SELECT patientId AS pid, sampleId AS sid, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,
          referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS altCount, tumorRefCount AS refCount, mutationStatus AS status, proteinPosStart AS pos
   FROM snapshot_db.mutation_derived
   WHERE studyId = 'msk_chord_2024' AND `GENE.hugoGeneSymbol` = 'KRAS'
-    AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c0)
+    AND molecularProfileId NOT LIKE '%uncalled%' AND sampleId IN (SELECT sid FROM c0)
 ),
 ct0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(attribute_value) AS v FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'CANCER_TYPE_DETAILED'
@@ -43,16 +53,21 @@ SELECT cohort, study, countIf((match(ifNull(toString(proteinChange), ''), '^G1[2
 WITH ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
   FROM oncokb_annotation.variant_annotation WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
   GROUP BY alteration),
-c0 AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))),
 m0 AS (
   SELECT patientId AS pid, sampleId AS sid, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,
          referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS altCount, tumorRefCount AS refCount, mutationStatus AS status, proteinPosStart AS pos
   FROM snapshot_db.mutation_derived
   WHERE studyId = 'msk_chord_2024' AND `GENE.hugoGeneSymbol` = 'KRAS'
-    AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c0)
+    AND molecularProfileId NOT LIKE '%uncalled%' AND sampleId IN (SELECT sid FROM c0)
 ),
 ct0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(attribute_value) AS v FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'CANCER_TYPE_DETAILED'

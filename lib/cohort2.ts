@@ -9,13 +9,17 @@
 //          | { kind: "sampleList", ids: ["<study>:<id>", ...] }    // explicit, cross-study sample list
 //          | { kind: "patientList", ids: ["<study>:<id>", ...] }   // explicit, cross-study patient list
 //
-// Depth is capped by construction (all -> any/not -> leaf): everything compiles to
-// per-leaf CTEs over patient stable ids combined with INTERSECT / UNION / EXCEPT,
-// and everything stays renderable as a sentence. Back-compat: the v1 flat event
+// Depth is capped by construction (all -> any/not -> leaf). A cohort is a set of SAMPLES, as on
+// cBioPortal: every leaf compiles to rows (pid, sid) of the study's samples — a sample-level leaf
+// (an alteration, a sample attribute, a sample list) the samples that match it, a patient-level
+// one (a patient attribute, a timeline event, a patient list) every sample of the patients that
+// match — combined with INTERSECT / UNION / EXCEPT, so all/any/not are intersection, union and
+// complement over samples. A cohort's patients are the owners of its samples. Everything stays
+// renderable as a sentence. Back-compat: the v1 flat event
 // shape {a, b?, rel, ...} is accepted anywhere a definition is expected.
 import { DB, STUDY } from "./ch.ts";
 import { compileCohort, sq, LINE_TYPE } from "./compiler.ts";
-import { oqlLeafSql } from "./oql.ts";
+import { oqlCasesSql } from "./oql.ts";
 import { clinicalValueFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
 import { activeCustomData, clinicalTable } from "./custom-data.ts";
@@ -44,6 +48,39 @@ export function basePatientsSql(study: string = STUDY, db: string = DB): string 
     "  WHERE cancer_study_identifier = " + sq(study);
 }
 
+/** Every sample of the study as (pid, sid), bare ids: what a cohort with no clauses is, and every cohort a subset of. */
+export function baseSamplesSql(study: string = STUDY, db: string = DB): string {
+  return "SELECT " + PID("patient_unique_id", study) + " AS pid, " + PID("sample_unique_id", study) + " AS sid FROM " + db + ".sample_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study);
+}
+
+/**
+ * What a leaf selects, before it becomes the study's samples: sample ids (`sample`), patient ids
+ * (`patient`, every sample of each), or rows (lvl, id) whose level the study's own data decides
+ * (`stored`, a clinical attribute or generic assay recorded per sample in one study and per patient
+ * in another). Each is a one-column subquery but `stored`, whose subquery yields (lvl, id) with lvl
+ * 'sample' or 'patient'.
+ */
+type LeafIds = { level: "sample" | "patient" | "stored"; sql: string };
+const ofSamples = (sql: string): LeafIds => ({ level: "sample", sql });
+const ofPatients = (sql: string): LeafIds => ({ level: "patient", sql });
+const ofStored = (sql: string): LeafIds => ({ level: "stored", sql });
+
+/** A leaf's ids as rows (pid, sid) of the study's samples. */
+function leafSamplesSql(ids: LeafIds, ctx: Ctx): string {
+  const pid = PID("patient_unique_id", ctx.study), sid = PID("sample_unique_id", ctx.study);
+  const cond = ids.level === "sample" ? sid + " IN (" + ids.sql + ")"
+    : ids.level === "patient" ? pid + " IN (" + ids.sql + ")"
+    // one subquery, named twice: ClickHouse builds the set for an identical IN subquery once
+    : "(('sample', " + sid + ") IN (" + ids.sql + ") OR ('patient', " + pid + ") IN (" + ids.sql + "))";
+  return baseSamplesSql(ctx.study, dbOf(ctx)) + "\n    AND " + cond;
+}
+
+/** A clause naming `per` no longer means anything: the level an attribute is recorded at is each study's own. */
+function rejectPer(leaf: object, kind: string): void {
+  if ("per" in leaf) throw new Error(kind + " clause: `per` was removed — an attribute is matched at the level each study records it (a sample attribute selects the matching samples, a patient attribute every sample of the matching patients)");
+}
+
 // DEPRECATED back-compat: {kind:"alteration", gene, driver, types} — grandfathered so
 // saved cohorts and old links keep working, but no longer part of the public DSL.
 // It translates to OQL and compiles through the same engine, so equivalence with the
@@ -62,10 +99,10 @@ function alterationToOql(leaf: AlterationLeaf): string {
   return gene + ": " + specs.join(" ");
 }
 
-function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
+function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): LeafIds {
   const attr = String(leaf.attribute || "");
   if (!attr || attr.length > 200) throw new Error("invalid clinical attribute");
-  const per = leaf.per === "sample" ? "sample" : "patient"; // sample-level collapses: patient matches if ANY sample matches
+  rejectPer(leaf, "clinical");
   const conds: string[] = [];
   if (Array.isArray(leaf.values) && leaf.values.length) {
     // folded on both sides, exactly as the `=` case is — a multi-value pick is
@@ -82,9 +119,8 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
       }
     }
   }
-  // Every condition here reads a recorded value, so a patient with none matches neither `= X` nor
-  // `!= X`, while {not: {= X}} keeps them. At sample level a patient whose samples differ can
-  // match both `= X` and `!= X`.
+  // Every condition here reads a recorded value, so a sample with none matches neither `= X` nor
+  // `!= X`, while {not: {= X}} keeps it.
   if (leaf.op != null) {
     const op = CLIN_OP[leaf.op];
     if (!op) throw new Error("invalid clinical op (use = != > >= < <=)");
@@ -98,22 +134,25 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): string {
         : "attribute_value " + op + " " + sq(String(leaf.value)));
   }
   if (!conds.length) throw new Error("clinical clause needs op/value, values[], or range{gt,gte,lt,lte}");
-  return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
-    "  FROM " + clinicalTable(dbOf(ctx), [attr]) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(ctx.study) + " AND type = " + sq(per) + "\n" +
-    "    AND attribute_name = " + sq(attr) + " AND " + conds.join(" AND ");
+  return ofStored(storedRowsSql(clinicalTable(dbOf(ctx), [attr]), ctx) +
+    "    AND attribute_name = " + sq(attr) + " AND " + conds.join(" AND "));
 }
 
-/** The patients with any value in an upload: a row of any of its columns, patient or sample level. */
-function uploadLeafSql(leaf: UploadLeaf, ctx: Ctx): string {
+/** A clinical table's rows in this study as (lvl, id): a sample row names its sample, a patient row its patient. */
+function storedRowsSql(table: string, ctx: Ctx): string {
+  return "SELECT DISTINCT type AS lvl, if(type = 'sample', " + PID("sample_unique_id", ctx.study) + ", " + PID("patient_unique_id", ctx.study) + ") AS id\n" +
+    "  FROM " + table + "\n" +
+    "  WHERE cancer_study_identifier = " + sq(ctx.study) + "\n";
+}
+
+/** The samples with any value in an upload — a row of any of its columns — or every sample of a patient with one. */
+function uploadLeafSql(leaf: UploadLeaf, ctx: Ctx): LeafIds {
   const name = UPLOAD_DATASET_RE.exec(String(leaf.dataset || ""))?.[1];
   if (!name) throw new Error('upload clause needs dataset:"custom:<name>"');
   const d = activeCustomData()?.datasets.find((x) => x.id === name);
   if (!d) throw new Error("this analysis uses custom data that was not sent with it: '" + name + "'");
   const attrs = d.columns.map((c) => customAttr(d.id, c.name));
-  return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
-    "  FROM " + clinicalTable(dbOf(ctx), attrs) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(ctx.study) + " AND attribute_name IN (" + attrs.map(sq).join(",") + ")";
+  return ofStored(storedRowsSql(clinicalTable(dbOf(ctx), attrs), ctx) + "    AND attribute_name IN (" + attrs.map(sq).join(",") + ")");
 }
 
 const PROFILED_TYPE: Record<string, string> = { MUTATION: "MUTATION_EXTENDED", CNA: "COPY_NUMBER_ALTERATION", SV: "STRUCTURAL_VARIANT" };
@@ -238,18 +277,17 @@ function derivedConds(leaf: any): { metric: DerivedMetric; conds: string; params
  * caught up, which reads as a frozen UI. Buckets of one metric are exactly the
  * case where the scan can be shared.
  */
-function derivedAnySql(leaves: any[], ctx: Ctx): string {
+function derivedAnySql(leaves: any[], ctx: Ctx): LeafIds {
   const parts = leaves.map(derivedConds);
   const metric = parts[0].metric;
-  return "SELECT pid FROM (\n" + derivedMetricSql(metric, ctx.study, dbOf(ctx), parts[0].params) + "\n)\n" +
-    "  WHERE " + parts.map((p) => "(" + p.conds + ")").join(" OR ");
+  return ofPatients("SELECT pid FROM (\n" + derivedMetricSql(metric, ctx.study, dbOf(ctx), parts[0].params) + "\n)\n" +
+    "  WHERE " + parts.map((p) => "(" + p.conds + ")").join(" OR "));
 }
 
-function derivedLeafSql(leaf: any, ctx: Ctx): string {
-  const { metric, conds: condStr, params } = derivedConds(leaf);
-  const conds = [condStr];
-  return "SELECT pid FROM (\n" + derivedMetricSql(metric as DerivedMetric, ctx.study, dbOf(ctx), params) + "\n)\n" +
-    "  WHERE " + conds.join(" AND ");
+function derivedLeafSql(leaf: any, ctx: Ctx): LeafIds {
+  const { metric, conds, params } = derivedConds(leaf);
+  return ofPatients("SELECT pid FROM (\n" + derivedMetricSql(metric as DerivedMetric, ctx.study, dbOf(ctx), params) + "\n)\n" +
+    "  WHERE " + conds);
 }
 
 /**
@@ -273,17 +311,17 @@ export function profiledCasesSql(gene: string, type: "MUTATION" | "CNA" | "SV", 
 /** the most genes one profiled clause names: a gene list's own limit (lib/gene-tracks.ts) */
 export const PROFILED_MAX_GENES = 32;
 
-function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): string {
+function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): LeafIds {
   const t = PROFILED_TYPE[String(leaf.type || "").toUpperCase()];
   if (!t) throw new Error("profiled clause: type must be MUTATION, CNA, or SV");
-  // A gene list is its genes' clauses AND-ed: the same patients as one clause per gene
+  // A gene list is its genes' clauses AND-ed: the same samples as one clause per gene
   if (leaf.genes != null) {
     if (leaf.gene != null) throw new Error("profiled clause: give `gene` or `genes`, not both");
     if (!Array.isArray(leaf.genes) || !leaf.genes.length) throw new Error("profiled clause: `genes` must list at least one gene");
     const genes = [...new Set(leaf.genes.map((g) => String(g).toUpperCase().trim()))];
     if (genes.length > PROFILED_MAX_GENES)
       throw new Error("profiled clause: at most " + PROFILED_MAX_GENES + " genes; this names " + genes.length);
-    return genes.map((gene) => "(" + profiledLeafSql({ kind: "profiled", type: leaf.type, gene }, ctx) + ")").join("\n  INTERSECT DISTINCT\n");
+    return ofSamples(genes.map((gene) => "(" + profiledLeafSql({ kind: "profiled", type: leaf.type, gene }, ctx).sql + ")").join("\n  INTERSECT DISTINCT\n"));
   }
   const db = dbOf(ctx);
   // Optional gene narrowing, resolved through the SAME panel tables as the
@@ -298,25 +336,23 @@ function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): string {
     geneCond = "\n    AND (sp.gene_panel_id = 'WES' OR sp.gene_panel_id IN (\n" +
       "      SELECT gene_panel_id FROM " + db + ".gene_panel_to_gene_derived WHERE gene = " + sq(gene) + "))";
   }
-  return "SELECT DISTINCT " + PID("sd.patient_unique_id", ctx.study) + " AS pid\n" +
+  return ofSamples("SELECT DISTINCT " + PID("sp.sample_unique_id", ctx.study) + " AS sid\n" +
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
-    "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
-    "  WHERE sp.cancer_study_identifier = " + sq(ctx.study) + " AND sp.alteration_type = " + sq(t) + geneCond;
+    "  WHERE sp.cancer_study_identifier = " + sq(ctx.study) + " AND sp.alteration_type = " + sq(t) + geneCond);
 }
 
-function caseListLeafSql(leaf: CaseListLeaf, ctx: Ctx): string {
+function caseListLeafSql(leaf: CaseListLeaf, ctx: Ctx): LeafIds {
   let id = String(leaf.id || "").trim();
   if (!/^[A-Za-z0-9._-]{1,120}$/.test(id)) throw new Error("caseList clause: bad list id");
   if (!id.startsWith(ctx.study + "_")) id = ctx.study + "_" + id; // accept 'sequenced' shorthand
   // only this study's lists: a sibling study's id also starts with this one's, and TCGA patient
   // ids are shared across TCGA studies, so its list would read as plausible members
-  return "SELECT DISTINCT p.stable_id AS pid\n" +
+  return ofSamples("SELECT DISTINCT s.stable_id AS sid\n" +
     "  FROM " + dbOf(ctx) + ".sample_list sl\n" +
     "  JOIN " + dbOf(ctx) + ".cancer_study cs ON cs.cancer_study_id = sl.cancer_study_id\n" +
     "  JOIN " + dbOf(ctx) + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
     "  JOIN " + dbOf(ctx) + ".sample s ON s.internal_id = sll.sample_id\n" +
-    "  JOIN " + dbOf(ctx) + ".patient p ON p.internal_id = s.patient_id\n" +
-    "  WHERE sl.stable_id = " + sq(id) + " AND cs.cancer_study_identifier = " + sq(ctx.study);
+    "  WHERE sl.stable_id = " + sq(id) + " AND cs.cancer_study_identifier = " + sq(ctx.study));
 }
 
 function numRangeConds(range: ClinicalRange | undefined, expr: string): string[] {
@@ -331,7 +367,7 @@ function numRangeConds(range: ClinicalRange | undefined, expr: string): string[]
   return conds;
 }
 
-function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): string {
+function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
   const gene = String(leaf.gene || "").toUpperCase().trim();
   if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(gene)) throw new Error("genomicData clause: bad gene");
   const pt = String(leaf.profileType || "");
@@ -341,15 +377,14 @@ function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): string {
   if (Array.isArray(leaf.values) && leaf.values.length)
     conds.push("ga.alteration_value IN (" + leaf.values.slice(0, 20).map(v => sq(String(v))).join(",") + ")");
   if (!conds.length) throw new Error("genomicData clause needs range{gt,gte,lt,lte} or values[]");
-  return "SELECT DISTINCT " + PID("sd.patient_unique_id", ctx.study) + " AS pid\n" +
+  return ofSamples("SELECT DISTINCT " + PID("ga.sample_unique_id", ctx.study) + " AS sid\n" +
     "  FROM " + dbOf(ctx) + ".genetic_alteration_derived ga\n" +
-    "  JOIN " + dbOf(ctx) + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
     "  WHERE ga.cancer_study_identifier = " + sq(ctx.study) + "\n" +
     "    AND ga.hugo_gene_symbol = " + sq(gene) + " AND ga.profile_type = " + sq(pt) + "\n" +
-    "    AND " + conds.join(" AND ");
+    "    AND " + conds.join(" AND "));
 }
 
-function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): string {
+function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): LeafIds {
   if (ctx.gaProfiles && !ctx.gaProfiles.length)
     throw new Error("genericAssay: this study has no generic assay profiles");
   const pt = String(leaf.profileType || ""), entity = String(leaf.entity || "");
@@ -361,36 +396,38 @@ function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): string {
     conds.push("value IN (" + leaf.values.slice(0, 20).map(v => sq(String(v))).join(",") + ")");
   if (leaf.measured === true) conds.push("trimBoth(value) NOT IN (" + ASSAY_MISSING_VALUES.map(sq).join(",") + ")");
   if (!conds.length) throw new Error("genericAssay clause needs range, values[] or measured: true");
-  return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
+  // a profile is measured per sample or (patient_level) per patient
+  return ofStored("SELECT DISTINCT if(patient_level = 1, 'patient', 'sample') AS lvl,\n" +
+    "       if(patient_level = 1, " + PID("patient_unique_id", ctx.study) + ", " + PID("sample_unique_id", ctx.study) + ") AS id\n" +
     "  FROM " + dbOf(ctx) + ".generic_assay_data_derived\n" +
     // the study's own profile by its exact id: a prefix match on the ids also reads every sibling
     // study named after this one (brca_tcga_pub_…, brca_tcga_pan_can_atlas_2018_…)
     "  WHERE profile_type = " + sq(pt) + " AND profile_stable_id = " + sq(ctx.study + "_" + pt) + "\n" +
     "    AND entity_stable_id = " + sq(entity) + "\n" +
-    "    AND " + conds.join(" AND ");
+    "    AND " + conds.join(" AND "));
 }
 
 // mutation_derived, not genetic_alteration_derived: the same table the lollipop reads
-// proteinPosStart from (never parsed from the change string), and its patientId is
-// already bare — no PID() stripping, unlike every table above keyed by patient_unique_id.
-function proteinPositionLeafSql(leaf: ProteinPositionLeaf, ctx: Ctx): string {
+// proteinPosStart from (never parsed from the change string), and its sampleId is
+// already bare — no PID() stripping, unlike every table above keyed by sample_unique_id.
+function proteinPositionLeafSql(leaf: ProteinPositionLeaf, ctx: Ctx): LeafIds {
   const gene = String(leaf.gene || "").toUpperCase().trim();
   if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(gene)) throw new Error("proteinPosition clause: bad gene");
   const conds = numRangeConds(leaf.range, "proteinPosStart");
   if (!conds.length) throw new Error("proteinPosition clause needs range{gt,gte,lt,lte}");
-  return "SELECT DISTINCT patientId AS pid\n" +
+  return ofSamples("SELECT DISTINCT sampleId AS sid\n" +
     "  FROM " + dbOf(ctx) + ".mutation_derived\n" +
     "  WHERE studyId = " + sq(ctx.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
     "    AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''\n" +
-    "    AND " + conds.join(" AND ");
+    "    AND " + conds.join(" AND "));
 }
 
-function eventLeafSql(leaf: EventLeafFields, ctx: Ctx): string {
+function eventLeafSql(leaf: EventLeafFields, ctx: Ctx): LeafIds {
   const { patientsSql } = compileCohort({
     db: dbOf(ctx), study: ctx.study, a: leaf.a, b: leaf.b, rel: leaf.rel,
     priorGuard: !!leaf.priorGuard, lineGap: leaf.lineGap ?? ctx.lineGap, patientsLimit: 1000000
   });
-  return patientsSql;
+  return ofPatients(patientsSql);
 }
 
 /**
@@ -445,52 +482,54 @@ function listMembership(leaf: SampleListLeaf | PatientListLeaf, ctx: Ctx, col: s
   return PID(col, ctx.study) + " IN (" + sql + ")";
 }
 
-function sampleListLeafSql(leaf: SampleListLeaf, ctx: Ctx): string {
+function sampleListLeafSql(leaf: SampleListLeaf, ctx: Ctx): LeafIds {
   const member = listMembership(leaf, ctx, "sample_unique_id");
   // No ids for THIS study is a normal, expected shape for a cross-study list
   // (most of it belongs to other studies in the fan-out) — it contributes
-  // zero patients here, not an error.
-  if (!member) return "SELECT " + PID("patient_unique_id", ctx.study) + " AS pid FROM " + dbOf(ctx) + ".sample_derived WHERE 1=0";
-  return "SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid\n" +
-    "  FROM " + dbOf(ctx) + ".sample_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(ctx.study) + "\n" +
-    "    AND " + member;
+  // zero samples here, not an error.
+  return ofSamples("SELECT " + PID("sample_unique_id", ctx.study) + " AS sid FROM " + dbOf(ctx) + ".sample_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(ctx.study) + " AND " + (member ?? "1=0"));
 }
 
-function patientListLeafSql(leaf: PatientListLeaf, ctx: Ctx): string {
+function patientListLeafSql(leaf: PatientListLeaf, ctx: Ctx): LeafIds {
   const member = listMembership(leaf, ctx, "patient_unique_id");
-  if (!member) return "SELECT " + PID("patient_unique_id", ctx.study) + " AS pid FROM " + dbOf(ctx) + ".sample_derived WHERE 1=0";
-  return basePatientsSql(ctx.study, dbOf(ctx)) + "\n    AND " + member;
-}
-
-/** The samples, as bare ids, of the patients `patientsSql` selects in `study`: what a lock records beside them. */
-export function memberSamplesSql(patientsSql: string, study: string, db: string): PatientSql {
-  return patientSql("SELECT DISTINCT " + PID("sample_unique_id", study) + " AS sid\n" +
-    "  FROM " + db + ".sample_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
-    "    AND " + PID("patient_unique_id", study) + " IN (SELECT pid FROM (" + patientsSql + "))");
+  return ofPatients(basePatientsSql(ctx.study, dbOf(ctx)) + "\n    AND " + (member ?? "1=0"));
 }
 
 /**
- * How far the data has moved from a locked cohort, in `study`: of the frozen patients
- * (`lockedSql`) how many the data still holds, what the definition (`liveSql`) selects now, who it
- * would add and who it would drop, and how many samples the frozen patients have that were not
- * theirs when locked (`samples`, where the lock keeps them; null when it recorded none).
+ * The one rule for joining a table to a cohort (a compiled cohort named `cte`, columns pid, sid).
+ * A table keyed by sample keeps the cohort's samples and nothing else — a patient's other samples
+ * are not in it; a table keyed by patient keeps the cohort's patients, the owners of its samples.
+ * Each takes the table's bare id expression (study prefix already stripped).
  */
-export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string, samples: { set: string; part: string } | null): AggregateSql {
-  const pid = PID("patient_unique_id", study), sid = PID("sample_unique_id", study);
-  let newSamples = "toInt64(-1)";
-  if (samples) {
-    const table = idSetTable(samples.set, study, "sample", samples.part);
-    newSamples = "(SELECT count() FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + sq(study) +
-      " AND " + pid + " IN (SELECT pid FROM locked)" + (table ? " AND " + sid + " NOT IN (SELECT id FROM " + table + ")" : "") + ")";
-  }
+export function inCohortSamples(sampleIdExpr: string, cte = "cohort"): string {
+  return sampleIdExpr + " IN (SELECT sid FROM " + cte + ")";
+}
+export function inCohortPatients(patientIdExpr: string, cte = "cohort"): string {
+  return patientIdExpr + " IN (SELECT pid FROM " + cte + ")";
+}
+/** A table's `sample_unique_id`-style column as a bare id, for inCohortSamples. */
+export const bareSampleId = (col: string, study: string): string => PID(col, study);
+
+/** A compiled cohort's samples, as bare ids (column sid): what a lock records beside its patients. */
+export function memberSamplesSql(cohortSql: string): PatientSql {
+  return patientSql("SELECT DISTINCT sid FROM (" + cohortSql + ")");
+}
+
+/**
+ * How far the data has moved from a locked cohort, in `study`, in samples: of the frozen samples
+ * (`lockedSql`) how many the data still holds, what the definition (`liveSql`) selects now, which it
+ * would add and which it would drop, and how many samples the frozen patients have that the lock
+ * does not hold.
+ */
+export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string): AggregateSql {
   return aggregateSql("WITH locked AS (" + lockedSql + "),\n     live AS (" + liveSql + ")\n" +
-    "SELECT (SELECT count() FROM locked) AS present,\n" +
-    "       (SELECT count() FROM live) AS now,\n" +
-    "       (SELECT count() FROM live WHERE pid NOT IN (SELECT pid FROM locked)) AS entered,\n" +
-    "       (SELECT count() FROM locked WHERE pid NOT IN (SELECT pid FROM live)) AS left,\n" +
-    "       " + newSamples + " AS newSamples");
+    "SELECT (SELECT uniqExact(sid) FROM locked) AS present,\n" +
+    "       (SELECT uniqExact(sid) FROM live) AS now,\n" +
+    "       (SELECT uniqExact(sid) FROM live WHERE sid NOT IN (SELECT sid FROM locked)) AS entered,\n" +
+    "       (SELECT uniqExact(sid) FROM locked WHERE sid NOT IN (SELECT sid FROM live)) AS left,\n" +
+    "       (SELECT count() FROM (" + baseSamplesSql(study, db) + ")\n" +
+    "         WHERE " + inCohortPatients("pid", "locked") + " AND sid NOT IN (SELECT sid FROM locked)) AS newSamples");
 }
 
 // The salt is part of what every held-out result means: changing it reshuffles every
@@ -503,17 +542,23 @@ export function splitBucketSql(pidExpr: string, study: string): string {
   return "cityHash64(concat(" + sq(SPLIT_SALT + ":" + study + ":") + ", " + pidExpr + ")) % 2";
 }
 
-function splitLeafSql(leaf: SplitLeaf, ctx: Ctx): string {
+function splitLeafSql(leaf: SplitLeaf, ctx: Ctx): LeafIds {
   const bucket = SPLIT_PARTS[String(leaf.part)];
   if (bucket === undefined) throw new Error('split clause: part must be "discovery" or "validation"');
   const pid = PID("patient_unique_id", ctx.study);
-  return "SELECT DISTINCT " + pid + " AS pid FROM " + dbOf(ctx) + ".sample_derived\n" +
+  return ofPatients("SELECT DISTINCT " + pid + " AS pid FROM " + dbOf(ctx) + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(ctx.study) + "\n" +
-    "    AND " + splitBucketSql(pid, ctx.study) + " = " + bucket;
+    "    AND " + splitBucketSql(pid, ctx.study) + " = " + bucket);
 }
 
+/** A leaf as rows (pid, sid) of the study's samples. */
 function leafSql(leaf: Leaf, ctx: Ctx): string {
-  const oqlCtx = () => ({ oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx) });
+  return leafSamplesSql(leafIds(leaf, ctx), ctx);
+}
+
+function leafIds(leaf: Leaf, ctx: Ctx): LeafIds {
+  // an alteration is called per sample
+  const oql = (q: string) => ofSamples(oqlCasesSql(q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx), unit: "sample" }));
   // v1 flat event shape without kind
   if (!("kind" in leaf)) {
     if (leaf.a && leaf.rel) return eventLeafSql(leaf, ctx);
@@ -521,8 +566,8 @@ function leafSql(leaf: Leaf, ctx: Ctx): string {
   }
   // one case per Leaf kind: a kind added to the Leaf union without a case here is a type error
   switch (leaf.kind) {
-    case "oql": return oqlLeafSql(leaf.q, oqlCtx());
-    case "alteration": return oqlLeafSql(alterationToOql(leaf), oqlCtx()); // deprecated alias
+    case "oql": return oql(leaf.q);
+    case "alteration": return oql(alterationToOql(leaf)); // deprecated alias
     case "clinical": return clinicalLeafSql(leaf, ctx);
     case "profiled": return profiledLeafSql(leaf, ctx);
     case "caseList": return caseListLeafSql(leaf, ctx);
@@ -554,19 +599,19 @@ function clauseSql(clause: any, ctx: Ctx): string {
     const ls = clause.any;
     if (ls.length > 1 && ls.every((l: any) => l && l.kind === "derived" && l.metric === ls[0].metric
       && (l.eventType || "") === (ls[0].eventType || "")))
-      return derivedAnySql(ls, ctx);
+      return leafSamplesSql(derivedAnySql(ls, ctx), ctx);
     return clause.any.map((l: any) => "(" + leafSql(l, ctx) + ")").join("\nUNION DISTINCT\n");
   }
   if (clause.not) {
-    // `not` is the study's patients minus the matches, so it keeps every patient the leaf could
-    // not decide: {not: oql "STK11:"} includes patients never sequenced for STK11, and
+    // `not` is the study's samples minus the matches, so it keeps every sample the leaf could
+    // not decide: {not: oql "STK11:"} includes samples never sequenced for STK11, and
     // {not: clinical} those with no value recorded. A wild-type cohort pairs it with
     // {kind: "profiled", type, gene} for the same gene; lib/cohort-partitions.ts sends the
     // undecided to their own arm instead.
     // clauseSql, not leafSql: {not: {any: [...]}} needs the same any/leaf dispatch a bare
     // clause gets, not just a single leaf — De Morgan's otherwise forces two separate `not`s
     // to express "none of these" (e.g. "DDR intact" needed !A and !B and !C by hand).
-    return "(" + basePatientsSql(ctx.study, dbOf(ctx)) + ")\nEXCEPT DISTINCT\n(" + clauseSql(clause.not, ctx) + ")";
+    return "(" + baseSamplesSql(ctx.study, dbOf(ctx)) + ")\nEXCEPT DISTINCT\n(" + clauseSql(clause.not, ctx) + ")";
   }
   return leafSql(clause, ctx);
 }
@@ -577,19 +622,19 @@ function normalizeSugar(def: CohortDef): CohortDef {
   return def;
 }
 
-// def -> SQL producing the cohort's patient stable ids (column: pid)
+// def -> SQL producing the cohort's samples, one row each: (pid, sid), bare stable ids
 export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin, profiles, gaProfiles, study = STUDY, db }: Partial<CompileCtx> = {}): string {
-  if (!def) return basePatientsSql(study, db || DB);
+  if (!def) return baseSamplesSql(study, db || DB);
   // a locked cohort is its frozen patients wherever it is compiled, not only inside runAnalysis
   // (which has already made it so, lib/cohort-lock.ts): Explore, an oncoprint spec, a link
   const d = def.lock ? { ...normalizeSugar(def), all: [lockClause(def.lock)] } : normalizeSugar(def);
   const clauses = d.all;
-  // No clauses means every patient in the study — the same thing an absent
+  // No clauses means every sample in the study — the same thing an absent
   // definition means, and a legitimate cohort (it is the denominator for
   // everything else). Kept consistent with the null case rather than erroring on
-  // one spelling of the same intent; the readback says "all patients in the
+  // one spelling of the same intent; the readback says "all samples in the
   // study" so it can never be mistaken for a filter that silently did nothing.
-  if (Array.isArray(clauses) && clauses.length === 0) return basePatientsSql(study, db || DB);
+  if (Array.isArray(clauses) && clauses.length === 0) return baseSamplesSql(study, db || DB);
   if (!Array.isArray(clauses) || clauses.length > 8) throw new Error("cohort def needs all: [0-8 clauses]");
   const ctx: Ctx = { oncokbPin, profiles, gaProfiles, study, db: db || DB, lineGap: d.lineGap ?? 90 };
   return clauses.map((c) => "(" + clauseSql(c, ctx) + ")").join("\nINTERSECT DISTINCT\n");
@@ -608,7 +653,7 @@ function leafText(leaf: any): string {
     if (leaf.range) bits.push(Object.entries(leaf.range).map(([k, v]) => k + " " + v).join(", "));
     if (leaf.op != null) bits.push(leaf.op + " " + leaf.value +
       (leaf.percentile != null ? " (" + Math.round(leaf.percentile * 100) + "th percentile" + (leaf.percentileOf ? " of " + leaf.percentileOf : "") + ")" : ""));
-    return leaf.attribute + " " + bits.join(" ") + (leaf.per === "sample" ? " (any sample)" : "");
+    return leaf.attribute + " " + bits.join(" ");
   }
   if (leaf.kind === "profiled") return "profiled for " + (leaf.genes?.length ? leaf.genes.map((g: string) => String(g).toUpperCase()).join(", ") + " " : leaf.gene ? String(leaf.gene).toUpperCase() + " " : "") + leaf.type;
   if (leaf.kind === "derived") {
@@ -667,9 +712,9 @@ function leafText(leaf: any): string {
 }
 
 export function describeCohortDef(def: CohortDef | null | undefined): string {
-  if (!def) return "all patients in the study";
+  if (!def) return "all samples in the study";
   const d = normalizeSugar(def);
-  if (Array.isArray(d.all) && d.all.length === 0) return "all patients in the study";
+  if (Array.isArray(d.all) && d.all.length === 0) return "all samples in the study";
   return (d.all || []).map(describeClause).join(" AND ");
 }
 

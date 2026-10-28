@@ -1,20 +1,20 @@
 Analysis over msk_impact_50k_2026 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- Colorectal: 4,993 patients — CANCER_TYPE in [Colorectal Cancer] (any sample)
-- Breast: 5,803 patients — CANCER_TYPE in [Breast Cancer] (any sample)
+- Colorectal: 4,993 patients — CANCER_TYPE in [Colorectal Cancer]
+- Breast: 5,803 patients — CANCER_TYPE in [Breast Cancer]
 
 Genome-wide copy number (hg19, 2 Mb bins, |log2| ≥ 0.2; peak % gained/lost per chromosome):
-  Colorectal (5,390 segmented samples): chr1 +13/−29, chr2 +4/−5, chr3 +6/−10, chr4 +2/−27, chr5 +11/−17, chr6 +11/−15, chr7 +31/−2, chr8 +35/−40, chr9 +7/−10, chr10 +4/−14, chr11 +5/−10, chr12 +11/−7, chr13 +46/−2, chr14 +4/−21, chr15 +5/−24, chr16 +15/−7, chr17 +9/−39, chr18 +3/−55, chr19 +9/−13, chr20 +61/−10, chr21 +3/−16, chr22 +4/−23
-  Breast (6,906 segmented samples): chr1 +51/−30, chr2 +7/−16, chr3 +16/−25, chr4 +5/−24, chr5 +17/−18, chr6 +17/−32, chr7 +16/−11, chr8 +49/−43, chr9 +7/−28, chr10 +17/−21, chr11 +27/−41, chr12 +14/−15, chr13 +10/−37, chr14 +11/−22, chr15 +13/−27, chr16 +31/−44, chr17 +25/−45, chr18 +7/−25, chr19 +11/−33, chr20 +32/−10, chr21 +14/−12, chr22 +7/−31
-  bins differing at q<0.05: 1255 for gains, 1217 for losses, of 1452
-  CAVEAT (tell the user): Share of each cohort's segmented SAMPLES (not patients: a patient with two segmented samples counts twice) gained (log2 segment mean ≥ 0.2) or lost (≤ −0.2) in each 2 Mb bin, hg19. Each bin's denominator is the samples whose segmentation covers it; a bin takes the value of the segment over its midpoint, so an event narrower than 2 Mb can be missed — use a smaller binMb to find it. 12,296 of 12,302 samples have segments. Thresholds on a log ratio are not purity- or ploidy-corrected: a low-purity tumour's real loss can sit inside ±0.2. Chromosome X is not drawn (includeX: true adds it). Per-bin two-sided Fisher tests, Benjamini–Hochberg across bins separately for gains and losses; adjacent bins are not independent, so read a run of significant bins as one region, not many findings.
+  Colorectal (5,273 segmented samples): chr1 +12/−29, chr2 +4/−5, chr3 +6/−9, chr4 +2/−27, chr5 +11/−17, chr6 +11/−15, chr7 +32/−2, chr8 +35/−41, chr9 +7/−10, chr10 +4/−14, chr11 +5/−10, chr12 +11/−7, chr13 +48/−2, chr14 +3/−21, chr15 +5/−24, chr16 +15/−7, chr17 +9/−39, chr18 +3/−57, chr19 +9/−12, chr20 +62/−11, chr21 +3/−16, chr22 +4/−23
+  Breast (6,806 segmented samples): chr1 +52/−30, chr2 +7/−16, chr3 +17/−25, chr4 +5/−24, chr5 +17/−18, chr6 +17/−32, chr7 +16/−11, chr8 +49/−43, chr9 +7/−28, chr10 +17/−21, chr11 +27/−41, chr12 +14/−15, chr13 +10/−37, chr14 +11/−22, chr15 +13/−27, chr16 +31/−44, chr17 +25/−45, chr18 +7/−25, chr19 +11/−33, chr20 +32/−10, chr21 +14/−12, chr22 +7/−31
+  bins differing at q<0.05: 1249 for gains, 1208 for losses, of 1452
+  CAVEAT (tell the user): Share of each cohort's segmented SAMPLES (not patients: a patient with two segmented samples counts twice) gained (log2 segment mean ≥ 0.2) or lost (≤ −0.2) in each 2 Mb bin, hg19. Each bin's denominator is the samples whose segmentation covers it; a bin takes the value of the segment over its midpoint, so an event narrower than 2 Mb can be missed — use a smaller binMb to find it. 12,079 of 12,084 samples have segments. Thresholds on a log ratio are not purity- or ploidy-corrected: a low-purity tumour's real loss can sit inside ±0.2. Chromosome X is not drawn (includeX: true adds it). Per-bin two-sided Fisher tests, Benjamini–Hochberg across bins separately for gains and losses; adjacent bins are not independent, so read a run of significant bins as one region, not many findings.
   METHOD:
     - Count gained and lost samples per bin [Colorectal · msk_impact_50k_2026]: The genome:coverage and genome:bins queries above. Per 2 Mb bin on hg19: the cohort's SAMPLES (a patient with two segmented samples counts twice) whose segmentation covers the bin's midpoint, and of those the ones gained (log2 segment mean ≥ 0.2) or lost (≤ −0.2) there. Counts only.
     - Count gained and lost samples per bin [Breast · msk_impact_50k_2026]: The genome:coverage and genome:bins queries above. Per 2 Mb bin on hg19: the cohort's SAMPLES (a patient with two segmented samples counts twice) whose segmentation covers the bin's midpoint, and of those the ones gained (log2 segment mean ≥ 0.2) or lost (≤ −0.2) there. Counts only.
     - Place the bins on one axis: Chromosomes 1–22 at hg19 lengths, 1,452 bins; counts add across studies (all on one build).
-        Colorectal: 5,390 of 5,395 samples segmented
-        Breast: 6,906 of 6,907 samples segmented
+        Colorectal: 5,273 of 5,277 samples segmented
+        Breast: 6,806 of 6,807 samples segmented
     - Fisher's exact test per bin: Two-sided, on gained vs not (and separately lost vs not) among each cohort's covered samples, in every bin both cohorts cover.
     - Benjamini–Hochberg across bins: Separately for gains and losses. Adjacent bins are not independent: a run of significant bins is one region, not many findings.
     Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).

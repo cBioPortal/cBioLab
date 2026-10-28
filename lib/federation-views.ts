@@ -4,10 +4,10 @@
 // the outer SELECT returns counts, sums and grouping keys — never an identifier — so any
 // participant, aggregate-only included, can answer.
 import { sq } from "./compiler.ts";
-import { ALTERED_COND, driverJoin } from "./federation.ts";
+import { ALTERED_COND, driverJoin, inCohortClinical } from "./federation.ts";
 import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql, foldedInSql } from "./event-names.ts";
 import { clinicalTable } from "./custom-data.ts";
-import { splitBucketSql } from "./cohort2.ts";
+import { splitBucketSql, inCohortSamples, inCohortPatients, bareSampleId } from "./cohort2.ts";
 import { finiteSql } from "./sql-number.ts";
 import { linesCtes, type LineSpec } from "./treatment-lines.ts";
 import { VIEW_ATTR_RE } from "./custom-data-names.ts";
@@ -43,13 +43,13 @@ export function studyGenomeSql(study: string, db: string): AggregateSql {
     "WHERE cs.cancer_study_identifier = " + sq(study));
 }
 
-/** How many of the cohort's samples exist, and how many have any segment at all. */
+/** How many samples the cohort holds, and how many of them have any segment at all. */
 export function genomeCoverageSql(cohortSql: string, study: string, db: string): AggregateSql {
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
     "  SELECT internal_id AS sid FROM " + db + ".sample_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) + "\n" +
     ")\n" +
     "SELECT (SELECT count() FROM samp) AS samples,\n" +
     "       (SELECT uniqExact(sample_id) FROM " + db + ".copy_number_seg\n" +
@@ -105,7 +105,7 @@ export function sampleAttributeValuesSql(cohortSql: string, study: string, db: s
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT attribute_value AS value, count() AS samples FROM " + clinicalTable(db, [attribute]) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(attribute) + "\n" +
-    "  AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "  AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) + "\n" +
     "GROUP BY value ORDER BY samples DESC LIMIT 50"
   ));
 }
@@ -133,7 +133,7 @@ function eventDaysSql(db: string, study: string, sel: EventSel, cohortRef: strin
     "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", sel.eventType) + "\n" +
     attrs.map((a) => "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE " +
       foldedEqualsSql("key", a.key) + " AND " + foldedEqualsSql("value", a.value) + ")\n").join("") +
-    "    AND p.stable_id IN (SELECT pid FROM " + cohortRef + ")";
+    "    AND " + inCohortPatients("p.stable_id", cohortRef);
 }
 
 /**
@@ -162,10 +162,10 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
       "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", anchor.eventType) + "\n" +
       (anchor.key ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE " +
         foldedEqualsSql("key", anchor.key) + " AND " + foldedEqualsSql("value", String(anchor.value ?? "")) + ")\n" : "") +
-      "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+      "    AND " + inCohortPatients("p.stable_id") + "\n" +
       "  GROUP BY pid\n" +
       "),\n"
-    : "anch AS (SELECT pid, toInt64(0) AS day FROM cohort),\n";
+    : "anch AS (SELECT DISTINCT pid, toInt64(0) AS day FROM cohort),\n";
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
@@ -174,7 +174,7 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     anchCte +
@@ -219,7 +219,7 @@ export function labTestsSql(cohortSql: string, study: string, db: string, eventT
     "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
     "JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("t.key", testKey) + "\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", eventType) + " AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", eventType) + " AND " + inCohortPatients("p.stable_id") + "\n" +
     "GROUP BY tk ORDER BY patients DESC, tk LIMIT 40"
   ));
 }
@@ -290,8 +290,9 @@ export interface RiskmodelRowsOpts {
 /**
  * One row per patient of the cohort with a survival time: months and event (from the anchor, with
  * `entry` its offset to the study's day 0, when one is given; `anchored` 0 for a patient without
- * the anchor event), the gene panels their samples were sequenced on for mutations, the genes
- * mutated in them (OncoKB drivers only with `driverPin`), their stratum and covariate values, and
+ * the anchor event), the gene panels their samples in the cohort were sequenced on for mutations, the
+ * genes mutated in those samples (OncoKB drivers only with `driverPin`), their stratum and covariate
+ * values (a sample attribute's from their first sample in the cohort), and
  * which half of the engine's fixed held-out split they are in (`half`, the split leaf's own
  * expression), in patient-id order. Values only: the patient id joins and orders the rows and is
  * never returned. Run only through PatientLevelResolver.viewRows, since a model of individual
@@ -319,7 +320,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "panels AS (\n" +
@@ -327,7 +328,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'\n" +
-    "    AND " + pidOf("sd.patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(bareSampleId("sp.sample_unique_id", study)) + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "mut AS (\n" +
@@ -336,7 +337,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     (driverPin ? driverJoin(driverPin) : "") +
     "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND " + ALTERED_COND + "\n" +
     (driverPin ? "    AND ann.is_driver = 1\n" : "") +
-    "    AND " + pidOf("g.patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortSamples(bareSampleId("g.sample_unique_id", study)) + "\n" +
     "  GROUP BY pid\n" +
     ")" +
     (attrs.length ?
@@ -345,7 +346,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
       attrs.map((a, k) => "         argMinIf(attribute_value, sample_unique_id, attribute_name = " + sq(a) + ") AS a" + k).join(",\n") + "\n" +
       "  FROM " + clinicalTable(db, attrs) + "\n" +
       "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name IN (" + attrs.map(sq).join(",") + ") AND attribute_value != ''\n" +
-      "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+      "    AND " + inCohortClinical(study) + "\n" +
       "  GROUP BY pid\n" +
       ")" : "") +
     (anchor ?
@@ -356,7 +357,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
       "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
       "  WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
       "    AND " + foldedEqualsSql("ce.event_type", anchor.eventType) + "\n" + anchorAttr +
-      "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+      "    AND " + inCohortPatients("p.stable_id") + "\n" +
       "  GROUP BY pid\n" +
       ")" : "") +
     (describe.length ?
@@ -369,7 +370,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
       }).join(",\n") + "\n" +
       "  FROM " + clinicalTable(db, describe) + "\n" +
       "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name IN (" + describe.map(sq).join(",") + ") AND trimBoth(attribute_value) != ''\n" +
-      "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+      "    AND " + inCohortClinical(study) + "\n" +
       "  GROUP BY pid\n" +
       ")" : "") + "\n" +
     "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes" +
@@ -426,7 +427,7 @@ export function cohortEventsFrom(db: string, study: string, alias: string): stri
   return "  FROM " + db + ".clinical_event " + alias + "\n" +
     "  JOIN " + db + ".patient p ON p.internal_id = " + alias + ".patient_id\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND p.stable_id IN (SELECT pid FROM cohort)\n";
+    "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + inCohortPatients("p.stable_id") + "\n";
 }
 
 /** an event of `alias` carrying `key` (folded) with a value meeting `valueCond` */
@@ -447,7 +448,7 @@ export function osCte(study: string, db: string): string {
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     ")";
 }
@@ -514,7 +515,7 @@ export function txEndpointCountsSql(cohortSql: string, study: string, db: string
       "x AS (SELECT prog.pid AS pid, min(prog.day) AS d, 0 AS nostop FROM prog INNER JOIN anch ON anch.pid = prog.pid WHERE prog.day > anch.a GROUP BY prog.pid)");
     x = "x";
   } else {
-    ctes.push(...linesCtes({ db, study, patientFilter: "p.stable_id IN (SELECT pid FROM cohort)", spec: o.lines }),
+    ctes.push(...linesCtes({ db, study, patientFilter: inCohortPatients("p.stable_id"), spec: o.lines }),
       // the anchor's line: the line of a record that is anchored and starts on day a
       "aline AS (\n" +
       "  SELECT n.pid AS pid, min(n.line_no) AS ln FROM numbered n\n" +

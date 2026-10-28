@@ -6,6 +6,7 @@ import { sq } from "./compiler.ts";
 import type { QueryColumn, RowSource } from "./table-query.ts";
 import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS } from "./lollipop.ts";
 import { clinicalTable } from "./custom-data.ts";
+import { inCohortSamples } from "./cohort2.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean }
 
@@ -80,7 +81,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS altCount, tumorRefCount AS refCount, mutationStatus AS status, proteinPosStart AS pos\n" +
     "  FROM " + db + ".mutation_derived\n" +
     "  WHERE studyId = " + sq(p.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
-    "    AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c" + i + ")\n" +
+    "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + "\n" +
     "),\n" +
     attr("CANCER_TYPE_DETAILED", "ct" + i) + ",\n" +
     attr("MUTATION_COUNT", "mc" + i) + ",\n";

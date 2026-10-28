@@ -128,7 +128,7 @@ function warnings(r: AnalysisResult): string {
   if (emptyArms.length)
     out.push(`WARNING: split arm${emptyArms.length === 1 ? "" : "s"} ${emptyArms.map((n) => `"${n}"`).join(", ")} ${emptyArms.length === 1 ? "is" : "are"} empty — arms are tested in order, so an earlier, broader arm may take every patient it matches; move it earlier (analysis_set_split) or check its condition.`);
   for (const [name, p] of Object.entries(r.splits || {}))
-    if (!p.conserved) out.push(`WARNING: split "${name}"'s children add up to ${p.sum.toLocaleString()}, not "${p.of}"'s ${p.parentCount.toLocaleString()} — do not compare them until this is explained.`);
+    if (!p.conserved) out.push(`WARNING: split "${name}"'s children add up to ${p.sum.toLocaleString()} samples, not "${p.of}"'s ${p.parentSamples.toLocaleString()} — do not compare them until this is explained.`);
   const empty = Object.entries(r.cohorts).filter(([n, c]) => c.count === 0 && !childRole.has(n)).map(([n]) => n);
   if (empty.length)
     out.push(`WARNING: ${empty.map((n) => `"${n}"`).join(", ")} match${empty.length === 1 ? "es" : ""} 0 patients — check its attributes, values and event names against study_vocabulary before drawing any conclusion.`);
@@ -366,7 +366,7 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
         await exploreSettled(get);
         return exploreState(get());
       } },
-    { name: "explore_add_filter", description: "Add a clause to the draft cohort, exactly as clicking a facet does (a second value of the same clinical attribute widens it to an OR list). The clause uses the cohort grammar in dsl_reference, e.g. {kind:'clinical', attribute:'CANCER_TYPE', op:'=', value:'Breast Cancer', per:'sample'}.",
+    { name: "explore_add_filter", description: "Add a clause to the draft cohort, exactly as clicking a facet does (a second value of the same clinical attribute widens it to an OR list). The clause uses the cohort grammar in dsl_reference, e.g. {kind:'clinical', attribute:'CANCER_TYPE', op:'=', value:'Breast Cancer'} (a clinical attribute is matched at whatever level each study records it).",
       inputSchema: { type: "object", required: ["clause"], properties: { clause: { type: "object" } } },
       run: async ({ clause }) => {
         if (!get().exploreStudies.length) throw new Error("select studies first (explore_select_studies)");

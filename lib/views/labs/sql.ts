@@ -3,6 +3,7 @@ import type { IncidenceAnchor } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
 import { foldedEqualsSql } from "../../event-names.ts";
 import { finiteSql } from "../../sql-number.ts";
+import { inCohortPatients } from "../../cohort2.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "../../sql-kinds.ts";
 
 /**
@@ -87,7 +88,7 @@ function labCtes(cohortSql: string, study: string, db: string, lab: LabSpec, anc
     "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", anchor.eventType) + "\n" +
     (anchor.key ? "    AND ce.clinical_event_id IN (SELECT clinical_event_id FROM " + db + ".clinical_event_data WHERE " +
       foldedEqualsSql("key", anchor.key) + " AND " + foldedEqualsSql("value", String(anchor.value ?? "")) + ")\n" : "") +
-    "    AND p.stable_id IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients("p.stable_id") + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "lab AS (\n" +
@@ -98,7 +99,7 @@ function labCtes(cohortSql: string, study: string, db: string, lab: LabSpec, anc
     "  JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("t.key", lab.testKey) + " AND " + foldedEqualsSql("t.value", lab.test) + "\n" +
     "  JOIN " + db + ".clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("r.key", lab.resultKey) + "\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", lab.eventType) + "\n" +
-    "    AND p.stable_id IN (SELECT pid FROM anch) AND " + finiteSql("r.value") + " IS NOT NULL\n" +
+    "    AND " + inCohortPatients("p.stable_id", "anch") + " AND " + finiteSql("r.value") + " IS NOT NULL\n" +
     "),\n" +
     "base AS (\n" +
     // the baseline is the mean of the readings on the last day with any, so several readings that day

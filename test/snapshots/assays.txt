@@ -1,41 +1,41 @@
 Analysis over msk_impact_50k_2026 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- Melanoma: 1,706 patients — CANCER_TYPE in [Melanoma] (any sample)
-- Non-small cell lung: 6,633 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)
+- Melanoma: 1,706 patients — CANCER_TYPE in [Melanoma]
+- Non-small cell lung: 6,633 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer]
 
-Generic-assay comparison, Mutational Signature Contribution Scores (COSMIC v2) (mutational_signatures_contribution_v2; numeric, per sample; Welch's t-test, BH q over 30 entities; 26 at q<0.05):
-  Signature4 (Smoking): Melanoma mean 0.0103 (n=1860) | Non-small cell lung mean 0.166 (n=8040), difference -0.156, q=<1e-300, higher in Non-small cell lung
-  Signature7 (UV): Melanoma mean 0.519 (n=1860) | Non-small cell lung mean 0.0238 (n=8040), difference 0.495, q=<1e-300, higher in Melanoma
-  Signature24 (Aflatoxin): Melanoma mean 0.00914 (n=1860) | Non-small cell lung mean 0.0697 (n=8040), difference -0.0606, q=4.3e-176, higher in Non-small cell lung
-  Signature13 (APOBEC): Melanoma mean 0.00957 (n=1860) | Non-small cell lung mean 0.0589 (n=8040), difference -0.0493, q=5.9e-164, higher in Non-small cell lung
-  Signature18 (Unknown): Melanoma mean 0.00872 (n=1860) | Non-small cell lung mean 0.0389 (n=8040), difference -0.0302, q=7.4e-64, higher in Non-small cell lung
-  Signature29 (Tobacco): Melanoma mean 0.00760 (n=1860) | Non-small cell lung mean 0.0365 (n=8040), difference -0.0289, q=9.1e-53, higher in Non-small cell lung
-  Signature2 (APOBEC): Melanoma mean 0.0157 (n=1860) | Non-small cell lung mean 0.0483 (n=8040), difference -0.0325, q=9.1e-53, higher in Non-small cell lung
-  Signature20 (MMR): Melanoma mean 0.0127 (n=1860) | Non-small cell lung mean 0.0315 (n=8040), difference -0.0187, q=3.4e-20, higher in Non-small cell lung
-  Signature16 (Unknown): Melanoma mean 0.00745 (n=1860) | Non-small cell lung mean 0.0185 (n=8040), difference -0.0111, q=2.7e-15, higher in Non-small cell lung
-  Signature8 (Unknown): Melanoma mean 0.00619 (n=1860) | Non-small cell lung mean 0.0163 (n=8040), difference -0.0101, q=2.4e-13, higher in Non-small cell lung
-  Signature3 (HRD): Melanoma mean 0.0334 (n=1860) | Non-small cell lung mean 0.0501 (n=8040), difference -0.0167, q=2.6e-8, higher in Non-small cell lung
-  Signature15 (MMR): Melanoma mean 0.00890 (n=1860) | Non-small cell lung mean 0.0175 (n=8040), difference -0.00860, q=2.7e-8, higher in Non-small cell lung
-  Signature14 (MMR): Melanoma mean 0.00338 (n=1860) | Non-small cell lung mean 0.00822 (n=8040), difference -0.00484, q=4.8e-7, higher in Non-small cell lung
-  Signature11 (TMZ): Melanoma mean 0.0250 (n=1860) | Non-small cell lung mean 0.0146 (n=8040), difference 0.0104, q=1.6e-6, higher in Melanoma
-  Signature22 (Aristolochic acid): Melanoma mean 0.0304 (n=1860) | Non-small cell lung mean 0.0174 (n=8040), difference 0.0130, q=1.6e-5, higher in Melanoma
-  Signature26 (MMR): Melanoma mean 0.00596 (n=1860) | Non-small cell lung mean 0.0115 (n=8040), difference -0.00553, q=2.0e-5, higher in Non-small cell lung
-  Signature6 (MMR): Melanoma mean 0.0158 (n=1860) | Non-small cell lung mean 0.0239 (n=8040), difference -0.00806, q=0.0003, higher in Non-small cell lung
-  Signature1 (Aging): Melanoma mean 0.0433 (n=1860) | Non-small cell lung mean 0.0560 (n=8040), difference -0.0127, q=0.0003, higher in Non-small cell lung
-  Signature19 (Unknown): Melanoma mean 0.00437 (n=1860) | Non-small cell lung mean 0.00758 (n=8040), difference -0.00321, q=0.0014, higher in Non-small cell lung
-  Signature9 (IGHV): Melanoma mean 0.00691 (n=1860) | Non-small cell lung mean 0.0106 (n=8040), difference -0.00372, q=0.0025, higher in Non-small cell lung
-  Signature10 (POLE): Melanoma mean 0.00837 (n=1860) | Non-small cell lung mean 0.0129 (n=8040), difference -0.00458, q=0.0025, higher in Non-small cell lung
-  Signature17 (Unknown): Melanoma mean 0.00671 (n=1860) | Non-small cell lung mean 0.00956 (n=8040), difference -0.00285, q=0.0269, higher in Non-small cell lung
-  Signature30 (Unknown): Melanoma mean 0.0122 (n=1860) | Non-small cell lung mean 0.0162 (n=8040), difference -0.00392, q=0.0298, higher in Non-small cell lung
-  Signature21 (MMR): Melanoma mean 0.0145 (n=1860) | Non-small cell lung mean 0.0183 (n=8040), difference -0.00382, q=0.0305, higher in Non-small cell lung
-  Signature12 (Unknown): Melanoma mean 0.0105 (n=1860) | Non-small cell lung mean 0.0140 (n=8040), difference -0.00346, q=0.0320, higher in Non-small cell lung
-  Signature5 (Unknown): Melanoma mean 0.00172 (n=1860) | Non-small cell lung mean 0.00298 (n=8040), difference -0.00126, q=0.0431, higher in Non-small cell lung
-  Signature27 (Unknown): Melanoma mean 0.00413 (n=1860) | Non-small cell lung mean 0.00572 (n=8040), difference -0.00159, q=0.0635, higher in Non-small cell lung
-  Signature25 (Unknown): Melanoma mean 0.00715 (n=1860) | Non-small cell lung mean 0.00813 (n=8040), difference -0.000981, q=0.4548, higher in Non-small cell lung
-  Signature28 (Unknown): Melanoma mean 0.0148 (n=1860) | Non-small cell lung mean 0.0132 (n=8040), difference 0.00164, q=0.4548, higher in Melanoma
-  Signature23 (Unknown): Melanoma mean 0.0218 (n=1860) | Non-small cell lung mean 0.0221 (n=8040), difference -0.000289, q=0.8979, higher in Non-small cell lung
-  CAVEAT (tell the user): Every entity of “Mutational Signature Contribution Scores (COSMIC v2)” (mutational_signatures_contribution_v2) compared across the cohorts, one value per sample as the study recorded it, from every sample of each cohort's patients. Values that are not numbers (a limit such as ">8", or NA) are left out (0 of them). Each entity is tested with Welch's t-test from each cohort's n, mean and variance; with thousands of samples a tiny difference is significant, so read the means too. 30 entities tested; q is Benjamini–Hochberg across all of them. 0 were not tested: fewer than 3 samples with a value in some cohort, or no spread. 
+Generic-assay comparison, Mutational Signature Contribution Scores (COSMIC v2) (mutational_signatures_contribution_v2; numeric, per sample; Welch's t-test, BH q over 30 entities; 27 at q<0.05):
+  Signature4 (Smoking): Melanoma mean 0.00982 (n=1819) | Non-small cell lung mean 0.169 (n=7779), difference -0.159, q=<1e-300, higher in Non-small cell lung
+  Signature7 (UV): Melanoma mean 0.528 (n=1819) | Non-small cell lung mean 0.0233 (n=7779), difference 0.504, q=<1e-300, higher in Melanoma
+  Signature24 (Aflatoxin): Melanoma mean 0.00864 (n=1819) | Non-small cell lung mean 0.0706 (n=7779), difference -0.0620, q=3.4e-183, higher in Non-small cell lung
+  Signature13 (APOBEC): Melanoma mean 0.00883 (n=1819) | Non-small cell lung mean 0.0584 (n=7779), difference -0.0496, q=6.1e-167, higher in Non-small cell lung
+  Signature18 (Unknown): Melanoma mean 0.00804 (n=1819) | Non-small cell lung mean 0.0395 (n=7779), difference -0.0315, q=5.3e-69, higher in Non-small cell lung
+  Signature29 (Tobacco): Melanoma mean 0.00664 (n=1819) | Non-small cell lung mean 0.0370 (n=7779), difference -0.0304, q=1.6e-62, higher in Non-small cell lung
+  Signature2 (APOBEC): Melanoma mean 0.0152 (n=1819) | Non-small cell lung mean 0.0485 (n=7779), difference -0.0333, q=4.0e-55, higher in Non-small cell lung
+  Signature20 (MMR): Melanoma mean 0.0123 (n=1819) | Non-small cell lung mean 0.0318 (n=7779), difference -0.0195, q=2.3e-22, higher in Non-small cell lung
+  Signature16 (Unknown): Melanoma mean 0.00752 (n=1819) | Non-small cell lung mean 0.0184 (n=7779), difference -0.0109, q=2.0e-14, higher in Non-small cell lung
+  Signature8 (Unknown): Melanoma mean 0.00617 (n=1819) | Non-small cell lung mean 0.0163 (n=7779), difference -0.0101, q=5.2e-13, higher in Non-small cell lung
+  Signature15 (MMR): Melanoma mean 0.00839 (n=1819) | Non-small cell lung mean 0.0172 (n=7779), difference -0.00878, q=5.0e-9, higher in Non-small cell lung
+  Signature3 (HRD): Melanoma mean 0.0334 (n=1819) | Non-small cell lung mean 0.0495 (n=7779), difference -0.0161, q=1.1e-7, higher in Non-small cell lung
+  Signature14 (MMR): Melanoma mean 0.00338 (n=1819) | Non-small cell lung mean 0.00815 (n=7779), difference -0.00477, q=1.2e-6, higher in Non-small cell lung
+  Signature11 (TMZ): Melanoma mean 0.0252 (n=1819) | Non-small cell lung mean 0.0147 (n=7779), difference 0.0106, q=1.6e-6, higher in Melanoma
+  Signature26 (MMR): Melanoma mean 0.00581 (n=1819) | Non-small cell lung mean 0.0115 (n=7779), difference -0.00565, q=1.7e-5, higher in Non-small cell lung
+  Signature22 (Aristolochic acid): Melanoma mean 0.0297 (n=1819) | Non-small cell lung mean 0.0174 (n=7779), difference 0.0123, q=3.3e-5, higher in Melanoma
+  Signature1 (Aging): Melanoma mean 0.0418 (n=1819) | Non-small cell lung mean 0.0545 (n=7779), difference -0.0127, q=0.0003, higher in Non-small cell lung
+  Signature6 (MMR): Melanoma mean 0.0150 (n=1819) | Non-small cell lung mean 0.0224 (n=7779), difference -0.00736, q=0.0008, higher in Non-small cell lung
+  Signature19 (Unknown): Melanoma mean 0.00425 (n=1819) | Non-small cell lung mean 0.00756 (n=7779), difference -0.00331, q=0.0010, higher in Non-small cell lung
+  Signature9 (IGHV): Melanoma mean 0.00678 (n=1819) | Non-small cell lung mean 0.0108 (n=7779), difference -0.00402, q=0.0013, higher in Non-small cell lung
+  Signature10 (POLE): Melanoma mean 0.00829 (n=1819) | Non-small cell lung mean 0.0130 (n=7779), difference -0.00467, q=0.0024, higher in Non-small cell lung
+  Signature30 (Unknown): Melanoma mean 0.0116 (n=1819) | Non-small cell lung mean 0.0160 (n=7779), difference -0.00437, q=0.0149, higher in Non-small cell lung
+  Signature17 (Unknown): Melanoma mean 0.00648 (n=1819) | Non-small cell lung mean 0.00946 (n=7779), difference -0.00298, q=0.0204, higher in Non-small cell lung
+  Signature27 (Unknown): Melanoma mean 0.00388 (n=1819) | Non-small cell lung mean 0.00566 (n=7779), difference -0.00179, q=0.0367, higher in Non-small cell lung
+  Signature5 (Unknown): Melanoma mean 0.00164 (n=1819) | Non-small cell lung mean 0.00295 (n=7779), difference -0.00131, q=0.0367, higher in Non-small cell lung
+  Signature21 (MMR): Melanoma mean 0.0145 (n=1819) | Non-small cell lung mean 0.0181 (n=7779), difference -0.00355, q=0.0455, higher in Non-small cell lung
+  Signature12 (Unknown): Melanoma mean 0.0107 (n=1819) | Non-small cell lung mean 0.0139 (n=7779), difference -0.00321, q=0.0485, higher in Non-small cell lung
+  Signature28 (Unknown): Melanoma mean 0.0146 (n=1819) | Non-small cell lung mean 0.0132 (n=7779), difference 0.00147, q=0.5264, higher in Melanoma
+  Signature25 (Unknown): Melanoma mean 0.00731 (n=1819) | Non-small cell lung mean 0.00804 (n=7779), difference -0.000728, q=0.5876, higher in Non-small cell lung
+  Signature23 (Unknown): Melanoma mean 0.0216 (n=1819) | Non-small cell lung mean 0.0216 (n=7779), difference -0.0000278, q=0.9903, higher in Non-small cell lung
+  CAVEAT (tell the user): Every entity of “Mutational Signature Contribution Scores (COSMIC v2)” (mutational_signatures_contribution_v2) compared across the cohorts, one value per sample as the study recorded it, from each cohort's own samples. Values that are not numbers (a limit such as ">8", or NA) are left out (0 of them). Each entity is tested with Welch's t-test from each cohort's n, mean and variance; with thousands of samples a tiny difference is significant, so read the means too. 30 entities tested; q is Benjamini–Hochberg across all of them. 0 were not tested: fewer than 3 samples with a value in some cohort, or no spread. 
   METHOD:
     - Sum each entity's values [Melanoma · msk_impact_50k_2026]: The assays:moments query above, on “mutational_signatures_contribution_v2”: per entity, over the cohort's samples, n, Σv and Σv² of the values that read as numbers, and how many did not. No individual value leaves the database.
     - Sum each entity's values [Non-small cell lung · msk_impact_50k_2026]: The assays:moments query above, on “mutational_signatures_contribution_v2”: per entity, over the cohort's samples, n, Σv and Σv² of the values that read as numbers, and how many did not. No individual value leaves the database.

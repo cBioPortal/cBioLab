@@ -1,27 +1,27 @@
 Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- LUAD KRAS G12C, immunotherapy: 279 patients — CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample) AND OQL[KRAS: G12C] AND has Immuno treatment AND followupMonths ≥ 6 months
-- LUAD KRAS wild-type: 3,976 patients — CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample) AND NOT OQL[KRAS]
+- LUAD KRAS G12C, immunotherapy: 279 patients — CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] AND OQL[KRAS: G12C] AND has Immuno treatment AND followupMonths ≥ 6 months
+- LUAD KRAS wild-type: 3,984 patients — CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] AND NOT OQL[KRAS]
 
 Cohort attrition (patients left after each clause, in order):
   LUAD KRAS G12C, immunotherapy: study base 24,950
-    → CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample): 5,957 (−18,993)
+    → CANCER_TYPE_DETAILED in [Lung Adenocarcinoma]: 5,957 (−18,993)
     → OQL[KRAS: G12C]: 793 (−5,164)
     → has Immuno treatment: 357 (−436)
     → followupMonths ≥ 6 months: 279 (−78)
   LUAD KRAS wild-type: study base 24,950
-    → CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample): 5,957 (−18,993)
-    → NOT OQL[KRAS]: 3,976 (−1,981)
+    → CANCER_TYPE_DETAILED in [Lung Adenocarcinoma]: 5,957 (−18,993)
+    → NOT OQL[KRAS]: 3,984 (−1,973)
   CAVEAT (tell the user): Each step counts the patients left after ANDing that clause onto every clause above it, in the order the cohort lists them. The order changes the path, never the final count: reorder the clauses to see a different attrition sequence. Each view further drops patients who lack its own data (survival without follow-up, genes never profiled), and says how many in its own caption.
   METHOD:
     - Count the cohort clause by clause [LUAD KRAS G12C, immunotherapy]: One attrition query per step above, per study: the patients left after ANDing that clause onto every clause before it, in the order the cohort lists them, summed across msk_chord_2024. Nothing is computed from these counts beyond the differences between steps.
         every patient: 24,950
-        CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample): 5,957 (−18,993)
+        CANCER_TYPE_DETAILED in [Lung Adenocarcinoma]: 5,957 (−18,993)
         OQL[KRAS: G12C]: 793 (−5,164)
         has Immuno treatment: 357 (−436)
         followupMonths ≥ 6 months: 279 (−78)
     - Count the cohort clause by clause [LUAD KRAS wild-type]: One attrition query per step above, per study: the patients left after ANDing that clause onto every clause before it, in the order the cohort lists them, summed across msk_chord_2024. Nothing is computed from these counts beyond the differences between steps.
         every patient: 24,950
-        CANCER_TYPE_DETAILED in [Lung Adenocarcinoma] (any sample): 5,957 (−18,993)
-        NOT OQL[KRAS]: 3,976 (−1,981)
+        CANCER_TYPE_DETAILED in [Lung Adenocarcinoma]: 5,957 (−18,993)
+        NOT OQL[KRAS]: 3,984 (−1,973)

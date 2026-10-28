@@ -9,10 +9,12 @@ import type { RiskFit, RiskFitArgs } from "./riskmodel/run.ts";
 /** one view of a document, as authored */
 export type DocView = NonNullable<AnalysisDoc["views"]>[number];
 
+/** A cohort as runAnalysis evaluated it: `count` in patients (the owners of its samples), `samples` in samples. */
 export interface EvaluatedCohort {
   studies: string[];
-  perStudy: Record<string, { sql: string; count: number; mode: string }>;
+  perStudy: Record<string, { sql: string; count: number; samples: number; mode: string }>;
   count: number;
+  samples: number;
   text: string;
 }
 

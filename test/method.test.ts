@@ -366,7 +366,7 @@ describe("coexpressionMethod", () => {
 
 describe("diffexprMethod", () => {
   const base = { profileType: "mrna_z", log2: false, groups: ["A", "B"] as [string, string], minN: 3, tested: 2, skipped: 1,
-    perSite: [{ cohort: "A", study: "s1", cohortPatients: 10 }, { cohort: "B", study: "s1", cohortPatients: 12 }],
+    perSite: [{ cohort: "A", study: "s1", cohortSamples: 10 }, { cohort: "B", study: "s1", cohortSamples: 12 }],
     moments: [{ cohort: "A", gene: "ESR1", n: 10, sx: 5, sxx: 9 }, { cohort: "B", gene: "ESR1", n: 12, sx: 20, sxx: 40 }],
     results: { genes: [{ gene: "ESR1", p: 0.01, q: 0.01 }], sets: [] } };
   test("Welch per gene with the same no-variance rule and a clamped variance, then BH", () => {

@@ -18,9 +18,9 @@ export function pathwaysMethod(t: PathwaysTrace): MethodRecord {
   const two = t.cohorts.length === 2;
   const what = t.measure === "driver" ? driverMeaning(t.oncokbPin).replace(/^driver: /, "") : ALTERED_MEANING.replace(/^altered: /, "");
   const steps: MethodStep[] = t.perSite.map((s) => ({
-    kind: "fetch" as const, title: "Count patients altered per pathway and per gene",
-    detail: "The geneCounts and pathways:sets queries above. Per pathway: patients profiled for at least one member gene (the denominator) and of those, patients with " + what +
-      " in at least one member. Per member gene: the same over the patients profiled for that gene. Counts only.",
+    kind: "fetch" as const, title: "Count samples altered per pathway and per gene",
+    detail: "The geneCounts and pathways:sets queries above, over the cohort's samples. Per pathway: samples profiled for at least one member gene (the denominator) and of those, samples with " + what +
+      " in at least one member. Per member gene: the same over the samples profiled for that gene. Counts only.",
     scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
     params: [["pathways / sets", t.sets.map((x) => x.name + " (" + x.genes.length + ")").join(", ")]],
   }));
@@ -36,9 +36,9 @@ export function pathwaysMethod(t: PathwaysTrace): MethodRecord {
     ...(two ? ["from scipy.stats import fisher_exact", "from statsmodels.stats.multitest import multipletests"] : []),
     "",
     RESULT_INIT,
-    ...pyTable("sets", "Per cohort and pathway: patients profiled for at least one member gene, and altered in at least one", ["cohort", "set", "profiled", "altered"],
+    ...pyTable("sets", "Per cohort and pathway: samples profiled for at least one member gene, and altered in at least one", ["cohort", "set", "profiled", "altered"],
       t.setCounts.map((r) => [r.cohort, r.set, r.profiled, r.altered]), "pathway_counts.csv"),
-    ...pyTable("genes", "Per cohort and member gene: patients profiled for it, and altered in it", ["cohort", "gene", "profiled", "altered"],
+    ...pyTable("genes", "Per cohort and member gene: samples profiled for it, and altered in it", ["cohort", "gene", "profiled", "altered"],
       t.geneCounts.map((r) => [r.cohort, r.gene, r.profiled, r.altered]), "gene_counts.csv"),
     "cohorts = " + JSON.stringify(t.cohorts),
     "for name, table in ((\"pathway\", sets.groupby([\"set\", \"cohort\"]).sum()), (\"gene\", genes.groupby([\"gene\", \"cohort\"]).sum())):",

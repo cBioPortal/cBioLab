@@ -1,23 +1,23 @@
 -- cohort all patients
 -- nsclc_ctdx_msk_2022
-SELECT DISTINCT replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') AS pid FROM snapshot_db.sample_derived
+SELECT replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') AS pid, replaceOne(sample_unique_id, 'nsclc_ctdx_msk_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'nsclc_ctdx_msk_2022'
 
 -- view 0 ctdna: ctdna:funnel:all patients · nsclc_ctdx_msk_2022
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') AS pid, replaceOne(sample_unique_id, 'nsclc_ctdx_msk_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'nsclc_ctdx_msk_2022'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
-    AND replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 classed AS (
   SELECT sd.sample_unique_id AS suid, sd.patient_stable_id AS pid, sd.sample_stable_id AS sample,
          multiIf(cls.v IN (lowerUTF8(trimBoth('cfDNA')),lowerUTF8(trimBoth('ctDNA'))), 'b', cls.v IN (lowerUTF8(trimBoth('Tumor'))), 'a', '') AS side
   FROM snapshot_db.sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id
-  WHERE sd.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND sd.patient_stable_id IN (SELECT pid FROM cohort)
+  WHERE sd.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND replaceOne(sd.sample_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT sid FROM cohort)
 ),
 sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),
@@ -36,20 +36,20 @@ SELECT (SELECT uniqExactIf(pid, side = 'b') FROM classed) AS plasma_all, (SELECT
 FROM system.one
 
 -- view 0 ctdna: ctdna:genes:all patients · nsclc_ctdx_msk_2022
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') AS pid, replaceOne(sample_unique_id, 'nsclc_ctdx_msk_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'nsclc_ctdx_msk_2022'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
-    AND replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 classed AS (
   SELECT sd.sample_unique_id AS suid, sd.patient_stable_id AS pid, sd.sample_stable_id AS sample,
          multiIf(cls.v IN (lowerUTF8(trimBoth('cfDNA')),lowerUTF8(trimBoth('ctDNA'))), 'b', cls.v IN (lowerUTF8(trimBoth('Tumor'))), 'a', '') AS side
   FROM snapshot_db.sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id
-  WHERE sd.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND sd.patient_stable_id IN (SELECT pid FROM cohort)
+  WHERE sd.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND replaceOne(sd.sample_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT sid FROM cohort)
 ),
 sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),
@@ -80,20 +80,20 @@ SELECT gene, count() AS pairs, countIf(aa AND ab) AS both, countIf(aa AND NOT ab
 FROM per WHERE pa AND pb GROUP BY gene
 
 -- view 0 ctdna: ctdna:survival:all patients · nsclc_ctdx_msk_2022
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') AS pid, replaceOne(sample_unique_id, 'nsclc_ctdx_msk_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'nsclc_ctdx_msk_2022'),
 cls AS (
   SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS v
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND type = 'sample' AND attribute_name = 'SAMPLE_CLASS'
-    AND replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT sid FROM cohort)
   GROUP BY suid
 ),
 classed AS (
   SELECT sd.sample_unique_id AS suid, sd.patient_stable_id AS pid, sd.sample_stable_id AS sample,
          multiIf(cls.v IN (lowerUTF8(trimBoth('cfDNA')),lowerUTF8(trimBoth('ctDNA'))), 'b', cls.v IN (lowerUTF8(trimBoth('Tumor'))), 'a', '') AS side
   FROM snapshot_db.sample_derived sd LEFT JOIN cls ON cls.suid = sd.sample_unique_id
-  WHERE sd.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND sd.patient_stable_id IN (SELECT pid FROM cohort)
+  WHERE sd.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND replaceOne(sd.sample_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT sid FROM cohort)
 ),
 sides AS (SELECT suid, pid, side FROM classed WHERE side != ''),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),

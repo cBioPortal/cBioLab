@@ -3,7 +3,8 @@
   "cohorts": {
     "all patients": {
       "count": 172,
-      "text": "all patients in the study",
+      "samples": 318,
+      "text": "all samples in the study",
       "studies": [
         "lung_msk_pdx"
       ]
@@ -183,7 +184,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Patients with a sample dated on or before their first Treatment [SUBTYPE=Systemic therapy] and another at least 30 days after it; each side is one sample — the last before and the first after — dated by its first Sample acquisition/Sequencing/Specimen timeline event (attribute SAMPLE_ID). Funnel: all patients — 142 started, 67 with a sample before, 107 with one after, 33 patients with both (median 27 days before and 279 after; samples a median 301 days apart, IQR 154–514). Per gene, counting only patients whose before- AND after-sample panels both cover it: an OncoKB oncogenic alteration (v7.5) after but not before (acquired), before but not after (lost), on both (shared). The exact McNemar test asks whether acquired and lost differ; q is Benjamini–Hochberg across the genes tested in each cohort — every gene altered after treatment in at least 3 patients (all patients: 30 genes), the 12 smallest p drawn. These are few patients, and a second biopsy is clinically indicated — typically taken at progression — so they are a selected group, and \"acquired\" means seen after and not before, not caused by the treatment: a subclone the first biopsy missed, a different lesion, or a lower-purity sample under-calling one side reads the same. Which treatment ran between the samples beyond the anchor is not considered."
+      "caveat": "Patients with a sample in the cohort dated on or before their first Treatment [SUBTYPE=Systemic therapy] and another at least 30 days after it; each side is one sample — the last before and the first after — dated by its first Sample acquisition/Sequencing/Specimen timeline event (attribute SAMPLE_ID). Funnel: all patients — 142 started, 67 with a sample before, 107 with one after, 33 patients with both (median 27 days before and 279 after; samples a median 301 days apart, IQR 154–514). Per gene, counting only patients whose before- AND after-sample panels both cover it: an OncoKB oncogenic alteration (v7.5) after but not before (acquired), before but not after (lost), on both (shared). The exact McNemar test asks whether acquired and lost differ; q is Benjamini–Hochberg across the genes tested in each cohort — every gene altered after treatment in at least 3 patients (all patients: 30 genes), the 12 smallest p drawn. These are few patients, and a second biopsy is clinically indicated — typically taken at progression — so they are a selected group, and \"acquired\" means seen after and not before, not caused by the treatment: a subclone the first biopsy missed, a different lesion, or a lower-purity sample under-calling one side reads the same. Which treatment ran between the samples beyond the anchor is not considered."
     }
   ]
 }

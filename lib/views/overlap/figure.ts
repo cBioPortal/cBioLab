@@ -136,7 +136,8 @@ export function upsetColumns(n: number, room: number): { shown: number; pooled: 
 
 function upsetSvg(v: DrawnResultOf<"overlap">, o: SvgOpts): string {
   const p = palette(o.theme), r = v.overlap;
-  const sets = r.sets, inter = r.intersections;
+  // the UpSet plot counts patients; a combination only samples share has no column
+  const sets = r.sets, inter = r.intersections.filter((x) => x.n > 0);
   const W = Math.max(480, o.width || 860);
 
   // left block: names | sizes | size bars; then the matrix takes what is left

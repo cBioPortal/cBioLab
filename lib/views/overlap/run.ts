@@ -1,4 +1,4 @@
-// Overlap view: how the cohorts' patients intersect
+// Overlap view: how the cohorts' samples, and their patients, intersect
 import type { ViewResult } from "../../types.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, answering, plural, refuse } from "../shared.ts";
@@ -14,7 +14,7 @@ export async function runOverlap(_view: OverlapView, ctx: ViewRun): Promise<View
   { const e = overLimit("an overlap view", OVERLAP_COHORT_LIMIT, vNames.length); if (e) return refuse("overlap", ctx, e.replace("at most " + OVERLAP_COHORT_LIMIT, "at most " + OVERLAP_COHORT_LIMIT + " cohorts")); }
   const { ok, excluded } = answering(ctx);
   if (!Object.keys(ok).length) return refuse("overlap", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
-  // per study, only the cohorts that reach it can hold its patients; their bits are mapped back
+  // per study, only the cohorts that reach it can hold its samples; their bits are mapped back
   const byMask = new Map<number, number>(), samplesByMask = new Map<number, number>();
   const perSite: { study: string; cohorts: string[]; patients: number }[] = [];
   const sites = Object.keys(ok).map((st) => ({ st, here: vNames.filter((n) => cohorts[n].studies.includes(st)) })).filter((x) => x.here.length);
@@ -44,11 +44,11 @@ export async function runOverlap(_view: OverlapView, ctx: ViewRun): Promise<View
   return {
     kind: "overlap", cohorts: vNames,
     overlap: { sets, intersections, union, ...(excluded.length ? { excluded } : {}) },
-    method: overlapMethod({ cohorts: vNames, perSite, union, intersections: intersections.length }),
+    method: overlapMethod({ cohorts: vNames, perSite, union, intersections: intersections.filter((x) => x.n > 0).length }),
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
     caveat: "Patients in exactly the marked cohorts and none of the others, for every combination that has any — computed inside each study's database, which returns one count per combination. " +
-      (vNames.length <= 3 ? "A cohort is a set of patients, so each patient's samples go wherever the patient does: the samples diagram counts the same patterns in samples. " : "") +
+      (vNames.length <= 3 ? "A cohort is a set of samples: the samples diagram places each sample by the cohorts that hold it, the patients diagram each patient by the cohorts that hold any of its samples, so a patient can be shared by cohorts that share none of its samples. " : "") +
       plural(union, "patient") + " are in at least one of the " + vNames.length + " cohorts. " +
       (multi ? "A patient in two studies is two patients here: ids are study-qualified, so overlap is only ever found within a study. " : "") +
       (mismatch.length ? "WARNING: " + mismatch.map((s) => s.name).join(", ") + " counted differently here than as a cohort — the definition was evaluated twice and gave two answers. " : "") +

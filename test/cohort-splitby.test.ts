@@ -54,10 +54,10 @@ describe("resolveSplitBy", () => {
     const other = r.arms.find((a) => a.name.endsWith("Other"))!;
     assert.deepEqual(other.def.all, [
       { kind: "oql", q: "TP53: MUT" },
-      { kind: "clinical", attribute: "SUBTYPE", per: "patient", op: "!=", value: "" },
+      { kind: "clinical", attribute: "SUBTYPE", op: "!=", value: "" },
       { not: { any: [
-        { kind: "clinical", attribute: "SUBTYPE", per: "patient", op: "=", value: "A" },
-        { kind: "clinical", attribute: "SUBTYPE", per: "patient", op: "=", value: "B" },
+        { kind: "clinical", attribute: "SUBTYPE", op: "=", value: "A" },
+        { kind: "clinical", attribute: "SUBTYPE", op: "=", value: "B" },
       ] } },
     ]);
   });
@@ -67,16 +67,14 @@ describe("resolveSplitBy", () => {
     const r = await resolveSplitBy(sb(), [], BASE, async () => dist);
     assert.deepEqual(r.arms[0].def.all, [
       { kind: "oql", q: "TP53: MUT" },
-      { kind: "clinical", attribute: "SUBTYPE", per: "patient", op: "=", value: "A" },
+      { kind: "clinical", attribute: "SUBTYPE", op: "=", value: "A" },
     ]);
   });
 
-  test("a sample-level attribute's arms carry per:\"sample\", read from the distribution itself", async () => {
-    const dist = cat([{ v: "A", n: 50 }, { v: "B", n: 50 }], "sample");
-    const r = await resolveSplitBy(sb(), [], BASE, async () => dist);
-    assert.equal((r.arms[0].def.all![1] as any).per, "sample");
+  test("a sample-level attribute's arms carry no level: each study matches the attribute at its own", async () => {
+    const r = await resolveSplitBy(sb(), [], BASE, async () => cat([{ v: "A", n: 50 }, { v: "B", n: 40 }], "sample"));
+    assert.equal("per" in (r.arms[0].def.all![1] as object), false);
   });
-
   test("a numeric attribute is refused — split needs a categorical, not a threshold", async () => {
     await assert.rejects(
       () => resolveSplitBy(sb(), [], BASE, async () => ({ kind: "num", per: "patient" })),
@@ -162,9 +160,9 @@ describe("resolveSplitBy", () => {
     assert.deepEqual(r.overlapCheckDef!.all, [
       { kind: "oql", q: "TP53: MUT" },
       { any: [
-        { kind: "clinical", attribute: "SUBTYPE", per: "patient", op: "=", value: "A" },
-        { kind: "clinical", attribute: "SUBTYPE", per: "patient", op: "=", value: "B" },
-        { kind: "clinical", attribute: "SUBTYPE", per: "patient", op: "=", value: "C" },
+        { kind: "clinical", attribute: "SUBTYPE", op: "=", value: "A" },
+        { kind: "clinical", attribute: "SUBTYPE", op: "=", value: "B" },
+        { kind: "clinical", attribute: "SUBTYPE", op: "=", value: "C" },
       ] },
     ]);
   });

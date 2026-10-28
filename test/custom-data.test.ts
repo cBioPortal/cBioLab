@@ -141,12 +141,13 @@ describe("custom data: a document that names an upload it was not sent with", ()
 
 describe("custom data: the upload clause", () => {
   const upload = { kind: "upload" as const, dataset: "custom:brain-mets" };
-  test("selects the patients with a row of any of the upload's columns", () => withCustomData(ctx(), async () => {
+  test("selects the samples with a row of any of the upload's columns, or every sample of a patient with one", () => withCustomData(ctx(), async () => {
     const sql = compileCohortDef({ all: [upload] }, { study: "s1", db: "db1" });
     assert.match(sql, /_custom_clinical_[0-9a-f]{8}/);
     assert.match(sql, /attribute_name IN \('custom:brain-mets\/MET_SITE','custom:brain-mets\/KPS'\)/);
-    // patient and sample rows alike
-    assert.doesNotMatch(sql, /type = /);
+    // patient and sample rows alike, each at its own level
+    assert.match(sql, /SELECT DISTINCT type AS lvl, if\(type = 'sample'/);
+    assert.doesNotMatch(sql, /AND type = /);
   }));
   test("names the upload as the document's other mentions of it do", async () => {
     const { assertCustomDataPresent } = await import("../lib/custom-data.ts");

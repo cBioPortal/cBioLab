@@ -1,35 +1,42 @@
 -- cohort TP53 mut
 -- msk_chord_2024
-((SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid
-  FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol = 'TP53'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))
-
--- cohort TP53 wt
--- msk_chord_2024
-((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024')
-EXCEPT DISTINCT
-((SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid
-  FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol = 'TP53'
-    AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2))))
-INTERSECT DISTINCT
-(SELECT DISTINCT replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') AS pid
-  FROM snapshot_db.sample_to_gene_panel_derived sp
-  JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
-  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND (sp.gene_panel_id = 'WES' OR sp.gene_panel_id IN (
-      SELECT gene_panel_id FROM snapshot_db.gene_panel_to_gene_derived WHERE gene = 'TP53')))
-
--- view 0 sequence: sequenceKeys · msk_chord_2024
-WITH cohort AS (((SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol = 'TP53'
     AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))
+
+-- cohort TP53 wt
+-- msk_chord_2024
+((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024')
+EXCEPT DISTINCT
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
+  FROM snapshot_db.genomic_event_derived g
+  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+    AND g.hugo_gene_symbol = 'TP53'
+    AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
+INTERSECT DISTINCT
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT DISTINCT replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') AS sid
+  FROM snapshot_db.sample_to_gene_panel_derived sp
+  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
+    AND (sp.gene_panel_id = 'WES' OR sp.gene_panel_id IN (
+      SELECT gene_panel_id FROM snapshot_db.gene_panel_to_gene_derived WHERE gene = 'TP53'))))
+
+-- view 0 sequence: sequenceKeys · msk_chord_2024
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
+  FROM snapshot_db.genomic_event_derived g
+  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+    AND g.hugo_gene_symbol = 'TP53'
+    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))
 SELECT lowerUTF8(trimBoth(d.key)) AS k, arraySort((x) -> (-x.2, x.1), arrayMap((v) -> (v, countEqual(groupArray(trimBoth(d.key)), v)), groupUniqArray(trimBoth(d.key))))[1].1 AS label,
        uniqExact(p.stable_id) AS pts, uniqExact(lowerUTF8(trimBoth(d.value))) AS values
 FROM snapshot_db.clinical_event ce
@@ -42,11 +49,24 @@ WHERE cs.cancer_study_identifier = 'msk_chord_2024'
 GROUP BY k ORDER BY pts DESC, k LIMIT 25
 
 -- view 0 sequence: treatmentSequence:SUBTYPE/gap90 · msk_chord_2024
-WITH cohort AS (((SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH cohort AS (((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024')
+EXCEPT DISTINCT
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol = 'TP53'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))),
+    AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
+INTERSECT DISTINCT
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT DISTINCT replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') AS sid
+  FROM snapshot_db.sample_to_gene_panel_derived sp
+  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
+    AND (sp.gene_panel_id = 'WES' OR sp.gene_panel_id IN (
+      SELECT gene_panel_id FROM snapshot_db.gene_panel_to_gene_derived WHERE gene = 'TP53'))))),
 txAll AS (
   SELECT ce.clinical_event_id AS eid, ce.patient_id AS patient_id, p.stable_id AS pid,
          ce.start_date AS s, coalesce(ce.stop_date, ce.start_date) AS e,
@@ -147,21 +167,13 @@ FROM txAll WHERE eid NOT IN (SELECT eid FROM txLabelled)
 GROUP BY cls, b
 
 -- view 0 sequence: treatmentSequence:SUBTYPE/gap90 · msk_chord_2024
-WITH cohort AS (((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024')
-EXCEPT DISTINCT
-((SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol = 'TP53'
-    AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2))))
-INTERSECT DISTINCT
-(SELECT DISTINCT replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') AS pid
-  FROM snapshot_db.sample_to_gene_panel_derived sp
-  JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
-  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND (sp.gene_panel_id = 'WES' OR sp.gene_panel_id IN (
-      SELECT gene_panel_id FROM snapshot_db.gene_panel_to_gene_derived WHERE gene = 'TP53')))),
+    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))),
 txAll AS (
   SELECT ce.clinical_event_id AS eid, ce.patient_id AS patient_id, p.stable_id AS pid,
          ce.start_date AS s, coalesce(ce.stop_date, ce.start_date) AS e,

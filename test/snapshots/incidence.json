@@ -3,21 +3,24 @@
   "cohorts": {
     "NSCLC": {
       "count": 7809,
-      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)",
+      "samples": 7809,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer]",
       "studies": [
         "msk_chord_2024"
       ]
     },
     "Breast": {
       "count": 5368,
-      "text": "CANCER_TYPE in [Breast Cancer] (any sample)",
+      "samples": 5368,
+      "text": "CANCER_TYPE in [Breast Cancer]",
       "studies": [
         "msk_chord_2024"
       ]
     },
     "Colorectal": {
       "count": 5543,
-      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample)",
+      "samples": 5543,
+      "text": "CANCER_TYPE in [Colorectal Cancer]",
       "studies": [
         "msk_chord_2024"
       ]

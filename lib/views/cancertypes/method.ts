@@ -15,7 +15,7 @@ export function cancertypesMethod(t: CancertypesTrace): MethodRecord {
     detail: "The cancertypes queries above. Per group, for the genes together and for each gene: the " + t.unit + "s profiled for it, and of those the " + t.unit + "s with " +
       (t.measure === "driver" ? "an OncoKB driver (" + t.oncokbPin + ")" : "any mutation, amplification, deep deletion or structural variant") +
       ", split by kind (one kind only, or more than one); and the whole cohort's, each " + t.unit + " once." +
-      (t.unit === "patient" ? " A patient counts in each group one of their samples is in, profiled if any of those samples is, altered if any is." : "") +
+      (t.unit === "patient" ? " A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is." : "") +
       " Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.",
     scope: s.cohort + " · " + s.study, rowsOut: s.groups,
     params: [["genes", t.genes.join(", ")], ["profiled " + t.unit + "s", s.profiled.toLocaleString("en-US")]],

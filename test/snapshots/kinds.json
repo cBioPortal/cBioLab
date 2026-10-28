@@ -2828,7 +2828,7 @@
       "figureTitle": "Oncogenic signalling pathways — A vs B",
       "headTitle": "Oncogenic signalling pathways",
       "help": {
-        "text": "Groups genes into ten well-known signalling pathways — chains of genes that together tell a cell when to grow, divide or die — and shows what share of each group of patients has a harmful change in at least one gene of each pathway. Two cancers can reach the same broken pathway through different genes, and this view makes that visible.",
+        "text": "Groups genes into ten well-known signalling pathways — chains of genes that together tell a cell when to grow, divide or die — and shows what share of each group's tumour samples has a harmful change in at least one gene of each pathway. Two cancers can reach the same broken pathway through different genes, and this view makes that visible.",
         "title": "What is this?"
       },
       "isNew": false,

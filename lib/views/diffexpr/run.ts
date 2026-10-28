@@ -80,7 +80,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
     tested.push({ gene: g, nA: a.n, nB: b.n, meanA: ma, meanB: mb, effect: ma - mb, t, p: w.p, q: 1 });
   }
   if (!tested.length)
-    return refuse("diffexpr", ctx, "no gene had at least " + DE_MIN_N + " patients with a " + profileType + " value in both cohorts" +
+    return refuse("diffexpr", ctx, "no gene had at least " + DE_MIN_N + " samples with a " + profileType + " value in both cohorts" +
       " (cohort sizes " + vNames.map((n) => n + " " + cohorts[n].count).join(", ") + ")");
   benjaminiHochberg(tested.map((g) => g.p)).forEach((q, i) => { tested[i].q = q; });
   const sig = tested.filter((g) => g.q < 0.05);
@@ -138,7 +138,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
     method: diffexprMethod({
       profileType, log2, groups: [A, B], minN: DE_MIN_N, tested: tested.length, skipped,
       perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
-        .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
+        .map((st) => ({ cohort: n, study: st, cohortSamples: cohorts[n].perStudy[st]?.samples || 0 }))),
       moments: [...moments].map(([k, m]) => ({ cohort: k.slice(0, k.indexOf("|")), gene: k.slice(k.indexOf("|") + 1), n: m.n, sx: m.sx, sxx: m.sxx }))
         .sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.gene < y.gene ? -1 : x.gene > y.gene ? 1 : 0)),
       ...(gsea && gseaSets ? { gsea: { sets: gseaSets, tested: gsea.sets.length, skipped: gsea.skipped, permutations: DE_PERMUTATIONS, minSize: 10 } } : {}),
@@ -151,12 +151,12 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
     caveat: "Welch's t-test per gene on " + profileType + (log2 ? " as log2(v + 1)" : " as stored") + ", " + A + " minus " + B +
-      ", each patient contributing the mean of their samples; computed from three running totals per gene and cohort, so it is exact across sites. " +
-      tested.length.toLocaleString("en-US") + " genes tested" + (skipped ? ", " + skipped.toLocaleString("en-US") + " left out (fewer than " + DE_MIN_N + " patients with a value in a cohort, or no variance)" : "") +
+      ", each sample in the cohort one observation, as the portal's group comparison tests expression; computed from three running totals per gene and cohort, so it is exact across sites. " +
+      tested.length.toLocaleString("en-US") + " genes tested" + (skipped ? ", " + skipped.toLocaleString("en-US") + " left out (fewer than " + DE_MIN_N + " samples with a value in a cohort, or no variance)" : "") +
       "; q is Benjamini–Hochberg across every gene tested. " +
       (sig.length > points.filter((g) => g.q < 0.05).length ? "The " + DE_POINT_CAP + " most significant genes are drawn as points, the rest as density. " : "") +
       (/zscore/i.test(profileType) ? "Z-scores are standardised within each study, so a difference is in study-specific units. " : "") +
-      "A t-test on thousands of patients finds tiny differences significant — read the effect, not only the q. " +
+      "A t-test on thousands of samples finds tiny differences significant — read the effect, not only the q. " +
       (gsea ? "Enrichment is preranked GSEA on the unrounded t (Subramanian et al. 2005, weight 1), significance from " + DE_PERMUTATIONS +
         " random sets of the same size drawn from the same ranking, seeded by the set's name so a shared link reproduces it; p = (b+1)/(m+1) over the same-sign nulls, q is Benjamini–Hochberg across the sets tested (not GSEA's own NES-based FDR). " +
         "Gene-set permutation ignores gene–gene correlation, so it is anti-conservative next to phenotype permutation, which needs patient-level values. " : "") +

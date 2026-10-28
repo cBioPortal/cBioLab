@@ -3,6 +3,7 @@
   "cohorts": {
     "liver mets": {
       "count": 227,
+      "samples": 227,
       "text": "OQL[APC: MUT] AND METASTASIS_LIVER in [Yes]",
       "studies": [
         "crc_apc_impact_2020"
@@ -10,6 +11,7 @@
     },
     "no liver mets": {
       "count": 98,
+      "samples": 98,
       "text": "OQL[APC: MUT] AND METASTASIS_LIVER in [No]",
       "studies": [
         "crc_apc_impact_2020"

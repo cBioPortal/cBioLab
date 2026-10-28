@@ -1,17 +1,17 @@
 -- cohort all patients
 -- msk_impact_50k_2026
-SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid FROM snapshot_db.sample_derived
+SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
 
 -- view 0 paired: paired:genes:all patients · msk_impact_50k_2026
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'),
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Primary'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Metastasis'))), 'b', '') AS side
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name = 'SAMPLE_TYPE'
-    AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),
 ps AS (SELECT suid, pid, side FROM sides WHERE side != '' AND pid IN (SELECT pid FROM paired)),
@@ -47,14 +47,14 @@ SELECT gene, count() AS pairs, countIf(aa AND ab) AS both, countIf(aa AND NOT ab
 FROM per WHERE pa AND pb GROUP BY gene
 
 -- view 0 paired: paired:patients:all patients · msk_impact_50k_2026
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'),
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Primary'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Metastasis'))), 'b', '') AS side
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name = 'SAMPLE_TYPE'
-    AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 paired AS (SELECT pid FROM sides GROUP BY pid HAVING countIf(side = 'a') > 0 AND countIf(side = 'b') > 0),
 ps AS (SELECT suid, pid, side FROM sides WHERE side != '' AND pid IN (SELECT pid FROM paired))

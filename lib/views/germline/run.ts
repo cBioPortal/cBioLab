@@ -123,7 +123,7 @@ export async function runGermline(view: GermlineView, ctx: ViewRun): Promise<Vie
       ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
-    caveat: "Carriers are patients with a mutation the study marks GERMLINE (mutation status, case-insensitive) in the gene, counted per patient over all their samples and only among the patients sequenced for the gene (a tumour mutation panel listing it, or whole-exome); " +
+    caveat: "Carriers are patients with a mutation the study marks GERMLINE (mutation status, case-insensitive) in the gene, counted per patient over their samples in the cohort and only among the patients sequenced for the gene (a tumour mutation panel listing it, or whole-exome); " +
       (outside ? plural(outside, "carrier") + " whose tumour panel does not list the gene are left out and counted. " : "none fell outside a panel. ") +
       "A study reports germline variants only for the patients it analysed and consented for it, and the warehouse cannot tell a patient tested and negative from one never tested, so the carrier share is of patients sequenced, not of patients germline-tested: a lower bound where germline testing was partial. " +
       "A somatic second hit in a carrier is another mutation in the same gene that is not germline (any called status but GERMLINE; uncalled and off-panel calls excluded) or a deep deletion (copy number −2, among patients profiled for copy number). " +

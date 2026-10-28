@@ -3,7 +3,8 @@
   "cohorts": {
     "all patients": {
       "count": 1127,
-      "text": "all patients in the study",
+      "samples": 2621,
+      "text": "all samples in the study",
       "studies": [
         "nsclc_ctdx_msk_2022"
       ]
@@ -431,7 +432,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Plasma is SAMPLE_CLASS = cfDNA/ctDNA, tissue SAMPLE_CLASS = Tumor. all patients: 1,119 patients with plasma, 690 patients with tissue, 682 patients with both (1,158 plasma and 945 tissue samples); ctDNA detected in 759 of the plasma patients (67.8%). Plasma and tissue are paired by patient whenever they were drawn, not by date — the tumour may have changed between them. Per gene, counting only patients whose plasma AND tissue panels both cover it, any alteration (mutation, amplification or deep deletion, structural variant) in both, tissue only, plasma only, or neither; a patient with several samples of a kind is altered there if any is. Positive percent agreement is both ÷ altered in tissue (tissue the reference), with a 95% Wilson interval; overall concordance is (both + neither) ÷ pairs. Plasma-only calls include clonal haematopoiesis (TP53, DNMT3A, TET2, PPM1D…) when the assay does not subtract white-cell DNA, and tissue-only calls a tumour shedding too little DNA — both are biology of the assay, not error. ctDNA detected means any alteration (mutation, amplification or deep deletion, structural variant) called in some plasma sample, over every gene the plasma panel covers. Survival is OS_MONTHS / OS_STATUS as each study records them, from its own origin, which need not be the plasma draw; when the draw comes after that origin the comparison carries immortal-time bias. "
+      "caveat": "Plasma is SAMPLE_CLASS = cfDNA/ctDNA, tissue SAMPLE_CLASS = Tumor; only the cohort's own samples are classed, so a cohort that selects one kind of sample has none of the other to pair. all patients: 1,119 patients with plasma, 690 patients with tissue, 682 patients with both (1,158 plasma and 945 tissue samples); ctDNA detected in 759 of the plasma patients (67.8%). Plasma and tissue are paired by patient whenever they were drawn, not by date — the tumour may have changed between them. Per gene, counting only patients whose plasma AND tissue panels both cover it, any alteration (mutation, amplification or deep deletion, structural variant) in both, tissue only, plasma only, or neither; a patient with several samples of a kind is altered there if any is. Positive percent agreement is both ÷ altered in tissue (tissue the reference), with a 95% Wilson interval; overall concordance is (both + neither) ÷ pairs. Plasma-only calls include clonal haematopoiesis (TP53, DNMT3A, TET2, PPM1D…) when the assay does not subtract white-cell DNA, and tissue-only calls a tumour shedding too little DNA — both are biology of the assay, not error. ctDNA detected means any alteration (mutation, amplification or deep deletion, structural variant) called in some plasma sample, over every gene the plasma panel covers. Survival is OS_MONTHS / OS_STATUS as each study records them, from its own origin, which need not be the plasma draw; when the draw comes after that origin the comparison carries immortal-time bias. "
     }
   ]
 }

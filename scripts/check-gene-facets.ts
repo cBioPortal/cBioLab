@@ -86,7 +86,7 @@ for (const c of CASES) for (const drafted of [false, true]) {
         all: [...(drafted ? DRAFT.all : []), ...clausesFor(f.gene, f.type, st.state)]
       } as never, { study: c.study, db: conn.db });
       const got = Number((await chQuery<{ n: string }>(
-        `SELECT uniqExact(pid) AS n FROM (${sql})`, conn)).data[0].n);
+        `SELECT uniqExact(sid) AS n FROM (${sql})`, conn)).data[0].n);
       checked++;
       if (got !== st.n) bad.push(`${f.gene}/${f.type}/${st.state}: shows ${st.n}, selects ${got}`);
     }

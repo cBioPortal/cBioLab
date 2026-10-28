@@ -179,7 +179,7 @@ export async function runCtdna(view: CtdnaView, ctx: ViewRun): Promise<ViewResul
     ctdna: { attribute, plasma, tissue, plasmaPanels, withinDays, measure, ...(pick ? { top } : {}), panels, ...(excluded.length ? { excluded } : {}), ...(ch ? { chFilter: ch } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
-    caveat: "Plasma is " + plasmaText + ", tissue " + attribute + " = " + tissue.join("/") + ". " +
+    caveat: "Plasma is " + plasmaText + ", tissue " + attribute + " = " + tissue.join("/") + "; only the cohort's own samples are classed, so a cohort that selects one kind of sample has none of the other to pair. " +
       panels.map((pn) => pn.cohort + ": " + plural(pn.plasmaPatients, "patient") + " with plasma, " + plural(pn.tissuePatients, "patient") + " with tissue, " +
         plural(pn.patients, "patient") + " with both (" + pn.plasmaSamples.toLocaleString("en-US") + " plasma and " + pn.tissueSamples.toLocaleString("en-US") + " tissue samples); ctDNA detected in " +
         pn.detected.toLocaleString("en-US") + " of the plasma patients (" + (pn.plasmaPatients ? pct(pn.detected / pn.plasmaPatients) : "—") + ")").join("; ") + ". " +

@@ -3,7 +3,8 @@
   "cohorts": {
     "CRC": {
       "count": 5543,
-      "text": "CANCER_TYPE in [Colorectal Cancer] (any sample)",
+      "samples": 5543,
+      "text": "CANCER_TYPE in [Colorectal Cancer]",
       "studies": [
         "msk_chord_2024"
       ]
@@ -18,8 +19,8 @@
       "hotspots": [
         {
           "gene": "KRAS",
-          "mutated": 2362,
-          "mutations": 2424,
+          "mutated": 2355,
+          "mutations": 2410,
           "positions": [
             {
               "pos": 10,
@@ -46,29 +47,29 @@
             },
             {
               "pos": 12,
-              "n": 1583,
+              "n": 1573,
               "color": "#008000",
               "impact": "missense",
               "driver": true,
               "changes": [
                 {
                   "change": "G12D",
-                  "n": 688,
-                  "rows": 689,
+                  "n": 687,
+                  "rows": 687,
                   "driver": true,
                   "impact": "missense"
                 },
                 {
                   "change": "G12V",
-                  "n": 487,
-                  "rows": 488,
+                  "n": 484,
+                  "rows": 484,
                   "driver": true,
                   "impact": "missense"
                 },
                 {
                   "change": "G12C",
-                  "n": 162,
-                  "rows": 162,
+                  "n": 158,
+                  "rows": 158,
                   "driver": true,
                   "impact": "missense"
                 },
@@ -81,8 +82,8 @@
                 },
                 {
                   "change": "G12A",
-                  "n": 108,
-                  "rows": 108,
+                  "n": 106,
+                  "rows": 106,
                   "driver": true,
                   "impact": "missense"
                 },
@@ -105,7 +106,7 @@
                 {
                   "mtype": "Missense_Mutation",
                   "driver": true,
-                  "rows": 1585
+                  "rows": 1573
                 }
               ]
             },
@@ -256,15 +257,15 @@
             },
             {
               "pos": 61,
-              "n": 82,
+              "n": 79,
               "color": "#008000",
               "impact": "missense",
               "driver": true,
               "changes": [
                 {
                   "change": "Q61H",
-                  "n": 55,
-                  "rows": 55,
+                  "n": 53,
+                  "rows": 53,
                   "driver": true,
                   "impact": "missense"
                 },
@@ -277,8 +278,8 @@
                 },
                 {
                   "change": "Q61L",
-                  "n": 8,
-                  "rows": 8,
+                  "n": 7,
+                  "rows": 7,
                   "driver": true,
                   "impact": "missense"
                 },
@@ -294,7 +295,7 @@
                 {
                   "mtype": "Missense_Mutation",
                   "driver": true,
-                  "rows": 82
+                  "rows": 79
                 }
               ]
             },
@@ -395,26 +396,26 @@
             {
               "change": "G12D",
               "pos": 12,
-              "n": 688,
-              "pct": 29.1
+              "n": 687,
+              "pct": 29.2
             },
             {
               "change": "G12V",
               "pos": 12,
-              "n": 487,
+              "n": 484,
               "pct": 20.6
             },
             {
               "change": "G13D",
               "pos": 13,
               "n": 426,
-              "pct": 18
+              "pct": 18.1
             },
             {
               "change": "G12C",
               "pos": 12,
-              "n": 162,
-              "pct": 6.9
+              "n": 158,
+              "pct": 6.7
             },
             {
               "change": "A146T",
@@ -431,13 +432,13 @@
             {
               "change": "G12A",
               "pos": 12,
-              "n": 108,
-              "pct": 4.6
+              "n": 106,
+              "pct": 4.5
             },
             {
               "change": "Q61H",
               "pos": 61,
-              "n": 55,
+              "n": 53,
               "pct": 2.3
             },
             {
@@ -457,16 +458,16 @@
           "lengthSource": "genome-nexus",
           "transcript": "ENST00000311936",
           "unpositioned": 0,
-          "withheld": 53,
+          "withheld": 52,
           "label": {
             "pos": 12,
             "text": "G12D/V/C and 4 more"
           },
-          "somaticSamples": 2371,
-          "cohortSamples": 5584,
+          "somaticSamples": 2355,
+          "cohortSamples": 5543,
           "tally": {
             "missense": {
-              "driver": 2365,
+              "driver": 2350,
               "vus": 3
             },
             "truncating": {
@@ -500,8 +501,8 @@
         },
         {
           "gene": "BRAF",
-          "mutated": 622,
-          "mutations": 658,
+          "mutated": 618,
+          "mutations": 653,
           "positions": [
             {
               "pos": 241,
@@ -616,15 +617,15 @@
             },
             {
               "pos": 469,
-              "n": 14,
+              "n": 13,
               "color": "#008000",
               "impact": "missense",
               "driver": true,
               "changes": [
                 {
                   "change": "G469A",
-                  "n": 10,
-                  "rows": 10,
+                  "n": 9,
+                  "rows": 9,
                   "driver": true,
                   "impact": "missense"
                 },
@@ -640,21 +641,21 @@
                 {
                   "mtype": "Missense_Mutation",
                   "driver": true,
-                  "rows": 14
+                  "rows": 13
                 }
               ]
             },
             {
               "pos": 581,
-              "n": 4,
+              "n": 3,
               "color": "#008000",
               "impact": "missense",
               "driver": true,
               "changes": [
                 {
                   "change": "N581S",
-                  "n": 4,
-                  "rows": 4,
+                  "n": 3,
+                  "rows": 3,
                   "driver": true,
                   "impact": "missense"
                 }
@@ -663,7 +664,7 @@
                 {
                   "mtype": "Missense_Mutation",
                   "driver": true,
-                  "rows": 4
+                  "rows": 3
                 }
               ]
             },
@@ -818,7 +819,7 @@
               "change": "V600E",
               "pos": 600,
               "n": 438,
-              "pct": 70.4
+              "pct": 70.9
             },
             {
               "change": "D594G",
@@ -827,22 +828,22 @@
               "pct": 6.1
             },
             {
-              "change": "G469A",
-              "pos": 469,
-              "n": 10,
-              "pct": 1.6
-            },
-            {
               "change": "A404Cfs*9",
               "pos": 403,
               "n": 10,
               "pct": 1.6
             },
             {
+              "change": "G469A",
+              "pos": 469,
+              "n": 9,
+              "pct": 1.5
+            },
+            {
               "change": "P403Lfs*8",
               "pos": 403,
               "n": 9,
-              "pct": 1.4
+              "pct": 1.5
             },
             {
               "change": "D594N",
@@ -879,16 +880,16 @@
           "lengthSource": "genome-nexus",
           "transcript": "ENST00000288602",
           "unpositioned": 0,
-          "withheld": 111,
+          "withheld": 108,
           "label": {
             "pos": 600,
             "text": "V600E"
           },
-          "somaticSamples": 623,
-          "cohortSamples": 5584,
+          "somaticSamples": 618,
+          "cohortSamples": 5543,
           "tally": {
             "missense": {
-              "driver": 520,
+              "driver": 518,
               "vus": 8
             },
             "truncating": {
@@ -922,8 +923,8 @@
         },
         {
           "gene": "PIK3CA",
-          "mutated": 1147,
-          "mutations": 1330,
+          "mutated": 1144,
+          "mutations": 1327,
           "positions": [
             {
               "pos": 38,
@@ -1086,7 +1087,7 @@
             },
             {
               "pos": 108,
-              "n": 27,
+              "n": 24,
               "color": "#008000",
               "impact": "missense",
               "driver": true,
@@ -1097,21 +1098,9 @@
                   "rows": 24,
                   "driver": true,
                   "impact": "missense"
-                },
-                {
-                  "change": "R108C",
-                  "n": 3,
-                  "rows": 3,
-                  "driver": false,
-                  "impact": "missense"
                 }
               ],
               "types": [
-                {
-                  "mtype": "Missense_Mutation",
-                  "driver": false,
-                  "rows": 3
-                },
                 {
                   "mtype": "Missense_Mutation",
                   "driver": true,
@@ -1441,7 +1430,7 @@
             },
             {
               "…": "17 more",
-              "sha256": "9a8135c6776c47e4"
+              "sha256": "30b83b4c1eee24c3"
             }
           ],
           "domains": [
@@ -1485,8 +1474,8 @@
             {
               "change": "E545K",
               "pos": 545,
-              "n": 253,
-              "pct": 22.1
+              "n": 251,
+              "pct": 21.9
             },
             {
               "change": "H1047R",
@@ -1547,17 +1536,17 @@
           "lengthSource": "genome-nexus",
           "transcript": "ENST00000263967",
           "unpositioned": 0,
-          "withheld": 231,
+          "withheld": 233,
           "label": {
             "pos": 545,
             "text": "E545K/G/D"
           },
-          "somaticSamples": 1147,
-          "cohortSamples": 5584,
+          "somaticSamples": 1144,
+          "cohortSamples": 5543,
           "tally": {
             "missense": {
-              "driver": 1036,
-              "vus": 41
+              "driver": 1034,
+              "vus": 38
             },
             "truncating": {
               "driver": 0,
@@ -1590,8 +1579,8 @@
         },
         {
           "gene": "TP53",
-          "mutated": 4080,
-          "mutations": 4441,
+          "mutated": 4068,
+          "mutations": 4417,
           "positions": [
             {
               "pos": 10,
@@ -1826,7 +1815,7 @@
             },
             {
               "pos": 75,
-              "n": 6,
+              "n": 3,
               "color": "#000000",
               "impact": "truncating",
               "driver": true,
@@ -1837,23 +1826,11 @@
                   "rows": 3,
                   "driver": true,
                   "impact": "truncating"
-                },
-                {
-                  "change": "P75Lfs*48",
-                  "n": 3,
-                  "rows": 3,
-                  "driver": true,
-                  "impact": "truncating"
                 }
               ],
               "types": [
                 {
                   "mtype": "Frame_Shift_Ins",
-                  "driver": true,
-                  "rows": 3
-                },
-                {
-                  "mtype": "Frame_Shift_Del",
                   "driver": true,
                   "rows": 3
                 }
@@ -1896,15 +1873,15 @@
             },
             {
               "pos": 91,
-              "n": 12,
+              "n": 11,
               "color": "#000000",
               "impact": "truncating",
               "driver": true,
               "changes": [
                 {
                   "change": "W91*",
-                  "n": 12,
-                  "rows": 12,
+                  "n": 11,
+                  "rows": 11,
                   "driver": true,
                   "impact": "truncating"
                 }
@@ -1913,7 +1890,7 @@
                 {
                   "mtype": "Nonsense_Mutation",
                   "driver": true,
-                  "rows": 12
+                  "rows": 11
                 }
               ]
             },
@@ -2123,8 +2100,8 @@
               ]
             },
             {
-              "…": "121 more",
-              "sha256": "7f03d7086ff7ec0c"
+              "…": "120 more",
+              "sha256": "778a5410e6b34d59"
             }
           ],
           "domains": [
@@ -2178,7 +2155,7 @@
             {
               "change": "R273H",
               "pos": 273,
-              "n": 179,
+              "n": 178,
               "pct": 4.4
             },
             {
@@ -2196,7 +2173,7 @@
             {
               "change": "G245S",
               "pos": 245,
-              "n": 119,
+              "n": 117,
               "pct": 2.9
             },
             {
@@ -2216,28 +2193,28 @@
           "lengthSource": "genome-nexus",
           "transcript": "ENST00000269305",
           "unpositioned": 0,
-          "withheld": 717,
+          "withheld": 718,
           "label": {
             "pos": 175,
             "text": "R175H/C/L"
           },
-          "somaticSamples": 4088,
-          "cohortSamples": 5584,
+          "somaticSamples": 4068,
+          "cohortSamples": 5543,
           "tally": {
             "missense": {
-              "driver": 2628,
+              "driver": 2616,
               "vus": 26
             },
             "truncating": {
-              "driver": 796,
+              "driver": 787,
               "vus": 0
             },
             "inframe": {
-              "driver": 30,
+              "driver": 29,
               "vus": 0
             },
             "splice": {
-              "driver": 244,
+              "driver": 241,
               "vus": 0
             },
             "fusion": {
@@ -2273,7 +2250,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "Mutations in “CRC” by protein position, as cBioPortal's mutation tab draws them: one stem per codon (the stored protein start position), its height the number of distinct patient + protein change pairs there. Colour is the codon's dominant mutation type, putative drivers before VUS (driver = OncoKB oncogenic, pinned; the portal also counts hotspots and custom annotations). VUS and germline mutations are included, as they are by default on the portal. A suppression floor of 3 patients per change was applied BY EACH SITE before returning anything, withholding 1,112 mutations."
+      "note": "Mutations in “CRC” by protein position, as cBioPortal's mutation tab draws them: one stem per codon (the stored protein start position), its height the number of distinct patient + protein change pairs there. Colour is the codon's dominant mutation type, putative drivers before VUS (driver = OncoKB oncogenic, pinned; the portal also counts hotspots and custom annotations). VUS and germline mutations are included, as they are by default on the portal. A suppression floor of 3 patients per change was applied BY EACH SITE before returning anything, withholding 1,111 mutations."
     }
   ]
 }

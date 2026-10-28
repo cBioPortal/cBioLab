@@ -201,11 +201,11 @@ describe("arms from Explore's selection in one chart", () => {
   test("a chart with nothing selected gives nothing", () => {
     assert.equal(armsFromSelection({ all: [luad.all![0]] }, { kind: "clinical", attribute: "STAGE" }), null);
   });
-  test("the same value on two sample/patient levels stays two charts", () => {
-    const r = armsFromSelection({ all: [{ kind: "clinical", attribute: "X", per: "sample", values: ["a"] }, { kind: "clinical", attribute: "X", values: ["b"] }] },
-      { kind: "clinical", attribute: "X", per: "sample" })!;
-    assert.deepEqual(r.arms.map((a) => a.name), ["a"]);
-    assert.equal(r.base.all.length, 1);
+  test("an attribute is one chart, whatever level a study records it at", () => {
+    const r = armsFromSelection({ all: [{ kind: "clinical", attribute: "X", values: ["a"] }, { kind: "clinical", attribute: "X", values: ["b"] }] },
+      { kind: "clinical", attribute: "X" })!;
+    assert.deepEqual(r.arms.map((a) => a.name), ["a", "b"]);
+    assert.equal(r.base.all.length, 0);
   });
 });
 

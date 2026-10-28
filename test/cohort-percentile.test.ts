@@ -21,9 +21,9 @@ describe("resolveCohortPercentiles", () => {
 
   test("a basic percentile leaf is rewritten to op+value, percentile/percentileOf/kind preserved", async () => {
     const d = doc({ high: { all: [{ kind: "clinical", attribute: "TMB_NONSYNONYMOUS", op: ">=", percentile: 0.8 }] } });
-    const out = await resolveCohortPercentiles(d, "x", async (study, refDef, attribute, per, p) => {
+    const out = await resolveCohortPercentiles(d, "x", async (study, refDef, attribute, p) => {
       assert.equal(study, "x"); assert.equal(refDef, null); assert.equal(attribute, "TMB_NONSYNONYMOUS");
-      assert.equal(per, "patient"); assert.equal(p, 0.8);
+      assert.equal(p, 0.8);
       return 13.7;
     });
     const leaf: any = out.cohorts.high.all![0];

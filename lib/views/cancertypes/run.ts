@@ -110,7 +110,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
       " (the union of their panels, as an oncoprint's merged row counts it). " +
       (measure === "driver" ? "Only OncoKB drivers (" + pin + ") count. " : "Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. ") +
       "A " + unit + " with more than one kind of alteration across the genes counts once, under \"multiple\". " +
-      (unit === "patient" ? "A patient counts in every group one of their samples falls in, profiled if any of those samples is, altered if any is. " : "Samples are counted, not patients: a patient with two samples counts twice. ") +
+      (unit === "patient" ? "A patient counts in every group one of their samples in the cohort falls in, profiled if any of those samples is, altered if any is. " : "Samples are counted, not patients: a patient with two samples counts twice. ") +
       (attribute ? attribute + " is read per sample and folded on case and whitespace; samples with no value form their own group. " : "") +
       "Groups with fewer than " + plural(minSamples, "profiled " + unit) + " are pooled into one bar rather than dropped. " +
       (multi ? "Counts are summed across " + ctx.vStudies.length + " studies; values are matched by name, not harmonized. " : "") +

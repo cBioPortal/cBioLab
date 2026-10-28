@@ -10,7 +10,7 @@ export interface DiffexprTrace {
   profileType: string;
   log2: boolean;
   groups: [string, string];
-  perSite: { cohort: string; study: string; cohortPatients: number }[];
+  perSite: { cohort: string; study: string; cohortSamples: number }[];
   /** per cohort, summed over its studies: each gene's n, Σv and Σv² */
   moments: { cohort: string; gene: string; n: number; sx: number; sxx: number }[];
   minN: number;
@@ -26,13 +26,13 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
   const steps: MethodStep[] = t.perSite.map((s) => ({
     kind: "fetch" as const, title: "Sum every gene's values",
     detail: "The diffexpr:moments query above, on “" + t.profileType + "”" + (t.log2 ? " as log2(v + 1) (a negative stored value has no log and is left out, not clamped)" : " as stored") +
-      ". Per gene, over the cohort's patients with a value (a patient with several samples contributes their average): n, Σv and Σv². Every gene in the profile, no individual value.",
-    scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
+      ". Per gene, over the cohort's samples with a value: n, Σv and Σv². Every gene in the profile, no individual value.",
+    scope: s.cohort + " · " + s.study, rowsIn: s.cohortSamples,
   }));
   if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length) steps.push({ kind: "transform", title: "Add each cohort's sums across its studies",
     detail: "The totals add exactly; there is no batch correction between studies." });
   steps.push({ kind: "transform", title: "Leave out genes that cannot be tested",
-    detail: "A gene with fewer than " + t.minN + " patients with a value in either cohort, or with no variance (Var A + Var B ≤ 1e-9 · (1 + mean A² + mean B²) — judged to a tolerance, since a constant gene's variance from the sums is rounding noise).",
+    detail: "A gene with fewer than " + t.minN + " samples with a value in either cohort, or with no variance (Var A + Var B ≤ 1e-9 · (1 + mean A² + mean B²) — judged to a tolerance, since a constant gene's variance from the sums is rounding noise).",
     rowsIn: t.tested + t.skipped, rowsOut: t.tested });
   steps.push({ kind: "statistic", title: "Welch's t-test per gene",
     detail: "Mean A − mean B (" + A + " minus " + B + ") with each cohort's variance (Σv² − (Σv)²/n)/(n − 1); unequal-variance t, Welch–Satterthwaite df, two-sided. With thousands of patients a tiny difference is significant: read the effect too.",

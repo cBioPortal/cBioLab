@@ -1,17 +1,17 @@
 -- cohort all patients
 -- msk_impact_50k_2026
-SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid FROM snapshot_db.sample_derived
+SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
 
 -- view 0 actionability: actionability:concordance:all patients · msk_impact_50k_2026
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'),
 seq AS (
   SELECT DISTINCT sp.sample_unique_id AS sid, replaceOne(sd.patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
   FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
   WHERE sp.cancer_study_identifier = 'msk_impact_50k_2026' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND replaceOne(sd.patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sp.sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 lv AS (
   SELECT g.sample_unique_id AS sid, min(multiIf(ann.highest_sensitive_level = 'LEVEL_1', 1, ann.highest_sensitive_level = 'LEVEL_2', 2, ann.highest_sensitive_level = 'LEVEL_3A', 3, ann.highest_sensitive_level = 'LEVEL_3B', 4, ann.highest_sensitive_level = 'LEVEL_4', 5, 9)) AS s,
@@ -45,14 +45,14 @@ ps AS (
 SELECT sa AS a, sb AS b, count() AS n FROM ps GROUP BY a, b
 
 -- view 0 actionability: actionability:levels:all patients · msk_impact_50k_2026
-WITH cohort AS (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid FROM snapshot_db.sample_derived
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'),
 seq AS (
   SELECT DISTINCT sp.sample_unique_id AS sid, replaceOne(sd.patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
   FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
   WHERE sp.cancer_study_identifier = 'msk_impact_50k_2026' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND replaceOne(sd.patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sp.sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 lv AS (
   SELECT g.sample_unique_id AS sid, min(multiIf(ann.highest_sensitive_level = 'LEVEL_1', 1, ann.highest_sensitive_level = 'LEVEL_2', 2, ann.highest_sensitive_level = 'LEVEL_3A', 3, ann.highest_sensitive_level = 'LEVEL_3B', 4, ann.highest_sensitive_level = 'LEVEL_4', 5, 9)) AS s,
@@ -79,7 +79,7 @@ grp AS (
   SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, if(uniqExact(attribute_value) > 1, 'Multiple', any(attribute_value)) AS g
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND attribute_name = 'CANCER_TYPE' AND trimBoth(attribute_value) != ''
-    AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+    AND if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort))
   GROUP BY pid
 )
 SELECT grp.g AS grp, pl.s AS level, pl.r AS resistance, count() AS n

@@ -1,32 +1,52 @@
 -- cohort Colorectal
 -- msk_impact_50k_2026
-(SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+(SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))
 
 -- cohort Breast
 -- msk_impact_50k_2026
-(SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+(SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer'))))
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer'))))))
 
 -- cohort Pancreatic
 -- msk_impact_50k_2026
-(SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+(SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))))
 
 -- view 0 instability: instability:arms:Breast · msk_impact_50k_2026
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer'))))))),
 samp AS (
   SELECT internal_id AS sid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 seg AS (
   SELECT s.sample_id AS sid, multiIf(s.chr IN ('23', 'X', 'chrX'), 'X', replaceOne(s.chr, 'chr', '')) AS chrom,
@@ -58,13 +78,18 @@ per AS (
 SELECT arm, countIf(measured) AS n_measured, countIf(measured AND gain) AS n_gain, countIf(measured AND loss) AS n_loss FROM calls GROUP BY arm
 
 -- view 0 instability: instability:arms:Colorectal · msk_impact_50k_2026
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))),
 samp AS (
   SELECT internal_id AS sid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 seg AS (
   SELECT s.sample_id AS sid, multiIf(s.chr IN ('23', 'X', 'chrX'), 'X', replaceOne(s.chr, 'chr', '')) AS chrom,
@@ -96,13 +121,18 @@ per AS (
 SELECT arm, countIf(measured) AS n_measured, countIf(measured AND gain) AS n_gain, countIf(measured AND loss) AS n_loss FROM calls GROUP BY arm
 
 -- view 0 instability: instability:arms:Pancreatic · msk_impact_50k_2026
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))))),
 samp AS (
   SELECT internal_id AS sid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 seg AS (
   SELECT s.sample_id AS sid, multiIf(s.chr IN ('23', 'X', 'chrX'), 'X', replaceOne(s.chr, 'chr', '')) AS chrom,
@@ -139,13 +169,18 @@ JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_ge
 WHERE cs.cancer_study_identifier = 'msk_impact_50k_2026'
 
 -- view 0 instability: instability:coverage:Breast · msk_impact_50k_2026
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer'))))))),
 samp AS (
   SELECT internal_id AS sid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 )
 SELECT (SELECT count() FROM samp) AS samples,
        (SELECT uniqExact(sample_id) FROM snapshot_db.copy_number_seg
@@ -154,13 +189,18 @@ SELECT (SELECT count() FROM samp) AS samples,
 FROM system.one
 
 -- view 0 instability: instability:coverage:Colorectal · msk_impact_50k_2026
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))),
 samp AS (
   SELECT internal_id AS sid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 )
 SELECT (SELECT count() FROM samp) AS samples,
        (SELECT uniqExact(sample_id) FROM snapshot_db.copy_number_seg
@@ -169,13 +209,18 @@ SELECT (SELECT count() FROM samp) AS samples,
 FROM system.one
 
 -- view 0 instability: instability:coverage:Pancreatic · msk_impact_50k_2026
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))))),
 samp AS (
   SELECT internal_id AS sid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 )
 SELECT (SELECT count() FROM samp) AS samples,
        (SELECT uniqExact(sample_id) FROM snapshot_db.copy_number_seg
@@ -184,13 +229,18 @@ SELECT (SELECT count() FROM samp) AS samples,
 FROM system.one
 
 -- view 0 instability: instability:scores:Breast · msk_impact_50k_2026
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer'))))))),
 samp AS (
   SELECT internal_id AS sid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 seg AS (
   SELECT s.sample_id AS sid, multiIf(s.chr IN ('23', 'X', 'chrX'), 'X', replaceOne(s.chr, 'chr', '')) AS chrom,
@@ -223,13 +273,18 @@ SELECT toInt32(least(100, floor(100 * alt / greatest(1, cov)))) AS fga_bin, scor
 FROM per GROUP BY fga_bin, score, measured ORDER BY fga_bin, score
 
 -- view 0 instability: instability:scores:Colorectal · msk_impact_50k_2026
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))),
 samp AS (
   SELECT internal_id AS sid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 seg AS (
   SELECT s.sample_id AS sid, multiIf(s.chr IN ('23', 'X', 'chrX'), 'X', replaceOne(s.chr, 'chr', '')) AS chrom,
@@ -262,13 +317,18 @@ SELECT toInt32(least(100, floor(100 * alt / greatest(1, cov)))) AS fga_bin, scor
 FROM per GROUP BY fga_bin, score, measured ORDER BY fga_bin, score
 
 -- view 0 instability: instability:scores:Pancreatic · msk_impact_50k_2026
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))))),
 samp AS (
   SELECT internal_id AS sid FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort)
+  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
 seg AS (
   SELECT s.sample_id AS sid, multiIf(s.chr IN ('23', 'X', 'chrX'), 'X', replaceOne(s.chr, 'chr', '')) AS chrom,

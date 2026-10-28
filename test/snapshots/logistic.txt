@@ -1,7 +1,7 @@
 Analysis over crc_apc_impact_2020 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- all patients: 471 patients — all patients in the study
+- all patients: 471 patients — all samples in the study
 
 Logistic regression (n=470, 27 with the outcome):
   APC mutation status: Mutated vs Not mutated: OR 0.28 (95% CI 0.13-0.63) p=0.0018

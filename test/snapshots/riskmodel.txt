@@ -1,83 +1,83 @@
 Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- NSCLC: 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)
+- NSCLC: 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer]
 
-Risk model (elastic-net Cox, 5 held-out splits, alpha 0.5, seed 1; 7,809 patients, 3,975 events, 302 candidate genes):
-  held-out C-index 0.617 (IQR 0.615–0.618)
-  risk score on OncoCast's 0–10 scale (0 and 10 the lowest and highest held-out score; raw -0.467 to 1.276)
+Risk model (elastic-net Cox, 5 held-out splits, alpha 0.5, seed 1; 7,809 patients, 3,975 events, 300 candidate genes):
+  held-out C-index 0.618 (IQR 0.615–0.619)
+  risk score on OncoCast's 0–10 scale (0 and 10 the lowest and highest held-out score; raw -0.497 to 1.277)
   risk groups (held-out scores, equal quantiles):
-    Low risk (score 0–2.7): n=2337, 888 events, median 68.2mo, 12-month 86%, 36-month 66%
-    Intermediate risk (score 2.7–4.4): n=2175, 1150 events, median 37.0mo, 12-month 76%, 36-month 51%, HR vs lowest 1.58 (95% CI 1.44–1.72, 2.7e-24)
-    High risk (score 4.4–10): n=2267, 1431 events, median 20.3mo, 12-month 62%, 36-month 39%, HR vs lowest 2.26 (95% CI 2.08–2.46, 8.1e-81)
-  log-rank p=3.5e-83
-  risk score alone: HR 1.39 per SD (95% CI 1.35–1.44, 4.7e-93)
-  genes kept most often: TGFBR2 100% HR 1.46, TP53 100% HR 1.37, KEAP1 100% HR 1.37, SMARCA4 100% HR 1.27, STK11 100% HR 1.22, NFE2L2 100% HR 1.17, PTEN 100% HR 1.14, EGFR 100% HR 0.92, CDK8 100% HR 0.93, EP300 100% HR 1.07, EPHA3 100% HR 0.93, PTPRD 100% HR 0.94, MED12 100% HR 0.96, CDK12 80% HR 0.87, DNMT3A 80% HR 0.89
+    Low risk (score 0–2.8): n=2352, 894 events, median 68.2mo, 12-month 85%, 36-month 66%
+    Intermediate risk (score 2.8–4.6): n=2167, 1145 events, median 36.9mo, 12-month 76%, 36-month 51%, HR vs lowest 1.58 (95% CI 1.45–1.73, 8.1e-25)
+    High risk (score 4.6–10): n=2260, 1430 events, median 20.3mo, 12-month 62%, 36-month 39%, HR vs lowest 2.25 (95% CI 2.07–2.45, 2.3e-80)
+  log-rank p=1.5e-82
+  risk score alone: HR 1.40 per SD (95% CI 1.35–1.44, 5.1e-95)
+  genes kept most often: TGFBR2 100% HR 1.47, TP53 100% HR 1.38, KEAP1 100% HR 1.38, SMARCA4 100% HR 1.27, STK11 100% HR 1.23, NFE2L2 100% HR 1.19, PTEN 100% HR 1.15, CDK12 100% HR 0.87, CDK8 100% HR 0.91, DNMT3A 100% HR 0.91, EGFR 100% HR 0.92, EP300 100% HR 1.08, PTPRD 100% HR 0.92, EPHA3 100% HR 0.92, MED12 100% HR 0.95
   1030 patients were never held out, so have no score
   CAVEAT (tell the user): Association, not cause: a gene's weight is its link to OS with the other candidates held fixed, in this cohort. Without strata, a gene that marks a cancer type carries that type's prognosis; on a cohort of several cancer types, stratify by CANCER_TYPE. Each patient is scored only by models that did not train on them. The group cuts are equal quantiles of the score, chosen without the outcome. Genes outside the panels every patient was sequenced on are not candidates, so a patient is never counted as wild-type for a gene they were not tested for. Table 1 describes the patients the curves draw; its rows marked “in the model” (the model's genes and covariates) and “outcome” differ between the groups by construction, so they get no q-value and are left out of the correction. The C-index ignores delayed entry. Seeded (seed 1): the same document gives the same model.
   METHOD:
     - One row per patient [NSCLC · msk_chord_2024] (7,809 → 7,809 rows): The riskmodel:rows query above: each patient's survival time and event, the panels their samples were sequenced on for mutations, the genes mutated in them, and their half of the engine's fixed held-out split. Patient-level: the rows never leave this server's engine, and no identifier is returned.
     - Patients, candidate genes and covariates: A gene is a candidate only if every patient's panels cover it, so no patient is counted as wild-type for a gene they were never tested for, and only if at least 30 patients have it mutated.
         genes covered for every patient: 341
-        candidates: 302
+        candidates: 300
         left out: no mutation panel on record: 0
     - Elastic-net Cox, 5 random splits: Each run holds out a random 33% of the patients; on the rest, the penalty is chosen from a path of 25 by 3-fold cross-validated partial likelihood (Verweij & van Houwelingen), and the model at that penalty scores the held-out patients. Genes are scaled to unit variance before fitting; Breslow ties. A patient's risk score is the mean of the scores they got while held out (OncoCast's ensemble, Martin et al.).
         l1 share of the penalty (alpha): 0.5
         runs: 5
         seed: 1
-        test-set C-index, median (IQR): 0.617 (0.615–0.618)
+        test-set C-index, median (IQR): 0.618 (0.615–0.619)
         never held out, so unscored: 1030
     - Risk groups, their survival and hazard ratios: Cuts at equal quantiles of the held-out scores, each moved to the nearer edge of any run of tied scores so equal scores share a group — no outcome is used to place them. Each group is drawn as a Kaplan–Meier curve and read at 12 and 36 months; the groups are compared with a log-rank test, and a Cox model of the outcome on the group indicators gives each group's hazard ratio against the lowest (Newton–Raphson, full information matrix, 95% Wald intervals). A second Cox model on the standardised score alone gives the hazard ratio per standard deviation. The score is also shown on OncoCast's 0–10 scale, (score − min) / (max − min) × 10, min and max the lowest and highest held-out score; the scale is linear, so it moves no patient between groups and changes no number above.
-        0 on the 0–10 scale (raw score): -0.4669
-        10 on the 0–10 scale (raw score): 1.2761
-        Low risk: 2,337 patients, 888 events, median 68.2 months
-        Intermediate risk: 2,175 patients, 1,150 events, median 37.0 months, HR 1.58
-        High risk: 2,267 patients, 1,431 events, median 20.3 months, HR 2.26
+        0 on the 0–10 scale (raw score): -0.4970
+        10 on the 0–10 scale (raw score): 1.2767
+        Low risk: 2,352 patients, 894 events, median 68.2 months
+        Intermediate risk: 2,167 patients, 1,145 events, median 36.9 months, HR 1.58
+        High risk: 2,260 patients, 1,430 events, median 20.3 months, HR 2.25
     - Table 1: the groups' patients again, with their clinical values: The riskmodel:table1 query above is the riskmodel:rows query with Table 1's attributes added: for each, the patient's value (a sample-level attribute: their first sample's), case and whitespace folded as everywhere in this app and shown in its commonest spelling, and how many values their samples hold. Its rows are kept exactly as the model's were and must match the model's patients one by one — survival time, entry and event — or the view is refused, so each group's column describes the patients its curve drew. riskmodel:table1-attributes gives each attribute's type (NUMBER is numeric), riskmodel:panels each mutation panel's genes. Patient-level: the rows never leave this server's engine; only the counts below do.
-        Low risk: 2,337 patients
-        Intermediate risk: 2,175 patients
-        High risk: 2,267 patients
+        Low risk: 2,352 patients
+        Intermediate risk: 2,167 patients
+        High risk: 2,260 patients
     - Table 1's rows: Attributes as the view names them; a categorical one with more than 100 values among these patients is set aside. Genes as the view names them. A gene is counted as mutated the way the model counts it (any mutation), and only among the patients whose mutation panels cover it (a whole-exome patient covers every gene): a patient whose panels do not is not profiled for it, never unaltered, and is counted as such in each group. A row the groups differ in by construction is marked: a gene the model kept in any run and a covariate are "in the model" (the score is built from them), the endpoint's own columns are "outcome" (the groups are cut to differ in survival); the model's stratum is marked "stratum" but is a description, since the score has no stratum term.
     - Each row tested across the groups: A categorical attribute: Pearson χ² on the group × value table, no continuity correction, an all-zero row or column dropped first, patients with no value left out. A gene: Pearson χ² on the group × (mutated, not mutated) table of its profiled patients. A numeric attribute: Kruskal–Wallis on each group's values, ranks averaged within ties and tie-corrected; medians and quartiles interpolating linearly between ranks. The smallest expected count is reported, since χ² is poor below about 5.
-        STAGE_HIGHEST_RECORDED: χ² 56.918 on 4 df · p 1.29e-11
-        GENDER: χ² 167.47 on 4 df · p 3.65e-35
-        SMOKING_PREDICTIONS_3_CLASSES: χ² 466.4278 on 4 df · p 1.22e-99
-        CURRENT_AGE_DEID: H 30.7119 on 2 df · p 2.14e-7
-        gene:KEAP1: χ² 1622.8469 on 2 df · p <1e-300 · in the model
-        gene:TP53: χ² 3699.2236 on 2 df · p <1e-300 · in the model
-        gene:ZFHX3: χ² 42.6173 on 2 df · p 5.57e-10
+        STAGE_HIGHEST_RECORDED: χ² 57.157 on 4 df · p 1.15e-11
+        GENDER: χ² 158.1311 on 4 df · p 3.68e-33
+        SMOKING_PREDICTIONS_3_CLASSES: χ² 467.5806 on 4 df · p 6.87e-100
+        CURRENT_AGE_DEID: H 31.9582 on 2 df · p 1.15e-7
+        gene:KEAP1: χ² 1599.4385 on 2 df · p <1e-300 · in the model
+        gene:TP53: χ² 3682.4791 on 2 df · p <1e-300 · in the model
+        gene:ZFHX3: χ² 43.2024 on 2 df · p 4.16e-10
     - Benjamini–Hochberg across Table 1's open rows: q-values over the 5 tested rows that are not in the model and not its outcome. Those rows differ between the groups by construction, so they get a p-value but no q-value and do not enter the correction, where their p-values would shrink every other row's q.
     lib/coxnet.ts's path is checked against scikit-survival's CoxnetSurvivalAnalysis, its delayed-entry, stratified fits (with standard errors) against statsmodels' PHReg and its C-index against lifelines, by test/coxnet-golden.test.ts (fixtures from python/golden/coxnet.py). The script below recomputes Table 1's tests and q-values from its counts (the model itself it does not refit); χ² matches scipy 1.18.1 chi2_contingency, Kruskal–Wallis and quantiles scipy/numpy, Benjamini–Hochberg statsmodels multipletests (test/tables-golden.test.ts, test/moments-golden.test.ts).
   METHOD:
     - One row per patient [NSCLC · msk_chord_2024] (7,809 → 7,809 rows): The riskmodel:rows query above: each patient's survival time and event, the panels their samples were sequenced on for mutations, the genes mutated in them, and their half of the engine's fixed held-out split. Patient-level: the rows never leave this server's engine, and no identifier is returned.
     - Patients, candidate genes and covariates: A gene is a candidate only if every patient's panels cover it, so no patient is counted as wild-type for a gene they were never tested for, and only if at least 30 patients have it mutated.
         genes covered for every patient: 341
-        candidates: 302
+        candidates: 300
         left out: no mutation panel on record: 0
     - Elastic-net Cox, 5 random splits: Each run holds out a random 33% of the patients; on the rest, the penalty is chosen from a path of 25 by 3-fold cross-validated partial likelihood (Verweij & van Houwelingen), and the model at that penalty scores the held-out patients. Genes are scaled to unit variance before fitting; Breslow ties. A patient's risk score is the mean of the scores they got while held out (OncoCast's ensemble, Martin et al.).
         l1 share of the penalty (alpha): 0.5
         runs: 5
         seed: 1
-        test-set C-index, median (IQR): 0.617 (0.615–0.618)
+        test-set C-index, median (IQR): 0.618 (0.615–0.619)
         never held out, so unscored: 1030
     - Risk groups, their survival and hazard ratios: Cuts at equal quantiles of the held-out scores, each moved to the nearer edge of any run of tied scores so equal scores share a group — no outcome is used to place them. Each group is drawn as a Kaplan–Meier curve and read at 12 and 36 months; the groups are compared with a log-rank test, and a Cox model of the outcome on the group indicators gives each group's hazard ratio against the lowest (Newton–Raphson, full information matrix, 95% Wald intervals). A second Cox model on the standardised score alone gives the hazard ratio per standard deviation. The score is also shown on OncoCast's 0–10 scale, (score − min) / (max − min) × 10, min and max the lowest and highest held-out score; the scale is linear, so it moves no patient between groups and changes no number above.
-        0 on the 0–10 scale (raw score): -0.4669
-        10 on the 0–10 scale (raw score): 1.2761
-        Low risk: 2,337 patients, 888 events, median 68.2 months
-        Intermediate risk: 2,175 patients, 1,150 events, median 37.0 months, HR 1.58
-        High risk: 2,267 patients, 1,431 events, median 20.3 months, HR 2.26
+        0 on the 0–10 scale (raw score): -0.4970
+        10 on the 0–10 scale (raw score): 1.2767
+        Low risk: 2,352 patients, 894 events, median 68.2 months
+        Intermediate risk: 2,167 patients, 1,145 events, median 36.9 months, HR 1.58
+        High risk: 2,260 patients, 1,430 events, median 20.3 months, HR 2.25
     - Table 1: the groups' patients again, with their clinical values: The riskmodel:table1 query above is the riskmodel:rows query with Table 1's attributes added: for each, the patient's value (a sample-level attribute: their first sample's), case and whitespace folded as everywhere in this app and shown in its commonest spelling, and how many values their samples hold. Its rows are kept exactly as the model's were and must match the model's patients one by one — survival time, entry and event — or the view is refused, so each group's column describes the patients its curve drew. riskmodel:table1-attributes gives each attribute's type (NUMBER is numeric), riskmodel:panels each mutation panel's genes. Patient-level: the rows never leave this server's engine; only the counts below do.
-        Low risk: 2,337 patients
-        Intermediate risk: 2,175 patients
-        High risk: 2,267 patients
+        Low risk: 2,352 patients
+        Intermediate risk: 2,167 patients
+        High risk: 2,260 patients
     - Table 1's rows: Attributes as the view names them; a categorical one with more than 100 values among these patients is set aside. Genes as the view names them. A gene is counted as mutated the way the model counts it (any mutation), and only among the patients whose mutation panels cover it (a whole-exome patient covers every gene): a patient whose panels do not is not profiled for it, never unaltered, and is counted as such in each group. A row the groups differ in by construction is marked: a gene the model kept in any run and a covariate are "in the model" (the score is built from them), the endpoint's own columns are "outcome" (the groups are cut to differ in survival); the model's stratum is marked "stratum" but is a description, since the score has no stratum term.
     - Each row tested across the groups: A categorical attribute: Pearson χ² on the group × value table, no continuity correction, an all-zero row or column dropped first, patients with no value left out. A gene: Pearson χ² on the group × (mutated, not mutated) table of its profiled patients. A numeric attribute: Kruskal–Wallis on each group's values, ranks averaged within ties and tie-corrected; medians and quartiles interpolating linearly between ranks. The smallest expected count is reported, since χ² is poor below about 5.
-        STAGE_HIGHEST_RECORDED: χ² 56.918 on 4 df · p 1.29e-11
-        GENDER: χ² 167.47 on 4 df · p 3.65e-35
-        SMOKING_PREDICTIONS_3_CLASSES: χ² 466.4278 on 4 df · p 1.22e-99
-        CURRENT_AGE_DEID: H 30.7119 on 2 df · p 2.14e-7
-        gene:KEAP1: χ² 1622.8469 on 2 df · p <1e-300 · in the model
-        gene:TP53: χ² 3699.2236 on 2 df · p <1e-300 · in the model
-        gene:ZFHX3: χ² 42.6173 on 2 df · p 5.57e-10
+        STAGE_HIGHEST_RECORDED: χ² 57.157 on 4 df · p 1.15e-11
+        GENDER: χ² 158.1311 on 4 df · p 3.68e-33
+        SMOKING_PREDICTIONS_3_CLASSES: χ² 467.5806 on 4 df · p 6.87e-100
+        CURRENT_AGE_DEID: H 31.9582 on 2 df · p 1.15e-7
+        gene:KEAP1: χ² 1599.4385 on 2 df · p <1e-300 · in the model
+        gene:TP53: χ² 3682.4791 on 2 df · p <1e-300 · in the model
+        gene:ZFHX3: χ² 43.2024 on 2 df · p 4.16e-10
     - Benjamini–Hochberg across Table 1's open rows: q-values over the 5 tested rows that are not in the model and not its outcome. Those rows differ between the groups by construction, so they get a p-value but no q-value and do not enter the correction, where their p-values would shrink every other row's q.
     lib/coxnet.ts's path is checked against scikit-survival's CoxnetSurvivalAnalysis, its delayed-entry, stratified fits (with standard errors) against statsmodels' PHReg and its C-index against lifelines, by test/coxnet-golden.test.ts (fixtures from python/golden/coxnet.py). The script below recomputes Table 1's tests and q-values from its counts (the model itself it does not refit); χ² matches scipy 1.18.1 chi2_contingency, Kruskal–Wallis and quantiles scipy/numpy, Benjamini–Hochberg statsmodels multipletests (test/tables-golden.test.ts, test/moments-golden.test.ts).

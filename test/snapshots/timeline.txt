@@ -1,7 +1,7 @@
 Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- Breast: 5,368 patients — CANCER_TYPE in [Breast Cancer] (any sample)
+- Breast: 5,368 patients — CANCER_TYPE in [Breast Cancer]
 
 Patient timeline — patients to choose from: 5,368; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	patient	source	samples	events	span	types

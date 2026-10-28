@@ -1,39 +1,39 @@
 Analysis over msk_impact_50k_2026 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- Early-onset CRC: 1,699 patients — CANCER_TYPE in [Colorectal Cancer] (any sample) AND AGE_AT_DX < 50
-- Average-onset CRC: 3,149 patients — CANCER_TYPE in [Colorectal Cancer] (any sample) AND AGE_AT_DX >= 50
+- Early-onset CRC: 1,699 patients — CANCER_TYPE in [Colorectal Cancer] AND AGE_AT_DX < 50
+- Average-onset CRC: 3,149 patients — CANCER_TYPE in [Colorectal Cancer] AND AGE_AT_DX >= 50
 
-Adjusted enrichment: Early-onset CRC vs Average-onset CRC, mutation per gene by logistic regression adjusted for MSI_TYPE, TMB_SCORE; 56 genes fit, 4 at q<0.05:
-  BRAF: Early-onset CRC 126/1693 (7.4%), Average-onset CRC 407/3146 (12.9%); raw OR 0.54 (Fisher p=2.7e-9); adjusted OR 0.52 (95% CI 0.42-0.65) p=7.5e-9 q=4.2e-7
-  TCF7L2: Early-onset CRC 288/1630 (17.7%), Average-onset CRC 423/3032 (14.0%); raw OR 1.32 (Fisher p=0.0009); adjusted OR 1.40 (95% CI 1.18-1.67) p=0.0001 q=0.0036
-  TP53: Early-onset CRC 1309/1693 (77.3%), Average-onset CRC 2272/3146 (72.2%); raw OR 1.31 (Fisher p=0.0001); adjusted OR 1.31 (95% CI 1.14-1.52) p=0.0003 q=0.0047
-  RNF43: Early-onset CRC 137/1693 (8.1%), Average-onset CRC 339/3146 (10.8%); raw OR 0.73 (Fisher p=0.0028); adjusted OR 0.66 (95% CI 0.51-0.86) p=0.0021 q=0.0287
-  ARID1B: Early-onset CRC 85/1693 (5.0%), Average-onset CRC 201/3146 (6.4%); raw OR 0.77 (Fisher p=0.0553); adjusted OR 0.75 (95% CI 0.56-1.01) p=0.0546 q=0.4665
-  SOX9: Early-onset CRC 179/1693 (10.6%), Average-onset CRC 396/3146 (12.6%); raw OR 0.82 (Fisher p=0.0404); adjusted OR 0.84 (95% CI 0.69-1.01) p=0.0652 q=0.4665
-  APC: Early-onset CRC 1312/1693 (77.5%), Average-onset CRC 2354/3146 (74.8%); raw OR 1.16 (Fisher p=0.0413); adjusted OR 1.14 (95% CI 0.99-1.31) p=0.0717 q=0.4665
-  PTCH1: Early-onset CRC 104/1693 (6.1%), Average-onset CRC 163/3146 (5.2%); raw OR 1.20 (Fisher p=0.1660); adjusted OR 1.33 (95% CI 0.97-1.80) p=0.0737 q=0.4665
-  PTPRT: Early-onset CRC 132/1693 (7.8%), Average-onset CRC 284/3146 (9.0%); raw OR 0.85 (Fisher p=0.1471); adjusted OR 0.81 (95% CI 0.64-1.02) p=0.0750 q=0.4665
-  AMER1: Early-onset CRC 119/1693 (7.0%), Average-onset CRC 260/3146 (8.3%); raw OR 0.84 (Fisher p=0.1302); adjusted OR 0.82 (95% CI 0.64-1.04) p=0.0988 q=0.5077
-  KMT2C: Early-onset CRC 149/1693 (8.8%), Average-onset CRC 236/3146 (7.5%); raw OR 1.19 (Fisher p=0.1188); adjusted OR 1.24 (95% CI 0.96-1.61) p=0.0997 q=0.5077
-  ALK: Early-onset CRC 98/1693 (5.8%), Average-onset CRC 150/3146 (4.8%); raw OR 1.23 (Fisher p=0.1327); adjusted OR 1.23 (95% CI 0.93-1.63) p=0.1557 q=0.7267
-  KRAS: Early-onset CRC 728/1693 (43.0%), Average-onset CRC 1403/3146 (44.6%); raw OR 0.94 (Fisher p=0.2882); adjusted OR 0.92 (95% CI 0.82-1.04) p=0.1957 q=0.8066
-  PTPRS: Early-onset CRC 178/1693 (10.5%), Average-onset CRC 299/3146 (9.5%); raw OR 1.12 (Fisher p=0.2662); adjusted OR 1.16 (95% CI 0.92-1.46) p=0.2016 q=0.8066
-  GRIN2A: Early-onset CRC 99/1693 (5.8%), Average-onset CRC 203/3146 (6.5%); raw OR 0.90 (Fisher p=0.4187); adjusted OR 0.84 (95% CI 0.64-1.11) p=0.2181 q=0.8141
-  ERBB4: Early-onset CRC 96/1693 (5.7%), Average-onset CRC 196/3146 (6.2%); raw OR 0.90 (Fisher p=0.4483); adjusted OR 0.85 (95% CI 0.64-1.12) p=0.2387 q=0.8353
-  MGA: Early-onset CRC 88/1630 (5.4%), Average-onset CRC 181/3032 (6.0%); raw OR 0.90 (Fisher p=0.4688); adjusted OR 0.85 (95% CI 0.63-1.14) p=0.2730 q=0.8586
-  PIK3CA: Early-onset CRC 344/1693 (20.3%), Average-onset CRC 675/3146 (21.5%); raw OR 0.93 (Fisher p=0.3750); adjusted OR 0.92 (95% CI 0.79-1.07) p=0.2895 q=0.8586
-  FBXW7: Early-onset CRC 254/1693 (15.0%), Average-onset CRC 503/3146 (16.0%); raw OR 0.93 (Fisher p=0.3837); adjusted OR 0.91 (95% CI 0.77-1.08) p=0.2967 q=0.8586
-  KMT2B: Early-onset CRC 144/1327 (10.9%), Average-onset CRC 268/2498 (10.7%); raw OR 1.01 (Fisher p=0.9128); adjusted OR 1.17 (95% CI 0.87-1.57) p=0.3066 q=0.8586
-  AXIN2: Early-onset CRC 84/1693 (5.0%), Average-onset CRC 183/3146 (5.8%); raw OR 0.85 (Fisher p=0.2348); adjusted OR 0.87 (95% CI 0.65-1.16) p=0.3290 q=0.8589
-  INPPL1: Early-onset CRC 70/1327 (5.3%), Average-onset CRC 125/2498 (5.0%); raw OR 1.06 (Fisher p=0.7575); adjusted OR 1.19 (95% CI 0.83-1.69) p=0.3451 q=0.8589
-  PREX2: Early-onset CRC 84/1327 (6.3%), Average-onset CRC 171/2498 (6.8%); raw OR 0.92 (Fisher p=0.5861); adjusted OR 0.87 (95% CI 0.65-1.17) p=0.3629 q=0.8589
-  MTOR: Early-onset CRC 89/1693 (5.3%), Average-onset CRC 181/3146 (5.8%); raw OR 0.91 (Fisher p=0.5115); adjusted OR 0.88 (95% CI 0.66-1.17) p=0.3681 q=0.8589
-  EPHA5: Early-onset CRC 113/1693 (6.7%), Average-onset CRC 188/3146 (6.0%); raw OR 1.13 (Fisher p=0.3494); adjusted OR 1.11 (95% CI 0.85-1.45) p=0.4340 q=0.9392
-  ATM: Early-onset CRC 142/1693 (8.4%), Average-onset CRC 273/3146 (8.7%); raw OR 0.96 (Fisher p=0.7470); adjusted OR 0.92 (95% CI 0.73-1.16) p=0.4763 q=0.9392
-  POLE: Early-onset CRC 105/1693 (6.2%), Average-onset CRC 175/3146 (5.6%); raw OR 1.12 (Fisher p=0.3667); adjusted OR 1.12 (95% CI 0.82-1.51) p=0.4765 q=0.9392
-  NOTCH4: Early-onset CRC 85/1693 (5.0%), Average-onset CRC 170/3146 (5.4%); raw OR 0.93 (Fisher p=0.5900); adjusted OR 0.90 (95% CI 0.67-1.22) p=0.5053 q=0.9392
-  NF1: Early-onset CRC 104/1693 (6.1%), Average-onset CRC 173/3146 (5.5%); raw OR 1.12 (Fisher p=0.3641); adjusted OR 1.10 (95% CI 0.83-1.46) p=0.5122 q=0.9392
-  CARD11: Early-onset CRC 115/1693 (6.8%), Average-onset CRC 201/3146 (6.4%); raw OR 1.07 (Fisher p=0.5836); adjusted OR 1.09 (95% CI 0.84-1.41) p=0.5197 q=0.9392
-  … 26 more genes fit
-  CAVEAT (tell the user): Per gene, a logistic regression of mutated (yes/no) on cohort (“Early-onset CRC” = 1 against “Average-onset CRC”) and MSI_TYPE, TMB_SCORE (MSI_TYPE as categories against its commonest value, TMB_SCORE as a number; a sample attribute is the patient's first sample's); the odds ratio is the cohort term's, Wald 95% CI, and q is Benjamini–Hochberg over the 56 genes fit. Patients, not samples: a patient is mutated in a gene when any of their samples carries a called mutation in it, and is in a gene's model only when one of their mutation panels covers it (or whole-exome) — panel-aware, so a patient not profiled for a gene is left out of that gene, never counted as wild type. Tested: the 56 genes mutated in at least 5.0% (and 10) of the patients profiled for them, both cohorts together (at most 200). “Early-onset CRC”: 1,699 patients with a mutation panel, 1,693 with every covariate; “Average-onset CRC”: 3,149 patients with a mutation panel, 3,146 with every covariate. Beside each adjusted odds ratio is the raw one with its two-sided Fisher p, on the same patients; 2 genes significant raw (Fisher p < 0.05) are not after adjustment (adjusted p ≥ 0.05). For 9 genes, a covariate category in which no patient (or every patient) was mutated was merged into its reference level, since it would separate. Adjustment removes only what the covariates measure: a hypermutated tumour raises every gene's odds at once, which TMB or MSI status as a covariate absorbs and nothing else does. Cohorts are expected not to share patients; a patient in both would count on both sides. 
+Adjusted enrichment: Early-onset CRC vs Average-onset CRC, mutation per gene by logistic regression adjusted for MSI_TYPE, TMB_SCORE; 54 genes fit, 4 at q<0.05:
+  BRAF: Early-onset CRC 124/1692 (7.3%), Average-onset CRC 406/3146 (12.9%); raw OR 0.53 (Fisher p=1.4e-9); adjusted OR 0.51 (95% CI 0.41-0.64) p=3.6e-9 q=1.9e-7
+  TP53: Early-onset CRC 1308/1692 (77.3%), Average-onset CRC 2261/3146 (71.9%); raw OR 1.33 (Fisher p=3.9e-5); adjusted OR 1.34 (95% CI 1.16-1.55) p=7.9e-5 q=0.0021
+  TCF7L2: Early-onset CRC 286/1629 (17.6%), Average-onset CRC 421/3031 (13.9%); raw OR 1.32 (Fisher p=0.0010); adjusted OR 1.40 (95% CI 1.18-1.67) p=0.0002 q=0.0028
+  RNF43: Early-onset CRC 136/1692 (8.0%), Average-onset CRC 336/3146 (10.7%); raw OR 0.73 (Fisher p=0.0032); adjusted OR 0.66 (95% CI 0.50-0.86) p=0.0019 q=0.0257
+  ARID1B: Early-onset CRC 82/1692 (4.8%), Average-onset CRC 198/3146 (6.3%); raw OR 0.76 (Fisher p=0.0452); adjusted OR 0.73 (95% CI 0.54-0.98) p=0.0360 q=0.3887
+  SOX9: Early-onset CRC 178/1692 (10.5%), Average-onset CRC 395/3146 (12.6%); raw OR 0.82 (Fisher p=0.0400); adjusted OR 0.83 (95% CI 0.69-1.01) p=0.0583 q=0.5019
+  APC: Early-onset CRC 1310/1692 (77.4%), Average-onset CRC 2353/3146 (74.8%); raw OR 1.16 (Fisher p=0.0451); adjusted OR 1.14 (95% CI 0.99-1.31) p=0.0703 q=0.5019
+  KMT2C: Early-onset CRC 146/1692 (8.6%), Average-onset CRC 231/3146 (7.3%); raw OR 1.19 (Fisher p=0.1155); adjusted OR 1.25 (95% CI 0.97-1.63) p=0.0890 q=0.5019
+  PTPRT: Early-onset CRC 130/1692 (7.7%), Average-onset CRC 277/3146 (8.8%); raw OR 0.86 (Fisher p=0.1925); adjusted OR 0.82 (95% CI 0.65-1.03) p=0.0929 q=0.5019
+  PTCH1: Early-onset CRC 102/1692 (6.0%), Average-onset CRC 162/3146 (5.1%); raw OR 1.18 (Fisher p=0.2075); adjusted OR 1.31 (95% CI 0.96-1.78) p=0.0929 q=0.5019
+  AMER1: Early-onset CRC 119/1692 (7.0%), Average-onset CRC 257/3146 (8.2%); raw OR 0.85 (Fisher p=0.1765); adjusted OR 0.83 (95% CI 0.65-1.05) p=0.1263 q=0.6199
+  ALK: Early-onset CRC 96/1692 (5.7%), Average-onset CRC 148/3146 (4.7%); raw OR 1.22 (Fisher p=0.1482); adjusted OR 1.22 (95% CI 0.92-1.62) p=0.1746 q=0.6938
+  AXIN2: Early-onset CRC 81/1692 (4.8%), Average-onset CRC 183/3146 (5.8%); raw OR 0.81 (Fisher p=0.1442); adjusted OR 0.83 (95% CI 0.62-1.11) p=0.1973 q=0.6938
+  GRIN2A: Early-onset CRC 98/1692 (5.8%), Average-onset CRC 203/3146 (6.5%); raw OR 0.89 (Fisher p=0.3827); adjusted OR 0.84 (95% CI 0.64-1.10) p=0.2054 q=0.6938
+  ERBB4: Early-onset CRC 95/1692 (5.6%), Average-onset CRC 196/3146 (6.2%); raw OR 0.90 (Fisher p=0.4102); adjusted OR 0.84 (95% CI 0.63-1.11) p=0.2131 q=0.6938
+  FBXW7: Early-onset CRC 249/1692 (14.7%), Average-onset CRC 500/3146 (15.9%); raw OR 0.91 (Fisher p=0.2975); adjusted OR 0.90 (95% CI 0.75-1.07) p=0.2172 q=0.6938
+  PTPRS: Early-onset CRC 176/1692 (10.4%), Average-onset CRC 297/3146 (9.4%); raw OR 1.11 (Fisher p=0.2868); adjusted OR 1.15 (95% CI 0.92-1.46) p=0.2229 q=0.6938
+  KRAS: Early-onset CRC 726/1692 (42.9%), Average-onset CRC 1395/3146 (44.3%); raw OR 0.94 (Fisher p=0.3464); adjusted OR 0.93 (95% CI 0.83-1.05) p=0.2424 q=0.6938
+  MGA: Early-onset CRC 86/1629 (5.3%), Average-onset CRC 179/3031 (5.9%); raw OR 0.89 (Fisher p=0.3894); adjusted OR 0.84 (95% CI 0.62-1.13) p=0.2441 q=0.6938
+  PIK3CA: Early-onset CRC 340/1692 (20.1%), Average-onset CRC 671/3146 (21.3%); raw OR 0.93 (Fisher p=0.3171); adjusted OR 0.92 (95% CI 0.79-1.07) p=0.2632 q=0.7108
+  KMT2B: Early-onset CRC 140/1322 (10.6%), Average-onset CRC 261/2491 (10.5%); raw OR 1.01 (Fisher p=0.9118); adjusted OR 1.18 (95% CI 0.87-1.61) p=0.2814 q=0.7236
+  ATM: Early-onset CRC 138/1692 (8.2%), Average-onset CRC 271/3146 (8.6%); raw OR 0.94 (Fisher p=0.6258); adjusted OR 0.89 (95% CI 0.71-1.13) p=0.3580 q=0.8431
+  MTOR: Early-onset CRC 87/1692 (5.1%), Average-onset CRC 178/3146 (5.7%); raw OR 0.90 (Fisher p=0.4669); adjusted OR 0.87 (95% CI 0.65-1.17) p=0.3622 q=0.8431
+  PREX2: Early-onset CRC 82/1322 (6.2%), Average-onset CRC 168/2491 (6.7%); raw OR 0.91 (Fisher p=0.5369); adjusted OR 0.87 (95% CI 0.65-1.18) p=0.3747 q=0.8431
+  NF1: Early-onset CRC 102/1692 (6.0%), Average-onset CRC 168/3146 (5.3%); raw OR 1.14 (Fisher p=0.3250); adjusted OR 1.11 (95% CI 0.84-1.48) p=0.4621 q=0.9129
+  KMT2A: Early-onset CRC 96/1692 (5.7%), Average-onset CRC 192/3146 (6.1%); raw OR 0.93 (Fisher p=0.5669); adjusted OR 0.90 (95% CI 0.67-1.20) p=0.4649 q=0.9129
+  EPHA5: Early-onset CRC 111/1692 (6.6%), Average-onset CRC 187/3146 (5.9%); raw OR 1.11 (Fisher p=0.4151); adjusted OR 1.10 (95% CI 0.84-1.43) p=0.4897 q=0.9129
+  POLD1: Early-onset CRC 78/1629 (4.8%), Average-onset CRC 165/3031 (5.4%); raw OR 0.87 (Fisher p=0.3692); adjusted OR 0.89 (95% CI 0.64-1.25) p=0.4989 q=0.9129
+  TGFBR2: Early-onset CRC 83/1692 (4.9%), Average-onset CRC 177/3146 (5.6%); raw OR 0.87 (Fisher p=0.3161); adjusted OR 0.90 (95% CI 0.67-1.22) p=0.5024 q=0.9129
+  NOTCH4: Early-onset CRC 84/1692 (5.0%), Average-onset CRC 167/3146 (5.3%); raw OR 0.93 (Fisher p=0.6347); adjusted OR 0.91 (95% CI 0.67-1.23) p=0.5422 q=0.9129
+  … 24 more genes fit
+  CAVEAT (tell the user): Per gene, a logistic regression of mutated (yes/no) on cohort (“Early-onset CRC” = 1 against “Average-onset CRC”) and MSI_TYPE, TMB_SCORE (MSI_TYPE as categories against its commonest value, TMB_SCORE as a number; a sample attribute is the patient's first cohort sample's); the odds ratio is the cohort term's, Wald 95% CI, and q is Benjamini–Hochberg over the 54 genes fit. Patients, not samples: a patient is mutated in a gene when any of their samples in the cohort carries a called mutation in it, and is in a gene's model only when the mutation panel of one of those samples covers it (or whole-exome) — panel-aware, so a patient not profiled for a gene is left out of that gene, never counted as wild type. Tested: the 54 genes mutated in at least 5.0% (and 10) of the patients profiled for them, both cohorts together (at most 200). “Early-onset CRC”: 1,699 patients with a mutation panel, 1,692 with every covariate; “Average-onset CRC”: 3,149 patients with a mutation panel, 3,146 with every covariate. Beside each adjusted odds ratio is the raw one with its two-sided Fisher p, on the same patients; 2 genes significant raw (Fisher p < 0.05) are not after adjustment (adjusted p ≥ 0.05). For 14 genes, a covariate category in which no patient (or every patient) was mutated was merged into its reference level, since it would separate. Adjustment removes only what the covariates measure: a hypermutated tumour raises every gene's odds at once, which TMB or MSI status as a covariate absorbs and nothing else does. Cohorts are expected not to share patients; a patient in both would count on both sides. 

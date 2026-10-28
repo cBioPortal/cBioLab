@@ -3,7 +3,8 @@
   "cohorts": {
     "Breast": {
       "count": 5368,
-      "text": "CANCER_TYPE in [Breast Cancer] (any sample)",
+      "samples": 5368,
+      "text": "CANCER_TYPE in [Breast Cancer]",
       "studies": [
         "msk_chord_2024"
       ]

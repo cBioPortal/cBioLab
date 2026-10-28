@@ -844,3 +844,42 @@ Caveats, which matter:
   syncs from — but their per-gene percentages are drawn into canvas rather than
   DOM text, so matched frequencies were **not** verified at that scale. Matched
   column counts (24,950 both sides) and complete annotation were.
+
+# Cohorts as sets of samples (October 2026)
+
+A cohort now compiles to its samples, `(pid, sid)` rows, instead of its patients, and every view
+joins a sample-keyed table on the cohort's samples (`inCohortSamples`) and a patient-keyed one on
+its patients (`inCohortPatients`) — see docs/DOMAIN.md, "Cohort". Measured on the primary
+warehouse, the base commit (`0d592e7`) and the change run back to back, interleaved, best of two
+runs each, `RESULT_CACHE=off`:
+
+| | base | samples | |
+|---|---|---|---|
+| all 92 gallery examples, end to end (`runAnalysis`), total | 191.0 s | 204.9 s | +7.3% (median example 1.07×) |
+| `bench.mjs` oncoprint, two event-defined groups (2,946 patients) | 1.13 s | 1.06 s | −6% |
+| `bench.mjs` oncoprint, one event-defined cohort (3,341) | 0.60 s | 0.50 s | −17% |
+| `bench.mjs` oncoprint, the whole study (24,950) | 0.77 s | 0.66 s | −14% |
+
+**Not the neutral-or-better the change was expected to be: the gallery is about 7% slower.** The
+cost is spread thinly rather than in one place. Faster: views whose numbers are sample-level
+(co-expression 0.42×, the lollipop 0.72×, the clinical course 0.78×, the risk models ~0.8×).
+Slower: views whose cohorts are defined by patient-level clauses (timeline events, labs, lines:
+1.2–1.6×), where each such clause now expands through `sample_derived` to its patients' samples,
+and patient-unit views that now join the genomic tables on the cohort's samples and group by
+patient (HLA 1.54×, a plot's cohort layer 1.68×, mutational signatures 2.0× — the last on a
+140 ms base). Two suspects measured and ruled out, so they are not worth a rewrite:
+- testing the raw `sample_unique_id` (which is in the big tables' sort key) instead of the
+  stripped id: ~5% on gene counts once warm;
+- the clinical clause naming its stored-level subquery twice: identical to one filtered
+  subquery per level once warm (ClickHouse builds the set once).
+
+**The oncoprint was 3× slower before it was fixed.** Patient columns are built from the cohort's
+samples only, and the first version pasted every group's compiled cohort into each of its eight
+data queries — a timeline cohort re-evaluated eight times (two-group case 3.3 s). The column fetch
+now returns `(column, sample)` pairs, the columns and their samples are read off it, and the
+samples ride along as an external table (`columnSamplesIn`, falling back to the definition past
+200,000 samples or outside a request context) — the same "resolve once, ship the ids" fix as
+Explore's (§ "Two fixes" above).
+
+The inline id ceiling is unchanged in kind: a stored id set or a lock is now a sample list, so a
+cohort's ~12,000-id inline limit counts samples.

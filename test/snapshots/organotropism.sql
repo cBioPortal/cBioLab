@@ -1,15 +1,25 @@
 -- cohort NSCLC
 -- msk_chord_2024
-(SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))
 
 -- view 0 organotropism: organotropism:counts · msk_chord_2024
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 evr AS (
   SELECT DISTINCT p.stable_id AS pid, lowerUTF8(trimBoth(d.value)) AS site, trimBoth(d.value) AS raw
   FROM snapshot_db.clinical_event ce
@@ -31,7 +41,7 @@ pp AS (
   FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
   WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 ),
 prof AS (
   SELECT DISTINCT pp.pid AS pid, gp.gene AS gene FROM pp JOIN snapshot_db.gene_panel_to_gene_derived gp ON gp.gene_panel_id = pp.panel WHERE gp.gene IN ('EGFR', 'KRAS', 'TP53', 'STK11', 'KEAP1', 'SMARCA4')
@@ -50,13 +60,13 @@ alt AS (
   WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT g.off_panel
     AND g.hugo_gene_symbol IN ('EGFR', 'KRAS', 'TP53', 'STK11', 'KEAP1', 'SMARCA4')
     AND ann.is_driver
-    AND replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 ),
 st AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, if(uniqExact(lowerUTF8(trimBoth(attribute_value))) > 1, 'Multiple', any(trimBoth(attribute_value))) AS s
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND attribute_name = 'CANCER_TYPE' AND trimBoth(attribute_value) != ''
-    AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND (type = 'sample' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort))
   GROUP BY pid
 )
 SELECT ps.site AS site, prof.gene AS gene, st.s AS stratum, count() AS n, sum(ps.has) AS with_site,
@@ -67,20 +77,30 @@ FROM ps INNER JOIN prof ON prof.pid = ps.pid
 GROUP BY site, gene, stratum
 
 -- view 0 organotropism: organotropism:incidence:altered · msk_chord_2024
-WITH cohort AS (SELECT pid FROM ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH cohort AS (SELECT pid, sid FROM ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))) WHERE pid IN (
-  WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))) WHERE pid IN (
+  WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 pp AS (
   SELECT DISTINCT replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') AS pid, toString(sp.gene_panel_id) AS panel
   FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
   WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 ),
 prof AS (
   SELECT DISTINCT pp.pid AS pid, gp.gene AS gene FROM pp JOIN snapshot_db.gene_panel_to_gene_derived gp ON gp.gene_panel_id = pp.panel WHERE gp.gene IN ('EGFR')
@@ -99,20 +119,25 @@ alt AS (
   WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT g.off_panel
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
-    AND replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 )
   SELECT pid FROM prof)
   AND pid IN (
-  WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+  WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 pp AS (
   SELECT DISTINCT replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') AS pid, toString(sp.gene_panel_id) AS panel
   FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
   WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 ),
 prof AS (
   SELECT DISTINCT pp.pid AS pid, gp.gene AS gene FROM pp JOIN snapshot_db.gene_panel_to_gene_derived gp ON gp.gene_panel_id = pp.panel WHERE gp.gene IN ('EGFR')
@@ -131,7 +156,7 @@ alt AS (
   WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT g.off_panel
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
-    AND replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 )
   SELECT pid FROM alt)),
 os AS (
@@ -143,7 +168,7 @@ os AS (
     AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
   GROUP BY pid
 ),
-anch AS (SELECT pid, toInt64(0) AS day FROM cohort),
+anch AS (SELECT DISTINCT pid, toInt64(0) AS day FROM cohort),
 ev AS (SELECT p.stable_id AS pid, ce.start_date AS day
   FROM snapshot_db.clinical_event ce
   JOIN snapshot_db.patient p ON p.internal_id = ce.patient_id
@@ -180,20 +205,30 @@ SELECT kind, if(kind = 'record', round(entry, 4), 0) AS entry, if(kind = 'record
 FROM cls GROUP BY kind, entry, t, cause, late ORDER BY t
 
 -- view 0 organotropism: organotropism:incidence:wildtype · msk_chord_2024
-WITH cohort AS (SELECT pid FROM ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH cohort AS (SELECT pid, sid FROM ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))) WHERE pid IN (
-  WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))) WHERE pid IN (
+  WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 pp AS (
   SELECT DISTINCT replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') AS pid, toString(sp.gene_panel_id) AS panel
   FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
   WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 ),
 prof AS (
   SELECT DISTINCT pp.pid AS pid, gp.gene AS gene FROM pp JOIN snapshot_db.gene_panel_to_gene_derived gp ON gp.gene_panel_id = pp.panel WHERE gp.gene IN ('EGFR')
@@ -212,20 +247,25 @@ alt AS (
   WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT g.off_panel
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
-    AND replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 )
   SELECT pid FROM prof)
   AND pid NOT IN (
-  WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+  WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 pp AS (
   SELECT DISTINCT replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') AS pid, toString(sp.gene_panel_id) AS panel
   FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id
   WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND replaceOne(sd.patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 ),
 prof AS (
   SELECT DISTINCT pp.pid AS pid, gp.gene AS gene FROM pp JOIN snapshot_db.gene_panel_to_gene_derived gp ON gp.gene_panel_id = pp.panel WHERE gp.gene IN ('EGFR')
@@ -244,7 +284,7 @@ alt AS (
   WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT g.off_panel
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
-    AND replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
+    AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 )
   SELECT pid FROM alt)),
 os AS (
@@ -256,7 +296,7 @@ os AS (
     AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)
   GROUP BY pid
 ),
-anch AS (SELECT pid, toInt64(0) AS day FROM cohort),
+anch AS (SELECT DISTINCT pid, toInt64(0) AS day FROM cohort),
 ev AS (SELECT p.stable_id AS pid, ce.start_date AS day
   FROM snapshot_db.clinical_event ce
   JOIN snapshot_db.patient p ON p.internal_id = ce.patient_id
@@ -293,10 +333,15 @@ SELECT kind, if(kind = 'record', round(entry, 4), 0) AS entry, if(kind = 'record
 FROM cls GROUP BY kind, entry, t, cause, late ORDER BY t
 
 -- view 0 organotropism: organotropism:sites · msk_chord_2024
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 evr AS (
   SELECT DISTINCT p.stable_id AS pid, lowerUTF8(trimBoth(d.value)) AS site, trimBoth(d.value) AS raw
   FROM snapshot_db.clinical_event ce
@@ -317,17 +362,22 @@ SELECT ps.site AS site, any(sl.label) AS label, count() AS evaluable, sum(ps.has
 FROM ps INNER JOIN sl ON sl.site = ps.site GROUP BY site
 
 -- view 0 organotropism: organotropism:sources · msk_chord_2024
-WITH cohort AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))))
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer')))))))
 SELECT
-  (SELECT uniqExact(replaceOne(patient_unique_id, 'msk_chord_2024_', '')) FROM snapshot_db.clinical_data_derived WHERE cancer_study_identifier = 'msk_chord_2024' AND startsWith(attribute_name, 'DMETS_DX_') AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)) AS flag_patients,
-  (SELECT uniqExact(attribute_name) FROM snapshot_db.clinical_data_derived WHERE cancer_study_identifier = 'msk_chord_2024' AND startsWith(attribute_name, 'DMETS_DX_') AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)) AS flags,
+  (SELECT uniqExact(replaceOne(patient_unique_id, 'msk_chord_2024_', '')) FROM snapshot_db.clinical_data_derived WHERE cancer_study_identifier = 'msk_chord_2024' AND startsWith(attribute_name, 'DMETS_DX_') AND (type = 'sample' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort))) AS flag_patients,
+  (SELECT uniqExact(attribute_name) FROM snapshot_db.clinical_data_derived WHERE cancer_study_identifier = 'msk_chord_2024' AND startsWith(attribute_name, 'DMETS_DX_') AND (type = 'sample' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort))) AS flags,
   (SELECT uniqExact(p.stable_id) FROM snapshot_db.clinical_event ce
      JOIN snapshot_db.clinical_event_data d ON d.clinical_event_id = ce.clinical_event_id
      JOIN snapshot_db.patient p ON p.internal_id = ce.patient_id
      JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND lowerUTF8(trimBoth(ce.event_type)) = lowerUTF8(trimBoth('Diagnosis')) AND lowerUTF8(trimBoth(d.key)) = lowerUTF8(trimBoth('TUMOR_SITE')) AND trimBoth(d.value) != '' AND p.stable_id IN (SELECT pid FROM cohort)) AS timeline_patients,
-  (SELECT uniqExact(replaceOne(patient_unique_id, 'msk_chord_2024_', '')) FROM snapshot_db.clinical_data_derived WHERE cancer_study_identifier = 'msk_chord_2024' AND attribute_name = 'METASTATIC_SITE' AND trimBoth(attribute_value) != '' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)) AS sample_patients
+  (SELECT uniqExact(replaceOne(patient_unique_id, 'msk_chord_2024_', '')) FROM snapshot_db.clinical_data_derived WHERE cancer_study_identifier = 'msk_chord_2024' AND attribute_name = 'METASTATIC_SITE' AND trimBoth(attribute_value) != '' AND (type = 'sample' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort))) AS sample_patients
 FROM system.one

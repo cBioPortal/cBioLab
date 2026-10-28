@@ -106,7 +106,7 @@ export async function runPathways(view: PathwaysView, ctx: ViewRun): Promise<Vie
     for (const r of rows) for (const t of r.top) if (gq.has(t.gene)) t.q = gq.get(t.gene);
   }
   if (!rows.some((r) => r.cells.some((c) => c.profiled > 0)))
-    return refuse("pathways", ctx, "no patient in " + (vNames.length === 1 ? "this cohort" : "these cohorts") + " was profiled for any gene in these pathways");
+    return refuse("pathways", ctx, "no sample in " + (vNames.length === 1 ? "this cohort" : "these cohorts") + " was profiled for any gene in these pathways");
   const multi = ctx.vStudies.length > 1;
   const unprofiled = rows.reduce((n, r) => n + r.notProfiled.length, 0);
   return {
@@ -123,10 +123,10 @@ export async function runPathways(view: PathwaysView, ctx: ViewRun): Promise<Vie
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
     caveat: (measure === "driver"
-        ? "Share of patients with an OncoKB driver (" + pin + ") in at least one member gene — drivers only, as Sanchez-Vega et al. counted curated oncogenic events. "
-        : "Share of patients with any alteration (mutation, high-level CNA, structural variant) in at least one member gene, drivers or not. ") +
-      "A pathway's denominator is the patients profiled for at least one of its genes, so a panel that covers few members makes a pathway look rarer than a genome-wide assay would; " +
-      "each member gene's own % is over the patients profiled for THAT gene. " +
+        ? "Share of samples with an OncoKB driver (" + pin + ") in at least one member gene — drivers only, as Sanchez-Vega et al. counted curated oncogenic events. "
+        : "Share of samples with any alteration (mutation, high-level CNA, structural variant) in at least one member gene, drivers or not. ") +
+      "A pathway's denominator is the samples profiled for at least one of its genes, so a panel that covers few members makes a pathway look rarer than a genome-wide assay would; " +
+      "each member gene's own % is over the samples profiled for THAT gene. " +
       (unprofiled ? unprofiled + " member-gene slots were on no participating panel and are listed as not profiled rather than counted as unaltered. " : "") +
       "Pathway membership is the paper's Table S3; a gene's pathway role (oncogene / tumour suppressor) is not used in the count." +
       (two ? " Two-sided Fisher tests; q is Benjamini–Hochberg across the pathways drawn, and separately across every member gene tested." : "") +

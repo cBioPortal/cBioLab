@@ -3,14 +3,16 @@
   "cohorts": {
     "Melanoma": {
       "count": 1706,
-      "text": "CANCER_TYPE in [Melanoma] (any sample)",
+      "samples": 1831,
+      "text": "CANCER_TYPE in [Melanoma]",
       "studies": [
         "msk_impact_50k_2026"
       ]
     },
     "Non-small cell lung": {
       "count": 6633,
-      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)",
+      "samples": 7867,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer]",
       "studies": [
         "msk_impact_50k_2026"
       ]
@@ -35,7 +37,7 @@
         ],
         "tested": 30,
         "untested": 0,
-        "significant": 26,
+        "significant": 27,
         "minN": 3,
         "test": "Welch's t-test",
         "missing": 0,
@@ -46,19 +48,19 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.010298716665451143,
-                "sd": 0.058030565429624245
+                "n": 1819,
+                "mean": 0.009823441629046534,
+                "sd": 0.05611523326686208
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.16622830059170146,
-                "sd": 0.2429434174798955
+                "n": 7779,
+                "mean": 0.16922881293087172,
+                "sd": 0.2444611475569555
               }
             ],
-            "diff": -0.1559295839262503,
-            "statistic": -51.5445,
+            "diff": -0.1594053713018252,
+            "statistic": -51.955,
             "p": 0,
             "q": 0,
             "higherIn": "Non-small cell lung"
@@ -69,19 +71,19 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.5187993341391373,
-                "sd": 0.38449006711437517
+                "n": 1819,
+                "mean": 0.5276076404106423,
+                "sd": 0.38234190753080016
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.023843506796059934,
-                "sd": 0.08326193650974895
+                "n": 7779,
+                "mean": 0.023264513947536695,
+                "sd": 0.08121010971829531
               }
             ],
-            "diff": 0.4949558273430773,
-            "statistic": 55.2198,
+            "diff": 0.5043431264631056,
+            "statistic": 55.9644,
             "p": 0,
             "q": 0,
             "higherIn": "Melanoma"
@@ -92,21 +94,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.009138891998722847,
-                "sd": 0.057083701696028374
+                "n": 1819,
+                "mean": 0.008637766189003356,
+                "sd": 0.05499485652223297
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.06971042637090322,
-                "sd": 0.14364314155913735
+                "n": 7779,
+                "mean": 0.07061299145846146,
+                "sd": 0.1443215096205962
               }
             ],
-            "diff": -0.060571534372180366,
-            "statistic": -29.1484,
-            "p": 4.257392752150982e-177,
-            "q": 4.257392752150982e-176,
+            "diff": -0.061975225269458104,
+            "statistic": -29.7482,
+            "p": 3.4141851060194217e-184,
+            "q": 3.4141851060194217e-183,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -115,21 +117,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.00956848138721051,
-                "sd": 0.049038566059724766
+                "n": 1819,
+                "mean": 0.008829971994853294,
+                "sd": 0.04750106848027519
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.05888704485121312,
-                "sd": 0.12005389818751065
+                "n": 7779,
+                "mean": 0.05839812173358551,
+                "sd": 0.11892255794443377
               }
             ],
-            "diff": -0.04931856346400261,
-            "statistic": -28.0766,
-            "p": 7.819767583291453e-165,
-            "q": 5.86482568746859e-164,
+            "diff": -0.04956814973873221,
+            "statistic": -28.3433,
+            "p": 8.13066007698531e-168,
+            "q": 6.097995057738982e-167,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -138,21 +140,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.008721388163558217,
-                "sd": 0.05475951701062739
+                "n": 1819,
+                "mean": 0.008038575260486342,
+                "sd": 0.053207146835977645
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.03888048199856076,
-                "sd": 0.10851084936848984
+                "n": 7779,
+                "mean": 0.03953184290346109,
+                "sd": 0.10946227456167744
               }
             ],
-            "diff": -0.030159093835002544,
-            "statistic": -17.1941,
-            "p": 1.2383597382494074e-64,
-            "q": 7.430158429496444e-64,
+            "diff": -0.03149326764297475,
+            "statistic": -17.8966,
+            "p": 8.800637811894144e-70,
+            "q": 5.280382687136486e-69,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -161,21 +163,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.0075951464783650165,
-                "sd": 0.05997980259981962
+                "n": 1819,
+                "mean": 0.006636948267939273,
+                "sd": 0.05401772159357197
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.036515687120827596,
-                "sd": 0.11050042911728776
+                "n": 7779,
+                "mean": 0.03700776611299747,
+                "sd": 0.11128470906710314
               }
             ],
-            "diff": -0.028920540642462578,
-            "statistic": -15.5638,
-            "p": 2.0399699792092248e-53,
-            "q": 9.140126119414008e-53,
+            "diff": -0.0303708178450582,
+            "statistic": -16.988,
+            "p": 3.206965556454754e-63,
+            "q": 1.603482778227377e-62,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -184,21 +186,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.01574707484289951,
-                "sd": 0.07207156259435718
+                "n": 1819,
+                "mean": 0.015208612014258518,
+                "sd": 0.07048746375327022
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.04828051007857093,
-                "sd": 0.11181289363691815
+                "n": 7779,
+                "mean": 0.04851314157384606,
+                "sd": 0.11232732309470482
               }
             ],
-            "diff": -0.032533435235671426,
-            "statistic": -15.6028,
-            "p": 2.132696094529935e-53,
-            "q": 9.140126119414008e-53,
+            "diff": -0.03330452955958754,
+            "statistic": -15.962,
+            "p": 9.389121052651763e-56,
+            "q": 4.023909022565042e-55,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -207,21 +209,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.012741072656891395,
-                "sd": 0.06996952278802417
+                "n": 1819,
+                "mean": 0.012330814020866242,
+                "sd": 0.06670530016016504
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.03148789629481505,
-                "sd": 0.10402448882076575
+                "n": 7779,
+                "mean": 0.03179647539801636,
+                "sd": 0.10449548306087562
               }
             ],
-            "diff": -0.018746823637923654,
-            "statistic": -9.3993,
-            "p": 8.978520304776075e-21,
-            "q": 3.366945114291028e-20,
+            "diff": -0.01946566137715012,
+            "statistic": -9.9208,
+            "p": 6.049120802895663e-23,
+            "q": 2.2684203010858736e-22,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -230,21 +232,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.007451000313366118,
-                "sd": 0.04686758323534038
+                "n": 1819,
+                "mean": 0.007523240316484443,
+                "sd": 0.04721872155255953
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.018510648716710272,
-                "sd": 0.07452376696028855
+                "n": 7779,
+                "mean": 0.01844508879059963,
+                "sd": 0.0747575824197538
               }
             ],
-            "diff": -0.011059648403344155,
-            "statistic": -8.0839,
-            "p": 8.068458736467697e-16,
-            "q": 2.6894862454892323e-15,
+            "diff": -0.010921848474115186,
+            "statistic": -7.833,
+            "p": 5.978316095432489e-15,
+            "q": 1.9927720318108296e-14,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -253,44 +255,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.006187496702424302,
-                "sd": 0.047053354018776014
+                "n": 1819,
+                "mean": 0.006172444851179041,
+                "sd": 0.047133271422549354
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.016258978835554536,
-                "sd": 0.07034220328342541
+                "n": 7779,
+                "mean": 0.01625783502839279,
+                "sd": 0.07050069814830043
               }
             ],
-            "diff": -0.010071482133130234,
-            "statistic": -7.4949,
-            "p": 8.113222960127824e-14,
-            "q": 2.433966888038347e-13,
-            "higherIn": "Non-small cell lung"
-          },
-          {
-            "entity": "mutational_signatures_contribution_v2_Signature3",
-            "name": "Signature3 (HRD)",
-            "cells": [
-              {
-                "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.033382070490749524,
-                "sd": 0.10985459784098602
-              },
-              {
-                "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.050057430234104486,
-                "sd": 0.12366731742703801
-              }
-            ],
-            "diff": -0.01667535974335496,
-            "statistic": -5.7568,
-            "p": 9.422091209324467e-9,
-            "q": 2.5696612389066728e-8,
+            "diff": -0.010085390177213749,
+            "statistic": -7.3945,
+            "p": 1.7229075154526388e-13,
+            "q": 5.168722546357917e-13,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -299,21 +278,44 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.008898449962132352,
-                "sd": 0.05376045204068322
+                "n": 1819,
+                "mean": 0.008388464795528777,
+                "sd": 0.050703609894759714
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.017503401319110528,
-                "sd": 0.0751290088094514
+                "n": 7779,
+                "mean": 0.017164987275290724,
+                "sd": 0.07416809551742064
               }
             ],
-            "diff": -0.008604951356978176,
-            "statistic": -5.7291,
-            "p": 1.089058255916334e-8,
-            "q": 2.722645639790835e-8,
+            "diff": -0.008776522479761947,
+            "statistic": -6.0271,
+            "p": 1.825941518592036e-9,
+            "q": 4.979840505251007e-9,
+            "higherIn": "Non-small cell lung"
+          },
+          {
+            "entity": "mutational_signatures_contribution_v2_Signature3",
+            "name": "Signature3 (HRD)",
+            "cells": [
+              {
+                "cohort": "Melanoma",
+                "n": 1819,
+                "mean": 0.033385207658641655,
+                "sd": 0.11040234979525171
+              },
+              {
+                "cohort": "Non-small cell lung",
+                "n": 7779,
+                "mean": 0.04950674500836107,
+                "sd": 0.1227026337467963
+              }
+            ],
+            "diff": -0.01612153734971941,
+            "statistic": -5.4859,
+            "p": 4.461405038680401e-8,
+            "q": 1.1153512596701002e-7,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -322,21 +324,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.003375244796579444,
-                "sd": 0.032469849908769825
+                "n": 1819,
+                "mean": 0.0033793466730416603,
+                "sd": 0.03269355428038455
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.008217846958261008,
-                "sd": 0.04910702349579657
+                "n": 7779,
+                "mean": 0.008149647462129227,
+                "sd": 0.04921453327244877
               }
             ],
-            "diff": -0.004842602161681564,
-            "statistic": -5.2015,
-            "p": 2.0737585057441852e-7,
-            "q": 4.78559655171735e-7,
+            "diff": -0.004770300789087566,
+            "statistic": -5.0312,
+            "p": 5.088426067526643e-7,
+            "q": 0.0000011742521694292254,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -345,44 +347,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.025012240905447253,
-                "sd": 0.08301104223943147
+                "n": 1819,
+                "mean": 0.02523444246257967,
+                "sd": 0.0834467586304767
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.014629153004696164,
-                "sd": 0.07381865739502905
+                "n": 7779,
+                "mean": 0.014655752710284825,
+                "sd": 0.07423733765506167
               }
             ],
-            "diff": 0.01038308790075109,
-            "statistic": 4.9598,
-            "p": 7.514323940558246e-7,
-            "q": 0.000001610212272976767,
-            "higherIn": "Melanoma"
-          },
-          {
-            "entity": "mutational_signatures_contribution_v2_Signature22",
-            "name": "Signature22 (Aristolochic acid)",
-            "cells": [
-              {
-                "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.030421841758504636,
-                "sd": 0.12065985491117996
-              },
-              {
-                "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.0174121127144547,
-                "sd": 0.0701378460140468
-              }
-            ],
-            "diff": 0.013009729044049935,
-            "statistic": 4.4784,
-            "p": 0.000007914499451777197,
-            "q": 0.000015828998903554394,
+            "diff": 0.010578689752294843,
+            "statistic": 4.9667,
+            "p": 7.263974545594609e-7,
+            "q": 0.0000015565659740559877,
             "higherIn": "Melanoma"
           },
           {
@@ -391,21 +370,67 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.005959323302291891,
-                "sd": 0.043912441051391006
+                "n": 1819,
+                "mean": 0.005814400052994906,
+                "sd": 0.04381394530974616
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.011484670137244484,
-                "sd": 0.06572043429115658
+                "n": 7779,
+                "mean": 0.011466432038772638,
+                "sd": 0.06549923110901848
               }
             ],
-            "diff": -0.005525346834952593,
-            "statistic": -4.4042,
-            "p": 0.000010893049287469575,
-            "q": 0.000020424467414005453,
+            "diff": -0.005652031985777732,
+            "statistic": -4.4588,
+            "p": 0.000008470270876633447,
+            "q": 0.000016940541753266895,
+            "higherIn": "Non-small cell lung"
+          },
+          {
+            "entity": "mutational_signatures_contribution_v2_Signature22",
+            "name": "Signature22 (Aristolochic acid)",
+            "cells": [
+              {
+                "cohort": "Melanoma",
+                "n": 1819,
+                "mean": 0.029666524071346307,
+                "sd": 0.11738422241107731
+              },
+              {
+                "cohort": "Non-small cell lung",
+                "n": 7779,
+                "mean": 0.017352128091831075,
+                "sd": 0.06973212843749997
+              }
+            ],
+            "diff": 0.012314395979515232,
+            "statistic": 4.3003,
+            "p": 0.000017825186697733187,
+            "q": 0.000033422225058249726,
+            "higherIn": "Melanoma"
+          },
+          {
+            "entity": "mutational_signatures_contribution_v2_Signature1",
+            "name": "Signature1 (Aging)",
+            "cells": [
+              {
+                "cohort": "Melanoma",
+                "n": 1819,
+                "mean": 0.041770565837440016,
+                "sd": 0.12799399102987016
+              },
+              {
+                "cohort": "Non-small cell lung",
+                "n": 7779,
+                "mean": 0.054507964886290575,
+                "sd": 0.13242525032676417
+              }
+            ],
+            "diff": -0.012737399048850559,
+            "statistic": -3.7958,
+            "p": 0.00015030831687296844,
+            "q": 0.00026524997095229725,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -414,44 +439,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.015807337209066928,
-                "sd": 0.0817667918971231
+                "n": 1819,
+                "mean": 0.01504705089308549,
+                "sd": 0.07937988971045185
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.023866173976835513,
-                "sd": 0.09133133211610106
+                "n": 7779,
+                "mean": 0.022409113067195827,
+                "sd": 0.08742952438512724
               }
             ],
-            "diff": -0.008058836767768585,
-            "statistic": -3.7444,
-            "p": 0.00018415566527705678,
-            "q": 0.00032498058578304137,
-            "higherIn": "Non-small cell lung"
-          },
-          {
-            "entity": "mutational_signatures_contribution_v2_Signature1",
-            "name": "Signature1 (Aging)",
-            "cells": [
-              {
-                "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.04333237406593814,
-                "sd": 0.1312946832832878
-              },
-              {
-                "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.05599605732477383,
-                "sd": 0.13541974869028547
-              }
-            ],
-            "diff": -0.012663683258835691,
-            "statistic": -3.7264,
-            "p": 0.00019799745329043342,
-            "q": 0.0003299957554840557,
+            "diff": -0.007362062174110336,
+            "statistic": -3.4912,
+            "p": 0.0004878629429090226,
+            "q": 0.000813104904848371,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -460,21 +462,21 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.004369047392522002,
-                "sd": 0.03509725788077581
+                "n": 1819,
+                "mean": 0.004246947864019563,
+                "sd": 0.03478555428709508
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.00757593414630822,
-                "sd": 0.04613297579534556
+                "n": 7779,
+                "mean": 0.007556698648466653,
+                "sd": 0.04597643812468158
               }
             ],
-            "diff": -0.0032068867537862183,
-            "statistic": -3.3308,
-            "p": 0.0008748917823274928,
-            "q": 0.001381408077359199,
+            "diff": -0.00330975078444709,
+            "statistic": -3.4193,
+            "p": 0.0006350882487296696,
+            "q": 0.0010027709190468467,
             "higherIn": "Non-small cell lung"
           },
           {
@@ -483,30 +485,30 @@
             "cells": [
               {
                 "cohort": "Melanoma",
-                "n": 1860,
-                "mean": 0.006908302333128928,
-                "sd": 0.04331609198242078
+                "n": 1819,
+                "mean": 0.0067764995172651,
+                "sd": 0.043385091251613606
               },
               {
                 "cohort": "Non-small cell lung",
-                "n": 8040,
-                "mean": 0.010629742521844341,
-                "sd": 0.056740018863434244
+                "n": 7779,
+                "mean": 0.010800096531271947,
+                "sd": 0.0573799898209521
               }
             ],
-            "diff": -0.0037214401887154134,
-            "statistic": -3.1349,
-            "p": 0.00173320076233686,
-            "q": 0.002543008405928216,
+            "diff": -0.004023597014006847,
+            "statistic": -3.3322,
+            "p": 0.0008706379323049543,
+            "q": 0.0013059568984574315,
             "higherIn": "Non-small cell lung"
           },
           {
             "…": "10 more",
-            "sha256": "7e4e84a5665d9825"
+            "sha256": "49ec9a800d763bcc"
           }
         ],
         "grid": {
-          "xMax": 0.5,
+          "xMax": 1,
           "yMax": 500,
           "nx": 80,
           "ny": 50,
@@ -523,8 +525,8 @@
           "mutational_signatures_contribution_v2_Signature20",
           "mutational_signatures_contribution_v2_Signature16",
           "mutational_signatures_contribution_v2_Signature8",
-          "mutational_signatures_contribution_v2_Signature3",
-          "mutational_signatures_contribution_v2_Signature15"
+          "mutational_signatures_contribution_v2_Signature15",
+          "mutational_signatures_contribution_v2_Signature3"
         ]
       },
       "participation": {
@@ -539,7 +541,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Every entity of “Mutational Signature Contribution Scores (COSMIC v2)” (mutational_signatures_contribution_v2) compared across the cohorts, one value per sample as the study recorded it, from every sample of each cohort's patients. Values that are not numbers (a limit such as \">8\", or NA) are left out (0 of them). Each entity is tested with Welch's t-test from each cohort's n, mean and variance; with thousands of samples a tiny difference is significant, so read the means too. 30 entities tested; q is Benjamini–Hochberg across all of them. 0 were not tested: fewer than 3 samples with a value in some cohort, or no spread. ",
+      "caveat": "Every entity of “Mutational Signature Contribution Scores (COSMIC v2)” (mutational_signatures_contribution_v2) compared across the cohorts, one value per sample as the study recorded it, from each cohort's own samples. Values that are not numbers (a limit such as \">8\", or NA) are left out (0 of them). Each entity is tested with Welch's t-test from each cohort's n, mean and variance; with thousands of samples a tiny difference is significant, so read the means too. 30 entities tested; q is Benjamini–Hochberg across all of them. 0 were not tested: fewer than 3 samples with a value in some cohort, or no spread. ",
       "method": {
         "steps": [
           {
@@ -612,83 +614,83 @@
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature24:p": {
-            "v": 4.257392752150982e-177,
+            "v": 3.4141851060194217e-184,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature24:q": {
-            "v": 4.257392752150982e-176,
+            "v": 3.4141851060194217e-183,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature13:p": {
-            "v": 7.819767583291453e-165,
+            "v": 8.13066007698531e-168,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature13:q": {
-            "v": 5.86482568746859e-164,
+            "v": 6.097995057738982e-167,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature18:p": {
-            "v": 1.2383597382494074e-64,
+            "v": 8.800637811894144e-70,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature18:q": {
-            "v": 7.430158429496444e-64,
+            "v": 5.280382687136486e-69,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature29:p": {
-            "v": 2.0399699792092248e-53,
+            "v": 3.206965556454754e-63,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature29:q": {
-            "v": 9.140126119414008e-53,
+            "v": 1.603482778227377e-62,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature2:p": {
-            "v": 2.132696094529935e-53,
+            "v": 9.389121052651763e-56,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature2:q": {
-            "v": 9.140126119414008e-53,
+            "v": 4.023909022565042e-55,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature20:p": {
-            "v": 8.978520304776075e-21,
+            "v": 6.049120802895663e-23,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature20:q": {
-            "v": 3.366945114291028e-20,
+            "v": 2.2684203010858736e-22,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature16:p": {
-            "v": 8.068458736467697e-16,
+            "v": 5.978316095432489e-15,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature16:q": {
-            "v": 2.6894862454892323e-15,
+            "v": 1.9927720318108296e-14,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "assays:mutational_signatures_contribution_v2_Signature8:p": {
-            "v": 8.113222960127824e-14,
+            "v": 1.7229075154526388e-13,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "…": {
             "more": 41,
-            "sha256": "89b71828088bd533"
+            "sha256": "b7cb9e907981f811"
           }
         }
       }

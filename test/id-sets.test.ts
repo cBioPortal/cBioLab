@@ -24,7 +24,7 @@ describe("a list clause naming a stored set", () => {
   test("names a different table per study, and nobody in a study the set has no ids for", async () => {
     assert.notEqual(idSetTableName(SET, "s1"), idSetTableName(SET, "s2"));
     const sql = await inSets(async () => compileCohortDef({ all: [leaf] }, { study: "s3", db: "db" }));
-    assert.match(sql, /WHERE 1=0/);
+    assert.match(sql, /AND 1=0\)/);
   });
   test("is refused, saying why, in a request that did not read the set (MCP, a script, a signed-out link)", () => {
     assert.throws(() => compileCohortDef({ all: [leaf] }, ctx), /names stored id set .* which this request did not read/);

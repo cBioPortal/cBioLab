@@ -31,7 +31,7 @@ function site(mode: "patient-level" | "aggregate-only", rows: BoxRow[], bins: { 
 }
 
 const evaluated = (studies: string[]): EvaluatedCohort =>
-  ({ studies, perStudy: Object.fromEntries(studies.map((s) => [s, { sql: "", count: 10, mode: "patient-level" }])), count: 10, text: "" });
+  ({ studies, perStudy: Object.fromEntries(studies.map((s) => [s, { sql: "", count: 10, samples: 10, mode: "patient-level" }])), count: 10, samples: 10, text: "" });
 
 async function run(resolvers: Record<string, unknown>, extra: Record<string, unknown> = {}): Promise<ViewResultOf<"plot">> {
   const studies = Object.keys(resolvers);

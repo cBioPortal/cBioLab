@@ -3,7 +3,8 @@
   "cohorts": {
     "Pancreatic": {
       "count": 3109,
-      "text": "CANCER_TYPE in [Pancreatic Cancer] (any sample)",
+      "samples": 3109,
+      "text": "CANCER_TYPE in [Pancreatic Cancer]",
       "studies": [
         "msk_chord_2024"
       ]
@@ -833,12 +834,12 @@
           {
             "cohort": "Pancreatic",
             "study": "msk_chord_2024",
-            "total": 3134,
-            "all": 3134
+            "total": 3109,
+            "all": 3109
           }
         ],
-        "total": 3134,
-        "all": 3134
+        "total": 3109,
+        "all": 3109
       },
       "participation": {
         "studies": [
@@ -852,7 +853,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "One row per sample of each cohort's patients, carrying its patient's attributes too, with 50 attributes as each study recorded them — vocabularies are not harmonized across studies. 3,134 samples. Sorted by Current Age (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "One row per sample of each cohort's patients, carrying its patient's attributes too, with 50 attributes as each study recorded them — vocabularies are not harmonized across studies. 3,109 samples. Sorted by Current Age (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {
@@ -862,7 +863,7 @@
             "params": [
               [
                 "Pancreatic · msk_chord_2024",
-                "3,134"
+                "3,109"
               ]
             ]
           },

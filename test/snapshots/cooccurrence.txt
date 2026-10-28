@@ -1,24 +1,24 @@
 Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
-- NSCLC: 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)
+- NSCLC: 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer]
 
 Co-occurrence (2x2 per pair, among patients profiled for BOTH genes):
-  STK11/KEAP1: both 572, STK11 only 537, KEAP1 only 512, neither 6,188 (of 7,809 profiled)  log2OR=3.69 (co-occur)  p=3.4e-249 q=5.1e-248
-  EGFR/KRAS: both 75, EGFR only 1,947, KRAS only 2,194, neither 3,593 (of 7,809 profiled)  log2OR=-3.99 (mutually exclusive)  p=1.5e-238 q=1.1e-237
-  EGFR/STK11: both 52, EGFR only 1,970, STK11 only 1,057, neither 4,730 (of 7,809 profiled)  log2OR=-3.08 (mutually exclusive)  p=8.9e-88 q=4.5e-87
-  KRAS/STK11: both 598, KRAS only 1,671, STK11 only 511, neither 5,029 (of 7,809 profiled)  log2OR=1.82 (co-occur)  p=4.9e-79 q=1.9e-78
-  EGFR/KEAP1: both 66, EGFR only 1,956, KEAP1 only 1,018, neither 4,769 (of 7,809 profiled)  log2OR=-2.66 (mutually exclusive)  p=1.5e-72 q=4.5e-72
-  KRAS/TP53: both 873, KRAS only 1,396, TP53 only 3,215, neither 2,325 (of 7,809 profiled)  log2OR=-1.15 (mutually exclusive)  p=1.1e-55 q=2.6e-55
-  EGFR/ALK: both 49, EGFR only 1,973, ALK only 503, neither 5,284 (of 7,809 profiled)  log2OR=-1.94 (mutually exclusive)  p=3.2e-25 q=6.9e-25
-  KRAS/KEAP1: both 456, KRAS only 1,813, KEAP1 only 628, neither 4,912 (of 7,809 profiled)  log2OR=0.98 (co-occur)  p=5.5e-23 q=1.0e-22
-  TP53/STK11: both 453, TP53 only 3,635, STK11 only 656, neither 3,065 (of 7,809 profiled)  log2OR=-0.78 (mutually exclusive)  p=1.3e-16 q=2.2e-16
-  EGFR/TP53: both 1,174, EGFR only 848, TP53 only 2,914, neither 2,873 (of 7,809 profiled)  log2OR=0.45 (co-occur)  p=2.3e-9 q=3.4e-9
-  KRAS/ALK: both 118, KRAS only 2,151, ALK only 434, neither 5,106 (of 7,809 profiled)  log2OR=-0.63 (mutually exclusive)  p=2.8e-5 q=3.8e-5
+  STK11/KEAP1: both 571, STK11 only 538, KEAP1 only 511, neither 6,189 (of 7,809 profiled)  log2OR=3.68 (co-occur)  p=1.2e-248 q=1.7e-247
+  EGFR/KRAS: both 71, EGFR only 1,946, KRAS only 2,187, neither 3,605 (of 7,809 profiled)  log2OR=-4.06 (mutually exclusive)  p=1.7e-240 q=1.3e-239
+  EGFR/STK11: both 51, EGFR only 1,966, STK11 only 1,058, neither 4,734 (of 7,809 profiled)  log2OR=-3.11 (mutually exclusive)  p=2.6e-88 q=1.3e-87
+  KRAS/STK11: both 596, KRAS only 1,662, STK11 only 513, neither 5,038 (of 7,809 profiled)  log2OR=1.82 (co-occur)  p=5.8e-79 q=2.2e-78
+  EGFR/KEAP1: both 65, EGFR only 1,952, KEAP1 only 1,017, neither 4,775 (of 7,809 profiled)  log2OR=-2.68 (mutually exclusive)  p=8.8e-73 q=2.6e-72
+  KRAS/TP53: both 855, KRAS only 1,403, TP53 only 3,219, neither 2,332 (of 7,809 profiled)  log2OR=-1.18 (mutually exclusive)  p=7.8e-59 q=1.9e-58
+  EGFR/ALK: both 49, EGFR only 1,968, ALK only 503, neither 5,289 (of 7,809 profiled)  log2OR=-1.93 (mutually exclusive)  p=3.2e-25 q=6.9e-25
+  KRAS/KEAP1: both 453, KRAS only 1,805, KEAP1 only 629, neither 4,922 (of 7,809 profiled)  log2OR=0.97 (co-occur)  p=9.0e-23 q=1.7e-22
+  TP53/STK11: both 449, TP53 only 3,625, STK11 only 660, neither 3,075 (of 7,809 profiled)  log2OR=-0.79 (mutually exclusive)  p=4.3e-17 q=7.2e-17
+  EGFR/TP53: both 1,168, EGFR only 849, TP53 only 2,906, neither 2,886 (of 7,809 profiled)  log2OR=0.45 (co-occur)  p=2.2e-9 q=3.3e-9
+  KRAS/ALK: both 118, KRAS only 2,140, ALK only 434, neither 5,117 (of 7,809 profiled)  log2OR=-0.62 (mutually exclusive)  p=4.1e-5 q=5.6e-5
   STK11/ALK: both 66, STK11 only 1,043, ALK only 486, neither 6,214 (of 7,809 profiled)  log2OR=-0.31 (mutually exclusive)  p=0.1288 q=0.1610
-  TP53/ALK: both 303, TP53 only 3,785, ALK only 249, neither 3,472 (of 7,809 profiled)  log2OR=0.16 (co-occur)  p=0.2162 q=0.2417
-  TP53/KEAP1: both 586, TP53 only 3,502, KEAP1 only 498, neither 3,223 (of 7,809 profiled)  log2OR=0.12 (co-occur)  p=0.2256 q=0.2417
-  KEAP1/ALK: both 72, KEAP1 only 1,012, ALK only 480, neither 6,245 (of 7,809 profiled)  log2OR=-0.11 (mutually exclusive)  p=0.6094 q=0.6094
+  TP53/ALK: both 303, TP53 only 3,771, ALK only 249, neither 3,486 (of 7,809 profiled)  log2OR=0.17 (co-occur)  p=0.1853 q=0.2138
+  TP53/KEAP1: both 583, TP53 only 3,491, KEAP1 only 499, neither 3,236 (of 7,809 profiled)  log2OR=0.12 (co-occur)  p=0.2253 q=0.2414
+  KEAP1/ALK: both 72, KEAP1 only 1,010, ALK only 480, neither 6,247 (of 7,809 profiled)  log2OR=-0.11 (mutually exclusive)  p=0.6093 q=0.6093
   Pairwise co-occurrence within “NSCLC”. Denominators are the patients profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on patients whose panel could not have detected it. Two-sided Fisher exact test. q-values are Benjamini–Hochberg across the 15 assessable pairs. Every site returns four counts per pair and nothing else.
   METHOD:
     - Count each gene pair's 2×2 table [NSCLC · msk_chord_2024]: The pairCounts query above. Of the patients with a sample on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.

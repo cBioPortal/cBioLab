@@ -3,7 +3,8 @@
   "cohorts": {
     "NSCLC": {
       "count": 7809,
-      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer] (any sample)",
+      "samples": 7809,
+      "text": "CANCER_TYPE in [Non-Small Cell Lung Cancer]",
       "studies": [
         "msk_chord_2024"
       ]
@@ -19,144 +20,144 @@
         {
           "a": "STK11",
           "b": "KEAP1",
-          "both": 572,
-          "onlyA": 537,
-          "onlyB": 512,
-          "neither": 6188,
+          "both": 571,
+          "onlyA": 538,
+          "onlyB": 511,
+          "neither": 6189,
           "profiled": 7809,
-          "log2Odds": 3.686,
-          "p": 3.396549365554813e-249,
-          "q": 5.094824048332219e-248,
+          "log2Odds": 3.684,
+          "p": 1.1515322331420719e-248,
+          "q": 1.7272983497131078e-247,
           "tendency": "co-occurrence"
         },
         {
           "a": "EGFR",
           "b": "KRAS",
-          "both": 75,
-          "onlyA": 1947,
-          "onlyB": 2194,
-          "neither": 3593,
+          "both": 71,
+          "onlyA": 1946,
+          "onlyB": 2187,
+          "neither": 3605,
           "profiled": 7809,
-          "log2Odds": -3.987,
-          "p": 1.5080466769626828e-238,
-          "q": 1.1310350077220122e-237,
+          "log2Odds": -4.056,
+          "p": 1.7475932682687458e-240,
+          "q": 1.3106949512015594e-239,
           "tendency": "mutual exclusivity"
         },
         {
           "a": "EGFR",
           "b": "STK11",
-          "both": 52,
-          "onlyA": 1970,
-          "onlyB": 1057,
-          "neither": 4730,
+          "both": 51,
+          "onlyA": 1966,
+          "onlyB": 1058,
+          "neither": 4734,
           "profiled": 7809,
-          "log2Odds": -3.082,
-          "p": 8.910206347433695e-88,
-          "q": 4.4551031737168476e-87,
+          "log2Odds": -3.107,
+          "p": 2.5872309776966024e-88,
+          "q": 1.2936154888483012e-87,
           "tendency": "mutual exclusivity"
         },
         {
           "a": "KRAS",
           "b": "STK11",
-          "both": 598,
-          "onlyA": 1671,
-          "onlyB": 511,
-          "neither": 5029,
+          "both": 596,
+          "onlyA": 1662,
+          "onlyB": 513,
+          "neither": 5038,
           "profiled": 7809,
           "log2Odds": 1.816,
-          "p": 4.9400796448155687e-79,
-          "q": 1.8525298668058381e-78,
+          "p": 5.750549146153232e-79,
+          "q": 2.156455929807462e-78,
           "tendency": "co-occurrence"
         },
         {
           "a": "EGFR",
           "b": "KEAP1",
-          "both": 66,
-          "onlyA": 1956,
-          "onlyB": 1018,
-          "neither": 4769,
+          "both": 65,
+          "onlyA": 1952,
+          "onlyB": 1017,
+          "neither": 4775,
           "profiled": 7809,
-          "log2Odds": -2.661,
-          "p": 1.503888597094316e-72,
-          "q": 4.511665791282948e-72,
+          "log2Odds": -2.677,
+          "p": 8.785826313148364e-73,
+          "q": 2.6357478939445094e-72,
           "tendency": "mutual exclusivity"
         },
         {
           "a": "KRAS",
           "b": "TP53",
-          "both": 873,
-          "onlyA": 1396,
-          "onlyB": 3215,
-          "neither": 2325,
+          "both": 855,
+          "onlyA": 1403,
+          "onlyB": 3219,
+          "neither": 2332,
           "profiled": 7809,
-          "log2Odds": -1.145,
-          "p": 1.0558783450158271e-55,
-          "q": 2.6396958625395677e-55,
+          "log2Odds": -1.18,
+          "p": 7.7934784462294424e-59,
+          "q": 1.9483696115573604e-58,
           "tendency": "mutual exclusivity"
         },
         {
           "a": "EGFR",
           "b": "ALK",
           "both": 49,
-          "onlyA": 1973,
+          "onlyA": 1968,
           "onlyB": 503,
-          "neither": 5284,
+          "neither": 5289,
           "profiled": 7809,
-          "log2Odds": -1.938,
-          "p": 3.1984865484044725e-25,
-          "q": 6.853899746581012e-25,
+          "log2Odds": -1.933,
+          "p": 3.2367056081627897e-25,
+          "q": 6.9357977317774065e-25,
           "tendency": "mutual exclusivity"
         },
         {
           "a": "KRAS",
           "b": "KEAP1",
-          "both": 456,
-          "onlyA": 1813,
-          "onlyB": 628,
-          "neither": 4912,
+          "both": 453,
+          "onlyA": 1805,
+          "onlyB": 629,
+          "neither": 4922,
           "profiled": 7809,
-          "log2Odds": 0.976,
-          "p": 5.47635802660293e-23,
-          "q": 1.0268171299880494e-22,
+          "log2Odds": 0.974,
+          "p": 8.969073797936211e-23,
+          "q": 1.6817013371130396e-22,
           "tendency": "co-occurrence"
         },
         {
           "a": "TP53",
           "b": "STK11",
-          "both": 453,
-          "onlyA": 3635,
-          "onlyB": 656,
-          "neither": 3065,
+          "both": 449,
+          "onlyA": 3625,
+          "onlyB": 660,
+          "neither": 3075,
           "profiled": 7809,
-          "log2Odds": -0.78,
-          "p": 1.3052910427261104e-16,
-          "q": 2.175485071210184e-16,
+          "log2Odds": -0.793,
+          "p": 4.339673873642473e-17,
+          "q": 7.232789789404122e-17,
           "tendency": "mutual exclusivity"
         },
         {
           "a": "EGFR",
           "b": "TP53",
-          "both": 1174,
-          "onlyA": 848,
-          "onlyB": 2914,
-          "neither": 2873,
+          "both": 1168,
+          "onlyA": 849,
+          "onlyB": 2906,
+          "neither": 2886,
           "profiled": 7809,
-          "log2Odds": 0.449,
-          "p": 2.2614400356737777e-9,
-          "q": 3.3921600535106666e-9,
+          "log2Odds": 0.45,
+          "p": 2.194819061759366e-9,
+          "q": 3.2922285926390486e-9,
           "tendency": "co-occurrence"
         },
         {
           "a": "KRAS",
           "b": "ALK",
           "both": 118,
-          "onlyA": 2151,
+          "onlyA": 2140,
           "onlyB": 434,
-          "neither": 5106,
+          "neither": 5117,
           "profiled": 7809,
-          "log2Odds": -0.632,
-          "p": 0.000027654786501243727,
-          "q": 0.00003771107250169599,
+          "log2Odds": -0.621,
+          "p": 0.00004115108468235987,
+          "q": 0.00005611511547594528,
           "tendency": "mutual exclusivity"
         },
         {
@@ -176,39 +177,39 @@
           "a": "TP53",
           "b": "ALK",
           "both": 303,
-          "onlyA": 3785,
+          "onlyA": 3771,
           "onlyB": 249,
-          "neither": 3472,
+          "neither": 3486,
           "profiled": 7809,
-          "log2Odds": 0.159,
-          "p": 0.21623930193910998,
-          "q": 0.24172078956410842,
+          "log2Odds": 0.17,
+          "p": 0.185270426469404,
+          "q": 0.21377356900315847,
           "tendency": "co-occurrence"
         },
         {
           "a": "TP53",
           "b": "KEAP1",
-          "both": 586,
-          "onlyA": 3502,
-          "onlyB": 498,
-          "neither": 3223,
+          "both": 583,
+          "onlyA": 3491,
+          "onlyB": 499,
+          "neither": 3236,
           "profiled": 7809,
           "log2Odds": 0.115,
-          "p": 0.2256060702598345,
-          "q": 0.24172078956410842,
+          "p": 0.22533443587021346,
+          "q": 0.24142975271808584,
           "tendency": "co-occurrence"
         },
         {
           "a": "KEAP1",
           "b": "ALK",
           "both": 72,
-          "onlyA": 1012,
+          "onlyA": 1010,
           "onlyB": 480,
-          "neither": 6245,
+          "neither": 6247,
           "profiled": 7809,
-          "log2Odds": -0.111,
-          "p": 0.6094218694938038,
-          "q": 0.6094218694938038,
+          "log2Odds": -0.108,
+          "p": 0.6093335644283459,
+          "q": 0.6093335644283459,
           "tendency": "mutual exclusivity"
         }
       ],
@@ -271,70 +272,70 @@
         "verification": "Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels 0.15.0 multipletests(method=\"fdr_bh\"), to a relative 1e-6 (test/tables-golden.test.ts).",
         "check": {
           "cooccurrence:STK11/KEAP1:p": {
-            "v": 3.396549365554813e-249
+            "v": 1.1515322331420719e-248
           },
           "cooccurrence:STK11/KEAP1:q": {
-            "v": 5.094824048332219e-248
+            "v": 1.7272983497131078e-247
           },
           "cooccurrence:EGFR/KRAS:p": {
-            "v": 1.5080466769626828e-238
+            "v": 1.7475932682687458e-240
           },
           "cooccurrence:EGFR/KRAS:q": {
-            "v": 1.1310350077220122e-237
+            "v": 1.3106949512015594e-239
           },
           "cooccurrence:EGFR/STK11:p": {
-            "v": 8.910206347433695e-88
+            "v": 2.5872309776966024e-88
           },
           "cooccurrence:EGFR/STK11:q": {
-            "v": 4.4551031737168476e-87
+            "v": 1.2936154888483012e-87
           },
           "cooccurrence:KRAS/STK11:p": {
-            "v": 4.9400796448155687e-79
+            "v": 5.750549146153232e-79
           },
           "cooccurrence:KRAS/STK11:q": {
-            "v": 1.8525298668058381e-78
+            "v": 2.156455929807462e-78
           },
           "cooccurrence:EGFR/KEAP1:p": {
-            "v": 1.503888597094316e-72
+            "v": 8.785826313148364e-73
           },
           "cooccurrence:EGFR/KEAP1:q": {
-            "v": 4.511665791282948e-72
+            "v": 2.6357478939445094e-72
           },
           "cooccurrence:KRAS/TP53:p": {
-            "v": 1.0558783450158271e-55
+            "v": 7.7934784462294424e-59
           },
           "cooccurrence:KRAS/TP53:q": {
-            "v": 2.6396958625395677e-55
+            "v": 1.9483696115573604e-58
           },
           "cooccurrence:EGFR/ALK:p": {
-            "v": 3.1984865484044725e-25
+            "v": 3.2367056081627897e-25
           },
           "cooccurrence:EGFR/ALK:q": {
-            "v": 6.853899746581012e-25
+            "v": 6.9357977317774065e-25
           },
           "cooccurrence:KRAS/KEAP1:p": {
-            "v": 5.47635802660293e-23
+            "v": 8.969073797936211e-23
           },
           "cooccurrence:KRAS/KEAP1:q": {
-            "v": 1.0268171299880494e-22
+            "v": 1.6817013371130396e-22
           },
           "cooccurrence:TP53/STK11:p": {
-            "v": 1.3052910427261104e-16
+            "v": 4.339673873642473e-17
           },
           "cooccurrence:TP53/STK11:q": {
-            "v": 2.175485071210184e-16
+            "v": 7.232789789404122e-17
           },
           "cooccurrence:EGFR/TP53:p": {
-            "v": 2.2614400356737777e-9
+            "v": 2.194819061759366e-9
           },
           "cooccurrence:EGFR/TP53:q": {
-            "v": 3.3921600535106666e-9
+            "v": 3.2922285926390486e-9
           },
           "cooccurrence:KRAS/ALK:p": {
-            "v": 0.000027654786501243727
+            "v": 0.00004115108468235987
           },
           "cooccurrence:KRAS/ALK:q": {
-            "v": 0.00003771107250169599
+            "v": 0.00005611511547594528
           },
           "cooccurrence:STK11/ALK:p": {
             "v": 0.12879997517049538
@@ -343,22 +344,22 @@
             "v": 0.16099996896311922
           },
           "cooccurrence:TP53/ALK:p": {
-            "v": 0.21623930193910998
+            "v": 0.185270426469404
           },
           "cooccurrence:TP53/ALK:q": {
-            "v": 0.24172078956410842
+            "v": 0.21377356900315847
           },
           "cooccurrence:TP53/KEAP1:p": {
-            "v": 0.2256060702598345
+            "v": 0.22533443587021346
           },
           "cooccurrence:TP53/KEAP1:q": {
-            "v": 0.24172078956410842
+            "v": 0.24142975271808584
           },
           "cooccurrence:KEAP1/ALK:p": {
-            "v": 0.6094218694938038
+            "v": 0.6093335644283459
           },
           "cooccurrence:KEAP1/ALK:q": {
-            "v": 0.6094218694938038
+            "v": 0.6093335644283459
           }
         }
       }

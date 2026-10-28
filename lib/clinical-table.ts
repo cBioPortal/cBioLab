@@ -7,6 +7,7 @@ import type { QueryColumn, RowSource } from "./table-query.ts";
 import { clinicalTable, clinicalMetaTable } from "./custom-data.ts";
 import { finiteSql } from "./sql-number.ts";
 import { aggregateSql, type AggregateSql } from "./sql-kinds.ts";
+import { inCohortSamples, inCohortPatients } from "./cohort2.ts";
 
 export interface TableColumn {
   id: string; name: string;
@@ -32,27 +33,32 @@ export function tableAttributesSql(study: string, db: string): AggregateSql {
 /** One (cohort, study) part of a table: the cohort's SQL as that study's resolver compiles it. */
 export interface TablePart { cohort: string; study: string; cohortSql: string }
 
-/** Every part's rows — patient, sample, unit count and the attribute map — labelled and combined. */
+/**
+ * Every part's rows — patient, sample, unit count and the attribute map — labelled and combined.
+ * Sample rows are the cohort's samples; patient rows their owners, each counting its samples in
+ * the cohort.
+ */
 function allRows(parts: TablePart[], db: string, unit: "sample" | "patient", columns: TableColumn[]): string {
   const attrsOf = (per: "patient" | "sample") => columns.filter((c) => c.per === per).map((c) => sq(c.id));
   const pAttrs = attrsOf("patient"), sAttrs = unit === "sample" ? attrsOf("sample") : [];
   const ctes: string[] = [], rows: string[] = [];
   parts.forEach((p, i) => {
     const pre = sq(p.study + "_");
-    const inCohort = (col: string) => "replaceOne(" + col + ", " + pre + ", '') IN (SELECT pid FROM c" + i + ")";
+    const bare = (col: string) => "replaceOne(" + col + ", " + pre + ", '')";
     const values = (per: "patient" | "sample", attrs: string[]) =>
       "  SELECT " + (per === "patient" ? "patient_unique_id" : "sample_unique_id") + " AS k,\n" +
       "         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m\n" +
       "  FROM " + clinicalTable(db, columns.map((c) => c.id)) + "\n" +
       "  WHERE cancer_study_identifier = " + sq(p.study) + " AND type = " + sq(per) +
       (attrs.length ? " AND attribute_name IN (" + attrs.join(",") + ")" : " AND 0") + "\n" +
-      "    AND attribute_value != '' AND " + inCohort("patient_unique_id") + "\n" +
+      "    AND attribute_value != '' AND " +
+      (per === "patient" ? inCohortPatients(bare("patient_unique_id"), "c" + i) : inCohortSamples(bare("sample_unique_id"), "c" + i)) + "\n" +
       "  GROUP BY k\n";
     const units = unit === "sample"
       ? "  SELECT patient_unique_id AS puid, sample_unique_id AS suid, 1 AS samples FROM " + db + ".sample_derived\n" +
-        "  WHERE cancer_study_identifier = " + sq(p.study) + " AND " + inCohort("patient_unique_id") + "\n"
+        "  WHERE cancer_study_identifier = " + sq(p.study) + " AND " + inCohortSamples(bare("sample_unique_id"), "c" + i) + "\n"
       : "  SELECT patient_unique_id AS puid, '' AS suid, uniqExact(sample_unique_id) AS samples FROM " + db + ".sample_derived\n" +
-        "  WHERE cancer_study_identifier = " + sq(p.study) + " AND " + inCohort("patient_unique_id") + "\n" +
+        "  WHERE cancer_study_identifier = " + sq(p.study) + " AND " + inCohortSamples(bare("sample_unique_id"), "c" + i) + "\n" +
         "  GROUP BY puid\n";
     ctes.push("c" + i + " AS (" + p.cohortSql + "),\nu" + i + " AS (\n" + units + "),\npv" + i + " AS (\n" + values("patient", pAttrs) + "),\nsv" + i + " AS (\n" + values("sample", sAttrs) + "),\n");
     rows.push("  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +

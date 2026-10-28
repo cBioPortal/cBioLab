@@ -6,6 +6,13 @@ import { clinicalTable } from "../../custom-data.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { finiteSql } from "../../sql-number.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "../../sql-kinds.ts";
+import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
+
+/** A clinical row of the cohort: a sample row by its sample, a patient row by its patient. */
+function inCohortClinical(study: string): string {
+  return "(type = 'sample' AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) +
+    " OR type = 'patient' AND " + inCohortPatients(pidOf("patient_unique_id", study)) + ")";
+}
 
 export interface HlaRowsOpts {
   /** per locus A, B, C: the attributes that may hold its first allele, its second, or both as one "x/y" value */
@@ -26,9 +33,9 @@ const hlaFieldsSql = (x: string) => {
 /**
  * One row per patient of the cohort: per locus whether its two alleles match at `fields` fields
  * (hA, hB, hC; NULL when either allele is missing), the fewest fields any allele was typed at (nf),
- * HLA LOH in any sample (loss; NULL when no sample has a call), the endpoint (m, ev) and each
- * covariate as c0, c1, … (the patient's, or the first sample's). Values only: the patient id joins
- * the CTEs and is never returned. Run only through PatientLevelResolver.viewRows.
+ * HLA LOH in any of its cohort samples (loss; NULL when none has a call), the endpoint (m, ev) and each
+ * covariate as c0, c1, … (the patient's, or its first cohort sample's). A sample-level value is read
+ * from the cohort's own samples only. Values only: the patient id joins the CTEs and is never returned. Run only through PatientLevelResolver.viewRows.
  */
 export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaRowsOpts): PatientSql {
   const names = [...o.loci.flatMap((l) => [...l.first, ...l.second, ...l.pair]), ...o.lohAttributes, o.months, o.status, ...o.covariates];
@@ -50,7 +57,7 @@ export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaR
     "  SELECT pid, [" + o.loci.flatMap((l) => [allele(l, 1), allele(l, 2)]).join(",\n    ") + "] AS raw\n" +
     "  FROM (SELECT " + pid + " AS pid, attribute_name AS k, trimBoth(attribute_value) AS v FROM " + clinicalTable(db, genoAttrs) + "\n" +
     "    WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name IN (" + genoAttrs.map(sq).join(", ") + ") AND trimBoth(attribute_value) != ''\n" +
-    "      AND " + pid + " IN (SELECT pid FROM cohort))\n" +
+    "      AND " + inCohortClinical(study) + ")\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "keys AS (\n" +
@@ -63,7 +70,7 @@ export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaR
     "  SELECT " + pid + " AS pid, toNullable(max(" + clinicalValueFoldSql("attribute_value") + " IN (" + o.lohValues.map((v) => clinicalValueFoldSql(sq(v))).join(", ") + "))) AS loss\n" +
     "  FROM " + clinicalTable(db, o.lohAttributes) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name IN (" + o.lohAttributes.map(sq).join(", ") + ") AND trimBoth(attribute_value) != ''\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortClinical(study) + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
     "os AS (\n" +
@@ -72,7 +79,7 @@ export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaR
     "         anyIf(attribute_value, attribute_name = " + sq(o.status) + ") AS status\n" +
     "  FROM " + clinicalTable(db, [o.months, o.status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN (" + sq(o.months) + ", " + sq(o.status) + ")\n" +
-    "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     ")" +
     (covs.length
@@ -80,14 +87,14 @@ export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaR
         "  SELECT " + pid + " AS pid" + covs.map((c, i) => ",\n         toNullable(argMinIf(trimBoth(attribute_value), sample_unique_id, attribute_name = " + sq(c) + ")) AS c" + i).join("") + "\n" +
         "  FROM " + clinicalTable(db, covs) + "\n" +
         "  WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name IN (" + covs.map(sq).join(", ") + ") AND trimBoth(attribute_value) != ''\n" +
-        "    AND " + pid + " IN (SELECT pid FROM cohort)\n" +
+        "    AND " + inCohortClinical(study) + "\n" +
         "  GROUP BY pid\n" +
         ")\n"
       : "\n") +
     "SELECT hom.hA AS hA, hom.hB AS hB, hom.hC AS hC, hom.nf AS nf, loh.loss AS loss,\n" +
     "       if(os.months >= 0, os.months, NULL) AS m, if(os.status LIKE '1%', 1, 0) AS ev" + covs.map((_, i) => ", cov.c" + i + " AS c" + i).join("") + "\n" +
-    "FROM cohort LEFT JOIN hom ON hom.pid = cohort.pid LEFT JOIN loh ON loh.pid = cohort.pid LEFT JOIN os ON os.pid = cohort.pid" +
-    (covs.length ? " LEFT JOIN cov ON cov.pid = cohort.pid" : "")
+    "FROM (SELECT DISTINCT pid FROM cohort) c LEFT JOIN hom ON hom.pid = c.pid LEFT JOIN loh ON loh.pid = c.pid LEFT JOIN os ON os.pid = c.pid" +
+    (covs.length ? " LEFT JOIN cov ON cov.pid = c.pid" : "")
   ));
 }
 

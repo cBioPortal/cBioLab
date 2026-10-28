@@ -137,7 +137,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
     "federated_aggregates",
     {
       description:
-        "Federation endpoint for another cbio-lab instance. Evaluates a cohort definition against a study THIS instance holds and returns aggregates only — cohort size, per-gene (profiled, altered, driver) counts, (months, event, n) survival triples, and per-gene-pair 2x2 tables. Never returns patient identifiers. Used by a coordinating instance to include this site's patients in compare and survival views without patient-level data leaving.",
+        "Federation endpoint for another cbio-lab instance. Evaluates a cohort definition against a study THIS instance holds and returns aggregates only — cohort size (patients and samples), per-gene (profiled, altered, driver) counts, (months, event, n) survival triples, and per-gene-pair 2x2 tables. Never returns patient identifiers. Used by a coordinating instance to include this site's patients in compare and survival views without patient-level data leaving.",
       inputSchema: {
         study: z.string().max(120).describe("Study id held by this instance"),
         cohort: z.record(z.string(), z.any()).describe("Cohort definition (v2 DSL; see describe_dsl)"),
@@ -151,7 +151,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
         survivalEndpoints: z.boolean().nullish()
           .describe("Return the survival endpoints THIS study declares, so a caller can offer only what exists"),
         pairs: z.array(z.tuple([z.string(), z.string()])).max(66).nullish()
-          .describe("Gene pairs for co-occurrence: returns each pair's 2x2 (both/onlyA/onlyB/neither) among patients profiled for BOTH genes"),
+          .describe("Gene pairs for co-occurrence: returns each pair's 2x2 (both/onlyA/onlyB/neither) among the cohort's samples profiled for BOTH genes"),
         attributes: z.array(z.string()).max(20).nullish()
           .describe("Clinical attributes to describe: value counts for categorical, (n, sum, sum of squares, min, max) for numeric. Never individual values."),
         attributeHistograms: z.boolean().nullish()
@@ -161,7 +161,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
         momentGenes: z.array(z.string()).max(12).nullish()
           .describe("With `profileType`, genes for per-gene (n, sum, sum of squares) on that profile — enough to define a z-score reference distribution without disclosing any value"),
         variantGenes: z.array(z.string()).max(12).nullish()
-          .describe("Genes for per-protein-change (lollipop) counts: how many patients carry each variant, plus per-gene totals"),
+          .describe("Genes for per-protein-change (lollipop) counts: how many patients carry each variant in one of the cohort's samples, plus per-gene totals"),
         lollipopGenes: z.array(z.string()).max(12).nullish()
           .describe("Genes for per-codon (lollipop) counts, the way cBioPortal's mutation tab counts them: distinct (patient, protein change) pairs per protein start position, raw rows per mutation type for the colour, per-gene totals and the cohort's sample count"),
         minCount: z.number().int().min(1).max(1000).nullish()
@@ -196,8 +196,8 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
         const { profiles, gaProfiles } = await studyProfiles(s);
         const pin = await oncokbPin();
         const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
-        const [count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, endpointList, lollipopCounts] = await Promise.all([
-          res.count(cohort),
+        const [sizes, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, endpointList, lollipopCounts] = await Promise.all([
+          res.sizes(cohort),
           genes && genes.length ? res.geneCounts(cohort, genes) : Promise.resolve([]),
           survival ? res.survivalCounts(cohort, endpoint || "OS", anchor || null, endpointColumns || undefined) : Promise.resolve([]),
           pairs && pairs.length ? res.pairCounts(cohort, pairs) : Promise.resolve([]),
@@ -223,9 +223,11 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
         // FEDERATION_HIDE_SQL=1 and the caller degrades gracefully.
         const hideSql = setting("FEDERATION_HIDE_SQL") === "1";
         const cohortSql = hideSql ? null : res.cohortSql(cohort);
-        const payload = { study: s, instance: res.instance.label, count, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, survivalEndpoints: endpointList, ...(lollipopCounts ? { lollipopCounts } : {}), ...(spans ? { timelineSpan: spans } : {}), ...(courseCounts ? { eventCourse: courseCounts } : {}), ...(flows ? { treatmentSequence: flows } : {}), ...(keys ? { sequenceKeys: keys } : {}), cohortSql, queries: hideSql ? null : res.queries, oncokbPin: pin };
+        // `count` is the cohort's patients (the owners of its samples), `samples` its samples
+        const count = sizes.patients;
+        const payload = { study: s, instance: res.instance.label, count, samples: sizes.samples, geneCounts, survivalCounts, pairCounts, attributeStats, pairMoments, variantCounts, profileMoments, survivalEndpoints: endpointList, ...(lollipopCounts ? { lollipopCounts } : {}), ...(spans ? { timelineSpan: spans } : {}), ...(courseCounts ? { eventCourse: courseCounts } : {}), ...(flows ? { treatmentSequence: flows } : {}), ...(keys ? { sequenceKeys: keys } : {}), cohortSql, queries: hideSql ? null : res.queries, oncokbPin: pin };
         return {
-          content: [{ type: "text" as const, text: `aggregates for ${s}: ${count.toLocaleString()} patients` +
+          content: [{ type: "text" as const, text: `aggregates for ${s}: ${count.toLocaleString()} patients, ${sizes.samples.toLocaleString()} samples` +
             (geneCounts.length ? `, ${geneCounts.length} gene counts` : "") +
             (survivalCounts.length ? `, ${survivalCounts.length} survival strata` : "") +
             (pairCounts.length ? `, ${pairCounts.length} gene-pair tables` : "") +

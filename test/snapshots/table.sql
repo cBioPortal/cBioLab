@@ -1,9 +1,14 @@
 -- cohort Pancreatic
 -- msk_chord_2024
-(SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))))
 
 -- view 0 table: table:attributes · msk_chord_2024
 SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority
@@ -13,13 +18,18 @@ WHERE cs.cancer_study_identifier = 'msk_chord_2024'
 ORDER BY priority DESC, name
 
 -- view 0 table: table:counts · msk_chord_2024
-WITH c0 AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))))),
 u0 AS (
   SELECT patient_unique_id AS puid, sample_unique_id AS suid, 1 AS samples FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM c0)
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM c0)
 ),
 pv0 AS (
   SELECT patient_unique_id AS k,
@@ -34,7 +44,7 @@ sv0 AS (
          CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND 0
-    AND attribute_value != '' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM c0)
+    AND attribute_value != '' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM c0)
   GROUP BY k
 ),
 rows AS (
@@ -45,13 +55,18 @@ rows AS (
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
 
 -- view 0 table: table:rows · msk_chord_2024
-WITH c0 AS ((SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
   FROM snapshot_db.clinical_data_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample'
-    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))),
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM snapshot_db.clinical_data_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pancreatic Cancer'))))))),
 u0 AS (
   SELECT patient_unique_id AS puid, sample_unique_id AS suid, 1 AS samples FROM snapshot_db.sample_derived
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM c0)
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM c0)
 ),
 pv0 AS (
   SELECT patient_unique_id AS k,
@@ -66,7 +81,7 @@ sv0 AS (
          CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE','CLINICAL_GROUP','CLINICAL_SUMMARY','DIAGNOSIS_DESCRIPTION','ICD_O_HISTOLOGY_DESCRIPTION','PATHOLOGICAL_GROUP','CANCER_TYPE_DETAILED','SAMPLE_TYPE','MSI_TYPE','GENE_PANEL','SOMATIC_STATUS','SAMPLE_CLASS','MUTATION_COUNT','FRACTION_GENOME_ALTERED','TMB_NONSYNONYMOUS','GLEASON_SAMPLE_LEVEL','MSI_COMMENT','MSI_SCORE','METASTATIC_SITE','ONCOTREE_CODE','PRIMARY_SITE','PDL1_POSITIVE','SAMPLE_COVERAGE','TUMOR_PURITY')
-    AND attribute_value != '' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM c0)
+    AND attribute_value != '' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM c0)
   GROUP BY k
 ),
 rows AS (

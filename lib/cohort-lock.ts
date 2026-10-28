@@ -1,8 +1,8 @@
-// Locked cohorts: a cohort frozen to the patients its definition selected at one moment, so an
-// analysis stops drifting as patients are added to the data.
+// Locked cohorts: a cohort frozen to the samples its definition selected at one moment, so an
+// analysis stops drifting as samples are added to the data.
 //
 // A locked cohort keeps its definition (`all`, the record of how it was made) and gains a `lock`:
-// the stored id set of its patients then (lib/id-set-store.ts), its samples then, when, against
+// the stored id set of its samples then (lib/id-set-store.ts), when, against
 // which data version and OncoKB release — and the frozen membership of each of its split arms,
 // keyed by the arm's name under the cohort ("<split> / <arm>"). The engine evaluates the set, not
 // the definition; the definition is still run, beside it, to say how far the data has moved since.
@@ -15,16 +15,9 @@
 // mistake. Pure and browser-safe.
 import type { AnalysisDoc, CohortDef, CohortLock, LockedMembers } from "./types.ts";
 
-/** The clause a locked cohort or arm compiles to: its patients when it was locked. */
-export function lockClause(m: LockedMembers): { kind: "patientList"; set: string; part?: string } {
-  return { kind: "patientList", set: m.set, ...(m.part ? { part: m.part } : {}) };
-}
-
-/** Where a lock's samples are, to measure new samples against: its set's "samples" part, a separate
- *  set (locks made before parts), or nowhere (an arm's lock records none). */
-export function lockSamples(m: LockedMembers): { set: string; part: string } | null {
-  if (m.samples) return { set: m.samples, part: "" };
-  return m.nSamples != null && !m.part ? { set: m.set, part: "samples" } : null;
+/** The clause a locked cohort or arm compiles to: its samples when it was locked. */
+export function lockClause(m: LockedMembers): { kind: "sampleList"; set: string; part?: string } {
+  return { kind: "sampleList", set: m.set, ...(m.part ? { part: m.part } : {}) };
 }
 
 /** What a locked name is evaluated from, and what its definition still says. */

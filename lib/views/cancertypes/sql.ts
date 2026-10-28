@@ -1,6 +1,6 @@
 // The cancertypes view's SQL: what its runner (run.ts) asks each participant's database for.
 // cancertypes: a gene list's alteration frequency per group of samples
-import { pidOf } from "../../federation-views.ts";
+import { inCohortSamples, bareSampleId } from "../../cohort2.ts";
 import { sq } from "../../compiler.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { clinicalTable } from "../../custom-data.ts";
@@ -11,9 +11,9 @@ import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
  * Per group of the cohort's samples (a sample attribute's value, or the study) and per gene — plus
  * the row "*" for the genes together — the units profiled for that gene and how many are altered,
  * split by kind: only mutations, only amplifications, only deep deletions, only structural variants,
- * or more than one kind. A unit is a SAMPLE, or a PATIENT counted in each group one of their
- * samples falls in (the portal's default); a patient is profiled when any of their samples is, and
- * carries the union of their samples' alterations. Counts only.
+ * or more than one kind. A unit is a SAMPLE of the cohort, or a PATIENT counted in each group one of
+ * their in-cohort samples falls in (the portal's default); a patient is profiled when any of their
+ * in-cohort samples is, and carries the union of those samples' alterations. Counts only.
  */
 export function cancerTypesSql(cohortSql: string, study: string, db: string, genes: string[], attribute: string | null,
   pin: string | null, measure: "driver" | "any", unit: "sample" | "patient" = "sample"): AggregateSql {
@@ -24,7 +24,7 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
     "  SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM " + db + ".sample_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) + "\n" +
     "),\n" +
     (attribute
       ? "grp AS (\n" +
@@ -74,7 +74,7 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
   ));
 }
 
-/** Each group's units (samples, or patients with a sample in the group), profiled or not, and how many
+/** Each group's units (the cohort's samples, or patients with one of them in the group), profiled or not, and how many
  *  were profiled for mutations, copy number and structural variants at all — the portal's "+" rows. */
 export function cancerTypeSamplesSql(cohortSql: string, study: string, db: string, attribute: string | null, unit: "sample" | "patient" = "sample"): AggregateSql {
   const fold = clinicalValueFoldSql("attribute_value");
@@ -83,7 +83,7 @@ export function cancerTypeSamplesSql(cohortSql: string, study: string, db: strin
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
     "  SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM " + db + ".sample_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + pidOf("patient_unique_id", study) + " IN (SELECT pid FROM cohort)\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) + "\n" +
     "),\n" +
     "prof AS (\n" +
     "  SELECT sample_unique_id AS suid, groupUniqArray(alteration_type) AS types FROM " + db + ".sample_to_gene_panel_derived\n" +

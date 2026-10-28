@@ -189,7 +189,7 @@ export async function runExclusivity(view: ExclusivityView, ctx: ViewRun): Promi
     participation: ctx.participationFor(studies, false),
     ...(multi ? { studies } : {}),
     caveat: "Within “" + cn + "”" + (vNames.length > 1 ? " (the first cohort in this view: exclusivity describes one cohort)" : "") + ", over its " + plural(samples, "sample") +
-      " with a gene panel (every sample of each patient; a sample without a panel record is left out, never read as wild-type), counting " + what + ". " +
+      " with a gene panel (a sample without a panel record is left out, never read as wild-type), counting " + what + ". " +
       "DISCOVER's background gives each sample and gene a probability of alteration, σ(a_sample + b_gene), fitted so that every sample's expected number of altered genes is its observed burden and every gene's expected number of altered samples its observed count — over the whole altered-gene matrix (" +
       plural(matrixGenes.size, "gene") + ", each sample's own panels: a gene off a sample's panel has no probability there)" +
       (stratifyBy ? ", separately within each " + stratifyBy + " (" + stratumList.length + " strata" + (multi ? ", and each study" : "") + ")" : multi ? ", separately in each of the " + studies.length + " studies" : "") + "; " +

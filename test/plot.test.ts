@@ -155,7 +155,8 @@ test("patient mode combines a patient's samples by a stated rule, never by which
 
 test("patient mode's coverage counts the patients with several samples, and the caption says how they were combined", () => {
   const pc = { ...ctx, unit: "patient" as const };
-  assert.match(plotCoverageSql("SELECT 1 AS id, 1 AS v", "SELECT 1 AS id, 1 AS v", pc), /HAVING count\(\) > 1\)\) AS multi/);
+  assert.match(plotCoverageSql("SELECT 1 AS id, 1 AS v", "SELECT 1 AS id, 1 AS v", pc), /SELECT pid FROM cohort GROUP BY pid HAVING uniqExact\(sid\) > 1\)\) AS multi/,
+    "several samples IN THE COHORT, not in the study");
   assert.doesNotMatch(plotCoverageSql("SELECT 1 AS id, 1 AS v", "SELECT 1 AS id, 1 AS v", ctx), /AS multi/, "sample mode has nothing to combine");
   const d = { n: 10, x: { label: "A", kind: "num" }, y: { label: "B", kind: "num" }, coverage: { total: 10, nx: 10, ny: 10, multi: 3 } } as unknown as PlotData;
   assert.match(combineNote(d, "patient"), /^3 patients have more than one sample: a numeric value is the mean of their samples', a category the samples' common value or “Multiple” where they differ, and an alteration counts if any sample has it\.$/);
@@ -254,10 +255,13 @@ test("an OQL axis by statement: a group per line, a pair for two, '3 or more lin
   assert.throws(() => validateAxis({ source: "alteration", oql: "KRAS", by: "cna" } as never, "x"), /groups by "any" .* or "statement"/);
 });
 
-test("an OQL axis matches samples in sample mode and patients in patient mode", () => {
+test("an OQL axis matches samples; in patient mode a patient is altered if one of its cohort samples is", () => {
   const oql = { source: "alteration" as const, oql: "TP53: TRUNC" };
   assert.match(axisSelect(oql, ctx, "cat"), /replaceOne\(g\.sample_unique_id/);
-  assert.match(axisSelect(oql, { ...ctx, unit: "patient" }, "cat"), /replaceOne\(g\.patient_unique_id/);
+  const pt = axisSelect(oql, { ...ctx, unit: "patient" }, "cat");
+  assert.match(pt, /SELECT replaceOne\(sd\.patient_unique_id, 'x_', ''\) AS oql_case, max\(replaceOne\(sd\.sample_unique_id, 'x_', ''\) IN \(SELECT pid FROM \(\(SELECT DISTINCT replaceOne\(g\.sample_unique_id/);
+  assert.match(pt, /replaceOne\(sd\.sample_unique_id, 'x_', ''\) IN \(SELECT sid FROM cohort\)/, "only the cohort's samples");
+  assert.doesNotMatch(pt, /g\.patient_unique_id/);
 });
 
 test("an OQL axis is refused when its query is, and says which axis", () => {

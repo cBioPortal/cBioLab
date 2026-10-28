@@ -2,13 +2,13 @@ Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
 
 Cohorts:
 - TP53 mut: 13,105 patients — OQL[TP53: MUT]
-- TP53 wt: 11,594 patients — NOT OQL[TP53:] AND profiled for TP53 MUTATION
+- TP53 wt: 11,642 patients — NOT OQL[TP53:] AND profiled for TP53 MUTATION
 
 Clinical course (3-month bins, -12 to +60mo relative to the anchor; DENOMINATOR IS THE PATIENTS STILL OBSERVABLE IN EACH BIN, not the cohort):
   TP53 mut / Treatment [a state patients are IN]: 0mo 100% (n=12,738), 12mo 51% (n=10,100), 24mo 45.5% (n=7,392), 60mo 39.7% (n=2,887)
   TP53 mut / Surgery [an event that HAPPENED]: 0mo 29.2% (n=12,738), 12mo 13.7% (n=10,100), 24mo 11.1% (n=7,392), 60mo 8.1% (n=2,887)
-  TP53 wt / Treatment [a state patients are IN]: 0mo 100% (n=11,044), 12mo 53.5% (n=9,629), 24mo 49.5% (n=8,010), 60mo 49.8% (n=4,205)
-  TP53 wt / Surgery [an event that HAPPENED]: 0mo 31.1% (n=11,044), 12mo 8.7% (n=9,629), 24mo 7.7% (n=8,010), 60mo 6.5% (n=4,205)
+  TP53 wt / Treatment [a state patients are IN]: 0mo 100% (n=11,092), 12mo 53.4% (n=9,673), 24mo 49.4% (n=8,051), 60mo 49.8% (n=4,229)
+  TP53 wt / Surgery [an event that HAPPENED]: 0mo 31.2% (n=11,092), 12mo 8.7% (n=9,673), 24mo 7.7% (n=8,051), 60mo 6.5% (n=4,229)
   CAVEAT (tell the user): Aligned on first Treatment — time 0 is that event, so every patient is lined up on the same clinical landmark. Patients with no such event are absent from every bin. THE DENOMINATOR IS NOT THE WHOLE COHORT: each bin is over the patients still under observation in it, from their first recorded event to their last contact (the later of their last recorded event and their OS follow-up where the study declares one). Without that, a curve would fall simply because follow-up ran out. Follow-up ending at the last recorded event biases the tail upward — by construction a patient has an event on their last observed day. Bins are half-open [t, t+3mo). The figure stops each line where fewer than 10 patients remain observable; the numbers past that point are in the result but not drawn. Event types carrying real durations are drawn as a state the patient is IN during the bin; the rest as an event that HAPPENED in it. That is read off the data, not the event's name.
   METHOD:
     - Count patients per time bin [TP53 mut · msk_chord_2024]: The timelineSpan and eventCourse queries above. Per 3-month bin: the cohort's patients observable in it, and of those the ones in each event's state (or with the event in it). Counts only.
@@ -18,5 +18,5 @@ Clinical course (3-month bins, -12 to +60mo relative to the anchor; DENOMINATOR 
         Surgery: no durations: an event that happened in a bin
     - Align on first Treatment: Day 0 is each patient's first Treatment; a patient without one is in no bin. A patient is observable from their first recorded event to their last contact — the later of their last recorded event and their OS follow-up (OS_MONTHS × 30.4375 days, assuming it starts at the timeline's day 0).
         TP53 mut: 13,105 in the cohort → 12,738 with the anchor event → 12,738 observable in the window
-        TP53 wt: 11,594 in the cohort → 11,044 with the anchor event → 11,044 observable in the window
+        TP53 wt: 11,642 in the cohort → 11,092 with the anchor event → 11,092 observable in the window
     - Share per bin: For each bin from month -12 to 63 (half-open [t, t+3)): patients in the state ÷ patients observable, as a percentage. The figure stops each line where fewer than 10 patients remain observable.

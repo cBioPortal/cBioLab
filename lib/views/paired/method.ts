@@ -25,7 +25,7 @@ export function pairedMethod(t: PairedTrace): MethodRecord {
     const sp = t.perStudy?.[s.study] || t.pairBy;
     return {
       kind: "fetch" as const, title: "Count each gene's state in paired samples",
-      detail: "The paired:patients and paired:genes queries above. Patients with both a " + sp.attribute + " = " + sp.a.join("/") + " sample (" + aL + ") and a " +
+      detail: "The paired:patients and paired:genes queries above. Patients with both, among the cohort's samples, a " + sp.attribute + " = " + sp.a.join("/") + " sample (" + aL + ") and a " +
         sp.attribute + " = " + sp.b.join("/") + " sample (" + bL + "); per gene" + (t.scan ? " — every gene altered (" + what + ") in some such patient" : "") +
         ", among those profiled for it on both sides by each side's own panels: altered (" + what + ") on both sides, on the " + aL +
         " side only, or the " + bL + " side only. A patient with several samples on one side counts as altered there if any is. Counts only.",

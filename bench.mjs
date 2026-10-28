@@ -4,7 +4,7 @@ for (const line of readFileSync(".env.local", "utf8").split("\n")) {
   const m = line.match(/^([A-Z_]+)=(.*)$/);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
 }
-const { buildContract } = await import("./lib/oncoprint.js");
+const { buildContract } = await import("./lib/oncoprint.ts");
 const GENES = ["TP53","KRAS","STK11","KEAP1","EGFR","ARID1A","MSH3"];
 const IMMUNO = { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] };
 const PROG = { eventType: "Diagnosis", attrs: [{ key: "PROGRESSION", value: "Y" }] };

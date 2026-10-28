@@ -3,13 +3,15 @@
   "cohorts": {
     "TP53 mut": {
       "count": 13105,
+      "samples": 13124,
       "text": "OQL[TP53: MUT]",
       "studies": [
         "msk_chord_2024"
       ]
     },
     "TP53 wt": {
-      "count": 11594,
+      "count": 11642,
+      "samples": 11664,
       "text": "NOT OQL[TP53:] AND profiled for TP53 MUTATION",
       "studies": [
         "msk_chord_2024"
@@ -367,25 +369,25 @@
                 "column": 1,
                 "label": "Chemo",
                 "kind": "regimen",
-                "n": 2551
+                "n": 2571
               },
               {
                 "column": 1,
                 "label": "other",
                 "kind": "regimen",
-                "n": 2434
+                "n": 2444
               },
               {
                 "column": 1,
                 "label": "Hormone",
                 "kind": "regimen",
-                "n": 2209
+                "n": 2218
               },
               {
                 "column": 1,
                 "label": "Chemo + Hormone",
                 "kind": "regimen",
-                "n": 781
+                "n": 783
               },
               {
                 "column": 1,
@@ -397,13 +399,13 @@
                 "column": 1,
                 "label": "Biologic + Chemo",
                 "kind": "regimen",
-                "n": 351
+                "n": 352
               },
               {
                 "column": 1,
                 "label": "Chemo + Hormone + Targeted",
                 "kind": "regimen",
-                "n": 344
+                "n": 346
               },
               {
                 "column": 1,
@@ -421,31 +423,31 @@
                 "column": 2,
                 "label": "",
                 "kind": "censored",
-                "n": 3577
+                "n": 3587
               },
               {
                 "column": 2,
                 "label": "",
                 "kind": "stopped",
-                "n": 2399
+                "n": 2410
               },
               {
                 "column": 2,
                 "label": "Hormone",
                 "kind": "regimen",
-                "n": 1172
+                "n": 1178
               },
               {
                 "column": 2,
                 "label": "other",
                 "kind": "regimen",
-                "n": 910
+                "n": 914
               },
               {
                 "column": 2,
                 "label": "Chemo",
                 "kind": "regimen",
-                "n": 740
+                "n": 745
               },
               {
                 "column": 2,
@@ -457,7 +459,7 @@
                 "column": 2,
                 "label": "Biologic + Chemo",
                 "kind": "regimen",
-                "n": 164
+                "n": 168
               },
               {
                 "column": 2,
@@ -469,23 +471,23 @@
                 "column": 2,
                 "label": "Chemo + Hormone",
                 "kind": "regimen",
-                "n": 133
+                "n": 135
               },
               {
                 "column": 2,
                 "label": "Chemo + Hormone + Targeted",
                 "kind": "regimen",
-                "n": 106
+                "n": 107
               },
               {
                 "column": 2,
                 "label": "Chemo + Immuno",
                 "kind": "regimen",
-                "n": 82
+                "n": 83
               },
               {
                 "…": "22 more",
-                "sha256": "731466154026352e"
+                "sha256": "bc181eaea110e0ed"
               }
             ],
             "flows": [
@@ -493,42 +495,42 @@
                 "column": 1,
                 "from": "other",
                 "to": "",
-                "n": 1449,
+                "n": 1455,
                 "kind": "censored"
               },
               {
                 "column": 1,
                 "from": "Chemo",
                 "to": "",
-                "n": 868,
+                "n": 874,
                 "kind": "stopped"
               },
               {
                 "column": 1,
                 "from": "Hormone",
                 "to": "",
-                "n": 643,
+                "n": 645,
                 "kind": "stopped"
               },
               {
                 "column": 1,
                 "from": "Hormone",
                 "to": "Hormone",
-                "n": 630,
+                "n": 633,
                 "kind": "regimen"
               },
               {
                 "column": 1,
                 "from": "Hormone",
                 "to": "",
-                "n": 612,
+                "n": 613,
                 "kind": "censored"
               },
               {
                 "column": 1,
                 "from": "Chemo",
                 "to": "Chemo",
-                "n": 479,
+                "n": 482,
                 "kind": "regimen"
               },
               {
@@ -542,35 +544,35 @@
                 "column": 1,
                 "from": "other",
                 "to": "",
-                "n": 393,
+                "n": 395,
                 "kind": "stopped"
               },
               {
                 "column": 1,
                 "from": "Chemo",
                 "to": "",
-                "n": 363,
+                "n": 364,
                 "kind": "censored"
               },
               {
                 "column": 1,
                 "from": "Chemo",
                 "to": "other",
-                "n": 288,
+                "n": 291,
                 "kind": "regimen"
               },
               {
                 "column": 1,
                 "from": "Chemo",
                 "to": "Hormone",
-                "n": 270,
+                "n": 272,
                 "kind": "regimen"
               },
               {
                 "column": 1,
                 "from": "Chemo + Hormone + Targeted",
                 "to": "",
-                "n": 269,
+                "n": 271,
                 "kind": "censored"
               },
               {
@@ -584,7 +586,7 @@
                 "column": 1,
                 "from": "Hormone",
                 "to": "other",
-                "n": 171,
+                "n": 172,
                 "kind": "regimen"
               },
               {
@@ -619,7 +621,7 @@
                 "column": 1,
                 "from": "Chemo + Hormone",
                 "to": "",
-                "n": 115,
+                "n": 116,
                 "kind": "stopped"
               },
               {
@@ -630,12 +632,12 @@
                 "kind": "stopped"
               },
               {
-                "…": "234 more",
-                "sha256": "b7b472db490e48ad"
+                "…": "237 more",
+                "sha256": "4c0d8c7b05c7c0a3"
               }
             ],
-            "started": 9645,
-            "censored": 5474
+            "started": 9689,
+            "censored": 5494
           }
         ]
       },
@@ -651,7 +653,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Therapies are grouped into LINES before being sequenced, by the definition every line count here shares: systemic-therapy treatment records (class, from SUBTYPE or else TREATMENT_TYPE, on the systemic list: chemotherapy, immunotherapy, targeted, hormone, biologic, investigational and their spellings; radiation, surgery, bone and ancillary treatment are not lines). A record starting more than 90 days after every earlier one has stopped begins a new line; anything closer is the same line, and a line is labelled by its whole combination (sorted, so 'A + B' and 'B + A' are one regimen). That grouping is the point — a patient here has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision, not several lines. Lines are labelled by SUBTYPE. ENDING A PATH IS SPLIT IN TWO, because the difference matters more than anything else here: 'no further line' means the study kept watching for at least 90 days (one line gap, the same rule that defines a line) and saw no further therapy; 'record ends here' means it did not, so nothing can be concluded about that patient. 55.5% of paths end censored — reading those as patients who finished treatment would be a claim about the record-keeping dressed up as one about the patient. Neither terminal is an outcome measure. 51 less common regimens folded into 'other', which is 23.3% of first-line patients in the first panel — combination regimens have a genuinely long tail, so 'other' is real diversity rather than a rounding bucket. Raise topN to split it further. Both panels share one scale and one colour per regimen, so their heights are directly comparable. TP53 mut: 11,564 with a first line; TP53 wt: 9,645 with a first line.",
+      "caveat": "Therapies are grouped into LINES before being sequenced, by the definition every line count here shares: systemic-therapy treatment records (class, from SUBTYPE or else TREATMENT_TYPE, on the systemic list: chemotherapy, immunotherapy, targeted, hormone, biologic, investigational and their spellings; radiation, surgery, bone and ancillary treatment are not lines). A record starting more than 90 days after every earlier one has stopped begins a new line; anything closer is the same line, and a line is labelled by its whole combination (sorted, so 'A + B' and 'B + A' are one regimen). That grouping is the point — a patient here has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision, not several lines. Lines are labelled by SUBTYPE. ENDING A PATH IS SPLIT IN TWO, because the difference matters more than anything else here: 'no further line' means the study kept watching for at least 90 days (one line gap, the same rule that defines a line) and saw no further therapy; 'record ends here' means it did not, so nothing can be concluded about that patient. 55.5% of paths end censored — reading those as patients who finished treatment would be a claim about the record-keeping dressed up as one about the patient. Neither terminal is an outcome measure. 51 less common regimens folded into 'other', which is 23.3% of first-line patients in the first panel — combination regimens have a genuinely long tail, so 'other' is real diversity rather than a rounding bucket. Raise topN to split it further. Both panels share one scale and one colour per regimen, so their heights are directly comparable. TP53 mut: 11,564 with a first line; TP53 wt: 9,689 with a first line.",
       "method": {
         "steps": [
           {
@@ -666,7 +668,7 @@
             "title": "Build lines and count what follows what",
             "detail": "The treatmentSequence query above builds every patient's lines in the database and returns, per line number, how many patients went from one regimen to the next, stopped, or were lost to follow-up — counts only — plus how many records it set aside.",
             "scope": "TP53 wt · msk_chord_2024",
-            "rowsIn": 11594
+            "rowsIn": 11642
           },
           {
             "kind": "transform",
@@ -675,15 +677,15 @@
             "params": [
               [
                 "Radiation Therapy",
-                "28,738 records set aside: not a line class"
+                "28,815 records set aside: not a line class"
               ],
               [
                 "Prior Medications to MSK",
-                "19,366 records set aside: not a line class"
+                "19,408 records set aside: not a line class"
               ],
               [
                 "Bone Treatment",
-                "5,548 records set aside: not a line class"
+                "5,567 records set aside: not a line class"
               ],
               [
                 "Other",
@@ -801,7 +803,7 @@
           },
           "…": {
             "more": 68,
-            "sha256": "2abab4efd36844fb"
+            "sha256": "bceceb054576b3de"
           }
         }
       }

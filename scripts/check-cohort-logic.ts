@@ -17,7 +17,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { compileCohortDef, basePatientsSql } from "../lib/cohort2.ts";
+import { compileCohortDef, memberSamplesSql } from "../lib/cohort2.ts";
 import { runAnalysis, studyProfiles } from "../lib/analysis.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
 import { oncokbPin } from "../lib/annotation.ts";
@@ -36,10 +36,14 @@ const record = (study: string, group: string, claim: string, pass: boolean, deta
 
 const pin = await oncokbPin();
 const profileCache = new Map<string, { profiles: string[]; gaProfiles: string[] }>();
-async function ids(study: string, def: CohortDef | null): Promise<Set<string>> {
+async function cohortSql(study: string, def: CohortDef | null): Promise<string> {
   if (!profileCache.has(study)) profileCache.set(study, await studyProfiles(study));
-  const sql = def ? compileCohortDef(def, { study, db: DB, oncokbPin: pin, ...profileCache.get(study)! }) : basePatientsSql(study, DB);
-  return new Set((await chQuery<{ pid: string }>("SELECT pid FROM (" + sql + ")", PRIMARY)).data.map((r) => r.pid));
+  return compileCohortDef(def, { study, db: DB, oncokbPin: pin, ...profileCache.get(study)! });
+}
+/** A cohort is a set of samples: every check below is set arithmetic over its sample ids. */
+async function ids(study: string, def: CohortDef | null): Promise<Set<string>> {
+  const sql = memberSamplesSql(await cohortSql(study, def));
+  return new Set((await chQuery<{ sid: string }>("SELECT sid FROM (" + sql + ")", PRIMARY)).data.map((r) => r.sid));
 }
 const leaf = (study: string, c: Clause) => ids(study, { all: [c] });
 
@@ -51,19 +55,19 @@ const within = (a: Set<string>, b: Set<string>) => [...a].every((x) => b.has(x))
 const n = (s: Set<string>) => s.size.toLocaleString();
 /** a description of how two sets differ, for a failure; their sizes when they agree */
 const diff = (label: string, ours: Set<string>, expected: Set<string>) => same(ours, expected)
-  ? `${label}: ${n(ours)} patients, identical`
+  ? `${label}: ${n(ours)} samples, identical`
   : `${label}: engine ${n(ours)}, expected ${n(expected)} (${minus(ours, expected).size} extra, ${minus(expected, ours).size} missing)`;
 
 /** The algebra of clauses, for one study and three conditions of different kinds. */
 async function algebra(study: string, A: Clause, B: Clause, C: Clause) {
   const base = await ids(study, null);
   const [a, b, c] = await Promise.all([leaf(study, A), leaf(study, B), leaf(study, C)]);
-  record(study, "sanity", "each test condition picks out a real, partial group of patients",
+  record(study, "sanity", "each test condition picks out a real, partial group of samples",
     [a, b, c].every((s) => s.size > 0 && s.size < base.size && within(s, base)),
-    `${n(a)}, ${n(b)} and ${n(c)} of ${n(base)} patients`);
+    `${n(a)}, ${n(b)} and ${n(c)} of ${n(base)} samples`);
 
   const ab = await ids(study, { all: [A, B] });
-  record(study, "and", "\"A and B\" is exactly the patients in both A and B", same(ab, and(a, b)), diff("A and B", ab, and(a, b)));
+  record(study, "and", "\"A and B\" is exactly the samples in both A and B", same(ab, and(a, b)), diff("A and B", ab, and(a, b)));
   const ba = await ids(study, { all: [B, A] });
   record(study, "and", "the order conditions are written in does not change the cohort", same(ab, ba), diff("B and A vs A and B", ba, ab));
   const abc = await ids(study, { all: [A, B, C] });
@@ -72,12 +76,12 @@ async function algebra(study: string, A: Clause, B: Clause, C: Clause) {
   record(study, "and", "three conditions combine the same way two do", same(abc, and(and(a, b), c)), diff("A and B and C", abc, and(and(a, b), c)));
 
   const aOrB = await ids(study, { all: [{ any: [A, B] as never }] });
-  record(study, "or", "\"A or B\" is exactly the patients in either", same(aOrB, or(a, b)), diff("A or B", aOrB, or(a, b)));
+  record(study, "or", "\"A or B\" is exactly the samples in either", same(aOrB, or(a, b)), diff("A or B", aOrB, or(a, b)));
   record(study, "or", "counts add up: |A or B| = |A| + |B| − |A and B|", aOrB.size === a.size + b.size - ab.size,
     `${n(aOrB)} = ${n(a)} + ${n(b)} − ${n(ab)}`);
 
   const notA = await ids(study, { all: [{ not: A as never }] });
-  record(study, "not", "\"not A\" is every other patient in the study", same(notA, minus(base, a)), diff("not A", notA, minus(base, a)));
+  record(study, "not", "\"not A\" is every other sample in the study", same(notA, minus(base, a)), diff("not A", notA, minus(base, a)));
   record(study, "not", "A and \"not A\" share nobody and together are the whole study",
     and(a, notA).size === 0 && same(or(a, notA), base), `${n(a)} + ${n(notA)} = ${n(base)}`);
   const notAorB = await ids(study, { all: [{ not: { any: [A, B] } as never }] });
@@ -138,9 +142,9 @@ async function splitByHand(study: string, parentDef: CohortDef, arms: { name: st
   };
   const result = await runAnalysis(doc);
   const part = result.splits?.["P / S"];
-  record(study, "splits", "the engine reports that the split's children add up to the parent",
-    !!part?.conserved, part ? `${part.children.map((c) => c.count.toLocaleString()).join(" + ")} = ${part.sum.toLocaleString()} of ${part.parentCount.toLocaleString()}` : "no split result");
-  // first match wins: each arm is its condition, minus everyone an earlier arm took
+  record(study, "splits", "the engine reports that the split's children's samples add up to the parent's",
+    !!part?.conserved, part ? `${part.children.map((c) => c.samples.toLocaleString()).join(" + ")} = ${part.sum.toLocaleString()} of ${part.parentSamples.toLocaleString()} samples` : "no split result");
+  // first match wins, per sample: each arm is its condition, minus every sample an earlier arm took
   let remaining = await ids(study, parentDef);
   const expected: Record<string, number> = {};
   for (const arm of arms) {
@@ -148,11 +152,11 @@ async function splitByHand(study: string, parentDef: CohortDef, arms: { name: st
     expected[arm.name] = hit.size;
     remaining = minus(remaining, hit);
   }
-  const got = Object.fromEntries((part?.children || []).map((c) => [c.label, c.count]));
-  const notProfiled = (part?.children || []).filter((c) => c.role === "notEvaluable").reduce((t, c) => t + c.count, 0);
+  const got = Object.fromEntries((part?.children || []).map((c) => [c.label, c.samples]));
+  const notProfiled = (part?.children || []).filter((c) => c.role === "notEvaluable").reduce((t, c) => t + c.samples, 0);
   const armsAgree = arms.every((a) => got[a.name] === expected[a.name]);
   const restAgree = (got[other] ?? 0) + notProfiled === remaining.size;
-  record(study, "splits", "every arm holds exactly the patients a by-hand first-match-wins pass puts there",
+  record(study, "splits", "every arm holds exactly the samples a by-hand first-match-wins pass puts there",
     armsAgree && restAgree,
     arms.map((a) => `${a.name} ${got[a.name]}/${expected[a.name]}`).join(", ") + `, rest ${(got[other] ?? 0) + notProfiled}/${remaining.size}`);
 }
@@ -187,31 +191,35 @@ async function heldOutHalves(study: string) {
 // nested three deep over a pool of leaves — and shrinks any disagreement to the smallest
 // definition that shows it. The seed is fixed, so a run is repeatable; FC_SEED overrides it.
 
-/** What one study holds that the generated leaves read, fetched once. */
+/** What one study holds that the generated leaves read, fetched once. Every set is of sample ids. */
 interface RawStudy {
   base: Set<string>;
-  /** attribute -> each row: its patient, its level, its value */
-  clinical: Map<string, { pid: string; type: string; value: string }[]>;
-  /** gene -> each call: its patient, what it is */
-  calls: Map<string, { pid: string; variantType: string; status: string | null; cna: number | null; variant: string | null }[]>;
+  /** patient -> its samples */
+  samplesOf: Map<string, string[]>;
+  /** attribute -> each row: its patient, its sample (a sample-level row), its level, its value */
+  clinical: Map<string, { pid: string; sid: string; type: string; value: string }[]>;
+  /** gene -> each call: the sample it was called in, what it is */
+  calls: Map<string, { sid: string; variantType: string; status: string | null; cna: number | null; variant: string | null }[]>;
 }
 
 async function rawStudy(study: string, attrs: string[], genes: string[]): Promise<RawStudy> {
-  const pid = (u: string) => u.startsWith(study + "_") ? u.slice(study.length + 1) : u;
+  const bare = (u: string) => u.startsWith(study + "_") ? u.slice(study.length + 1) : u;
   const lit = (xs: string[]) => xs.map((x) => "'" + x.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'").join(",");
   const [base, clin, calls] = await Promise.all([
-    chQuery<{ u: string }>("SELECT DISTINCT patient_unique_id AS u FROM " + DB + ".sample_derived WHERE cancer_study_identifier = '" + study + "'", PRIMARY),
-    chQuery<{ u: string; type: string; a: string; v: string }>("SELECT patient_unique_id AS u, type, attribute_name AS a, attribute_value AS v FROM " + DB +
+    chQuery<{ u: string; s: string }>("SELECT patient_unique_id AS u, sample_unique_id AS s FROM " + DB + ".sample_derived WHERE cancer_study_identifier = '" + study + "'", PRIMARY),
+    chQuery<{ u: string; s: string; type: string; a: string; v: string }>("SELECT patient_unique_id AS u, sample_unique_id AS s, type, attribute_name AS a, attribute_value AS v FROM " + DB +
       ".clinical_data_derived WHERE cancer_study_identifier = '" + study + "' AND attribute_name IN (" + lit(attrs) + ")", PRIMARY),
-    chQuery<{ u: string; g: string; vt: string; st: string | null; cna: number | null; mv: string | null }>(
-      "SELECT patient_unique_id AS u, hugo_gene_symbol AS g, variant_type AS vt, mutation_status AS st, cna_alteration AS cna, mutation_variant AS mv FROM " + DB +
+    chQuery<{ s: string; g: string; vt: string; st: string | null; cna: number | null; mv: string | null }>(
+      "SELECT sample_unique_id AS s, hugo_gene_symbol AS g, variant_type AS vt, mutation_status AS st, cna_alteration AS cna, mutation_variant AS mv FROM " + DB +
       ".genomic_event_derived WHERE cancer_study_identifier = '" + study + "' AND hugo_gene_symbol IN (" + lit(genes) + ")", PRIMARY),
   ]);
+  const samplesOf = new Map<string, string[]>();
+  for (const r of base.data) samplesOf.set(bare(r.u), [...(samplesOf.get(bare(r.u)) ?? []), bare(r.s)]);
   const clinical = new Map(attrs.map((a) => [a, [] as RawStudy["clinical"] extends Map<string, infer R> ? R : never]));
-  for (const r of clin.data) clinical.get(r.a)!.push({ pid: pid(r.u), type: r.type, value: r.v });
+  for (const r of clin.data) clinical.get(r.a)!.push({ pid: bare(r.u), sid: bare(r.s), type: r.type, value: r.v });
   const byGene = new Map(genes.map((g) => [g, [] as RawStudy["calls"] extends Map<string, infer R> ? R : never]));
-  for (const r of calls.data) byGene.get(r.g)!.push({ pid: pid(r.u), variantType: r.vt, status: r.st, cna: r.cna == null ? null : Number(r.cna), variant: r.mv });
-  return { base: new Set(base.data.map((r) => pid(r.u))), clinical, calls: byGene };
+  for (const r of calls.data) byGene.get(r.g)!.push({ sid: bare(r.s), variantType: r.vt, status: r.st, cna: r.cna == null ? null : Number(r.cna), variant: r.mv });
+  return { base: new Set(base.data.map((r) => bare(r.s))), samplesOf, clinical, calls: byGene };
 }
 
 /** a clinical value as the DSL compares it: case and surrounding spaces folded */
@@ -219,8 +227,13 @@ const fold = (v: string) => v.trim().toLowerCase();
 /** a clinical value read as a number, or null when it is not a finite one */
 const finite = (v: string) => { const x = v.trim() === "" ? NaN : Number(v); return Number.isFinite(x) ? x : null; };
 
-/** The patients a leaf selects, read off the raw rows by the DSL reference's rules. */
+/**
+ * The samples a leaf selects, read off the raw rows by the DSL reference's rules: a sample-level
+ * leaf (a sample attribute, an alteration, a sample list) selects the samples that match it; a
+ * patient-level one (a patient attribute, a patient list) every sample of the patients that match.
+ */
 function evalLeaf(raw: RawStudy, leaf: any): Set<string> {
+  const ofPatients = (pids: Iterable<string>) => new Set([...pids].flatMap((p) => raw.samplesOf.get(p) ?? []));
   if (leaf.kind === "oql") {
     const [, gene, spec] = /^(\w+): (.+)$/.exec(leaf.q)!;
     const called = raw.calls.get(gene)!.filter((c) => c.status !== "UNCALLED");
@@ -229,10 +242,11 @@ function evalLeaf(raw: RawStudy, leaf: any): Set<string> {
       : s === "AMP" ? c.variantType === "cna" && (c.cna ?? 0) >= 2
       : s === "HOMDEL" ? c.variantType === "cna" && (c.cna ?? 0) <= -2
       : c.variantType === "mutation" && c.variant === s;
-    return new Set(called.filter((c) => spec.split(" ").some((s) => match(c, s))).map((c) => c.pid));
+    return new Set(called.filter((c) => spec.split(" ").some((s) => match(c, s))).map((c) => c.sid).filter((s) => raw.base.has(s)));
   }
   if (leaf.kind === "clinical") {
-    const rows = raw.clinical.get(leaf.attribute)!.filter((r) => r.type === (leaf.per === "sample" ? "sample" : "patient"));
+    // the level is the study's: a sample attribute's rows name their sample, a patient attribute's their patient
+    const rows = raw.clinical.get(leaf.attribute)!;
     const ok = (v: string) => {
       if (leaf.values) return leaf.values.map(fold).includes(fold(v));
       if (leaf.range) {
@@ -245,9 +259,13 @@ function evalLeaf(raw: RawStudy, leaf: any): Set<string> {
       }
       return leaf.op === "=" ? fold(v) === fold(leaf.value) : fold(v) !== fold(leaf.value);
     };
-    return new Set(rows.filter((r) => ok(r.value)).map((r) => r.pid));
+    const hits = rows.filter((r) => ok(r.value));
+    return or(new Set(hits.filter((r) => r.type === "sample").map((r) => r.sid).filter((s) => raw.base.has(s))),
+      ofPatients(hits.filter((r) => r.type === "patient").map((r) => r.pid)));
   }
-  if (leaf.kind === "patientList") return new Set(leaf.ids.map((x: string) => x.split(":")).filter(([s]: string[]) => s === leaf.study).map(([, id]: string[]) => id).filter((id: string) => raw.base.has(id)));
+  const listed = (ids: string[]) => ids.map((x) => x.split(":")).filter(([s]) => s === leaf.study).map(([, id]) => id);
+  if (leaf.kind === "patientList") return ofPatients(listed(leaf.ids));
+  if (leaf.kind === "sampleList") return new Set(listed(leaf.ids).filter((id) => raw.base.has(id)));
   throw new Error("no reference for leaf " + JSON.stringify(leaf));
 }
 function evalClause(raw: RawStudy, c: any): Set<string> {
@@ -271,9 +289,9 @@ async function generated(study: string, attrs: string[], genes: string[], leaves
     if (!same(ours, ref)) mismatches.push(diff(JSON.stringify(strip(l)), ours, ref));
   }
   const sizes = leaves.map((l) => evalLeaf(raw, l).size);
-  record(study, "reference", "each leaf alone selects exactly the patients the raw rows say it should",
+  record(study, "reference", "each leaf alone selects exactly the samples the raw rows say it should",
     !mismatches.length && sizes.every((s) => s > 0 && s < raw.base.size),
-    mismatches.length ? mismatches.join("; ") : `${leaves.length} leaves (OQL, clinical values and numbers, patient lists), each a partial group of ${n(raw.base)} patients`);
+    mismatches.length ? mismatches.join("; ") : `${leaves.length} leaves (OQL, clinical values and numbers, patient and sample lists), each a partial group of ${n(raw.base)} samples`);
 
   // the grammar: a clause is a leaf, {any: [leaves]} or {not: clause}
   const leafArb = fc.constantFrom(...leaves);
@@ -301,9 +319,9 @@ await algebra("brca_tcga", { kind: "oql", q: "PIK3CA: MUT" }, { kind: "oql", q: 
 await oqlNesting(CHORD, "KRAS", "G12C");
 await oqlNesting("brca_tcga", "PIK3CA", "H1047R");
 await clinicalPartition(CHORD, "GENDER", ["Female", "Male", "Unknown"], "CURRENT_AGE_DEID", 65);
-await splitByHand(CHORD, { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" } as Clause] },
+await splitByHand(CHORD, { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] } as Clause] },
   [{ name: "G12C", where: { kind: "oql", q: "KRAS: G12C" } }, { name: "other KRAS", where: { kind: "oql", q: "KRAS: MUT" } }], "KRAS wild-type");
-await splitByHand(CHORD, { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"], per: "sample" } as Clause] },
+await splitByHand(CHORD, { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Breast Cancer"] } as Clause] },
   [{ name: "PIK3CA", where: { kind: "oql", q: "PIK3CA: MUT" } }, { name: "TP53", where: { kind: "oql", q: "TP53: MUT" } }], "neither");
 await profiledGeneList(CHORD, "MUTATION", ["KRAS", "NRAS", "BRAF", "NTRK3", "SOX9"]);
 await profiledGeneList("brca_tcga", "CNA", ["KRAS", "TP53", "PIK3CA"]);
@@ -312,25 +330,28 @@ await heldOutHalves(CHORD);
 
 /** every seventh patient, and two ids the study does not have: a list leaf naming a partial group */
 const someOf = (study: string, raw: RawStudy): Clause => ({ kind: "patientList", study,
-  ids: [...[...raw.base].sort().filter((_, i) => i % 7 === 0), "NOT-A-PATIENT", "ALSO-NOT"].map((id) => study + ":" + id) } as unknown as Clause);
+  ids: [...[...raw.samplesOf.keys()].sort().filter((_, i) => i % 7 === 0), "NOT-A-PATIENT", "ALSO-NOT"].map((id) => study + ":" + id) } as unknown as Clause);
+/** every fifth sample, and an id the study does not have */
+const someSamples = (study: string, raw: RawStudy): Clause => ({ kind: "sampleList", study,
+  ids: [...[...raw.base].sort().filter((_, i) => i % 5 === 0), "NOT-A-SAMPLE"].map((id) => study + ":" + id) } as unknown as Clause);
 await generated("brca_tcga", ["SEX", "AGE", "ER_STATUS_BY_IHC", "SAMPLE_TYPE", "TMB_NONSYNONYMOUS"], ["PIK3CA", "TP53", "MYC", "PTEN", "CDH1", "ERBB2"], (raw) => [
   { kind: "oql", q: "PIK3CA: MUT" }, { kind: "oql", q: "PIK3CA: H1047R" }, { kind: "oql", q: "TP53: MUT" }, { kind: "oql", q: "MYC: AMP" },
   { kind: "oql", q: "PTEN: HOMDEL" }, { kind: "oql", q: "CDH1: MUT HOMDEL" }, { kind: "oql", q: "ERBB2: AMP" },
   { kind: "clinical", attribute: "SEX", values: [" female "] }, { kind: "clinical", attribute: "SEX", op: "!=", value: "FEMALE" },
   { kind: "clinical", attribute: "AGE", op: ">=", value: 60 }, { kind: "clinical", attribute: "AGE", range: { gte: 40, lt: 55 } },
   { kind: "clinical", attribute: "ER_STATUS_BY_IHC", values: ["Positive", "Indeterminate"] },
-  { kind: "clinical", attribute: "SAMPLE_TYPE", values: ["Metastasis"], per: "sample" },
-  { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", range: { gte: 1 }, per: "sample" },
-  someOf("brca_tcga", raw),
+  { kind: "clinical", attribute: "SAMPLE_TYPE", values: ["Metastasis"] },
+  { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", range: { gte: 1 } },
+  someOf("brca_tcga", raw), someSamples("brca_tcga", raw),
 ] as Clause[], 60);
 await generated(CHORD, ["GENDER", "CURRENT_AGE_DEID", "SMOKING_PREDICTIONS_3_CLASSES", "CANCER_TYPE", "TMB_NONSYNONYMOUS"], ["KRAS", "TP53", "EGFR", "CDKN2A", "ERBB2"], (raw) => [
   { kind: "oql", q: "KRAS: G12C" }, { kind: "oql", q: "KRAS: MUT" }, { kind: "oql", q: "TP53: MUT" }, { kind: "oql", q: "EGFR: MUT AMP" },
   { kind: "oql", q: "CDKN2A: HOMDEL" }, { kind: "oql", q: "ERBB2: AMP" },
   { kind: "clinical", attribute: "GENDER", values: ["  MALE"] }, { kind: "clinical", attribute: "SMOKING_PREDICTIONS_3_CLASSES", op: "=", value: "never" },
   { kind: "clinical", attribute: "CURRENT_AGE_DEID", op: "<", value: 50 },
-  { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer", "Colorectal Cancer"], per: "sample" },
-  { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", range: { gte: 10 }, per: "sample" },
-  someOf(CHORD, raw),
+  { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer", "Colorectal Cancer"] },
+  { kind: "clinical", attribute: "TMB_NONSYNONYMOUS", range: { gte: 10 } },
+  someOf(CHORD, raw), someSamples(CHORD, raw),
 ] as Clause[], 40);
 
 const failed = checks.filter((c) => !c.pass).length;

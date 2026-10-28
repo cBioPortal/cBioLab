@@ -6,7 +6,7 @@
 // oncoprint — the one view whose output is patients — carries the cohort SQL and
 // re-derives its columns inside the owning database.
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
-import { applyLocks, lockDate, lockSamples } from "./cohort-lock.ts";
+import { applyLocks, lockDate } from "./cohort-lock.ts";
 import { chQuery, STUDY, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
@@ -27,7 +27,7 @@ import { upgradeDocument } from "./doc-version.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { ATTR_NAME_RE, assertCustomDataPresent } from "./custom-data.ts";
 import { viewRunner } from "./views/index.ts";
-import { Untimed, type ViewRun, type RiskFitter } from "./views/run.ts";
+import { Untimed, type ViewRun, type RiskFitter, type EvaluatedCohort } from "./views/run.ts";
 import { overLimit } from "./views/shared.ts";
 
 async function oncokbPin(): Promise<string | null> {
@@ -159,11 +159,12 @@ export interface RunOpts {
   /** which of a view's tables `page` or `values` reads, for a view that holds several (the alterations view's "mutations", "cna", "sv") */
   table?: string;
   /**
-   * How a local participant's cohort is counted, given its compiled SQL: the Next routes pass a
-   * cached one (lib/next-cache.ts), so the per-view requests the page sends do not each count
-   * every cohort again. A remote peer always answers for itself.
+   * How a local participant counts the rows of a statement: the Next routes pass a cached one
+   * (lib/next-cache.ts), so the per-view requests the page sends do not each count every cohort
+   * again. It is given the cohort's compiled SQL (its samples, one row each) and that SQL's
+   * distinct patients. A remote peer always answers for itself.
    */
-  count?: (conn: ChConn, cohortSql: string) => Promise<number>;
+  count?: (conn: ChConn, sql: string) => Promise<number>;
   /**
    * How a risk model is fitted: the Next routes pass a cached one (lib/next-cache.ts), so a change
    * to a risk model's groups, which the fit does not depend on, refits nothing.
@@ -173,7 +174,7 @@ export interface RunOpts {
 
 /**
  * A categorical attribute's value counts within a cohort, merged across every study the cohort
- * spans. Each study answers for its own patients (attributeStats is on AggregateCapable, so an
+ * spans. Each study answers for its own part of the cohort (attributeStats is on AggregateCapable, so an
  * aggregate-only or remote participant answers too), and disagreeing declared types across
  * studies are refused, not silently merged, as the clinical view's cross-study comparison does.
  */
@@ -230,8 +231,8 @@ export async function resolveDocCohorts(input: unknown): Promise<{ paramsDoc: An
   const { doc: partitionedDoc } = expandSplitTree(paramsDoc as AnalysisDoc);
   const extendsDoc = resolveExtends(applyLocks(partitionedDoc).doc);
   const docStudy = await resolveStudy(extendsDoc.study);
-  const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, per, p) =>
-    (await resolverFor(study, {})).attributeQuantile(refDef, attribute, per, p));
+  const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, p) =>
+    (await resolverFor(study, {})).attributeQuantile(refDef, attribute, p));
   return { paramsDoc: paramsDoc as AnalysisDoc, doc, docStudy };
 }
 
@@ -276,14 +277,14 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
   if (dist.skipped) throw new Error("cannot split by '" + attribute + "': " + dist.skipped);
   if (dist.kind === "num") {
     // A median split relative to the cohort being split, through a percentile leaf: the engine
-    // resolves the cutoff live from this cohort's own patients.
+    // resolves the cutoff live from this cohort's own values, at the level the study records them.
     if (studies.length > 1) throw new Error("'" + attribute + "' is numeric, and a median split needs a cohort in a single study (“" + cohort + "” spans " + studies.length + ")");
     const name = nameFor(attribute);
     return { name, note: "split at the median of " + attribute + " within “" + cohort + "”",
-      def: { of: cohort, split: name, arms: [{ name: attribute + " below median", where: { kind: "clinical", attribute, ...(dist.per === "sample" ? { per: "sample" as const } : {}), op: "<", percentile: 0.5, percentileOf: cohort } }],
+      def: { of: cohort, split: name, arms: [{ name: attribute + " below median", where: { kind: "clinical", attribute, op: "<", percentile: 0.5, percentileOf: cohort } }],
         other: attribute + " at or above median", source: { attribute, median: true } } };
   }
-  const { def: p, pooled } = partitionFromValues(cohort, attribute, dist.per, dist.values || [], { maxArms: req.maxArms, minCount: req.minCount });
+  const { def: p, pooled } = partitionFromValues(cohort, attribute, dist.values || [], { maxArms: req.maxArms, minCount: req.minCount });
   if (dist.partial && p.source) p.source.otherValuesTruncated = true;
   const name = nameFor(attribute);
   return { name, def: { ...p, split: name },
@@ -354,13 +355,13 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   // document's own JSON), so this runs after extends/params but before anything compiles a
   // cohort — by the time compileCohortDef sees a leaf, `percentile` has already become an
   // ordinary `value`.
-  const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, per, p) => {
+  const doc = await resolveCohortPercentiles(extendsDoc, docStudy, async (study, refDef, attribute, p) => {
     const res = await resolverFor(study, {});
-    return res.attributeQuantile(refDef, attribute, per, p);
+    return res.attributeQuantile(refDef, attribute, p);
   });
   const live = Object.keys(locked).length
-    ? await resolveCohortPercentiles(resolveExtends(liveDoc), docStudy, async (study, refDef, attribute, per, p) =>
-      (await resolverFor(study, {})).attributeQuantile(refDef, attribute, per, p))
+    ? await resolveCohortPercentiles(resolveExtends(liveDoc), docStudy, async (study, refDef, attribute, p) =>
+      (await resolverFor(study, {})).attributeQuantile(refDef, attribute, p))
     : null;
   const pin = process.env.ONCOKB_PIN || await oncokbPin();
   const names = Object.keys(doc.cohorts || {});
@@ -377,7 +378,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   { const e = overLimit("an analysis document", 6, (doc.views || []).length); if (e) throw new Error(e.replace("at most 6", "at most 6 views")); }
 
   // ---- evaluate cohorts: per study, sum the counts ------------------------
-  type EvaledCohort = { studies: string[]; perStudy: Record<string, { sql: string; count: number; mode: string }>; count: number; text: string };
+  type EvaledCohort = EvaluatedCohort;
   const cohorts: Record<string, EvaledCohort> = {};
   const resolvers: Record<string, Resolver> = {}; // study -> its instance's resolver
   // Extracted so a splitBy arm (a synthetic cohort, never in `doc.cohorts`/`names`) can be
@@ -386,7 +387,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
   const evalCohortDef = async (def: CohortDef): Promise<EvaledCohort> => {
     const studies = [];
     for (const s of cohortStudies(def, docStudy)) studies.push(await resolveStudy(s, docStudy));
-    const perStudy: Record<string, { sql: string; count: number; mode: string }> = {};
+    const perStudy: EvaledCohort["perStudy"] = {};
     // Every instance is asked for a COUNT, including the patient-level ones.
     // Cohort evaluation has no use for identities: the size is a count, and the
     // oncoprint — the only view whose output is patients — carries the cohort SQL
@@ -396,55 +397,65 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       const { profiles, gaProfiles } = await studyProfiles(s);
       const res = await resolverFor(s, { oncokbPin: pin, profiles, gaProfiles });
       resolvers[s] = res;
-      // count() first: a remote peer only learns its own SQL by answering, and
+      // sizes() first: a remote peer only learns its own SQL by answering, and
       // cohortSql() reads what it reported.
       const local = res instanceof PatientLevelResolver || res instanceof AggregateResolver;
-      const count = local && opts.count ? await opts.count(res.instance.conn, res.cohortSql(def)) : await res.count(def);
-      return { s, res, sql: res.cohortSql(def), count };
+      const rowsOf = opts.count;
+      const { patients, samples } = local && rowsOf
+        ? await (async () => {
+          const sql = res.cohortSql(def);
+          const [patients, samples] = await Promise.all([rowsOf(res.instance.conn, "SELECT DISTINCT pid FROM (" + sql + ")"), rowsOf(res.instance.conn, sql)]);
+          return { patients, samples };
+        })()
+        : await res.sizes(def);
+      return { s, res, sql: res.cohortSql(def), count: patients, samples };
     }));
-    for (const { s, res, sql, count } of evals) {
-      perStudy[s] = { sql, count, mode: res.instance.mode };
+    for (const { s, res, sql, count, samples } of evals) {
+      perStudy[s] = { sql, count, samples, mode: res.instance.mode };
     }
     return {
       studies, perStudy,
       count: Object.values(perStudy).reduce((n, x) => n + x.count, 0),
+      samples: Object.values(perStudy).reduce((n, x) => n + x.samples, 0),
       text: describeCohortDef(def) +
         (studies.length > 1 ? " — across " + studies.length + " studies" :
          studies[0] !== docStudy ? " — in " + studies[0] : "")
     };
   };
   for (const name of names) cohorts[name] = await evalCohortDef(doc.cohorts[name]);
-  // A locked cohort answers from its frozen patients; its definition is run beside them, so the
+  // A locked cohort answers from its frozen samples; its definition is run beside them, so the
   // reader is told how far the data has moved since, never left to notice.
   const drift: Record<string, LockDrift> = {};
   for (const [name, l] of Object.entries(locked)) {
     if (!cohorts[name] || !live) continue;
     const liveDef = live.cohorts[name];
     const d: LockDrift = { cohort: l.cohort, at: l.lock.at, ...(l.lock.dataVersion ? { dataVersion: l.lock.dataVersion } : {}),
-      n: l.members.n, present: 0, now: 0, entered: 0, left: 0, newSamples: lockSamples(l.members) ? 0 : null };
+      n: l.members.n, present: 0, now: 0, entered: 0, left: 0, newSamples: 0 };
     try {
       for (const s of cohorts[name].studies) {
         const res = resolvers[s];
         if (!(res instanceof PatientLevelResolver)) throw new Error(s + " is not held at patient level here");
-        const r = await res.lockDrift(doc.cohorts[name], liveDef, lockSamples(l.members));
+        const r = await res.lockDrift(doc.cohorts[name], liveDef);
         d.present += r.present; d.now += r.now; d.entered += r.entered; d.left += r.left;
-        if (d.newSamples != null) d.newSamples = r.newSamples == null ? null : d.newSamples + r.newSamples;
+        d.newSamples += r.newSamples;
       }
     } catch (e) { d.error = "how far the data has moved could not be measured: " + ((e as Error)?.message || e); }
     drift[name] = d;
     const studies = cohorts[name].studies;
-    cohorts[name].text = "locked " + lockDate(l.lock.at) + ": " + l.members.n.toLocaleString("en-US") + " patient" + (l.members.n === 1 ? "" : "s") +
-      " who were " + describeCohortDef(liveDef) +
+    cohorts[name].text = "locked " + lockDate(l.lock.at) + ": " + l.members.n.toLocaleString("en-US") + " sample" + (l.members.n === 1 ? "" : "s") +
+      " that were " + describeCohortDef(liveDef) +
       (studies.length > 1 ? " — across " + studies.length + " studies" : studies[0] !== docStudy ? " — in " + studies[0] : "");
   }
   // The children of a partition are disjoint and cover the parent by construction; counting
   // them is the check that the construction held, so a mismatch is reported, never hidden.
   const partitionResults: NonNullable<AnalysisResult["splits"]> = {};
   for (const plan of partitionPlans) {
-    const children = plan.children.map((c) => ({ name: c.name, label: c.label, role: c.role, count: cohorts[c.name].count }));
-    const sum = children.reduce((n, c) => n + c.count, 0);
-    const parentCount = cohorts[plan.of].count;
-    partitionResults[plan.name] = { of: plan.of, split: plan.split, parentCount, children, sum, conserved: sum === parentCount, unchecked: plan.unchecked };
+    const children = plan.children.map((c) => ({ name: c.name, label: c.label, role: c.role, count: cohorts[c.name].count, samples: cohorts[c.name].samples }));
+    // arms are decided per sample, so they are disjoint in samples; a patient whose samples land in
+    // different arms is in each of them, and the children's patients need not add up
+    const sum = children.reduce((n, c) => n + c.samples, 0);
+    const parentSamples = cohorts[plan.of].samples;
+    partitionResults[plan.name] = { of: plan.of, split: plan.split, parentCount: cohorts[plan.of].count, parentSamples, children, sum, conserved: sum === parentSamples, unchecked: plan.unchecked };
   }
   const partitionShapes = partitionPlans.map((p) => ({ name: p.name, of: p.of, comparable: comparableChildren(p) }));
   const generatedNames = new Set(partitionPlans.flatMap((p) => p.children.map((c) => c.name)));
@@ -533,7 +544,7 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
           ...(resolved.gene ? { gene: resolved.gene } : resolved.oql ? { oql: resolved.oql } : { attribute: resolved.attribute }),
           cohort: baseName,
           arms: keptArms.map((a) => ({
-            name: a.name, count: cohorts[a.name].count, text: cohorts[a.name].text,
+            name: a.name, count: cohorts[a.name].count, samples: cohorts[a.name].samples, text: cohorts[a.name].text,
             sql: Object.entries(cohorts[a.name].perStudy).map(([s, x]) => "-- " + s + "\n" + x.sql).join("\n\n")
           })),
           ...(resolved.otherValues.length ? { otherValues: resolved.otherValues } : {}),
@@ -615,11 +626,11 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
     ...(partitionPlans.length ? { splits: partitionResults } : {}),
     ...(upgrade ? { upgraded: upgrade } : {}),
     cohorts: Object.fromEntries(names.map((n) => [n, {
-      count: cohorts[n].count, text: cohorts[n].text,
+      count: cohorts[n].count, samples: cohorts[n].samples, text: cohorts[n].text,
       studies: cohorts[n].studies,
       ...(drift[n] ? { lock: drift[n] } : {}),
       sql: Object.entries(cohorts[n].perStudy).map(([s, x]) => "-- " + s + "\n" + x.sql).join("\n\n-- combined at the analysis layer: each study is evaluated separately against its own\n" +
-        "-- instance and the counts are ADDED; patient overlap across studies is not deduplicated.\n\n")
+        "-- instance and the counts are ADDED; patient and sample overlap across studies is not deduplicated.\n\n")
     }])),
     views,
     stats: { ms: Date.now() - t0 }

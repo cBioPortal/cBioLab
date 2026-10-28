@@ -9,6 +9,7 @@ import type { TablePart } from "./clinical-table.ts";
 import type { PatientEvent, PatientSample } from "./types.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { patientSql, type PatientSql } from "./sql-kinds.ts";
+import { inCohortPatients } from "./cohort2.ts";
 
 /** A study's patient id as stored (no study prefix): what a cohort's `pid` holds. */
 export const PATIENT_ID = /^[A-Za-z0-9._-]{1,80}$/;
@@ -32,7 +33,9 @@ export type TimelinePart = TablePart & { source: string };
  * Every (cohort, study) part's patients, one row each: how many samples and timeline events they
  * have, the first and last event day (days from diagnosis, a range counted to its stop) and the
  * event types recorded. A patient with no timeline is listed, with no events — the list is the
- * cohort, not the patients who happen to have a timeline. All parts must live in this database.
+ * cohort's patients (the owners of its samples), not the patients who happen to have a timeline;
+ * `samples` counts all of a patient's samples, as the patient's own timeline draws them. All parts
+ * must live in this database.
  */
 export function timelinePatientRowSource(parts: TimelinePart[], db: string): RowSource {
   if (!parts.length) throw new Error("timelinePatientRowSource needs at least one part");
@@ -44,7 +47,7 @@ export function timelinePatientRowSource(parts: TimelinePart[], db: string): Row
       "pt" + i + " AS (\n" +
       "  SELECT p.internal_id AS iid, p.stable_id AS pid FROM " + db + ".patient p\n" +
       "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-      "  WHERE cs.cancer_study_identifier = " + sq(p.study) + " AND p.stable_id IN (SELECT pid FROM c" + i + ")\n" +
+      "  WHERE cs.cancer_study_identifier = " + sq(p.study) + " AND " + inCohortPatients("p.stable_id", "c" + i) + "\n" +
       "),\n" +
       "ev" + i + " AS (\n" +
       "  SELECT ce.patient_id AS iid, count() AS events, min(ce.start_date) AS first,\n" +
@@ -55,7 +58,7 @@ export function timelinePatientRowSource(parts: TimelinePart[], db: string): Row
       "),\n" +
       "sm" + i + " AS (\n" +
       "  SELECT replaceOne(patient_unique_id, " + pre + ", '') AS pid, uniqExact(sample_unique_id) AS samples FROM " + db + ".sample_derived\n" +
-      "  WHERE cancer_study_identifier = " + sq(p.study) + " AND replaceOne(patient_unique_id, " + pre + ", '') IN (SELECT pid FROM c" + i + ")\n" +
+      "  WHERE cancer_study_identifier = " + sq(p.study) + " AND " + inCohortPatients("replaceOne(patient_unique_id, " + pre + ", '')", "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n");
     rows.push(

@@ -644,14 +644,13 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
               </span>
               {(() => {
                 const label = c.displayName || c.attribute;
-                const chart: ChartKey = { kind: "clinical", attribute: c.attribute, per: c.per === "sample" ? "sample" : "patient" };
+                const chart: ChartKey = { kind: "clinical", attribute: c.attribute };
                 const n = selectionArmCount(chart);
-                const per = c.per === "sample" ? { per: "sample" as const } : {};
                 const checked = c.kind === "cat" ? c.values.filter((v: any) => picks.has(String(v.v)))
                   .sort((x: any, y: any) => picks.picked.indexOf(String(x.v)) - picks.picked.indexOf(String(y.v))) : [];
                 if (c.kind === "cat" && !PIE_ATTRIBUTES.has(c.attribute)) return <ChartMenu label={label} actions={addMode ? [] : [
                   splitChecked(checked.length, "value of " + label, () => splitDraftByPicks(chart, checked.map((v: any) => ({ name: armLabel(String(v.v)),
-                    where: { kind: "clinical", attribute: c.attribute, ...per, values: [v.v] } as Leaf })), label))]} />;
+                    where: { kind: "clinical", attribute: c.attribute, values: [v.v] } as Leaf })), label))]} />;
                 return <ChartMenu label={label} actions={addMode ? [] : [
                   { label: "Split by this", disabled: !!splittingBy, working: splittingBy === label,
                     title: "Analyze the current selection split by " + label + (c.kind === "num"
@@ -672,8 +671,7 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           const d = parseDraft();
           const isSel = (v: any) => !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
             ((cl.values || []).includes(v.v) || cl.value === v.v)));
-          const clause = (v: any) => ({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v,
-            ...(c.per === "sample" ? { per: "sample" } : {}) });
+          const clause = (v: any) => ({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v });
           // slice geometry: cumulative angles over the returned values.
           // The shape comes from PIE_ATTRIBUTES, a fixed allowlist — see
           // its own comment for why cardinality (the study's, or worse,
@@ -708,8 +706,7 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                   title: v.v + " — " + v.n.toLocaleString() }))}
                 onApply={(keys) => {
                   const vs = keys.map((k) => byKey.get(k).v);
-                  addClause(vs.length === 1 ? clause(byKey.get(keys[0])) : { kind: "clinical", attribute: c.attribute, values: vs,
-                    ...(c.per === "sample" ? { per: "sample" } : {}) });
+                  addClause(vs.length === 1 ? clause(byKey.get(keys[0])) : { kind: "clinical", attribute: c.attribute, values: vs });
                 }} />
                 {(c.distinct ?? 0) > c.values.length ? (
                   <span className="meta pad-tight vlistfoot">
@@ -746,10 +743,9 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
         {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
           const maxN = Math.max(...c.bins.map((b: any) => b.count), 1);
           const clauseFor = (b: any) => {
-            const per = c.per === "sample" ? { per: "sample" } : {};
-            if (b.special === "<=") return { kind: "clinical", attribute: c.attribute, range: { lte: b.end }, ...per };
-            if (b.special === ">") return { kind: "clinical", attribute: c.attribute, range: { gt: b.start }, ...per };
-            return { kind: "clinical", attribute: c.attribute, range: { gt: b.start, lte: b.end }, ...per };
+            if (b.special === "<=") return { kind: "clinical", attribute: c.attribute, range: { lte: b.end } };
+            if (b.special === ">") return { kind: "clinical", attribute: c.attribute, range: { gt: b.start } };
+            return { kind: "clinical", attribute: c.attribute, range: { gt: b.start, lte: b.end } };
           };
           const label = (b: any) => b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start) + "–" + fmtNum(b.end);
           const tick = (b: any) => b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start);
@@ -766,8 +762,8 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
         })()}
         {c.kind === "num" && <div className="flex items-center gap-1 mt-1 flex-wrap">
           <span className="meta">min {fmtNum(c.min)} · median {fmtNum(c.median)} · max {fmtNum(c.max)}</span>
-          <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>≥ median</Button>
-          <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 }, ...(c.per === "sample" ? { per: "sample" } : {}) })}>&lt; median</Button>
+          <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 } })}>≥ median</Button>
+          <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 } })}>&lt; median</Button>
         </div>}
     </div>
   );
@@ -883,11 +879,11 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
         <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type} className="card">
           <div className="facettitle">
             {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
-            <span className="meta"> · patient-level · {f.total.toLocaleString()} patients</span>
+            <span className="meta"> · sample-level · {f.total.toLocaleString()} samples</span>
           </div>
-          <ValueList hint={"keep the patients in any of the checked states of " + f.gene}
+          <ValueList hint={"keep the samples in any of the checked states of " + f.gene}
             rows={f.states.map((st) => ({ key: st.state, name: st.label, n: st.n, total: f.total, muted: st.state === "notProfiled",
-              title: st.label + " — " + st.n.toLocaleString() + " patients" }))}
+              title: st.label + " — " + st.n.toLocaleString() + " samples" }))}
             why={(states) => { const r = apply(states); return "why" in r ? r.why : null; }}
             onApply={(states) => { const r = apply(states); if ("clauses" in r) addClauses(r.clauses); }} />
           {f.overlap ? (
