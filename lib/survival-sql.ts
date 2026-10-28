@@ -11,13 +11,17 @@ import { finiteSql } from "./sql-number.ts";
 /** the values cBioPortal reads as a missing survival status or time, compared trimmed and lower-cased */
 export const SURVIVAL_NULL_VALUES = ["[not applicable]", "[not available]", "[pending]", "[discrepancy]", "[completed]", "[null]", "", "na"];
 
-const present = (expr: string): string =>
+/** true when a status (or months) value is recorded: not one of the portal's missing markers */
+export const survivalPresentSql = (expr: string): string =>
   "lowerUTF8(trimBoth(ifNull(" + expr + ", ''))) NOT IN (" + SURVIVAL_NULL_VALUES.map((v) => "'" + v + "'").join(", ") + ")";
+
+/** true when a months value is usable: recorded, and a number of at least 0 */
+export const survivalTimeUsableSql = (months: string): string =>
+  survivalPresentSql(months) + " AND " + finiteSql("trimBoth(" + months + ")") + " >= 0";
 
 /** the survival time in months, or NULL when the patient does not enter: missing status or months, or months not a number ≥ 0 */
 export function survivalMonthsSql(months: string, status: string): string {
-  const m = finiteSql("trimBoth(" + months + ")");
-  return "if(" + present(status) + " AND " + present(months) + " AND " + m + " >= 0, " + m + ", NULL)";
+  return "if(" + survivalPresentSql(status) + " AND " + survivalTimeUsableSql(months) + ", " + finiteSql("trimBoth(" + months + ")") + ", NULL)";
 }
 
 /** 1 when the status's code records the event ("1:DECEASED", "1:Progressed", "1", "1.0"), else 0 */

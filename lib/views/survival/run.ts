@@ -2,11 +2,15 @@
 // (months, event, n) counts, with log-rank tests.
 import { kaplanMeier, logRank, logRankK, applyCutoff, toIncidence } from "../../stats.ts";
 import type { ViewResult, LogRank, LogRankK } from "../../types.ts";
-import { expandSurvivalCounts, type SurvivalCount, type EndpointColumns } from "../../federation.ts";
+import { expandSurvivalCounts, hasViewAggregates, type SurvivalCount, type EndpointColumns } from "../../federation.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { ATTR_NAME, askEachSite } from "../shared.ts";
 import type { SurvivalView } from "./types.ts";
 import { survivalMethod } from "./method.ts";
+import { survivalLeftOutSql } from "./sql.ts";
+
+/** a cohort whose left-out patients reach this share of it is drawn from incomplete follow-up, and the caption says so */
+const LEFT_OUT_WARN_SHARE = 0.1;
 
 export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;
@@ -64,6 +68,18 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
   for (const n of vNames) perSite.set(n, new Map());
   for (const { cohort: n, study: st, answer } of await askEachSite(c, resolvers, (n, _st, r) => r.survivalCounts(doc.cohorts[n], endpoint, anchor, columns)))
     perSite.get(n)!.set(st, answer);
+  // the cohort's patients the curve leaves out for want of half an endpoint (lib/survival-sql.ts); a
+  // remote peer sends only its counts, so its share is unknown and said to be
+  const monthsCol = columns ? columns.months : endpoint + "_MONTHS", statusCol = columns ? columns.status : endpoint + "_STATUS";
+  const leftOut = new Map(vNames.map((n) => [n, { noStatus: 0, noTime: 0 }]));
+  const leftOutUnknown = new Set<string>();
+  for (const { cohort: n, study: st, answer } of await askEachSite(c, resolvers, (n, st, r) => hasViewAggregates(r)
+    ? r.viewAggregate("survivalLeftOut:" + endpoint, doc.cohorts[n], (cs, s, d) => survivalLeftOutSql(cs, s, d, monthsCol, statusCol))
+    : Promise.resolve(null))) {
+    if (!answer) { leftOutUnknown.add(st); continue; }
+    const t = leftOut.get(n)!;
+    t.noStatus += Number(answer[0]?.no_status || 0); t.noTime += Number(answer[0]?.no_time || 0);
+  }
   // An EMPTY COHORT also yields no rows, and must not be reported as a
   // missing endpoint — that sends the reader (or a model) off to conclude the
   // study lacks OS when it does not. Separate the two causes before blaming
@@ -111,7 +127,9 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
   };
   const curvesRaw = vNames.map((n) => {
     const data = pointsFor(n);
-    return { cohort: n, ...kaplanMeier(data), missing: cohorts[n].count - data.length };
+    const lo = leftOut.get(n)!;
+    return { cohort: n, ...kaplanMeier(data), missing: cohorts[n].count - data.length,
+      ...(lo.noStatus ? { noStatus: lo.noStatus } : {}), ...(lo.noTime ? { noTime: lo.noTime } : {}) };
   });
   const curves = display === "incidence" ? curvesRaw.map((c) => toIncidence(c)) : curvesRaw;
   // Two cohorts is the case the 2-arm log-rank test is defined for, matching the compare
@@ -165,6 +183,18 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
     }
   }
   const unobservedTotal = curvesRaw.reduce((sum, c) => sum + (c.unobserved || 0), 0);
+  const pl = (k: number, one: string, many: string) => k.toLocaleString("en-US") + " " + (k === 1 ? one : many);
+  const leftOutText = curvesRaw.filter((cv) => cv.noStatus || cv.noTime).map((cv) => {
+    const parts = [...(cv.noStatus ? [pl(cv.noStatus, "patient", "patients") + " with a time but no status"] : []),
+      ...(cv.noTime ? [pl(cv.noTime, "patient", "patients") + " with a status but no usable time"] : [])];
+    const share = ((cv.noStatus || 0) + (cv.noTime || 0)) / Math.max(1, cohorts[cv.cohort].count);
+    return "“" + cv.cohort + "”: " + parts.join(" and ") +
+      (share >= LEFT_OUT_WARN_SHARE ? " (" + Math.round(100 * share) + "% of the cohort: this curve is drawn from incomplete follow-up, and is biased if the missing are sicker or healthier than the rest)" : "");
+  });
+  const leftOutCaveat = (leftOutText.length
+    ? "Left out of the curves and the test, as on cBioPortal (a patient enters only with both a status and a time of at least 0, so a missing status is never read as censored): " + leftOutText.join("; ") + ". "
+    : "") +
+    (leftOutUnknown.size ? "Not known for " + [...leftOutUnknown].join(", ") + ", which send only their counts: how many of their patients lack a status or a time. " : "");
   const beyondCutoff = cutoffMonths != null
     ? vNames.reduce((sum, n) => sum + expandSurvivalCounts([...perSite.get(n)!.values()].flat())
         .filter((r) => r.t > cutoffMonths!).length, 0)
@@ -202,7 +232,7 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
     }),
     caveat: (display === "incidence"
       ? "Cumulative incidence (1 - survival) shown, not survival. "
-      : "") +
+      : "") + leftOutCaveat +
       (cutoffMonths != null
         ? "Administratively censored at " + cutoffMonths + " months" +
           (beyondCutoff ? " (" + beyondCutoff + " patient" + (beyondCutoff === 1 ? "" : "s") + " still under observation past this point)" : "") +

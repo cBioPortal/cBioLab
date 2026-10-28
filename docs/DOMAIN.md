@@ -21,7 +21,8 @@ shortcut that gives a plausible wrong number), the trap is named.
   A patient enters a survival analysis only with both a status and a months value (neither a missing
   marker such as `NA` or `[Not Available]`) and months at least 0, as on cBioPortal: months with no
   status is left out, never censored. The event is a status coded 1 (`1:DECEASED`, or a bare `1`).
-  One rule for every view: `lib/survival-sql.ts`.
+  One rule for every view: `lib/survival-sql.ts`. The survival view names, per cohort, the patients
+  it leaves out for want of a status or a time, and warns when they reach a tenth of the cohort.
 - **Molecular profile** — one kind of measurement for a study: mutations, copy number (CNA),
   structural variants (SV), mRNA expression (and its z-scores), protein, methylation, or a
   **generic assay** (mutational signatures, arm-level copy number, cell-type fractions: any per-case

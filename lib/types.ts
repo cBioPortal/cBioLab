@@ -593,6 +593,10 @@ export interface KmCurve {
   atRisk?: number[];
   /** patients whose follow-up ended at or before their entry: never at risk, so left out of n */
   unobserved?: number;
+  /** cohort patients with a usable time but no status, left out of n (lib/survival-sql.ts); absent when none */
+  noStatus?: number;
+  /** cohort patients with a status but no usable time, left out of n; absent when none */
+  noTime?: number;
 }
 export interface Cmh {
   chi2: number; p: number; df: number;

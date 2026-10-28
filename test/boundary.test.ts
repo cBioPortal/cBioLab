@@ -464,6 +464,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // molsubtype: each patient's class stays in CTEs; patients are counted per class, group and survival time
     "molCountsSql": () => aggregates.molCountsSql(cohortSql, "x", "db", { poleHotspots: ["P286R", "V411L"], msi: { attribute: "MSI_TYPE", high: ["Instable"], stable: ["Stable"] }, p53Pin: "v7.5", by: "ANCESTRY_LABEL" }),
     "molCountsSql:score": () => aggregates.molCountsSql(cohortSql, "x", "db", { poleHotspots: ["P286R"], msi: { attribute: "MSI_SCORE", threshold: 10, stableBelow: 3 }, p53Pin: null, by: null }),
+    "survivalLeftOutSql": () => aggregates.survivalLeftOutSql(cohortSql, "x", "db", "OS_MONTHS", "OS_STATUS"),
     "molSurvivalSql": () => aggregates.molSurvivalSql(cohortSql, "x", "db", { poleHotspots: ["P286R"], msi: { attribute: "MSI_TYPE", high: ["Instable"], stable: ["Stable"] }, p53Pin: "v7.5", by: null }),
     "molMsiAttributesSql": () => aggregates.molMsiAttributesSql(cohortSql, "x", "db"),
     // germline: carriers, somatic hits and panels stay in CTEs; patients are counted per gene and combination
