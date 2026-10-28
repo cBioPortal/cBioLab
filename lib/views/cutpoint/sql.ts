@@ -1,5 +1,6 @@
 // The cutpoint view's SQL: what its runner (run.ts) asks each participant's database for.
 // cutpoint: a numeric marker against a survival endpoint, per patient
+import { survivalMonthsSql, survivalEventSql } from "../../survival-sql.ts";
 import { pidOf } from "../../federation-views.ts";
 import { finiteSql } from "../../sql-number.ts";
 import { sq } from "../../compiler.ts";
@@ -41,7 +42,7 @@ export function cutpointRowsSql(cohortSql: string, study: string, db: string,
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + finiteSql("anyIf(attribute_value, attribute_name = " + sq(o.months) + ")") + " AS months,\n" +
+    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name = " + sq(o.months) + ")", "anyIf(attribute_value, attribute_name = " + sq(o.status) + ")") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = " + sq(o.status) + ") AS status\n" +
     "  FROM " + clinicalTable(db, [o.months, o.status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN (" + sq(o.months) + ", " + sq(o.status) + ")\n" +
@@ -58,7 +59,7 @@ export function cutpointRowsSql(cohortSql: string, study: string, db: string,
     "    AND " + inCohortClinical(study) + "\n" +
     "  GROUP BY pid\n" +
     ")\n" : "") +
-    "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, " + (o.assay ? "ga.v" : "val.v") + " AS v" + (o.stratum ? ", val.s AS s" : "") + "\n" +
+    "SELECT os.months AS m, " + survivalEventSql("os.status") + " AS ev, " + (o.assay ? "ga.v" : "val.v") + " AS v" + (o.stratum ? ", val.s AS s" : "") + "\n" +
     "FROM os" + (o.assay ? " LEFT JOIN ga ON ga.pid = os.pid" : "") + (attrs.length ? " LEFT JOIN val ON val.pid = os.pid" : "") + "\n" +
     "WHERE os.months IS NOT NULL AND os.months >= 0"
   ));

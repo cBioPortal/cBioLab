@@ -1,4 +1,5 @@
 // The molsubtype view's SQL: what its runner (run.ts) asks each participant's database for.
+import { survivalMonthsSql, survivalEventSql } from "../../survival-sql.ts";
 import { pidOf, orgAttr } from "../../federation-views.ts";
 import { finiteSql } from "../../sql-number.ts";
 import { clinicalTable } from "../../custom-data.ts";
@@ -25,8 +26,8 @@ export function molSurvivalSql(cohortSql: string, study: string, db: string, o: 
   const pid = pidOf("patient_unique_id", study);
   return aggregateSql(molEndometrialCtes(cohortSql, study, db, o) + ",\n" +
     "os AS (\n" +
-    "  SELECT " + pid + " AS pid, " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
-    "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
+    "  SELECT " + pid + " AS pid, " + survivalMonthsSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')", "anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS months,\n" +
+    "         " + survivalEventSql("anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS dead\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
     "    AND " + inCohortPatients(pid) + "\n" +

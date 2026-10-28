@@ -19,6 +19,7 @@
 // for the transport — a real deployment swaps in a second connection
 // (data-level federation) or a federation API client to a remote cbio-lab
 // (document-level federation) behind the same interface.
+import { survivalMonthsSql, survivalEventSql } from "./survival-sql.ts";
 import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
@@ -759,8 +760,8 @@ export function survivalCountsSql(cohortSql: string, study: string, db: string =
     "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     ")\n" +
-    "SELECT " + finiteSql("months") + " AS m, if(status LIKE '1%', 1, 0) AS ev, count() AS n\n" +
-    "FROM os WHERE " + finiteSql("months") + " IS NOT NULL\n" +
+    "SELECT " + survivalMonthsSql("months", "status") + " AS m, " + survivalEventSql("status") + " AS ev, count() AS n\n" +
+    "FROM os WHERE m IS NOT NULL\n" +
     "GROUP BY m, ev ORDER BY m"
   ));
 }
@@ -796,7 +797,7 @@ export function anchoredSurvivalSql(
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + finiteSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")") + " AS months,\n" +
+    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")", "anyIf(attribute_value, attribute_name=" + sq(status) + ")") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
@@ -818,7 +819,7 @@ export function anchoredSurvivalSql(
     // sense as a start of follow-up, so later ones are dropped and counted.
     "SELECT round(-anch.day / " + DAYS_PER_MONTH + ", 4) AS entry,\n" +
     "       round(os.months - anch.day / " + DAYS_PER_MONTH + ", 4) AS m,\n" +
-    "       if(os.status LIKE '1%', 1, 0) AS ev, count() AS n\n" +
+    "       " + survivalEventSql("os.status") + " AS ev, count() AS n\n" +
     "FROM os INNER JOIN anch USING (pid)\n" +
     "WHERE os.months IS NOT NULL AND anch.day <= 0\n" +
     "GROUP BY entry, m, ev ORDER BY m"
@@ -866,7 +867,7 @@ export function coxRowsSql(
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + finiteSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")") + " AS months,\n" +
+    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")", "anyIf(attribute_value, attribute_name=" + sq(status) + ")") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
@@ -874,7 +875,7 @@ export function coxRowsSql(
     "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     ")" + (covCtes ? ",\n" + covCtes : "") + "\n" +
-    "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev" + (select ? ", " + select : "") + "\n" +
+    "SELECT os.months AS m, " + survivalEventSql("os.status") + " AS ev" + (select ? ", " + select : "") + "\n" +
     "FROM os\n" + (joins ? "  " + joins + "\n" : "") +
     "WHERE os.months IS NOT NULL"
   ));

@@ -1,7 +1,7 @@
 // The germline view's SQL: what its runner (run.ts) asks each participant's database for.
+import { survivalMonthsSql, survivalEventSql } from "../../survival-sql.ts";
 import { pidOf, geneList } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
-import { finiteSql } from "../../sql-number.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
@@ -39,8 +39,8 @@ export function germSurvivalSql(cohortSql: string, study: string, db: string, ge
   const pid = pidOf("patient_unique_id", study);
   return aggregateSql(germCtes(cohortSql, study, db, [gene]) + ",\n" +
     "os AS (\n" +
-    "  SELECT " + pid + " AS pid, " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
-    "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
+    "  SELECT " + pid + " AS pid, " + survivalMonthsSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')", "anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS months,\n" +
+    "         " + survivalEventSql("anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS dead\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
     "    AND " + inCohortPatients(pid) + "\n" +

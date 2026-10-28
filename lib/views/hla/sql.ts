@@ -1,10 +1,10 @@
 // The hla view's SQL: what its runner (run.ts) asks each participant's database for.
 // hla: HLA class I genotype and HLA LOH per patient
+import { survivalMonthsSql, survivalEventSql } from "../../survival-sql.ts";
 import { pidOf } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
-import { finiteSql } from "../../sql-number.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "../../sql-kinds.ts";
 import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
 
@@ -75,7 +75,7 @@ export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaR
     "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + finiteSql("anyIf(attribute_value, attribute_name = " + sq(o.months) + ")") + " AS months,\n" +
+    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name = " + sq(o.months) + ")", "anyIf(attribute_value, attribute_name = " + sq(o.status) + ")") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = " + sq(o.status) + ") AS status\n" +
     "  FROM " + clinicalTable(db, [o.months, o.status]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN (" + sq(o.months) + ", " + sq(o.status) + ")\n" +
@@ -92,7 +92,7 @@ export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaR
         ")\n"
       : "\n") +
     "SELECT hom.hA AS hA, hom.hB AS hB, hom.hC AS hC, hom.nf AS nf, loh.loss AS loss,\n" +
-    "       if(os.months >= 0, os.months, NULL) AS m, if(os.status LIKE '1%', 1, 0) AS ev" + covs.map((_, i) => ", cov.c" + i + " AS c" + i).join("") + "\n" +
+    "       if(os.months >= 0, os.months, NULL) AS m, " + survivalEventSql("os.status") + " AS ev" + covs.map((_, i) => ", cov.c" + i + " AS c" + i).join("") + "\n" +
     "FROM (SELECT DISTINCT pid FROM cohort) c LEFT JOIN hom ON hom.pid = c.pid LEFT JOIN loh ON loh.pid = c.pid LEFT JOIN os ON os.pid = c.pid" +
     (covs.length ? " LEFT JOIN cov ON cov.pid = c.pid" : "")
   ));

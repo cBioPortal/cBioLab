@@ -105,8 +105,8 @@ det AS (
     AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b')
 ),
 os AS (
-  SELECT replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') AS pid, if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS')), NULL) AS months,
-         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead, replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT pid FROM det) AS detected
+  SELECT replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') AS pid, if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL), NULL) AS months,
+         if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))[1])), NULL) = 1, 1, 0) AS dead, replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT pid FROM det) AS detected
   FROM snapshot_db.clinical_data_derived
   WHERE cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'nsclc_ctdx_msk_2022_', '') IN (SELECT pid FROM sides WHERE side = 'b')

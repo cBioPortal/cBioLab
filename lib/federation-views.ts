@@ -3,6 +3,7 @@
 // lib/federation.ts, which re-exports these so test/boundary.test.ts sweeps them with the rest:
 // the outer SELECT returns counts, sums and grouping keys — never an identifier — so any
 // participant, aggregate-only included, can answer.
+import { survivalMonthsSql, survivalEventSql } from "./survival-sql.ts";
 import { sq } from "./compiler.ts";
 import { ALTERED_COND, driverJoin, inCohortClinical } from "./federation.ts";
 import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql, foldedInSql } from "./event-names.ts";
@@ -170,7 +171,7 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
+    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')", "anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name = 'OS_STATUS') AS status\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
@@ -185,7 +186,7 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
     "  FROM ev INNER JOIN anch ON anch.pid = ev.pid GROUP BY ev.pid\n" +
     "),\n" +
     "per AS (\n" +
-    "  SELECT anch.pid AS pid, anch.day AS a, os.months AS months, os.status LIKE '1%' AS dead,\n" +
+    "  SELECT anch.pid AS pid, anch.day AS a, os.months AS months, " + survivalEventSql("os.status") + " AS dead,\n" +
     "         evs.pid != '' AS has_ev, evs.n_prior AS n_prior, evs.n_after AS n_after, evs.first_after AS first_after\n" +
     "  FROM anch\n" +
     "  LEFT JOIN os ON os.pid = anch.pid\n" +
@@ -315,7 +316,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + finiteSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")") + " AS months,\n" +
+    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")", "anyIf(attribute_value, attribute_name=" + sq(status) + ")") + " AS months,\n" +
     "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status,\n" +
     "         " + splitBucketSql(pid, study) + " AS half\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
@@ -374,7 +375,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
       "    AND " + inCohortClinical(study) + "\n" +
       "  GROUP BY pid\n" +
       ")" : "") + "\n" +
-    "SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes" +
+    "SELECT os.months AS m, " + survivalEventSql("os.status") + " AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes" +
     (strata ? ", attrs.a0 AS stratum" : "") +
     covariates.map((_, k) => ", attrs.a" + (k + (strata ? 1 : 0)) + " AS c" + k).join("") +
     (anchor ? ", anch.hit AS anchored, round(anch.day / " + DAYS_PER_MONTH + ", 4) AS anchor_months" : "") +
@@ -445,8 +446,8 @@ export function osCte(study: string, db: string): string {
   const pid = pidOf("patient_unique_id", study);
   return "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + finiteSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')") + " AS months,\n" +
-    "         anyIf(attribute_value, attribute_name = 'OS_STATUS') LIKE '1%' AS dead\n" +
+    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name = 'OS_MONTHS')", "anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS months,\n" +
+    "         " + survivalEventSql("anyIf(attribute_value, attribute_name = 'OS_STATUS')") + " AS dead\n" +
     "  FROM " + clinicalTable(db, ["OS_MONTHS", "OS_STATUS"]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')\n" +
     "    AND " + inCohortPatients(pid) + "\n" +

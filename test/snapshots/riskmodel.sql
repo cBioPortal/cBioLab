@@ -36,7 +36,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid,
-         if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), NULL) AS months,
+         if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status,
          cityHash64(concat('cohort-lab-split-v1:msk_chord_2024:', replaceOne(patient_unique_id, 'msk_chord_2024_', ''))) % 2 AS half
   FROM snapshot_db.clinical_data_derived
@@ -60,7 +60,7 @@ mut AS (
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
   GROUP BY pid
 )
-SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes
+SELECT os.months AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), NULL) = 1, 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes
 FROM os
   LEFT JOIN panels ON panels.pid = os.pid
   LEFT JOIN mut ON mut.pid = os.pid
@@ -79,7 +79,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Non-Small Cell Lung Cancer'))))))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid,
-         if(isFinite(ifNull(toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), nan)), toFloat64OrNull(anyIf(attribute_value, attribute_name='OS_MONTHS')), NULL) AS months,
+         if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name='OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name='OS_MONTHS'))), NULL), NULL) AS months,
          anyIf(attribute_value, attribute_name='OS_STATUS') AS status,
          cityHash64(concat('cohort-lab-split-v1:msk_chord_2024:', replaceOne(patient_unique_id, 'msk_chord_2024_', ''))) % 2 AS half
   FROM snapshot_db.clinical_data_derived
@@ -114,7 +114,7 @@ descr AS (
     AND ((type = 'sample' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)) OR (type = 'patient' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM cohort)))
   GROUP BY pid
 )
-SELECT os.months AS m, if(os.status LIKE '1%', 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes, descr.d0 AS d0, descr.r0 AS r0, descr.u0 AS u0, descr.d1 AS d1, descr.r1 AS r1, descr.u1 AS u1, descr.d2 AS d2, descr.r2 AS r2, descr.u2 AS u2, descr.d3 AS d3, descr.r3 AS r3, descr.u3 AS u3
+SELECT os.months AS m, if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(os.status, ''))[1])), NULL) = 1, 1, 0) AS ev, os.half AS half, panels.panels AS panels, mut.genes AS genes, descr.d0 AS d0, descr.r0 AS r0, descr.u0 AS u0, descr.d1 AS d1, descr.r1 AS r1, descr.u1 AS u1, descr.d2 AS d2, descr.r2 AS r2, descr.u2 AS u2, descr.d3 AS d3, descr.r3 AS r3, descr.u3 AS u3
 FROM os
   LEFT JOIN panels ON panels.pid = os.pid
   LEFT JOIN mut ON mut.pid = os.pid
