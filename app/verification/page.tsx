@@ -339,11 +339,13 @@ export default function VerificationPage() {
               <b>Matching cBioPortal shows we compute the same thing from the same data, not that the data
               is right, and not that cBioPortal is right.</b> We found an example while building this page.
               In <span className="mono">blca_mskcc_solit_2014</span>, one copy-number dataset is labeled as
-              whole-exome even though the samples were sequenced on a panel. Both tools therefore count each
-              sample twice: copy-number frequencies are divided by 218 for a 109-sample study
-              {blcaShared && <> (for example, {blcaShared.what}: {blcaShared.ours} in both tools)</>}, so they
-              appear half as common as they are. We have not changed this tool to differ from cBioPortal: the fix
-              belongs in the study&apos;s data, where it corrects both.
+              whole-exome even though the samples were sequenced on a panel. cBioPortal&apos;s study view counts a
+              sample once per dataset, so there copy-number frequencies are divided by 218 for a 109-sample study
+              and appear half as common as they are. This tool counts each sample once
+              {blcaShared && <> (for example, {blcaShared.what.replace(/ \(.*$/, "")}: {blcaShared.ours})</>}, and the
+              check compares it with cBioPortal&apos;s own per-sample panel data. The label still makes every gene read
+              as profiled in those samples, including genes the panel does not cover: that fix belongs in the
+              study&apos;s data.
             </li>
             <li>
               <b>The checks cover the studies, genes and questions listed above, not every possible query.</b>

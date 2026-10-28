@@ -63,7 +63,7 @@ const STUDIES = [
   "msk_ch_2020",            // mostly whole-exome, some panel
   "crc_apc_impact_2020",    // targeted panel
   "luad_tcga_pan_can_atlas_2018",
-  "blca_mskcc_solit_2014",   // its log2 CNA profile is tagged WES: both engines count each sample twice (see /verification)
+  "blca_mskcc_solit_2014",   // its log2 CNA profile is tagged WES: the portal's study view counts each sample twice, we once
 ];
 const TOP_GENES = 15;
 const CLINICAL_ATTRS = 4;
@@ -110,6 +110,35 @@ const portalGene = (p: PortalGene) => `${p.numberOfAlteredCases}/${p.numberOfAlt
 interface PortalCount { attributeId: string; counts: { value: string; count: number }[] }
 interface PortalSample { sampleId: string; patientId: string }
 
+/**
+ * Per gene, the samples the portal's own per-sample panel data says are profiled for an alteration
+ * type, each sample once (a sample profiled by no panel is whole-exome: every gene). The portal's
+ * study view counts a sample once per profile instead, so a study with two copy-number profiles
+ * (a discrete one and a log2 one tagged whole-exome) reads every sample twice; our Explore counts
+ * it once, as our views do, and is compared with this.
+ */
+const profiledOnce = new Map<string, Promise<(gene: string) => number>>();
+function portalProfiledOnce(study: string, alterationType: string): Promise<(gene: string) => number> {
+  const key = study + "|" + alterationType;
+  if (!profiledOnce.has(key)) profiledOnce.set(key, (async () => {
+    const ids = (await api<{ molecularProfileId: string; molecularAlterationType: string }[]>("/studies/" + study + "/molecular-profiles"))
+      .filter((p) => p.molecularAlterationType === alterationType).map((p) => p.molecularProfileId);
+    const rows = await api<{ sampleId: string; genePanelId?: string; profiled: boolean }[]>("/gene-panel-data/fetch", { molecularProfileIds: ids });
+    const panels = new Map<string, Set<string> | "all">();
+    for (const r of rows.filter((x) => x.profiled)) {
+      const cur = panels.get(r.sampleId);
+      if (cur === "all") continue;
+      if (!r.genePanelId) { panels.set(r.sampleId, "all"); continue; }
+      panels.set(r.sampleId, (cur ?? new Set()).add(r.genePanelId));
+    }
+    const genesOf = new Map<string, Set<string>>();
+    for (const id of new Set([...panels.values()].flatMap((v) => v === "all" ? [] : [...v])))
+      genesOf.set(id, new Set((await api<{ genes: { hugoGeneSymbol: string }[] }>("/gene-panels/" + id)).genes.map((g) => g.hugoGeneSymbol)));
+    return (gene: string) => [...panels.values()].filter((v) => v === "all" || [...v].some((id) => genesOf.get(id)!.has(gene))).length;
+  })());
+  return profiledOnce.get(key)!;
+}
+
 async function oursCount(study: string, def: CohortDef, profiles: { profiles: string[]; gaProfiles: string[] }): Promise<number> {
   const sql = compileCohortDef(def, { study, db: DB, oncokbPin: await oncokbPin(), ...profiles });
   return Number((await chQuery<{ n: string }>("SELECT uniqExact(pid) AS n FROM (" + sql + ")", PRIMARY)).data[0].n);
@@ -128,20 +157,27 @@ for (const study of STUDIES) {
     agree: ex.totals?.samples === portalSamples.length });
 
   // 2. gene tables
-  const tables: [string, GeneTableRow[] | undefined, string][] = [
-    ["mutations", ex.mutatedGenes, "/mutated-genes/fetch"],
-    ["copy number", ex.cnaGenes, "/cna-genes/fetch"],
-    ["structural variants", ex.svGenes, "/structuralvariant-genes/fetch"],
+  const tables: [string, GeneTableRow[] | undefined, string, string][] = [
+    ["mutations", ex.mutatedGenes, "/mutated-genes/fetch", "MUTATION_EXTENDED"],
+    ["copy number", ex.cnaGenes, "/cna-genes/fetch", "COPY_NUMBER_ALTERATION"],
+    ["structural variants", ex.svGenes, "/structuralvariant-genes/fetch", "STRUCTURAL_VARIANT"],
   ];
-  for (const [label, rows, path] of tables) {
+  for (const [label, rows, path, alterationType] of tables) {
     if (!rows?.length) continue;
     const portal = await api<PortalGene[]>(path, { studyIds: [study] });
     const byKey = new Map(portal.map((g) => [g.hugoGeneSymbol + "|" + (g.alteration ?? ""), g]));
     for (const r of rows.slice(0, TOP_GENES)) {
       const p = byKey.get(r.gene + "|" + (r.cna ?? ""));
-      const what = r.gene + (r.cna === 2 ? " amplified" : r.cna === -2 ? " deleted" : "");
-      record({ study, group: label, what, ours: oursGene(r), portal: p ? portalGene(p) : "absent",
-        agree: !!p && oursGene(r) === portalGene(p) });
+      let what = r.gene + (r.cna === 2 ? " amplified" : r.cna === -2 ? " deleted" : "");
+      let theirs = p ? portalGene(p) : "absent";
+      // profiled is the portal's own per-sample panel data, each sample once; where its study view
+      // counts a sample on two profiles twice, the row says so
+      const once = p && (await portalProfiledOnce(study, alterationType))(r.gene);
+      if (p && once !== p.numberOfProfiledCases) {
+        what += " (profiled: each sample once; the study view counts " + p.numberOfProfiledCases + ", once per profile)";
+        theirs = `${p.numberOfAlteredCases}/${p.numberOfAlteredCasesOnPanel}/${once}`;
+      }
+      record({ study, group: label, what, ours: oursGene(r), portal: theirs, agree: oursGene(r) === theirs });
     }
   }
 
@@ -538,6 +574,19 @@ for (const [st, attr] of [["brca_mbcproject_wagle_2017", "DX_PERCENT_PR"], ["pro
     { genericAssayDataFilters: [{ stableId: entity, profileType }], studyViewFilter: { studyIds: [st] } }))[0]?.counts || [];
   for (const v of portal)
     record({ study: st, group: "generic assay (samples)", what: entity + " = " + v.value, ours: String(ours.get(v.value) ?? "absent"), portal: String(v.count), agree: ours.get(v.value) === v.count });
+}
+
+// 16. a sample on several panels of one alteration type is profiled once: nsclc_ctdx_msk_2022 has
+// 219 samples with a whole-exome copy-number row beside a panel row, which the portal's study view
+// counts twice (EGFR 2,840 profiled in a 2,621-sample study). Compared with the portal's own
+// per-sample panel data, each sample once.
+{
+  const st = "nsclc_ctdx_msk_2022";
+  const ex = await buildExplore({ study: st, ...(await studyProfiles(st)) });
+  const once = await portalProfiledOnce(st, "COPY_NUMBER_ALTERATION");
+  for (const r of (ex.cnaGenes || []).slice(0, 5))
+    record({ study: st, group: "copy number (profiled once per sample)", what: r.gene + (r.cna === 2 ? " amplified" : " deleted"),
+      ours: String(r.profiled), portal: String(once(r.gene)), agree: r.profiled === once(r.gene) });
 }
 
 // 8. uncalled mutations are not alterations
