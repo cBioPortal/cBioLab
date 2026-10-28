@@ -75,7 +75,7 @@ describe("a locked cohort compiled anywhere", () => {
     assert.deepEqual(JSON.parse(ext).map((e: { data: string }) => e.data), ["S-2\n"], "only that arm's samples are uploaded");
   });
   test("the drift query measures the frozen samples against the definition's", () => {
-    const sql = lockDriftSql("SELECT 'P-1' AS pid, 'S-1' AS sid", "SELECT 'P-9' AS pid, 'S-9' AS sid", "s1", "db");
+    const sql = lockDriftSql("SELECT 'P-1' AS pid, 'S-1' AS sid", "SELECT 'P-9' AS pid, 'S-9' AS sid");
     assert.match(sql, /uniqExact\(sid\) FROM live WHERE sid NOT IN \(SELECT sid FROM locked\)\) AS entered/);
     assert.match(sql, /uniqExact\(sid\) FROM locked WHERE sid NOT IN \(SELECT sid FROM live\)\) AS left/);
     assert.doesNotMatch(sql, /newSamples/);

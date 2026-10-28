@@ -2159,7 +2159,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * frozen patients' ids, so patient-level only, as members() is.
    */
   async lockDrift(locked: CohortDef, live: CohortDef): Promise<{ present: number; now: number; entered: number; left: number; sql: string }> {
-    const sql = lockDriftSql(this.cohortSql(locked), this.cohortSql(live), this.study, this.instance.conn.db);
+    const sql = lockDriftSql(this.cohortSql(locked), this.cohortSql(live));
     const r = (await this.runLogged<ChRow>("lock: drift since locked", sql, this.instance.conn)).data[0];
     return { present: Number(r.present), now: Number(r.now), entered: Number(r.entered), left: Number(r.left), sql };
   }

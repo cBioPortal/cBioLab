@@ -521,7 +521,7 @@ export function memberSamplesSql(cohortSql: string): PatientSql {
  * (`lockedSql`) how many the data still holds, what the definition (`liveSql`) selects now, and
  * which it would add and which it would drop — a new sample the definition selects is one it adds.
  */
-export function lockDriftSql(lockedSql: string, liveSql: string, study: string, db: string): AggregateSql {
+export function lockDriftSql(lockedSql: string, liveSql: string): AggregateSql {
   return aggregateSql("WITH locked AS (" + lockedSql + "),\n     live AS (" + liveSql + ")\n" +
     "SELECT (SELECT uniqExact(sid) FROM locked) AS present,\n" +
     "       (SELECT uniqExact(sid) FROM live) AS now,\n" +
