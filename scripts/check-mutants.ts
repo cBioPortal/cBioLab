@@ -136,8 +136,8 @@ const MUTANTS: Mutant[] = [
 
   { id: "denominator-ignores-panel", layer: "counts", guard: "portal-parity", file: "lib/explore.ts",
     effect: "A gene's frequency is divided by samples on the largest panel instead of samples whose panel actually covers that gene, so genes on smaller panels look rarer than they are.",
-    find: "const profiled = (panelMap.get(r.g) || 0) + wesN;",
-    replace: "const profiled = Math.max(0, ...panelMap.values()) + wesN;" },
+    find: "const profiled = (panelMap.get(r.g) || 0) + wesN - (surplusOf.get(r.g) || 0);",
+    replace: "const profiled = Math.max(0, ...panelMap.values()) + wesN - (surplusOf.get(r.g) || 0);" },
   { id: "cna-denominator-double-count", layer: "counts", guard: "portal-parity", file: "lib/explore.ts",
     effect: "Whole-exome samples with two copy-number profiles are counted twice in the denominator, halving every copy-number frequency.",
     history: "Shipped once: brca_tcga MYC amplification read 10.6% where cBioPortal says 21.2%.",
