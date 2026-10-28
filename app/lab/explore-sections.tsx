@@ -742,13 +742,17 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
         })()}
         {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
           const maxN = Math.max(...c.bins.map((b: any) => b.count), 1);
+          // a bar is a word ("Negative"), one value (start = end), an outlier bar or an interval (start, end]
           const clauseFor = (b: any) => {
+            if (b.value != null) return { kind: "clinical", attribute: c.attribute, values: [b.value] };
             if (b.special === "<=") return { kind: "clinical", attribute: c.attribute, range: { lte: b.end } };
             if (b.special === ">") return { kind: "clinical", attribute: c.attribute, range: { gt: b.start } };
+            if (b.start === b.end) return { kind: "clinical", attribute: c.attribute, op: "=", value: b.start };
             return { kind: "clinical", attribute: c.attribute, range: { gt: b.start, lte: b.end } };
           };
-          const label = (b: any) => b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start) + "–" + fmtNum(b.end);
-          const tick = (b: any) => b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start);
+          const label = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start)
+            : b.start === b.end ? fmtNum(b.start) : fmtNum(b.start) + "–" + fmtNum(b.end);
+          const tick = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start);
           return (
             <Histogram ticks={c.bins.map(tick)} na={c.naCount ? "NA " + fmtInt(c.naCount) : null}>
               {c.bins.map((b: any, i: number) => (

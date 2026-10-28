@@ -17,7 +17,10 @@ shortcut that gives a plausible wrong number), the trap is named.
   numeric or categorical. Vocabularies are each study's own and are not harmonised across studies;
   a view over several says so. A value spelled as missing (empty, `NA`, `N/A`, `NaN`, any case) is
   no value, as in cBioPortal's study view: `clinicalRecordedSql` in `lib/event-names.ts`, applied
-  by `clinicalTable` (`lib/custom-data.ts`) to every read.
+  by `clinicalTable` (`lib/custom-data.ts`) to every read. A numeric attribute's histogram on Explore
+  is laid out by cBioPortal's own binner, ported in `lib/data-binner.ts` (bars of (start, end], one
+  bar per value when there are few, log-scale or powers-of-ten bars for wide or tiny ranges, a
+  value recorded as a bound such as `>90` in the outlier bar on its side, a word its own bar).
 - **Survival endpoint** — a pair `<X>_MONTHS` / `<X>_STATUS` (overall survival is `OS_*`). A study
   with no such pair cannot fit survival or Cox (`noSurvivalWhy` in `app/lab/use-view-options.ts`).
   A patient enters a survival analysis only with both a status and a months value (neither a missing

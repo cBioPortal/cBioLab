@@ -599,6 +599,25 @@ for (const [range, values] of [[{ gt: 89 }, { start: 89 }], [{ gt: 80, lte: 95 }
   record({ study: st, group: "selection (values recorded as a bound)", what: "samples with " + attr + " " + JSON.stringify(range), ours: String(ours), portal: String(portalSamples.length), agree: ours === portalSamples.length });
 }
 
+// 18. Explore's histograms are the portal's: every bar and the NA count of each numeric chart, against
+// its DYNAMIC bins (clinical-data-bin-counts). Values on an edge (MSI_SENSOR_SCORE), one bar per value
+// (GLEASON scores), ">90" ages and words in a numeric column (PSA), and a multi-study selection pooled.
+const binSig = (b: { value?: string; special?: string; specialValue?: string; start?: number; end?: number; count: number }) =>
+  (b.value ?? b.special ?? b.specialValue ?? "") + "(" + (b.start ?? "") + "," + (b.end ?? "") + "]=" + b.count;
+for (const studies of [["brca_tcga_pan_can_atlas_2018"], ["prostate_pcbm_swiss_2019"], ["nsclc_ctdx_msk_2022"], ["brca_tcga_pan_can_atlas_2018", "luad_tcga_pan_can_atlas_2018"]]) {
+  const ex = studies.length > 1 ? await buildExploreFederated({ studies, profilesByStudy: new Map() }) : await buildExplore({ study: studies[0], ...(await studyProfiles(studies[0])) });
+  const nums = ex.clinical.filter((c) => c.kind === "num" && c.bins) as Extract<ClinicalFacet, { kind: "num" }>[];
+  const portal = await api<{ attributeId: string; specialValue?: string; start?: number; end?: number; count: number }[]>("/clinical-data-bin-counts/fetch?dataBinMethod=DYNAMIC",
+    { attributes: nums.map((f) => ({ attributeId: f.attribute })), studyViewFilter: { studyIds: studies } });
+  for (const f of nums) {
+    const theirs = portal.filter((b) => b.attributeId === f.attribute && b.specialValue !== "NA")
+      .map((b) => binSig(b.start == null && b.end == null ? { value: b.specialValue, count: b.count } : b)).join(" ");
+    const na = portal.find((b) => b.attributeId === f.attribute && b.specialValue === "NA")?.count ?? 0;
+    const ours = f.bins!.map(binSig).join(" ");
+    record({ study: studies.join(" + "), group: "histogram", what: f.attribute + " (bars, NA)", ours: ours + " NA=" + f.naCount, portal: theirs + " NA=" + na, agree: ours === theirs && f.naCount === na });
+  }
+}
+
 // 8. uncalled mutations are not alterations
 {
   const study = "glioma_msk_2018", { profiles } = await studyProfiles(study);

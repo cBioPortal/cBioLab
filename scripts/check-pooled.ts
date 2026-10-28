@@ -5,10 +5,10 @@
  * through the compiler. Exact, no tolerance.
  *
  *   1. Explore histograms: every bar of every binned facet, outlier bars included, and its NA
- *      count, with and without a draft. Bars are summed across studies by bin, never by position:
- *      a study carries the "<=" / ">" bars only when it has values there, and summing by position
- *      once shifted every bar after a missing one into its neighbour (14 of 14 facets over 32
- *      studies).
+ *      count, with and without a draft, each bar recounted here from every study's recorded values
+ *      by the range it shows. Bars once summed across studies by position shifted every bar after
+ *      a missing one into its neighbour (14 of 14 facets over 32 studies); the layout itself is
+ *      compared with cbioportal.org in check:portal.
  *   2. The OncoPrint's gene rows, sample and patient columns: altered / profiled where profiled is
  *      a column some mutation, CNA or SV panel of covers the gene (whole-exome covers every gene)
  *      and altered is a profiled column with a call in it — so a call off its column's panels is in
@@ -64,28 +64,47 @@ for (const [label, draft] of [["no draft", null], ["SEX = Female", FEMALE]] as c
   const facets = ex.clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num" && !!c.bins?.length);
   let withOutliers = 0;
   for (const f of facets) {
-    const bars = f.bins!.filter((b) => !b.special);
-    const e0 = bars[0].start!, interval = Math.round((bars[0].end! - bars[0].start!) * 1e6) / 1e6;
-    const last = Math.round((e0 + interval * bars.length) * 1e6) / 1e6;
+    // every recorded value of every study, by study, and each bar's count restated from them: a plain
+    // number in the bar whose range holds it ((start, end], one value, at or below the "<=" bar's
+    // end, above the ">" bar's start), a number recorded as a bound (">90") in the outlier bar on
+    // its side, a word in the bar of its spelling (case aside); a number with space around it is in
+    // none, as on the portal
     const unit = f.per === "sample" ? "sample_unique_id" : "patient_unique_id";
-    const r = await chQuery(`SELECT cancer_study_identifier AS s,
-        if(v <= ${e0}, 'lo', if(v > ${last}, 'hi', toString(toInt32(ceil((v - ${e0}) / ${interval})) - 1))) AS b, uniqExact(id) AS n
-      FROM (SELECT cancer_study_identifier, toFloat64OrNull(attribute_value) AS v, ${unit} AS id FROM ${DB}.clinical_data_derived
-            WHERE cancer_study_identifier IN (${IN}) AND attribute_name = ${sq(f.attribute)} AND type = ${sq(f.per)} AND attribute_value != ''
-            ${draft ? "AND patient_unique_id IN (" + FEMALE_SQL + ")" : ""})
-      WHERE v IS NOT NULL GROUP BY s, b`);
-    const truth = new Map<string, number>();
-    for (const x of r.data) truth.set(String(x.b), (truth.get(String(x.b)) || 0) + n(x.n));
-    const ours = new Map(f.bins!.map((b) => [b.special === "<=" ? "lo" : b.special === ">" ? "hi" : String(bars.indexOf(b)), b.count]));
-    if (truth.has("lo") || truth.has("hi")) withOutliers++;
-    const keys = [...new Set([...truth.keys(), ...ours.keys()])];
-    const bad = keys.filter((k) => (truth.get(k) || 0) !== (ours.get(k) || 0));
+    const r = await chQuery(`SELECT cancer_study_identifier AS s, attribute_value AS v, uniqExact(${unit}) AS n FROM ${DB}.clinical_data_derived
+      WHERE cancer_study_identifier IN (${IN}) AND attribute_name = ${sq(f.attribute)} AND type = ${sq(f.per)}
+        AND lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
+        AND patient_unique_id IN (SELECT patient_unique_id FROM ${DB}.sample_derived WHERE cancer_study_identifier IN (${IN}))
+        ${draft ? "AND patient_unique_id IN (" + FEMALE_SQL + ")" : ""}
+      GROUP BY s, v`);
+    const PLAIN = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+    const barOf = (raw: string): number => {
+      const t = raw.trim();
+      if (PLAIN.test(raw)) {
+        const x = Number(raw);
+        return f.bins!.findIndex((b) => b.value == null && (b.special === "<=" ? x <= b.end! : b.special === ">" ? x > b.start!
+          : b.start === b.end ? x === b.start : x > b.start! && x <= b.end!));
+      }
+      if (PLAIN.test(t)) return -1;
+      const bound = /^(<=|>=|<|>)(.*)$/.exec(t);
+      if (bound && PLAIN.test(bound[2])) return f.bins!.findIndex((b) => b.special === (bound[1][0] === "<" ? "<=" : ">"));
+      return f.bins!.findIndex((b) => b.value != null && b.value.toUpperCase() === t.toUpperCase());
+    };
+    const truth = new Map<number, number>();
+    let recorded = 0;
+    for (const x of r.data) {
+      recorded += n(x.n);
+      const i = barOf(String(x.v));
+      if (i >= 0 || !PLAIN.test(String(x.v).trim())) truth.set(i, (truth.get(i) || 0) + n(x.n));
+    }
+    if (f.bins!.some((b) => b.special)) withOutliers++;
+    const keys = [...new Set([...truth.keys(), ...f.bins!.map((_, i) => i)])];
+    const bad = keys.filter((i) => (truth.get(i) || 0) !== (f.bins![i]?.count || 0));
     ok(`histogram, ${label}: ${f.attribute} bars`, !bad.length,
-      bad.length ? bad.slice(0, 4).map((k) => `${k}: ${ours.get(k) || 0} vs ${truth.get(k) || 0}`).join(", ") : `${bars.length} bars`);
-    // NA: the cohort in the facet's unit, less the values binned
+      bad.length ? bad.slice(0, 4).map((i) => `${i < 0 ? "no bar" : i}: ${f.bins![i]?.count || 0} vs ${truth.get(i) || 0}`).join(", ") : `${f.bins!.length} bars`);
+    // NA: the cohort in the facet's unit, less those with a recorded value
     const c = await chQuery(`SELECT uniqExact(${unit}) AS n FROM ${DB}.sample_derived WHERE cancer_study_identifier IN (${IN})
       ${draft ? "AND patient_unique_id IN (" + FEMALE_SQL + ")" : ""}`);
-    const na = Math.max(0, n(c.data[0].n) - [...truth.values()].reduce((a, b) => a + b, 0));
+    const na = Math.max(0, n(c.data[0].n) - recorded);
     ok(`histogram, ${label}: ${f.attribute} not available`, f.naCount === na, `${f.naCount} vs ${na}`);
   }
   // the defect this guards needs studies whose outlier bars differ; say whether the data has them

@@ -890,12 +890,15 @@ export interface AssayFacet {
   error?: string;
 }
 
-/** one bar of a numeric histogram */
+/** one bar of a numeric histogram, as cBioPortal lays it out (lib/data-binner.ts) */
 export interface NumericBin {
-  /** "<=" and ">" mark the outlier bins; interior bins have neither */
+  /** "<=" the bar of values at or below `end`, ">" those above `start`; an interior bar has neither */
   special?: "<=" | ">";
+  /** an interior bar is (start, end]; start = end is a bar of that one value */
   start?: number;
   end?: number;
+  /** a value that is not a number ("Negative", "UNKNOWN"), drawn as its own bar */
+  value?: string;
   count: number;
 }
 /**
@@ -994,7 +997,6 @@ export interface ExploreResult {
   /** molecular data types with sample counts (the portal's genomic-data chart) */
   dataTypes?: { profile: string; label: string; alterationType: string; n: number }[];
   /** per-attribute numeric stats, used to derive shared bins when federating */
-  numStats?: { attribute: string; per: "patient" | "sample"; min: number; max: number; q1: number; q3: number; allInts: boolean; n: number }[];
   /** cohort size in both units, as the portal's header reports it */
   totals?: { patients: number; samples: number };
   caseLists: { id: string; name: string; n: number }[];

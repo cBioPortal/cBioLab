@@ -9,6 +9,7 @@ import { compileCohortDef } from "./cohort2.ts";
 import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, DerivedRequest, AssayFacet } from "./types.ts";
 import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
+import { dataBins, type BinInput } from "./data-binner.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor } from "./custom-data.ts";
 
 /**
@@ -297,13 +298,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // ---- numeric histograms (cBioPortal study-view bins) --------------------
   if (!skipBins) {
     const numFacets = clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num").slice(0, NUM_HISTOGRAM_LIMIT);
-    const edgesByAttr: Record<string, { edges: number[]; interval: number }> = {};
-    for (const f of numFacets) {
-      const src = numAttrs.find((r) => r.a === f.attribute);
-      if (src) edgesByAttr[f.attribute] = numericBinEdges(Number(src.mn), Number(src.mx), Number(src.q1), Number(src.q3), String(src.allints) === "1");
-    }
-    await fillHistograms({ facets: numFacets.filter((f) => edgesByAttr[f.attribute]), edgesByAttr,
-      groups: [{ conn, studies: [study], set: draftSet }], cohort: totals });
+    await fillHistograms({ facets: numFacets, groups: [{ conn, studies: [study], set: draftSet }], cohort: totals });
   }
 
   // ---- timeline event types ----------------------------------------------
@@ -349,7 +344,6 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
     mutatedGenes, cnaGenes, svGenes, geneTotals, geneFacets, totals, dataTypes,
-    numStats: numAttrs.map((r) => ({ attribute: r.a, per: r.type as "patient" | "sample", min: Number(r.mn), max: Number(r.mx), q1: Number(r.q1), q3: Number(r.q3), allInts: String(r.allints) === "1", n: Number(r.np) })),
     profiles: profiles || [], gaProfiles: gaProfiles || [],
     stats: { ms: Date.now() - t0 }
   };
@@ -881,15 +875,13 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
   const partsP = prefetchP.then(() => Promise.all(studies.map(s =>
     buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: true, attributes, geneCharts, derived,
       conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}), resolved: resolvedByStudy.get(s), prefetched: prefetched.get(s) }))));
-  // Pass 2: ONE set of edges per attribute from the pooled statistics, binned over every study at
-  // once, so the bars line up and add. It needs the studies' facets, not the gene tables, so it
+  // Pass 2: every numeric facet binned once over the values of every study, pooled, as the
+  // portal bins a multi-study selection. It needs the studies' facets, not the gene tables, so it
   // runs beside them rather than after.
   const binsP = partsP.then(async (parts) => {
     const facets = mergeExplore(parts, !!draft);
-    const edgesByAttr = sharedBinEdges(parts);
-    const numFacets = facets.clinical.filter(
-      (c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num" && !!edgesByAttr[c.attribute]).slice(0, NUM_HISTOGRAM_LIMIT);
-    await fillHistograms({ facets: numFacets, edgesByAttr, cohort: facets.totals || { patients: 0, samples: 0 },
+    const numFacets = facets.clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num").slice(0, NUM_HISTOGRAM_LIMIT);
+    await fillHistograms({ facets: numFacets, cohort: facets.totals || { patients: 0, samples: 0 },
       groups: groups.map((g) => ({ ...g, set: setOf.get(g)! })) });
     return new Map(numFacets.filter((f) => f.bins).map((f) => [f.per + "|" + f.attribute, { bins: f.bins!, naCount: f.naCount }]));
   });
@@ -931,33 +923,23 @@ function byConnection(studies: string[], connByStudy?: Map<string, ChConn>): Con
 }
 
 /**
- * Histograms for `facets` against the given edges, counted over every group's studies (one query
- * per facet per connection, pooledHistograms) and summed by bin. `cohort` is everyone the counts
- * are drawn from, so a facet's NA bar is the rest of it.
+ * Histograms for `facets`, laid out by cBioPortal's binner (lib/data-binner.ts) over every value the
+ * cohort holds in every group's studies, pooled as the portal pools a multi-study selection: one
+ * query per connection returns each recorded value with how many samples (or patients) hold it.
+ * `cohort` is everyone the counts are drawn from, so a facet's NA bar is the rest of it.
  */
 async function fillHistograms(opts: {
   facets: Extract<ClinicalFacet, { kind: "num" }>[];
-  edgesByAttr: Record<string, { edges: number[]; interval: number }>;
   groups: (ConnGroup & { set: CohortSet })[];
   cohort: { patients: number; samples: number };
 }): Promise<void> {
-  const { facets, edgesByAttr, groups, cohort } = opts;
+  const { facets, groups, cohort } = opts;
   if (!facets.length) return;
-  const pooled = await Promise.all(groups.map((g) => pooledHistograms({
-    facets, studies: g.studies, db: g.conn.db, conn: g.conn, edgesByAttr, set: g.set })));
+  const lists = await Promise.all(groups.map((g) => numericValueCounts({ facets, studies: g.studies, db: g.conn.db, conn: g.conn, set: g.set })));
   for (const f of facets) {
-    const { edges, interval } = edgesByAttr[f.attribute];
-    if (edges.length < 2) continue;
-    const key = f.per + "|" + f.attribute;
-    const count = (b: number) => pooled.reduce((n, g) => n + (g.get(key)?.bins.get(b) || 0), 0);
-    const lastEdge = edges[edges.length - 1] + interval;
-    // portal bins are (start, end]: a value on an edge belongs to the lower bar
-    const bins: NumericBin[] = [];
-    if (count(-1)) bins.push({ special: "<=", end: edges[0], count: count(-1) });
-    edges.forEach((e, i) => bins.push({ start: e, end: Math.round((e + interval) * 1e6) / 1e6, count: count(i) }));
-    if (count(-2)) bins.push({ special: ">", start: lastEdge, count: count(-2) });
-    f.bins = bins;
-    const counted = pooled.reduce((n, g) => n + (g.get(key)?.counted || 0), 0);
+    const values = lists.flatMap((m) => m.get(f.per + "|" + f.attribute) || []);
+    f.bins = dataBins(values, f.attribute);
+    const counted = values.reduce((n, v) => n + v.count, 0);
     f.naCount = Math.max(0, (f.per === "sample" ? cohort.samples : cohort.patients) - counted);
   }
 }
@@ -1129,63 +1111,29 @@ function pooledCohortSet(g: ConnGroup, resolved: Map<string, { rows?: [string, s
 
 
 /**
- * Pass-2 histograms for every study on one connection in one query per facet: the edges are
- * shared (that is what pass 2 is for) and ids are study-qualified, so a pooled count per bin is
- * exactly the sum of the per-study counts. The outlier bars ride in the same scan as bins -1/-2.
+ * Each numeric facet's recorded values in these studies (the cohort's samples, or the patients who
+ * own them), each with how many hold it — what lib/data-binner.ts draws the bars from. Keyed
+ * "per|attribute". Values, never ids: a value is held by a count.
  */
-async function pooledHistograms(opts: {
+async function numericValueCounts(opts: {
   facets: Extract<ClinicalFacet, { kind: "num" }>[]; studies: string[]; db: string; conn: ChConn; set: CohortSet;
-  edgesByAttr: Record<string, { edges: number[]; interval: number }>;
-}): Promise<Map<string, { bins: Map<number, number>; counted: number }>> {
-  const { facets, studies, db, conn, set, edgesByAttr } = opts;
-  const out = new Map<string, { bins: Map<number, number>; counted: number }>();
-  await Promise.all(facets.map(async (f) => {
-    const { edges, interval } = edgesByAttr[f.attribute];
-    if (edges.length < 2) return;
-    const lastEdge = edges[edges.length - 1] + interval;
-    const unit = f.per === "sample" ? "sample_unique_id" : "patient_unique_id";
-    const cond = f.per === "sample" ? inSamples(set) : set.patients ? inPatients(set) : "\n  AND patient_unique_id IN " + ownersIn(db, studies);
-    const r = await chQuery<ChRow>(
-      "SELECT multiIf(v <= " + edges[0] + ", -1, v > " + lastEdge + ", -2, toInt32(ceil((v - " + edges[0] + ") / " + interval + ")) - 1) AS b,\n" +
-      "       uniqExact(id) AS n\n" +
-      "FROM (SELECT " + finiteSql("attribute_value") + " AS v, " + unit + " AS id\n" +
-      "      FROM " + clinicalTable(db, [f.attribute]) + "\n" +
-      "      WHERE cancer_study_identifier IN (" + studies.map(sq).join(",") + ") AND attribute_name = " + sq(f.attribute) +
-      "        AND type = " + sq(f.per) + " AND attribute_value != ''" + cond + ")\n" +
-      "WHERE v IS NOT NULL\nGROUP BY b", conn);
-    const bins = new Map<number, number>(r.data.map((x) => [Number(x.b), Number(x.n)]));
-    out.set(f.per + "|" + f.attribute, { bins, counted: r.data.reduce((n, x) => n + Number(x.n), 0) });
-  }));
-  return out;
-}
-
-
-/**
- * One set of bin edges per numeric attribute, from the pooled statistics.
- * min/max pool exactly; quartiles do not decompose, so they are approximated by
- * a size-weighted mean — the same approximation already used for the median,
- * and it only shifts where the outlier bars fall, never a count.
- */
-function sharedBinEdges(parts: ExploreResult[]): Record<string, { edges: number[]; interval: number }> {
-  const byAttr = new Map<string, NonNullable<ExploreResult["numStats"]>>();
-  for (const p of parts) for (const st of p.numStats || []) {
-    if (!byAttr.has(st.attribute)) byAttr.set(st.attribute, []);
-    byAttr.get(st.attribute)!.push(st);
-  }
-  const out: Record<string, { edges: number[]; interval: number }> = {};
-  for (const [attr, list] of byAttr) {
-    const n = list.reduce((a, x) => a + x.n, 0) || 1;
-    const spec = numericBinEdges(
-      Math.min(...list.map((x) => x.min)),
-      Math.max(...list.map((x) => x.max)),
-      list.reduce((a, x) => a + x.q1 * x.n, 0) / n,
-      list.reduce((a, x) => a + x.q3 * x.n, 0) / n,
-      list.every((x) => x.allInts)
-    );
-    if (spec.edges.length >= 2) out[attr] = spec;
+}): Promise<Map<string, BinInput[]>> {
+  const { facets, studies, db, conn, set } = opts;
+  const attrs = [...new Set(facets.map((f) => f.attribute))];
+  const r = await chQuery<ChRow>(
+    "SELECT type, attribute_name AS a, attribute_value AS v, uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
+    "FROM " + clinicalTable(db, attrs) + "\n" +
+    "WHERE " + studyIn(studies) + " AND (type, attribute_name) IN (" + facets.map((f) => "(" + sq(f.per) + ", " + sq(f.attribute) + ")").join(", ") + ")" +
+    inClinical(set, ownersIn(db, studies)) + "\n" +
+    "GROUP BY type, a, v", conn);
+  const out = new Map<string, BinInput[]>();
+  for (const x of r.data) {
+    const k = x.type + "|" + x.a, l = out.get(k), row = { value: String(x.v), count: Number(x.n) };
+    if (l) l.push(row); else out.set(k, [row]);
   }
   return out;
 }
+
 
 /**
  * Merge faceted catalogs from several participants. Every input is already
@@ -1433,7 +1381,7 @@ export async function buildAssayFacets(o: {
     const measured = st.reduce((n, r) => n + Number(r["nnum" + sfx] || 0), 0);
     const live = st.filter((r) => Number(r.nv) > 0);
     if (!live.length) return { ...base, measured };
-    // min and max pool exactly; quartiles do not, so they are weighted by size (sharedBinEdges' rule)
+    // min and max pool exactly; quartiles do not, so they are weighted by size
     const nv = live.reduce((n, r) => n + Number(r.nv), 0);
     const wavg = (k: string) => live.reduce((a, r) => a + Number(r[k]) * Number(r.nv), 0) / nv;
     const min = Math.min(...live.map((r) => Number(r.mn))), max = Math.max(...live.map((r) => Number(r.mx)));

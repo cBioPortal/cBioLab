@@ -1979,7 +1979,7 @@ regression line, and its own contingency cells or per-group quartiles. All of th
 except one thing: **Spearman rank correlation is not reported for a federated plot**, because a
 rank needs the pooled *global* ordering, which no per-site aggregate can reconstruct — reported
 as absent, not approximated. A federated box plot's quartiles are a size-weighted approximation
-across sites, the same one Explore's federated numeric histograms already disclose. When it draws
+across sites. When it draws
 no points, its violin is binned the way a scatter's grid is: every site cuts the same bins over one
 shared range (the pooled whiskers, reaching at most one whisker span past them, which is the axis
 the figure draws), so the counts add exactly; a value past that range is off the figure and left
