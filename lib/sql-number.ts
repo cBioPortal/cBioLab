@@ -8,3 +8,17 @@
 /** `expr` as a finite Float64, or NULL when it is not a number (including NaN and ±Infinity) */
 export const finiteSql = (expr: string): string =>
   "if(isFinite(ifNull(toFloat64OrNull(" + expr + "), nan)), toFloat64OrNull(" + expr + "), NULL)";
+
+/**
+ * A clinical value as a number for a comparison open on one side, as cBioPortal's study-view filter
+ * reads it (castStringValueToFloat): a value recorded as a bound — a de-identified age ">90", a lab
+ * limit "<0.5" — counts on the side the comparison is open to, ">90" as just above 90 and ">=90" as
+ * 90, and is NULL otherwise. `open` is ">" for a comparison with no upper end (`> x`, `>= x`), "<"
+ * for one with no lower end; with neither, a closed range or an equality, only a plain number counts.
+ */
+export function boundedNumberSql(expr: string, open: ">" | "<" | null): string {
+  if (!open) return finiteSql(expr);
+  return "multiIf(startsWith(" + expr + ", '" + open + "='), " + finiteSql("substring(" + expr + ", 3)") +
+    ", startsWith(" + expr + ", '" + open + "'), " + finiteSql("substring(" + expr + ", 2)") + (open === ">" ? " + " : " - ") + "1e-10" +
+    ", " + finiteSql(expr) + ")";
+}
