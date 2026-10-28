@@ -589,6 +589,16 @@ for (const [st, attr] of [["brca_mbcproject_wagle_2017", "DX_PERCENT_PR"], ["pro
       ours: String(r.profiled), portal: String(once(r.gene)), agree: r.profiled === once(r.gene) });
 }
 
+// 17. a value recorded as a bound (a de-identified age ">90") is selected by a range open on its
+// side, as the portal's filter reads it, and by no closed range. nsclc_ctdx_msk_2022 has one ">90".
+for (const [range, values] of [[{ gt: 89 }, { start: 89 }], [{ gt: 80, lte: 95 }, { start: 80, end: 95 }]] as const) {
+  const st = "nsclc_ctdx_msk_2022", attr = "AGE_AT_SEQ_REPORTED_YEARS";
+  const portalSamples = await api<PortalSample[]>("/filtered-samples/fetch", { studyIds: [st], clinicalDataFilters: [{ attributeId: attr, values: [values] }] });
+  const cohortSql = compileCohortDef({ all: [{ kind: "clinical", attribute: attr, range }] } as CohortDef, { study: st, db: DB, oncokbPin: await oncokbPin(), ...(await studyProfiles(st)) });
+  const ours = Number((await chQuery<{ n: string }>("SELECT count() AS n FROM (" + memberSamplesSql(cohortSql) + ")", PRIMARY)).data[0].n);
+  record({ study: st, group: "selection (values recorded as a bound)", what: "samples with " + attr + " " + JSON.stringify(range), ours: String(ours), portal: String(portalSamples.length), agree: ours === portalSamples.length });
+}
+
 // 8. uncalled mutations are not alterations
 {
   const study = "glioma_msk_2018", { profiles } = await studyProfiles(study);

@@ -18,11 +18,11 @@ INTERSECT DISTINCT
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
-    AND attribute_name = 'AGE_AT_DX' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) < 50) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+    AND attribute_name = 'AGE_AT_DX' AND multiIf(startsWith(attribute_value, '<='), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 3)), nan)), toFloat64OrNull(substring(attribute_value, 3)), NULL), startsWith(attribute_value, '<'), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 2)), nan)), toFloat64OrNull(substring(attribute_value, 2)), NULL) - 1e-10, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL)) < 50) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
-    AND attribute_name = 'AGE_AT_DX' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) < 50)))
+    AND attribute_name = 'AGE_AT_DX' AND multiIf(startsWith(attribute_value, '<='), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 3)), nan)), toFloat64OrNull(substring(attribute_value, 3)), NULL), startsWith(attribute_value, '<'), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 2)), nan)), toFloat64OrNull(substring(attribute_value, 2)), NULL) - 1e-10, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL)) < 50)))
 
 -- cohort Average-onset CRC
 -- msk_impact_50k_2026
@@ -44,11 +44,11 @@ INTERSECT DISTINCT
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
-    AND attribute_name = 'AGE_AT_DX' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) >= 50) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+    AND attribute_name = 'AGE_AT_DX' AND multiIf(startsWith(attribute_value, '>='), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 3)), nan)), toFloat64OrNull(substring(attribute_value, 3)), NULL), startsWith(attribute_value, '>'), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 2)), nan)), toFloat64OrNull(substring(attribute_value, 2)), NULL) + 1e-10, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL)) >= 50) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
-    AND attribute_name = 'AGE_AT_DX' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) >= 50)))
+    AND attribute_name = 'AGE_AT_DX' AND multiIf(startsWith(attribute_value, '>='), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 3)), nan)), toFloat64OrNull(substring(attribute_value, 3)), NULL), startsWith(attribute_value, '>'), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 2)), nan)), toFloat64OrNull(substring(attribute_value, 2)), NULL) + 1e-10, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL)) >= 50)))
 
 -- view 0 adjusted: adjusted:panels · msk_impact_50k_2026
 SELECT toString(pg.gene_panel_id) AS panel, groupUniqArray(pg.gene) AS genes
@@ -83,11 +83,11 @@ INTERSECT DISTINCT
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
-    AND attribute_name = 'AGE_AT_DX' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) >= 50) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+    AND attribute_name = 'AGE_AT_DX' AND multiIf(startsWith(attribute_value, '>='), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 3)), nan)), toFloat64OrNull(substring(attribute_value, 3)), NULL), startsWith(attribute_value, '>'), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 2)), nan)), toFloat64OrNull(substring(attribute_value, 2)), NULL) + 1e-10, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL)) >= 50) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
-    AND attribute_name = 'AGE_AT_DX' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) >= 50)))),
+    AND attribute_name = 'AGE_AT_DX' AND multiIf(startsWith(attribute_value, '>='), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 3)), nan)), toFloat64OrNull(substring(attribute_value, 3)), NULL), startsWith(attribute_value, '>'), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 2)), nan)), toFloat64OrNull(substring(attribute_value, 2)), NULL) + 1e-10, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL)) >= 50)))),
 panels AS (
   SELECT replaceOne(sd.patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, groupUniqArray(toString(sp.gene_panel_id)) AS panels
   FROM snapshot_db.sample_to_gene_panel_derived sp
@@ -138,11 +138,11 @@ INTERSECT DISTINCT
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
-    AND attribute_name = 'AGE_AT_DX' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) < 50) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
+    AND attribute_name = 'AGE_AT_DX' AND multiIf(startsWith(attribute_value, '<='), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 3)), nan)), toFloat64OrNull(substring(attribute_value, 3)), NULL), startsWith(attribute_value, '<'), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 2)), nan)), toFloat64OrNull(substring(attribute_value, 2)), NULL) - 1e-10, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL)) < 50) OR ('patient', replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', ''), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')) AS id
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
-    AND attribute_name = 'AGE_AT_DX' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) < 50)))),
+    AND attribute_name = 'AGE_AT_DX' AND multiIf(startsWith(attribute_value, '<='), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 3)), nan)), toFloat64OrNull(substring(attribute_value, 3)), NULL), startsWith(attribute_value, '<'), if(isFinite(ifNull(toFloat64OrNull(substring(attribute_value, 2)), nan)), toFloat64OrNull(substring(attribute_value, 2)), NULL) - 1e-10, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL)) < 50)))),
 panels AS (
   SELECT replaceOne(sd.patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, groupUniqArray(toString(sp.gene_panel_id)) AS panels
   FROM snapshot_db.sample_to_gene_panel_derived sp

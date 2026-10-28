@@ -31,7 +31,7 @@ import type {
   ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
   SampleListLeaf, PatientListLeaf, SplitLeaf, UploadLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
 } from "./types.ts";
-import { finiteSql } from "./sql-number.ts";
+import { finiteSql, boundedNumberSql } from "./sql-number.ts";
 import { ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
@@ -111,7 +111,9 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): LeafIds {
       leaf.values.slice(0, 50).map(v => clinicalValueFoldSql(sq(String(v)))).join(",") + ")");
   }
   if (leaf.range && typeof leaf.range === "object") {
-    const r = leaf.range as Record<string, number | undefined>, num = finiteSql("attribute_value");
+    const r = leaf.range as Record<string, number | undefined>;
+    const lower = r.gt != null || r.gte != null, upper = r.lt != null || r.lte != null;
+    const num = boundedNumberSql("attribute_value", lower && !upper ? ">" : upper && !lower ? "<" : null);
     for (const [k, opSym] of [["gt", ">"], ["gte", ">="], ["lt", "<"], ["lte", "<="]]) {
       if (r[k] != null) {
         if (!Number.isFinite(Number(r[k]))) throw new Error("clinical range." + k + " must be a number");
@@ -125,7 +127,7 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): LeafIds {
     const op = CLIN_OP[leaf.op];
     if (!op) throw new Error("invalid clinical op (use = != > >= < <=)");
     conds.push(typeof leaf.value === "number"
-      ? finiteSql("attribute_value") + " " + op + " " + Number(leaf.value)
+      ? boundedNumberSql("attribute_value", op[0] === ">" ? ">" : op[0] === "<" ? "<" : null) + " " + op + " " + Number(leaf.value)
       // Equality folds case and whitespace, matching how the facet that offered
       // this value counted it. Ordering comparisons do not: they are for
       // numbers, and folding a string range would change what it means.

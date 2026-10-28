@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-10-27",
+  "generated": "2026-10-28",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1890,
@@ -152,7 +152,7 @@
     },
     "Adjusted enrichment: early-onset colorectal cancer, adjusted for MSI and TMB": {
       "Early-onset CRC": 1699,
-      "Average-onset CRC": 3149
+      "Average-onset CRC": 3174
     },
     "Clinical actionability: OncoKB levels across 50,000 tumours, and primary against metastasis": {
       "all patients": 48179
