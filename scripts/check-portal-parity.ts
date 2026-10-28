@@ -399,6 +399,19 @@ for (const sel of SAMPLE_SELECTIONS) {
   }
 }
 
+// 9b. off-panel calls: a call in a gene its sample's panel does not cover is in neither side of the
+// views' frequency, as in the portal's study view. RTEL1-TNFRSF6B is on no msk_chord_2024 panel, so
+// every one of its calls is off-panel and nothing is profiled; PTEN in nsclc_ctdx_msk_2022 mixes
+// calls on and off its panels.
+for (const [st, gene] of [["msk_chord_2024", "RTEL1-TNFRSF6B"], ["nsclc_ctdx_msk_2022", "PTEN"]] as const) {
+  const profiles = await studyProfiles(st);
+  const p = (await api<PortalGene[]>("/mutated-genes/fetch", { studyIds: [st] })).find((g) => g.hugoGeneSymbol === gene);
+  const resolver = await resolverFor(st, { oncokbPin: await oncokbPin(), ...profiles });
+  const c = (await resolver.geneCounts(null, [gene])).find((r) => r.gene === gene)?.byType.mutation;
+  const ours = `${c?.altered ?? 0}/${c?.profiled ?? 0}`, theirs = p ? `${p.numberOfAlteredCasesOnPanel}/${p.numberOfProfiledCases}` : "absent";
+  record({ study: st, group: "mutations (views, off-panel)", what: gene, ours, portal: theirs, agree: ours === theirs });
+}
+
 // 10. one clause over studies that record its attribute at different levels: GRADE is a sample
 // attribute in pancan_pcawg_2020 and a patient attribute in lihc_tcga, so the same clause selects
 // the matching samples in one and every sample of the matching patients in the other.

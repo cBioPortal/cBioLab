@@ -31,7 +31,7 @@ altered AS (
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
   WHERE g.cancer_study_identifier = 'sarcoma_msk_2022'
-    AND g.hugo_gene_symbol IN ('MDM2','TP53') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+    AND g.hugo_gene_symbol IN ('MDM2','TP53') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'sarcoma_msk_2022_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype
 ),

@@ -57,7 +57,7 @@ alt AS (
    AND ((g.variant_type = 'mutation' AND ann.alteration_type = 'MUTATION' AND ann.alteration = g.mutation_variant)
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT g.off_panel
+  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND g.hugo_gene_symbol IN ('EGFR', 'KRAS', 'TP53', 'STK11', 'KEAP1', 'SMARCA4')
     AND ann.is_driver
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
@@ -116,7 +116,7 @@ alt AS (
    AND ((g.variant_type = 'mutation' AND ann.alteration_type = 'MUTATION' AND ann.alteration = g.mutation_variant)
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT g.off_panel
+  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
@@ -153,7 +153,7 @@ alt AS (
    AND ((g.variant_type = 'mutation' AND ann.alteration_type = 'MUTATION' AND ann.alteration = g.mutation_variant)
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT g.off_panel
+  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
@@ -244,7 +244,7 @@ alt AS (
    AND ((g.variant_type = 'mutation' AND ann.alteration_type = 'MUTATION' AND ann.alteration = g.mutation_variant)
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT g.off_panel
+  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
@@ -281,7 +281,7 @@ alt AS (
    AND ((g.variant_type = 'mutation' AND ann.alteration_type = 'MUTATION' AND ann.alteration = g.mutation_variant)
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED' AND NOT g.off_panel
+  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)

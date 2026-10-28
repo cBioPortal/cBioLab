@@ -43,13 +43,12 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     "    AND g.sample_unique_id IN (SELECT suid FROM samp)" + (drv ? " AND ann.is_driver" : "") + "\n" +
     "  GROUP BY suid, gene, t\n" +
     "),\n" +
-    // a sample is profiled for a gene its panel lists, and for one it is altered in (an off-panel call is a measurement)
+    // a sample is profiled for a gene its panel lists
     "cov AS (\n" +
     "  SELECT DISTINCT sp.sample_unique_id AS suid, pg.gene AS gene FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.sample_unique_id IN (SELECT suid FROM samp)\n" +
     "    AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
-    "  UNION DISTINCT SELECT DISTINCT suid, gene FROM alt\n" +
     "),\n" +
     "sg AS (\n" +
     "  SELECT cov.suid AS suid, cov.gene AS gene, groupUniqArrayIf(alt.t, alt.t != '') AS types\n" +

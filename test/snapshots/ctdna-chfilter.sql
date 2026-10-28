@@ -83,7 +83,7 @@ chx AS (
 det AS (
   SELECT DISTINCT s.pid AS pid FROM snapshot_db.genomic_event_derived g
   INNER JOIN sides s ON s.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'msk_access_2021' AND s.side = 'b' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_access_2021' AND s.side = 'b' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b') AND NOT (s.side = 'b' AND g.variant_type = 'mutation' AND (g.sample_unique_id, g.hugo_gene_symbol, g.mutation_variant) IN (SELECT suid, gene, mv FROM chx WHERE by_gene OR by_normal))
 )
 SELECT (SELECT uniqExactIf(pid, side = 'b') FROM classed) AS plasma_all, (SELECT uniqExactIf(pid, side = 'a') FROM classed) AS tissue_all,
@@ -136,7 +136,7 @@ alt AS (
   SELECT g.hugo_gene_symbol AS gene, ps.pid AS pid, ps.side AS side, 1 AS hit
   FROM snapshot_db.genomic_event_derived g
   INNER JOIN ps ON ps.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'msk_access_2021' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_access_2021' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps) AND NOT (ps.side = 'b' AND g.variant_type = 'mutation' AND (g.sample_unique_id, g.hugo_gene_symbol, g.mutation_variant) IN (SELECT suid, gene, mv FROM chx WHERE by_gene OR by_normal))
   GROUP BY gene, pid, side
   HAVING hit > 0
@@ -197,7 +197,7 @@ chx AS (
 det AS (
   SELECT DISTINCT s.pid AS pid FROM snapshot_db.genomic_event_derived g
   INNER JOIN sides s ON s.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'msk_access_2021' AND s.side = 'b' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_access_2021' AND s.side = 'b' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b') AND NOT (s.side = 'b' AND g.variant_type = 'mutation' AND (g.sample_unique_id, g.hugo_gene_symbol, g.mutation_variant) IN (SELECT suid, gene, mv FROM chx WHERE by_gene OR by_normal))
 ),
 os AS (
@@ -233,7 +233,7 @@ ps AS (SELECT suid, pid, side FROM sides WHERE pid IN (SELECT pid FROM paired)),
 det AS (
   SELECT DISTINCT s.pid AS pid FROM snapshot_db.genomic_event_derived g
   INNER JOIN sides s ON s.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'msk_access_2021' AND s.side = 'b' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_access_2021' AND s.side = 'b' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b')
 )
 SELECT (SELECT uniqExactIf(pid, side = 'b') FROM classed) AS plasma_all, (SELECT uniqExactIf(pid, side = 'a') FROM classed) AS tissue_all,
@@ -266,7 +266,7 @@ alt AS (
   SELECT g.hugo_gene_symbol AS gene, ps.pid AS pid, ps.side AS side, 1 AS hit
   FROM snapshot_db.genomic_event_derived g
   INNER JOIN ps ON ps.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'msk_access_2021' AND g.hugo_gene_symbol IN ('TP53','EGFR','KRAS','CDKN2A','TERT','ARID1A','KEAP1','PIK3CA','SMAD4','AR','RB1','ATM','STK11','SMARCA4','APC') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_access_2021' AND g.hugo_gene_symbol IN ('TP53','EGFR','KRAS','CDKN2A','TERT','ARID1A','KEAP1','PIK3CA','SMAD4','AR','RB1','ATM','STK11','SMARCA4','APC') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps)
   GROUP BY gene, pid, side
 ),
@@ -309,7 +309,7 @@ ps AS (SELECT suid, pid, side FROM sides WHERE pid IN (SELECT pid FROM paired)),
 det AS (
   SELECT DISTINCT s.pid AS pid FROM snapshot_db.genomic_event_derived g
   INNER JOIN sides s ON s.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'msk_access_2021' AND s.side = 'b' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_access_2021' AND s.side = 'b' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b')
 ),
 os AS (

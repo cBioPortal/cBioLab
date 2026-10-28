@@ -32,8 +32,8 @@
           "Colorectal, MSS",
           "Pancreatic, MSS"
         ],
-        "tested": 494,
-        "untested": 8,
+        "tested": 493,
+        "untested": 7,
         "significant": 328,
         "minAltered": 5,
         "test": "two-sided Fisher's exact test",
@@ -78,7 +78,7 @@
             ],
             "log2Ratio": -0.8888587185359295,
             "p": 3.3890878095288153e-251,
-            "q": 8.371046889536174e-249,
+            "q": 8.35410145048853e-249,
             "enrichedIn": "Pancreatic, MSS",
             "cytoband": "12p12.1"
           },
@@ -100,7 +100,7 @@
             ],
             "log2Ratio": -4.356207664482494,
             "p": 3.284288823108772e-213,
-            "q": 5.408128928719111e-211,
+            "q": 5.397181299308749e-211,
             "enrichedIn": "Pancreatic, MSS",
             "cytoband": "9p21.3"
           },
@@ -122,7 +122,7 @@
             ],
             "log2Ratio": 3.050149211565574,
             "p": 5.573498114286534e-121,
-            "q": 6.883270171143869e-119,
+            "q": 6.869336425858153e-119,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "3q26.32"
           },
@@ -144,7 +144,7 @@
             ],
             "log2Ratio": 7.454708443246248,
             "p": 1.9957721923475326e-119,
-            "q": 1.9718229260393623e-117,
+            "q": 1.9678313816546674e-117,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "10q25.2-q25.3"
           },
@@ -166,7 +166,7 @@
             ],
             "log2Ratio": 3.6320169058638645,
             "p": 2.6807419470934915e-99,
-            "q": 2.2071442031069745e-97,
+            "q": 2.202676299861819e-97,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "4q31.3"
           },
@@ -188,7 +188,7 @@
             ],
             "log2Ratio": 3.6712862806627,
             "p": 7.392002898686707e-73,
-            "q": 5.2166420456446185e-71,
+            "q": 5.206082041503639e-71,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "17q24.3"
           },
@@ -210,7 +210,7 @@
             ],
             "log2Ratio": 2.534751405937777,
             "p": 3.455118066593093e-41,
-            "q": 2.1335354061212348e-39,
+            "q": 2.1292165085379933e-39,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "7q34"
           },
@@ -232,7 +232,7 @@
             ],
             "log2Ratio": 2.8657246404281467,
             "p": 3.991429699491581e-35,
-            "q": 2.1908514128320455e-33,
+            "q": 2.1864164909437213e-33,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "Xq11.2"
           },
@@ -254,7 +254,7 @@
             ],
             "log2Ratio": 3.8657246404281467,
             "p": 7.772332731975096e-34,
-            "q": 3.839532369595697e-32,
+            "q": 3.8317600368637224e-32,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "18q21.1"
           },
@@ -276,7 +276,7 @@
             ],
             "log2Ratio": -3.0347396860209392,
             "p": 6.489772996605343e-31,
-            "q": 2.9144980548391263e-29,
+            "q": 2.9085982612058487e-29,
             "enrichedIn": "Pancreatic, MSS",
             "cytoband": "11q13"
           },
@@ -298,7 +298,7 @@
             ],
             "log2Ratio": 0.22532085626896317,
             "p": 8.169594904934612e-29,
-            "q": 3.363149902531415e-27,
+            "q": 3.356341906777303e-27,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "17p13.1"
           },
@@ -320,7 +320,7 @@
             ],
             "log2Ratio": 2.348472367402507,
             "p": 2.0279504087077926e-27,
-            "q": 7.706211553089612e-26,
+            "q": 7.69061193456109e-26,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "3p22.1"
           },
@@ -342,7 +342,7 @@
             ],
             "log2Ratio": 3.3377059365334367,
             "p": 1.380315980681615e-25,
-            "q": 4.870543531833699e-24,
+            "q": 4.860684131971687e-24,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "5q13.1"
           },
@@ -364,7 +364,7 @@
             ],
             "log2Ratio": 2.9361139683195443,
             "p": 2.5070217710352286e-25,
-            "q": 8.256458365942686e-24,
+            "q": 8.239744887469119e-24,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "1p13.2"
           },
@@ -386,7 +386,7 @@
             ],
             "log2Ratio": 1.7785329569722128,
             "p": 4.524844013431579e-23,
-            "q": 1.3970455891470001e-21,
+            "q": 1.3942175616386053e-21,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "20q12-q13.11"
           },
@@ -408,7 +408,7 @@
             ],
             "log2Ratio": 1.7643476200530648,
             "p": 3.586950453464018e-19,
-            "q": 1.0423256023595439e-17,
+            "q": 1.0402156315045651e-17,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "19p13.3"
           },
@@ -430,7 +430,7 @@
             ],
             "log2Ratio": 2.2954089156713917,
             "p": 7.7657514349014e-17,
-            "q": 2.131267338245162e-15,
+            "q": 2.126953031892439e-15,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "7p22.2"
           },
@@ -452,7 +452,7 @@
             ],
             "log2Ratio": 2.215694683033221,
             "p": 9.62724480717449e-17,
-            "q": 2.5030836498653673e-15,
+            "q": 2.4980166789142226e-15,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "3p11.1"
           },
@@ -474,13 +474,13 @@
             ],
             "log2Ratio": 2.0180119807544017,
             "p": 2.241849673908303e-16,
-            "q": 5.5373686945535084e-15,
+            "q": 5.526159446183967e-15,
             "enrichedIn": "Colorectal, MSS",
             "cytoband": "16p13.2"
           },
           {
             "…": "280 more",
-            "sha256": "39dc8d59f8f1d5bc"
+            "sha256": "54a03b80aea83bf3"
           }
         ],
         "grid": {
@@ -577,7 +577,7 @@
             [
               40,
               0,
-              10
+              9
             ]
           ]
         },
@@ -608,7 +608,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Every gene's mutation frequency in each cohort, counted in SAMPLES over the samples profiled for that gene (a panel that lists it, or whole-exome; a sample altered off-panel counts as measured), uncalled mutations excluded as the portal excludes them. 494 genes tested with a two-sided Fisher's exact test; q is Benjamini–Hochberg across all of them. 8 altered genes were not tested: fewer than 5 altered samples across the cohorts, or not profiled in one of them. The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. ",
+      "caveat": "Every gene's mutation frequency in each cohort, counted in SAMPLES over the samples profiled for that gene (a panel that lists it, or whole-exome; an off-panel call is left out), uncalled mutations excluded as the portal excludes them. 493 genes tested with a two-sided Fisher's exact test; q is Benjamini–Hochberg across all of them. 7 altered genes were not tested: fewer than 5 altered samples across the cohorts, or not profiled in one of them. The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. ",
       "method": {
         "steps": [
           {
@@ -616,7 +616,7 @@
             "title": "Count altered and profiled samples per gene",
             "detail": "The enrichment queries above: per gene, samples with a mutation; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.",
             "scope": "Colorectal, MSS · msk_chord_2024",
-            "rowsOut": 502,
+            "rowsOut": 500,
             "params": [
               [
                 "whole-exome samples",
@@ -629,7 +629,7 @@
             "title": "Count altered and profiled samples per gene",
             "detail": "The enrichment queries above: per gene, samples with a mutation; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.",
             "scope": "Pancreatic, MSS · msk_chord_2024",
-            "rowsOut": 483,
+            "rowsOut": 482,
             "params": [
               [
                 "whole-exome samples",
@@ -644,11 +644,11 @@
             "params": [
               [
                 "tested",
-                "494"
+                "493"
               ],
               [
                 "not tested",
-                "8"
+                "7"
               ]
             ]
           },
@@ -669,7 +669,7 @@
         "verification": "Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
         "check": {
           "enrichment:tested": {
-            "v": 494
+            "v": 493
           },
           "enrichment:APC:p": {
             "v": 0
@@ -681,56 +681,56 @@
             "v": 3.3890878095288153e-251
           },
           "enrichment:KRAS:q": {
-            "v": 8.371046889536174e-249
+            "v": 8.35410145048853e-249
           },
           "enrichment:CDKN2A:p": {
             "v": 3.284288823108772e-213
           },
           "enrichment:CDKN2A:q": {
-            "v": 5.408128928719111e-211
+            "v": 5.397181299308749e-211
           },
           "enrichment:PIK3CA:p": {
             "v": 5.573498114286534e-121
           },
           "enrichment:PIK3CA:q": {
-            "v": 6.883270171143869e-119
+            "v": 6.869336425858153e-119
           },
           "enrichment:TCF7L2:p": {
             "v": 1.9957721923475326e-119
           },
           "enrichment:TCF7L2:q": {
-            "v": 1.9718229260393623e-117
+            "v": 1.9678313816546674e-117
           },
           "enrichment:FBXW7:p": {
             "v": 2.6807419470934915e-99
           },
           "enrichment:FBXW7:q": {
-            "v": 2.2071442031069745e-97
+            "v": 2.202676299861819e-97
           },
           "enrichment:SOX9:p": {
             "v": 7.392002898686707e-73
           },
           "enrichment:SOX9:q": {
-            "v": 5.2166420456446185e-71
+            "v": 5.206082041503639e-71
           },
           "enrichment:BRAF:p": {
             "v": 3.455118066593093e-41
           },
           "enrichment:BRAF:q": {
-            "v": 2.1335354061212348e-39
+            "v": 2.1292165085379933e-39
           },
           "enrichment:AMER1:p": {
             "v": 3.991429699491581e-35
           },
           "enrichment:AMER1:q": {
-            "v": 2.1908514128320455e-33
+            "v": 2.1864164909437213e-33
           },
           "enrichment:SMAD2:p": {
             "v": 7.772332731975096e-34
           },
           "…": {
             "more": 61,
-            "sha256": "d9fb8db24dff2919"
+            "sha256": "b5f2b3d1e9b44e88"
           }
         }
       }

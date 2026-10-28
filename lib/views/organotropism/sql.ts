@@ -241,7 +241,7 @@ function orgGeneCtes(study: string, db: string, g: OrgGenes): string {
     "alt AS (\n" +
     "  SELECT DISTINCT " + gPid + " AS pid, g.hugo_gene_symbol AS gene\n" +
     "  FROM " + db + ".genomic_event_derived g\n" + (g.driverPin ? driverJoin(g.driverPin) : "") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND " + enrichEventCond(g.alteration) + " AND NOT g.off_panel\n" +
+    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND " + enrichEventCond(g.alteration) + "\n" +
     (list ? "    AND g.hugo_gene_symbol IN (" + list + ")\n" : "") + (g.driverPin ? "    AND ann.is_driver\n" : "") +
     "    AND " + inCohortSamples(gSid) + "\n" +
     ")"

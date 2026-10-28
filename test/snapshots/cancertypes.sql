@@ -20,7 +20,7 @@ alt AS (
          multiIf(g.variant_type = 'mutation', 'mutation', g.variant_type = 'cna' AND g.cna_alteration >= 2, 'amp',
                  g.variant_type = 'cna', 'homdel', 'sv') AS t
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_impact_50k_2026' AND g.hugo_gene_symbol IN ('KRAS','NRAS','HRAS') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_impact_50k_2026' AND g.hugo_gene_symbol IN ('KRAS','NRAS','HRAS') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM samp)
   GROUP BY suid, gene, t
 ),
@@ -29,7 +29,6 @@ cov AS (
   JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN ('KRAS','NRAS','HRAS')
   WHERE sp.cancer_study_identifier = 'msk_impact_50k_2026' AND sp.sample_unique_id IN (SELECT suid FROM samp)
     AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')
-  UNION DISTINCT SELECT DISTINCT suid, gene FROM alt
 ),
 sg AS (
   SELECT cov.suid AS suid, cov.gene AS gene, groupUniqArrayIf(alt.t, alt.t != '') AS types

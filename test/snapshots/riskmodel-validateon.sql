@@ -68,7 +68,7 @@ panels AS (
 mut AS (
   SELECT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid, groupUniqArray(g.hugo_gene_symbol) AS genes
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
   GROUP BY pid
 )
@@ -111,7 +111,7 @@ panels AS (
 mut AS (
   SELECT replaceOne(g.patient_unique_id, 'msk_impact_2017_', '') AS pid, groupUniqArray(g.hugo_gene_symbol) AS genes
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_impact_2017' AND g.variant_type = 'mutation' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_impact_2017' AND g.variant_type = 'mutation' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_impact_2017_', '') IN (SELECT sid FROM cohort)
   GROUP BY pid
 )

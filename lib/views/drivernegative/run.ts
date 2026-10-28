@@ -21,8 +21,7 @@ export function dnegTest(altered: Map<string, [number, number]>, profiled: Map<s
   let untested = 0;
   for (const [gene, alt] of altered) {
     const pr = profiled.get(gene) || [0, 0];
-    // a patient altered in a gene their panel does not list (an off-panel call) was measured
-    const prof: [number, number] = [Math.max(alt[0], pr[0] + wes[0]), Math.max(alt[1], pr[1] + wes[1])];
+    const prof: [number, number] = [pr[0] + wes[0], pr[1] + wes[1]];
     if (alt[0] + alt[1] < minAltered || !prof[0] || !prof[1]) { untested++; continue; }
     const p = fisherExact(alt[0], prof[0] - alt[0], alt[1], prof[1] - alt[1]);
     const s0 = alt[0] / prof[0], s1 = alt[1] / prof[1];
@@ -94,7 +93,7 @@ export async function runDrivernegative(view: DrivernegativeView, ctx: ViewRun):
       "; " + groups.negative.toLocaleString("en-US") + " (" + pct(groups.negative, sequenced) + ") carry none and were sequenced on a panel covering every one of those genes (or whole-exome): the driver-negative group. " +
       groups.unprofiled.toLocaleString("en-US") + " (" + pct(groups.unprofiled, sequenced) + ") carry none but were not profiled for every listed gene, so are neither — kept out of both sides, never counted as driver-negative. " +
       "Coverage is read from the mutation panels and calls from the cohort's own samples only; a fusion driver is called only where the study reports structural variants. " +
-      "Then every other gene's " + word + (measure === "driver" ? " (OncoKB drivers only)" : "") + " frequency is compared between driver-negative and driver-positive patients, in PATIENTS over the patients profiled for that gene (a panel that lists it, or whole-exome; an off-panel call counts as measured), two-sided Fisher's exact test, Benjamini–Hochberg q over the " + plural(tested.length, "gene") + " tested; " +
+      "Then every other gene's " + word + (measure === "driver" ? " (OncoKB drivers only)" : "") + " frequency is compared between driver-negative and driver-positive patients, in PATIENTS over the patients profiled for that gene (a panel that lists it, or whole-exome; an off-panel call is left out), two-sided Fisher's exact test, Benjamini–Hochberg q over the " + plural(tested.length, "gene") + " tested; " +
       untested.toLocaleString("en-US") + " altered genes were not tested (fewer than " + minAltered + " altered patients, or not profiled in a group). The log ratio is log2 of the driver-negative share over the driver-positive one. " +
       "Driver-positive tumours are often mutually exclusive with other drivers by biology, so a gene enriched in the driver-negative group is a candidate alternative driver, not a proven one; smoking history and tumour mutation burden also differ between the groups and are not adjusted for. " +
       (multi ? "Counts are summed across " + ctx.vStudies.length + " studies; overlap is not deduplicated. " : "") +

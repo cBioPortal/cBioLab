@@ -37,7 +37,7 @@ altc AS (
   FROM snapshot_db.genomic_event_derived g
   INNER JOIN sp ON sp.suid = g.sample_unique_id
   INNER JOIN cov ON cov.sig = sp.sig AND cov.gene = g.hugo_gene_symbol
-  WHERE g.cancer_study_identifier = 'msk_impact_2017' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_impact_2017' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM sp)
 ),
 strat AS (
@@ -73,7 +73,7 @@ altc AS (
   FROM snapshot_db.genomic_event_derived g
   INNER JOIN sp ON sp.suid = g.sample_unique_id
   INNER JOIN cov ON cov.sig = sp.sig AND cov.gene = g.hugo_gene_symbol
-  WHERE g.cancer_study_identifier = 'msk_impact_2017' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_impact_2017' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM sp)
 ),
 strat AS (
@@ -108,7 +108,7 @@ altc AS (
   FROM snapshot_db.genomic_event_derived g
   INNER JOIN sp ON sp.suid = g.sample_unique_id
   INNER JOIN cov ON cov.sig = sp.sig AND cov.gene = g.hugo_gene_symbol
-  WHERE g.cancer_study_identifier = 'msk_impact_2017' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'msk_impact_2017' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM sp)
 ),
 strat AS (

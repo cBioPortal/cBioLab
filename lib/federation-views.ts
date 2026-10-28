@@ -231,12 +231,13 @@ export type EnrichAlteration = "mutation" | "cna" | "amp" | "homdel" | "sv";
 export const ENRICH_PANEL_TYPE: Record<EnrichAlteration, string> = {
   mutation: "MUTATION_EXTENDED", cna: "COPY_NUMBER_ALTERATION", amp: "COPY_NUMBER_ALTERATION", homdel: "COPY_NUMBER_ALTERATION", sv: "STRUCTURAL_VARIANT"
 };
-export const enrichEventCond = (a: EnrichAlteration): string =>
+/** one alteration type's calls, made on a panel covering the gene (an off-panel call is in neither side) */
+export const enrichEventCond = (a: EnrichAlteration): string => "NOT g.off_panel AND " + (
   a === "mutation" ? "g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'"
   : a === "sv" ? "g.variant_type = 'structural_variant'"
   : a === "amp" ? "g.variant_type = 'cna' AND g.cna_alteration >= 2"
   : a === "homdel" ? "g.variant_type = 'cna' AND g.cna_alteration <= -2"
-  : "g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2";
+  : "g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2");
 
 // ---------------------------------------------------------------------------
 // assays: a generic-assay profile's every entity, compared between cohorts
