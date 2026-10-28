@@ -516,8 +516,8 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET }
 
   // ---- gene tables: Mutated / CNA / SV, cBioPortal study-view semantics ----
   // Counts are SAMPLES. The denominator is samples profiled for THAT gene in the
-  // relevant alteration type, computed the way the portal does it:
-  //   profiled(gene) = panel-profiled(gene)  +  whole-exome sample count
+  // relevant alteration type:
+  //   profiled(gene) = panel-profiled(gene)  +  whole-exome sample count  -  surplus(gene)
   // The WES panel is excluded from the join on purpose: it enumerates ~45k genes,
   // so joining it multiplies every WES sample by that many rows (47.8M for one
   // TCGA study). The portal splits it into a scalar for exactly this reason.
@@ -534,7 +534,7 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET }
       (geneSearch ? "\n  AND positionCaseInsensitive(hugo_gene_symbol, " + sq(geneSearch) + ") > 0" : "") +
       inSamples(set);
 
-    const [altered, panelProfiled, wes, distinct] = await Promise.all([
+    const [altered, panelProfiled, wes, distinct, surplus] = await Promise.all([
       chQuery<ChRow>(
         "SELECT hugo_gene_symbol AS g," + (isCna ? " cna_alteration AS cna, any(cna_cytoband) AS cytoband," : "") + "\n" +
         "       uniqExact(sample_unique_id) AS altered, uniqExactIf(sample_unique_id, NOT off_panel) AS on_panel, count() AS events\n" +
@@ -562,11 +562,9 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET }
         inSamples(set) + "\n" +
         "  GROUP BY gene_panel_id\n" +
         ")\n" +
-        // Summing across the panels that carry the gene leaves one residual: a
-        // sample on two DIFFERENT panels for the same alteration type is counted
-        // once per panel. Deduplicating that needs the sample-level join this
-        // CTE exists to avoid, and it is rare — 328 samples across the whole
-        // database against 37,666 cured by counting distinct above.
+        // Summing across the panels that carry the gene counts a sample on two
+        // DIFFERENT panels (or a panel and whole-exome) once per panel; `surplus`
+        // below takes the extra off.
         "SELECT gptg.gene AS g, sum(pc.n) AS n\n" +
         "FROM " + db + ".gene_panel_to_gene_derived gptg\n" +
         "INNER JOIN pc ON pc.gene_panel_id = gptg.gene_panel_id\n" +
@@ -580,13 +578,32 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET }
         "  AND alteration_type = " + sq(alterationType) + " AND gene_panel_id = 'WES'" +
         inSamples(set), conn),
       chQuery<ChRow>(
-        "SELECT uniqExact(hugo_gene_symbol) AS n FROM " + db + ".genomic_event_derived\n" + where, conn)
+        "SELECT uniqExact(hugo_gene_symbol) AS n FROM " + db + ".genomic_event_derived\n" + where, conn),
+      // A sample on several panels for this alteration type is profiled once, as the views count
+      // it, never once per panel as the sums above (and cBioPortal's study view) would: per gene,
+      // the extra counts of the samples with more than one panel, joined at the sample level over
+      // those samples only (nsclc_ctdx_msk_2022: 219 of 2,621, whole-exome beside a panel).
+      chQuery<ChRow>(
+        "WITH multi AS (\n" +
+        "  SELECT sample_unique_id AS s, groupUniqArray(gene_panel_id) AS panels\n" +
+        "  FROM " + db + ".sample_to_gene_panel_derived\n" +
+        "  WHERE " + studyIn(studies) + "\n" +
+        "    AND alteration_type = " + sq(alterationType) + inSamples(set) + "\n" +
+        "  GROUP BY s HAVING length(panels) > 1\n" +
+        ")\n" +
+        "SELECT g, sum(extra) AS n FROM (\n" +
+        "  SELECT m.s AS s, gptg.gene AS g, count() + any(m.wes) - 1 AS extra\n" +
+        "  FROM (SELECT s, toInt64(has(panels, 'WES')) AS wes, arrayJoin(arrayFilter((x) -> x != 'WES', panels)) AS panel FROM multi) m\n" +
+        "  INNER JOIN " + db + ".gene_panel_to_gene_derived gptg ON gptg.gene_panel_id = m.panel\n" +
+        "  GROUP BY s, g\n" +
+        ") WHERE extra > 0 GROUP BY g", conn),
     ]);
 
     const panelMap = new Map<string, number>(panelProfiled.data.map((r) => [r.g, Number(r.n)]));
     const wesN = Number(wes.data[0]?.n || 0);
+    const surplusOf = new Map<string, number>(surplus.data.map((r) => [r.g, Number(r.n)]));
     const rows = altered.data.map((r): GeneTableRow => {
-      const profiled = (panelMap.get(r.g) || 0) + wesN;
+      const profiled = (panelMap.get(r.g) || 0) + wesN - (surplusOf.get(r.g) || 0);
       const alt = Number(r.altered), onPanel = Number(r.on_panel);
       return {
         gene: r.g, altered: alt, alteredOnPanel: onPanel, events: Number(r.events), profiled,
