@@ -31,7 +31,8 @@ lv AS (
 ),
 st AS (
   SELECT sample_unique_id AS sid, multiIf(lower(trimBoth(attribute_value)) IN ('primary'), 'a', lower(trimBoth(attribute_value)) IN ('metastasis'), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name = 'SAMPLE_TYPE'
     AND sample_unique_id IN (SELECT sid FROM seq)
 ),
@@ -77,7 +78,8 @@ pl AS (
 ),
 grp AS (
   SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, if(uniqExact(attribute_value) > 1, 'Multiple', any(attribute_value)) AS g
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND attribute_name = 'CANCER_TYPE' AND trimBoth(attribute_value) != ''
     AND if(type = 'sample', replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort), replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT pid FROM cohort))
   GROUP BY pid

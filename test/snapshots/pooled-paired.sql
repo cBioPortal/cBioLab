@@ -37,7 +37,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'blca_cornell_2016_', '') A
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'blca_cornell_2016_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('pre-chemotherapy'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('post-chemotherapy'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'blca_cornell_2016' AND type = 'sample' AND attribute_name = 'SPECIMEN_COLLECTION_PRE_OR_POST_CHEMO'
     AND replaceOne(sample_unique_id, 'blca_cornell_2016_', '') IN (SELECT sid FROM cohort)
 ),
@@ -81,7 +82,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'brca_dldccc_2022_', '') AS
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'brca_dldccc_2022_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pre-Treatment'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Post-Treatment'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_dldccc_2022' AND type = 'sample' AND attribute_name = 'TREATMENT_STATUS'
     AND replaceOne(sample_unique_id, 'brca_dldccc_2022_', '') IN (SELECT sid FROM cohort)
 ),
@@ -125,7 +127,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'breast_alpelisib_2020_', '
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'breast_alpelisib_2020_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('pre-treatment'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('post-treatment'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'breast_alpelisib_2020' AND type = 'sample' AND attribute_name = 'SAMPLE_COLLECTION_TIMEPOINT'
     AND replaceOne(sample_unique_id, 'breast_alpelisib_2020_', '') IN (SELECT sid FROM cohort)
 ),
@@ -169,7 +172,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'egc_msk_2017_', '') AS pid
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'egc_msk_2017_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('PRE-TX'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('POST-TX'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'egc_msk_2017' AND type = 'sample' AND attribute_name = 'IMPACT_PRE_POST'
     AND replaceOne(sample_unique_id, 'egc_msk_2017_', '') IN (SELECT sid FROM cohort)
 ),
@@ -213,7 +217,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'egc_trap_ccr_msk_2023_', '
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'egc_trap_ccr_msk_2023_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pre'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Post'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'egc_trap_ccr_msk_2023' AND type = 'sample' AND attribute_name = 'PRE_OR_POST_TREATMENT'
     AND replaceOne(sample_unique_id, 'egc_trap_ccr_msk_2023_', '') IN (SELECT sid FROM cohort)
 ),
@@ -257,7 +262,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'blca_cornell_2016_', '') A
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'blca_cornell_2016_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('pre-chemotherapy'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('post-chemotherapy'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'blca_cornell_2016' AND type = 'sample' AND attribute_name = 'SPECIMEN_COLLECTION_PRE_OR_POST_CHEMO'
     AND replaceOne(sample_unique_id, 'blca_cornell_2016_', '') IN (SELECT sid FROM cohort)
 ),
@@ -271,7 +277,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'brca_dldccc_2022_', '') AS
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'brca_dldccc_2022_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pre-Treatment'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Post-Treatment'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_dldccc_2022' AND type = 'sample' AND attribute_name = 'TREATMENT_STATUS'
     AND replaceOne(sample_unique_id, 'brca_dldccc_2022_', '') IN (SELECT sid FROM cohort)
 ),
@@ -285,7 +292,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'breast_alpelisib_2020_', '
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'breast_alpelisib_2020_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('pre-treatment'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('post-treatment'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'breast_alpelisib_2020' AND type = 'sample' AND attribute_name = 'SAMPLE_COLLECTION_TIMEPOINT'
     AND replaceOne(sample_unique_id, 'breast_alpelisib_2020_', '') IN (SELECT sid FROM cohort)
 ),
@@ -299,7 +307,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'egc_msk_2017_', '') AS pid
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'egc_msk_2017_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('PRE-TX'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('POST-TX'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'egc_msk_2017' AND type = 'sample' AND attribute_name = 'IMPACT_PRE_POST'
     AND replaceOne(sample_unique_id, 'egc_msk_2017_', '') IN (SELECT sid FROM cohort)
 ),
@@ -313,7 +322,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'egc_trap_ccr_msk_2023_', '
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'egc_trap_ccr_msk_2023_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Pre'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Post'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'egc_trap_ccr_msk_2023' AND type = 'sample' AND attribute_name = 'PRE_OR_POST_TREATMENT'
     AND replaceOne(sample_unique_id, 'egc_trap_ccr_msk_2023_', '') IN (SELECT sid FROM cohort)
 ),

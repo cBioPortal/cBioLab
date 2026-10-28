@@ -11,10 +11,12 @@ INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND (('sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Yes')))) OR ('patient', replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Yes'))))))
 
@@ -31,10 +33,12 @@ INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND (('sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('No')))) OR ('patient', replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('No'))))))
 
@@ -50,15 +54,18 @@ INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND (('sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('No')))) OR ('patient', replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('No'))))))),
      raw AS (
        SELECT attribute_name AS a, type AS per, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS x
-       FROM snapshot_db.clinical_data_derived
+       FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
        WHERE cancer_study_identifier = 'crc_apc_impact_2020'
          AND attribute_name IN ('MSI_SCORE','AGE_AT_MET')
          AND attribute_value != ''
@@ -83,15 +90,18 @@ INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND (('sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Yes')))) OR ('patient', replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Yes'))))))),
      raw AS (
        SELECT attribute_name AS a, type AS per, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS x
-       FROM snapshot_db.clinical_data_derived
+       FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
        WHERE cancer_study_identifier = 'crc_apc_impact_2020'
          AND attribute_name IN ('MSI_SCORE','AGE_AT_MET')
          AND attribute_value != ''
@@ -116,16 +126,19 @@ INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND (('sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('No')))) OR ('patient', replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('No')))))))
 SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx
 FROM (
   SELECT attribute_name AS a, type AS per, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS x
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name IN ('MSI_SCORE','AGE_AT_MET')
     AND attribute_value != ''
@@ -146,16 +159,19 @@ INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND (('sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Yes')))) OR ('patient', replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'crc_apc_impact_2020_', ''), replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name = 'METASTASIS_LIVER' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Yes')))))))
 SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx
 FROM (
   SELECT attribute_name AS a, type AS per, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS x
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND attribute_name IN ('MSI_SCORE','AGE_AT_MET')
     AND attribute_value != ''

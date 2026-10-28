@@ -10,12 +10,14 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')
 y0 AS (
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), if(uniqExactIf(v, pref = 0) > 1, 'Multiple', anyIf(v, pref = 0))) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS id, attribute_value AS v, 1 AS pref
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020' AND attribute_name = 'MSI_TYPE' AND attribute_value != ''
     AND type = 'patient' AND replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS id, attribute_value AS v, 0 AS pref
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020' AND attribute_name = 'MSI_TYPE' AND attribute_value != ''
     AND type = 'sample' AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -50,12 +52,14 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '')
 y0 AS (
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), if(uniqExactIf(v, pref = 0) > 1, 'Multiple', anyIf(v, pref = 0))) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS id, attribute_value AS v, 1 AS pref
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020' AND attribute_name = 'MSI_TYPE' AND attribute_value != ''
     AND type = 'patient' AND replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS id, attribute_value AS v, 0 AS pref
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'crc_apc_impact_2020' AND attribute_name = 'MSI_TYPE' AND attribute_value != ''
     AND type = 'sample' AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id

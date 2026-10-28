@@ -231,6 +231,10 @@ rel      := { "type": "NONE" }                                                 /
 - **Names and values match ignoring case and surrounding whitespace** — event types, attribute
   keys and attribute values alike (`Chemo` = `CHEMO`), because studies spell the same thing
   differently. Nothing beyond case and whitespace is merged.
+- **A clinical value spelled as missing is no value**: empty, `NA`, `N/A` and `NaN`, in any case,
+  as cBioPortal's study view reads them. Such a value gets no facet bar and no group, matches
+  neither `= X` nor `!= X`, and `{not: …}` keeps its sample, so `{not: {kind:"clinical",
+  attribute, op:"!=", value:""}}` is the portal's NA filter. Other words (`Unknown`, `None`) are values.
 
 ## Views
 

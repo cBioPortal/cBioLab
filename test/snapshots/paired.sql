@@ -9,7 +9,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Primary'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Metastasis'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name = 'SAMPLE_TYPE'
     AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
@@ -52,7 +53,8 @@ WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '')
 sides AS (
   SELECT sample_unique_id AS suid, replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid,
          multiIf(lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Primary'))), 'a', lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Metastasis'))), 'b', '') AS side
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name = 'SAMPLE_TYPE'
     AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),

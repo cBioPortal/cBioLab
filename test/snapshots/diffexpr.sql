@@ -3,10 +3,12 @@
 (SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND (('sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', ''), replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_Basal')))) OR ('patient', replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', ''), replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_Basal'))))))
 
@@ -15,10 +17,12 @@
 (SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND (('sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', ''), replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_LumA')))) OR ('patient', replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', ''), replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_LumA'))))))
 
@@ -33,10 +37,12 @@ WHERE startsWith(gs.external_id, 'HALLMARK_') GROUP BY set_name ORDER BY set_nam
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND (('sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', ''), replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_Basal')))) OR ('patient', replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', ''), replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_Basal'))))))),
 vals AS (
@@ -53,10 +59,12 @@ SELECT gene, count() AS n, sum(v) AS sx, sum(v * v) AS sxx FROM vals GROUP BY ge
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND (('sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', ''), replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_LumA')))) OR ('patient', replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', ''), replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_LumA'))))))),
 vals AS (

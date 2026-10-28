@@ -3,10 +3,12 @@
 (SELECT replaceOne(patient_unique_id, 'sarcoma_msk_2022_', '') AS pid, replaceOne(sample_unique_id, 'sarcoma_msk_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'sarcoma_msk_2022'
     AND (('sample', replaceOne(sample_unique_id, 'sarcoma_msk_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'sarcoma_msk_2022_', ''), replaceOne(patient_unique_id, 'sarcoma_msk_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'sarcoma_msk_2022'
     AND attribute_name = 'CANCER_TYPE_DETAILED' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Well-Differentiated Liposarcoma')))) OR ('patient', replaceOne(patient_unique_id, 'sarcoma_msk_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'sarcoma_msk_2022_', ''), replaceOne(patient_unique_id, 'sarcoma_msk_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'sarcoma_msk_2022'
     AND attribute_name = 'CANCER_TYPE_DETAILED' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Well-Differentiated Liposarcoma'))))))
 
@@ -14,10 +16,12 @@
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'sarcoma_msk_2022_', '') AS pid, replaceOne(sample_unique_id, 'sarcoma_msk_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'sarcoma_msk_2022'
     AND (('sample', replaceOne(sample_unique_id, 'sarcoma_msk_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'sarcoma_msk_2022_', ''), replaceOne(patient_unique_id, 'sarcoma_msk_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'sarcoma_msk_2022'
     AND attribute_name = 'CANCER_TYPE_DETAILED' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Well-Differentiated Liposarcoma')))) OR ('patient', replaceOne(patient_unique_id, 'sarcoma_msk_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'sarcoma_msk_2022_', ''), replaceOne(patient_unique_id, 'sarcoma_msk_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'sarcoma_msk_2022'
     AND attribute_name = 'CANCER_TYPE_DETAILED' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Well-Differentiated Liposarcoma'))))))),
 altered AS (

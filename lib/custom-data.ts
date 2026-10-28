@@ -8,6 +8,7 @@
 // tables at query time:
 //
 //   clinicalTable(db, attrs) = db.clinical_data_derived    UNION ALL  _custom_clinical[_<subset>]
+//                              (recorded values only, either way)
 //   clinicalMetaTable(db)    = db.clinical_attribute_meta  UNION ALL  _custom_meta
 //
 // `_custom_clinical` / `_custom_meta` are ClickHouse external tables, uploaded by lib/ch.ts with
@@ -15,8 +16,8 @@
 // cohort leaves, Explore facets, oncoprint tracks, split arms, compare, survival, plots — sees an
 // uploaded column as one more attribute, and nothing is ever written to ClickHouse.
 //
-// With no custom data in the request both functions return the plain table name, so a request
-// without uploads compiles to exactly the SQL it always did.
+// With no custom data in the request, clinicalMetaTable returns the plain table name and
+// clinicalTable the study's own rows with a recorded value.
 //
 // Patient-data boundary (docs/DATA-BOUNDARY.md): the rows are patient-level. They are merged
 // only into databases of patient-level connections (`allowedConns`, decided at the request
@@ -24,6 +25,7 @@
 //
 // Pure apart from the AsyncLocalStorage: no I/O, safe to import from lib/ch.ts.
 import { AsyncLocalStorage } from "node:async_hooks";
+import { clinicalRecordedSql } from "./event-names.ts";
 
 import {
   CUSTOM_PREFIX, CUSTOM_REF_RE, LIMITS, customAttr, isCustomAttr,
@@ -145,7 +147,10 @@ export const CUSTOM_META_STRUCTURE =
 export const CUSTOM_PRIORITY = "5000";
 
 /**
- * The clinical data table, with the request's custom rows merged in when there are any.
+ * The clinical data table's rows with a recorded value (clinicalRecordedSql: no empty, "NA", "N/A"
+ * or "NaN" spelling, as cBioPortal's study view reads them), with the request's custom rows merged
+ * in when there are any. Every reader of clinical values goes through here, so a missing value is
+ * never a value: no facet bar, no group, no match for `= X` or `!= X`, and `not` keeps its sample.
  *
  * `attrs` is what the statement reads: the attribute names it filters on, or "all" for one that
  * reads every attribute. Only those custom columns are shipped with it, and a statement about
@@ -154,19 +159,20 @@ export const CUSTOM_PRIORITY = "5000";
  */
 export function clinicalTable(db: string, attrs: readonly string[] | "all"): string {
   const s = activeCustomData();
-  if (!s || !s.allowedDbs.has(db)) return db + ".clinical_data_derived";
+  const own = "SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type\n" +
+    "   FROM " + db + ".clinical_data_derived WHERE " + clinicalRecordedSql("attribute_value");
+  if (!s || !s.allowedDbs.has(db)) return "(" + own + ")";
   let table = CUSTOM_CLINICAL_TABLE;
   if (attrs !== "all") {
     const custom = [...new Set(attrs.filter(isCustomAttr))].sort();
-    if (!custom.length) return db + ".clinical_data_derived";
+    if (!custom.length) return "(" + own + ")";
     table = CUSTOM_CLINICAL_TABLE + "_" + fnv1a(custom.join("\n"));
     (s.subsets ??= new Map()).set(table, new Set(custom));
   }
-  return "(SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type\n" +
-    "   FROM " + db + ".clinical_data_derived\n" +
+  return "(" + own + "\n" +
     " UNION ALL\n" +
     " SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type\n" +
-    "   FROM " + table + ")";
+    "   FROM " + table + " WHERE " + clinicalRecordedSql("attribute_value") + ")";
 }
 
 function fnv1a(s: string): string {

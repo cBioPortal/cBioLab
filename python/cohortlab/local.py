@@ -6,6 +6,9 @@ from typing import Any
 
 from .gene_tracks import gene_symbols, parse_gene_list
 
+# the spellings read as "no value recorded", as lib/event-names.ts CLINICAL_MISSING_VALUES
+CLINICAL_MISSING_VALUES = ("", "na", "n/a", "nan")
+
 Table = list[dict[str, str]]
 
 
@@ -79,7 +82,7 @@ def clinical_from_table(rows: Table) -> list[dict[str, Any]]:
         values = {}
         for r in rows:
             v = r.get(raw)
-            if v is not None and v != "" and v.upper() != "NA":
+            if v is not None and v.strip().lower() not in CLINICAL_MISSING_VALUES:
                 values[r[id_col]] = v
         out.append({"attr": attr, "values": values})
     return out

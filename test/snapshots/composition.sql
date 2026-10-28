@@ -3,10 +3,12 @@
 (SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Dup')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Dup'))))))
 
@@ -15,10 +17,12 @@
 (SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Del')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Del'))))))
 
@@ -27,10 +31,12 @@
 (SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('FBI')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('FBI'))))))
 
@@ -38,10 +44,12 @@
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('FBI')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('FBI'))))))),
 parts AS (
@@ -49,19 +57,19 @@ SELECT id, toUInt16(0) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -71,19 +79,19 @@ SELECT id, toUInt16(1) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -93,19 +101,19 @@ SELECT id, toUInt16(2) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -115,19 +123,19 @@ SELECT id, toUInt16(3) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -137,19 +145,19 @@ SELECT id, toUInt16(4) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -159,19 +167,19 @@ SELECT id, toUInt16(5) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -181,19 +189,19 @@ SELECT id, toUInt16(6) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -203,19 +211,19 @@ SELECT id, toUInt16(7) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -225,19 +233,19 @@ SELECT id, toUInt16(8) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -247,19 +255,19 @@ SELECT id, toUInt16(9) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -281,10 +289,12 @@ LIMIT 2001
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Del')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Del'))))))),
 parts AS (
@@ -292,19 +302,19 @@ SELECT id, toUInt16(0) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -314,19 +324,19 @@ SELECT id, toUInt16(1) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -336,19 +346,19 @@ SELECT id, toUInt16(2) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -358,19 +368,19 @@ SELECT id, toUInt16(3) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -380,19 +390,19 @@ SELECT id, toUInt16(4) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -402,19 +412,19 @@ SELECT id, toUInt16(5) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -424,19 +434,19 @@ SELECT id, toUInt16(6) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -446,19 +456,19 @@ SELECT id, toUInt16(7) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -468,19 +478,19 @@ SELECT id, toUInt16(8) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -490,19 +500,19 @@ SELECT id, toUInt16(9) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -524,10 +534,12 @@ LIMIT 2001
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Dup')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Dup'))))))),
 parts AS (
@@ -535,19 +547,19 @@ SELECT id, toUInt16(0) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -557,19 +569,19 @@ SELECT id, toUInt16(1) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -579,19 +591,19 @@ SELECT id, toUInt16(2) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -601,19 +613,19 @@ SELECT id, toUInt16(3) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -623,19 +635,19 @@ SELECT id, toUInt16(4) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -645,19 +657,19 @@ SELECT id, toUInt16(5) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -667,19 +679,19 @@ SELECT id, toUInt16(6) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -689,19 +701,19 @@ SELECT id, toUInt16(7) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -711,19 +723,19 @@ SELECT id, toUInt16(8) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -733,19 +745,19 @@ SELECT id, toUInt16(9) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -767,10 +779,12 @@ LIMIT 2001
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('FBI')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('FBI'))))))),
 parts AS (
@@ -778,19 +792,19 @@ SELECT id, toUInt16(0) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -800,19 +814,19 @@ SELECT id, toUInt16(1) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -822,19 +836,19 @@ SELECT id, toUInt16(2) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -844,19 +858,19 @@ SELECT id, toUInt16(3) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -866,19 +880,19 @@ SELECT id, toUInt16(4) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -888,19 +902,19 @@ SELECT id, toUInt16(5) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -910,19 +924,19 @@ SELECT id, toUInt16(6) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -932,19 +946,19 @@ SELECT id, toUInt16(7) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -954,19 +968,19 @@ SELECT id, toUInt16(8) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -976,19 +990,19 @@ SELECT id, toUInt16(9) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1012,10 +1026,12 @@ FROM cases
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Del')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Del'))))))),
 parts AS (
@@ -1023,19 +1039,19 @@ SELECT id, toUInt16(0) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1045,19 +1061,19 @@ SELECT id, toUInt16(1) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1067,19 +1083,19 @@ SELECT id, toUInt16(2) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1089,19 +1105,19 @@ SELECT id, toUInt16(3) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1111,19 +1127,19 @@ SELECT id, toUInt16(4) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1133,19 +1149,19 @@ SELECT id, toUInt16(5) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1155,19 +1171,19 @@ SELECT id, toUInt16(6) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1177,19 +1193,19 @@ SELECT id, toUInt16(7) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1199,19 +1215,19 @@ SELECT id, toUInt16(8) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1221,19 +1237,19 @@ SELECT id, toUInt16(9) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1257,10 +1273,12 @@ FROM cases
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Dup')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Dup'))))))),
 parts AS (
@@ -1268,19 +1286,19 @@ SELECT id, toUInt16(0) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_c69fe134)
+   FROM _custom_clinical_c69fe134 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1290,19 +1308,19 @@ SELECT id, toUInt16(1) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e449dcfd)
+   FROM _custom_clinical_e449dcfd WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_naive' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1312,19 +1330,19 @@ SELECT id, toUInt16(2) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_f23281fa)
+   FROM _custom_clinical_f23281fa WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD4_T_reg' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1334,19 +1352,19 @@ SELECT id, toUInt16(3) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d53efc38)
+   FROM _custom_clinical_d53efc38 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1356,19 +1374,19 @@ SELECT id, toUInt16(4) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_36ce14b9)
+   FROM _custom_clinical_36ce14b9 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_ISG' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1378,19 +1396,19 @@ SELECT id, toUInt16(5) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e42f954c)
+   FROM _custom_clinical_e42f954c WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_CD8_T_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1400,19 +1418,19 @@ SELECT id, toUInt16(6) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_e52f52c7)
+   FROM _custom_clinical_e52f52c7 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_Cycling_T_NK' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1422,19 +1440,19 @@ SELECT id, toUInt16(7) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_d3243663)
+   FROM _custom_clinical_d3243663 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_ILC' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1444,19 +1462,19 @@ SELECT id, toUInt16(8) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_33a1d461)
+   FROM _custom_clinical_33a1d461 WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_CD56' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1466,19 +1484,19 @@ SELECT id, toUInt16(9) AS c, toFloat64(assumeNotNull(av)) AS v FROM (SELECT id, 
 SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'patient' AND replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT pid FROM cohort)
   UNION ALL
 SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')
  UNION ALL
  SELECT toInt32(0) AS internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM _custom_clinical_a671983f)
+   FROM _custom_clinical_a671983f WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022' AND attribute_name = 'custom:spectrum-sc-tnk/TNK_NK_cytotoxic' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id
@@ -1502,10 +1520,12 @@ FROM cases
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('FBI')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('FBI'))))))),
 parts AS (
@@ -1534,10 +1554,12 @@ LIMIT 2001
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Del')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Del'))))))),
 parts AS (
@@ -1566,10 +1588,12 @@ LIMIT 2001
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Dup')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Dup'))))))),
 parts AS (
@@ -1605,10 +1629,12 @@ SELECT entity FROM entities ORDER BY entity
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('FBI')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('FBI'))))))),
 parts AS (
@@ -1639,10 +1665,12 @@ FROM cases
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Del')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Del'))))))),
 parts AS (
@@ -1673,10 +1701,12 @@ FROM cases
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '') AS pid, replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND (('sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Dup')))) OR ('patient', replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_spectrum_tme_2022_', ''), replaceOne(patient_unique_id, 'msk_spectrum_tme_2022_', '')) AS id
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_spectrum_tme_2022'
     AND attribute_name = 'CONSENSUS_SIGNATURE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('HRD-Dup'))))))),
 parts AS (

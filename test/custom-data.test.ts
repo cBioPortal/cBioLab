@@ -9,6 +9,7 @@ import {
   hasCustomData, customAttr, parseCustomAttr, ATTR_NAME_RE, tsvField, LIMITS, type CustomDataset
 } from "../lib/custom-data.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
+import { clinicalRecordedSql } from "../lib/event-names.ts";
 
 const DS: CustomDataset = {
   id: "brain-mets", name: "Brain mets", level: "patient",
@@ -83,25 +84,28 @@ describe("custom data: encoding", () => {
   });
 });
 
+const OWN = (db: string) => "(SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type\n" +
+  "   FROM " + db + ".clinical_data_derived WHERE " + clinicalRecordedSql("attribute_value") + ")";
+
 describe("custom data: the merged clinical table", () => {
-  test("without custom data the SQL is exactly what it always was", () => {
+  test("without custom data it is the study's own rows with a recorded value", () => {
     assert.equal(hasCustomData(), false);
-    assert.equal(clinicalTable("db1", "all"), "db1.clinical_data_derived");
+    assert.equal(clinicalTable("db1", "all"), OWN("db1"));
     assert.equal(clinicalMetaTable("db1"), "db1.clinical_attribute_meta");
     const sql = compileCohortDef({ all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Glioma"] }] }, { study: "s1", db: "db1" });
     assert.ok(!sql.includes("_custom_"));
   });
   test("with it, only statements that read a custom attribute get the union", () => withCustomData(ctx(), async () => {
     assert.equal(hasCustomData(), true);
-    assert.equal(clinicalTable("db1", ["CANCER_TYPE"]), "db1.clinical_data_derived");
-    assert.match(clinicalTable("db1", "all"), /UNION ALL[\s\S]*FROM _custom_clinical\)$/);
+    assert.equal(clinicalTable("db1", ["CANCER_TYPE"]), OWN("db1"));
+    assert.match(clinicalTable("db1", "all"), /UNION ALL[\s\S]*FROM _custom_clinical WHERE [^\n]*\)$/);
     const one = clinicalTable("db1", ["custom:brain-mets/KPS"]);
-    assert.match(one, /FROM _custom_clinical_[0-9a-f]{8}\)$/);
+    assert.match(one, /FROM _custom_clinical_[0-9a-f]{8} WHERE [^\n]*\)$/);
     const ext = customExternalsFor("SELECT 1 FROM " + one, "a");
     assert.equal(ext.length, 1);
     assert.equal(ext[0].data, "s1\tpatient\tcustom:brain-mets/KPS\t80\ts1_P-1\t\n");
     // a database not entitled to the rows is left alone
-    assert.equal(clinicalTable("other_db", "all"), "other_db.clinical_data_derived");
+    assert.equal(clinicalTable("other_db", "all"), OWN("other_db"));
   }));
   test("a cohort leaf on a custom attribute compiles against the merged table", () => withCustomData(ctx(), async () => {
     const sql = compileCohortDef({ all: [{ kind: "clinical", attribute: "custom:brain-mets/MET_SITE", values: ["Brain"] }] }, { study: "s1", db: "db1" });

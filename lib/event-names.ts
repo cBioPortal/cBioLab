@@ -85,6 +85,14 @@ export function clinicalValueFoldSql(expr: string): string {
   return "lowerUTF8(trimBoth(" + expr + "))";
 }
 
+/** the folded spellings cBioPortal's study view reads as "no value recorded" (its isAttributeValueNA): empty, NA, N/A, NaN */
+export const CLINICAL_MISSING_VALUES: readonly string[] = ["", "na", "n/a", "nan"];
+
+/** true when a clinical value is recorded: not one of CLINICAL_MISSING_VALUES, folded as clinicalValueFoldSql folds */
+export function clinicalRecordedSql(expr: string): string {
+  return clinicalValueFoldSql(expr) + " NOT IN (" + CLINICAL_MISSING_VALUES.map((v) => "'" + v + "'").join(", ") + ")";
+}
+
 /** One canonical event name and the spellings that folded into it. */
 export interface FoldedName {
   /** the grouping key — lowercase, trimmed */

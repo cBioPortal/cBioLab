@@ -35,7 +35,8 @@ mut AS (
 ),
 msi AS (
   SELECT replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') AS pid, max(multiIf(if(isFinite(ifNull(toFloat64OrNull(trimBoth(attribute_value)), nan)), toFloat64OrNull(trimBoth(attribute_value)), NULL) IS NULL OR if(isFinite(ifNull(toFloat64OrNull(trimBoth(attribute_value)), nan)), toFloat64OrNull(trimBoth(attribute_value)), NULL) < 0, 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(attribute_value)), nan)), toFloat64OrNull(trimBoth(attribute_value)), NULL) >= 10, 2, if(isFinite(ifNull(toFloat64OrNull(trimBoth(attribute_value)), nan)), toFloat64OrNull(trimBoth(attribute_value)), NULL) < 3, 1, 0)) AS m
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018' AND attribute_name = 'MSI_SENSOR_SCORE' AND (type = 'sample' AND replaceOne(sample_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT pid FROM cohort))
   GROUP BY pid
 ),
@@ -48,7 +49,8 @@ cls AS (
 ),
 grp AS (
   SELECT replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') AS pid, if(uniqExact(lowerUTF8(trimBoth(attribute_value))) > 1, 'Multiple', any(trimBoth(attribute_value))) AS g
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018' AND attribute_name = 'SUBTYPE' AND trimBoth(attribute_value) != ''
     AND (type = 'sample' AND replaceOne(sample_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT pid FROM cohort))
   GROUP BY pid
@@ -59,7 +61,8 @@ SELECT cls.cls AS cls, cls.why AS why, grp.g AS grp, count() AS n FROM cls LEFT 
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018')
 SELECT attribute_name AS attribute, uniqExact(replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '')) AS patients, uniqExact(attribute_value) AS nvalues, arraySort(groupUniqArray(8)(attribute_value)) AS examples
-FROM snapshot_db.clinical_data_derived
+FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
 WHERE cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018' AND positionCaseInsensitive(attribute_name, 'MSI') > 0 AND trimBoth(attribute_value) != ''
   AND (type = 'sample' AND replaceOne(sample_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT pid FROM cohort))
 GROUP BY attribute ORDER BY patients DESC
@@ -96,7 +99,8 @@ mut AS (
 ),
 msi AS (
   SELECT replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') AS pid, max(multiIf(if(isFinite(ifNull(toFloat64OrNull(trimBoth(attribute_value)), nan)), toFloat64OrNull(trimBoth(attribute_value)), NULL) IS NULL OR if(isFinite(ifNull(toFloat64OrNull(trimBoth(attribute_value)), nan)), toFloat64OrNull(trimBoth(attribute_value)), NULL) < 0, 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(attribute_value)), nan)), toFloat64OrNull(trimBoth(attribute_value)), NULL) >= 10, 2, if(isFinite(ifNull(toFloat64OrNull(trimBoth(attribute_value)), nan)), toFloat64OrNull(trimBoth(attribute_value)), NULL) < 3, 1, 0)) AS m
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018' AND attribute_name = 'MSI_SENSOR_SCORE' AND (type = 'sample' AND replaceOne(sample_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT pid FROM cohort))
   GROUP BY pid
 ),
@@ -109,7 +113,8 @@ cls AS (
 ),
 grp AS (
   SELECT replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') AS pid, if(uniqExact(lowerUTF8(trimBoth(attribute_value))) > 1, 'Multiple', any(trimBoth(attribute_value))) AS g
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018' AND attribute_name = 'SUBTYPE' AND trimBoth(attribute_value) != ''
     AND (type = 'sample' AND replaceOne(sample_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort) OR type = 'patient' AND replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT pid FROM cohort))
   GROUP BY pid
@@ -117,7 +122,8 @@ grp AS (
 os AS (
   SELECT replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') AS pid, if(lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND lowerUTF8(trimBoth(ifNull(anyIf(attribute_value, attribute_name = 'OS_MONTHS'), ''))) NOT IN ('[not applicable]', '[not available]', '[pending]', '[discrepancy]', '[completed]', '[null]', '', 'na') AND if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL) >= 0, if(isFinite(ifNull(toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), nan)), toFloat64OrNull(trimBoth(anyIf(attribute_value, attribute_name = 'OS_MONTHS'))), NULL), NULL) AS months,
          if(if(isFinite(ifNull(toFloat64OrNull(trimBoth(splitByChar(':', ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))[1])), nan)), toFloat64OrNull(trimBoth(splitByChar(':', ifNull(anyIf(attribute_value, attribute_name = 'OS_STATUS'), ''))[1])), NULL) = 1, 1, 0) AS dead
-  FROM snapshot_db.clinical_data_derived
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018' AND type = 'patient' AND attribute_name IN ('OS_MONTHS', 'OS_STATUS')
     AND replaceOne(patient_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT pid FROM cohort)
   GROUP BY pid

@@ -15,7 +15,9 @@ shortcut that gives a plausible wrong number), the trap is named.
   `"<study>:<id>"`.
 - **Clinical attribute** — a column of clinical data (`SEX`, `AGE`, `OS_MONTHS`, `CANCER_TYPE`),
   numeric or categorical. Vocabularies are each study's own and are not harmonised across studies;
-  a view over several says so.
+  a view over several says so. A value spelled as missing (empty, `NA`, `N/A`, `NaN`, any case) is
+  no value, as in cBioPortal's study view: `clinicalRecordedSql` in `lib/event-names.ts`, applied
+  by `clinicalTable` (`lib/custom-data.ts`) to every read.
 - **Survival endpoint** — a pair `<X>_MONTHS` / `<X>_STATUS` (overall survival is `OS_*`). A study
   with no such pair cannot fit survival or Cox (`noSurvivalWhy` in `app/lab/use-view-options.ts`).
   A patient enters a survival analysis only with both a status and a months value (neither a missing
