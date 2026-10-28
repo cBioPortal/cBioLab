@@ -28,7 +28,9 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
 }) {
   const [listOpen, setListOpen] = useState(false);
   const p = a.patient;
-  const marks = useMemo(() => sampleMarks(p?.samples || [], []), [p]);
+  const allMarks = useMemo(() => sampleMarks(p?.samples || [], []), [p]);
+  // the samples the tables read, each keeping its number among all the patient's (the portal's sample view)
+  const marks = useMemo(() => p?.shown ? new Map([...allMarks].filter(([id]) => p.shown!.includes(id))) : allMarks, [p, allMarks]);
   const go = (to: PatientKey | null | undefined) => { if (to && !updating) patch({ patient: to }); };
   const isSel = (row: { study: string; patient: string }) => p != null && row.study === p.study && row.patient === p.id;
   // a table's query goes to its own key, keeping its page size; an empty one leaves the key out

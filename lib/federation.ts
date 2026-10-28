@@ -1252,6 +1252,8 @@ export interface PeerRowsRequest {
   limit?: number; offset?: number; column?: string; patient?: string;
   /** a table of one patient's: whose, and the order of their samples (the Samples column's) */
   subject?: { patient: string; order?: string[] };
+  /** the alterations tables: every sample of a patient (default) or only the cohort's */
+  samples?: "patient" | "cohort";
   /** the OncoKB version this instance annotates with, for the tables that carry OncoKB's call */
   oncokbPin?: string | null;
 }
@@ -1259,6 +1261,8 @@ export interface PeerRowsAnswer {
   rows?: ChRow[]; counts?: { cohort: string; study: string; n: number; all: number }[]; values?: ChRow[]; rank?: number | null;
   /** the OncoKB version the peer annotated its rows with (null: not annotated) */
   oncokbPin?: string | null;
+  /** which samples the peer read, echoed so a peer that ignored the request is caught */
+  samples?: "patient" | "cohort";
 }
 export function hasPatientTimeline(r: Resolver): r is Resolver & PatientTimelineCapable {
   return typeof (r as unknown as Partial<PatientTimelineCapable>).patientTimeline === "function";
