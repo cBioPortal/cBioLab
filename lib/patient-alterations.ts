@@ -7,7 +7,7 @@ import { sq } from "./compiler.ts";
 import type { QueryColumn, RowSource } from "./table-query.ts";
 import type { TablePart } from "./mutation-table.ts";
 import { patientSamplesSql } from "./patient-timeline.ts";
-import { inCohortPatients } from "./cohort2.ts";
+import { inCohortPatients, inCohortSamples } from "./cohort2.ts";
 
 /** The view's three tables, in the portal's order. */
 export const ALTERATION_TABLES = ["mutations", "cna", "sv"] as const;
@@ -90,6 +90,16 @@ const annSelect = (pin: string | null) => pin
   ? "ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv"
   : "'' AS oncogenicity, '' AS level, toUInt8(0) AS drv";
 
+/**
+ * Which of the patient's samples a table reads: every one ("patient", cBioPortal's patient view) or
+ * only those in the cohort ("cohort", its sample view — a cohort of one sample shows that sample).
+ */
+export type AlterationSamples = "patient" | "cohort";
+/** the cohort as a CTE, when a table reads only the cohort's samples */
+const cohortCte = (p: TablePart, samples: AlterationSamples) => samples === "cohort" ? "ck AS (" + p.cohortSql + "),\n" : "";
+/** `AND <sample id> is one of the cohort's`, when a table reads only the cohort's samples */
+const onlyCohort = (sampleIdExpr: string, samples: AlterationSamples, cte = "ck") => samples === "cohort" ? " AND " + inCohortSamples(sampleIdExpr, cte) : "";
+
 /** The rows' labels: the part's cohort and study, the patient, and the first sample (the row's `sample`). */
 const labels = (p: TablePart, patient: string) => sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, 0 AS ord, " + sq(patient) + " AS patient, splitByString(', ', g.samples)[1] AS sid";
 
@@ -102,15 +112,15 @@ const labels = (p: TablePart, patient: string) => sq(p.cohort) + " AS cohort, " 
  * driver first, then by name — and within a gene by the first sample carrying the row (`order`, the
  * patient's sample order), then codon.
  */
-export function patientMutationsSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[]): RowSource {
-  const st = sq(p.study), uid = sq(p.study + "_" + patient);
+export function patientMutationsSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient"): RowSource {
+  const st = sq(p.study), pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
   return {
-    with: "WITH m AS (\n" +
+    with: "WITH " + cohortCte(p, samples) + "m AS (\n" +
       "  SELECT sampleId AS sid, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,\n" +
       "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon,\n" +
       "         if(tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f\n" +
       "  FROM " + db + ".mutation_derived\n" +
-      "  WHERE studyId = " + st + " AND patientId = " + sq(patient) + " AND molecularProfileId NOT LIKE '%uncalled%'\n" +
+      "  WHERE studyId = " + st + " AND patientId = " + sq(patient) + " AND molecularProfileId NOT LIKE '%uncalled%'" + onlyCohort("sampleId", samples) + "\n" +
       "),\n" +
       "g AS (\n" +
       "  SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, " + sampleCols(order) + ",\n" +
@@ -120,7 +130,7 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       (pin ? oncokbCte(pin, "MUTATION", "SELECT gene FROM g") : "") +
       "cn AS (SELECT hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupUniqArray(if(cna_alteration > 0, 'AMP', 'HOMDEL'))), ', ') AS copy\n" +
       "  FROM " + db + ".genomic_event_derived WHERE cancer_study_identifier = " + st + " AND patient_unique_id = " + uid + "\n" +
-      "    AND variant_type = 'cna' AND abs(cna_alteration) >= 2 AND hugo_gene_symbol IN (SELECT gene FROM g) GROUP BY gene),\n" +
+      "    AND variant_type = 'cna' AND abs(cna_alteration) >= 2 AND hugo_gene_symbol IN (SELECT gene FROM g)" + onlyCohort("replaceOne(sample_unique_id, " + pre + ", '')", samples) + " GROUP BY gene),\n" +
       "fa AS (SELECT hugo_gene_symbol AS gene, uniqExact(sample_unique_id) AS n FROM " + db + ".genomic_event_derived\n" +
       "  WHERE cancer_study_identifier = " + st + " AND variant_type = 'mutation' AND genetic_profile_stable_id NOT LIKE '%uncalled%'\n" +
       "    AND hugo_gene_symbol IN (SELECT gene FROM g) GROUP BY gene),\n" +
@@ -147,13 +157,13 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
  * share of the study's samples profiled for the gene with the same call (Cohort %). With no sort,
  * genes with a driver call first, then by gene, then by the first sample carrying the call (`order`).
  */
-export function patientCnaSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[]): RowSource {
+export function patientCnaSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient"): RowSource {
   const st = sq(p.study), pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
   return {
-    with: "WITH c AS (\n" +
+    with: "WITH " + cohortCte(p, samples) + "c AS (\n" +
       "  SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, hugo_gene_symbol AS gene, cna_alteration AS alt, cna_cytoband AS cytoband\n" +
       "  FROM " + db + ".genomic_event_derived\n" +
-      "  WHERE cancer_study_identifier = " + st + " AND patient_unique_id = " + uid + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2\n" +
+      "  WHERE cancer_study_identifier = " + st + " AND patient_unique_id = " + uid + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2" + onlyCohort("replaceOne(sample_unique_id, " + pre + ", '')", samples) + "\n" +
       "),\n" +
       "g AS (SELECT gene, alt, any(cytoband) AS cytoband, " + sampleCols(order) + " FROM c GROUP BY gene, alt),\n" +
       (pin ? oncokbCte(pin, "CNA", "SELECT gene FROM g") : "") +
@@ -187,9 +197,9 @@ const patientSamples = (db: string, study: string, patient: string) =>
  * highest supporting read counts among those samples. With no sort, by the first gene, then by the first
  * sample carrying the event (`order`), then the second gene.
  */
-export function patientSvSource(p: TablePart, patient: string, db: string, order: string[]): RowSource {
+export function patientSvSource(p: TablePart, patient: string, db: string, order: string[], samples: AlterationSamples = "patient"): RowSource {
   return {
-    with: "WITH s AS (\n" +
+    with: "WITH " + cohortCte(p, samples) + "s AS (\n" +
       "  SELECT smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,\n" +
       "         ifNull(sv.class, '') AS class, ifNull(sv.event_info, '') AS eventInfo, sv.breakpoint_type AS breakpointType, sv.connection_type AS connectionType,\n" +
       "         sv.site2_effect_on_frame AS frame, sv.site1_description AS site1, sv.site2_description AS site2,\n" +
@@ -201,7 +211,7 @@ export function patientSvSource(p: TablePart, patient: string, db: string, order
       "  JOIN " + db + ".sample smp ON smp.internal_id = sv.sample_id\n" +
       "  LEFT JOIN " + db + ".gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id\n" +
       "  LEFT JOIN " + db + ".gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id\n" +
-      "  WHERE sv.sample_id IN (" + patientSamples(db, p.study, patient) + ")\n" +
+      "  WHERE sv.sample_id IN (" + patientSamples(db, p.study, patient) + ")" + onlyCohort("smp.stable_id", samples) + "\n" +
       "),\n" +
       "g AS (\n" +
       "  SELECT gene1, gene2, class, eventInfo, pos1, pos2, " + sampleCols(order) + ",\n" +
@@ -220,9 +230,11 @@ export function patientSvSource(p: TablePart, patient: string, db: string, order
 
 /** One patient's samples with their SAMPLE_TYPE — what numbers and colours the Samples column's markers. */
 export const PATIENT_SAMPLE_COLUMNS: QueryColumn[] = [text("sid", "Sample ID"), text("type", "Sample Type")];
-export function patientSamplesSource(p: TablePart, patient: string, db: string): RowSource {
+export function patientSamplesSource(p: TablePart, patient: string, db: string, samples: AlterationSamples = "patient"): RowSource {
   return {
-    with: "WITH s AS (" + patientSamplesSql(p.study, patient, db) + "),\n" +
+    with: "WITH " + cohortCte(p, samples) + "s AS (" + (samples === "cohort"
+      ? "SELECT * FROM (" + patientSamplesSql(p.study, patient, db) + ") WHERE " + inCohortSamples("id", "ck")
+      : patientSamplesSql(p.study, patient, db)) + "),\n" +
       "rows AS (SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, 0 AS ord, " + sq(patient) + " AS patient, s.id AS sid, ifNull(s.type, '') AS type FROM s)\n",
     columns: PATIENT_SAMPLE_COLUMNS,
     select: "*",
@@ -232,8 +244,8 @@ export function patientSamplesSource(p: TablePart, patient: string, db: string):
 }
 
 /** A table's row source for one patient of `p`'s study. */
-export function alterationSource(table: AlterationTable, p: TablePart, patient: string, db: string, pin: string | null, order: string[]): RowSource {
-  return table === "mutations" ? patientMutationsSource(p, patient, db, pin, order) : table === "cna" ? patientCnaSource(p, patient, db, pin, order) : patientSvSource(p, patient, db, order);
+export function alterationSource(table: AlterationTable, p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient"): RowSource {
+  return table === "mutations" ? patientMutationsSource(p, patient, db, pin, order, samples) : table === "cna" ? patientCnaSource(p, patient, db, pin, order, samples) : patientSvSource(p, patient, db, order, samples);
 }
 
 /**
@@ -241,10 +253,10 @@ export function alterationSource(table: AlterationTable, p: TablePart, patient: 
  * rows each of the three tables would list for them — counted as the tables count (a variant, a
  * gene's call, an event, however many samples carry it). A patient with nothing called is listed:
  * the list is the cohort's patients, the owners of its samples. Like the patient's own tables, the
- * counts cover all of a patient's samples, not only the cohort's. Patients with any alteration
- * first, then by patient id. All parts must live in this database.
+ * counts cover all of a patient's samples, or with `samples: "cohort"` only the cohort's. Patients
+ * with any alteration first, then by patient id. All parts must live in this database.
  */
-export function alterationPatientRowSource(parts: AlterationPart[], db: string): RowSource {
+export function alterationPatientRowSource(parts: AlterationPart[], db: string, samples: AlterationSamples = "patient"): RowSource {
   if (!parts.length) throw new Error("alterationPatientRowSource needs at least one part");
   const ctes: string[] = [], rows: string[] = [];
   parts.forEach((p, i) => {
@@ -253,19 +265,19 @@ export function alterationPatientRowSource(parts: AlterationPart[], db: string):
       "c" + i + " AS (" + p.cohortSql + "),\n" +
       "sm" + i + " AS (\n" +
       "  SELECT replaceOne(patient_unique_id, " + pre + ", '') AS pid, uniqExact(sample_unique_id) AS n FROM " + db + ".sample_derived\n" +
-      "  WHERE cancer_study_identifier = " + st + " AND " + inCohortPatients("replaceOne(patient_unique_id, " + pre + ", '')", "c" + i) + "\n" +
+      "  WHERE cancer_study_identifier = " + st + " AND " + inCohortPatients("replaceOne(patient_unique_id, " + pre + ", '')", "c" + i) + onlyCohort("replaceOne(sample_unique_id, " + pre + ", '')", samples, "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n" +
       "mu" + i + " AS (\n" +
       "  SELECT patientId AS pid, uniqExact(tuple(`GENE.hugoGeneSymbol`, proteinChange, mutationType, variantType, chr, startPosition, endPosition, referenceAllele, tumorSeqAllele)) AS n\n" +
       "  FROM " + db + ".mutation_derived\n" +
-      "  WHERE studyId = " + st + " AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortPatients("patientId", "c" + i) + "\n" +
+      "  WHERE studyId = " + st + " AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortPatients("patientId", "c" + i) + onlyCohort("sampleId", samples, "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n" +
       "cn" + i + " AS (\n" +
       "  SELECT replaceOne(patient_unique_id, " + pre + ", '') AS pid, uniqExact(hugo_gene_symbol, cna_alteration) AS n FROM " + db + ".genomic_event_derived\n" +
       "  WHERE cancer_study_identifier = " + st + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2\n" +
-      "    AND " + inCohortPatients("replaceOne(patient_unique_id, " + pre + ", '')", "c" + i) + "\n" +
+      "    AND " + inCohortPatients("replaceOne(patient_unique_id, " + pre + ", '')", "c" + i) + onlyCohort("replaceOne(sample_unique_id, " + pre + ", '')", samples, "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n" +
       "sv" + i + " AS (\n" +
@@ -274,7 +286,7 @@ export function alterationPatientRowSource(parts: AlterationPart[], db: string):
       "  JOIN " + db + ".sample s ON s.internal_id = sv.sample_id\n" +
       "  JOIN " + db + ".patient p ON p.internal_id = s.patient_id\n" +
       "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-      "  WHERE cs.cancer_study_identifier = " + st + " AND " + inCohortPatients("p.stable_id", "c" + i) + "\n" +
+      "  WHERE cs.cancer_study_identifier = " + st + " AND " + inCohortPatients("p.stable_id", "c" + i) + onlyCohort("s.stable_id", samples, "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n");
     rows.push(

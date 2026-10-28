@@ -337,10 +337,13 @@ const patientRows: FederationOp = {
     patient: z.string().max(80).nullish(),
     // for a table of one patient's: whose, and their samples' order (the Samples column's)
     subject: z.object({ patient: z.string().max(80), order: z.array(z.string().max(120)).max(500).nullish() }).nullish(),
+    // the alterations tables: every sample of a patient, or only the cohort's
+    samples: z.enum(["patient", "cohort"]).nullish(),
     // the OncoKB version the caller annotates with, used unless this instance pins its own (ONCOKB_PIN)
     oncokbPin: z.string().max(40).nullish(),
   }),
-  async run({ study, table, parts, source, query, defaults, mode, limit, offset, column, patient, subject, oncokbPin }: { study: string; table: PeerTable; parts: { cohort: string; cohortDef: any }[]; source: string; query?: any; defaults: string[]; mode: "page" | "counts" | "values" | "rank"; limit?: number | null; offset?: number | null; column?: string | null; patient?: string | null; subject?: { patient: string; order?: string[] | null } | null; oncokbPin?: string | null }) {
+  async run({ study, table, parts, source, query, defaults, mode, limit, offset, column, patient, subject, samples, oncokbPin }: { study: string; table: PeerTable; parts: { cohort: string; cohortDef: any }[]; source: string; query?: any; defaults: string[]; mode: "page" | "counts" | "values" | "rank"; limit?: number | null; offset?: number | null; column?: string | null; patient?: string | null; subject?: { patient: string; order?: string[] | null } | null; samples?: "patient" | "cohort" | null; oncokbPin?: string | null }) {
+    const scope = samples === "cohort" ? "cohort" : "patient";
     if (parts.some((p) => carriesPatientIds(p.cohortDef)))
       throw new Error("a cohort contains an explicit sample or patient list; identifier lists are not accepted across instances");
     const t = TABLES[table];
@@ -360,9 +363,9 @@ const patientRows: FederationOp = {
     const pin = annotated ? process.env.ONCOKB_PIN || oncokbPin || null : null;
     const src: (db: string) => RowSource =
       table === "timeline" ? (db) => timelinePatientRowSource(sourced, db)
-      : table === "alterations" ? (db) => alterationPatientRowSource(sourced, db)
-      : table === "alterations:samples" ? (db) => patientSamplesSource(sourced[0], subject!.patient, db)
-      : (db) => alterationSource(table.slice("alterations:".length) as "mutations" | "cna" | "sv", sourced[0], subject!.patient, db, pin, subject!.order || []);
+      : table === "alterations" ? (db) => alterationPatientRowSource(sourced, db, scope)
+      : table === "alterations:samples" ? (db) => patientSamplesSource(sourced[0], subject!.patient, db, scope)
+      : (db) => alterationSource(table.slice("alterations:".length) as "mutations" | "cna" | "sv", sourced[0], subject!.patient, db, pin, subject!.order || [], scope);
     const tag = table + ":" + mode;
     let out: Record<string, unknown>;
     if (mode === "counts") out = { counts: await res.rowsCounts(tag, src, q, defaults) };
@@ -373,7 +376,7 @@ const patientRows: FederationOp = {
       if (!patient || !PATIENT_ID.test(patient)) throw new Error("rank needs a patient id");
       out = { rank: await res.rowsRank(tag, src, q, defaults, s, patient) };
     } else out = { rows: (await res.rowsPage(tag, src, q, defaults, limit || 25, offset || 0)).rows };
-    return { table, ...out, ...(annotated ? { oncokbPin: pin } : {}), queries: hideSql() ? null : res.queries, source: await peerSource(s) };
+    return { table, ...out, ...(annotated ? { oncokbPin: pin } : {}), ...(table !== "timeline" ? { samples: scope } : {}), queries: hideSql() ? null : res.queries, source: await peerSource(s) };
   }
 };
 

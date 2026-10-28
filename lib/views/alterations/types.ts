@@ -21,6 +21,11 @@ export interface AlterationsView extends TableQuery {
   patient?: { study: string; id: string };
   /** patients per page of the list (default 25, at most 1000) */
   rows?: number;
+  /**
+   * which of the patient's samples the tables read: every one ("patient", the default — cBioPortal's
+   * patient view) or only the cohort's ("cohort" — its sample view, for a cohort of one sample)
+   */
+  samples?: "patient" | "cohort";
   /** each table's own query (the top-level columns/search/filters/sort are the patient list's) */
   mutations?: AlterationTableQuery;
   cna?: AlterationTableQuery;
@@ -28,7 +33,10 @@ export interface AlterationsView extends TableQuery {
 }
 export interface AlterationsResult extends TableRows<string | number | null> {
   /** the patient listed, with their samples (none on a page request), or null when the list is empty */
-  patient: { study: string; id: string; samples: PatientSample[]; source?: { label: string; remote: boolean } } | null;
+  patient: { study: string; id: string; samples: PatientSample[];
+    /** with samples: "cohort", the samples the tables read (the cohort's); `samples` is every sample of the patient, which numbers them */
+    shown?: string[];
+    source?: { label: string; remote: boolean } } | null;
   /** where that patient falls in the list's order, and the patients either side (as the timeline's) */
   position?: TimelineResult["position"];
   /** the patient's three tables; on a page or values request, only the one asked for */

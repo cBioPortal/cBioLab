@@ -56,6 +56,8 @@ export interface KindCardCtx {
   docJson?: () => string;
   /** settings the surrounding page controls for every view at once (a portal tab's gene chips), so not offered here */
   locked?: string[];
+  /** the page shows one patient (the Patient page): a patient view draws them without the navigator through the cohort's others */
+  fixedPatient?: boolean;
 }
 
 /** The add-view dialog's categories, in its sidebar's order. */

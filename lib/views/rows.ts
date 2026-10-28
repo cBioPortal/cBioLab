@@ -47,7 +47,7 @@ export type Rows = { rows: Record<string, unknown>[]; lists: { cohort: string; s
  * patient falls in the order and its neighbours (the timeline's prev / next). With `remote`, a
  * study whose peer may serve this table (`of`) has its rows paged by that peer, as `table`.
  */
-export type RemoteRows = { of: (r: Resolver) => RemotePatientRows | null; table: PeerRowsRequest["table"]; subject?: PeerRowsRequest["subject"];
+export type RemoteRows = { of: (r: Resolver) => RemotePatientRows | null; table: PeerRowsRequest["table"]; subject?: PeerRowsRequest["subject"]; samples?: PeerRowsRequest["samples"];
   oncokbPin?: string | null; onAnswer?: (a: { oncokbPin?: string | null }) => void };
 export async function runRows(ctx: ViewRun, label: string, holders: string[], q: TableQuery, defaults: string[], shown: string[], size: number,
   source: (parts: TablePart[], reads: string[] | "all") => (db: string) => RowSource, values?: { column: string; numeric: boolean },
@@ -69,7 +69,7 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
   const peer = (r: RemotePatientRows, rr: RemoteRows): Backend => {
     const ask = async (parts: TablePart[], req: Pick<PeerRowsRequest, "mode" | "limit" | "offset" | "column" | "patient">) => {
       const a = await r.patientRows({ table: rr.table, parts: parts.map((p) => ({ cohort: p.cohort, def: ctx.doc.cohorts[p.cohort] })), query: q, defaults,
-        ...req, ...(rr.subject ? { subject: rr.subject } : {}), ...(rr.oncokbPin ? { oncokbPin: rr.oncokbPin } : {}) });
+        ...req, ...(rr.subject ? { subject: rr.subject } : {}), ...(rr.samples ? { samples: rr.samples } : {}), ...(rr.oncokbPin ? { oncokbPin: rr.oncokbPin } : {}) });
       rr.onAnswer?.(a);
       return a;
     };

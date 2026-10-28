@@ -497,6 +497,7 @@ export class RemotePatientResolver extends RemoteAggregateResolver implements Re
       query: req.query, defaults: req.defaults, mode: req.mode,
       ...(req.limit != null ? { limit: req.limit } : {}), ...(req.offset != null ? { offset: req.offset } : {}), ...(req.column ? { column: req.column } : {}),
       ...(req.patient ? { patient: req.patient } : {}), ...(req.subject ? { subject: req.subject } : {}), ...(req.oncokbPin ? { oncokbPin: req.oncokbPin } : {}),
+      ...(req.samples === "cohort" ? { samples: req.samples } : {}),
     }), kind);
     // the table the peer answered with: a peer on a build from before named tables answers every call with the
     // timeline's list and names none, so anything else it sends without saying so is refused rather than shown
@@ -504,6 +505,9 @@ export class RemotePatientResolver extends RemoteAggregateResolver implements Re
     if (served !== req.table)
       throw new Error("the peer serving " + this.study + " answered with " + String(served).slice(0, 40) + " rows when asked for " + req.table +
         "; it predates sharing " + PATIENT_KIND_NAMES[kind] + " — update that instance");
+    // a peer that read every sample when asked for the cohort's alone would list samples outside the cohort
+    if (req.samples === "cohort" && (r as { samples?: unknown }).samples !== "cohort")
+      throw new Error("the peer serving " + this.study + " did not limit " + req.table + " to the cohort's samples; it predates that setting — update that instance");
     if (Array.isArray(r.queries)) for (const q of r.queries) this.queries.push({ label: q.label, sql: q.sql, ms: q.ms, remote: true });
     // what the peer answered for is what it was asked about: its own study, the asked cohorts — and a table of one patient's, that patient
     const cohorts = new Set(req.parts.map((p) => p.cohort));

@@ -5,7 +5,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
   ALTERATION_TABLES, ALTERATION_COLUMNS, ALTERATION_DEFAULT_COLUMNS, ALTERATION_PATIENT_COLUMNS, ALTERATION_PATIENT_DEFAULT_COLUMNS,
-  alterationSource, alterationPatientRowSource,
+  alterationSource, alterationPatientRowSource, patientSamplesSource,
 } from "../lib/patient-alterations.ts";
 import { checkQuery, countsSql, pageSql, rankSql, valuesSql } from "../lib/table-query.ts";
 
@@ -44,6 +44,22 @@ describe("the alterations view's tables", () => {
     }
     assert.match(alterationSource("mutations", part, "P-1", "db", null, []).with, /NOT LIKE '%uncalled%'/, "uncalled calls are left out, as the portal leaves them out");
     assert.match(alterationSource("cna", part, "P-1", "db", null, []).with, /abs\(cna_alteration\) >= 2/, "the deep calls only");
+  });
+  test("samples: \"cohort\" reads only the cohort's samples, in every table and in the patient list's counts", () => {
+    const inCohort = /IN \(SELECT sid FROM ck\)/;
+    for (const t of ALTERATION_TABLES) {
+      assert.doesNotMatch(alterationSource(t, part, "P-1", "db", null, []).with, /SELECT sid FROM/, t + ": every sample by default");
+      const sql = alterationSource(t, part, "P-1", "db", "v7.5", [], "cohort").with;
+      assert.match(sql, /ck AS \(SELECT 'P-1' AS pid\)/, t + ": the cohort is a CTE");
+      assert.match(sql, inCohort, t);
+    }
+    // the mutations table's Copy # column reads the same samples as its rows
+    assert.equal(alterationSource("mutations", part, "P-1", "db", null, [], "cohort").with.match(/IN \(SELECT sid FROM ck\)/g)!.length, 2);
+    assert.match(patientSamplesSource(part, "P-1", "db", "cohort").with, /\) WHERE id IN \(SELECT sid FROM ck\)/);
+    assert.doesNotMatch(patientSamplesSource(part, "P-1", "db").with, /SELECT sid FROM/);
+    const list = alterationPatientRowSource([{ ...part, source: "here" }], "db", "cohort").with;
+    assert.equal(list.match(/IN \(SELECT sid FROM c0\)/g)!.length, 4, "samples, mutations, copy number and structural variants all counted over the cohort's samples");
+    assert.doesNotMatch(alterationPatientRowSource([{ ...part, source: "here" }], "db").with, /SELECT sid FROM/);
   });
   test("with no sort a gene's rows sit together, then follow the patient's sample order", () => {
     const order = ["P-1-T03", "P-1-T01"];

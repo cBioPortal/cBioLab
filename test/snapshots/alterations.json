@@ -950,7 +950,7 @@
           {
             "kind": "fetch",
             "title": "Count the patients per cohort and study",
-            "detail": "The alterations:counts query above: every patient of each cohort, with their sample count and how many rows each of the three tables lists for them (a mutation, a gene's deep copy-number call, a structural variant — each counted once however many samples carry it).",
+            "detail": "The alterations:counts query above: every patient of each cohort, with the count of the patient's samples and how many rows each of the three tables lists for them over those samples (a mutation, a gene's deep copy-number call, a structural variant — each counted once however many samples carry it).",
             "params": [
               [
                 "Prostate · msk_chord_2024",
@@ -966,7 +966,7 @@
           {
             "kind": "fetch",
             "title": "Read P-0024249's three tables",
-            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Mutations: every called mutation of the patient's samples (uncalled calls left out), one row per variant with the samples carrying it, the highest allele frequency among them (variant / (variant + reference) reads) with that sample's reads, and the gene's deep copy-number calls in the patient (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event (both genes and breakpoints, class, event info), the highest read counts among its samples. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
+            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, the highest allele frequency among them (variant / (variant + reference) reads) with that sample's reads, and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event (both genes and breakpoints, class, event info), the highest read counts among its samples. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
             "params": [
               [
                 "Mutations",

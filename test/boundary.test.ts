@@ -792,6 +792,32 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     } finally { globalThis.fetch = original; }
   });
 
+  test("a peer asked for the cohort's samples alone must say it limited them, or the answer is refused", async () => {
+    const original = globalThis.fetch;
+    let echo: string | undefined;
+    const sent: unknown[] = [];
+    globalThis.fetch = (async (_u: unknown, init?: { body?: string }) => {
+      sent.push(JSON.parse(String(init?.body || "{}")));
+      return new Response(JSON.stringify({ table: "alterations:mutations", rows: [{ cohort: "c", study: "s", patient: "P-1" }], ...(echo ? { samples: echo } : {}) }),
+        { headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    try {
+      const r = new RemoteTimelineResolver("s", "http://peer.invalid/api/federation/v1", AGG, ["alterations"]);
+      const ask = (samples?: "patient" | "cohort") =>
+        r.patientRows({ table: "alterations:mutations", parts: [{ cohort: "c", def: {} }], query: {}, defaults: [], mode: "page", subject: { patient: "P-1" }, samples });
+      // a peer on an older build ignores the setting and reads every sample of the patient
+      await assert.rejects(() => ask("cohort"), /did not limit alterations:mutations to the cohort's samples[\s\S]*update that instance/);
+      assert.equal((sent.at(-1) as { samples?: string }).samples, "cohort", "the request carries the setting");
+      echo = "patient";
+      await assert.rejects(() => ask("cohort"), /did not limit/);
+      echo = "cohort";
+      assert.equal((await ask("cohort")).rows!.length, 1);
+      echo = undefined;
+      assert.equal((await ask()).rows!.length, 1, "the default needs no echo: every peer reads every sample");
+      assert.equal((sent.at(-1) as { samples?: string }).samples, undefined);
+    } finally { globalThis.fetch = original; }
+  });
+
   test("the patient views ask a peer only through the kind they belong to", () => {
     const read = (f: string) => readFileSync(new URL("../lib/views/" + f.replace(/\.ts$/, "/run.ts"), import.meta.url), "utf8");
     assert.match(read("timeline.ts"), /rowHolders\(ctx, "timeline"\)/);
