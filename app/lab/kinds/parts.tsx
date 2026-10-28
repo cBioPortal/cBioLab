@@ -24,7 +24,7 @@ export function DraftInput({ value, onCommit, disabled, width, placeholder, titl
   const [draft, setDraft] = useState(value);
   useEffect(() => { setDraft(value); }, [value]);
   const commit = () => { if (draft !== value) onCommit(draft); };
-  return <Input type="text" value={draft} disabled={disabled} placeholder={placeholder} title={title} className={FIELD} style={{ width: width || "8rem" }}
+  return <Input type="text" value={draft} disabled={disabled} placeholder={placeholder} data-tip={title} aria-label={title} className={FIELD} style={{ width: width || "8rem" }}
     onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); }} />;
 }
 
@@ -59,12 +59,12 @@ export function CovariateList({ covariates, ratio, observedLevels, busy, attrs, 
             <AxisPicker side={"covariate " + (ci + 1)} axis={c} attrs={attrs}
               catalog={catalog} loading={loading} busy={busy}
               onChange={(next) => onChange(ci, next)} />
-            {levels.length > 1 && <label className="tbfield" title={(ratio === "hazard" ? "the level a hazard ratio" : "the level an odds ratio") + " is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)"}>
+            {levels.length > 1 && <label className="tbfield" data-tip={(ratio === "hazard" ? "the level a hazard ratio" : "the level an odds ratio") + " is measured against; unset uses this covariate's default (mutated/not always compares against 'Not mutated', other categoricals use whichever level is most frequent)"}>
               ref <Choice size="ctl" value={c.reference && levels.includes(c.reference) ? c.reference : ""} disabled={busy}
                 onChange={v => onChange(ci, { ...c, reference: v || undefined })}
                 options={[["", "(default)"], ...levels.map(l => [l, l] as const)]} />
             </label>}
-            <Button type="button" variant="outline" size="sm" className={TB} disabled={busy} title="remove this covariate"
+            <Button type="button" variant="outline" size="sm" className={TB} disabled={busy} data-tip="remove this covariate"
               onClick={() => onRemove(ci)}><X />remove</Button>
           </span>
         );

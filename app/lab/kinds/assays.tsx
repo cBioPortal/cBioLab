@@ -22,7 +22,7 @@ function AssaysBody({ v }: { v: DrawnResultOf<"assays"> }) {
   const color = (g: string) => seriesStyle(Math.max(0, r.groups.indexOf(g))).color;
   const numeric = r.datatype === "numeric";
   const cols: Col<AsRow>[] = [
-    { key: "name", label: "Entity", value: (e) => e.name, render: (e) => <strong title={e.entity}>{e.name}</strong> },
+    { key: "name", label: "Entity", value: (e) => e.name, render: (e) => <strong data-tip={e.entity}>{e.name}</strong> },
     ...r.groups.flatMap((name, i): Col<AsRow>[] => numeric
       ? [{ key: "m" + i, label: name + " mean", num: true, value: (e) => e.cells[i].mean ?? null, render: (e) => e.cells[i].mean == null ? "—" : fmtNum(e.cells[i].mean!) },
          { key: "s" + i, label: name + " SD", num: true, value: (e) => e.cells[i].sd ?? null, render: (e) => e.cells[i].sd == null ? "—" : fmtNum(e.cells[i].sd!) }]
@@ -52,13 +52,13 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="the generic-assay profile whose every entity is compared">
+        <label className="tbfield" data-tip="the generic-assay profile whose every entity is compared">
           profile <OptionSelect value={spec.profileType || ""} disabled={busy} onValueChange={(v) => patch({ profileType: v })}>
             {!c.assays.includes(spec.profileType) && <option value={spec.profileType || ""}>{spec.profileType || "choose…"}</option>}
             {c.assays.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="an entity with fewer values than this in any cohort is counted but not tested">
+        <label className="tbfield" data-tip="an entity with fewer values than this in any cohort is counted but not tested">
           test with ≥ <OptionSelect value={String(spec.minN ?? 3)} disabled={busy} onValueChange={(v) => patch({ minN: Number(v) === 3 ? undefined : Number(v) })}>
             {[2, 3, 5, 10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
           </OptionSelect> per cohort

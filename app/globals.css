@@ -1247,12 +1247,18 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 }
 .onco-trackmenu-name { padding: 0 var(--s1) var(--s0); }
 
-.onco-tip {
-  position: absolute; z-index: 2; pointer-events: none; max-width: 330px;
+/* every tooltip is the same card: a `data-tip`'s text (.tip) and a figure's rich tip (.onco-tip),
+   both from app/_ui/tooltip.tsx */
+.tip, .onco-tip {
+  position: fixed; z-index: 1000; pointer-events: none; max-width: 330px;
   padding: var(--s1) var(--s2); font-size: var(--t-md);
   background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-sm);
   box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
 }
+.tip { white-space: pre-line; overflow-wrap: anywhere; }
+/* a tip the pointer can enter (useHoverTip): its links are clickable */
+.onco-tip.live { pointer-events: auto; }
+.onco-tip .tip-link { display: inline-block; margin-top: var(--s1); color: var(--accent-ink); }
 .onco-tip .dim { color: var(--muted); }
 .onco-tip .lead { font-weight: 600; }
 .onco-tip .mono { font-family: "IBM Plex Mono", monospace; font-size: var(--t-sm); }

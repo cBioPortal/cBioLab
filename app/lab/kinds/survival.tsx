@@ -15,7 +15,7 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
     {v.kind === "survival" && v.curves && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} {...placement(ctx, vi)}
         sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
-        chips={v.truncated ? <span className="trunc" title={
+        chips={v.truncated ? <span className="trunc" data-tip={
           "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
           (v.entryMonths ? "\n\nMedian " + v.entryMonths.median + " months from anchor to entry; 90th percentile "
             + v.entryMonths.p90 + "; longest " + v.entryMonths.max + "." : "")}>left-truncated</span> : null} />

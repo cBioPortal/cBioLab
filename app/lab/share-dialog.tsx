@@ -130,7 +130,7 @@ export function ShareDialog({ kind, name, sharing, groups, groupsError, onSave, 
             {err && <p className="error m-0">{err}</p>}
             <DialogFooter className="mt-1 items-center">
               <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={busy || !!why} title={why ?? undefined}>{busy ? "saving…" : "Save"}</Button>
+              <Button type="submit" disabled={busy || !!why} data-tip={why ?? undefined}>{busy ? "saving…" : "Save"}</Button>
             </DialogFooter>
           </form>
         )}

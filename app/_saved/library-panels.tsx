@@ -44,7 +44,7 @@ const byNewest = <T extends { savedAt: string }>(m: Record<string, T>) =>
 /** An own item's sharing, as a small badge that opens the share dialog. */
 function ShareBadge({ sharing, onClick }: { sharing?: Sharing & { groupName: string | null }; onClick: () => void }) {
   const label = sharing ? sharingLabel(sharing) : "only you";
-  return <Button variant="link" size="inline" className="sharebadge text-sm" onClick={onClick} title={"shared with " + label + " — change who"}>
+  return <Button variant="link" size="inline" className="sharebadge text-sm" onClick={onClick} data-tip={"shared with " + label + " — change who"}>
     {sharing && sharing.visibility !== "private" ? "shared: " + label : "share…"}</Button>;
 }
 
@@ -142,7 +142,7 @@ export function CohortsPanel() {
   return <div className="card m-0">
     <div className="row savedbar">
       <Button size="sm" disabled={!picked.length || picked.length > MAX_COHORTS} onClick={analyze}
-        title={!picked.length ? "tick at least one cohort" : picked.length > MAX_COHORTS ? "an analysis takes at most " + MAX_COHORTS + " cohorts"
+        data-tip={!picked.length ? "tick at least one cohort" : picked.length > MAX_COHORTS ? "an analysis takes at most " + MAX_COHORTS + " cohorts"
           : "start an analysis of the ticked cohorts together (replaces the analysis open in the lab)"}>
         Analyze selected
       </Button>
@@ -153,7 +153,7 @@ export function CohortsPanel() {
       {picked.length > 0 && <Button variant="link" size="inline" onClick={() => setPicked([])}>clear</Button>}
       <span className="spacer" />
       <Button variant="outline" size="sm" className={cn(TB, "newlistcohort")} onClick={() => setNewList(true)}
-        title="make a cohort from a pasted list of sample or patient ids, saved straight to your library">
+        data-tip="make a cohort from a pasted list of sample or patient ids, saved straight to your library">
         <Plus />New cohort from a list of ids…</Button>
     </div>
     {err && <p className="error">{err}</p>}

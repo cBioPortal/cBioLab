@@ -105,10 +105,10 @@ function AddCohortBar({ existing, target, ready, error, onAdd, onCancel }: {
           onKeyDown={(e) => { if (e.key === "Enter" && ready && name.trim() && !clash) onAdd(name); }} />
       </label>
       <Button disabled={!ready || !name.trim() || clash} onClick={() => onAdd(name)}
-        title={!ready ? "select a study first" : clash ? "the analysis already has a cohort with this name" : "add this selection to " + target + " as “" + name.trim() + "”"}>
+        data-tip={!ready ? "select a study first" : clash ? "the analysis already has a cohort with this name" : "add this selection to " + target + " as “" + name.trim() + "”"}>
         <Plus />Add to {target}
       </Button>
-      <Button variant="outline" onClick={onCancel} title="close without adding (Esc)">Cancel</Button>
+      <Button variant="outline" onClick={onCancel} data-tip="close without adding (Esc)">Cancel</Button>
       {(clash || error) && <p className="error fullrow flush">{clash ? "the analysis already has a cohort named “" + name.trim() + "”" : error}</p>}
     </div>
   );
@@ -126,10 +126,10 @@ function EditCohortBar({ name, locked, ready, error, onSave, onCancel }: {
       <span className="meta">change its studies and filters below{locked ? " — saving unlocks it, so it follows its new definition" : ""}; its name, note and splits stay</span>
       <span className="spacer" />
       <Button disabled={!ready || saving} onClick={async () => { setSaving(true); try { await onSave(); } finally { setSaving(false); } }}
-        title={ready ? "save these filters over “" + name + "” in your library" : "select a study first"}>
+        data-tip={ready ? "save these filters over “" + name + "” in your library" : "select a study first"}>
         {saving ? <span className="spinner" /> : <Save />}Save changes
       </Button>
-      <Button variant="outline" onClick={onCancel} title="close without saving (Esc)">Cancel</Button>
+      <Button variant="outline" onClick={onCancel} data-tip="close without saving (Esc)">Cancel</Button>
       {error && <p className="error fullrow flush">{error}</p>}
     </div>
   );
@@ -507,7 +507,7 @@ export default function AnalysisPage() {
           {explore && (
             <div className="row mb-4">
               <Button variant="outline" size="sm" onClick={() => setAddChartOpen(true)}><Plus />Add chart</Button>
-              <Button variant="outline" size="sm" title="upload your own annotations and chart, filter and analyse them like clinical attributes"
+              <Button variant="outline" size="sm" data-tip="upload your own annotations and chart, filter and analyse them like clinical attributes"
                 onClick={() => openCustomManager(customState.unlocked && customState.datasets.length ? "manage" : "add")}>
                 <Upload />Custom data{customState.datasets.length ? " (" + customState.datasets.length + ")" : ""}</Button>
               {(() => {
@@ -577,7 +577,7 @@ export default function AnalysisPage() {
         onLogin={requestLogin}
         cells={cellExplorerFor(doc.study || study)}
         onClose={() => setChooser(null)} />
-      {toast && <div className="toast" role="status"><button type="button" title="dismiss" onClick={() => setToast(null)}>{toast}</button></div>}
+      {toast && <div className="toast" role="status"><button type="button" data-tip="dismiss" onClick={() => setToast(null)}>{toast}</button></div>}
       <CustomDataManager tab={exploreState.customTab} setTab={exploreState.setCustomTab} studies={exStudies} onChanged={() => fetchExplore()} />
       <CustomDataDialog focus={cdFocus} onClose={() => setCdFocus(null)}
         bindings={doc.uploads || []}

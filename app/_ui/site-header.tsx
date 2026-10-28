@@ -35,15 +35,15 @@ export function SiteHeader({ page, current, onLink, children }: {
   useOpenSavedFromUrl();
   return (
     <header>
-      <h1><a href="/" className="text-foreground no-underline" title="choose studies, then explore or query them">cbio-lab</a></h1>
-      <span className="sub" title={page}>{page}</span>
+      <h1><a href="/" className="text-foreground no-underline">cbio-lab</a></h1>
+      <span className="sub" data-tip={page}>{page}</span>
       {LINKS.map(([key, href, label]) => (
         <a key={key} className="toplink" href={href} aria-current={key === current ? "page" : undefined}
           onClick={(e) => { if (plainClick(e) && onLink?.(key)) e.preventDefault(); }}>{label}</a>
       ))}
       {children}
       <Button asChild variant="outline" size="sm" className={cn(TB, "savedbtn")} aria-current={current === "saved" ? "page" : undefined}>
-        <a href="/saved" title="your saved cohorts, analyses, uploads, groups and gene lists"
+        <a href="/saved" data-tip="your saved cohorts, analyses, uploads, groups and gene lists"
           onClick={(e) => { if (plainClick(e) && current !== "saved") { e.preventDefault(); saved.open("cohorts"); } }}><Bookmark />Saved work</a>
       </Button>
       <LoginButton />

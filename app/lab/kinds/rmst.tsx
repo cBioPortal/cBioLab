@@ -10,11 +10,11 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">restrict</span>
-        <label className="tbfield" title="months up to which the area under each curve is taken; empty for the largest time every cohort has 10 at risk">
+        <label className="tbfield" data-tip="months up to which the area under each curve is taken; empty for the largest time every cohort has 10 at risk">
           τ <DraftInput value={spec.tau != null ? String(spec.tau) : ""} disabled={busy} width="4rem" placeholder="auto"
             onCommit={(t) => patch({ tau: t.trim() && Number.isFinite(Number(t)) ? Number(t) : undefined })} />
         </label>
-        <label className="tbfield" title="landmarks in months, comma-separated: each keeps the patients still followed then and restarts the clock">
+        <label className="tbfield" data-tip="landmarks in months, comma-separated: each keeps the patients still followed then and restarts the clock">
           landmarks <DraftInput value={lms} disabled={busy} width="6rem" placeholder="0, 6, 12"
             onCommit={(t) => { const xs = t.split(/[ ,]+/).filter(Boolean).map(Number).filter((x) => Number.isFinite(x)); patch({ landmarkMonths: xs.length ? xs : [0] }); }} />
         </label>

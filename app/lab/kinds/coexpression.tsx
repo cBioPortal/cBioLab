@@ -14,11 +14,11 @@ function CoexpressionCard({ ctx, v, vi }: CardProps) {
     {v.kind === "coexpression" && isDrawn(v) && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-expression" cohorts={cohortChoice(vi, docView(vi), 1)} sub="Pearson correlation from per-site sums" {...placement(ctx, vi)}
         actions={<>
-          <label className="tbfield" title="the molecular profile the correlation is computed over">profile <Choice size="ctl"
+          <label className="tbfield" data-tip="the molecular profile the correlation is computed over">profile <Choice size="ctl"
             value={docView(vi).profileType || ""} disabled={busy} placeholder="(none)"
             onChange={(v) => updateView(vi, (vv: any) => ({ ...vv, profileType: v }))}
             options={((explore && explore.profiles) || []).map((pt: string) => [pt, pt] as const)} /></label>
-          <Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>
+          <Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} data-tip="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>
         </>} />
       {v.note && <p className="note">{v.note}</p>}
       <div className="vscroll">
@@ -34,7 +34,7 @@ function CoexpressionCard({ ctx, v, vi }: CardProps) {
           </tr></thead>
           <tbody>{v.coexpression.map(r => (
             <tr key={r.a + "|" + r.b} className="ruled"
-              title={(r.perStudy || []).map(s2 => s2.study + ": r=" + s2.r + " (n=" + s2.n + ")").join("\n") || undefined}>
+              data-tip={(r.perStudy || []).map(s2 => s2.study + ": r=" + s2.r + " (n=" + s2.n + ")").join("\n") || undefined}>
               <td className="bold">{r.a} / {r.b}</td>
               <td className="r tnum muted">{r.n.toLocaleString()}</td>
               <td >

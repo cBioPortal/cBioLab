@@ -46,7 +46,7 @@ function LogisticCard({ ctx, v, vi }: CardProps) {
             <AxisPicker side="outcome" axis={sv.outcome || { source: "clinical", attribute: "" }} attrs={catalogAttrs()}
               catalog={profileCatalog()} loading={attrsLoading()} busy={busy}
               onChange={(next) => patchView(vi, { outcome: next })} />
-            {!outcomeIsAlteration && <label className="tbfield" title="which observed value of the outcome counts as the event (1); every other observed value is treated as 'not event' and disclosed in the caveat. Required for a categorical outcome; not used for a numeric one, which must already be coded 0/1">
+            {!outcomeIsAlteration && <label className="tbfield" data-tip="which observed value of the outcome counts as the event (1); every other observed value is treated as 'not event' and disclosed in the caveat. Required for a categorical outcome; not used for a numeric one, which must already be coded 0/1">
               event <Input type="text" list={"outcome-levels-" + vi} disabled={busy} className="h-ctl w-36 bg-card text-md md:text-md"
                 placeholder="e.g. Responder" value={sv.outcomeEvent || ""}
                 onChange={e => patchView(vi, { outcomeEvent: e.target.value || undefined })} />

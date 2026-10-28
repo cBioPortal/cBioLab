@@ -14,6 +14,7 @@ import { ChevronsUpDown } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
+import { FloatingTip } from "../_ui/tooltip.tsx";
 
 type Spec = { patient?: { study: string; id: string }; collapsed?: string[]; expandGaps?: boolean } & Record<string, unknown>;
 
@@ -48,9 +49,8 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
   };
   const onMove = (e: React.MouseEvent) => {
     const m = (e.target as Element).closest?.(".tl-m") as SVGGElement | null;
-    const r = box.current?.getBoundingClientRect();
-    if (!m || !r || !m.dataset.ev) { if (tip) setTip(null); return; }
-    setTip({ x: e.clientX - r.left, y: e.clientY - r.top, ev: m.dataset.ev.split(",").map(Number) });
+    if (!m || !m.dataset.ev) { if (tip) setTip(null); return; }
+    setTip({ x: e.clientX, y: e.clientY, ev: m.dataset.ev.split(",").map(Number) });
   };
   const isSel = (row: { study: string; patient: string }) => p != null && row.study === p.study && row.patient === p.patient;
 
@@ -68,16 +68,16 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
           <span className="meta">{p.study}{p.source.remote ? " · from " + p.source.label + " via federation" : ""}</span>
           <span className="meta">{p.events.length.toLocaleString()} events · {p.samples.length} sample{p.samples.length === 1 ? "" : "s"}</span>
           {[...marks.values()].map((m) => (
-            <span key={m.id} className="tl-sample" title={m.id + (m.type ? " — " + m.type : "")}>
+            <span key={m.id} className="tl-sample" data-tip={m.id + (m.type ? " — " + m.type : "")}>
               <svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
               <span className="mono">{m.id}</span>
             </span>))}
           <div className="viewtb tl-settings">
             <div className="tbz">
-              <label className="chk" title="draw every year, rather than cutting runs of four or more years without an event to one dashed mark">
+              <label className="chk" data-tip="draw every year, rather than cutting runs of four or more years without an event to one dashed mark">
                 <Checkbox checked={!!spec.expandGaps} onCheckedChange={(on) => patch({ expandGaps: (on === true) || undefined })} /> every year
               </label>
-              <Button type="button" variant="outline" size="sm" className={TB} disabled={!collapsed.length} title="unfold every nested track"
+              <Button type="button" variant="outline" size="sm" className={TB} disabled={!collapsed.length} data-tip="unfold every nested track"
                 onClick={() => patch({ collapsed: undefined })}><ChevronsUpDown />expand all tracks</Button>
             </div>
           </div>
@@ -88,7 +88,7 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
         {drawn && (p!.events.length
           ? <div dangerouslySetInnerHTML={{ __html: drawn.svg }} />
           : <p className="meta tl-empty">{p!.patient} has no timeline events recorded.</p>)}
-        {tip && p && <EventTip x={tip.x} y={tip.y} w={width} events={tip.ev.map((i) => p.events[i]).filter(Boolean)} marks={marks} />}
+        {tip && p && <EventTip x={tip.x} y={tip.y} events={tip.ev.map((i) => p.events[i]).filter(Boolean)} marks={marks} />}
       </div>
       {p && drawn && <p className="note vfoot">{timelineSummary(p, drawn.layout, !!spec.expandGaps)} Click a track with ▾ to fold its sub-tracks into one row.</p>}
       {listOpen && (
@@ -105,10 +105,10 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
   );
 }
 
-function EventTip({ x, y, w, events, marks }: { x: number; y: number; w: number; events: PatientEvent[]; marks: Map<string, { label: string; color: string }> }) {
+function EventTip({ x, y, events, marks }: { x: number; y: number; events: PatientEvent[]; marks: Map<string, { label: string; color: string }> }) {
   const shown = events.slice(0, 4);
   return (
-    <div className="onco-tip tl-tip" style={{ left: Math.min(x + 14, w - 340), top: y + 14 }}>
+    <FloatingTip x={x} y={y} className="tl-tip">
       {shown.map((e, k) => {
         const sid = attr(e, "SAMPLE_ID");
         const m = sid ? marks.get(sid) : undefined;
@@ -123,6 +123,6 @@ function EventTip({ x, y, w, events, marks }: { x: number; y: number; w: number;
           </div>);
       })}
       {events.length > shown.length && <div className="dim">and {events.length - shown.length} more on this day</div>}
-    </div>
+    </FloatingTip>
   );
 }

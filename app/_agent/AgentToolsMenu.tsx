@@ -12,7 +12,7 @@ export function AgentToolsMenu({ page, tools, webmcp, intro }: {
 }) {
   return (
     <details className="agent-menu" id="ai-tools">
-      <summary title="Tools this page exposes to your AI assistant">AI tools</summary>
+      <summary data-tip="Tools this page exposes to your AI assistant">AI tools</summary>
       <div className="agent-pop">
         <p>{intro}</p>
         <p className="agent-how">

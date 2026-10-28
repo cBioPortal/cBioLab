@@ -40,7 +40,7 @@ function Cell({ value, was, onCommit, label, disabled }: { value: string; was?: 
   const edited = was !== undefined && value !== was;
   return (
     <input value={draft} disabled={disabled} aria-label={label} spellCheck={false}
-      title={edited ? "was " + (was === "" ? "empty" : "“" + was + "”") : undefined}
+      data-tip={edited ? "was " + (was === "" ? "empty" : "“" + was + "”") : undefined}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => { if (draft !== value) onCommit(draft); }}
       onKeyDown={(e) => {
@@ -212,7 +212,7 @@ export function DatasetEditor({ meta, onSaved, onClose }: { meta: DatasetMeta; o
               <Input value={name} onChange={(e) => setName(e.target.value)} aria-label="dataset name"
                 className="h-8 w-80 text-md font-semibold md:text-md" />
               <span className="rounded-full bg-muted px-2.5 py-0.5 text-sm text-muted-foreground"
-                title={dataChanged ? "saving makes a new version" : "a note alone is saved without a new version"}>
+                data-tip={dataChanged ? "saving makes a new version" : "a note alone is saved without a new version"}>
                 v{meta.latestVersion}{dataChanged && <> → <b className="text-foreground">v{meta.latestVersion + 1}</b></>}</span>
               <Tabs className="ml-auto" value={step} onValueChange={(v) => { if (v === "review") next(); else { setErr(null); setStep(v as Step); } }}>
                 <TabsList className={SEG_TABS} aria-label="how to change it">
@@ -244,7 +244,7 @@ export function DatasetEditor({ meta, onSaved, onClose }: { meta: DatasetMeta; o
                   </div>
                   <div className="tbz">
                     <Button variant="outline" size="sm" className={cn(TB, "cd-addrow")} onClick={() => { change((x) => addRow(x, studies[0])); setSearch(""); setOnlyEdited(false); setPage(0); }}
-                      title={"a row for a " + level + " the data does not have yet: type its id, matched to " + studies.join(", ") + " on review"}><Plus />Row</Button>
+                      data-tip={"a row for a " + level + " the data does not have yet: type its id, matched to " + studies.join(", ") + " on review"}><Plus />Row</Button>
                     <Input value={newCol} onChange={(e) => setNewCol(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") tryAddColumn(); }}
                       placeholder="new column" aria-label="new column name" className="h-ctl w-36 text-md md:text-md" />
                     <Button variant="outline" size="sm" className={cn(TB, "cd-addcol")} disabled={!newCol.trim()} onClick={tryAddColumn}><Plus />Column</Button>
@@ -280,7 +280,7 @@ export function DatasetEditor({ meta, onSaved, onClose }: { meta: DatasetMeta; o
                             </td>)}
                             <td className="px-1 text-center">
                               {!was && <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive"
-                                aria-label={"take out " + (r.newId || r.key)} title={"take out this added " + level + " (stored rows always stay)"}
+                                aria-label={"take out " + (r.newId || r.key)} data-tip={"take out this added " + level + " (stored rows always stay)"}
                                 onClick={() => change((x) => dropRow(x, r.key))}><Trash2 /></Button>}
                             </td>
                           </tr>
@@ -328,17 +328,17 @@ export function DatasetEditor({ meta, onSaved, onClose }: { meta: DatasetMeta; o
                 : !changed ? <span className="text-muted-foreground">No changes from v{meta.latestVersion} yet.</span>
                 : <span><b>Changes from v{meta.latestVersion}:</b> {[summary, pendingAdds > 0 && fmt(pendingAdds) + " new row" + (pendingAdds === 1 ? "" : "s") + " to match"].filter(Boolean).join(" · ")}</span>}
             </div>
-            {changed && <Button variant="link" size="inline" className="text-md" onClick={startOver} title={"discard every change and start again from v" + meta.latestVersion}>
+            {changed && <Button variant="link" size="inline" className="text-md" onClick={startOver} data-tip={"discard every change and start again from v" + meta.latestVersion}>
               <RotateCcw className="size-3.5" />Start over</Button>}
             <Button variant="outline" className="cd-cancel" onClick={onClose}
-              title={changed ? "close without saving: v" + meta.latestVersion + " stays as it is and these changes are discarded" : "close"}>Cancel</Button>
+              data-tip={changed ? "close without saving: v" + meta.latestVersion + " stays as it is and these changes are discarded" : "close"}>Cancel</Button>
             {step !== "review"
               ? <Button className="cd-review" disabled={!canReview} onClick={next}
-                  title={canReview ? undefined : step === "file" ? "paste a table or drop a file first" : "change a value, or add a row or column, first"}>Review changes →</Button>
+                  data-tip={canReview ? undefined : step === "file" ? "paste a table or drop a file first" : "change a value, or add a row or column, first"}>Review changes →</Button>
               : <>
                 <Button variant="outline" onClick={() => { setErr(null); setStep(from); }}><ArrowLeft />{from === "file" ? "Back to file" : "Back to table"}</Button>
                 <Button className="cd-save" disabled={!changed || !!busy} onClick={() => void save()}
-                  title={!changed ? "nothing changed from v" + meta.latestVersion : !dataChanged ? "the note only: the data stays at v" + meta.latestVersion
+                  data-tip={!changed ? "nothing changed from v" + meta.latestVersion : !dataChanged ? "the note only: the data stays at v" + meta.latestVersion
                     : "earlier versions, and analyses pinned to them, stay as they are"}>
                   {dataChanged ? "Save as v" + (meta.latestVersion + 1) : "Save note"}</Button>
               </>}

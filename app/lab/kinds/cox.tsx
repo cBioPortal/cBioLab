@@ -52,12 +52,12 @@ function CoxCard({ ctx, v, vi }: CardProps) {
               value={sv.cutoffMonths ?? ""}
               onChange={e => patchView(vi, { cutoffMonths: e.target.value ? Number(e.target.value) : undefined })} />
             <span className="meta">mo</span>
-            <label className="chk" title="fit a separate baseline hazard per study instead of pooling them">
+            <label className="chk" data-tip="fit a separate baseline hazard per study instead of pooling them">
               <Checkbox checked={!!sv.stratifyByStudy} disabled={busy}
                 onCheckedChange={c => patchView(vi, { stratifyByStudy: c === true || undefined })} />
               stratify by study
             </label>
-            <label className="chk" title="fit each cohort as its own separate model — own coefficients, own reference levels — instead of pooling them into one fit; a no-op with only one cohort">
+            <label className="chk" data-tip="fit each cohort as its own separate model — own coefficients, own reference levels — instead of pooling them into one fit; a no-op with only one cohort">
               <Checkbox checked={!!sv.stratifyByCohort} disabled={busy}
                 onCheckedChange={c => patchView(vi, { stratifyByCohort: c === true || undefined })} />
               stratify by cohort

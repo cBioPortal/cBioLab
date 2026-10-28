@@ -9,8 +9,9 @@
 // changes cause a refetch; everything else is applied to the decoded arrays in place.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
+import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
+import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { STYLE, geneLegend, glyphPresence, numericValue, resolveStyle, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
@@ -47,6 +48,15 @@ const EXPORT_LAYOUT_DPI = 96;
 /** the style this figure draws with: its own override, then the browser's viewing options and the spec's annotation */
 function figureStyle(data: UnpackedContract, display: FigureDisplay) {
   return styleForDisplay(resolveStyle(data.display?.style), { ...display, annotate: data.display?.annotate });
+}
+
+/** the Patient page for one column, or a sample's page for a sample column; a pooled figure's
+ *  column ids are "<study>_<id>" (lib/oncoprint-detail.ts studyOfColumn) */
+function patientPage(study: string, column: string, unit: string): { href: string; label: string } {
+  const id = column.startsWith(study + "_") ? column.slice(study.length + 1) : column;
+  const sample = unit === "sample";
+  return { href: "/portal/patient?" + new URLSearchParams({ study, [sample ? "sample" : "patient"]: id }).toString(),
+    label: sample ? "open this sample" : "open this patient" };
 }
 
 /**
@@ -138,7 +148,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const [loading, setLoading] = useState(true);
   const [perf, setPerf] = useState<Perf>({ frames: 0 });
   const [view, setView] = useState<View>({ zoom: 1, scrollX: 0, whitespace: display.whitespace });
-  const [hover, setHover] = useState<{ hit: Hit; x: number; y: number } | null>(null);
+  const { tip: hover, move: hoverAt, hide: hideHover, live: hoverLive } = useHoverTip<{ hit: Hit; at: TipBox }>();
+  // a zoom or scroll moves the cell out from under its tip
+  useEffect(() => hideHover(), [view.zoom, view.scrollX, hideHover]);
   /** the gutter label under the pointer: a track row, not a column */
   const [labelHover, setLabelHover] = useState<{ ti: number; x: number; y: number } | null>(null);
   // per-column specifics, fetched only for the column under the pointer and remembered
@@ -441,13 +453,19 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     // the gutter is labels, not cells: hovering one explains the row it names
     if (x < GEOM.gutter) {
       const ti = trackAt(y);
-      setLabelHover(ti >= 0 ? { ti, x, y } : null);
-      setHover(null);
+      setLabelHover(ti >= 0 ? { ti, x: e.clientX, y: e.clientY } : null);
+      hideHover();
       return;
     }
     if (labelHover) setLabelHover(null);
-    const hit = hitTest(x, y, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, view.scrollX) }, gapPx);
-    setHover(hit ? { hit, x, y } : null);
+    const shownView = { ...view, scrollX: Math.min(maxScroll, view.scrollX) };
+    const hit = hitTest(x, y, data, visible.order, visible.groups, shownView, gapPx);
+    // the tip sits against its cell, and stays put while the pointer stays in that cell
+    const same = hit && hover && hover.hit.ti === hit.ti && hover.hit.k === hit.k && hover.hit.k1 === hit.k1;
+    const cell = hit && !same ? hitRect(hit, visible.groups, shownView, cssW, gapPx) : null;
+    hoverAt(same ? hover : hit && cell
+      ? { hit, at: { left: rect.left + cell.left, right: rect.left + cell.right, top: rect.top + cell.top, bottom: rect.top + cell.bottom } }
+      : null, e.clientX, e.clientY);
     // one column under the pointer: ask the server what it carries, once, after a pause
     if (detailTimer.current) clearTimeout(detailTimer.current);
     if (hit && hit.n === 1) {
@@ -508,7 +526,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     const x = e.clientX - rect.left;
     if (x < GEOM.gutter) return;                       // the gutter belongs to the track menu
     selDrag.current = { x0: x };
-    setSel({ x0: x, x1: x, live: true }); setSelRanges(null); setSelError(null); setHover(null);
+    setSel({ x0: x, x1: x, live: true }); setSelRanges(null); setSelError(null); hideHover();
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onSelMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -615,7 +633,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       if (d.panels.length) lines.push({ text: "panel " + d.panels.map((p) => p.panel).join(", ") + (d.notProfiled.length ? " — not covering " + d.notProfiled.join(", ") : ""), dim: true });
       else if (d.notProfiled.length) lines.push({ text: "no panel covers " + d.notProfiled.join(", "), dim: true });
     }
-    return lines;
+    // the detail came back, so this column's study is held here at patient level: its page can open
+    const open = col && d && d !== "loading" && d.study ? patientPage(d.study, col, data.unit) : null;
+    return { lines, open };
   }, [hover, data, visible, detail]);
 
   // ---- render ---------------------------------------------------------------
@@ -707,25 +727,25 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             across a line break. */}
         <div className="viewtb">
           <div className="tbz">
-            <span className="tbl" title="these change what is drawn, and re-run the query">data</span>
+            <span className="tbl" data-tip="these change what is drawn, and re-run the query">data</span>
             {props.tracksMenu}
             {props.controls}
           </div>
           <div className="tbz">
-            <span className="tbl" title="these change how it is drawn, here in your browser">view</span>
+            <span className="tbl" data-tip="these change how it is drawn, here in your browser">view</span>
             <GearMenu menuId="onco-display" title="how the figure is drawn — nothing here re-runs a query" wide contentClassName="px-2.5"
               label={<><SlidersHorizontal />display{offDefaults ? " (" + offDefaults + ")" : ""}</>}>
                 <label className="chk"><Checkbox checked={display.showUnaltered} disabled={busy}
                   onCheckedChange={(c) => set({ showUnaltered: (c === true) })} /> show unaltered {data.unit}s</label>
                 <label className="chk"><Checkbox checked={display.whitespace} disabled={busy}
                   onCheckedChange={(c) => set({ whitespace: (c === true) })} /> whitespace between cells</label>
-                <label className="chk" title="colour each mutation class separately, or draw them all as one">
+                <label className="chk" data-tip="colour each mutation class separately, or draw them all as one">
                   <Checkbox checked={display.colorByType} disabled={busy}
                     onCheckedChange={(c) => set({ colorByType: (c === true) })} /> colour by mutation type</label>
-                <label className="chk" title="white instead of grey for unaltered cells — for print; profiled and unprofiled then look alike, apart from the stripe">
+                <label className="chk" data-tip="white instead of grey for unaltered cells — for print; profiled and unprofiled then look alike, apart from the stripe">
                   <Checkbox checked={!!display.whiteBackground} disabled={busy}
                     onCheckedChange={(c) => set({ whiteBackground: (c === true) || undefined })} /> white background (for print)</label>
-                <label className="setrow" title={gapTrack ? "split each cohort into runs of " + gapTrack.label : "choose a categorical track as the sort key first"}>
+                <label className="setrow" data-tip={gapTrack ? "split each cohort into runs of " + gapTrack.label : "choose a categorical track as the sort key first"}>
                   <span className="meta">gaps</span>
                   <OptionSelect value={display.gaps} disabled={busy || !gapTrack} onValueChange={(v) => set({ gaps: v as FigureDisplay["gaps"] })}>
                     <option value="none">none</option><option value="gaps">gaps</option><option value="pct">gaps with % on the right</option><option value="pct-left">gaps with % on the left</option>
@@ -738,7 +758,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                     setting that only one reader could see. */}
                 <div className="menu-aside">
                   <span className="meta">this browser only</span>
-                  <label className="chk" title="an overview of the whole figure, with the part you are looking at marked">
+                  <label className="chk" data-tip="an overview of the whole figure, with the part you are looking at marked">
                     <Checkbox checked={showMini} onCheckedChange={(c) => setShowMini((c === true))} /> minimap</label>
                 </div>
             </GearMenu>
@@ -757,11 +777,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <option key={"-" + t.label} value={"-" + t.label}>{t.label} ↓</option>])}
             </OptionSelect></label>
             <span className="zoomctl">
-              <Button type="button" variant="ghost" size="icon-xs" className={ZOOM} onClick={() => zoomAt(1 / 1.4)} title="zoom out" aria-label="zoom out"><Minus /></Button>
-              <Slider min={0} max={100} value={[pct]} title="zoom" aria-label="zoom" className="mx-2 w-24"
+              <Button type="button" variant="ghost" size="icon-xs" className={ZOOM} onClick={() => zoomAt(1 / 1.4)} data-tip="zoom out" aria-label="zoom out"><Minus /></Button>
+              <Slider min={0} max={100} value={[pct]} data-tip="zoom" aria-label="zoom" className="mx-2 w-24"
                 onValueChange={([x]) => { const p = x / 100; setView((v) => ({ ...v, zoom: minZoom * Math.pow(MAX_ZOOM / minZoom, p) })); }} />
-              <Button type="button" variant="ghost" size="icon-xs" className={ZOOM} onClick={() => zoomAt(1.4)} title="zoom in" aria-label="zoom in"><Plus /></Button>
-              <Button type="button" variant="ghost" size="xs" className={cn(ZOOM, "w-auto border-l px-2 text-sm")} onClick={() => setView((v) => ({ ...v, zoom: minZoom, scrollX: 0 }))} title="fit every column in the width">fit</Button>
+              <Button type="button" variant="ghost" size="icon-xs" className={ZOOM} onClick={() => zoomAt(1.4)} data-tip="zoom in" aria-label="zoom in"><Plus /></Button>
+              <Button type="button" variant="ghost" size="xs" className={cn(ZOOM, "w-auto border-l px-2 text-sm")} onClick={() => setView((v) => ({ ...v, zoom: minZoom, scrollX: 0 }))} data-tip="fit every column in the width">fit</Button>
             </span>
           </div>
           <div className="tbz">
@@ -778,11 +798,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                   <span className="meta">open this figure elsewhere</span>
                   {lab ? <>
                     <a className="block rounded-sm px-2 py-1 text-link hover:bg-accent" href={lab.cli} target="_blank" rel="noreferrer"
-                      title="the node and Python command lines, run against this spec on this server">export to CLI emulator ↗</a>
+                      data-tip="the node and Python command lines, run against this spec on this server">export to CLI emulator ↗</a>
                     <a className="block rounded-sm px-2 py-1 text-link hover:bg-accent" href={lab.python} target="_blank" rel="noreferrer"
-                      title="this figure in a Pyodide notebook — the cohortlab package, in your browser">export to Python notebook ↗</a>
+                      data-tip="this figure in a Pyodide notebook — the cohortlab package, in your browser">export to Python notebook ↗</a>
                     <a className="block rounded-sm px-2 py-1 text-link hover:bg-accent" href={lab.ipynb} download="oncoprint.ipynb"
-                      title="a real .ipynb with the package and this figure's contract embedded; it opens in JupyterLab, VS Code or Colab">export to Jupyter (.ipynb)</a>
+                      data-tip="a real .ipynb with the package and this figure's contract embedded; it opens in JupyterLab, VS Code or Colab">export to Jupyter (.ipynb)</a>
                     {lab.cut && <span className="meta">{lab.cut}</span>}
                   </> : <span className="meta">this figure&apos;s spec is too large to travel in a link;
                     export the tabular TSV instead</span>}
@@ -792,9 +812,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           </div>
         </div>
         {sortKeys.length > 1 && <div className="viewtb-more">
-          <span className="meta" title="ties in the first key are broken by these, in order">then</span>
+          <span className="meta" data-tip="ties in the first key are broken by these, in order">then</span>
           {sortKeys.slice(1).map((k) => (
-            <Button key={k} variant="link" size="inline" disabled={busy} title="drop this tiebreaker"
+            <Button key={k} variant="link" size="inline" disabled={busy} data-tip="drop this tiebreaker"
               onClick={() => onSortKeys(sortKeys.filter((x) => x !== k))}>{k.startsWith("-") ? k.slice(1) + " ↓" : k + " ↑"}<X /></Button>
           ))}
         </div>}
@@ -805,7 +825,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           </div>}
           <canvas ref={canvasRef} className="onco-canvas"
             onPointerDown={onSelDown} onPointerMove={onSelMove} onPointerUp={onSelUp} onPointerCancel={onSelUp}
-            onMouseMove={onMove} onMouseLeave={() => { setHover(null); setLabelHover(null); }}
+            onMouseMove={onMove} onMouseLeave={(e) => { hoverAt(null, e.clientX, e.clientY); setLabelHover(null); }}
             onClick={(e) => {
               // a click on a track's label opens that track's menu, like the portal's three dots
               const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
@@ -890,23 +910,24 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             const t = data.tracks[labelHover.ti];
             const lines = trackTooltipLines(t, data.n, data.unit);
             return (
-              <div className="onco-tip" style={{ left: Math.min(labelHover.x + 12, cssW - 300), top: labelHover.y + 14 }}>
+              <FloatingTip x={labelHover.x} y={labelHover.y}>
                 {lines.map((l, i) => <div key={i} className={i ? "dim" : "lead"}>{l}</div>)}
                 <div className="dim">click for track options</div>
-              </div>
+              </FloatingTip>
             );
           })()}
 
           {hover && tip && (
-            <div className="onco-tip" style={{ left: Math.min(hover.x + 12, cssW - 260), top: hover.y + 14 }}>
-              {tip.map((l, i) => <div key={i} className={(l.mono ? "mono " : "") + (l.dim ? "dim" : "")}>{l.text}</div>)}
-            </div>
+            <FloatingTip at={hover.at} live={hoverLive}>
+              {tip.lines.map((l, i) => <div key={i} className={(l.mono ? "mono " : "") + (l.dim ? "dim" : "")}>{l.text}</div>)}
+              {tip.open && <a className="tip-link" href={tip.open.href} target="_blank" rel="noreferrer">{tip.open.label} ↗</a>}
+            </FloatingTip>
           )}
         </div>
         {maxScroll > 0 && (() => {
           const { w, x } = barGeom();
           return (
-            <div className="onco-bar" title="drag to move across the figure"
+            <div className="onco-bar" data-tip="drag to move across the figure"
               onPointerDown={onBarDown} onPointerMove={onBarMove} onPointerUp={onBarUp} onPointerCancel={onBarUp}
               style={{ marginLeft: GEOM.gutter, width: Math.max(0, cssW - GEOM.gutter) }}>
               <div className="onco-bar-thumb" style={{ left: Math.round(x), width: Math.round(w) }} />
@@ -928,7 +949,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               </>}
               {props.onSaveFeature && (
                 <Button variant="outline" size="sm" className={TB} disabled={selBusy}
-                  title={"save this selection as a yes/no custom attribute: the selected " + data.unit + "s are Yes, every other " + data.unit + " in the figure No"}
+                  data-tip={"save this selection as a yes/no custom attribute: the selected " + data.unit + "s are Yes, every other " + data.unit + " in the figure No"}
                   onClick={saveFeature}><Tag />Save as feature</Button>
               )}
               <Button variant="link" size="inline" className="text-md" onClick={zoomToSelection}>Zoom to selection</Button>
@@ -1038,7 +1059,7 @@ function Legend({ data, display, colors }: { data: UnpackedContract; display: Fi
       <span>% = driver / any</span>
       {white && <span className="mark">white background: unaltered and not-profiled differ only by the stripe</span>}
       {data.stats.hiddenVus != null && <span className="mark">{data.stats.hiddenVus.toLocaleString()} alterations of unknown significance hidden — the percentages are over drivers alone</span>}
-      {!!data.stats.offPanel && <span className="mark" title="the gene is not on any panel that column was sequenced with, so the column is not profiled for it — as on cBioPortal, the call is not drawn and the % leaves it out">{data.stats.offPanel.toLocaleString()} off-panel {data.stats.offPanel === 1 ? "call" : "calls"} not drawn — those cells are not profiled</span>}
+      {!!data.stats.offPanel && <span className="mark" data-tip="the gene is not on any panel that column was sequenced with, so the column is not profiled for it — as on cBioPortal, the call is not drawn and the % leaves it out">{data.stats.offPanel.toLocaleString()} off-panel {data.stats.offPanel === 1 ? "call" : "calls"} not drawn — those cells are not profiled</span>}
       {data.display?.annotate === "none" && <span className="mark">driver annotation off: nothing is called a driver</span>}
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
         <span key={t.label}>{t.label}: {t.bar

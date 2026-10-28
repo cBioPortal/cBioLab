@@ -238,6 +238,7 @@ change. The ones most often broken:
   server covers the figure with "updating…"; a fetched control shows a loader; loading, empty and
   failed are three states; a disabled control says why; nothing is dropped without saying so; a
   request past a limit is refused with the limit named.
+- **Tooltips are `data-tip`, never `title`** (`app/_ui/tooltip.tsx`; docs/UI.md says why).
 - **Keystrokes stay in the field** (a small component owns the draft); **one way to change the
   document** (`app/lab/doc-store.ts`).
 - **Look at a UI change, then measure it** (`misalignedControls` in `e2e.cjs`), and verify waiting
@@ -257,7 +258,7 @@ they can't tell you:
   change `eslint.config.mjs`, `knip.json` or the ruff rules as part of other work.
 - Off on purpose, so don't "fix" code for them: `any` / `no-unsafe-*`, complexity, nesting, formatting.
 - Accessibility (`jsx-a11y-x`, `app/**/*.tsx`): clickable things are `<button>`s, every input or
-  select has a name (label text, `title` or `aria-label`). A native `<dialog>`'s backdrop click is
+  select has a name (label text or `aria-label`; a `data-tip` tooltip is not a name). A native `<dialog>`'s backdrop click is
   the accepted exception: disable on that line, since Escape closes it.
 - The Semgrep and jscpd reports (`npm run report:security`, `report:dupes`): user values reach SQL
   only through `sq()` / `PIDS_SQL` (invariant 5), never turn off TLS verification (`lib/db.ts`'s

@@ -64,11 +64,11 @@ export default function LoginButton() {
                   <div className="meta">{server.user?.email}</div>
                 </div>
                 <MenuSeparator />
-                {server.user?.admin && <MenuItem asChild onClick={close}><a href="/admin" title="clear the result cache, see and change the federation settings"><Settings />Admin</a></MenuItem>}
+                {server.user?.admin && <MenuItem asChild onClick={close}><a href="/admin" data-tip="clear the result cache, see and change the federation settings"><Settings />Admin</a></MenuItem>}
                 <MenuItem onClick={() => { close(); void logOut(); }}><LogOut />Sign out</MenuItem>
               </>}
             </GearMenu></span>
-        : <Button variant="outline" size="sm" className={TB} onClick={() => void open()} title="sign in to save cohorts and analyses and use custom data"><LogIn />Sign in</Button>}
+        : <Button variant="outline" size="sm" className={TB} onClick={() => void open()} data-tip="sign in to save cohorts and analyses and use custom data"><LogIn />Sign in</Button>}
       <Dialog open={shown} onOpenChange={setShown}>
         <DialogContent className="logindialog sm:max-w-sm">
           <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="flex flex-col gap-3">

@@ -260,6 +260,16 @@ export function hitTest(x: number, y: number, data: UnpackedContract, order: Uin
   return null;
 }
 
+/** the box, in canvas coordinates, of the cell a hit names (its columns in its track's row), cut to the plot */
+export function hitRect(hit: Hit, groups: VisibleGroup[], view: View, width: number, gap: Gap = GEOM.groupGap): { left: number; top: number; right: number; bottom: number } {
+  const { header, rowH, rowGap, gutter } = GEOM;
+  const g = groups[hit.gi], gx = groupOffsets(groups, view.zoom, gap)[hit.gi];
+  const x0 = gutter - view.scrollX + gx + (hit.k - g.start) * view.zoom;
+  const x1 = x0 + Math.max(1, (hit.k1 - hit.k) * view.zoom);
+  const top = header + hit.ti * (rowH + rowGap);
+  return { left: Math.max(gutter, x0), right: Math.min(width, x1), top, bottom: top + rowH };
+}
+
 export function decodeGene(code: number): string {
   if (code === -1) return "not profiled";
   if (code === 0) return "no alteration";

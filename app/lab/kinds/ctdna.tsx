@@ -13,24 +13,24 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="the sample attribute's values that mark a plasma (cfDNA) sample; comma-separated">
+        <label className="tbfield" data-tip="the sample attribute's values that mark a plasma (cfDNA) sample; comma-separated">
           plasma <DraftInput value={csv(spec.plasma, ["cfDNA", "ctDNA"])} disabled={busy} width="7rem" onCommit={(t) => patch({ plasma: parse(t).length ? parse(t) : undefined })} />
         </label>
-        <label className="tbfield" title="the values that mark a tissue sample">
+        <label className="tbfield" data-tip="the values that mark a tissue sample">
           tissue <DraftInput value={csv(spec.tissue, ["Tumor"])} disabled={busy} width="6rem" onCommit={(t) => patch({ tissue: parse(t).length ? parse(t) : undefined })} />
         </label>
-        <label className="tbfield" title="test the genes you chose, or the most altered in the paired patients">
+        <label className="tbfield" data-tip="test the genes you chose, or the most altered in the paired patients">
           genes <OptionSelect value={choosing ? "chosen" : "top"} disabled={busy}
             onValueChange={(v) => patch(v === "top" ? { genes: undefined } : { genes: ["EGFR", "KRAS", "TP53", "PIK3CA", "BRAF"], top: undefined })}>
             <option value="chosen">chosen</option><option value="top">most altered</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" title="pair only samples the timeline dates within this many days of each other">
+        <label className="tbfield" data-tip="pair only samples the timeline dates within this many days of each other">
           drawn within <OptionSelect value={spec.withinDays == null ? "" : String(spec.withinDays)} disabled={busy} onValueChange={(v) => patch({ withinDays: v === "" ? undefined : Number(v) })}>
             {[...new Set(["", "30", "90", "365", spec.withinDays == null ? "" : String(spec.withinDays)])].map((d) => <option key={d} value={d}>{d === "" ? "any time" : d + " days"}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="any alteration, or only those OncoKB calls oncogenic">
+        <label className="tbfield" data-tip="any alteration, or only those OncoKB calls oncogenic">
           count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
             <option value="any">any alteration</option><option value="driver">oncogenic only</option>
           </OptionSelect>

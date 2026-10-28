@@ -12,31 +12,31 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">endpoint</span>
-        <label className="tbfield" title="what ends each patient's time: the next treatment line, stopping this treatment, or recorded progression — death ends it too">
+        <label className="tbfield" data-tip="what ends each patient's time: the next treatment line, stopping this treatment, or recorded progression — death ends it too">
           to <OptionSelect value={spec.endpoint || "ttnt"} disabled={busy} onValueChange={(v) => patch({ endpoint: v })}>
             <option value="ttnt">next treatment (TTNT)</option>
             <option value="tot">end of treatment (TOT)</option>
             <option value="rwpfs">progression (rwPFS)</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" title="days without therapy that start a new treatment line">
+        <label className="tbfield" data-tip="days without therapy that start a new treatment line">
           line gap <OptionSelect value={String(spec.lineGap ?? 90)} disabled={busy} onValueChange={(v) => patch({ lineGap: Number(v) })}>
             {[30, 60, 90, 120, 180].map((d) => <option key={d} value={d}>{d} days</option>)}
           </OptionSelect>
         </label>
       </div>
       <div className="tbz"><span className="tbl">clock</span>
-        <label className="tbfield" title="the treatment record whose start begins the clock">
+        <label className="tbfield" data-tip="the treatment record whose start begins the clock">
           from first <OptionSelect value={an.eventType || ""} disabled={busy} onValueChange={(v) => patch({ anchor: { ...an, eventType: v } })}>
             {!types.includes(an.eventType) && <option value={an.eventType || ""}>{an.eventType || "choose…"}</option>}
             {types.map((t) => <option key={t} value={t}>{t}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="only treatment records with this attribute (e.g. SUBTYPE, AGENT); empty for any">
+        <label className="tbfield" data-tip="only treatment records with this attribute (e.g. SUBTYPE, AGENT); empty for any">
           where <DraftInput value={an.key || ""} disabled={busy} width="6rem" placeholder="attribute"
             onCommit={(t) => patch({ anchor: { eventType: an.eventType, ...(an.occurrence ? { occurrence: an.occurrence } : {}), ...(t.trim() ? { key: t.trim(), value: an.value || "" } : {}) } })} />
         </label>
-        <label className="tbfield" title="the value that attribute must take (e.g. Immuno, PEMBROLIZUMAB)">
+        <label className="tbfield" data-tip="the value that attribute must take (e.g. Immuno, PEMBROLIZUMAB)">
           = <DraftInput value={an.value || ""} disabled={busy} width="7rem" placeholder="value"
             onCommit={(t) => patch({ anchor: { ...an, value: t } })} />
         </label>

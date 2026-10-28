@@ -130,7 +130,7 @@ async function main() {
       const shareFrom = async (row, edit) => {
         await row.locator("button.sharebadge").click({ timeout: 120000 });
         await dlg.locator("label", { hasText: "A group" }).click();
-        await dlg.locator("[role=combobox][title=group]").click();
+        await dlg.locator("[role=combobox][data-tip=group]").click();
         await a.locator("[role=option]").first().click();
         if (edit) await dlg.locator("label", { hasText: "can edit it too" }).click();
         await dlg.locator("button[type=submit]").click();
@@ -145,7 +145,7 @@ async function main() {
       steps.bobSees = (await b.locator(".listrow", { hasText: "e2e shared cohort " + T }).innerText({ timeout: 120000 }).catch(() => "")).includes("from " + A);
       await b.getByRole("tab", { name: "Analyses" }).click();
       await b.locator(".listrow", { hasText: "e2e shared analysis " + T }).locator("button", { hasText: "open" }).click();
-      await b.locator("button[title*='” — ']").first().click({ timeout: 120000 });
+      await b.locator("button[data-tip*='” — ']").first().click({ timeout: 120000 });
       await b.locator("[role=dialog].wsdialog button", { hasText: "Save to theirs" }).click();
       for (let i = 0; i < 40 && (await (await ca.request.get(BASE + "/api/artifacts/" + ws.id)).json()).artifact.version < 2; i++) await b.waitForTimeout(250);
       steps.savedBack = (await (await ca.request.get(BASE + "/api/artifacts/" + ws.id)).json()).artifact.version;
@@ -674,9 +674,9 @@ async function main() {
           cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
           views: [{ kind: "oncoprint", genes: ["TP53", "KRAS"] }]
         })).toString("base64")));
-        await page.waitForSelector('button[title="download or open this figure elsewhere"]', { timeout: 300000 });
+        await page.waitForSelector('button[data-tip="download or open this figure elsewhere"]', { timeout: 300000 });
         const namedButton = await page.locator("button.genesbtn").first().innerText();
-        await page.locator('button[title="download or open this figure elsewhere"]').click();
+        await page.locator('button[data-tip="download or open this figure elsewhere"]').click();
         const gear = page.locator("[data-slot=popover-content]");
         const gearHasEditor = (await gear.locator("[data-slot=badge]").count()) > 0;
         const gearHasCbioportal = (await gear.locator('a:has-text("cBioPortal")').count()) > 0;
@@ -909,7 +909,7 @@ async function main() {
       // Each cohort card names the studies it was queried in, with all of them in its tooltip.
       const studyLines = await page.$$eval(".cohortbox", bs => bs.map(b => {
         const el = b.querySelector(".cohortbox-studies");
-        return el ? { text: el.textContent.trim(), title: el.title } : null;
+        return el ? { text: el.textContent.trim(), title: el.dataset.tip } : null;
       }));
       ok("each cohort in the summary says which studies it queried",
         studyLines.length > 0 && studyLines.every(s => s && s.text && s.title),
@@ -1075,7 +1075,7 @@ async function main() {
           if (!name) continue;                       // "The document" and other non-view cards
           seen.push(name);
           const b = card.querySelector(".partbadge");
-          if (!b || !b.getAttribute("title")) missing.push(name);
+          if (!b || !b.getAttribute("data-tip")) missing.push(name);
         }
         return { seen, missing };
       });
@@ -1367,7 +1367,7 @@ async function main() {
       await dlg.locator(".riskgroupsapply").click();
       await page.waitForFunction(() => { const l = document.querySelector("svg[aria-label^='Risk model']")?.getAttribute("aria-label") || ""; return /Low risk, High risk$/.test(l); }, null, { timeout: 120000 });
       const ms = Date.now() - t0;
-      ok("risk model: Apply is one request, and the button's title then names the cut", requests === 1 && /cut at the 80th percentile/.test(await page.locator(".riskgroupsbtn").getAttribute("title")), requests + " requests, " + ms + " ms");
+      ok("risk model: Apply is one request, and the button's title then names the cut", requests === 1 && /cut at the 80th percentile/.test(await page.locator(".riskgroupsbtn").getAttribute("data-tip")), requests + " requests, " + ms + " ms");
       ok("risk model: the caveat says the cuts were chosen", /The cuts were chosen in the view, at the 80th percentile/.test(await text()));
       // the same model regrouped is the cached fit: a seed nothing else here fits, then the same with a cut
       const post = async (view) => (await (await ctx.request.post(BASE + "/api/analysis", { data: { ...doc, views: [{ ...doc.views[0], runs: 5, seed: 7, ...view }] } })).json()).views[0];
@@ -1639,7 +1639,7 @@ async function main() {
       const landed = new URL(page.url()).pathname;     // the homepage itself, no longer a redirect to /lab
       await page.locator(".study-row:not(.study-head)").first().waitFor({ timeout: 120000 });
       const query = page.locator("button.querybygene");
-      const empty = { disabled: await query.isDisabled(), why: await query.getAttribute("title") };
+      const empty = { disabled: await query.isDisabled(), why: await query.getAttribute("data-tip") };
       // the list's own count of matches ("84 of 565"): it draws at most 200 rows, so counting rows would cap there
       const rows = async () => Number((/([\d,]+) of [\d,]+/.exec(await page.locator("section[aria-label='choose studies']").innerText()) || [])[1]?.replace(/,/g, ""));
       const all = await rows();
@@ -1739,7 +1739,7 @@ async function main() {
       await page.goto(BASE + "/lab?tab=explore", { waitUntil: "domcontentloaded" });
       await page.locator(".study-row:not(.study-head)").first().waitFor({ timeout: 120000 });
       const header = page.locator("button.querygenes");
-      const none = { disabled: await header.isDisabled(), why: await header.getAttribute("title") };
+      const none = { disabled: await header.isDisabled(), why: await header.getAttribute("data-tip") };
       await page.getByLabel("search studies").fill("coadread_tcga_pub");
       await page.getByRole("button", { name: "query genes in coadread_tcga_pub", exact: true }).click();
       const dlg = page.locator("[role=dialog].gene-query-dialog");
@@ -2138,7 +2138,7 @@ async function main() {
       // facet queries, and nothing here needs more than a handful
       const addAll = sp.getByRole("checkbox", { name: /^Select all/ });
       const refused = await addAll.isDisabled();
-      const refusedWhy = (await addAll.getAttribute("title")) || "";
+      const refusedWhy = (await addAll.getAttribute("data-tip")) || "";
       ok("select all is refused past 30 studies, saying so", refused && /at most 30 studies/.test(refusedWhy), refusedWhy.slice(0, 90));
       // a narrow search: two ticks, then select all picks up the rest of it
       await sp.locator('input[placeholder^="search name"]').fill("thymoma");

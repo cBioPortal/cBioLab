@@ -151,7 +151,7 @@ function Density({ data, onSelect }: { data: PlotData; onSelect: (x0: number, x1
           <rect x={L} y={T} width={PW} height={PH} className="xc-frame" />
           {(data.bins || []).map((b, i) => (
             <rect key={i} x={L + PW * b.bx / gx} y={T + PH - PH * (b.by + 1) / gy} width={PW / gx + 0.3} height={PH / gy + 0.3}
-              className="xc-cell" opacity={0.15 + 0.85 * Math.log1p(b.n) / Math.log1p(maxN)}><title>{fmtInt(b.n) + " samples"}</title></rect>
+              className="xc-cell" opacity={0.15 + 0.85 * Math.log1p(b.n) / Math.log1p(maxN)} data-tip={fmtInt(b.n) + " samples"} />
           ))}
           {/* the axes are drawn by the figures' own kit (lib/chart/axis.ts), which escapes what it writes */}
           <g dangerouslySetInnerHTML={{ __html: axes }} />

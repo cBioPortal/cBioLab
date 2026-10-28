@@ -51,7 +51,7 @@ function CorrelatesBody({ v, docJson }: { v: DrawnResultOf<"correlates">; docJso
     x: { source: "profile", profile: r.profileType, gene: r.gene }, y: { source: "profile", profile: r.otherProfile, ...(r.otherIsAssay ? { entity: picked.gene } : { gene: picked.gene }) } } : null);
   const cols: Col<CoRow>[] = [
     r.otherIsAssay
-      ? { key: "gene", label: "Correlated entity", value: (g) => g.name || g.gene, render: (g) => <strong title={g.gene}>{g.name || g.gene}</strong> }
+      ? { key: "gene", label: "Correlated entity", value: (g) => g.name || g.gene, render: (g) => <strong data-tip={g.gene}>{g.name || g.gene}</strong> }
       : { key: "gene", label: "Correlated Gene", value: (g) => g.gene, render: (g) => <strong>{g.gene}</strong> },
     ...(r.otherIsAssay ? [] : [{ key: "cytoband", label: "Cytoband", value: (g: CoRow) => g.cytoband || null }]),
     { key: "rho", label: "Spearman's Correlation", num: true, value: (g) => g.rho,
@@ -88,7 +88,7 @@ function Controls({ c }: { c: KindCardCtx }) {
   // a numeric generic assay can be what the gene is correlated against: every entity of it
   const assays = (c.catalog || []).filter((p) => profileUse(p) === "assayNumber");
   const pick = (value: string, set: (v: string) => void, title: string, label: string, withAssays = false) => (
-    <label className="tbfield" title={title}>
+    <label className="tbfield" data-tip={title}>
       {label} <OptionSelect value={value} disabled={busy} onValueChange={(v) => set(v)}>
         {!profs.includes(value) && !(withAssays && assays.some((p) => p.profile === value)) && <option value={value}>{value || "choose…"}</option>}
         {profs.map((pr) => <option key={pr} value={pr}>{pr}</option>)}
@@ -99,12 +99,12 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="the gene every other gene is correlated with">
+        <label className="tbfield" data-tip="the gene every other gene is correlated with">
           gene <DraftInput value={spec.gene || ""} disabled={busy} width="6rem" placeholder="ESR1" onCommit={(t) => patch({ gene: t.trim().toUpperCase() })} />
         </label>
         {pick(spec.profileType || "", (v) => patch({ profileType: v }), "the query gene's profile", "on")}
         {pick(spec.otherProfile || spec.profileType || "", (v) => patch({ otherProfile: v === spec.profileType ? undefined : v }), "the profile every other gene is read from, or a generic assay whose every entity is", "against", true)}
-        <label className="tbfield" title="genes listed in each direction; every tested gene is in the histogram">
+        <label className="tbfield" data-tip="genes listed in each direction; every tested gene is in the histogram">
           list <OptionSelect value={String(spec.show ?? 100)} disabled={busy} onValueChange={(v) => patch({ show: Number(v) === 100 ? undefined : Number(v) })}>
             {[25, 100, 250].map((n) => <option key={n} value={n}>{n}</option>)}
           </OptionSelect> each way

@@ -56,7 +56,7 @@ export function RiskGroupsButton({ spec, m, busy, onApply }: {
     : (EQUAL_NAMES[g.groups] ?? g.groups + " equal groups") + ": equal shares of patients by risk score, tied scores kept together";
   return <>
     <Button variant="outline" size="sm" className={TB + " riskgroupsbtn"} disabled={busy || !m}
-      title={!m ? "waiting for the model: the groups are cut from its scores" : now + " — click to change"} onClick={() => setOpen(true)}>
+      data-tip={!m ? "waiting for the model: the groups are cut from its scores" : now + " — click to change"} onClick={() => setOpen(true)}>
       groups
     </Button>
     {open && m && <RiskGroupsDialog m={m} initial={g} onClose={() => setOpen(false)}
@@ -170,12 +170,12 @@ function RiskGroupsDialog({ m, initial, onApply, onClose }: { m: RiskmodelResult
             {pcts.map((p, k) => <span key={k} className="flex items-center gap-1">
               <CutField value={p} label={"cut " + (k + 1) + ", percentile"} onCommit={(v) => setCuts(pcts.map((q, j) => j === k ? v : q))} />
               <span className="text-sm text-muted-foreground">% · {riskScaled(m, scoreAt(p)).toFixed(1)}
-                {lands[k] !== p && <> · <span className="text-foreground" title="this many patients share one score here, and patients with the same score stay in one group">falls at {lands[k]}%: tied scores</span></>}</span>
+                {lands[k] !== p && <> · <span className="text-foreground" data-tip="this many patients share one score here, and patients with the same score stay in one group">falls at {lands[k]}%: tied scores</span></>}</span>
               <RemoveBadge label={"the cut at " + p + "%"} className="px-1" disabled={pcts.length === 1}
-                title={pcts.length === 1 ? "two groups need one cut" : "remove this cut"} onClick={() => setCuts(pcts.filter((_, j) => j !== k))}>{""}</RemoveBadge>
+                data-tip={pcts.length === 1 ? "two groups need one cut" : "remove this cut"} onClick={() => setCuts(pcts.filter((_, j) => j !== k))}>{""}</RemoveBadge>
             </span>)}
             <Button type="button" variant="outline" size="sm" className={TB} disabled={!canAdd}
-              title={pcts.length >= MAX_CUTS ? "at most " + MAX_CUTS + " cuts (5 groups)" : !canAdd ? "no group is wide enough to split" : "add a cut in the middle of the widest group"}
+              data-tip={pcts.length >= MAX_CUTS ? "at most " + MAX_CUTS + " cuts (5 groups)" : !canAdd ? "no group is wide enough to split" : "add a cut in the middle of the widest group"}
               onClick={() => setCuts([...pcts, Math.round((edges[widest[1]] + edges[widest[1] + 1]) / 2)])}>+ add cut</Button>
           </div>
         </div>

@@ -162,7 +162,7 @@ function QueriesPanel({ ctx, v, vi }: CardProps) {
               <code>{q.label}</code>
               <span className="meta">{q.study}</span>
               {q.ms != null && <span className="meta">{q.ms.toLocaleString()}ms</span>}
-              {q.remote && <span className="prem" title="compiled and executed by the peer against its own schema; only aggregates came back">ran on peer</span>}
+              {q.remote && <span className="prem" data-tip="compiled and executed by the peer against its own schema; only aggregates came back">ran on peer</span>}
             </div>
             <pre>{q.sql}</pre>
           </div>
@@ -187,7 +187,7 @@ function ErrorNote({ ctx, v }: CardProps) {
   const { docHistory } = ctx;
   return <>
     {v.error && <ErrorAlert onUndo={docHistory.canUndo ? docHistory.undo : undefined}>{v.kind}: {v.error}{v.participation ? <> <>{v.ms != null && (
-          <span className="lat" title={
+          <span className="lat" data-tip={
             "Server-side wall-clock for this view. Its queries run concurrently, so this is not their sum, and it excludes rendering in your browser." +
             (v.renderMs != null ? "\n\n" + (v.ms - v.renderMs).toLocaleString() + "ms querying · " + v.renderMs.toLocaleString() + "ms drawing the SVG on the server." : "")}>
             {v.ms.toLocaleString()}ms

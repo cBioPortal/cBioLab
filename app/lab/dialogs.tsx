@@ -203,11 +203,11 @@ export function WorkspaceDialog({ doc, saved, shared, busy, unusedParams, error,
       footer={<>
         {saved && (
           <Button type="button" variant="ghost" className="mr-auto text-destructive hover:text-destructive" disabled={busy}
-            title={"delete the saved workspace “" + doc.title + "”"} onClick={onDelete}>Delete</Button>
+            data-tip={"delete the saved workspace “" + doc.title + "”"} onClick={onDelete}>Delete</Button>
         )}
         <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
         {shared?.canEdit && onSaveShared && <Button type="button"
-          title={"save over " + shared.owner + "'s “" + doc.title + "” — refused if someone has saved it since you opened it"}
+          data-tip={"save over " + shared.owner + "'s “" + doc.title + "” — refused if someone has saved it since you opened it"}
           onClick={() => { onClose(); onSaveShared(); }}>Save to theirs</Button>}
         <Button type="submit" variant={shared?.canEdit ? "outline" : "default"} disabled={!name.trim()}>
           {saved ? "Save changes" : shared ? "Save as my copy" : "Save"}</Button>
@@ -278,7 +278,7 @@ function ParamRow({ name, value, busy, onChange }:
         <code className={PARAM_NAME}>${name}</code>
         <div className="flex flex-1 flex-wrap items-center gap-1">
           {items.map(x => (
-            <RemoveBadge key={x} label={x} disabled={busy} title={"remove " + x} onClick={() => onChange(items.filter(y => y !== x))} />
+            <RemoveBadge key={x} label={x} disabled={busy} data-tip={"remove " + x} onClick={() => onChange(items.filter(y => y !== x))} />
           ))}
           <Input list="view-genes" placeholder="add…" value={add} disabled={busy} className="h-7 w-28 text-md md:text-md"
             onChange={e => setAdd(e.target.value.toUpperCase())}

@@ -57,7 +57,7 @@ export function DatasetsTable({ rows }: { rows: DatasetRow[] }) {
     });
   }, [rows, q, on, sort]);
   const head = (key: keyof DatasetRow, label: string, title: string, num = true) => (
-    <th key={String(key)} title={title} className={num ? "num" : undefined} aria-sort={sort.key === key ? (sort.desc ? "descending" : "ascending") : "none"}
+    <th key={String(key)} data-tip={title} className={num ? "num" : undefined} aria-sort={sort.key === key ? (sort.desc ? "descending" : "ascending") : "none"}
       onClick={() => setSort((s) => ({ key, desc: s.key === key ? !s.desc : num }))}>
       {label}{sort.key === key ? (sort.desc ? " ▾" : " ▴") : ""}
     </th>
@@ -79,7 +79,7 @@ export function DatasetsTable({ rows }: { rows: DatasetRow[] }) {
         <GearMenu menuId="ds-columns" title="choose the count columns shown" contentClassName="px-2.5"
           label={<><Columns3 />Columns</>}>
             {COUNTS.map((c) => (
-              <label key={String(c.key)} className={CHK} title={c.title}><Checkbox checked={cols.includes(String(c.key))}
+              <label key={String(c.key)} className={CHK} data-tip={c.title}><Checkbox checked={cols.includes(String(c.key))}
                 onCheckedChange={() => setCols((o) => o.includes(String(c.key)) ? o.filter((x) => x !== String(c.key)) : [...o, String(c.key)])} /> {c.label}</label>
             ))}
         </GearMenu>
@@ -96,10 +96,10 @@ export function DatasetsTable({ rows }: { rows: DatasetRow[] }) {
             {shown.map((r) => (
               <tr key={r.id}>
                 <td className="ds-study">
-                  <a href={"/lab?tab=explore&study=" + encodeURIComponent(r.id)} title={r.id + " — explore this study"}>{r.name}</a>
+                  <a href={"/lab?tab=explore&study=" + encodeURIComponent(r.id)} data-tip={r.id + " — explore this study"}>{r.name}</a>
                   {r.instance !== "a" && <span className="meta"> · {r.instanceLabel}</span>}
                 </td>
-                <td className="ds-dl"><a href={"https://datahub.assets.cbioportal.org/" + encodeURIComponent(r.id) + ".tar.gz"} title="download this study's files from the public cBioPortal datahub" aria-label={"download " + r.id}>
+                <td className="ds-dl"><a href={"https://datahub.assets.cbioportal.org/" + encodeURIComponent(r.id) + ".tar.gz"} data-tip="download this study's files from the public cBioPortal datahub" aria-label={"download " + r.id}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M4 21h16" /></svg>
                 </a></td>
                 <td>{r.citation ? (r.pmids.length

@@ -198,7 +198,7 @@ export function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded
                     onChange={(e) => { void loadFile(e.target.files?.[0]); e.target.value = ""; }} /></label>, or paste below</span>
                 <span className="spacer" />
                 <Button variant="outline" size="sm" className={TB} disabled={exampleBusy} onClick={loadExample}
-                  title={"a few of " + studies[0] + "'s own patients with made-up values, so it can be added as it stands"}>
+                  data-tip={"a few of " + studies[0] + "'s own patients with made-up values, so it can be added as it stands"}>
                   {exampleBusy ? <><LoaderCircle className="animate-spin" /> loading…</> : "Use example data for " + studies[0]}
                 </Button>
               </div>
@@ -291,7 +291,7 @@ export function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded
               {rate < LOW_MATCH && !confirmLow
                 ? <Button variant="outline" size="sm" className={TB} disabled={!resolved || !matchedRows || stale} onClick={() => setConfirmLow(true)}>Save anyway…</Button>
                 : <Button size="sm" className="cd-save" disabled={!resolved || !matchedRows || busy || stale || readOnlyClash || blocked} onClick={save}
-                    title={change?.diff?.same ? "nothing changed from v" + change.version
+                    data-tip={change?.diff?.same ? "nothing changed from v" + change.version
                       : "stored on the server: anyone who logs in can read it, and analyses that use it can be shared"}>
                     {target ? "Save as v" + (target.latestVersion + 1) + " of “" + target.name + "”" : "Add data to " + studyLabel}</Button>}
               <Button variant="link" size="inline" className="text-md" onClick={reset}>start over</Button>

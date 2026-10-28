@@ -11,8 +11,8 @@ function CompareCard({ ctx, v, vi }: CardProps) {
   return <>
     {v.kind === "compare" && v.rows && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Compare" cohorts={cohortChoice(vi, docView(vi))} sub={<>alteration frequencies · {v.annotation}</>} {...placement(ctx, vi)}
-        actions={<Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>} />
-      {v.note && <p className="note" title={(v.studies || []).join(", ") || undefined}
+        actions={<Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} data-tip="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>} />
+      {v.note && <p className="note" data-tip={(v.studies || []).join(", ") || undefined}
         style={v.studies && v.studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{v.note}</p>}
       <div className="vscroll">
         <table className="vtable">
@@ -35,7 +35,7 @@ function CompareCard({ ctx, v, vi }: CardProps) {
                   " · structural-variant " + bt.structuralVariant.altered + "/" + bt.structuralVariant.profiled +
                   (missing && missing.length ? " — no " + missing.map(t => label[t]).join("/") + " data for this cohort's study" : "") : undefined;
                 return (
-                  <td key={c.cohort} className="r tnum" title={title}>
+                  <td key={c.cohort} className="r tnum" data-tip={title}>
                     {c.driverPct}% / {c.anyPct}%{missing && missing.length ? <sup className="warnmark">*</sup> : null}
                   </td>
                 );

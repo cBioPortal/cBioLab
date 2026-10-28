@@ -10,14 +10,14 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="estimate the background within each value of this sample attribute, so that subtypes with different drivers do not read as exclusivity">
+        <label className="tbfield" data-tip="estimate the background within each value of this sample attribute, so that subtypes with different drivers do not read as exclusivity">
           stratify by <OptionSelect value={spec.stratifyBy || ""} disabled={busy} onValueChange={(v) => patch({ stratifyBy: v || undefined })}>
             <option value="">none</option>
             {spec.stratifyBy && !cats.includes(spec.stratifyBy) && <option value={spec.stratifyBy}>{spec.stratifyBy}</option>}
             {cats.map((a) => <option key={a} value={a}>{a}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="any alteration, or only those OncoKB calls oncogenic">
+        <label className="tbfield" data-tip="any alteration, or only those OncoKB calls oncogenic">
           count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
             <option value="any">any alteration</option><option value="driver">oncogenic only</option>
           </OptionSelect>

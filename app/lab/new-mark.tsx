@@ -2,5 +2,5 @@
 import { NEW_TITLE } from "../../lib/new-in-lab.ts";
 
 export function NewMark() {
-  return <span className="ml-1 text-xs font-bold tracking-wide text-new" title={NEW_TITLE}>NEW</span>;
+  return <span className="ml-1 text-xs font-bold tracking-wide text-new" data-tip={NEW_TITLE}>NEW</span>;
 }

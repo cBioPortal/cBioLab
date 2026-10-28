@@ -35,7 +35,7 @@ function toggled(hide: Set<string>, cells: AlterationCell[]): string[] {
 
 function Badge({ n, color, shown, onClick, title, label }: { n: number; color: string; shown: boolean; onClick: () => void; title: string; label: string }) {
   return (
-    <button type="button" className={"lp-badge" + (shown ? "" : " off")} onClick={onClick} title={title} aria-pressed={shown} aria-label={label}
+    <button type="button" className={"lp-badge" + (shown ? "" : " off")} onClick={onClick} data-tip={title} aria-pressed={shown} aria-label={label}
       style={shown ? { background: color, borderColor: color } : { color, borderColor: color }}>
       {n.toLocaleString()}
     </button>
@@ -58,10 +58,10 @@ function AlterationGrid({ g, classes, hide, onHide }: { g: HotspotGene; classes:
           <th key={c}>
             <span className="lp-head">
               <button type="button" className="lp-colname" onClick={() => onHide(toggled(hide, colCells(c)))}
-                title={(colShown(c) ? "hide" : "show") + " every " + (c === "driver" ? "putative driver" : "VUS")}>{c === "driver" ? "Driver" : "VUS"}</button>
+                data-tip={(colShown(c) ? "hide" : "show") + " every " + (c === "driver" ? "putative driver" : "VUS")}>{c === "driver" ? "Driver" : "VUS"}</button>
               <Badge n={total(c)} color={c === "driver" ? "#000000" : "#696969"} shown={colShown(c)} onClick={() => onHide(toggled(hide, colCells(c)))}
                 title={(colShown(c) ? "hide" : "show") + " every " + (c === "driver" ? "putative driver" : "VUS")} label={(c === "driver" ? "drivers" : "VUS") + " total"} />
-              <button type="button" className="lp-only" onClick={() => only(colCells(c))} title={"show only " + (c === "driver" ? "putative drivers" : "VUS")}>only</button>
+              <button type="button" className="lp-only" onClick={() => only(colCells(c))} data-tip={"show only " + (c === "driver" ? "putative drivers" : "VUS")}>only</button>
             </span>
           </th>))}
       </tr></thead>
@@ -74,8 +74,8 @@ function AlterationGrid({ g, classes, hide, onHide }: { g: HotspotGene; classes:
               <th scope="row">
                 <span className="lp-head">
                   <button type="button" className={"lp-rowname" + (rowShown ? "" : " off")} style={{ color: k === "truncating" ? undefined : c.driver }}
-                    onClick={() => onHide(toggled(hide, rowCells(k)))} title={(rowShown ? "hide" : "show") + " every " + c.label.toLowerCase() + " mutation"}>{c.label}</button>
-                  <button type="button" className="lp-only" onClick={() => only(rowCells(k))} title={"show only " + c.label.toLowerCase() + " mutations"}>only</button>
+                    onClick={() => onHide(toggled(hide, rowCells(k)))} data-tip={(rowShown ? "hide" : "show") + " every " + c.label.toLowerCase() + " mutation"}>{c.label}</button>
+                  <button type="button" className="lp-only" onClick={() => only(rowCells(k))} data-tip={"show only " + c.label.toLowerCase() + " mutations"}>only</button>
                 </span>
               </th>
               {COLS.map((col) => {
@@ -103,7 +103,7 @@ function GeneSummary({ g }: { g: HotspotGene }) {
     <div className="lp-summary">
       <div>{link(ids.refseq, "https://www.ncbi.nlm.nih.gov/nuccore/" + (ids.refseq || ""))} | {link(ids.ensembl, "https://grch37.ensembl.org/homo_sapiens/Transcript/Summary?t=" + (ids.ensembl || "").replace(/\.\d+$/, ""))}</div>
       <div>{link(ids.ccds, "https://www.ncbi.nlm.nih.gov/CCDS/CcdsBrowse.cgi?REQUEST=CCDS&DATA=" + (ids.ccds || ""))} | {link(ids.uniprotName || ids.uniprotAccession, "https://www.uniprot.org/uniprot/" + (ids.uniprotAccession || ""))}</div>
-      <div className="lp-freq" title={g.somaticSamples.toLocaleString() + " of " + g.cohortSamples.toLocaleString() + " samples carry a somatic mutation in " + g.gene}>
+      <div className="lp-freq" data-tip={g.somaticSamples.toLocaleString() + " of " + g.cohortSamples.toLocaleString() + " samples carry a somatic mutation in " + g.gene}>
         <span>Somatic Mutation Frequency</span> <b>{freq}</b>
       </div>
     </div>

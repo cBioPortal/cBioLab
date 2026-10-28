@@ -43,7 +43,7 @@ export function StudySearch({ query, onQuery, caps, onCaps, matches, total, chil
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className={cn("h-8 gap-1.5 font-normal", caps.size > 0 && "border-primary text-accent-foreground")}
-            title="show only studies that hold a kind of data">
+            data-tip="show only studies that hold a kind of data">
             <ListFilter />Filters{caps.size > 0 && <span className="tabular-nums">({caps.size})</span>}<ChevronDown className="opacity-60" />
           </Button>
         </DropdownMenuTrigger>
@@ -71,7 +71,7 @@ function StudyName({ s }: { s: StudyInfo }) {
   return (
     <span className="studyname">
       <strong>{s.name}</strong>
-      {s.instance && s.instance !== "a" && <span className="peerbadge" title={"held by the federated peer " + s.instanceLabel}>⧉ {s.instanceLabel}</span>}
+      {s.instance && s.instance !== "a" && <span className="peerbadge" data-tip={"held by the federated peer " + s.instanceLabel}>⧉ {s.instanceLabel}</span>}
     </span>
   );
 }
@@ -95,8 +95,8 @@ export function StudyRows({ hits, selected, onToggle, selectAll, actions }: {
       {hits.length > 0 && (
         <div className="study-row study-head pb-2">
           {selectAll
-            ? <label className="contents cursor-pointer" title={selectAll.title}>
-                <Checkbox checked={selectAll.checked} disabled={selectAll.disabled} onCheckedChange={selectAll.onChange} aria-label={selectAll.label} title={selectAll.title} />
+            ? <label className="contents cursor-pointer" data-tip={selectAll.title}>
+                <Checkbox checked={selectAll.checked} disabled={selectAll.disabled} onCheckedChange={selectAll.onChange} aria-label={selectAll.label} data-tip={selectAll.title} />
                 <span className="normal-case tracking-normal text-sm">{selectAll.label}</span>
               </label>
             : <><span /><span /></>}
@@ -104,7 +104,7 @@ export function StudyRows({ hits, selected, onToggle, selectAll, actions }: {
         </div>
       )}
       {hits.slice(0, STUDY_ROWS_SHOWN).map((s) => (
-        <label key={s.id} title={s.name + " (" + s.id + ")"} className={"study-row" + (selected.includes(s.id) ? " sel" : "")}>
+        <label key={s.id} data-tip={s.name + " (" + s.id + ")"} className={"study-row" + (selected.includes(s.id) ? " sel" : "")}>
           <Checkbox checked={selected.includes(s.id)} onCheckedChange={() => onToggle(s.id)} aria-label={"stage " + s.name} />
           <StudyName s={s} />
           <span className="meta">{s.cancerType}</span>

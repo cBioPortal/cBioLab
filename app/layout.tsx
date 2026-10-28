@@ -3,6 +3,7 @@ import { BUILD_INFO } from "../lib/build-info.ts";
 import { ChatSidebar } from "./_agent/ChatSidebar.tsx";
 import { LabProviders } from "./lab/providers.tsx";
 import { SavedProvider } from "./_saved/saved-context.tsx";
+import { TooltipLayer } from "./_ui/tooltip.tsx";
 
 export const metadata = {
   title: "cbio-lab",
@@ -23,10 +24,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="build-stamp">
           build{" "}
           {BUILD_INFO.url
-            ? <a className="mono" href={BUILD_INFO.url} title={BUILD_INFO.commit ?? undefined}>{BUILD_INFO.label}</a>
-            : <span className="mono" title={BUILD_INFO.commit ? undefined : "this build was not told which commit it is"}>{BUILD_INFO.label}</span>}
+            ? <a className="mono" href={BUILD_INFO.url} data-tip={BUILD_INFO.commit ?? undefined}>{BUILD_INFO.label}</a>
+            : <span className="mono" data-tip={BUILD_INFO.commit ? undefined : "this build was not told which commit it is"}>{BUILD_INFO.label}</span>}
         </footer>
         <ChatSidebar />
+        <TooltipLayer />
       </body>
     </html>
   );

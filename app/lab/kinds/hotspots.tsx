@@ -12,7 +12,7 @@ function HotspotsCard({ ctx, v, vi }: CardProps) {
   return <>
     {v.kind === "hotspots" && v.hotspots && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi), 1)} sub="lollipop by protein position, as the portal's mutation tab draws it" {...placement(ctx, vi)}
-        actions={<Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>} />
+        actions={<Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} data-tip="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>} />
       {/* the plot from the same renderer MCP uses (lib/view-svg.ts), with the gene summary and the
           alteration grid beside it as controls; the grid's selection re-runs nothing */}
       <HotspotsBody v={v} hide={docView(vi).hide} onHide={(h) => updateViewLocal(vi, (vv: any) => {

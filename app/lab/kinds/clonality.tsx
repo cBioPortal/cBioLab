@@ -10,12 +10,12 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="OncoKB driver mutations only, or every mutation call">
+        <label className="tbfield" data-tip="OncoKB driver mutations only, or every mutation call">
           count <OptionSelect value={spec.measure === "any" ? "any" : "driver"} disabled={busy} onValueChange={(v) => patch({ measure: v === "any" ? "any" : undefined })}>
             <option value="driver">driver mutations</option><option value="any">every mutation</option>
           </OptionSelect>
         </label>
-        <label className="chk" title="use only samples whose FACETS_QC is Pass">
+        <label className="chk" data-tip="use only samples whose FACETS_QC is Pass">
           <Checkbox checked={spec.qc !== false} disabled={busy} onCheckedChange={(on) => patch({ qc: (on === true) ? undefined : false })} /> FACETS QC pass only
         </label>
       </div>

@@ -158,7 +158,7 @@ export default function CampaignPage() {
               <strong>{new Date(c.lockedAt!).toLocaleString()}</strong> — {testable.length} testable hypotheses frozen before any result existed.
               The database refuses any later addition, removal or edit.
             </div>
-            <code title="sha256 over every registered test">{c.ledgerHash?.slice(0, 24)}…</code>
+            <code data-tip="sha256 over every registered test">{c.ledgerHash?.slice(0, 24)}…</code>
           </section>
         )}
 
@@ -180,14 +180,14 @@ export default function CampaignPage() {
               // was cut off (a server time limit). Results so far are saved and a resume re-runs
               // only what is missing, so offering it is safe either way.
               <div className="camp-act-row">
-                <Button disabled={!!busy || !!why} title={why || undefined} onClick={() => act("run")}><Play />Resume the run</Button>
+                <Button disabled={!!busy || !!why} data-tip={why || undefined} onClick={() => act("run")}><Play />Resume the run</Button>
                 <span className="camp-dim">
                   {c.hypotheses.filter((h) => h.discovery).length}/{testable.length} tested so far. A run is in progress elsewhere or
                   was interrupted; resuming re-runs only what is missing.
                 </span>
               </div>
             ) : (
-              <Button disabled={!!busy || !!why} title={why || undefined} onClick={() => act("run")}><Play />{`Run all ${testable.length} tests`}</Button>
+              <Button disabled={!!busy || !!why} data-tip={why || undefined} onClick={() => act("run")}><Play />{`Run all ${testable.length} tests`}</Button>
             )}
           </section>
         )}
@@ -216,7 +216,7 @@ export default function CampaignPage() {
               nothing can be added, removed or reworded — the database itself refuses. This is what lets the final report
               say “1 of {testable.length} tested” and mean it.
             </p>
-            <Button disabled={!!busy || !!why} title={why || undefined} onClick={() => act("lock")}>
+            <Button disabled={!!busy || !!why} data-tip={why || undefined} onClick={() => act("lock")}>
               {busy === "lock" ? <><LoaderCircle className="animate-spin" /> locking…</> : <><Lock />{`Lock in ${testable.length} ${testable.length === 1 ? "hypothesis" : "hypotheses"}`}</>}
             </Button>
           </section>
@@ -272,7 +272,7 @@ function AgentPanel({ c, webmcp, busy, why, onSubmit }: { c: Campaign; webmcp: b
         <Textarea id="agent-json" className="camp-json font-mono text-md md:text-md" rows={6} value={text} onChange={(e) => setText(e.target.value)}
           placeholder='[{"statement": "…", "rationale": "…", "doc": {"study": "…", "cohorts": {…}, "views": [{…}]}, "primary": {"view": 0, "stat": "compare", "gene": "…"}, "direction": "higher"}]' />
         <div className="row">
-          <Button variant="outline" disabled={busy || !text.trim() || !!why} title={why || undefined} onClick={submit}>Submit hypotheses</Button>
+          <Button variant="outline" disabled={busy || !text.trim() || !!why} data-tip={why || undefined} onClick={submit}>Submit hypotheses</Button>
           <label className="chk camp-inline"><Checkbox checked={mine} onCheckedChange={(on) => setMine(on === true)} /> these are the researcher's own ideas</label>
           {bad && <span className="camp-err">{bad}</span>}
         </div>
@@ -301,7 +301,7 @@ function HypCard({ h, prior, canRemove, removeWhy, onRemove }: { h: HypothesisRo
       {!!prior?.length && <p className="camp-prior">Tested before: {prior.map((p) => `“${p.question}” → ${p.verdict}${p.p != null ? ` (p=${fmtP(p.p)})` : ""}`).join("; ")}</p>}
       <div className="camp-links">
         <a href={labLink(h)} target="_blank" rel="noreferrer">open the analysis</a>
-        {canRemove && <Button variant="link" size="inline" className="text-destructive" disabled={!!removeWhy} title={removeWhy || undefined} onClick={onRemove}>remove</Button>}
+        {canRemove && <Button variant="link" size="inline" className="text-destructive" disabled={!!removeWhy} data-tip={removeWhy || undefined} onClick={onRemove}>remove</Button>}
       </div>
     </article>
   );

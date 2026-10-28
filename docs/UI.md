@@ -113,6 +113,21 @@ still holds, against a running server.
   a renderer, adds a stress document when the existing ones do not reach its crowded case.
 - **Geometry stays inline, styling does not.** A tooltip's position and a legend swatch's colour
   are data computed from the drawing; borders, padding and type are classes.
+- **Tooltips are `data-tip`, never `title`.** The browser's `title` waits about a second and is cut
+  off by nothing but the screen; `data-tip="…"` on any element is shown by `TooltipLayer`
+  (`app/_ui/tooltip.tsx`, mounted by the root layout) after 300 ms, on hover and keyboard focus,
+  drawn into `body` with a fixed position so a scrolling or clipped container (the oncoprint, the
+  timeline, a dialog's list) never hides it. A component that draws a rich tip at the pointer (an
+  oncoprint cell, a timeline event) uses `FloatingTip` from the same file; when the reader needs to
+  move into it and click (an oncoprint cell's "open this patient"), its state comes from
+  `useHoverTip`, which holds the tip still while the pointer heads for it and open while the pointer
+  is over it; such a tip sits against the cell it explains (`FloatingTip`'s `at`), not beside the
+  pointer, so there is nothing to cross on the way in. A `<title>` in a drawn
+  figure's SVG (the renderers keep them for MCP, exports and the CLI) is read by the same layer, so
+  React-drawn SVG uses `data-tip` instead. `data-tip` is not an accessible name: a control whose
+  only words were its tip also gets an `aria-label`. Not everything needs one — no tip on the app's
+  name, or one that repeats a label already shown whole (the layer skips those anyway, so a tip on
+  text that may be cut with an ellipsis appears only when it is cut).
 
 ## UI conventions — waiting, and never hiding what isn't shown
 

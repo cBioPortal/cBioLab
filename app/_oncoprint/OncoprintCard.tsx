@@ -175,7 +175,7 @@ export function TracksMenu({ attrs, profiles, assays = [], clinical, heatmap, co
           <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
             <TabsList className="h-7">
               <TabsTrigger value="clinical" className="px-2 text-sm">Clinical {studyAttrs.length ? "(" + studyAttrs.length + ")" : ""}</TabsTrigger>
-              <TabsTrigger value="custom" className="px-2 text-sm" title="attributes from your uploads (Explore → Custom data)">Custom ({customAttrs.length})</TabsTrigger>
+              <TabsTrigger value="custom" className="px-2 text-sm" data-tip="attributes from your uploads (Explore → Custom data)">Custom ({customAttrs.length})</TabsTrigger>
               <TabsTrigger value="heatmap" className="px-2 text-sm">Heatmap ({heatOptions.length})</TabsTrigger>
               <TabsTrigger value="cohorts" className="px-2 text-sm">Cohort rows ({cohorts.length})</TabsTrigger>
             </TabsList>
@@ -200,13 +200,13 @@ export function TracksMenu({ attrs, profiles, assays = [], clinical, heatmap, co
               <div key={name}>
                 <label className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
                   <Checkbox className="self-center" checked={on} disabled={busy || (!on && chosen.length >= cap)} onCheckedChange={() => toggle(name)} />
-                  <span style={{ flex: 1 }} title={tab === "custom" || ga ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : ga ? ga.name + " (generic assay)" : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
+                  <span style={{ flex: 1 }} data-tip={tab === "custom" || ga ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : ga ? ga.name + " (generic assay)" : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
                     {tab === "custom" && <span className="meta"> · {parseCustomAttr(name)?.dataset}</span>}</span>
                   {a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
                 </label>
                 {h && ga && <div className="mb-1.5 ml-6 flex flex-wrap items-center gap-1">
                   {(h.entities || []).map((e) => <span key={e} className="flex items-center gap-1 rounded border border-input px-1 text-sm">
-                    <span className="max-w-40 truncate" title={e}>{assayTrackLabel(e, name)}</span>
+                    <span className="max-w-40 truncate" data-tip={e}>{assayTrackLabel(e, name)}</span>
                     <button type="button" aria-label={"remove " + e} disabled={busy} className="text-muted-foreground hover:text-foreground"
                       onClick={() => setEntities(name, (h.entities || []).filter((x) => x !== e))}>×</button></span>)}
                   {(h.entities || []).length < 12 && <EntityField study={ga.study || ""} profile={name} value="" placeholder="add an entity…" busy={busy}
@@ -282,18 +282,18 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
         busy={busy}
         controls={<>
           <Button variant="outline" size="sm" className={cn(TB, "genesbtn")} disabled={busy}
-            title="choose the genes this oncoprint draws" onClick={() => onGenes ? onGenes() : setGenesOpen(true)}>genes ({geneRowCount(view)})</Button>
-          <label className="tbfield" title="a cohort selects patients; sample mode draws every sample of those patients">columns <OptionSelect
+            data-tip="choose the genes this oncoprint draws" onClick={() => onGenes ? onGenes() : setGenesOpen(true)}>genes ({geneRowCount(view)})</Button>
+          <label className="tbfield" data-tip="a cohort selects patients; sample mode draws every sample of those patients">columns <OptionSelect
             value={view.unit || "patient"} disabled={busy}
             onValueChange={(v) => { const n = { ...view }; if (v === "sample") n.unit = "sample"; else delete n.unit; edit(n); }}>
             <option value="patient">patients</option><option value="sample">samples</option>
           </OptionSelect></label>
-          <label className="tbfield" title="driver calls come from the version-pinned OncoKB store">annotate <OptionSelect
+          <label className="tbfield" data-tip="driver calls come from the version-pinned OncoKB store">annotate <OptionSelect
             value={disp.annotate || "oncokb"} disabled={busy}
             onValueChange={(v) => edit(setDisplayKey(view, "annotate", v === "none" ? "none" : undefined))}>
             <option value="oncokb">OncoKB</option><option value="none">none</option>
           </OptionSelect></label>
-          <label className="chk tbchk" title="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
+          <label className="chk tbchk" data-tip="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
             <Checkbox checked={!!disp.hideVUS} disabled={busy}
               onCheckedChange={(on) => edit(setDisplayKey(view, "hideVUS", on === true || undefined))} /> drivers only</label>
         </>}
@@ -307,7 +307,7 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
           onHeatmap={(next) => edit(withHeatmap(view, next))}
           onDerived={(next) => edit(withDerived(view, next))} />}
         footer={<>
-          {note && <p className="note" title={(studies || []).join(", ") || undefined}
+          {note && <p className="note" data-tip={(studies || []).join(", ") || undefined}
             style={studies && studies.length > 2 ? { cursor: "help", textDecorationLine: "underline", textDecorationStyle: "dotted" } : undefined}>{note}</p>}
           {c && c.queries && c.queries.length > 0 && (
             <details className="provsql">

@@ -27,7 +27,7 @@ export function Choice({ value, onChange, options, placeholder, pending, disable
   const known = value === "" || options.some(([v]) => v === value);
   return (
     <Select value={value === "" && hasNone ? NONE : value} onValueChange={(v) => onChange(v === NONE ? "" : v)} disabled={disabled}>
-      <SelectTrigger size="sm" title={title}
+      <SelectTrigger size="sm" data-tip={title} aria-label={title}
         className={cn("bg-card text-md", size === "ctl" ? "h-ctl gap-1 px-2 data-[size=sm]:h-ctl [&_svg:not([class*='size-'])]:size-3.5" : "h-8", className)}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
@@ -72,7 +72,7 @@ export function OptionSelect({ value, onValueChange, children, disabled, title, 
   const hasNone = options.some((o) => o.value === "");
   return (
     <Select value={v === "" && hasNone ? NONE : v} onValueChange={(x) => onValueChange(x === NONE ? "" : x)} disabled={disabled}>
-      <SelectTrigger size="sm" title={title} aria-label={ariaLabel} style={style}
+      <SelectTrigger size="sm" data-tip={title} aria-label={ariaLabel} style={style}
         className={cn("h-ctl gap-1 bg-card px-2 text-md data-[size=sm]:h-ctl [&_svg:not([class*='size-'])]:size-3.5", className)}>
         <SelectValue />
       </SelectTrigger>

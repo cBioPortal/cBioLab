@@ -48,7 +48,7 @@ function CourseCard({ ctx, v, vi }: CardProps) {
               <Button key={e.canonical} type="button" variant="outline" size="xs" disabled={busy || (!chosen.includes(e.canonical) && chosen.length >= 6)}
                 className={CHIP} aria-pressed={chosen.includes(e.canonical)}
                 onClick={() => toggle(e.canonical)}
-                title={(!chosen.includes(e.canonical) && chosen.length >= 6 ? "a course view measures at most 6 event types — drop one first. " : "") +
+                data-tip={(!chosen.includes(e.canonical) && chosen.length >= 6 ? "a course view measures at most 6 event types — drop one first. " : "") +
                   e.patients.toLocaleString() + " patients · " + e.perPatient + " events each · " +
                   (e.hasDurations ? "carries durations, so it is drawn as a state patients are IN"
                     : e.perPatient < 1.5 ? "about one per patient and no duration — likely a filing record rather than a clinical course"

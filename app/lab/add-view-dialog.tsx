@@ -85,7 +85,7 @@ export function AddViewDialog({ open, onOpenChange, items, onAdd }: {
               const n = rows.filter((r) => inFilter(r, c.id)).length;
               const active = !needle && cat === c.id;
               return (<Fragment key={c.id}>
-                <Button variant="ghost" size="sm" data-cat={c.id} title={c.id === "classic" ? "views cBioPortal also draws (no NEW mark)" : undefined} aria-current={active || undefined}
+                <Button variant="ghost" size="sm" data-cat={c.id} data-tip={c.id === "classic" ? "views cBioPortal also draws (no NEW mark)" : undefined} aria-current={active || undefined}
                   onClick={() => { setCat(c.id); setQ(""); }}
                   className={cn("flex-none justify-between gap-3 font-normal md:w-full",
                     active ? "bg-card font-medium text-accent-foreground shadow-xs hover:bg-card" : "text-muted-foreground hover:bg-card/70")}>
@@ -112,7 +112,7 @@ export function AddViewDialog({ open, onOpenChange, items, onAdd }: {
                     {g.rows.map((r) => (
                       <li key={r.kind}>
                         <Button variant="outline" data-kind={r.kind} disabled={!!r.blocked} aria-busy={r.waiting || undefined}
-                          title={r.blocked || ("add a " + r.name.toLowerCase() + " view, then choose its cohorts")}
+                          data-tip={r.blocked || ("add a " + r.name.toLowerCase() + " view, then choose its cohorts")}
                           onClick={() => { onAdd(r.kind); onOpenChange(false); setQ(""); }}
                           className={cn("addview-item group h-full w-full items-start justify-start gap-2.5 px-3 py-2 text-left font-normal whitespace-normal shadow-none",
                             !r.blocked && "hover:border-primary/60")}>

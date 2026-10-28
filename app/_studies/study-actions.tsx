@@ -32,11 +32,11 @@ export function StudyRowActions({ id, acts }: { id: string; acts: RowActs }) {
         // inside the row's <label>, so a click must not reach it and tick the row
         if (a.href) return (
           <Button key={k} asChild variant="ghost" size="icon-xs" className={cls}>
-            <a href={a.href} title={a.title} aria-label={LABEL[k] + " " + id} onClick={(e) => e.stopPropagation()}>{ICONS[k]}</a>
+            <a href={a.href} data-tip={a.title} aria-label={LABEL[k] + " " + id} onClick={(e) => e.stopPropagation()}>{ICONS[k]}</a>
           </Button>
         );
         return (
-          <Button key={k} variant="ghost" size="icon-xs" className={cls} title={a.title} aria-label={LABEL[k] + " " + id}
+          <Button key={k} variant="ghost" size="icon-xs" className={cls} data-tip={a.title} aria-label={LABEL[k] + " " + id}
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); a.onClick?.(); }}>{ICONS[k]}</Button>
         );
       })}

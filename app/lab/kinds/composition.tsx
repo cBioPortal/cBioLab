@@ -14,7 +14,7 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="where the parts come from: every entity of a generic-assay profile, or numeric clinical attributes you list">
+        <label className="tbfield" data-tip="where the parts come from: every entity of a generic-assay profile, or numeric clinical attributes you list">
           parts <OptionSelect value={fromProfile ? "profile:" + (spec.profileType || "") : "attributes"} disabled={busy}
             onValueChange={(v) => v === "attributes"
               ? patch({ profileType: undefined, entities: undefined, attributes: spec.attributes?.length ? spec.attributes : [], sort: undefined })
@@ -24,23 +24,23 @@ function Controls({ c }: { c: KindCardCtx }) {
             <option value="attributes">clinical attributes…</option>
           </OptionSelect>
         </label>
-        {!fromProfile && <label className="tbfield" title="the numeric clinical attributes that are the parts, comma-separated (2–16; custom: names work)">
+        {!fromProfile && <label className="tbfield" data-tip="the numeric clinical attributes that are the parts, comma-separated (2–16; custom: names work)">
           attributes <DraftInput value={(spec.attributes || []).join(", ")} disabled={busy} width="22rem" placeholder="custom:my-data/A, custom:my-data/B"
             onCommit={(t) => patch({ attributes: t.split(",").map((x) => x.trim()).filter(Boolean), sort: undefined })} />
         </label>}
-        {!fromProfile && <label className="tbfield" title="one bar per patient, or per sample">
+        {!fromProfile && <label className="tbfield" data-tip="one bar per patient, or per sample">
           per <OptionSelect value={spec.unit === "sample" ? "sample" : "patient"} disabled={busy} onValueChange={(v) => patch({ unit: v === "sample" ? "sample" : undefined })}>
             <option value="patient">patient</option><option value="sample">sample</option>
           </OptionSelect>
         </label>}
       </div>
       <div className="tbz"><span className="tbl">view</span>
-        {parts.length > 0 && <label className="tbfield" title="the part the cases are ordered by, highest first">
+        {parts.length > 0 && <label className="tbfield" data-tip="the part the cases are ordered by, highest first">
           sort by <OptionSelect value={spec.sort || parts[0]} disabled={busy} onValueChange={(v) => patch({ sort: v === parts[0] ? undefined : v })}>
             {parts.map((x) => <option key={x} value={x}>{names.get(x) || x}</option>)}
           </OptionSelect>
         </label>}
-        <label className="chk" title="divide each case's parts by their sum, so every bar is a whole">
+        <label className="chk" data-tip="divide each case's parts by their sum, so every bar is a whole">
           <Checkbox checked={spec.normalize !== false} disabled={busy} onCheckedChange={(on) => patch({ normalize: on === true ? undefined : false })} /> shares
         </label>
       </div>

@@ -12,7 +12,7 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="split each cohort by a categorical attribute; the largest groups are drawn and the rest pooled into Other">
+        <label className="tbfield" data-tip="split each cohort by a categorical attribute; the largest groups are drawn and the rest pooled into Other">
           by <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ groupBy: v || undefined })}>
             <option value="">cohort only</option>
             <option value="CANCER_TYPE">cancer type</option>
@@ -20,12 +20,12 @@ function Controls({ c }: { c: KindCardCtx }) {
             {cats.filter((a) => a !== "CANCER_TYPE").map((a) => <option key={a} value={a}>{a}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="how many of the largest groups are drawn">
+        <label className="tbfield" data-tip="how many of the largest groups are drawn">
           top <OptionSelect value={String(spec.top ?? 8)} disabled={busy || !by} onValueChange={(v) => patch({ top: v === "8" ? undefined : Number(v) })}>
             {[...new Set([4, 8, 12, 20, spec.top ?? 8])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
           </OptionSelect>
         </label>
-        <label className="chk" title="compare each patient's highest level between their primary and metastatic samples (SAMPLE_TYPE)">
+        <label className="chk" data-tip="compare each patient's highest level between their primary and metastatic samples (SAMPLE_TYPE)">
           <Checkbox checked={spec.pairBy !== null} disabled={busy} onCheckedChange={(on) => patch({ pairBy: on === true ? undefined : null })} /> primary vs metastasis
         </label>
       </div>

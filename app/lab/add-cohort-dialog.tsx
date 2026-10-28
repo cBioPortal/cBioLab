@@ -88,10 +88,10 @@ export function AddCohortDialog({ target, analysis, library, studies, storeLists
       <li key={name} className="acd-row">
         <div className="acd-main">
           <div className="acd-name">{name}{as !== name && <span className="meta"> — added as “{as}”, since this analysis already has a different “{name}”</span>}</div>
-          <div className="meta" title={desc}>{desc}</div>
+          <div className="meta" data-tip={desc}>{desc}</div>
           <div className="acd-def"><CohortPills def={def} /></div>
         </div>
-        <Button variant="outline" size="sm" className={TB} disabled={full} title={addTitle("“" + as + "”")} onClick={() => onAdd(as, copy)}>{replaces ? "Use" : <><Plus />Add</>}</Button>
+        <Button variant="outline" size="sm" className={TB} disabled={full} data-tip={addTitle("“" + as + "”")} onClick={() => onAdd(as, copy)}>{replaces ? "Use" : <><Plus />Add</>}</Button>
       </li>
     );
   };
@@ -127,10 +127,10 @@ export function AddCohortDialog({ target, analysis, library, studies, storeLists
                     <span className="cohortswatch" aria-hidden="true" style={{ background: CAT_COLORS[analysis.indexOf(c) % CAT_COLORS.length] }} />
                     {c.name} {c.count != null && <><strong>{c.count.toLocaleString()}</strong> <span className="meta">patients</span></>}
                   </div>
-                  <div className="meta" title={c.views.join(", ")}>{c.views.length ? "in " + c.views.join(", ") : "in no view yet"}</div>
+                  <div className="meta" data-tip={c.views.join(", ")}>{c.views.length ? "in " + c.views.join(", ") : "in no view yet"}</div>
                   <div className="acd-def"><CohortPills def={c.def} /></div>
                 </div>
-                <Button variant="outline" size="sm" className={TB} disabled={full} title={addTitle("“" + c.name + "”")} onClick={() => onAdd(c.name)}>{replaces ? "Use" : <><Plus />Add</>}</Button>
+                <Button variant="outline" size="sm" className={TB} disabled={full} data-tip={addTitle("“" + c.name + "”")} onClick={() => onAdd(c.name)}>{replaces ? "Use" : <><Plus />Add</>}</Button>
               </li>
             ))}
           </ul>
@@ -157,7 +157,7 @@ export function AddCohortDialog({ target, analysis, library, studies, storeLists
               Explore opens over this analysis with the studies it already uses. Filter with its charts, name the
               selection, and it comes back as a cohort of <strong>{target.title}</strong>; Cancel returns here with nothing added.
             </p>
-            <Button disabled={full} title={full ? addTitle("") : undefined} onClick={onExplore}>Open Explore</Button>
+            <Button disabled={full} data-tip={full ? addTitle("") : undefined} onClick={onExplore}>Open Explore</Button>
           </div>
         )}
         {source === "list" && <ListSource studies={studies} saved={library.saved} disabled={full} doneTitle={(as) => addTitle("“" + as + "”")}
@@ -227,7 +227,7 @@ function CellsSource({ cells, full, replaces, addTitle, nameFor, storeLists, onA
         <div className="viewtb">
           <div className="tbz">
             <label className="tbfield">name <Input aria-label="cohort name" className="h-ctl w-56 text-md md:text-md" value={name} onChange={(e) => setName(e.target.value)} /></label>
-            <Button variant="outline" size="sm" className={TB} disabled={full || busy} title={addTitle("“" + as + "”")}
+            <Button variant="outline" size="sm" className={TB} disabled={full || busy} data-tip={addTitle("“" + as + "”")}
               onClick={() => void add()}>{busy && <span className="spinner" />}{replaces ? "Use" : <><Plus />Add</>}</Button>
           </div>
         </div>

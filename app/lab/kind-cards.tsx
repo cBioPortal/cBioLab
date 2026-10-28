@@ -56,7 +56,7 @@ export function KindCard({ ctx, v, vi }: CardProps) {
         cohorts={cohortChoice(vi, docView(vi), ui.maxCohorts)} cohortInSub={ui.cohortInHeader}
         {...placement(ctx, vi)}
         actions={ui.genes
-          ? <Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} title="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>
+          ? <Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} data-tip="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>
           : undefined} />
       {(() => {
         const mc = { vi, spec: docView(vi), v, busy, updating: busy || pendingKeys.has(viewIds[vi]), patch: (p: Record<string, unknown>) => patchView(vi, p),

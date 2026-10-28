@@ -30,19 +30,19 @@ function RiskModelSettings({ vi, spec, busy, patch }: { vi: number; spec: any; b
   return (
     <GearMenu menuId={"risk-settings:" + vi} menuStore={RISK_MENUS} wide className="risksettingsbtn" contentClassName="gap-1.5 px-2.5 py-2" title="risk model options"
       label={<><Settings2 />settings</>}>
-      <div className="setrow" title="the lasso share of the penalty: lasso keeps fewer genes, ridge keeps all of them shrunk">
+      <div className="setrow" data-tip="the lasso share of the penalty: lasso keeps fewer genes, ridge keeps all of them shrunk">
         <span className="meta">penalty</span>
         <Choice className="flex-1" value={alpha} disabled={busy} onChange={(v) => patch({ alpha: Number(v) })} options={penalties} />
       </div>
-      <div className="setrow" title="random two-thirds / one-third splits; each patient's score is the mean over the runs that held them out (OncoCast recommends 50 or more)">
+      <div className="setrow" data-tip="random two-thirds / one-third splits; each patient's score is the mean over the runs that held them out (OncoCast recommends 50 or more)">
         <span className="meta">runs</span>
         <Choice className="flex-1" value={runs} disabled={busy} onChange={(v) => patch({ runs: Number(v) })}
           options={(runSteps.includes(runs) ? runSteps : [runs, ...runSteps]).map((r) => [r, r] as const)} />
       </div>
-      <label className="chk" title="train only on the discovery half of the engine's fixed split, and report the groups, table and C-index on the validation half, which the model never saw">
+      <label className="chk" data-tip="train only on the discovery half of the engine's fixed split, and report the groups, table and C-index on the validation half, which the model never saw">
         <Checkbox checked={!!spec.validate} disabled={busy} onCheckedChange={(on) => patch({ validate: (on === true) || undefined })} /> validate on held-out half
       </label>
-      <div className="setrow" title="another cohort of this analysis to score with the fitted model, cut at the training thresholds, with its C-index and curves (empty for none)">
+      <div className="setrow" data-tip="another cohort of this analysis to score with the fitted model, cut at the training thresholds, with its C-index and curves (empty for none)">
         <span className="meta">validate on</span>
         <DraftInput value={spec.validateOn || ""} disabled={busy} width="10rem" placeholder="cohort name"
           onCommit={(t) => patch({ validateOn: t.trim() || undefined })} />
@@ -62,12 +62,12 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb riskmodel-tb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="mutations counted as a gene's feature">
+        <label className="tbfield" data-tip="mutations counted as a gene's feature">
           genes <OptionSelect value={spec.measure || "any"} disabled={busy} onValueChange={(v) => patch({ measure: v })}>
             <option value="any">any mutation</option><option value="driver">OncoKB drivers</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" title="a separate baseline hazard per value — use CANCER_TYPE on a cohort of several cancers, or a gene that marks a type carries its prognosis">
+        <label className="tbfield" data-tip="a separate baseline hazard per value — use CANCER_TYPE on a cohort of several cancers, or a gene that marks a type carries its prognosis">
           stratify by <OptionSelect value={spec.strata || ""} disabled={busy} onValueChange={(v) => patch({ strata: v || undefined })}>
             <option value="">nothing</option>
             {!cats.includes(spec.strata) && spec.strata && <option value={spec.strata}>{spec.strata}</option>}
@@ -78,7 +78,7 @@ function Controls({ c }: { c: KindCardCtx }) {
           options={c.attrs.filter((a) => a.attribute !== spec.strata).map((a) => ({ value: a.attribute, label: a.attribute, hint: a.kind === "num" ? "number" : "category" }))}
           chosen={spec.covariates || []} max={6} busy={busy} menuId={"risk-cov:" + c.vi} menuStore={RISK_MENUS}
           onChange={(next) => patch({ covariates: next.length ? next : undefined })} />
-        <label className="tbfield" title="start each patient's clock at a timeline event instead of the study's day 0; they then enter the risk set at day 0 (delayed entry)">
+        <label className="tbfield" data-tip="start each patient's clock at a timeline event instead of the study's day 0; they then enter the risk set at day 0 (delayed entry)">
           clock from <OptionSelect value={spec.anchor?.eventType || ""} disabled={busy}
             onValueChange={(v) => patch({ anchor: v ? { ...(spec.anchor || {}), eventType: v } : undefined })}>
             <option value="">study's day 0</option>
@@ -87,11 +87,11 @@ function Controls({ c }: { c: KindCardCtx }) {
           </OptionSelect>
         </label>
         {spec.anchor?.eventType && <>
-          <label className="tbfield" title="only anchor events with this attribute (e.g. SUBTYPE); empty for any">
+          <label className="tbfield" data-tip="only anchor events with this attribute (e.g. SUBTYPE); empty for any">
             where <DraftInput value={spec.anchor.key || ""} disabled={busy} width="6rem" placeholder="attribute"
               onCommit={(t) => patch({ anchor: { eventType: spec.anchor.eventType, ...(t.trim() ? { key: t.trim(), value: spec.anchor.value || "" } : {}) } })} />
           </label>
-          <label className="tbfield" title="the value that attribute must take (e.g. Immuno)">
+          <label className="tbfield" data-tip="the value that attribute must take (e.g. Immuno)">
             = <DraftInput value={spec.anchor.value || ""} disabled={busy} width="6rem" placeholder="value"
               onCommit={(t) => patch({ anchor: { ...spec.anchor, value: t } })} />
           </label>
@@ -103,7 +103,7 @@ function Controls({ c }: { c: KindCardCtx }) {
         <RiskTable1Button vi={c.vi} spec={spec} m={c.v?.riskmodel} busy={busy} attrs={c.attrs} docJson={c.docJson} onPatch={patch} />
       </div>
       <div className="tbz"><span className="tbl">view</span>
-        <label className="tbfield" title="the volcano names the genes the model kept in at least this share of its runs; the rest are drawn unnamed">
+        <label className="tbfield" data-tip="the volcano names the genes the model kept in at least this share of its runs; the rest are drawn unnamed">
           label genes kept in ≥ <OptionSelect value={String(labelAbove)} disabled={busy} onValueChange={(v) => patch({ labelAbove: Number(v) === RISK_LABEL_ABOVE ? undefined : Number(v) })}>
             {!RISK_LABEL_STEPS.includes(labelAbove) && <option value={labelAbove}>{Math.round(labelAbove * 100)}%</option>}
             {RISK_LABEL_STEPS.map((t) => <option key={t} value={t}>{Math.round(t * 100)}%</option>)}

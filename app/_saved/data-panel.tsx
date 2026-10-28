@@ -51,7 +51,7 @@ export function DataPanel() {
   };
   const [adding, setAdding] = useState<string[] | null>(null);
   const add = server.unlocked && <Button className="cd-adddata" onClick={() => { setNote(null); setAdding(actions.studies?.() ?? []); }}
-    title="upload a table of annotations, matched to the study it belongs to"><Plus />Add data</Button>;
+    data-tip="upload a table of annotations, matched to the study it belongs to"><Plus />Add data</Button>;
 
   return (
     <section className="card cd-saved m-0">
@@ -76,18 +76,18 @@ export function DataPanel() {
                     <td><b>{d.name}</b> <span className="meta">custom:{d.slug} · {d.level} level · v{d.latestVersion}
                       {d.versions.length > 1 ? " of " + d.versions.length : ""} · {new Date(d.updatedAt).toLocaleDateString()}
                       {" · "}{d.rights.share ? "shared with " + sharingLabel(d.sharing) : "from " + d.ownerEmail}</span>
-                      {d.note && <span className="cd-rownote mt-0.5 line-clamp-2 block max-w-xl text-md whitespace-pre-wrap" title={d.note}>{d.note}</span>}</td>
+                      {d.note && <span className="cd-rownote mt-0.5 line-clamp-2 block max-w-xl text-md whitespace-pre-wrap" data-tip={d.note}>{d.note}</span>}</td>
                     <td className="meta">{v?.columns.map((c) => c.name).join(", ")}</td>
                     <td className="meta">{v?.rowCount.toLocaleString()} {d.level}s</td>
                     <td className="meta">{v?.studies.join(", ")}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       {v && v.studies.length > 0 && <><Button variant="outline" size="sm" className={TB}
-                        title={"start an analysis with one cohort: the " + v.rowCount.toLocaleString() + " " + d.level + "s' patients with a row in this upload"}
+                        data-tip={"start an analysis with one cohort: the " + v.rowCount.toLocaleString() + " " + d.level + "s' patients with a row in this upload"}
                         onClick={() => { actions.openDoc(uploadDoc(d, v.studies)); close(); }}><Users />Analyze</Button>{" "}</>}
                       <Button variant="outline" size="sm" className={TB} disabled={!!busy}
                         onClick={() => void act("exporting…", async () => download(await fetchServerVersion(d.id, d.latestVersion)))}><Download />Export</Button>{" "}
                       {d.rights.edit && v && <><Button variant="outline" size="sm" className={cn(TB, "cd-edit")} disabled={!!busy}
-                        title={"change v" + d.latestVersion + " in a table or replace it from a file; every change is shown before it is saved as v" + (d.latestVersion + 1)}
+                        data-tip={"change v" + d.latestVersion + " in a table or replace it from a file; every change is shown before it is saved as v" + (d.latestVersion + 1)}
                         onClick={() => { setNote(null); setEditing(d); }}><Pencil />Edit…</Button>{" "}</>}
                       {d.rights.share && <><Button variant="outline" size="sm" className={TB} disabled={!!busy} onClick={() => setSharing(d)}><Share2 />Share…</Button>{" "}
                         <Button variant="outline" size="sm" className={cn(TB, "text-destructive hover:text-destructive")} disabled={!!busy} onClick={() => remove(d)}><Trash2 />Delete</Button></>}

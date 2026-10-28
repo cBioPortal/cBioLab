@@ -58,7 +58,7 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
       </div>
       <table className="pb-table">
         <thead><tr>{cols.map((c) => (
-          <th key={c.key} className={c.num ? "num" : undefined} title={c.title} aria-sort={sort.key === c.key ? (sort.desc ? "descending" : "ascending") : "none"}
+          <th key={c.key} className={c.num ? "num" : undefined} data-tip={c.title} aria-sort={sort.key === c.key ? (sort.desc ? "descending" : "ascending") : "none"}
             onClick={() => setSort((s) => ({ key: c.key, desc: s.key === c.key ? !s.desc : !!c.num }))}>
             {c.label}{sort.key === c.key ? (sort.desc ? " ▾" : " ▴") : ""}
           </th>))}</tr></thead>

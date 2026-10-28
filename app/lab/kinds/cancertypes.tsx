@@ -48,7 +48,7 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" title="the portal's category type: the study, the cancer type or the detailed cancer type — or any other sample attribute">
+        <label className="tbfield" data-tip="the portal's category type: the study, the cancer type or the detailed cancer type — or any other sample attribute">
           category <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ groupBy: v === "CANCER_TYPE" ? undefined : v })}>
             <option value="study">Cancer Study</option>
             <option value="CANCER_TYPE">Cancer Type</option>
@@ -57,24 +57,24 @@ function Controls({ c }: { c: KindCardCtx }) {
             {cats.filter((a) => a !== "CANCER_TYPE" && a !== "CANCER_TYPE_DETAILED").map((a) => <option key={a} value={a}>{a}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="count patients (as the portal does by default — a patient counts in each group one of their samples is in) or samples">
+        <label className="tbfield" data-tip="count patients (as the portal does by default — a patient counts in each group one of their samples is in) or samples">
           count by <OptionSelect value={spec.unit === "sample" ? "sample" : "patient"} disabled={busy} onValueChange={(v) => patch({ unit: v === "sample" ? "sample" : undefined })}>
             <option value="patient">patients</option><option value="sample">samples</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" title="count every alteration, or only OncoKB drivers">
+        <label className="tbfield" data-tip="count every alteration, or only OncoKB drivers">
           count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
             <option value="any">any alteration</option><option value="driver">drivers</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" title="groups with fewer profiled patients (or samples) than this are pooled into one bar, never dropped">
+        <label className="tbfield" data-tip="groups with fewer profiled patients (or samples) than this are pooled into one bar, never dropped">
           min group <OptionSelect value={String(spec.minSamples ?? 10)} disabled={busy} onValueChange={(v) => patch({ minSamples: Number(v) })}>
             {[...new Set([1, 10, 50, 100, 200, 500, spec.minSamples ?? 10])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
           </OptionSelect>
         </label>
       </div>
       <div className="tbz"><span className="tbl">view</span>
-        <label className="tbfield" title="the y axis: each group's altered share, or its altered count">
+        <label className="tbfield" data-tip="the y axis: each group's altered share, or its altered count">
           y-axis <OptionSelect value={spec.show === "count" ? "count" : "frequency"} disabled={busy} onValueChange={(v) => patch({ show: v === "count" ? "count" : undefined })}>
             <option value="frequency">Alteration Frequency</option><option value="count">Absolute Counts</option>
           </OptionSelect>

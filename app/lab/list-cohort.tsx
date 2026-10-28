@@ -107,7 +107,7 @@ export function ListSource({ studies, studyPicker, saved, disabled, doneTitle, d
           <label className="tbfield">name <Input aria-label="set name" className="h-ctl w-56 text-md md:text-md" value={name} placeholder="name this list…"
             onChange={(e) => { setName(e.target.value); reset(); }} /></label>
           <Button variant="outline" size="sm" className={cn(TB, "idsetsave")} disabled={busy || !ids.length || !studies.length || !name.trim()}
-            title={!studies.length ? "choose the study to match the ids in" : !ids.length ? "paste some ids first"
+            data-tip={!studies.length ? "choose the study to match the ids in" : !ids.length ? "paste some ids first"
               : !name.trim() ? "name the list first: it is how it is found again, in the analysis and your library" : undefined}
             onClick={() => void save()}>
             {busy && !done && <span className="spinner" />}Match {ids.length ? ids.length.toLocaleString() + " id" + (ids.length === 1 ? "" : "s") : "ids"}</Button>
@@ -125,7 +125,7 @@ export function ListSource({ studies, studyPicker, saved, disabled, doneTitle, d
         </p>
         <div className="viewtb">
           <div className="tbz">
-            <Button variant="outline" size="sm" className={cn(TB, "idsetdone")} disabled={disabled || busy} title={doneTitle(as)}
+            <Button variant="outline" size="sm" className={cn(TB, "idsetdone")} disabled={disabled || busy} data-tip={doneTitle(as)}
               onClick={() => void finish(as, def)}>{busy && <span className="spinner" />}{doneLabel}</Button>
           </div>
         </div>

@@ -12,17 +12,17 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">exposure</span>
-        <label className="tbfield" title="patients with an event of this type are exposed, the rest unexposed">
+        <label className="tbfield" data-tip="patients with an event of this type are exposed, the rest unexposed">
           had <OptionSelect value={ex.eventType || ""} disabled={busy} onValueChange={(v) => patch({ exposure: { ...ex, eventType: v } })}>
             {!types.includes(ex.eventType) && <option value={ex.eventType || ""}>{ex.eventType || "choose…"}</option>}
             {types.map((t) => <option key={t} value={t}>{t}</option>)}
           </OptionSelect>
         </label>
-        <label className="tbfield" title="only events with this attribute (e.g. SUBTYPE, AGENT); empty for any">
+        <label className="tbfield" data-tip="only events with this attribute (e.g. SUBTYPE, AGENT); empty for any">
           where <DraftInput value={ex.key || ""} disabled={busy} width="6rem" placeholder="attribute"
             onCommit={(t) => patch({ exposure: { eventType: ex.eventType, ...(t.trim() ? { key: t.trim(), value: ex.value || "" } : {}) } })} />
         </label>
-        <label className="tbfield" title="the value that attribute must take (e.g. Immuno)">
+        <label className="tbfield" data-tip="the value that attribute must take (e.g. Immuno)">
           = <DraftInput value={ex.value || ""} disabled={busy} width="7rem" placeholder="value"
             onCommit={(t) => patch({ exposure: { ...ex, value: t } })} />
         </label>

@@ -126,11 +126,11 @@ function Pill({ leaf, negated, onRemove, onCustomData }: { leaf: any; negated?: 
     <span className="fpill" style={{ borderLeftColor: meta.color }}>
       <span className="fkind">{meta.label}</span>
       {custom && (onCustomData
-        ? <button className="customtag" title={"show the uploaded data behind this clause (" + leaf.attribute + ")"}
+        ? <button className="customtag" data-tip={"show the uploaded data behind this clause (" + leaf.attribute + ")"}
             onClick={() => onCustomData(leaf.attribute, leaf, !!negated)}>custom</button>
-        : <span className="customtag" title={leaf.attribute}>custom</span>)}
+        : <span className="customtag" data-tip={leaf.attribute}>custom</span>)}
       {negated && <span className="fnot">NOT</span>}
-      <span className="fval" title={text}>{text}</span>
+      <span className="fval" data-tip={text}>{text}</span>
       {onRemove && <button className="fx" aria-label="remove clause" onClick={onRemove}>×</button>}
     </span>
   );

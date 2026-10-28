@@ -50,20 +50,20 @@ function SavedCohortMenu({ id, name, def, onAnalyze, own, onCopy }: {
       {(close) => splitting && own
         ? <SavedSplitForm name={name} def={def} onSplit={own.onSplit} onDone={() => { close(); setSplitting(false); }} />
         : <>
-          <MenuItem title="start an analysis of this cohort alone (replaces the analysis open in the lab)"
+          <MenuItem data-tip="start an analysis of this cohort alone (replaces the analysis open in the lab)"
             onClick={() => { close(); onAnalyze(); }}><BarChart3 />analyze</MenuItem>
-          {onCopy && <MenuItem title="save a copy to your own cohorts, to rename, edit or split"
+          {onCopy && <MenuItem data-tip="save a copy to your own cohorts, to rename, edit or split"
             onClick={async () => { close(); await onCopy(); }}><Copy />save a copy</MenuItem>}
           {own && <>
           <MenuSeparator />
           <MenuItem onClick={() => { close(); own.onRename(); }}><Pencil />rename…</MenuItem>
-          <MenuItem title="what this cohort is, or why it is defined this way — shown under it, and in every analysis it joins"
+          <MenuItem data-tip="what this cohort is, or why it is defined this way — shown under it, and in every analysis it joins"
             onClick={() => { close(); own.onNote(); }}><StickyNote />{def.notes ? "edit note…" : "add note…"}</MenuItem>
-          <MenuItem disabled={!!cannot} title={cannot ? "can't edit its filters here: " + cannot : "change its studies and filters in Explore, then save them over it"}
+          <MenuItem disabled={!!cannot} data-tip={cannot ? "can't edit its filters here: " + cannot : "change its studies and filters in Explore, then save them over it"}
             onClick={() => { close(); own.onEditFilters(); }}><Filter />edit filters in Explore…</MenuItem>
-          <MenuItem title="divide this cohort into arms that never overlap and add up to it"
+          <MenuItem data-tip="divide this cohort into arms that never overlap and add up to it"
             onClick={() => setSplitting(true)}><Split />{def.splits && Object.keys(def.splits).length ? "split another way…" : "split into arms…"}</MenuItem>
-          <MenuItem title="save a copy under a new name" onClick={async () => { close(); await own.onDuplicate(); }}><Copy />duplicate</MenuItem>
+          <MenuItem data-tip="save a copy under a new name" onClick={async () => { close(); await own.onDuplicate(); }}><Copy />duplicate</MenuItem>
           <MenuSeparator />
           <MenuItem className="text-destructive hover:text-destructive" onClick={() => { close(); own.onDelete(); }}><Trash2 />delete…</MenuItem>
           </>}
@@ -111,7 +111,7 @@ function SavedSplits({ def, onRemove }: { def: CohortDef; onRemove?: (split: str
           <span className="text-muted-foreground">split “{split}”:</span>
           <span>{[...d.arms.map((a) => a.name), d.other || "Other"].join(" · ")}</span>
           {nested && <span className="text-muted-foreground">(some arms split further)</span>}
-          {onRemove && <Button variant="ghost" size="icon-xs" title={"remove the split “" + split + "”"} aria-label={"remove the split “" + split + "”"}
+          {onRemove && <Button variant="ghost" size="icon-xs" data-tip={"remove the split “" + split + "”"} aria-label={"remove the split “" + split + "”"}
             onClick={() => onRemove(split)}><X /></Button>}
         </div>
       );

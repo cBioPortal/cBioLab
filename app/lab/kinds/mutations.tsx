@@ -27,7 +27,7 @@ function Controls({ c }: { c: KindCardCtx }) {
   return (c.locked || []).includes("gene") ? null : (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        {!(c.locked || []).includes("gene") && <label className="tbfield" title="the gene whose mutations are listed">
+        {!(c.locked || []).includes("gene") && <label className="tbfield" data-tip="the gene whose mutations are listed">
           gene <DraftInput value={spec.gene || ""} disabled={busy} width="6rem" placeholder="KRAS" onCommit={(t) => patch({ gene: t.trim().toUpperCase() })} />
         </label>}
 

@@ -70,10 +70,10 @@ export function QueryFlow({ initial, onStudies, queryTitle, explore = true, clas
       <div className="sticky bottom-0 z-10 -mx-4.5 -mb-4 mt-4 grid grid-cols-1 items-center gap-2.5 rounded-b-lg border-t bg-card px-4.5 py-3 sm:grid-cols-[1fr_auto_1fr]">
         <span className="justify-self-center sm:justify-self-start"><SelectionStats studies={studies} selected={chosen} loading={loading} /></span>
         <div className="flex flex-wrap justify-center gap-2.5">
-          <Button className="querybygene" disabled={!!queryWhy} title={queryWhy || "enter genes to query in the selected studies"}
+          <Button className="querybygene" disabled={!!queryWhy} data-tip={queryWhy || "enter genes to query in the selected studies"}
             onClick={() => setAsking({ studies: chosen, filters, query: initial.query, title: queryTitle })}><Dna />Query by gene</Button>
           {explore && <Button variant="outline" className="exploreselected" disabled={!chosen.length} asChild={!!chosen.length}
-            title={chosen.length ? "open the selected studies' summary in Explore" + (filters.length ? " (the filters do not carry over)" : "") : "select at least one study"}>
+            data-tip={chosen.length ? "open the selected studies' summary in Explore" + (filters.length ? " (the filters do not carry over)" : "") : "select at least one study"}>
             {chosen.length ? <a href={exploreHref(chosen)}><LayoutDashboard />Explore selected studies</a> : <><LayoutDashboard />Explore selected studies</>}
           </Button>}
         </div>
