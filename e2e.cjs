@@ -743,7 +743,7 @@ async function main() {
       try {
         await page.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify({
           study: "msk_chord_2024",
-          cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] } },
+          cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"] }] } },
           views: [{ kind: "oncoprint", genes: [{ label: "TP53 pathway", genes: ["TP53", "MDM2", "MDM4"] }, "TP53"] }]
         })).toString("base64url"));
         await page.waitForSelector("canvas", { timeout: 300000 });
@@ -776,7 +776,7 @@ async function main() {
       const errsBeforeUndo = errors.length;
       try {
         const good = { study: "msk_chord_2024",
-          cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"], per: "sample" }] } },
+          cohorts: { "Pancreatic": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Pancreatic Cancer"] }] } },
           views: [{ kind: "oncoprint", cohorts: ["Pancreatic"], genes: ["KRAS", "TP53"] }] };
         const bad = { ...good, views: [{ ...good.views[0], heatmap: [{ profileType: "NOT_A_PROFILE" }] }] };
         await page.goto(BASE + "/lab?tab=analysis&doc=" + Buffer.from(JSON.stringify(good)).toString("base64url"));
@@ -1314,7 +1314,7 @@ async function main() {
     const page = await ctx.newPage();
     const errors = [];
     page.on("pageerror", e => errors.push("pageerror: " + e.message));
-    const doc = { study: "msk_chord_2024", cohorts: { NSCLC: { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] } },
+    const doc = { study: "msk_chord_2024", cohorts: { NSCLC: { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] } },
       views: [{ kind: "riskmodel", cohorts: ["NSCLC"], runs: 2 }] };
     const b64 = Buffer.from(JSON.stringify(doc)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     const fig = page.locator("svg[aria-label^='Risk model']");
@@ -1391,7 +1391,7 @@ async function main() {
     const page = await ctx.newPage();
     const errors = [];
     page.on("pageerror", e => errors.push("pageerror: " + e.message));
-    const doc = { study: "msk_chord_2024", cohorts: { NSCLC: { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }] } },
+    const doc = { study: "msk_chord_2024", cohorts: { NSCLC: { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }] } },
       views: [{ kind: "riskmodel", cohorts: ["NSCLC"], runs: 2 }] };
     const b64 = Buffer.from(JSON.stringify(doc)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     const fig = page.locator("svg[aria-label^='Risk model']");
@@ -1523,7 +1523,7 @@ async function main() {
     const page = await ctx.newPage();
     const errors = [];
     page.on("pageerror", e => errors.push("pageerror: " + e.message));
-    const doc = { study: "msk_chord_2024", cohorts: { Prostate: { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Prostate Cancer"], per: "sample" }] } },
+    const doc = { study: "msk_chord_2024", cohorts: { Prostate: { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Prostate Cancer"] }] } },
       views: [{ kind: "alterations", patient: { study: "msk_chord_2024", id: "P-0024249" } }] };
     const b64 = Buffer.from(JSON.stringify(doc)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     try {
@@ -2010,7 +2010,7 @@ async function main() {
       const docOf = async () => JSON.parse(await sp.locator("#docjson").inputValue());
       const counts = async () => sp.$$eval(".cohortbox-head", (hs) => hs.map((h) => h.innerText.replace(/\s+/g, " ")));
       const doc = { dsl: "2.8", study: "msk_chord_2024", cohorts: {
-        "KRAS NSCLC": { all: [{ kind: "oql", q: "KRAS: MUT" }, { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"], per: "sample" }],
+        "KRAS NSCLC": { all: [{ kind: "oql", q: "KRAS: MUT" }, { kind: "clinical", attribute: "CANCER_TYPE", values: ["Non-Small Cell Lung Cancer"] }],
           splits: { g12c: { arms: [{ name: "G12C", where: { kind: "oql", q: "KRAS: G12C" } }] } } },
         "EGFR": { all: [{ kind: "oql", q: "EGFR: MUT" }] } },
         views: [{ kind: "survival", cohorts: ["KRAS NSCLC", "EGFR"] }] };

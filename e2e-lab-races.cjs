@@ -188,7 +188,7 @@ async function labRaces(browser, ok, BASE) {
     //    is released. Judged by what the page shows, against the API's own count for that draft.
     {
       const STUDY = "msk_chord_2024";
-      const clause = (value) => ({ kind: "clinical", attribute: "CANCER_TYPE", op: "=", value, per: "sample" });
+      const clause = (value) => ({ kind: "clinical", attribute: "CANCER_TYPE", op: "=", value });
       const fire = (name, args) => page.evaluate(([n, a]) => { window.cohortLab.call(n, a).catch(() => {}); }, [name, args]);
       const state = () => tool(page, "explore_get_state");
       const apiCount = async (draft) => {
