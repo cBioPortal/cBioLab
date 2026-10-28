@@ -21,8 +21,10 @@ const TABLES = [
   { key: "sv", name: "Structural Variants" },
 ] as const;
 
-export function AlterationsBody({ a, spec, vi, updating, docJson, patch }: {
+export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }: {
   a: AlterationsResult; spec: Spec; vi: number; updating: boolean; docJson?: () => string; patch: (p: Record<string, unknown>) => void;
+  /** one patient only (the Patient page): no navigator through the cohort's others */
+  fixed?: boolean;
 }) {
   const [listOpen, setListOpen] = useState(false);
   const p = a.patient;
@@ -61,8 +63,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch }: {
   return (
     // eslint-disable-next-line jsx-a11y-x/no-static-element-interactions -- arrow-key shortcuts for the patient buttons PatientNav already provides
     <div className="tl-view" tabIndex={-1} onKeyDown={patientKeys(a.position, go)}>
-      <PatientNav shown={p ? p.id : null} position={a.position} total={a.total} updating={updating} go={go} what="list its alterations"
-        openList={() => setListOpen(true)} first={() => patch({ patient: undefined })} />
+      {!fixed && <PatientNav shown={p ? p.id : null} position={a.position} total={a.total} updating={updating} go={go} what="list its alterations"
+        openList={() => setListOpen(true)} first={() => patch({ patient: undefined })} />}
       {p ? (
         <div className="tl-head">
           <span className="tl-who mono">{p.id}</span>

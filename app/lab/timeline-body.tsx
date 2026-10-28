@@ -17,8 +17,10 @@ import { TB } from "../_ui/toolbar.ts";
 
 type Spec = { patient?: { study: string; id: string }; collapsed?: string[]; expandGaps?: boolean } & Record<string, unknown>;
 
-export function TimelineBody({ t, spec, vi, updating, docJson, patch }: {
+export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
   t: TimelineResult; spec: Spec; vi: number; updating: boolean; docJson?: () => string; patch: (p: Record<string, unknown>) => void;
+  /** one patient only (the Patient page): no navigator through the cohort's others */
+  fixed?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000);
@@ -58,8 +60,8 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch }: {
   return (
     // eslint-disable-next-line jsx-a11y-x/no-static-element-interactions -- arrow-key shortcuts for the patient buttons PatientNav already provides
     <div className="tl-view" tabIndex={-1} onKeyDown={onKey}>
-      <PatientNav shown={p ? p.patient : null} position={t.position} total={t.total} updating={updating} go={go} what="draw it"
-        openList={() => setListOpen(true)} first={() => patch({ patient: undefined })} />
+      {!fixed && <PatientNav shown={p ? p.patient : null} position={t.position} total={t.total} updating={updating} go={go} what="draw it"
+        openList={() => setListOpen(true)} first={() => patch({ patient: undefined })} />}
       {p ? (
         <div className="tl-head">
           <span className="tl-who mono">{p.patient}</span>

@@ -14,6 +14,6 @@ export const alterationsUi: KindUi<"alterations"> = {
     const cohort = Array.isArray(v.cohorts) && v.cohorts[0] ? String(v.cohorts[0]).split(" / ").join(" › ") : null;
     return <>{cohort && <><strong>{cohort}</strong> · </>}{v.alterations ? v.alterations.total.toLocaleString() + " patients · " : ""}mutations, copy-number alterations and structural variants</>;
   },
-  body: (c) => c.v.alterations ? <AlterationsBody a={c.v.alterations} spec={c.spec} vi={c.vi} updating={c.updating ?? c.busy} docJson={c.docJson} patch={c.patch} /> : null,
+  body: (c) => c.v.alterations ? <AlterationsBody a={c.v.alterations} spec={c.spec} vi={c.vi} updating={c.updating ?? c.busy} docJson={c.docJson} patch={c.patch} fixed={c.fixedPatient} /> : null,
   drawsOwnWaiting: true,
 };
