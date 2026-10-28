@@ -210,19 +210,34 @@ export function useHoverTip<T>() {
 
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
-/** a rich tip drawn at the pointer (viewport coordinates), kept inside the viewport; with `live`
- *  (from useHoverTip) the pointer can enter it and click what it holds */
-export function FloatingTip({ x, y, className, live, children }: { x: number; y: number; className?: string; live?: Live; children: React.ReactNode }) {
+/** a box in viewport coordinates */
+export type TipBox = { left: number; top: number; right: number; bottom: number };
+
+/** how far a tip sits from the box it explains: near enough that the pointer crosses nothing on its way in */
+const NEAR = 3;
+
+/**
+ * A rich tip, kept inside the viewport: beside the pointer at (x, y), or `at` a box (the cell it
+ * explains), centred just above it, or just below where there is no room. With `live` (from
+ * useHoverTip) the pointer can enter it and click what it holds.
+ */
+export function FloatingTip({ x = 0, y = 0, at, className, live, children }: { x?: number; y?: number; at?: TipBox; className?: string; live?: Live; children: React.ReactNode }) {
   const own = useRef<HTMLDivElement>(null);
   const ref = live ? live.ref : own;
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   useLayoutEffect(() => {
     const box = ref.current; if (!box) return;
     const w = box.offsetWidth, h = box.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+    if (at) {
+      const left = Math.max(EDGE, Math.min((at.left + at.right) / 2 - w / 2, vw - w - EDGE));
+      const top = at.top - NEAR - h >= EDGE ? at.top - NEAR - h : Math.min(at.bottom + NEAR, vh - h - EDGE);
+      setPos({ left, top });
+      return;
+    }
     const left = x + 14 + w <= vw - EDGE ? x + 14 : Math.max(EDGE, x - 14 - w);
     const top = y + 14 + h <= vh - EDGE ? y + 14 : Math.max(EDGE, y - 14 - h);
     setPos({ left, top });
-  }, [x, y, children, ref]);
+  }, [x, y, at, children, ref]);
   if (typeof document === "undefined") return null;
   return createPortal(
     // a portal still bubbles React events to the figure that drew it; the tip's own clicks stay here

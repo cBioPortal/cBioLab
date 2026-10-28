@@ -121,7 +121,8 @@ still holds, against a running server.
   oncoprint cell, a timeline event) uses `FloatingTip` from the same file; when the reader needs to
   move into it and click (an oncoprint cell's "open this patient"), its state comes from
   `useHoverTip`, which holds the tip still while the pointer heads for it and open while the pointer
-  is over it. A `<title>` in a drawn
+  is over it; such a tip sits against the cell it explains (`FloatingTip`'s `at`), not beside the
+  pointer, so there is nothing to cross on the way in. A `<title>` in a drawn
   figure's SVG (the renderers keep them for MCP, exports and the CLI) is read by the same layer, so
   React-drawn SVG uses `data-tip` instead. `data-tip` is not an accessible name: a control whose
   only words were its tip also gets an `aria-label`. Not everything needs one — no tip on the app's

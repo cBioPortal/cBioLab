@@ -9,9 +9,9 @@
 // changes cause a refetch; everything else is applied to the decoded arrays in place.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
+import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
-import { FloatingTip, useHoverTip } from "../_ui/tooltip.tsx";
+import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { STYLE, geneLegend, glyphPresence, numericValue, resolveStyle, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
@@ -148,7 +148,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const [loading, setLoading] = useState(true);
   const [perf, setPerf] = useState<Perf>({ frames: 0 });
   const [view, setView] = useState<View>({ zoom: 1, scrollX: 0, whitespace: display.whitespace });
-  const { tip: hover, move: hoverAt, hide: hideHover, live: hoverLive } = useHoverTip<{ hit: Hit; x: number; y: number }>();
+  const { tip: hover, move: hoverAt, hide: hideHover, live: hoverLive } = useHoverTip<{ hit: Hit; at: TipBox }>();
+  // a zoom or scroll moves the cell out from under its tip
+  useEffect(() => hideHover(), [view.zoom, view.scrollX, hideHover]);
   /** the gutter label under the pointer: a track row, not a column */
   const [labelHover, setLabelHover] = useState<{ ti: number; x: number; y: number } | null>(null);
   // per-column specifics, fetched only for the column under the pointer and remembered
@@ -456,8 +458,14 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       return;
     }
     if (labelHover) setLabelHover(null);
-    const hit = hitTest(x, y, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, view.scrollX) }, gapPx);
-    hoverAt(hit ? { hit, x: e.clientX, y: e.clientY } : null, e.clientX, e.clientY);
+    const shownView = { ...view, scrollX: Math.min(maxScroll, view.scrollX) };
+    const hit = hitTest(x, y, data, visible.order, visible.groups, shownView, gapPx);
+    // the tip sits against its cell, and stays put while the pointer stays in that cell
+    const same = hit && hover && hover.hit.ti === hit.ti && hover.hit.k === hit.k && hover.hit.k1 === hit.k1;
+    const cell = hit && !same ? hitRect(hit, visible.groups, shownView, cssW, gapPx) : null;
+    hoverAt(same ? hover : hit && cell
+      ? { hit, at: { left: rect.left + cell.left, right: rect.left + cell.right, top: rect.top + cell.top, bottom: rect.top + cell.bottom } }
+      : null, e.clientX, e.clientY);
     // one column under the pointer: ask the server what it carries, once, after a pause
     if (detailTimer.current) clearTimeout(detailTimer.current);
     if (hit && hit.n === 1) {
@@ -910,7 +918,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           })()}
 
           {hover && tip && (
-            <FloatingTip x={hover.x} y={hover.y} live={hoverLive}>
+            <FloatingTip at={hover.at} live={hoverLive}>
               {tip.lines.map((l, i) => <div key={i} className={(l.mono ? "mono " : "") + (l.dim ? "dim" : "")}>{l.text}</div>)}
               {tip.open && <a className="tip-link" href={tip.open.href} target="_blank" rel="noreferrer">{tip.open.label} ↗</a>}
             </FloatingTip>
