@@ -71,9 +71,15 @@ const studySet = (study: string, src: string): CohortSet => ({
 const inSamples = (set: CohortSet) => set.samples ? "\n  AND sample_unique_id IN " + set.samples : "";
 /** Rows of the cohort's patients (owners of its samples); nothing when there is no set. */
 const inPatients = (set: CohortSet) => set.patients ? "\n  AND patient_unique_id IN " + set.patients : "";
-/** clinical_data_derived, both levels at once: sample rows by the cohort's samples, patient rows by their owners. */
-const inClinical = (set: CohortSet) => set.samples
-  ? "\n  AND if(type = 'sample', sample_unique_id IN " + set.samples + ", patient_unique_id IN " + set.patients + ")" : "";
+/** The patients of these studies that own a sample: a study's patients as the portal counts them, without its sampleless records. */
+const ownersIn = (db: string, studies: string[]) => "(SELECT patient_unique_id FROM " + db + ".sample_derived WHERE " + studyIn(studies) + ")";
+/**
+ * clinical_data_derived, both levels at once: sample rows by the cohort's samples, patient rows by
+ * their owners; with no set, every sample row and the rows of patients who own a sample (`owners`).
+ */
+const inClinical = (set: CohortSet, owners: string) => set.samples
+  ? "\n  AND if(type = 'sample', sample_unique_id IN " + set.samples + ", patient_unique_id IN " + set.patients + ")"
+  : "\n  AND (type = 'sample' OR patient_unique_id IN " + owners + ")";
 /** A definition's samples in these studies, each study's compiled on its own: NO_SET for no clauses. */
 type DefCtx = { oncokbPin?: string | null; profilesByStudy?: Map<string, { profiles?: string[]; gaProfiles?: string[] }> };
 function cohortSet(studies: string[], db: string, def: CohortDef | null | undefined, ctx: DefCtx): CohortSet {
@@ -1011,7 +1017,7 @@ async function prefetchFacets(opts: {
       "  countIf(" + finiteSql("attribute_value") + " IS NULL) AS na,\n" +
       "  countIf(" + finiteSql("attribute_value") + " = round(" + finiteSql("attribute_value") + ")) = countIf(" + finiteSql("attribute_value") + " IS NOT NULL) AS allints\n" +
       "FROM " + clinicalTable(db, attrAllow.length ? attrAllow : "all") + "\n" +
-      "WHERE cancer_study_identifier IN " + IN + " AND attribute_value != ''" + inClinical(set) +
+      "WHERE cancer_study_identifier IN " + IN + " AND attribute_value != ''" + inClinical(set, ownersIn(db, studies)) +
       (attrAllow.length ? "\n  AND attribute_name IN (" + attrAllow.map(sq).join(",") + ")" : "") + "\n" +
       "GROUP BY s, type, a ORDER BY np DESC LIMIT 250 BY s", conn),
     chQuery<ChRow>(
@@ -1081,7 +1087,7 @@ async function valueCounts(o: { studies: string[]; db: string; conn: ChConn; att
     "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
     "FROM " + clinicalTable(o.db, o.attrs) + "\n" +
     "WHERE " + studyIn(o.studies) + " AND attribute_value != ''\n" +
-    "  AND attribute_name IN (" + o.attrs.map(sq).join(",") + ")" + inClinical(o.set) + "\n" +
+    "  AND attribute_name IN (" + o.attrs.map(sq).join(",") + ")" + inClinical(o.set, ownersIn(o.db, o.studies)) + "\n" +
     "GROUP BY s, type, a, vkey ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT + " BY s, type, a", o.conn)).data);
 }
 
@@ -1121,7 +1127,7 @@ async function pooledHistograms(opts: {
     if (edges.length < 2) return;
     const lastEdge = edges[edges.length - 1] + interval;
     const unit = f.per === "sample" ? "sample_unique_id" : "patient_unique_id";
-    const cond = f.per === "sample" ? inSamples(set) : inPatients(set);
+    const cond = f.per === "sample" ? inSamples(set) : set.patients ? inPatients(set) : "\n  AND patient_unique_id IN " + ownersIn(db, studies);
     const r = await chQuery<ChRow>(
       "SELECT multiIf(v <= " + edges[0] + ", -1, v > " + lastEdge + ", -2, toInt32(ceil((v - " + edges[0] + ") / " + interval + ")) - 1) AS b,\n" +
       "       uniqExact(id) AS n\n" +
@@ -1370,7 +1376,7 @@ export async function buildAssayFacets(o: {
       ? "\n    AND if(ifNull(patient_level, 0) = 1, patient_unique_id IN " + set.patients + ", sample_unique_id IN " + set.samples + ")" : "";
     // every statement aggregates straight off the table: none projects a patient id, even inside
     // a subquery (the boundary suite's rule for this module)
-    // these charts count patients: the owners of the in-cohort rows
+    // these charts count samples, as the portal's do, or patients for a patient-level profile
     const from = (g: (typeof groups)[number]) => " FROM " + g.conn.db + ".generic_assay_data_derived\n" +
       "  WHERE profile_type = " + sq(profileType) + " AND profile_stable_id IN (" + g.studies.map((s) => sq(s + "_" + profileType)).join(",") + ")\n" +
       "    AND entity_stable_id = " + sq(entity) + assayCond(g.set);
@@ -1379,22 +1385,27 @@ export async function buildAssayFacets(o: {
     const [first, ...stats] = await Promise.all([
       chQuery<ChRow>(assayEntitySearchSql(holders[0], groups[0].conn.db, profileType, entity, 3), groups[0].conn),
       ...groups.map((g) => chQuery<ChRow>(num +
-        "SELECT (SELECT uniqExact(patient_unique_id) FROM " + g.conn.db + ".sample_derived WHERE " + studyIn(g.studies) + inSamples(g.set) + ") AS total,\n" +
+        "SELECT (SELECT uniqExact(patient_unique_id) FROM " + g.conn.db + ".sample_derived WHERE " + studyIn(g.studies) + inSamples(g.set) + ") AS total_p,\n" +
+        "       (SELECT uniqExact(sample_unique_id) FROM " + g.conn.db + ".sample_derived WHERE " + studyIn(g.studies) + inSamples(g.set) + ") AS total_s,\n" +
         "       (SELECT any(datatype)" + from(g) + ") AS dt,\n" +
-        "       uniqExact(patient_unique_id) AS nnum, min(v) AS mn, max(v) AS mx,\n" +
+        "       (SELECT max(ifNull(patient_level, 0))" + from(g) + ") AS pl,\n" +
+        "       uniqExact(patient_unique_id) AS nnum_p, uniqExact(sample_unique_id) AS nnum_s, min(v) AS mn, max(v) AS mx,\n" +
         "       quantile(0.25)(v) AS q1, quantile(0.5)(v) AS q2, quantile(0.75)(v) AS q3, count() AS nv, min(v = floor(v)) AS allints\n" +
         from(g) + " AND v IS NOT NULL", g.conn)),
     ]);
     const st = stats.map((r) => r.data[0] || {});
     const name = String(first.data.find((r) => String(r.entity) === entity)?.name || "");
-    const total = st.reduce((n, r) => n + Number(r.total || 0), 0);
-    const base = { ...none, ...(name && name !== entity ? { name } : {}), total, ...(own ? { disjunctive: true as const } : {}) };
+    // the portal's rule (GenericAssayMapper getGenericAssayDataCounts): patients when the profile is patient-level, else samples
+    const unit = st.some((r) => Number(r.pl) === 1) ? "patient" as const : "sample" as const;
+    const id = unit === "patient" ? "patient_unique_id" : "sample_unique_id", sfx = unit === "patient" ? "_p" : "_s";
+    const total = st.reduce((n, r) => n + Number(r["total" + sfx] || 0), 0);
+    const base = { ...none, unit, ...(name && name !== entity ? { name } : {}), total, ...(own ? { disjunctive: true as const } : {}) };
     if (isCategoricalAssay(String(st.find((r) => r.dt)?.dt || ""))) {
       const counts = new Map<string, number>();
       const measured = await Promise.all(groups.map(async (g) => {
         const [r, m] = await Promise.all([
-          chQuery<ChRow>("SELECT trimBoth(value) AS v, uniqExact(patient_unique_id) AS n" + from(g) + notMissing + "\nGROUP BY v", g.conn),
-          chQuery<ChRow>("SELECT uniqExact(patient_unique_id) AS n" + from(g) + notMissing, g.conn),
+          chQuery<ChRow>("SELECT trimBoth(value) AS v, uniqExact(" + id + ") AS n" + from(g) + notMissing + "\nGROUP BY v", g.conn),
+          chQuery<ChRow>("SELECT uniqExact(" + id + ") AS n" + from(g) + notMissing, g.conn),
         ]);
         for (const x of r.data) counts.set(String(x.v), (counts.get(String(x.v)) || 0) + Number(x.n));
         return Number(m.data[0]?.n || 0);
@@ -1402,7 +1413,7 @@ export async function buildAssayFacets(o: {
       const values = [...counts].map(([v, n]) => ({ v, n })).sort((a, b) => b.n - a.n || (a.v < b.v ? -1 : 1)).slice(0, ASSAY_VALUE_LIMIT);
       return { ...base, kind: "cat", measured: measured.reduce((a, b) => a + b, 0), values };
     }
-    const measured = st.reduce((n, r) => n + Number(r.nnum || 0), 0);
+    const measured = st.reduce((n, r) => n + Number(r["nnum" + sfx] || 0), 0);
     const live = st.filter((r) => Number(r.nv) > 0);
     if (!live.length) return { ...base, measured };
     // min and max pool exactly; quartiles do not, so they are weighted by size (sharedBinEdges' rule)
@@ -1418,7 +1429,7 @@ export async function buildAssayFacets(o: {
     const lastEdge = edges[edges.length - 1] + interval;
     const binned = await Promise.all(groups.map((g) => chQuery<ChRow>(num +
       "SELECT multiIf(v <= " + edges[0] + ", -1, v > " + lastEdge + ", -2, toInt32(ceil((v - " + edges[0] + ") / " + interval + ")) - 1) AS b,\n" +
-      "       uniqExact(patient_unique_id) AS n" + from(g) + " AND v IS NOT NULL\nGROUP BY b", g.conn)));
+      "       uniqExact(" + id + ") AS n" + from(g) + " AND v IS NOT NULL\nGROUP BY b", g.conn)));
     const count = (b: number) => binned.reduce((n, r) => n + Number(r.data.find((x) => Number(x.b) === b)?.n || 0), 0);
     // portal bins are (start, end]: a value on an edge belongs to the lower bar
     const bins: NumericBin[] = [];
