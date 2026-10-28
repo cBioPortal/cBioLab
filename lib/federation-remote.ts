@@ -27,6 +27,7 @@ import type { PatientTimeline, PatientEvent, PatientSample, PeerSource } from ".
 import type { StudyRow } from "./study-list.ts";
 import type { StudyCatalog } from "./study-catalog.ts";
 import { cohortSubquery, type CohortSql } from "./sql-kinds.ts";
+import { checkStudyInputs, type StudyInputs, type StudyInputsRequest } from "./oncoprint.ts";
 import { setting } from "./settings.ts";
 
 interface RemoteAggregates {
@@ -443,6 +444,20 @@ export class RemotePatientResolver extends RemoteAggregateResolver implements Re
     // methods are this object's own, never the class's, so a peer that does not share them has no
     // way to be asked — the guarantee the boundary tests check.
     if (this.patientKinds.has("plot")) Object.assign(this, plotCaseMethods(this));
+    // the same for an oncoprint's columns (the `oncoprint` kind)
+    if (this.patientKinds.has("oncoprint")) Object.assign(this, { oncoprintInputs: (req: StudyInputsRequest) => this.oncoprintCall(req) });
+  }
+  /** this peer's study's share of an oncoprint, checked before any of it is drawn */
+  async oncoprintCall(req: StudyInputsRequest): Promise<StudyInputs> {
+    if (!this.patientKinds.has("oncoprint"))
+      throw new Error("this instance does not accept oncoprint columns from the peer serving " + this.study + " (FEDERATION_ACCEPT_PATIENT_LEVEL)");
+    this.refuseIds((req.groups || []).map((g) => g || null));
+    const r = await this.disclosed(this.call<Record<string, unknown>>("oncoprint-columns", { study: this.study, ...req }), "oncoprint");
+    if (r.study !== this.study) throw new Error("the peer serving " + this.study + " answered for " + String(r.study).slice(0, 120));
+    const inputs = checkStudyInputs(r, req.groups ? req.groups.length : 1);
+    const queries = Array.isArray(r.queries) ? (r.queries as QueryLogEntry[]).map((q) => ({ label: String(q.label), sql: String(q.sql), ...(q.ms != null ? { ms: Number(q.ms) } : {}) })) : null;
+    for (const q of queries || []) this.queries.push({ ...q, remote: true });
+    return { ...inputs, queries };
   }
   /** a call for a plot's cases, its refusal said in terms of the rules that decide it */
   async casesCall<T>(op: string, def: CohortDef | null | undefined, spec: PlotRequest, extra: Record<string, unknown>): Promise<T> {

@@ -2552,7 +2552,7 @@
         "loading": false,
         "why": null
       },
-      "need": "patients",
+      "need": "oncoprint",
       "preview": null,
       "sub": null,
       "title": "Oncoprint"

@@ -6,6 +6,7 @@ import { answerFederation } from "../../../../../lib/federation-api.ts";
 import { asLoopbackPeer, isLoopbackRequest } from "../../../../../lib/loopback-peer.ts";
 import { logInbound } from "../../../../../lib/federation-log.ts";
 import { refreshSettings } from "../../../../../lib/settings.ts";
+import { gzipSync } from "node:zlib";
 
 export const maxDuration = 60;
 
@@ -21,5 +22,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ op: str
   const { status, body } = await (asPeer ? asLoopbackPeer(() => answerFederation(op, args)) : answerFederation(op, args));
   const text = JSON.stringify(body);
   logInbound(op, args, asPeer, Date.now() - t0, status, text.length);
+  // a large answer (an oncoprint's columns) is compressed when the caller takes it: it is mostly ids
+  if (text.length > 65536 && /\bgzip\b/.test(req.headers.get("accept-encoding") || "")) {
+    const z = gzipSync(text, { level: 5 });
+    return new Response(z.buffer.slice(z.byteOffset, z.byteOffset + z.byteLength) as ArrayBuffer,
+      { status, headers: { "content-type": "application/json", "content-encoding": "gzip" } });
+  }
   return new Response(text, { status, headers: { "content-type": "application/json" } });
 }

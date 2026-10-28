@@ -8,7 +8,7 @@
 // itself, whatever the caller checked, and answers only for a study held here — one this instance
 // reaches through a peer of its own is refused, never relayed.
 //
-// The patient-level ops (patient-rows, patient-timeline, plot-cases) exist only where this
+// The patient-level ops (patient-rows, patient-timeline, plot-cases, oncoprint-columns) exist only where this
 // instance's operator writes rules in FEDERATION_DISCLOSE_PATIENTS (lib/disclosure.ts): a peer that
 // has not opted in does not have them at all. See docs/DATA-BOUNDARY.md. There is no caller
 // authentication yet: anyone who can reach this endpoint can read what it discloses.
@@ -29,6 +29,7 @@ import { catalogFor } from "./study-catalog.ts";
 import { validateAxis, type PlotAxis, type PlotRequest, type AxisKind, type PointRank, type SparseCells, type Whiskers } from "./plot.ts";
 import { resolveAxes } from "./plot-profile.ts";
 import { setting } from "./settings.ts";
+import { studyOncoprintInputs } from "./oncoprint.ts";
 
 /** The protocol version, which is part of every op's path: a breaking change gets a new one. */
 export const FEDERATION_VERSION = "v1";
@@ -436,6 +437,32 @@ const plotCases: FederationOp = {
 };
 
 /**
+ * One study's share of an oncoprint (kind 'oncoprint'): its columns in each group, with the rows the
+ * figure is assembled from — alterations, panel coverage, sample counts, and the clinical, heatmap
+ * and overlay tracks the spec asks for. The coordinator draws them as columns beside its own.
+ */
+const oncoprintColumns: FederationOp = {
+  patientLevel: true,
+  input: z.object({
+    study: z.string().max(120),
+    groups: z.array(z.union([z.record(z.string(), z.any()), z.literal(false)])).max(4).nullable(),
+    genes: z.array(z.any()).min(1).max(40),
+    clinical: z.array(z.string().max(120)).max(8),
+    heatmap: z.array(z.record(z.string(), z.any())).max(4),
+    overlays: z.array(z.record(z.string(), z.any())).max(2),
+    unit: z.enum(["patient", "sample"]),
+    lineGap: z.number().int().min(1).max(100000),
+  }),
+  async run(args: { study: string; groups: (Record<string, unknown> | false)[] | null; genes: unknown[]; clinical: string[];
+    heatmap: Record<string, unknown>[]; overlays: Record<string, unknown>[]; unit: "patient" | "sample"; lineGap: number }) {
+    if ((args.groups || []).some((g) => g && carriesPatientIds(g))) throw new Error(ID_LIST);
+    const { s, res } = await held(args.study, "oncoprint");
+    const { queries, ...inputs } = await studyOncoprintInputs(s, res.instance.conn, args as never, await oncokbPin());
+    return { study: s, ...inputs, queries: hideSql() ? null : queries, source: await peerSource(s) };
+  }
+};
+
+/**
  * The ops this instance serves, as its settings stand now. The patient-level ones are present ONLY
  * when FEDERATION_DISCLOSE_PATIENTS has rules: without them, asking for one is asking for an op that
  * does not exist.
@@ -449,6 +476,7 @@ export function federationOps(): Map<string, FederationOp> {
     ops.set("patient-rows", patientRows);
     ops.set("patient-timeline", patientTimeline);
     ops.set("plot-cases", plotCases);
+    ops.set("oncoprint-columns", oncoprintColumns);
   }
   return ops;
 }

@@ -827,7 +827,7 @@ export interface Contract {
     /** calls on a cell no panel covers (off-panel), not drawn: the cell stays not profiled; absent when none */
     offPanel?: number };
   /** the SQL this contract was built from, when the caller asked for provenance */
-  queries?: { label: string; sql: string; ms?: number; study?: string }[];
+  queries?: { label: string; sql: string; ms?: number; study?: string; remote?: boolean }[];
   /** set by the MCP app's display-resolution downsampler */
   bucketed?: boolean; bucketSizes?: number[];
 }

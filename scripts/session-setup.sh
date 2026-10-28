@@ -65,7 +65,7 @@ if ! grep -q LOOPBACK_PEER "$DIR/serve-$PORT.sh"; then
 # Federation: the second database (CLICKHOUSE2_*) is served to this app as a simulated peer at
 # its own /api/federation/v1 (lib/loopback-peer.ts), patient timelines and alterations disclosed to
 # the app alone. Here rather than in .env.local, so a gate run in this folder keeps its own address.
-export PORT=$PORT LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations' FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations'
+export PORT=$PORT LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations+oncoprint' FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations+oncoprint'
 FED
   grep -q LOOPBACK_PEER "$DIR/serve-$PORT.sh" || echo "WARNING: serve-$PORT.sh has no 'cd \"\$(dirname \"\$0\")\"' line; its dev server does not federate" >&2
 fi

@@ -18,7 +18,13 @@ export const PIDS_SQL: unique symbol = Symbol("pidsSql");
  * one string (single study) or a {study: sql} map (federated). JSON.parse
  * cannot produce symbol keys, so client specs can never inject through it.
  */
-export type PidsCarrier = CohortDef & { [PIDS_SQL]?: string | Record<string, string> };
+export type PidsCarrier = CohortDef & { [PIDS_SQL]?: string | Record<string, string>; [PEER_STUDIES]?: string[] };
+/**
+ * Beside a {study: sql} map: the federation peers' studies the cohort spans. Their cohorts are not
+ * compiled here — the peer evaluates the definition itself (StudyInputsRequest) — so they have no SQL
+ * in the map, only their place in this list.
+ */
+export const PEER_STUDIES: unique symbol = Symbol("peerStudies");
 import { buildAnnotationIndex, oncokbPin } from "./annotation.ts";
 import { compileCohortDef, baseSamplesSql } from "./cohort2.ts";
 import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
@@ -346,9 +352,153 @@ export function specToQueries(spec: OncoprintSpec, pin?: string | null) {
 
 /** Optional per-call sink so the analysis layer can report what this view ran. */
 export interface ContractOpts {
-  log?: { label: string; sql: string; ms?: number; study?: string }[];
+  log?: { label: string; sql: string; ms?: number; study?: string; remote?: boolean }[];
   /** copy the query log into the contract, for callers that receive it directly */
   provenance?: boolean;
+}
+
+/**
+ * One study's share of an oncoprint, read where the study is held: its columns, and the rows the
+ * contract is assembled from, each an array in its SELECT's column order. A federation peer that
+ * shares oncoprint columns answers with this (its `oncoprint-columns` op), and the contract is
+ * assembled from it beside this instance's own studies' rows, so the peer's patients are columns of
+ * the same figure — sorted, counted and annotated with the rest.
+ */
+export interface StudyInputs {
+  /** the genes the coverage masks' bits stand for, in bit order */
+  genes: string[];
+  /** each column group's column ids, a column in the first group that holds it ([] for a group the study is not in) */
+  groups: string[][];
+  /** pid, gene, vt, mt, mv, cna */
+  events: unknown[][];
+  /** pid, mask */
+  coverage: unknown[][];
+  /** pid, samples, mask */
+  facts: unknown[][];
+  /** pid, attribute, value */
+  clinical: unknown[][];
+  /**
+   * per heatmap spec: the study's generic assay of that profile type, if it has one; whether it has
+   * the profile as a gene profile (or, for VAF, allele counts); and the values a track would draw
+   */
+  heatmap: { assay: { datatype: string; patientLevel: boolean } | null; available: boolean; values: unknown[][] }[];
+  /** per overlay spec: whether the study has the profile, and its values */
+  overlays: { available: boolean; values: unknown[][] }[];
+  /** the study's molecular profile types and numeric generic-assay profiles: what a missing profile is named against */
+  profileTypes: string[];
+  assays: string[];
+  /** the queries that read it, unless the peer keeps its SQL to itself */
+  queries?: { label: string; sql: string; ms?: number }[] | null;
+}
+
+/**
+ * What one study's share is read for: the spec's parts that decide its rows, and each column group's
+ * cohort definition — false for a group that holds none of the study's patients, and no groups at
+ * all for every column of the study in one group.
+ */
+export interface StudyInputsRequest {
+  groups: (CohortDef | false)[] | null;
+  genes: OncoprintSpec["genes"]; clinical: string[]; heatmap: HeatmapSpec[]; overlays: NonNullable<OncoprintSpec["overlays"]>;
+  unit: Unit; lineGap: number;
+}
+
+/** A federation peer that shares oncoprint columns (lib/federation-remote.ts). */
+export interface OncoprintPeer { oncoprintInputs(req: StudyInputsRequest): Promise<StudyInputs> }
+
+/**
+ * Read one study's share of an oncoprint from `conn`, the instance holding it: the same queries the
+ * contract runs for a study of its own, answered as rows instead of assembled.
+ */
+export function studyOncoprintInputs(study: string, conn: ChConn, req: StudyInputsRequest, pin: string | null): Promise<StudyInputs> {
+  return ensureChContext(async () => {
+    const { genes, clinical, heatmap, overlays, unit, lineGap } = normalizeSpec({ genes: req.genes, clinical: req.clinical,
+      heatmap: req.heatmap, overlays: req.overlays, unit: req.unit, conventions: { lineGap: req.lineGap } });
+    const queries: NonNullable<StudyInputs["queries"]> = [];
+    const rows = async (label: string, sql: string): Promise<unknown[][]> => {
+      const entry: { label: string; sql: string; ms?: number } = { label, sql };
+      queries.push(entry);
+      const r = await chQueryRows(sql, conn);
+      entry.ms = r._ms;
+      return r.rows;
+    };
+    const db = conn.db;
+    // columns: each group's, a column in the first group that holds it, as the contract draws them
+    const groups: string[][] = [];
+    const groupRows: string[] = [], colSamples: string[] = [];
+    if (req.groups) {
+      const seen = new Set<string>();
+      for (const def of req.groups.slice(0, 4)) {
+        if (def === false) { groups.push([]); continue; }
+        const rowsSql = cohortRowsSql({ ...def, lineGap }, study, db, pin);
+        groupRows.push(rowsSql);
+        const cols = columnRows(await rows("oncoprint:columns", columnRowsSql(rowsSql, unit)));
+        const pids: string[] = [];
+        for (const p of cols.pids) {
+          if (seen.has(p)) continue;
+          seen.add(p); pids.push(p); colSamples.push(...cols.samples.get(p)!);
+        }
+        groups.push(pids);
+      }
+    } else groups.push((await rows("oncoprint:columns", cohortColumnsSql(null, study, db, unit, pin))).map((x) => x[0] as string));
+    const samples = unit === "patient" && groupRows.length ? columnSamplesIn(study, colSamples, groupRows) : null;
+    const [events, coverage, facts, clinicalRows] = await Promise.all([
+      rows("oncoprint:alterations", genomicEventsSql(genes, study, db, unit, samples)),
+      rows("oncoprint:coverage", coverageSql(genes, study, db, unit, samples)),
+      rows("oncoprint:profiledTypes", columnFactsSql(study, db, unit, samples)),
+      clinical.length ? rows("oncoprint:clinicalTracks", clinicalSql(clinical, study, db, unit, samples)) : Promise.resolve([])
+    ]);
+    const types = await studyProfileTypes(study, db, conn);
+    const assayProfiles = await studyAssayProfiles(study, db, conn);
+    // each heatmap's values as the contract would take them from this study: an assay's when the
+    // spec names entities and the assay is numeric, a gene profile's (or VAF) otherwise
+    const heat: StudyInputs["heatmap"] = [];
+    for (const h of heatmap) {
+      const isVaf = /^vaf$/i.test(h.profileType);
+      const a = isVaf ? undefined : assayProfiles.get(h.profileType);
+      if (a) {
+        heat.push({ assay: { datatype: a.datatype, patientLevel: a.patientLevel }, available: false,
+          values: h.assay && !isCategoricalAssay(a.datatype)
+            ? await rows("oncoprint:assay heatmap", assayHeatmapSql(h.profileType, h.genes, study, db, unit, a.patientLevel, samples)) : [] });
+        continue;
+      }
+      const available = isVaf ? await vafAvailable(study, db, conn) : types.has(h.profileType);
+      heat.push({ assay: null, available, values: available && !h.assay
+        ? await rows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, study, db, unit, samples) : heatmapSql(h.profileType, h.genes, study, db, unit, samples))
+        : [] });
+    }
+    const over: StudyInputs["overlays"] = [];
+    for (const ov of overlays) {
+      const available = types.has(ov.profileType);
+      over.push({ available, values: available ? await rows("oncoprint:overlay " + ov.kind, heatmapSql(ov.profileType, genes, study, db, unit, samples)) : [] });
+    }
+    return { genes, groups, events, coverage, facts, clinical: clinicalRows, heatmap: heat, overlays: over,
+      profileTypes: [...types], assays: [...assayProfiles].filter(([, a]) => !isCategoricalAssay(a.datatype)).map(([pt]) => pt), queries };
+  });
+}
+
+/**
+ * A peer's StudyInputs as it arrived, checked field by field before any of it is drawn — a peer is
+ * another program, not this one — for a request with `nGroups` groups.
+ */
+export function checkStudyInputs(x: unknown, nGroups: number): StudyInputs {
+  const r = x as Record<string, unknown>;
+  const bad = (what: string): never => { throw new Error("the peer sent oncoprint " + what + " this instance cannot read"); };
+  const ids = (v: unknown): string[] => Array.isArray(v) && v.every((p) => typeof p === "string" && p.length <= 200) ? v as string[] : bad("column ids");
+  const table = (v: unknown, width: number, what: string): unknown[][] =>
+    Array.isArray(v) && v.every((row) => Array.isArray(row) && row.length === width && typeof row[0] === "string") ? v as unknown[][] : bad(what);
+  const strings = (v: unknown, what: string): string[] => Array.isArray(v) && v.every((p) => typeof p === "string") ? v as string[] : bad(what);
+  if (!r || typeof r !== "object") bad("rows");
+  const groups = Array.isArray(r.groups) && r.groups.length === nGroups ? r.groups.map(ids) : bad("column groups");
+  const heatmap = (Array.isArray(r.heatmap) ? r.heatmap : bad("heatmap tracks")).map((h: Record<string, unknown>) => {
+    const a = h?.assay as Record<string, unknown> | null;
+    return { assay: a ? { datatype: String(a.datatype), patientLevel: a.patientLevel === true } : null,
+      available: h?.available === true, values: table(h?.values, 3, "heatmap values") };
+  });
+  const overlays = (Array.isArray(r.overlays) ? r.overlays : bad("overlays")).map((o: Record<string, unknown>) =>
+    ({ available: o?.available === true, values: table(o?.values, 3, "overlay values") }));
+  return { genes: strings(r.genes, "genes"), groups, events: table(r.events, 6, "alterations"), coverage: table(r.coverage, 2, "panel coverage"),
+    facts: table(r.facts, 3, "column facts"), clinical: table(r.clinical, 3, "clinical values"), heatmap, overlays,
+    profileTypes: strings(r.profileTypes, "profile types"), assays: strings(r.assays, "assay profiles") };
 }
 
 export function buildContract(spec: OncoprintSpec, opts: ContractOpts = {}): Promise<Contract> {
@@ -408,15 +558,49 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   //
   // Imported dynamically on purpose: federation.ts imports this module's SQL builders, so a
   // static import here would close a cycle.
-  const { patientLevelConn } = await import("./federation.ts");
-  const conns = new Map(await Promise.all(studies.map(async (s) =>
-    [s, await patientLevelConn(s, "an oncoprint's columns are patients")] as const)));
+  // A study a federation peer holds is read there, when the peer shares oncoprint columns: one call
+  // answers its whole share (StudyInputs), and every step below takes that study's rows from it.
+  const { patientLevelConn, oncoprintPeerOf } = await import("./federation.ts");
+  const peers = new Map<string, OncoprintPeer>();
+  const conns = new Map<string, ChConn>();
+  await Promise.all(studies.map(async (s) => {
+    const peer = await oncoprintPeerOf(s);
+    if (peer) peers.set(s, peer);
+    else conns.set(s, await patientLevelConn(s, "an oncoprint's columns are patients"));
+  }));
   const connOf = (s: string): ChConn => conns.get(s)!;
   const dbOf = (s: string): string => connOf(s).db;
   const { genes, geneList, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays } = normalizeSpec(spec);
   if (multi && derivedEvents.length) throw new Error("derived-event tracks are single-study; drop them or the extra studies");
   if (unit === "sample" && derivedEvents.length)
     throw new Error("cohort rows are patient-level: a cohort selects patients, so drawing one per sample would repeat a patient's answer across their samples. Drop the rows or switch columns back to patients.");
+  if (derivedEvents.length && peers.has(study))
+    throw new Error("derived-event rows are evaluated against the study's own database, and " + study + " is a federation peer's; drop the rows");
+
+  const gb = spec.layout && spec.layout.groupBy;
+  const gbGroups = gb && gb.kind === "cohorts" && Array.isArray(gb.groups) && gb.groups.length ? gb.groups.slice(0, 4) : null;
+  const fromPeer = new Map<string, Promise<StudyInputs>>();
+  for (const [s, peer] of peers) {
+    // each group's definition, for the peer to evaluate; a group whose cohort was evaluated here
+    // (a {study: sql} map) holds the peer's patients only when it spans the peer's study
+    const groups = gbGroups ? gbGroups.map((g): CohortDef | false => {
+      const c = g.dsl as PidsCarrier;
+      return c[PIDS_SQL] && typeof c[PIDS_SQL] === "object" && !(c[PEER_STUDIES] || []).includes(s) ? false : c;
+    }) : spec.cohort ? [spec.cohort.dsl] : null;
+    const p = peer.oncoprintInputs({ groups, genes: spec.genes, clinical, heatmap: (spec.heatmap || []).slice(0, 4),
+      overlays: (spec.overlays || []).slice(0, 2), unit, lineGap }).then((r) => {
+      // drawn beside this instance's rows, so it must mean what they mean
+      if (r.genes.join(",") !== genes.join(",") || r.heatmap.length !== heatmap.length || r.overlays.length !== overlays.length)
+        throw new Error("the peer serving " + s + " read a different oncoprint than the one asked for; it is likely on another build");
+      for (const q of r.queries || []) opts.log?.push({ label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}), study: s, remote: true });
+      return r;
+    });
+    p.catch(() => { /* awaited below; a refusal fails the figure there */ });
+    fromPeer.set(s, p);
+  }
+  const peerShare = (s: string): Promise<StudyInputs> => fromPeer.get(s)!;
+  /** a peer study's rows in the shape a query's result has, so both are read by the same loops */
+  const peerRows = async (s: string, pick: (i: StudyInputs) => unknown[][]) => ({ rows: pick(await peerShare(s)) });
 
   // ---- columns: groups of patients or samples ----------------------------
   let groups: { name: string; pids: string[] }[]; // [{name, pids: [columnId]}] — a column lands in its first matching group
@@ -425,11 +609,14 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   const rowsByStudy = new Map<string, string[]>(studies.map((s) => [s, []]));
   // each study's samples its patient columns are built from: a column's samples in the group it is drawn in
   const columnSamples = new Map<string, string[]>(studies.map((s) => [s, []]));
-  const gb = spec.layout && spec.layout.groupBy;
-  if (gb && gb.kind === "cohorts" && Array.isArray(gb.groups) && gb.groups.length) {
+  // a peer study's columns in a group, as the peer drew them (their samples stay with the peer)
+  const peerColumns = async (s: string, gi: number): Promise<{ s: string; cols: ColumnRows }> =>
+    ({ s, cols: { pids: (await peerShare(s)).groups[gi], samples: new Map() } });
+  const inStudyOrder = <T extends { s: string }>(xs: T[]): T[] => studies.flatMap((s) => xs.filter((x) => x.s === s));
+  if (gbGroups) {
     groups = [];
     const seen = new Set<string>();
-    for (const g of gb.groups.slice(0, 4)) {
+    for (const [gi, g] of gbGroups.entries()) {
       const v = (g.dsl as PidsCarrier | undefined)?.[PIDS_SQL];
       let per: { s: string; cols: ColumnRows }[];
       if (v && typeof v === "object") {
@@ -441,18 +628,19 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
           ({ s, cols: columnRows((await lqRows("oncoprint:columns", columnRowsSql((v as Record<string, string>)[s], unit), s)).rows) })));
       } else {
         // no pre-compiled SQL: compile the definition against each study in turn
-        per = await Promise.all(studies.map(async (s) => {
+        per = await Promise.all(studies.filter((s) => !peers.has(s)).map(async (s) => {
           const rows = cohortRowsSql({ ...g.dsl, lineGap }, s, dbOf(s), pin);
           rowsByStudy.get(s)!.push(rows);
           return { s, cols: await cohortColumns(rows, s, opts.log, "oncoprint:columns", unit, connOf(s)) };
         }));
       }
+      per = inStudyOrder([...per, ...await Promise.all([...peers.keys()].map((s) => peerColumns(s, gi)))]);
       const pids: string[] = [];
       for (const { s, cols } of per) for (const p of cols.pids) {
         const id = qual(s, p);
         if (seen.has(id)) continue;
         seen.add(id); pids.push(id); studyOf.set(id, s);
-        columnSamples.get(s)!.push(...cols.samples.get(p)!);
+        if (!peers.has(s)) columnSamples.get(s)!.push(...cols.samples.get(p)!);
       }
       groups.push({ name: g.name || "group " + (groups.length + 1), pids });
     }
@@ -460,10 +648,15 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
     // no groups: every patient of every study, one column group, study order
     if (spec.cohort) throw new Error("multi-study oncoprint with a cohort requires cohort groups (layout.groupBy)");
     const fetched = await Promise.all(studies.map(async (s) =>
-      ({ s, r: await lqRows("oncoprint:columns", cohortColumnsSql(null, s, dbOf(s), unit, pin), s) })));
+      ({ s, r: peers.has(s) ? { rows: (await peerShare(s)).groups[0].map((p) => [p]) }
+        : await lqRows("oncoprint:columns", cohortColumnsSql(null, s, dbOf(s), unit, pin), s) })));
     const pids: string[] = [];
     for (const { s, r } of fetched) for (const x of r.rows) { const id = qual(s, x[0] as string); pids.push(id); studyOf.set(id, s); }
     groups = [{ name: "all patients", pids }];
+  } else if (peers.has(study)) {
+    const pids = (await peerShare(study)).groups[0];
+    for (const p of pids) studyOf.set(p, study);
+    groups = [{ name: "cohort", pids }];
   } else if (spec.cohort) {
     const rows = cohortRowsSql({ ...spec.cohort.dsl, lineGap }, study, dbOf(study), pin);
     rowsByStudy.get(study)!.push(rows);
@@ -489,8 +682,9 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   const coverage: AssembleInput["coverage"] = [];
   const profiledMasks: { pid: string; mask: number }[] = [];
   const samplesPer: { pid: string; n: number }[] = [];
-  const evFetched = await Promise.all(studies.map(s =>
-    Promise.all([lqRows("oncoprint:alterations", genomicEventsSql(genes, s, dbOf(s), unit, samplesOf(s)), s),
+  const evFetched = await Promise.all(studies.map(s => peers.has(s)
+    ? peerShare(s).then((i) => ({ s, e: { rows: i.events }, c: { rows: i.coverage }, p: { rows: i.facts } }))
+    : Promise.all([lqRows("oncoprint:alterations", genomicEventsSql(genes, s, dbOf(s), unit, samplesOf(s)), s),
                  lqRows("oncoprint:coverage", coverageSql(genes, s, dbOf(s), unit, samplesOf(s)), s),
                  lqRows("oncoprint:profiledTypes", columnFactsSql(s, dbOf(s), unit, samplesOf(s)), s)]).then(([e, c, p]) => ({ s, e, c, p }))));
   for (const { s, e, c, p } of evFetched) {
@@ -518,7 +712,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   if (clinical.length) {
     const byAttr = new Map<string, Map<string, string>>(clinical.map((a) => [a, new Map<string, string>()]));
     const cdFetched = await Promise.all(studies.map(async (s) =>
-      ({ s, r: await lqRows("oncoprint:clinicalTracks", clinicalSql(clinical, s, dbOf(s), unit, samplesOf(s)), s) })));
+      ({ s, r: peers.has(s) ? await peerRows(s, (i) => i.clinical) : await lqRows("oncoprint:clinicalTracks", clinicalSql(clinical, s, dbOf(s), unit, samplesOf(s)), s) })));
     // rows are (pid, k, v); bucket straight into per-attribute maps, no intermediate array
     for (const { s, r } of cdFetched) {
       const pref = multi ? s + "_" : "";
@@ -529,9 +723,16 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
 
   // ---- heatmap values per profile (validated against each study's inventory) ----
   const heatmapIn: AssembleInput["heatmap"] = [];
-  for (const h of heatmap) {
+  // a study's profile inventory: its own database's, or as the peer holding it reported it
+  const profileTypesOf = async (s: string): Promise<string[]> =>
+    peers.has(s) ? (await peerShare(s)).profileTypes : [...await studyProfileTypes(s, dbOf(s), connOf(s))];
+  const numericAssaysOf = async (s: string): Promise<string[]> => peers.has(s) ? (await peerShare(s)).assays
+    : [...(await studyAssayProfiles(s, dbOf(s), connOf(s))).entries()].filter(([, a]) => !isCategoricalAssay(a.datatype)).map(([pt]) => pt);
+  for (const [hi, h] of heatmap.entries()) {
     const isVaf = /^vaf$/i.test(h.profileType);
-    const assays = await Promise.all(studies.map(async (s) => (await studyAssayProfiles(s, dbOf(s), connOf(s))).get(h.profileType)));
+    const assays = await Promise.all(studies.map(async (s) => peers.has(s)
+      ? (await peerShare(s)).heatmap[hi].assay ?? undefined
+      : (await studyAssayProfiles(s, dbOf(s), connOf(s))).get(h.profileType)));
     if (!isVaf && assays.some((a) => a)) {
       if (!h.assay) throw new Error("heatmap: '" + h.profileType + "' is a generic assay; name the entities to draw (entities: [...]) rather than genes");
       if (assays.some((a) => a && isCategoricalAssay(a.datatype)))
@@ -540,7 +741,8 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
       const okStudies = studies.filter((_, i) => assays[i]);
       const values = new Map<string, number>();
       const fetched = await Promise.all(okStudies.map(async (s) =>
-        ({ s, r: await lqRows("oncoprint:assay heatmap", assayHeatmapSql(h.profileType, h.genes, s, dbOf(s), unit, !!assays[studies.indexOf(s)]!.patientLevel, samplesOf(s)), s) })));
+        ({ s, r: peers.has(s) ? await peerRows(s, (i) => i.heatmap[hi].values)
+          : await lqRows("oncoprint:assay heatmap", assayHeatmapSql(h.profileType, h.genes, s, dbOf(s), unit, !!assays[studies.indexOf(s)]!.patientLevel, samplesOf(s)), s) })));
       for (const { s, r } of fetched)
         for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
       heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf: false, assay: true, values });
@@ -548,18 +750,19 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
     }
     if (h.assay) throw new Error("heatmap: entities name a generic assay's tracks; '" + h.profileType + "' is not a generic-assay profile of " + studies.join("/"));
     const avail = await Promise.all(studies.map(async (s) =>
-      (isVaf ? await vafAvailable(s, dbOf(s), connOf(s)) : (await studyProfileTypes(s, dbOf(s), connOf(s))).has(h.profileType)) ? s : null));
+      (peers.has(s) ? (await peerShare(s)).heatmap[hi].available
+        : isVaf ? await vafAvailable(s, dbOf(s), connOf(s)) : (await studyProfileTypes(s, dbOf(s), connOf(s))).has(h.profileType)) ? s : null));
     const okStudies = avail.filter((s): s is string => s !== null);
     if (!okStudies.length)
       throw new Error(isVaf
         ? "heatmap: 'VAF' needs mutation allele counts, which " + studies.join("/") + " did not load"
         : "heatmap: profile '" + h.profileType + "' not in " + studies.join("/") +
-          " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0]), connOf(studies[0])))].join(", ") || "none") + ", VAF" +
-          [...(await studyAssayProfiles(studies[0], dbOf(studies[0]), connOf(studies[0]))).entries()].filter(([, a]) => !isCategoricalAssay(a.datatype))
-            .map(([pt]) => ", " + pt + " (generic assay: name its entities)").join("") + ")");
+          " (available: " + ((await profileTypesOf(studies[0])).join(", ") || "none") + ", VAF" +
+          (await numericAssaysOf(studies[0])).map((pt) => ", " + pt + " (generic assay: name its entities)").join("") + ")");
     const values = new Map<string, number>(); // columnId|gene -> value
     const hFetched = await Promise.all(okStudies.map(async (s) =>
-      ({ s, r: await lqRows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s), unit, samplesOf(s)) : heatmapSql(h.profileType, h.genes, s, dbOf(s), unit, samplesOf(s)), s) })));
+      ({ s, r: peers.has(s) ? await peerRows(s, (i) => i.heatmap[hi].values)
+        : await lqRows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s), unit, samplesOf(s)) : heatmapSql(h.profileType, h.genes, s, dbOf(s), unit, samplesOf(s)), s) })));
     for (const { s, r } of hFetched)
       for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
     heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf, values });
@@ -595,15 +798,17 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
 
   // ---- molecular overlays: values thresholded into the gene cells ---------
   const overlaysIn: AssembleInput["overlays"] = [];
-  for (const ov of overlays) {
-    const avail = await Promise.all(studies.map(async (s) => (await studyProfileTypes(s, dbOf(s), connOf(s))).has(ov.profileType) ? s : null));
+  for (const [oi, ov] of overlays.entries()) {
+    const avail = await Promise.all(studies.map(async (s) => (peers.has(s) ? (await peerShare(s)).overlays[oi].available
+      : (await studyProfileTypes(s, dbOf(s), connOf(s))).has(ov.profileType)) ? s : null));
     const okStudies = avail.filter((s): s is string => s !== null);
     if (!okStudies.length)
       throw new Error("overlay: profile '" + ov.profileType + "' not in " + studies.join("/") +
-        " (available: " + ([...(await studyProfileTypes(studies[0], dbOf(studies[0]), connOf(studies[0])))].join(", ") || "none") + ")");
+        " (available: " + ((await profileTypesOf(studies[0])).join(", ") || "none") + ")");
     const values = new Map<string, number>();
     const fetched = await Promise.all(okStudies.map(async (s) =>
-      ({ s, r: await lqRows("oncoprint:overlay " + ov.kind, heatmapSql(ov.profileType, genes, s, dbOf(s), unit, samplesOf(s)), s) })));
+      ({ s, r: peers.has(s) ? await peerRows(s, (i) => i.overlays[oi].values)
+        : await lqRows("oncoprint:overlay " + ov.kind, heatmapSql(ov.profileType, genes, s, dbOf(s), unit, samplesOf(s)), s) })));
     for (const { s, r } of fetched)
       for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
     overlaysIn.push({ kind: ov.kind, profileType: ov.profileType, threshold: ov.threshold, values });

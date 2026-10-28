@@ -20,7 +20,12 @@ export interface StudyAccess {
 }
 
 /** What a view kind needs of every study it draws (its descriptor says); a kind without a need needs only counts. */
-export type Need = "patients" | "timeline" | "alterations" | "local";
+export type Need = "patients" | "timeline" | "alterations" | "oncoprint" | "local";
+
+/** what a peer that shares a kind sends, as the refusals name it (lib/disclosure.ts's names) */
+const SHARED: Record<"timeline" | "alterations" | "oncoprint", string> = {
+  timeline: "patient timelines", alterations: "patient alterations", oncoprint: "oncoprint columns",
+};
 
 /** What `kind` needs of every study it draws (its descriptor's `need`; null: only counts, which every participant gives). */
 export const viewNeed = (kind: string): Need | null => kindOf(kind)?.need ?? null;
@@ -31,7 +36,7 @@ const why = (need: Need, a: StudyAccess): string | null => {
   if (need !== "patients" && a.remote && a.shares.includes(need)) return null;
   if (!a.remote) return "answers with aggregate counts only";
   return need === "patients" ? "is a remote peer, which shares no patient-level data for this view"
-    : "is a remote peer, which does not share patient " + (need === "timeline" ? "timelines" : "alterations") + " with this instance";
+    : "is a remote peer, which does not share " + SHARED[need] + " with this instance";
 };
 
 /**

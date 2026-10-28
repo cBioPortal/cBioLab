@@ -677,7 +677,7 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     assert.deepEqual([...allowedKinds(r, "s2")].sort(), ["alterations", "timeline"], "s2's own rule and the * rule together");
     assert.deepEqual([...allowedKinds(r, "s3")], ["alterations"]);
     assert.deepEqual([...allowedKinds(parseRules("s1", "X"), "s1")], ["timeline"]);
-    assert.deepEqual([...allowedKinds(parseRules("s1:*", "X"), "s1")].sort(), ["alterations", "plot", "timeline"]);
+    assert.deepEqual([...allowedKinds(parseRules("s1:*", "X"), "s1")].sort(), ["alterations", "oncoprint", "plot", "timeline"]);
     assert.equal(allowedKinds(parseRules("", "X"), "s1").size, 0);
     assert.throws(() => parseRules("s1:timline", "FEDERATION_ACCEPT_PATIENT_LEVEL"), /FEDERATION_ACCEPT_PATIENT_LEVEL: unknown kind 'timline'/);
     assert.throws(() => parseRules("s1:", "X"), /names no kind/);
@@ -912,7 +912,7 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     await withEnv({ FEDERATION_DISCLOSE_PATIENTS: undefined }, async () => {
       const n = [...federationOps().keys()];
       assert.ok(n.includes("aggregates"));
-      assert.equal(n.some((x) => /^patient-|^plot-cases$/.test(x)), false, "no opt-in, no op");
+      assert.equal(n.some((x) => /^patient-|^plot-cases$|^oncoprint-columns$/.test(x)), false, "no opt-in, no op");
       const r = await answerFederation("patient-timeline", { study: "rms_msk_2026", patient: "P-1" });
       assert.equal(r.status, 404, "asking for it is asking for an op that does not exist");
     });

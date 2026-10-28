@@ -114,6 +114,7 @@ The kinds (`lib/disclosure.ts`, `PATIENT_KINDS`), each one view's needs and noth
 | `timeline` | `timeline` | the cohort's patient list with timeline counts; one patient's events and samples |
 | `alterations` | `alterations` | the cohort's patient list with alteration counts; one patient's samples, mutations, copy-number calls and structural variants |
 | `plot` | `plot` | the cases a plot draws as points, with their case ids: every case up to the points cap, the outliers past it, a ranked layer's extremes, a cohort layer's cases |
+| `oncoprint` | `oncoprint` | the study's share of the figure, one column per patient (or sample) of the cohort: each column's id, its alterations in the drawn genes (gene, alteration type, mutation type, protein change, copy-number call), which of those genes its panels cover, its sample count and the alteration types it was profiled for, and the values of the clinical, heatmap and overlay tracks the figure draws. The coordinator assembles, sorts and annotates the figure with these columns beside its own |
 
 A plot's **aggregates** cross for every peer, whatever its rules: the `plot` op answers a whole
 plot (density grid, quartiles, violin, contingency, coefficients) or one piece of a plot pooled
@@ -127,12 +128,12 @@ a peer that refuses mid-way leaves the density and names its reason, never faili
 
 Each side writes **rules**: a study (or `*`) and the kinds allowed for it, e.g.
 `genie_public:timeline+alterations, *:timeline`. A bare study id allows the timeline alone; `*` as
-a kind allows every kind (so `plot` too); an unknown kind is refused naming the setting, never
+a kind allows every kind (so `plot` and `oncoprint` too); an unknown kind is refused naming the setting, never
 ignored.
 
 | side | setting | effect |
 |---|---|---|
-| peer (data owner) | `FEDERATION_DISCLOSE_PATIENTS=<rules>` | adds the `patient-rows`, `patient-timeline` and `plot-cases` ops to its federation API (`lib/federation-api.ts`); without it the ops **do not exist** (404). Every call is checked against the rules — the study and the kind its table belongs to (`PEER_TABLES` in `lib/federation.ts`), before anything is read — and answers only for studies the peer holds itself at patient level (never a study it reaches through a peer of its own, never an aggregate-only one) |
+| peer (data owner) | `FEDERATION_DISCLOSE_PATIENTS=<rules>` | adds the `patient-rows`, `patient-timeline`, `plot-cases` and `oncoprint-columns` ops to its federation API (`lib/federation-api.ts`); without it the ops **do not exist** (404). Every call is checked against the rules — the study and the kind its table belongs to (`PEER_TABLES` in `lib/federation.ts`), before anything is read — and answers only for studies the peer holds itself at patient level (never a study it reaches through a peer of its own, never an aggregate-only one) |
 | coordinator | `FEDERATION_ACCEPT_PATIENT_LEVEL=<rules>` | the `FEDERATION_PEERS` peer for a study becomes a `RemotePatientResolver` carrying the kinds accepted for it — a `RemoteTimelineResolver` when they include `timeline` — instead of a `RemoteAggregateResolver` |
 
 Both settings, like the rest of federation's (`FEDERATION_PEERS`, `LOOPBACK_PEER`, `STUDY_DENY`,
