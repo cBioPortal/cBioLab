@@ -98,7 +98,7 @@ alt AS (
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
   INNER JOIN ps ON ps.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'lung_msk_pdx' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'lung_msk_pdx' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps)
   GROUP BY gene, pid, side
   HAVING hit > 0

@@ -745,7 +745,7 @@
             "name": "WNT",
             "source": "Sanchez-Vega 2018",
             "genes": 68,
-            "profiledGenes": 12,
+            "profiledGenes": 10,
             "cells": [
               {
                 "cohort": "Colorectal",
@@ -882,7 +882,9 @@
               "CHD8",
               "LEF1",
               "LGR4",
+              "LGR5",
               "LRP5",
+              "LRP6",
               "NDP",
               "PORCN",
               "RSPO1",
@@ -897,11 +899,9 @@
               "TLE3",
               "TLE4",
               "WIF1",
-              "DVL1",
-              "DVL2",
               {
-                "…": "36 more",
-                "sha256": "e206ba224e3aee31"
+                "…": "38 more",
+                "sha256": "9b715e115a783712"
               }
             ],
             "q": 0
@@ -910,7 +910,7 @@
             "name": "NOTCH",
             "source": "Sanchez-Vega 2018",
             "genes": 71,
-            "profiledGenes": 14,
+            "profiledGenes": 11,
             "cells": [
               {
                 "cohort": "Colorectal",
@@ -1065,8 +1065,8 @@
               "APH1A",
               "FHL1",
               {
-                "…": "37 more",
-                "sha256": "d68e27faa10564d1"
+                "…": "40 more",
+                "sha256": "3b1d7e1d119c747b"
               }
             ],
             "q": 9.746310598961845e-141
@@ -1438,7 +1438,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Share of samples with an OncoKB driver (v7.5) in at least one member gene — drivers only, as Sanchez-Vega et al. counted curated oncogenic events. A pathway's denominator is the samples profiled for at least one of its genes, so a panel that covers few members makes a pathway look rarer than a genome-wide assay would; each member gene's own % is over the samples profiled for THAT gene. 206 member-gene slots were on no participating panel and are listed as not profiled rather than counted as unaltered. Pathway membership is the paper's Table S3; a gene's pathway role (oncogene / tumour suppressor) is not used in the count. Two-sided Fisher tests; q is Benjamini–Hochberg across the pathways drawn, and separately across every member gene tested.",
+      "caveat": "Share of samples with an OncoKB driver (v7.5) in at least one member gene — drivers only, as Sanchez-Vega et al. counted curated oncogenic events. A pathway's denominator is the samples profiled for at least one of its genes, so a panel that covers few members makes a pathway look rarer than a genome-wide assay would; each member gene's own % is over the samples profiled for THAT gene. 211 member-gene slots were on no participating panel and are listed as not profiled rather than counted as unaltered. Pathway membership is the paper's Table S3; a gene's pathway role (oncogene / tumour suppressor) is not used in the count. Two-sided Fisher tests; q is Benjamini–Hochberg across the pathways drawn, and separately across every member gene tested.",
       "method": {
         "steps": [
           {

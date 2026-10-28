@@ -4,7 +4,7 @@ Cohorts:
 - Colorectal, MSS: 4,957 patients — CANCER_TYPE in [Colorectal Cancer] AND NOT MSI_TYPE in [Instable]
 - Pancreatic, MSS: 3,097 patients — CANCER_TYPE in [Pancreatic Cancer] AND NOT MSI_TYPE in [Instable]
 
-Alteration enrichment (mutation; two-sided Fisher's exact test, BH q over 494 genes; 328 at q<0.05):
+Alteration enrichment (mutation; two-sided Fisher's exact test, BH q over 493 genes; 328 at q<0.05):
   APC: Colorectal, MSS 76.9% (3813/4957) | Pancreatic, MSS 1.3% (39/3097), log2 ratio 5.93, q=<1e-300, enriched in Colorectal, MSS
   KRAS: Colorectal, MSS 43.7% (2167/4957) | Pancreatic, MSS 80.9% (2507/3097), log2 ratio -0.89, q=8.4e-249, enriched in Pancreatic, MSS
   CDKN2A: Colorectal, MSS 1% (49/4957) | Pancreatic, MSS 20.2% (627/3097), log2 ratio -4.36, q=5.4e-211, enriched in Pancreatic, MSS
@@ -19,7 +19,7 @@ Alteration enrichment (mutation; two-sided Fisher's exact test, BH q over 494 ge
   TP53: Colorectal, MSS 78.2% (3877/4957) | Pancreatic, MSS 66.9% (2072/3097), log2 ratio 0.23, q=3.4e-27, enriched in Colorectal, MSS
   CTNNB1: Colorectal, MSS 5.4% (269/4957) | Pancreatic, MSS 1.1% (33/3097), log2 ratio 2.35, q=7.7e-26, enriched in Colorectal, MSS
   PIK3R1: Colorectal, MSS 3.6% (178/4957) | Pancreatic, MSS 0.4% (11/3097), log2 ratio 3.34, q=4.9e-24, enriched in Colorectal, MSS
-  NRAS: Colorectal, MSS 4% (196/4957) | Pancreatic, MSS 0.5% (16/3097), log2 ratio 2.94, q=8.3e-24, enriched in Colorectal, MSS
+  NRAS: Colorectal, MSS 4% (196/4957) | Pancreatic, MSS 0.5% (16/3097), log2 ratio 2.94, q=8.2e-24, enriched in Colorectal, MSS
   PTPRT: Colorectal, MSS 6.3% (313/4957) | Pancreatic, MSS 1.8% (57/3097), log2 ratio 1.78, q=1.4e-21, enriched in Colorectal, MSS
   PTPRS: Colorectal, MSS 5.3% (261/4957) | Pancreatic, MSS 1.5% (48/3097), log2 ratio 1.76, q=1.0e-17, enriched in Colorectal, MSS
   CARD11: Colorectal, MSS 3.3% (165/4957) | Pancreatic, MSS 0.7% (21/3097), log2 ratio 2.30, q=2.1e-15, enriched in Colorectal, MSS
@@ -28,7 +28,7 @@ Alteration enrichment (mutation; two-sided Fisher's exact test, BH q over 494 ge
   MTOR: Colorectal, MSS 3% (149/4957) | Pancreatic, MSS 0.5% (17/3097), log2 ratio 2.45, q=6.4e-15, enriched in Colorectal, MSS
   PLCG2: Colorectal, MSS 2.6% (122/4777) | Pancreatic, MSS 0.4% (11/3064), log2 ratio 2.83, q=1.9e-14, enriched in Colorectal, MSS
   ASXL1: Colorectal, MSS 2.6% (128/4957) | Pancreatic, MSS 0.4% (12/3097), log2 ratio 2.74, q=2.0e-14, enriched in Colorectal, MSS
-  KDR: Colorectal, MSS 2.9% (146/4957) | Pancreatic, MSS 0.6% (18/3097), log2 ratio 2.34, q=6.8e-14, enriched in Colorectal, MSS
+  KDR: Colorectal, MSS 2.9% (146/4957) | Pancreatic, MSS 0.6% (18/3097), log2 ratio 2.34, q=6.7e-14, enriched in Colorectal, MSS
   ERBB2: Colorectal, MSS 3.1% (155/4957) | Pancreatic, MSS 0.7% (21/3097), log2 ratio 2.21, q=9.1e-14, enriched in Colorectal, MSS
   PDGFRA: Colorectal, MSS 2.2% (109/4957) | Pancreatic, MSS 0.3% (8/3097), log2 ratio 3.09, q=9.1e-14, enriched in Colorectal, MSS
   EPHA5: Colorectal, MSS 3.6% (179/4957) | Pancreatic, MSS 1% (30/3097), log2 ratio 1.90, q=1.9e-13, enriched in Colorectal, MSS
@@ -45,15 +45,15 @@ Alteration enrichment (mutation; two-sided Fisher's exact test, BH q over 494 ge
   AXIN2: Colorectal, MSS 2.8% (141/4957) | Pancreatic, MSS 0.8% (26/3097), log2 ratio 1.76, q=1.2e-9, enriched in Colorectal, MSS
   SLX4: Colorectal, MSS 2% (80/4032) | Pancreatic, MSS 0.3% (7/2573), log2 ratio 2.87, q=1.2e-9, enriched in Colorectal, MSS
   EPHA7: Colorectal, MSS 2.4% (117/4777) | Pancreatic, MSS 0.6% (19/3064), log2 ratio 1.98, q=1.5e-9, enriched in Colorectal, MSS
-  … 454 more genes tested
-  CAVEAT (tell the user): Every gene's mutation frequency in each cohort, counted in SAMPLES over the samples profiled for that gene (a panel that lists it, or whole-exome; a sample altered off-panel counts as measured), uncalled mutations excluded as the portal excludes them. 494 genes tested with a two-sided Fisher's exact test; q is Benjamini–Hochberg across all of them. 8 altered genes were not tested: fewer than 5 altered samples across the cohorts, or not profiled in one of them. The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. 
+  … 453 more genes tested
+  CAVEAT (tell the user): Every gene's mutation frequency in each cohort, counted in SAMPLES over the samples profiled for that gene (a panel that lists it, or whole-exome; an off-panel call is left out), uncalled mutations excluded as the portal excludes them. 493 genes tested with a two-sided Fisher's exact test; q is Benjamini–Hochberg across all of them. 7 altered genes were not tested: fewer than 5 altered samples across the cohorts, or not profiled in one of them. The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. 
   METHOD:
     - Count altered and profiled samples per gene [Colorectal, MSS · msk_chord_2024]: The enrichment queries above: per gene, samples with a mutation; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.
         whole-exome samples: 0
     - Count altered and profiled samples per gene [Pancreatic, MSS · msk_chord_2024]: The enrichment queries above: per gene, samples with a mutation; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.
         whole-exome samples: 0
     - Profiled = panel samples + whole-exome samples, summed across studies: A sample altered in a gene its panel does not list still counts as measured. Genes with fewer than 5 altered samples across the cohorts, or not profiled in one of them, are not tested.
-        tested: 494
-        not tested: 8
+        tested: 493
+        not tested: 7
     - Fisher's exact test per gene, then Benjamini–Hochberg: A two-sided Fisher's exact test on altered vs not among the profiled, per gene; q across every gene tested.
     Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).

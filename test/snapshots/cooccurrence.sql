@@ -24,7 +24,7 @@ altered AS (
   SELECT DISTINCT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS sid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol IN ('EGFR','KRAS','TP53','STK11','KEAP1','ALK') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+    AND g.hugo_gene_symbol IN ('EGFR','KRAS','TP53','STK11','KEAP1','ALK') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 ),
 covered AS (

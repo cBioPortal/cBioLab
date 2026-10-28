@@ -25,7 +25,7 @@ ps AS (SELECT suid, pid, side FROM sides WHERE pid IN (SELECT pid FROM paired)),
 det AS (
   SELECT DISTINCT s.pid AS pid FROM snapshot_db.genomic_event_derived g
   INNER JOIN sides s ON s.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND s.side = 'b' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND s.side = 'b' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b')
 )
 SELECT (SELECT uniqExactIf(pid, side = 'b') FROM classed) AS plasma_all, (SELECT uniqExactIf(pid, side = 'a') FROM classed) AS tissue_all,
@@ -58,7 +58,7 @@ alt AS (
   SELECT g.hugo_gene_symbol AS gene, ps.pid AS pid, ps.side AS side, 1 AS hit
   FROM snapshot_db.genomic_event_derived g
   INNER JOIN ps ON ps.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND g.hugo_gene_symbol IN ('EGFR','KRAS','TP53','STK11','KEAP1','PIK3CA','BRAF','MET','ERBB2','ALK') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND g.hugo_gene_symbol IN ('EGFR','KRAS','TP53','STK11','KEAP1','PIK3CA','BRAF','MET','ERBB2','ALK') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps)
   GROUP BY gene, pid, side
 ),
@@ -101,7 +101,7 @@ ps AS (SELECT suid, pid, side FROM sides WHERE pid IN (SELECT pid FROM paired)),
 det AS (
   SELECT DISTINCT s.pid AS pid FROM snapshot_db.genomic_event_derived g
   INNER JOIN sides s ON s.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND s.side = 'b' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+  WHERE g.cancer_study_identifier = 'nsclc_ctdx_msk_2022' AND s.side = 'b' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b')
 ),
 os AS (

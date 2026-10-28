@@ -38,8 +38,8 @@
         "positive": 4898,
         "negative": 2911,
         "unprofiled": 0,
-        "tested": 487,
-        "untested": 7,
+        "tested": 486,
+        "untested": 4,
         "significant": 103,
         "rows": [
           {
@@ -54,7 +54,7 @@
             ],
             "log2Ratio": 1.3105158410067523,
             "p": 7.930184481576199e-32,
-            "q": 2.4624026117151252e-29,
+            "q": 2.457346343518585e-29,
             "cytoband": "12q13.12"
           },
           {
@@ -69,7 +69,7 @@
             ],
             "log2Ratio": 1.3356404351623685,
             "p": 1.0112536393080597e-31,
-            "q": 2.4624026117151252e-29,
+            "q": 2.457346343518585e-29,
             "cytoband": "17q11.2"
           },
           {
@@ -84,7 +84,7 @@
             ],
             "log2Ratio": -1.2401620662733115,
             "p": 8.526521385110937e-28,
-            "q": 1.3841386381830088e-25,
+            "q": 1.3812964643879717e-25,
             "cytoband": "Xp11.3"
           },
           {
@@ -99,7 +99,7 @@
             ],
             "log2Ratio": 0.33648092166495686,
             "p": 8.433020860998713e-26,
-            "q": 1.0267202898265933e-23,
+            "q": 1.0246120346113437e-23,
             "cytoband": "17p13.1"
           },
           {
@@ -114,7 +114,7 @@
             ],
             "log2Ratio": 1.8336672991122438,
             "p": 3.8375390978660617e-22,
-            "q": 3.737763081321544e-20,
+            "q": 3.730088003125812e-20,
             "cytoband": "2q31.2"
           },
           {
@@ -129,7 +129,7 @@
             ],
             "log2Ratio": 1.0117640684854847,
             "p": 2.888418522445667e-17,
-            "q": 2.344433034051733e-15,
+            "q": 2.3396190031809902e-15,
             "cytoband": "9p21.3"
           },
           {
@@ -144,7 +144,7 @@
             ],
             "log2Ratio": 1.5349492433857752,
             "p": 1.0832089367286241e-13,
-            "q": 7.536039316954857e-12,
+            "q": 7.52056490357302e-12,
             "cytoband": "5q14.3"
           },
           {
@@ -159,7 +159,7 @@
             ],
             "log2Ratio": 1.2981657297437057,
             "p": 3.475061123903411e-13,
-            "q": 2.1154434591762015e-11,
+            "q": 2.111099632771322e-11,
             "cytoband": "10q23.31"
           },
           {
@@ -174,7 +174,7 @@
             ],
             "log2Ratio": 0.5014640231942609,
             "p": 3.231234854363358e-9,
-            "q": 1.748457082305506e-7,
+            "q": 1.7448668213562133e-7,
             "cytoband": "19p13.2"
           },
           {
@@ -189,7 +189,7 @@
             ],
             "log2Ratio": 1.8936358882832554,
             "p": 1.9365251916808887e-8,
-            "q": 9.430877683485928e-7,
+            "q": 9.411512431569118e-7,
             "cytoband": "15q22.31"
           },
           {
@@ -204,7 +204,7 @@
             ],
             "log2Ratio": 0.6848401210784663,
             "p": 2.4000209053632777e-8,
-            "q": 0.0000010625547099199239,
+            "q": 0.00000106037287273323,
             "cytoband": "1p36.11"
           },
           {
@@ -219,7 +219,7 @@
             ],
             "log2Ratio": 1.1916449903139932,
             "p": 5.52641980867281e-8,
-            "q": 0.0000022428053723530488,
+            "q": 0.000002238200022512488,
             "cytoband": "16q24.3"
           },
           {
@@ -234,7 +234,7 @@
             ],
             "log2Ratio": 1.1967423293406807,
             "p": 1.1049701397048592e-7,
-            "q": 0.000004139388138740511,
+            "q": 0.0000041308883684350885,
             "cytoband": "4q31.3"
           },
           {
@@ -249,7 +249,7 @@
             ],
             "log2Ratio": 1.9290151756997247,
             "p": 4.119653217679125e-7,
-            "q": 0.000014330507978640958,
+            "q": 0.000014301081884228963,
             "cytoband": "2q33.1"
           },
           {
@@ -264,7 +264,7 @@
             ],
             "log2Ratio": -1.3154112560165598,
             "p": 5.475848606447246e-7,
-            "q": 0.00001737998959016686,
+            "q": 0.00001734430172653202,
             "cytoband": "21q22.3"
           },
           {
@@ -279,7 +279,7 @@
             ],
             "log2Ratio": 0.7076092125493266,
             "p": 5.710058181574328e-7,
-            "q": 0.00001737998959016686,
+            "q": 0.00001734430172653202,
             "cytoband": "13q14.2"
           },
           {
@@ -294,7 +294,7 @@
             ],
             "log2Ratio": 1.689277389777069,
             "p": 0.00000141738485451397,
-            "q": 0.00004060390730284137,
+            "q": 0.000040520531723164087,
             "cytoband": "1p13.2"
           },
           {
@@ -309,7 +309,7 @@
             ],
             "log2Ratio": 0.8236094568950635,
             "p": 0.0000017875423706880156,
-            "q": 0.00004836295191805909,
+            "q": 0.00004826364400857642,
             "cytoband": "9q34.3"
           },
           {
@@ -324,7 +324,7 @@
             ],
             "log2Ratio": 0.6229223872428398,
             "p": 0.000002919451766796664,
-            "q": 0.00007483015844368291,
+            "q": 0.00007467650308753573,
             "cytoband": "7q36.1"
           },
           {
@@ -339,12 +339,12 @@
             ],
             "log2Ratio": 0.6843354396125166,
             "p": 0.000006930515164070668,
-            "q": 0.00016875804424512078,
+            "q": 0.00016841151848691723,
             "cytoband": "2q34"
           },
           {
             "…": "280 more",
-            "sha256": "b14fd702a6501c54"
+            "sha256": "33d58e22993a7193"
           }
         ],
         "labels": [
@@ -374,7 +374,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Of the 7,809 patients of “NSCLC” sequenced for mutations, 4,898 (62.7%) carry an OncoKB driver (v7.5) — a called mutation, a high-level copy-number call or a structural variant the store calls oncogenic or likely oncogenic — in EGFR, KRAS, ALK, ROS1, BRAF, MET, RET, ERBB2, NTRK1, NTRK2, NTRK3; 2,911 (37.3%) carry none and were sequenced on a panel covering every one of those genes (or whole-exome): the driver-negative group. 0 (0.0%) carry none but were not profiled for every listed gene, so are neither — kept out of both sides, never counted as driver-negative. Coverage is read from the mutation panels and calls from the cohort's own samples only; a fusion driver is called only where the study reports structural variants. Then every other gene's mutation frequency is compared between driver-negative and driver-positive patients, in PATIENTS over the patients profiled for that gene (a panel that lists it, or whole-exome; an off-panel call counts as measured), two-sided Fisher's exact test, Benjamini–Hochberg q over the 487 genes tested; 7 altered genes were not tested (fewer than 5 altered patients, or not profiled in a group). The log ratio is log2 of the driver-negative share over the driver-positive one. Driver-positive tumours are often mutually exclusive with other drivers by biology, so a gene enriched in the driver-negative group is a candidate alternative driver, not a proven one; smoking history and tumour mutation burden also differ between the groups and are not adjusted for. "
+      "caveat": "Of the 7,809 patients of “NSCLC” sequenced for mutations, 4,898 (62.7%) carry an OncoKB driver (v7.5) — a called mutation, a high-level copy-number call or a structural variant the store calls oncogenic or likely oncogenic — in EGFR, KRAS, ALK, ROS1, BRAF, MET, RET, ERBB2, NTRK1, NTRK2, NTRK3; 2,911 (37.3%) carry none and were sequenced on a panel covering every one of those genes (or whole-exome): the driver-negative group. 0 (0.0%) carry none but were not profiled for every listed gene, so are neither — kept out of both sides, never counted as driver-negative. Coverage is read from the mutation panels and calls from the cohort's own samples only; a fusion driver is called only where the study reports structural variants. Then every other gene's mutation frequency is compared between driver-negative and driver-positive patients, in PATIENTS over the patients profiled for that gene (a panel that lists it, or whole-exome; an off-panel call is left out), two-sided Fisher's exact test, Benjamini–Hochberg q over the 486 genes tested; 4 altered genes were not tested (fewer than 5 altered patients, or not profiled in a group). The log ratio is log2 of the driver-negative share over the driver-positive one. Driver-positive tumours are often mutually exclusive with other drivers by biology, so a gene enriched in the driver-negative group is a candidate alternative driver, not a proven one; smoking history and tumour mutation burden also differ between the groups and are not adjusted for. "
     }
   ]
 }

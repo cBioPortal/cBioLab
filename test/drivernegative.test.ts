@@ -16,8 +16,8 @@ test("per gene: whole-exome patients join every gene's denominator, Fisher and B
   assert.equal(tested[0].gene, "NTRK1");
 });
 
-test("an off-panel call counts as measured, never as more altered than profiled", () => {
-  const { tested } = dnegTest(new Map([["X", [6, 0]]]), new Map(), [0, 4], 5);
-  assert.deepEqual(tested[0].profiled, [6, 4]);
-  assert.equal(tested[0].log2Ratio, null);
+test("a gene profiled in only one group is not tested", () => {
+  const { tested, untested } = dnegTest(new Map([["X", [6, 0]]]), new Map(), [0, 4], 5);
+  assert.equal(tested.length, 0);
+  assert.equal(untested, 1);
 });

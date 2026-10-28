@@ -52,8 +52,7 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   for (const g of genes) {
     const cells = vNames.map((n) => {
       const alt = altered.get(n + "\t" + g) || 0;
-      // a sample can be altered in a gene its panel does not list (an off-panel call): it was measured
-      const profiled = Math.max(alt, (panel.get(n + "\t" + g) || 0) + (wes.get(n) || 0));
+      const profiled = (panel.get(n + "\t" + g) || 0) + (wes.get(n) || 0);
       return { cohort: n, altered: alt, profiled, pct: profiled ? Math.round(1000 * alt / profiled) / 10 : null };
     });
     const total = cells.reduce((a, c) => a + c.altered, 0);
@@ -100,7 +99,7 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
     caveat: "Every gene's " + ALTERATION_WORD[alteration] + " frequency in each cohort, counted in SAMPLES over the samples profiled for that gene " +
-      "(a panel that lists it, or whole-exome; a sample altered off-panel counts as measured)" +
+      "(a panel that lists it, or whole-exome; an off-panel call is left out)" +
       (alteration === "mutation" ? ", uncalled mutations excluded as the portal excludes them" : alteration === "sv" ? "" : ", high-level copy number only") + ". " +
       (measure === "driver" ? "Only OncoKB drivers (" + pin + ") count. " : "") +
       tested.length.toLocaleString("en-US") + " genes tested with a " + test + "; q is Benjamini–Hochberg across all of them. " +

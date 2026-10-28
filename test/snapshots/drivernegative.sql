@@ -65,7 +65,7 @@ grp AS (
 SELECT g.hugo_gene_symbol AS gene, grp.g AS grp, uniqExact(replaceOne(g.patient_unique_id, 'msk_chord_2024_', '')) AS altered
 FROM snapshot_db.genomic_event_derived g
   INNER JOIN grp ON grp.pid = replaceOne(g.patient_unique_id, 'msk_chord_2024_', '')
-WHERE g.cancer_study_identifier = 'msk_chord_2024' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
   AND g.hugo_gene_symbol NOT IN ('EGFR', 'KRAS', 'ALK', 'ROS1', 'BRAF', 'MET', 'RET', 'ERBB2', 'NTRK1', 'NTRK2', 'NTRK3') AND grp.g IN ('positive', 'negative')
   AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 GROUP BY gene, grp

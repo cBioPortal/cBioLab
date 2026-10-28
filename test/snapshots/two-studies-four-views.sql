@@ -94,7 +94,7 @@ altered AS (
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+    AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype
 ),
@@ -148,7 +148,7 @@ altered AS (
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+    AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype
 ),
@@ -213,7 +213,7 @@ altered AS (
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
   WHERE g.cancer_study_identifier = 'msk_met_2021'
-    AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+    AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_met_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype
 ),
@@ -267,7 +267,7 @@ altered AS (
      OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
      OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
   WHERE g.cancer_study_identifier = 'msk_met_2021'
-    AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+    AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_met_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype
 ),
@@ -526,7 +526,7 @@ altered AS (
   SELECT DISTINCT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS sid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol IN ('TP53','KRAS','PIK3CA','APC') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+    AND g.hugo_gene_symbol IN ('TP53','KRAS','PIK3CA','APC') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 ),
 covered AS (
@@ -564,7 +564,7 @@ altered AS (
   SELECT DISTINCT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS sid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_met_2021'
-    AND g.hugo_gene_symbol IN ('TP53','KRAS','PIK3CA','APC') AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)
+    AND g.hugo_gene_symbol IN ('TP53','KRAS','PIK3CA','APC') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_met_2021_', '') IN (SELECT sid FROM cohort)
 ),
 covered AS (

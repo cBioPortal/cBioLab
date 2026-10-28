@@ -300,8 +300,11 @@ export function inCohortClinical(study: string, alias = ""): string {
     " OR (" + alias + "type = 'patient' AND " + inCohortPatients(bareId(alias + "patient_unique_id", study)) + "))";
 }
 
-/** high-level CNA only, matching the oncoprint/compare convention (±2) */
-export const ALTERED_COND = "(g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)";
+/**
+ * high-level CNA only, matching the oncoprint/compare convention (±2), and only calls a covering panel
+ * made: an off-panel call is in neither side of a frequency, as on cBioPortal's study view and OncoPrint
+ */
+export const ALTERED_COND = "((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)";
 
 export function driverJoin(pin: string): string {
   return (
