@@ -54,6 +54,7 @@ const coverageOf = (row: Record<string, unknown>): NonNullable<PlotData["coverag
   ({ total: Number(row.total || 0), nx: Number(row.nx || 0), ny: Number(row.ny || 0), ...(row.multi != null ? { multi: Number(row.multi) } : {}) });
 import type { CohortDef, CohortSizes, CompileCtx, ChRow, ChResult, PatientTimeline } from "./types.ts";
 import type { StudyAccess } from "./view-coverage.ts";
+import type { OncoprintPeer } from "./oncoprint.ts";
 import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } from "./patient-timeline.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
@@ -263,9 +264,13 @@ export async function routeStudy(study: string): Promise<ChConn> {
 /**
  * The connection for a request that returns patient or sample identifiers to the caller (an
  * oncoprint's columns, one column's detail, a selection's patients). Refused for a study this
- * deployment holds only in aggregate.
+ * deployment holds only in aggregate, and for one a federation peer holds: that study's data is
+ * the peer's to answer, through its federation API.
  */
 export async function patientLevelConn(study: string, what = "this request lists patients"): Promise<ChConn> {
+  const { peerForStudy } = await import("./federation-remote.ts");
+  const peer = await peerForStudy(study);
+  if (peer) throw new Error(what + ", and " + study + " is held by " + peer.label + ", a federation peer that does not answer this request");
   const inst = await instanceForStudy(study);
   if (inst.mode !== "patient-level")
     throw new Error(what + ", and " + inst.label + " is not entitled to patient-level data (" + study + ")");
@@ -1275,6 +1280,28 @@ export function plotCasesOf(r: Resolver): (Resolver & PlotCasesCapable) | null {
   if (isPatientLevel(r)) return r;
   const p = r as unknown as Partial<PlotCasesCapable>;
   return typeof p.plotScatterPoints === "function" && typeof p.plotPoints === "function" ? r as Resolver & PlotCasesCapable : null;
+}
+
+/**
+ * Whether `r` is a federation peer this instance accepts oncoprint columns from (the `oncoprint`
+ * kind), whose resolver then has oncoprintInputs (lib/federation-remote.ts).
+ */
+export function sharesOncoprint(r: Resolver): r is Resolver & OncoprintPeer {
+  return typeof (r as unknown as Partial<OncoprintPeer>).oncoprintInputs === "function";
+}
+
+/**
+ * The federation peer serving `study`, when there is one, for an oncoprint's columns: null for a
+ * study this instance holds itself. A peer that does not share oncoprint columns is refused by
+ * name rather than drawn without its patients.
+ */
+export async function oncoprintPeerOf(study: string): Promise<OncoprintPeer | null> {
+  const { peerForStudy } = await import("./federation-remote.ts");
+  if (!(await peerForStudy(study))) return null;
+  const r = await resolverFor(study, {});
+  if (sharesOncoprint(r)) return r;
+  throw new Error("an oncoprint's columns are patients, and " + r.instance.label + " does not share oncoprint columns of " + study +
+    " with this instance (FEDERATION_ACCEPT_PATIENT_LEVEL)");
 }
 
 export function isPatientLevel(r: Resolver): r is PatientLevelCapable {

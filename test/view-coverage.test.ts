@@ -18,7 +18,7 @@ describe("which views a federated study lets be drawn", () => {
   });
 
   test("a view whose output is patients is not drawn over a study that does not disclose them", () => {
-    for (const kind of ["oncoprint", "table", "mutations", "cox", "logistic", "riskmodel"]) {
+    for (const kind of ["table", "mutations", "cox", "logistic", "riskmodel"]) {
       assert.equal(cantDraw(kind, ["l"], access({ l: LOCAL })), null, kind);
       assert.match(cantDraw(kind, ["l", "p"], access({ l: LOCAL, p: SHARING }))!, /leaving out the patients of p — GENIE \(federated\) is a remote peer, which shares no patient-level data/, kind);
       assert.match(cantDraw(kind, ["g"], access({ g: AGG }))!, /g — primary \(aggregate-only\) answers with aggregate counts only/, kind);
@@ -33,6 +33,9 @@ describe("which views a federated study lets be drawn", () => {
     assert.match(cantDraw("alterations", ["p"], access({ p: timelineOnly }))!, /does not share patient alterations/);
     assert.match(cantDraw("timeline", ["p"], access({ p: PEER }))!, /does not share patient timelines/);
     assert.match(cantDraw("timeline", ["g"], access({ g: AGG }))!, /aggregate counts only/);
+    assert.match(cantDraw("oncoprint", ["p"], access({ p: SHARING }))!, /does not share oncoprint columns/);
+    assert.equal(cantDraw("oncoprint", ["l", "p"], access({ l: LOCAL, p: { ...SHARING, shares: ["oncoprint"] } })), null);
+    assert.match(cantDraw("oncoprint", ["g"], access({ g: AGG }))!, /aggregate counts only/);
   });
 
   test("the aggregates a remote peer does not serve: drawn over local participants, aggregate-only included", () => {
@@ -67,6 +70,7 @@ describe("which views a federated study lets be drawn", () => {
       if (/\banswering\(/.test(src)) assert.equal(viewNeed(kind), "local", kind + " leaves out participants without view aggregates");
       if (/\browHolders\(/.test(src)) assert.ok(["patients", "timeline", "alterations"].includes(viewNeed(kind)!), kind + " leaves out participants that do not disclose rows");
     }
-    for (const kind of ["oncoprint", "cox", "logistic", "riskmodel"]) assert.equal(viewNeed(kind), "patients", kind);
+    for (const kind of ["cox", "logistic", "riskmodel"]) assert.equal(viewNeed(kind), "patients", kind);
+    assert.equal(viewNeed("oncoprint"), "oncoprint");
   });
 });

@@ -99,10 +99,12 @@ The map of the code: what each part does, where it lives, and the one place each
   navigator (cohort, the patient list — a `<dialog>` holding the `DataTable` — and ‹ prev / next ›) steps by the result's `position` — the drawn patient's place
   in the list's order (`rankSql`) and its neighbours — setting `patient`. The chosen `patient`, folded `collapsed`
   tracks and `expandGaps` are in the spec; the last two are drawn in the browser (`dataPart`).
-  **Opt-in patient-level federation** serves this view, `alterations` and a plot's cases (`plot`;
-  a plot's aggregates cross for any peer through the federation API's `plot` op), per study and kind
-  of data: rules (`lib/disclosure.ts`; `study:timeline+alterations+plot`, `*` for every study) in the
-  peer's `FEDERATION_DISCLOSE_PATIENTS` add and gate the `patient-rows`/`patient-timeline`/`plot-cases`
+  **Opt-in patient-level federation** serves this view, `alterations`, a plot's cases (`plot`;
+  a plot's aggregates cross for any peer through the federation API's `plot` op) and an oncoprint's
+  columns (`oncoprint`: the peer answers its study's share, `StudyInputs` in `lib/oncoprint.ts`, and
+  the contract is assembled from it beside the local studies' rows), per study and kind
+  of data: rules (`lib/disclosure.ts`; `study:timeline+alterations+plot+oncoprint`, `*` for every study) in the
+  peer's `FEDERATION_DISCLOSE_PATIENTS` add and gate the `patient-rows`/`patient-timeline`/`plot-cases`/`oncoprint-columns`
   ops (`lib/federation-api.ts`), and the same rules in the coordinator's
   `FEDERATION_ACCEPT_PATIENT_LEVEL` decide what it accepts — data crosses
   only where both allow it. The coordinator reaches the peer through `RemotePatientResolver` /

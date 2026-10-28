@@ -105,7 +105,7 @@ e2e() {
   if [ -n "${CLICKHOUSE2_URL:-}" ] || grep -q '^CLICKHOUSE2_URL=.' .env.local 2>/dev/null; then
     phase "e2e: federation (simulated peer)"
     sleep 2
-    (DATABASE_URL= SUPABASE_DB_URL= PORT=$PORT LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations' FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations' \
+    (DATABASE_URL= SUPABASE_DB_URL= PORT=$PORT LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations+oncoprint' FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations+oncoprint' \
       npm start -- -p $PORT >/tmp/gate-server-fed-$PORT.log 2>&1 &)
     for _ in $(seq 1 40); do curl -sf -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/lab" && break; sleep 3; done
     set +e; E2E_PORT=$PORT node scripts/e2e-federation.cjs; FRC=$?; set -e

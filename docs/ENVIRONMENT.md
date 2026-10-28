@@ -43,7 +43,7 @@ Federation section for what each supports, and `docs/DATA-BOUNDARY.md` for the r
 | `LOOPBACK_PEER_LABEL` | same | optional: how the peer's studies are labelled, e.g. `GENIE (federated)` (default `<CLICKHOUSE2_LABEL> (simulated peer)`) |
 | `FEDERATION_PEERS` | a coordinator using a separate peer | which studies a peer serves: `study=url` pairs, comma-separated, e.g. `genie_public=http://peer:3000/api/federation/v1,nsclc_public_genie_bpc=http://peer:3000/api/federation/v1`. Only the studies listed are taken from that peer |
 | `PEER_LABEL` | same | optional: how those studies are labelled (default `federated peer`) |
-| `FEDERATION_DISCLOSE_PATIENTS` | the peer (for a simulated peer: the deployment) | opt-in patient-level federation, what the peer sends: rules `study:kind+kind`, comma-separated, `*` for every study. Kinds: `timeline`, `alterations`, `plot` (a plot's cases; its aggregates cross without a rule) (a bare study means `timeline`). Unset, the peer sends aggregates only |
+| `FEDERATION_DISCLOSE_PATIENTS` | the peer (for a simulated peer: the deployment) | opt-in patient-level federation, what the peer sends: rules `study:kind+kind`, comma-separated, `*` for every study. Kinds: `timeline`, `alterations`, `plot` (a plot's cases; its aggregates cross without a rule), `oncoprint` (an oncoprint's columns) (a bare study means `timeline`). Unset, the peer sends aggregates only |
 | `FEDERATION_ACCEPT_PATIENT_LEVEL` | the coordinator (for a simulated peer: the deployment) | the same rules, for what this app accepts. Patient-level data crosses only where both sides allow the study and kind |
 | `FEDERATION_HIDE_SQL` | the peer | `1`: do not send the SQL it ran back with its answers (provenance then stops at the peer) |
 
@@ -57,25 +57,25 @@ LOOPBACK_PEER=b
 LOOPBACK_PEER_URL=https://cbiolab.vercel.app/api/federation/v1
 LOOPBACK_PEER_TOKEN=<openssl rand -hex 24, marked Sensitive>
 LOOPBACK_PEER_LABEL=GENIE (federated)
-FEDERATION_DISCLOSE_PATIENTS=*:timeline+alterations
-FEDERATION_ACCEPT_PATIENT_LEVEL=*:timeline+alterations
+FEDERATION_DISCLOSE_PATIENTS=*:timeline+alterations+oncoprint
+FEDERATION_ACCEPT_PATIENT_LEVEL=*:timeline+alterations+oncoprint
 ```
 
 To let plots draw the peer's cases as points as well as its density, add `+plot` to both of the
-last two lines (`*:timeline+alterations+plot`); without it a plot over a peer's study is its
+last two lines (`*:timeline+alterations+oncoprint+plot`); without it a plot over a peer's study is its
 density, and the caption says the peer shares no cases.
 
 Then redeploy. The study picker labels the second database's studies `GENIE (federated)`, and a
 view's "how these numbers were computed" marks the queries that ran on the peer. Without the last
-two lines the peer is aggregate-only: the timeline and alterations views are not drawn over its
-studies either.
+two lines the peer is aggregate-only: the timeline, alterations and oncoprint views are not drawn
+over its studies either.
 
 ### Dev servers
 
 `scripts/session-setup.sh` turns the simulated peer on in each session's `serve-<port>.sh`:
 
 ```
-export PORT=<port> LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations' FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations'
+export PORT=<port> LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations+oncoprint' FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations+oncoprint'
 ```
 
 These go in the serve script, **not** `.env.local`: `scripts/gate.sh` builds and serves from the

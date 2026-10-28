@@ -45,7 +45,7 @@ changing first. The parts, and the one place each rule lives:
   sort, CSV and columns in the database; UI `app/_table/DataTable.tsx`. Never build these per view.
 - **Patient views** (`timeline`, `alterations`) — one patient at a time, navigator
   `app/lab/patient-nav.tsx`; opt-in patient-level federation through `lib/disclosure.ts` (kinds
-  `timeline`, `alterations`, and `plot` for a plot's cases).
+  `timeline`, `alterations`, `plot` for a plot's cases, and `oncoprint` for an oncoprint's columns).
 - **THE one place for:** timeline event-name folding — `lib/event-names.ts`; who enters a survival
   analysis and what is an event — `lib/survival-sql.ts` (its queries `lib/survival-queries.ts`, and every
   view reading an endpoint names who it leaves out, `reportsLeftOut` in `lib/views/index.ts`); a treatment line —

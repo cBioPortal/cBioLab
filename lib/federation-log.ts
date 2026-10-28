@@ -11,7 +11,7 @@ function subject(op: string, args: unknown): string {
   const a = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
   const study = typeof a.study === "string" ? " study=" + a.study.slice(0, 80) : "";
   const table = typeof a.table === "string" ? " table=" + a.table.slice(0, 40) : "";
-  return study + table + (op.startsWith("patient-") || op === "plot-cases" ? " (patient-level)" : "");
+  return study + table + (op.startsWith("patient-") || op === "plot-cases" || op === "oncoprint-columns" ? " (patient-level)" : "");
 }
 
 /** A call this app made to a peer. */

@@ -6,8 +6,8 @@
 //
 // Run by scripts/gate.sh when a second database is configured; on its own against a server started
 // with the simulated peer on:
-//   PORT=3110 LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations' \
-//     FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations' npx next start -p 3110
+//   PORT=3110 LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations+oncoprint' \
+//     FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations+oncoprint' npx next start -p 3110
 //   E2E_PORT=3110 node scripts/e2e-federation.cjs
 const { launch } = require("../e2e-browser.cjs");
 
@@ -102,6 +102,25 @@ async function main() {
       !peerBox.error && pb?.shape === "box" && (pb.violin || []).length > 0 && remoteQueries(peerBox) > 0 && pb.pointSet?.rule === "none" &&
       /may not show individual cases/.test(pb.pointSet?.why || "") && !(pb.points || []).length,
       peerBox.error || JSON.stringify(pb?.pointSet) + "; " + (pb?.groups || []).map((g) => g.g + " " + g.n).join(", "));
+
+    // an oncoprint: the peer's patients as columns of the same figure as this instance's
+    const onco = doc([{ kind: "oncoprint", genes: ["KRAS", "TP53"], cohorts: ["KRAS mut"] }]);
+    const op = (await post("/api/analysis", onco)).views[0];
+    ok("an oncoprint draws the peer's patients as columns beside this instance's", !op.error && op.nColumns > 0 && remoteQueries(op) > 0 &&
+      (op.queries || []).some((q) => !q.remote) && new RegExp("columns of " + PEER + " come from .*via federation").test(op.note || ""),
+      op.error || op.nColumns + " columns, " + remoteQueries(op) + " queries on the peer; " + op.note);
+    // the page's path: the spec the analysis hands it, posted to /api/oncoprint with the cohort definitions
+    const specView = (await post("/api/analysis?oncoprint=spec", onco)).views[0];
+    const contract = specView.spec ? await post("/api/oncoprint?provenance=1", specView.spec) : {};
+    const columns = contract.columns || [];
+    const fromPeer = columns.filter((c) => c.startsWith(PEER + "_")).length, fromHere = columns.filter((c) => c.startsWith(LOCAL + "_")).length;
+    ok("the page's oncoprint has columns from both studies, the peer's read through the federation API",
+      fromPeer > 0 && fromHere > 0 && fromPeer + fromHere === columns.length && (contract.queries || []).some((q) => q.remote && q.study === PEER),
+      specView.error || contract.error || fromPeer + " peer, " + fromHere + " local of " + columns.length + " columns");
+    ok("both paths draw the same columns", columns.length === op.nColumns, columns.length + " vs " + op.nColumns);
+    const outsideOnco = await outsideCall("oncoprint-columns", { study: PEER, groups: null, genes: ["KRAS"], clinical: [], heatmap: [], overlays: [], unit: "patient", lineGap: 90 });
+    ok("an outside caller gets no oncoprint columns of the simulated peer's study", outsideOnco.status === 422 && /not held here at patient level/.test(outsideOnco.error),
+      outsideOnco.status + " " + outsideOnco.error);
 
     // an outside caller: patient-level data of neither database
     const parts = [{ cohort: "c", cohortDef: { all: [] } }];

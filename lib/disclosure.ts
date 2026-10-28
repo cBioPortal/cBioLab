@@ -13,7 +13,7 @@
 import { setting } from "./settings.ts";
 
 /** The kinds of patient-level data a rule can allow — each one view's needs, and nothing else. */
-export const PATIENT_KINDS = ["timeline", "alterations", "plot"] as const;
+export const PATIENT_KINDS = ["timeline", "alterations", "plot", "oncoprint"] as const;
 export type PatientKind = (typeof PATIENT_KINDS)[number];
 
 /** What each kind lets cross, for the setting's error messages and the result captions. */
@@ -21,6 +21,7 @@ export const PATIENT_KIND_NAMES: Record<PatientKind, string> = {
   timeline: "patient timelines",
   alterations: "patient alterations",
   plot: "plot cases",
+  oncoprint: "oncoprint columns",
 };
 
 /** study (or `*`) -> the kinds allowed for it */

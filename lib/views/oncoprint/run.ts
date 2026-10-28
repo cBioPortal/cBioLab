@@ -1,11 +1,11 @@
 // Oncoprint view: genes by patients, built from patient-level participants only (its columns
 // ARE patients) — the rest are named as left out.
-import { buildContract, PIDS_SQL, type PidsCarrier } from "../../oncoprint.ts";
+import { buildContract, PIDS_SQL, PEER_STUDIES, type PidsCarrier } from "../../oncoprint.ts";
 import { geneSymbols } from "../../gene-tracks.ts";
 import { varianceFromMoments } from "../../stats.ts";
 import { contractToSvg } from "../../oncoprint-svg.ts";
 import type { ViewResult } from "../../types.ts";
-import { isPatientLevel } from "../../federation.ts";
+import { isPatientLevel, sharesOncoprint } from "../../federation.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { overLimit } from "../shared.ts";
 import type { OncoprintView, ZReference } from "./types.ts";
@@ -14,9 +14,12 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;
   // Oncoprint columns ARE patients, so an instance that will not disclose
   // member ids cannot contribute columns. Render what is permitted and say
-  // exactly what was left out — never silently narrow the cohort.
-  const okStudies = vStudies.filter((st) => isPatientLevel(resolvers[st]));
-  const withheld = vStudies.filter((st) => !isPatientLevel(resolvers[st]));
+  // exactly what was left out — never silently narrow the cohort. A federation
+  // peer that shares oncoprint columns contributes its own.
+  const drawable = (st: string) => isPatientLevel(resolvers[st]) || sharesOncoprint(resolvers[st]);
+  const okStudies = vStudies.filter(drawable);
+  const withheld = vStudies.filter((st) => !drawable(st));
+  const atPeer = okStudies.filter((st) => sharesOncoprint(resolvers[st]));
   const withheldPts = vNames.reduce((n, cn) =>
     n + withheld.reduce((m, st) => m + (cohorts[cn].perStudy[st]?.count || 0), 0), 0);
   const shownPts = vNames.reduce((n, cn) =>
@@ -91,10 +94,12 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
       ? (multi ? " — " : "") + "columns cover " + shownPts.toLocaleString() + " of " +
         (shownPts + withheldPts).toLocaleString() + " patients: " + withheld.join(", ") +
         " answer with aggregates only, so their patients cannot be drawn as columns (compare and survival above include them)"
-      : "");
+      : "") +
+    (atPeer.length ? ((multi || withheld.length) ? " — " : "") + "the columns of " + atPeer.join(", ") + " come from " +
+      [...new Set(atPeer.map((st) => resolvers[st].instance.label.replace(/ \(shares [^)]*\)$/, "")))].join(", ") + ", via federation" : "");
   const oncoShared = { kind: "oncoprint" as const, cohorts: vNames,
     participation: participationFor(vStudies, true),
-    ...(multi || withheld.length ? { studies: okStudies, note } : {}) };
+    ...(multi || withheld.length || atPeer.length ? { studies: okStudies, note } : {}) };
 
   if (c.oncoprint === "spec") {
     // The web app draws the figure itself from the binary contract, so the run
@@ -104,20 +109,24 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
     return { ...oncoShared, spec: { ...oncoSpec,
       layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: doc.cohorts[n] })) } } } };
   } else {
-    const oncoLog: { label: string; sql: string; ms?: number; study?: string }[] = [];
+    const oncoLog: { label: string; sql: string; ms?: number; study?: string; remote?: boolean }[] = [];
     const contract = await buildContract({ ...oncoSpec,
-      layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: {
-        [PIDS_SQL]: multi
+      layout: { groupBy: { kind: "cohorts" as const, groups: vNames.map((n) => ({ name: n, dsl: atPeer.length
+        // a peer evaluates its share of the cohort from the definition; the rest were evaluated here
+        ? { ...doc.cohorts[n],
+          [PIDS_SQL]: Object.fromEntries(okStudies.filter((s) => cohorts[n].perStudy[s] && !atPeer.includes(s)).map((s) => [s, cohorts[n].perStudy[s].sql])),
+          [PEER_STUDIES]: atPeer.filter((s) => cohorts[n].perStudy[s]) } as PidsCarrier
+        : { [PIDS_SQL]: multi
           ? Object.fromEntries(okStudies.filter((s) => cohorts[n].perStudy[s]).map((s) => [s, cohorts[n].perStudy[s].sql]))
           : cohorts[n].perStudy[okStudies[0]].sql
-      } as PidsCarrier })) } }
+        } as PidsCarrier })) } }
     }, { log: oncoLog });
     const tRender = Date.now();
     const oncoSvg = contractToSvg(contract, 1200);
     const oncoRenderMs = Date.now() - tRender;
     return { ...oncoShared, svg: oncoSvg,
       renderMs: oncoRenderMs,
-      queries: oncoLog.map((q) => ({ study: q.study || okStudies[0], label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}) })),
+      queries: oncoLog.map((q) => ({ study: q.study || okStudies[0], label: q.label, sql: q.sql, ...(q.ms != null ? { ms: q.ms } : {}), ...(q.remote ? { remote: true } : {}) })),
       genes: contract.tracks.filter((t) => t.kind === "gene").map((t) => ({ gene: t.label, driverPct: t.driverPct ?? null, anyPct: t.freqPct ?? null })),
       nColumns: contract.stats.nColumns, annotation: contract.conventions.annotation };
   }

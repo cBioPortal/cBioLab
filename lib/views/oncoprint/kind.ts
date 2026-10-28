@@ -21,5 +21,5 @@ export const oncoprintKind: ViewKindDef<"oncoprint"> = {
     title: "What is this?",
     text: "A grid with one column per patient and one row per gene, color-coded to show what kind of genetic change (if any) each patient has in each gene. It's a fast way to see patterns across many patients and genes at once — for example, whether certain alterations tend to show up in the same patients, or never together."
   },
-  need: "patients",
+  need: "oncoprint",
 };
