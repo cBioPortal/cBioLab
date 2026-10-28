@@ -511,6 +511,21 @@ for (const [st, attr] of [["brca_mbcproject_wagle_2017", "DX_PERCENT_PR"], ["pro
       ours: String(ours.get(v) ?? "absent"), portal: String(theirs.get(v)), agree: ours.get(v) === theirs.get(v) });
 }
 
+// 14. a study's patients are those who own a sample: a patient record with no sample is not
+// counted, filtered or not, as on the portal's study view. hgsoc_tcga_gdc has 20 sampleless
+// patients, 9 with an OS_STATUS. The NA bar is compared too: the cohort's patients minus those
+// with a value.
+{
+  const st = "hgsoc_tcga_gdc", attr = "OS_STATUS";
+  const ex = await buildExplore({ study: st });
+  const f = ex.clinical.find((c) => c.attribute === attr && c.kind === "cat") as CatFacet | undefined;
+  const ours = new Map((f?.values || []).map((v) => [v.v, v.n]));
+  ours.set("NA", (ex.totals?.patients ?? 0) - [...ours.values()].reduce((a, b) => a + b, 0));
+  const portal = (await api<PortalCount[]>("/clinical-data-counts/fetch", { attributes: [{ attributeId: attr }], studyViewFilter: { studyIds: [st] } }))[0]?.counts || [];
+  for (const v of portal)
+    record({ study: st, group: "clinical (patients who own a sample)", what: attr + " = " + v.value, ours: String(ours.get(v.value) ?? "absent"), portal: String(v.count), agree: ours.get(v.value) === v.count });
+}
+
 // 8. uncalled mutations are not alterations
 {
   const study = "glioma_msk_2018", { profiles } = await studyProfiles(study);
