@@ -65,7 +65,7 @@ function layerItems(d: PlotData): LegendItem[] {
   return (d.layers || []).filter((l) => l.shown !== "none")
     .map((l) => ({ label: l.label + " (" + fmtInt(l.n) + ")", color: l.color, kind: "dot" as const }));
 }
-/** the layers drawn at all: with any, the plotted cohort steps back to a grey so their colours read */
+/** the layers drawn at all, each in its own colour over the plotted cohort's light blue */
 const drawnLayers = (d: PlotData) => (d.layers || []).filter((l) => l.shown !== "none");
 /**
  * One layer's marks as a group tagged with its place in the view's list, so a page can hide it;
@@ -84,7 +84,7 @@ function sharedGroups(h: PlotLayer, key: number, mark: (pt: HighlightPoint) => s
 function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotData, W: number, p: Pal): string {
   const { x0, x1, y0, y1 } = d.extent!, [gx, gy] = d.grid!;
   const hs = drawnLayers(d);
-  const base = hs.length ? LAYER_BASE : SERIES[0];
+  const base = LAYER_BASE;
   const st = d.stats;
   const statLine = st ? [st.pearson != null ? "Pearson r = " + fmtNum(st.pearson, 2) + " (" + fmtP(st.pPearson ?? 1) + ")" : "",
     st.spearman != null ? "Spearman ρ = " + fmtNum(st.spearman, 2) + " (" + fmtP(st.pSpearman ?? 1) + ")" : ""].filter(Boolean).join("   ·   ") : "";
@@ -113,7 +113,7 @@ function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: Pl
   const cellMax = hs.find((l) => l.kind === "outliers" && l.shown === "points")?.cellMax;
   const shaded = d.pointSet?.rule === "all" && d.xyPoints?.length ? []
     : cellMax ? d.bins!.filter((b) => b.n > cellMax) : d.bins!;
-  // under point layers the plotted cohort is a floor-raised grey, so its faintest cells still read
+  // under point layers the plotted cohort is a floor-raised shade, so its faintest cells still read
   const own = d.xyPoints || [];
   out.push(layerGroup("base", [
     ...shaded.map((b) => cell(b, base, hs.length ? 0.3 + 0.7 * shade(b.n) : shade(b.n))),
@@ -157,7 +157,7 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
   // a figure that still claims the full count.
   const gs = d.groups!;
   const hs = drawnLayers(d);
-  const base = hs.length ? LAYER_BASE : SERIES[0];
+  const base = LAYER_BASE;
   const numAxis = d.x.kind === "num" ? d.x : d.y, catAxis = d.x.kind === "num" ? d.y : d.x;
   const numTitle = axisTitle(numAxis), catTitle = axisTitle(catAxis);
   const T = 12, R = 16, PLOT = plotHeight(W0);

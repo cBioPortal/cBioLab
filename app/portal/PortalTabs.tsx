@@ -16,6 +16,7 @@ import { api } from "../lab/api.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { LINE_TABS, PAGE_TAB, SEG_TAB, SEG_TABS } from "../_ui/toolbar.ts";
 import { ViewHead } from "../lab/view-chrome.tsx";
+import { Updating } from "../lab/view-cards.tsx";
 import { PlotControls } from "../lab/plot-controls.tsx";
 import { cn } from "../../lib/cn";
 
@@ -121,7 +122,8 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
         const spec = views[vi] as unknown as Record<string, unknown>;
         // a result belongs to the request that produced it; while a newer one runs, the cover says so
         const v = st?.result?.views[i];
-        const busy = !!st?.loading;
+        // waiting from the render the edit lands in, not only once the effect has sent it
+        const busy = !!st?.loading || (!!st && st.sent !== sent);
         const mc = { vi: i, spec, v: v || {}, busy, updating: busy, attrs: [], profiles: [], assays: [], events: [], locked: tab?.chooser?.locks || [],
           patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
         const body = v && !v.error && v.kind === "hotspots" && v.hotspots
@@ -135,7 +137,7 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
         // the figure and what covers it while it waits; a plot holds it beside its axis sidebar
         const figureArea = <>
           {busy && !v && <div className="skeleton skeleton-view" />}
-          {busy && v && !(drawsOwnWaiting(v.kind) && !v.error) && <div className="view-updating"><span className="spinner" /> updating…</div>}
+          {busy && v && !(drawsOwnWaiting(v.kind) && !v.error) && <Updating />}
           {!busy && st?.error && <p className="note">{st.error}</p>}
           {v && v.error && <p className="note">{v.error}</p>}
           {v && !v.error && (body

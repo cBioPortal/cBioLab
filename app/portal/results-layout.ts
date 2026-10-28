@@ -135,7 +135,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     ...(genes.length >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, cohorts: queried })] }] : []),
     ...(plotY ? [{ title: "Plots", views: [v("Plot", { kind: "plot",
       x: expr ? (data.cna ? { source: "profile", profile: data.cna, gene: genes[0] } : { source: "alteration", gene: genes[0], by: "cna" }) : { source: "alteration", gene: genes[0], by: "mutationType" },
-      y: plotY, cohorts: queried, points: [{ cohort: "Altered" }] })] }] : []),
+      y: plotY, cohorts: queried, points: [{ cohort: "Altered" }, { rule: "outliers" }] })] }] : []),
     // the portal's Mutations tab: one gene at a time, its lollipop over its mutation table
     { title: "Mutations", views: [v("Mutation diagram", { kind: "hotspots", genes: [genes[0]], cohorts: queried }),
         v("Mutation table", { kind: "mutations", gene: genes[0], cohorts: queried })],

@@ -9,7 +9,7 @@ Plot (box): ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq
   Gain: median 0.16 (IQR -0.23–0.41, whiskers -1.20–1.38, n=206)
   Amplification: median 2.33 (IQR 1.45–2.81, whiskers -0.60–3.72, n=122)
   Values are drawn as individual points.
-  1,068 of 1,084 samples have a value on both axes (14 have no ERBB2: Putative copy-number alterations from GISTIC; 2 have no ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)); only those are drawn. Point layers — outliers: not drawn, at or under 10,000 cases there is no density for them to stand out of.
+  1,068 of 1,084 samples have a value on both axes (14 have no ERBB2: Putative copy-number alterations from GISTIC; 2 have no ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)); only those are drawn. Point layers — outliers: 41 values beyond the whiskers. The statistics are over the whole plotted cohort.
 
 Plot (box): FRACTION_GENOME_ALTERED by TP53 mutation type — 1,068 samples.
   Not mutated: median 0.19 (IQR 0.10–0.35, whiskers 0.00–0.71, n=706)
@@ -20,4 +20,4 @@ Plot (box): FRACTION_GENOME_ALTERED by TP53 mutation type — 1,068 samples.
   Inframe: median 0.27 (IQR 0.25–0.48, whiskers 0.25–0.56, n=5)
   Multiple: median 0.63 (IQR 0.46–0.65, whiskers 0.18–0.65, n=4)
   Values are drawn as individual points.
-  1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: not drawn, at or under 10,000 cases there is no density for them to stand out of.
+  1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: 16 values beyond the whiskers. The statistics are over the whole plotted cohort.

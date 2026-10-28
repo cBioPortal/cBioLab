@@ -319,6 +319,8 @@ pre {
   padding: 0 1.15rem 1rem; background: var(--card); border-radius: 0 0 var(--r-lg) var(--r-lg);
 }
 .view-updating .loading-block { padding: var(--s2) 0 0; }
+/* a plot's figure column holds its own cover, so the axis sidebar and the toolbar above stay usable */
+.plot-figure { position: relative; }
 .view-updating .skeleton { flex: 1; min-height: 3rem; }
 /* A control whose options are still being fetched, standing where the control will be. */
 .waiting { display: inline-flex; align-items: center; gap: var(--s1); color: var(--muted); font-size: var(--t-sm); white-space: nowrap; }
