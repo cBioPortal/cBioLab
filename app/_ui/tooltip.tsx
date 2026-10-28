@@ -9,14 +9,17 @@
 //   CLI) is read the same way. A tip that only repeats text the reader can already see whole is
 //   not shown, so `data-tip` on a cell that may be cut with an ellipsis appears only when it is cut.
 // - `FloatingTip`, for a component that draws its own rich tip at the pointer (an oncoprint cell,
-//   a timeline event): it places it beside the pointer, inside the viewport.
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+//   a timeline event): it places it beside the pointer, inside the viewport. With `useHoverTip` the
+//   reader can move into it and click what it holds (an oncoprint cell's link to its patient).
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 const DELAY = 300;
 const WARM = 400;
 const GAP = 8;
 const EDGE = 8;
+/** how long a tip waits for a pointer heading into it before following the pointer instead */
+const HEADING = 300;
 
 type Shown = { el: Element; text: string; x: number; rect: DOMRect };
 
@@ -168,9 +171,50 @@ function Bubble({ shown }: { shown: Shown }) {
   );
 }
 
-/** a rich tip drawn at the pointer (viewport coordinates), kept inside the viewport */
-export function FloatingTip({ x, y, className, children }: { x: number; y: number; className?: string; children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
+type Live = { ref: React.RefObject<HTMLDivElement | null>; onPointerEnter: () => void; onPointerLeave: () => void };
+
+const gap = (x: number, y: number, r: DOMRect) =>
+  Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom));
+
+/**
+ * The state of a tip the reader can move into. `move(next, x, y)` on every pointer move over the
+ * figure (`next` null over nothing tipped, and on leaving it): while the pointer is heading for the
+ * tip it stays where it is, so crossing other cells on the way does not move it, and while the
+ * pointer is over it, it stays open. A pointer that stops short is followed after `HEADING` ms.
+ * `hide()` closes it at once. Pass `live` to the FloatingTip.
+ */
+export function useHoverTip<T>() {
+  const [tip, setTip] = useState<T | null>(null);
+  const ref = useRef<HTMLDivElement | null>(null);
+  const inside = useRef(false);
+  const last = useRef<[number, number] | null>(null);
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clear = () => { if (pending.current) { clearTimeout(pending.current); pending.current = null; } };
+  const move = useCallback((next: T | null, x: number, y: number) => {
+    clear();
+    if (inside.current) return;
+    const prev = last.current; last.current = [x, y];
+    const r = ref.current?.getBoundingClientRect();
+    if (r && prev && gap(x, y, r) < gap(prev[0], prev[1], r)) pending.current = setTimeout(() => setTip(next), HEADING);
+    else setTip(next);
+  }, []);
+  const hide = useCallback(() => { clear(); inside.current = false; last.current = null; setTip(null); }, []);
+  useEffect(() => clear, []);
+  const live = useMemo<Live>(() => ({
+    ref,
+    onPointerEnter: () => { inside.current = true; clear(); },
+    onPointerLeave: () => { inside.current = false; last.current = null; setTip(null); },
+  }), []);
+  return { tip, move, hide, live };
+}
+
+const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
+/** a rich tip drawn at the pointer (viewport coordinates), kept inside the viewport; with `live`
+ *  (from useHoverTip) the pointer can enter it and click what it holds */
+export function FloatingTip({ x, y, className, live, children }: { x: number; y: number; className?: string; live?: Live; children: React.ReactNode }) {
+  const own = useRef<HTMLDivElement>(null);
+  const ref = live ? live.ref : own;
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   useLayoutEffect(() => {
     const box = ref.current; if (!box) return;
@@ -178,10 +222,13 @@ export function FloatingTip({ x, y, className, children }: { x: number; y: numbe
     const left = x + 14 + w <= vw - EDGE ? x + 14 : Math.max(EDGE, x - 14 - w);
     const top = y + 14 + h <= vh - EDGE ? y + 14 : Math.max(EDGE, y - 14 - h);
     setPos({ left, top });
-  }, [x, y, children]);
+  }, [x, y, children, ref]);
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div ref={ref} className={"onco-tip" + (className ? " " + className : "")} style={pos ? pos : { left: 0, top: 0, visibility: "hidden" }}>
+    // a portal still bubbles React events to the figure that drew it; the tip's own clicks stay here
+    // eslint-disable-next-line jsx-a11y-x/no-static-element-interactions -- hover keeps the tip open; its links are the controls
+    <div ref={ref} className={"onco-tip" + (live ? " live" : "") + (className ? " " + className : "")} style={pos ? pos : { left: 0, top: 0, visibility: "hidden" }}
+      onPointerEnter={live?.onPointerEnter} onPointerLeave={live?.onPointerLeave} onPointerDown={stop} onMouseDown={stop} onClick={stop} onKeyDown={stop} onMouseMove={stop}>
       {children}
     </div>,
     document.body);

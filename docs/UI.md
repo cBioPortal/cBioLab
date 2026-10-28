@@ -118,7 +118,10 @@ still holds, against a running server.
   (`app/_ui/tooltip.tsx`, mounted by the root layout) after 300 ms, on hover and keyboard focus,
   drawn into `body` with a fixed position so a scrolling or clipped container (the oncoprint, the
   timeline, a dialog's list) never hides it. A component that draws a rich tip at the pointer (an
-  oncoprint cell, a timeline event) uses `FloatingTip` from the same file. A `<title>` in a drawn
+  oncoprint cell, a timeline event) uses `FloatingTip` from the same file; when the reader needs to
+  move into it and click (an oncoprint cell's "open this patient"), its state comes from
+  `useHoverTip`, which holds the tip still while the pointer heads for it and open while the pointer
+  is over it. A `<title>` in a drawn
   figure's SVG (the renderers keep them for MCP, exports and the CLI) is read by the same layer, so
   React-drawn SVG uses `data-tip` instead. `data-tip` is not an accessible name: a control whose
   only words were its tip also gets an `aria-label`. Not everything needs one — no tip on the app's

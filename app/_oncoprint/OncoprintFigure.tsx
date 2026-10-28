@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
-import { FloatingTip } from "../_ui/tooltip.tsx";
+import { FloatingTip, useHoverTip } from "../_ui/tooltip.tsx";
 import { STYLE, geneLegend, glyphPresence, numericValue, resolveStyle, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
@@ -48,6 +48,15 @@ const EXPORT_LAYOUT_DPI = 96;
 /** the style this figure draws with: its own override, then the browser's viewing options and the spec's annotation */
 function figureStyle(data: UnpackedContract, display: FigureDisplay) {
   return styleForDisplay(resolveStyle(data.display?.style), { ...display, annotate: data.display?.annotate });
+}
+
+/** the Patient page for one column, or a sample's page for a sample column; a pooled figure's
+ *  column ids are "<study>_<id>" (lib/oncoprint-detail.ts studyOfColumn) */
+function patientPage(study: string, column: string, unit: string): { href: string; label: string } {
+  const id = column.startsWith(study + "_") ? column.slice(study.length + 1) : column;
+  const sample = unit === "sample";
+  return { href: "/portal/patient?" + new URLSearchParams({ study, [sample ? "sample" : "patient"]: id }).toString(),
+    label: sample ? "open this sample" : "open this patient" };
 }
 
 /**
@@ -139,7 +148,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const [loading, setLoading] = useState(true);
   const [perf, setPerf] = useState<Perf>({ frames: 0 });
   const [view, setView] = useState<View>({ zoom: 1, scrollX: 0, whitespace: display.whitespace });
-  const [hover, setHover] = useState<{ hit: Hit; x: number; y: number } | null>(null);
+  const { tip: hover, move: hoverAt, hide: hideHover, live: hoverLive } = useHoverTip<{ hit: Hit; x: number; y: number }>();
   /** the gutter label under the pointer: a track row, not a column */
   const [labelHover, setLabelHover] = useState<{ ti: number; x: number; y: number } | null>(null);
   // per-column specifics, fetched only for the column under the pointer and remembered
@@ -443,12 +452,12 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     if (x < GEOM.gutter) {
       const ti = trackAt(y);
       setLabelHover(ti >= 0 ? { ti, x: e.clientX, y: e.clientY } : null);
-      setHover(null);
+      hideHover();
       return;
     }
     if (labelHover) setLabelHover(null);
     const hit = hitTest(x, y, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, view.scrollX) }, gapPx);
-    setHover(hit ? { hit, x: e.clientX, y: e.clientY } : null);
+    hoverAt(hit ? { hit, x: e.clientX, y: e.clientY } : null, e.clientX, e.clientY);
     // one column under the pointer: ask the server what it carries, once, after a pause
     if (detailTimer.current) clearTimeout(detailTimer.current);
     if (hit && hit.n === 1) {
@@ -509,7 +518,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     const x = e.clientX - rect.left;
     if (x < GEOM.gutter) return;                       // the gutter belongs to the track menu
     selDrag.current = { x0: x };
-    setSel({ x0: x, x1: x, live: true }); setSelRanges(null); setSelError(null); setHover(null);
+    setSel({ x0: x, x1: x, live: true }); setSelRanges(null); setSelError(null); hideHover();
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onSelMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -616,7 +625,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       if (d.panels.length) lines.push({ text: "panel " + d.panels.map((p) => p.panel).join(", ") + (d.notProfiled.length ? " — not covering " + d.notProfiled.join(", ") : ""), dim: true });
       else if (d.notProfiled.length) lines.push({ text: "no panel covers " + d.notProfiled.join(", "), dim: true });
     }
-    return lines;
+    // the detail came back, so this column's study is held here at patient level: its page can open
+    const open = col && d && d !== "loading" && d.study ? patientPage(d.study, col, data.unit) : null;
+    return { lines, open };
   }, [hover, data, visible, detail]);
 
   // ---- render ---------------------------------------------------------------
@@ -806,7 +817,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           </div>}
           <canvas ref={canvasRef} className="onco-canvas"
             onPointerDown={onSelDown} onPointerMove={onSelMove} onPointerUp={onSelUp} onPointerCancel={onSelUp}
-            onMouseMove={onMove} onMouseLeave={() => { setHover(null); setLabelHover(null); }}
+            onMouseMove={onMove} onMouseLeave={(e) => { hoverAt(null, e.clientX, e.clientY); setLabelHover(null); }}
             onClick={(e) => {
               // a click on a track's label opens that track's menu, like the portal's three dots
               const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
@@ -899,8 +910,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           })()}
 
           {hover && tip && (
-            <FloatingTip x={hover.x} y={hover.y}>
-              {tip.map((l, i) => <div key={i} className={(l.mono ? "mono " : "") + (l.dim ? "dim" : "")}>{l.text}</div>)}
+            <FloatingTip x={hover.x} y={hover.y} live={hoverLive}>
+              {tip.lines.map((l, i) => <div key={i} className={(l.mono ? "mono " : "") + (l.dim ? "dim" : "")}>{l.text}</div>)}
+              {tip.open && <a className="tip-link" href={tip.open.href} target="_blank" rel="noreferrer">{tip.open.label} ↗</a>}
             </FloatingTip>
           )}
         </div>
