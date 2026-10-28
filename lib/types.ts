@@ -876,7 +876,9 @@ export interface AssayFacet {
   /** the entity's display name, where the study gives one */
   name?: string;
   kind: "num" | "cat";
-  /** patients in the cohort of the studies holding the profile, and those with a value */
+  /** what is counted: samples, as on the portal, or patients for a patient-level profile; absent on an error */
+  unit?: "sample" | "patient";
+  /** the cohort's samples (or patients) in the studies holding the profile, and those with a value */
   total: number; measured: number;
   bins?: NumericBin[];
   min?: number; max?: number; median?: number;

@@ -44,7 +44,7 @@ import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { buildExplore, buildExploreFederated } from "../lib/explore.ts";
+import { buildExplore, buildExploreFederated, buildAssayFacets } from "../lib/explore.ts";
 import { studyProfiles } from "../lib/analysis.ts";
 import { compileCohortDef, memberSamplesSql } from "../lib/cohort2.ts";
 import { resolverFor, hasViewAggregates } from "../lib/federation.ts";
@@ -524,6 +524,20 @@ for (const [st, attr] of [["brca_mbcproject_wagle_2017", "DX_PERCENT_PR"], ["pro
   const portal = (await api<PortalCount[]>("/clinical-data-counts/fetch", { attributes: [{ attributeId: attr }], studyViewFilter: { studyIds: [st] } }))[0]?.counts || [];
   for (const v of portal)
     record({ study: st, group: "clinical (patients who own a sample)", what: attr + " = " + v.value, ours: String(ours.get(v.value) ?? "absent"), portal: String(v.count), agree: ours.get(v.value) === v.count });
+}
+
+// 15. a generic-assay chart counts samples (patients only for a patient-level profile), as the
+// portal's study view does. difg_glass_2019 holds primary and recurrence samples of the same
+// patients, so counting patients would read lower; the NA bar is the cohort's samples without a value.
+{
+  const st = "difg_glass_2019", profileType = "armlevel_cna", entity = "1p_status";
+  const [f] = await buildAssayFacets({ studies: [st], profilesByStudy: new Map([[st, { gaProfiles: [profileType] }]]), charts: [{ profileType, entity }] });
+  const ours = new Map((f?.values || []).map((v) => [v.v, v.n]));
+  ours.set("NA", (f?.total ?? 0) - (f?.measured ?? 0));
+  const portal = (await api<{ counts: PortalCount["counts"] }[]>("/generic-assay-data-counts/fetch",
+    { genericAssayDataFilters: [{ stableId: entity, profileType }], studyViewFilter: { studyIds: [st] } }))[0]?.counts || [];
+  for (const v of portal)
+    record({ study: st, group: "generic assay (samples)", what: entity + " = " + v.value, ours: String(ours.get(v.value) ?? "absent"), portal: String(v.count), agree: ours.get(v.value) === v.count });
 }
 
 // 8. uncalled mutations are not alterations
