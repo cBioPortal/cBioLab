@@ -1,7 +1,7 @@
 "use client";
 // A cBioPortal-style page over ONE analysis document (app/portal/page-doc.ts): tabs (and a tab's
 // sub-tabs) list the indices of the views they show; opening a tab sends that slice —
-// {study, cohorts, views: the tab's} — as an ordinary analysis request, kept until one of its views
+// {study, the cohorts its views use, views: the tab's} (tabSlice) — as an ordinary analysis request, kept until one of its views
 // changes. A setting changed here is an edit to the document (onDoc), which the page writes to the
 // URL; the oncoprint's display and sort are applied in the browser and never re-run anything.
 import { ViewFigure } from "../lab/figure.tsx";
@@ -11,7 +11,7 @@ import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
 import { KindCardBody, KindCardControls, hasKindCard, drawsOwnWaiting, figureView } from "../lab/kind-cards";
 import { dataPart } from "../_oncoprint/view-display.ts";
 import { OncoprintCard, type TrackCatalog } from "../_oncoprint/OncoprintCard.tsx";
-import type { PageTab } from "./page-doc";
+import { tabSlice, type PageTab } from "./page-doc";
 import { api } from "../lab/api.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { LINE_TABS, PAGE_TAB, SEG_TAB, SEG_TABS } from "../_ui/toolbar.ts";
@@ -25,8 +25,10 @@ type Patch = Record<string, unknown>;
 
 type TabState = { sent: string; result?: AnalysisResult; error?: string; loading: boolean };
 
-export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, catalog, fixedPatient }: {
+export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, onCounts, catalog, fixedPatient }: {
   doc: AnalysisDoc; tabs: PageTab[]; titles: string[];
+  /** the page's first tabs only (PageLayout.partial): a tab the page opens on that is not among them yet is waited for */
+  partial?: boolean;
   /** what the oncoprint's Tracks menu can offer: the study's attributes and profiles */
   catalog: TrackCatalog;
   /** the open tab, "Title" or "Title › Sub" */
@@ -46,11 +48,14 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
   const views = doc.views || [];
 
   const [mainTitle, subTitle] = open.split(" › ");
-  const tab = tabs.find((x) => x.title === mainTitle) || tabs[0];
+  const named = tabs.find((x) => x.title === mainTitle);
+  // a tab the page has not laid out yet is waited for, not swapped for the first
+  const waiting = partial && !!mainTitle && (!named || (!!subTitle && !!named.sub && !named.sub.some((x) => x.title === subTitle)));
+  const tab = waiting ? undefined : named || tabs[0];
   const sub = tab?.sub ? tab.sub.find((x) => x.title === subTitle) || tab.sub[0] : null;
   const key = tab ? (sub ? tab.title + " › " + sub.title : tab.title) : "";
   const idx = (sub ? sub.views : tab?.views) || [];
-  const slice: AnalysisDoc = { study: doc.study, cohorts: doc.cohorts, views: idx.map((i) => views[i]) };
+  const slice = tabSlice(doc, idx);
   // what decides a re-run: the slice without what the oncoprint applies in the browser
   const sent = JSON.stringify({ ...slice, views: (slice.views || []).map((v) => dataPart(v as unknown as Record<string, unknown>)) });
 
@@ -85,15 +90,17 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
   };
   return (
     <div className="portal">
-      <Tabs data-tw value={tab?.title ?? ""} onValueChange={onOpen} className="mb-4">
+      <Tabs data-tw value={tab?.title ?? mainTitle ?? ""} onValueChange={onOpen} className="mb-4">
         <TabsList variant="line" aria-label="results tabs" className={LINE_TABS}>
           {tabs.map((t) => (
             <TabsTrigger key={t.title} value={t.title} className={PAGE_TAB}>
               {t.title}
             </TabsTrigger>
           ))}
+          {waiting && <span data-tw className="skeleton my-auto block h-5 w-28" role="status" aria-label={"laying out " + open} />}
         </TabsList>
       </Tabs>
+      {waiting && <div className="card viewcard viewloading" aria-busy="true"><div className="vhead"><span data-tw className="skeleton block h-[34px] w-56" /></div><div className="skeleton skeleton-view" /></div>}
       {(tab?.sub || chooser) && (
         <div className="viewtb mt-0 mb-4">
           {tab?.sub && (
@@ -153,7 +160,7 @@ export function PortalTabs({ doc, tabs, titles, open, onOpen, onDoc, onCounts, c
             : <ViewFigure v={figureView(spec, v)} />)}
         </>;
         return (
-          <section key={key + vi} className={cn("card viewcard", busy && !v && "viewloading")} aria-busy={busy || undefined}>
+          <section key={key + " › " + titles[vi]} className={cn("card viewcard", busy && !v && "viewloading")} aria-busy={busy || undefined}>
             <ViewHead menuStore={menus.current} v={v && !v.error ? v : { kind: spec.kind }} title={titles[vi]}
               sub={drawn.length ? drawn.join(drawn.length === 2 ? " vs " : ", ") : undefined} />
             {hasKindCard(spec.kind as string) && <KindCardControls c={mc} />}

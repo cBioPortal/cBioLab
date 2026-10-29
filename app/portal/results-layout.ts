@@ -37,6 +37,11 @@ export interface ResultsData {
   held: { every: ProfileType[]; some: ProfileType[] };
   /** one generic-assay profile per kind, each a sub-tab of Comparison/Survival (assayComparisonProfiles) */
   assays?: { label: string; profile: string }[];
+  /**
+   * only `held` is known yet: lay out the tabs that need nothing else (Plots, Co-expression and
+   * Comparison's Clinical and assay sub-tabs follow once the profiles and attributes are known)
+   */
+  partial?: boolean;
 }
 
 type ProfileType = "MUTATION" | "CNA" | "SV";
@@ -115,16 +120,19 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   const multi = q.studies.length > 1;
   // as cBioPortal does: expression across studies only where its rule allows, and co-expression for one study only
   const expr = data.expr && (!multi || data.expressionAcross) ? data.expr : null;
-  const plotY = expr ? { source: "profile", profile: expr, gene: genes[0] }
+  const plotY = data.partial ? null : expr ? { source: "profile", profile: expr, gene: genes[0] }
     : data.numeric.length ? { source: "clinical", attribute: data.numeric.find((a) => a === "FRACTION_GENOME_ALTERED" || a === "MUTATION_COUNT") || data.numeric[0] } : null;
   // every tab draws the queried patients, as cBioPortal's do; only Comparison/Survival compares groups
   const queried = ["Queried"], both = ["Altered", "Unaltered"];
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
   const left = [
-    !data.expr ? (multi ? "Co-expression (no shared mRNA profile)" : "Co-expression (no mRNA profile)")
-      : multi ? "Co-expression (one study at a time)" : null,
-    data.expr && multi && !data.expressionAcross ? "expression in Plots (expression data cannot be compared across the selected studies)" : null,
-    !plotY ? "Plots (no mRNA profile or numeric clinical attribute)" : null,
+    // what the profiles decide is said once they are known
+    ...(data.partial ? [] : [
+      !data.expr ? (multi ? "Co-expression (no shared mRNA profile)" : "Co-expression (no mRNA profile)")
+        : multi ? "Co-expression (one study at a time)" : null,
+      data.expr && multi && !data.expressionAcross ? "expression in Plots (expression data cannot be compared across the selected studies)" : null,
+      !plotY ? "Plots (no mRNA profile or numeric clinical attribute)" : null,
+    ]),
     genes.length < 2 ? "Mutual Exclusivity (one gene)" : null,
     unchecked.length ? "Unaltered includes patients without data for " + unchecked.join(", ") + ", which cannot be checked for profiling" : null,
     partly.length ? "Unaltered is not checked for " + partly.map((t) => TYPE_WORD[t]).join(" or ") + " profiling, which only some of the selected studies hold" : null,
@@ -154,5 +162,5 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       ...(data.assays || []).map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile, cohorts: both })] }))
     ] },
     { title: "CN Segments", views: [v("Genome-wide copy number", { kind: "genome", cohorts: queried })] }
-  ], left);
+  ], left, { partial: data.partial });
 }

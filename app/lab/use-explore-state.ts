@@ -17,6 +17,9 @@ import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
 import type { CustomDataTab } from "./custom-data-panel.tsx";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useExplore, type ExploreAsk } from "./use-explore.ts";
+import { storeCohortLists } from "./id-sets-client.ts";
+import { encodeParam } from "../portal/page-doc.ts";
+import { SPEC_URL_MAX } from "../../lib/lab-links.ts";
 
 /** how many clinical charts Explore draws until the reader picks — cBioPortal's own default
  *  (studyview_clinical_attribute_chart_count) */
@@ -164,6 +167,25 @@ export function useExploreState(page: ExplorePage) {
    * Build a multi-cohort comparison by ticking cohorts in the Cohorts tab and
    * hitting "Analyze selected".
    */
+  /**
+   * "View patients": the Patient page stepping through the explored cohort, as the portal's study
+   * view opens its selected patients. The link carries the cohort's definition, not its patients; a
+   * definition whose id lists would make it too long has them stored as sets first (signed in).
+   */
+  const viewPatients = async () => {
+    let d = barDef();
+    if (!d) { setExMsg("select at least one study first"); return; }
+    setExMsg(null);
+    if (encodeParam(d).length > SPEC_URL_MAX) {
+      try { d = await storeCohortLists(d, barDefaultName()); } catch (e) { setExMsg(String((e as Error)?.message || e)); return; }
+      const n = encodeParam(d).length;
+      if (n > SPEC_URL_MAX) {
+        setExMsg("this cohort's definition is too long for a link (" + Math.round(n / 1000) + " KB of " + SPEC_URL_MAX / 1000 + " KB) — its id lists are stored only for a signed-in reader: sign in, or narrow it with filters");
+        return;
+      }
+    }
+    window.location.assign("/portal/patient?" + new URLSearchParams({ cohort: encodeParam(d) }).toString());
+  };
   const analyzeDraft = () => {
     const d = barDef();
     if (!d) { setExMsg("select at least one study first"); return; }
@@ -672,7 +694,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, splitDraftBy, selectionArmCount, splitDraftBySelection, splitDraftByPicks, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, splitDraftBy, selectionArmCount, splitDraftBySelection, splitDraftByPicks, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

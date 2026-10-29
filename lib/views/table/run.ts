@@ -4,7 +4,7 @@ import { tableAttributesSql, clinicalRowSource, idColumns, TABLE_COLUMNS_MAX, ty
 import { checkQuery, describeQuery, shownColumns } from "../../table-query.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, ATTR_NAME, plural, refuse, type ViewResolver } from "../shared.ts";
-import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
+import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
 import type { TableView } from "./types.ts";
 import { tableMethod } from "./method.ts";
 
@@ -20,6 +20,15 @@ export async function runTable(view: TableView, ctx: ViewRun): Promise<ViewResul
 
   const { holders, excluded } = rowHolders(ctx);
   if (!holders.length) return refuse("table", ctx, "no study here may disclose patients' rows (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
+  const named = view.patient;
+  if (named) {
+    if (unit !== "patient") return refuse("table", ctx, "patient places a patient in a per-patient list: it needs unit \"patient\"");
+    if (typeof named.study !== "string" || typeof named.id !== "string") return refuse("table", ctx, "patient is {study, id}");
+    if (!ctx.vStudies.includes(named.study))
+      return refuse("table", ctx, "patient " + named.id + " is named in " + named.study + ", which none of this view's cohorts span (" + ctx.vStudies.join(", ") + ")");
+    if (!holders.includes(named.study))
+      return refuse("table", ctx, named.study + " is " + excluded.find((e) => e.study === named.study)!.reason + ", so its patients cannot be listed");
+  }
 
   const all: TableColumn[] = [];
   for (const st of holders) {
@@ -37,16 +46,18 @@ export async function runTable(view: TableView, ctx: ViewRun): Promise<ViewResul
     return refuse("table", ctx, sampleAttr ? sampleAttr + " is a sample attribute; a per-patient table holds patient attributes only" : bad);
   }
   // the attributes the table holds: every one, unless the studies record more than a table carries
-  const named = new Set([...(q.columns || []), ...Object.keys(q.filters || {}), ...(q.sort ? [q.sort.column] : [])]);
+  const asked = new Set([...(q.columns || []), ...Object.keys(q.filters || {}), ...(q.sort ? [q.sort.column] : [])]);
   const held = usable.length <= TABLE_COLUMNS_MAX ? usable
-    : [...usable.filter((c) => named.has(c.id)), ...usable.filter((c) => !named.has(c.id))].slice(0, TABLE_COLUMNS_MAX);
+    : [...usable.filter((c) => asked.has(c.id)), ...usable.filter((c) => !asked.has(c.id))].slice(0, TABLE_COLUMNS_MAX);
   const defaults = [...ids.map((c) => c.id), ...held.map((c) => c.id)];
 
   let r: Rows;
+  const source = (parts: Parameters<typeof clinicalRowSource>[0], reads: string[] | "all") => (db: string) =>
+    clinicalRowSource(parts, db, unit, reads === "all" ? held : held.filter((c) => reads.includes(c.id)));
+  const locate = named && !ctx.page && !ctx.values ? { study: named.study, patient: named.id } : undefined;
   try {
-    r = await runRows(ctx, "table", holders, q, defaults, shownColumns(q, known, defaults), show,
-      (parts, reads) => (db) => clinicalRowSource(parts, db, unit, reads === "all" ? held : held.filter((c) => reads.includes(c.id))),
-      ctx.values ? { column: ctx.values, numeric: !!known.find((c) => c.id === ctx.values)?.numeric } : undefined);
+    r = await runRows(ctx, "table", holders, q, defaults, shownColumns(q, known, defaults), show, source,
+      ctx.values ? { column: ctx.values, numeric: !!known.find((c) => c.id === ctx.values)?.numeric } : undefined, undefined, locate);
   } catch (e) { return refuse("table", ctx, (e as Error).message); }
   const columns = [...ids.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric })), ...held.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric }))];
   const shown = shownColumns(q, columns, defaults);
@@ -56,7 +67,8 @@ export async function runTable(view: TableView, ctx: ViewRun): Promise<ViewResul
     return { cohort: String(x.cohort), study: String(x.study), patient: own.patient, sample: own.sample, values: columns.map((c) => c.id in own && ids.some((i) => i.id === c.id) ? own[c.id] : m[c.id] ?? "") };
   });
   const table = { unit, columns, shown, defaults, query: q, rows, offset: r.offset, pageSize: show, lists: r.lists, total: r.total, all: r.all,
-    ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
+    ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}),
+    ...(locate ? { position: await listPosition(r, true, () => Promise.resolve(r)) } : {}) };
   if (ctx.page || ctx.values) return { kind: "table", cohorts: vNames, table, participation: ctx.participationFor(ctx.vStudies, true) };
   const one = unit === "sample" ? "sample" : "patient";
   return {

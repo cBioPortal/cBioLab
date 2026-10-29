@@ -17,7 +17,7 @@ import { naturalOrder } from "../../lib/ordinal.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
-import { Dna, Save, Tag, X } from "lucide-react";
+import { Dna, Save, Tag, Users, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { CHIP } from "../_ui/toolbar.ts";
 import { GearMenu } from "../_ui/gear-menu.tsx";
@@ -78,7 +78,7 @@ const CHIP_X = "ml-1 size-4 rounded-sm text-muted-foreground hover:text-foregrou
 
 
 export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
-  const { addMode, analyzeDraft, exDraftStudies, exPanelOpen, exSel, exStudies, explore, exploreBusy, parseDraft, sCaps, sQuery, setExDraftStudies, setExPanelOpen, setExploreStudies, setSCaps, setSQuery, setStudyChipsOpen, studies, studyChipsOpen } = ctx;
+  const { addMode, analyzeDraft, viewPatients, exDraftStudies, exPanelOpen, exSel, exStudies, explore, exploreBusy, parseDraft, sCaps, sQuery, setExDraftStudies, setExPanelOpen, setExploreStudies, setSCaps, setSQuery, setStudyChipsOpen, studies, studyChipsOpen } = ctx;
   // what a gene query is being written for: the selection (the header's button) or one study (a row's icon)
   const [queryFor, setQueryFor] = useState<{ studies: string[]; filters: Clause[] } | null>(null);
   const maxStudies = resultsMaxStudies(usePublicEnv());
@@ -164,6 +164,11 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
                 (selectionFilters.length ? ", within your " + selectionFilters.length + " filter" + (selectionFilters.length === 1 ? "" : "s") : "") +
                 ", and open the results — oncoprint, mutations, survival…"}>
               <Dna />Query genes…
+            </Button>}
+            {!addMode && <Button variant="outline" className="viewpatients" disabled={!ready} onClick={() => void viewPatients()}
+              data-tip={ready ? "open the Patient page on the first of " + (parseDraft() ? "the patients your filters select" : "the selected studies' patients") +
+                ", and step through the rest" : "select a study first"}>
+              <Users />View patients
             </Button>}
             {exStudies.length > 0 && <Button variant="outline" onClick={() => {
               if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
