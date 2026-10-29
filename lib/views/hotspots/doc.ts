@@ -1,0 +1,8 @@
+// The `hotspots` view in the DSL reference: its row of the Views table, its entry in the agent grammar.
+// lib/dsl-reference.ts assembles these from lib/views/docs.ts.
+import type { KindDoc } from "../kind-doc.ts";
+
+export const hotspotsDoc: KindDoc = {
+  reference: `\`genes:[\u226412], cohorts:[names], minCount?, hide?:[cells]\` | the lollipop, as cBioPortal's results-page mutation tab draws it: one stem per codon (the stored protein start position) whose height is the distinct patient + protein change pairs there, coloured by the codon's dominant mutation type (putative drivers first), on the canonical transcript with its Pfam domains (Genome Nexus); mutations with no protein position are counted and disclosed, not drawn. \`minCount\` is a suppression floor each site applies **before returning anything** \u2014 a change carried by one patient is the most disclosive aggregate here. \`hide\` leaves cells of the Driver/VUS \u00d7 alteration class grid out of the plot \u2014 \`"<class>.driver"\` or \`"<class>.vus"\`, classes \`missense\`, \`truncating\`, \`inframe\`, \`splice\`, \`fusion\`, \`other\` (e.g. \`["missense.vus", "truncating.vus"]\` draws drivers only, \`["missense.driver", "missense.vus"]\` everything but missense); each change goes in or out whole by its class and driver status. The grid's counts stay whole, and the result keeps every change, so the web app redraws a new selection without re-running; a figure standing alone says in its caption what is hidden. A site on older code that reports no class has its changes drawn regardless, and the caption says how many`,
+  grammar: `{"kind":"hotspots","genes":[...(max 12)],"cohorts":[names?],"minCount":1,"hide":["missense.vus","truncating.vus"]?}`,
+};

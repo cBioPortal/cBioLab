@@ -105,18 +105,20 @@ and commit both.
 - **`lib/analysis.ts`** — `runAnalysis(doc)`: evaluates cohorts (per-study; cross-study
   federation via study-qualified member ids), then hands each view to its kind's runner.
 - **View kinds** — **each kind is a folder, `lib/views/<kind>/`, plus one page file,
-  `app/lab/kinds/<kind>.tsx`, and a line in each of three registries.** The folder holds `types.ts`
+  `app/lab/kinds/<kind>.tsx`, and a line in each of four registries.** The folder holds `types.ts`
   (the kind's spec and result fields: it adds its entry to `ViewSpecs`, `ViewResultFields` and
   `ViewResultMain` in `lib/types.ts` by `declare module`), `run.ts` (the runner), `sql.ts` (its
   queries; `test/boundary.test.ts` sweeps every kind's), `method.ts` (its method record, invariant
-  12), `figure.ts` (its SVG) and `kind.ts` (its descriptor: figure, title, results text, help,
-  federation need, marks — `ViewKindDef` in `lib/views/kind-def.ts`). The page file is its
+  12), `figure.ts` (its SVG), `kind.ts` (its descriptor: figure, title, results text, help,
+  federation need, marks — `ViewKindDef` in `lib/views/kind-def.ts`) and `doc.ts` (its part of the DSL
+  reference: its row of the Views table, its agent-grammar entry and its own gallery examples —
+  `KindDoc` in `lib/views/kind-doc.ts`; never add a kind's text to `lib/dsl-reference.ts` itself). The page file is its
   `KindUi` (`app/lab/kinds/kind-ui.ts`): its add-view dialog entry, the category it is listed under
   (`VIEW_CATEGORIES`, the dialog's sidebar; `app/lab/add-view-dialog.tsx`) and why it is disabled, the view a new
   one starts from, how many cohorts it draws, and its card — the shared card
   (`app/lab/kind-cards.tsx`) with its subtitle, controls and body, or a `Card` of its own. The
-  registries are `lib/views/index.ts` (runners), `lib/views/kinds.ts` (descriptors) and
-  `app/lab/kinds/index.ts` (page files); each is typed by `ViewKind`, the `View` union's kinds, so
+  registries are `lib/views/index.ts` (runners), `lib/views/kinds.ts` (descriptors),
+  `lib/views/docs.ts` (DSL reference) and `app/lab/kinds/index.ts` (page files); each is typed by `ViewKind`, the `View` union's kinds, so
   a kind missing from any of them does not compile, and everything else (`lib/view-svg.ts`,
   `lib/result-text.ts`, `VIEW_HELP`, `viewNeed`, the add menu, the cards) reads them. A runner gets
   the run's context (`ViewRun` in `lib/views/run.ts`: the document, evaluated cohorts, resolvers,

@@ -13,11 +13,13 @@ import { readFileSync } from "node:fs";
 import { viewKinds } from "./support/view-kinds.ts";
 import { KINDS } from "../lib/views/kinds.ts";
 import { analysisText } from "../lib/result-text.ts";
+import { AGENT_GRAMMAR, renderDslMarkdown } from "../lib/dsl-reference.ts";
 
 const tools = readFileSync(new URL("../mcp/tools.ts", import.meta.url), "utf8");
 // the per-view text lives in lib/result-text.ts, shared by run_analysis and the WebMCP tools
 const renderer = readFileSync(new URL("../lib/result-text.ts", import.meta.url), "utf8");
-const reference = readFileSync(new URL("../lib/dsl-reference.ts", import.meta.url), "utf8");
+// the reference as a reader and a model get it, assembled from every kind's lib/views/<kind>/doc.ts
+const reference = renderDslMarkdown();
 
 /** every view kind the document language has (test/support/view-kinds.ts) */
 const engineViewKinds = viewKinds;
@@ -47,9 +49,8 @@ describe("MCP run_analysis describes every view the engine can produce", () => {
     // is one the model will not think to ask for.
     const desc = /"run_analysis",\s*"([^"]+)"/.exec(tools);
     assert.ok(desc, "could not find the run_analysis description in mcp/tools.ts");
-    const ref = reference.replace(/\\`/g, "`");
-    const table = ref.slice(ref.indexOf("\n## Views"), ref.indexOf("\n### Plot axes"));
-    assert.ok(table.length > 100, "could not find the views table in lib/dsl-reference.ts");
+    const table = reference.slice(reference.indexOf("\n## Views"), reference.indexOf("\n### Plot axes"));
+    assert.ok(table.length > 100, "could not find the views table in describe_dsl's reference");
     for (const k of engineViewKinds()) {
       assert.match(desc![1], new RegExp("\\b" + k + "\\b"), "run_analysis's description never mentions the " + k + " view");
       assert.match(table, new RegExp("\\n\\| `" + k + "` \\|"), "describe_dsl's views table has no " + k + " row");
@@ -115,15 +116,13 @@ describe("every view kind is DOCUMENTED, not just implemented", () => {
   // the chat grammar, which is what prompted this test.
   test("the markdown reference has a row for every view kind", () => {
     const kinds = engineViewKinds();
-    const missing = kinds.filter((k) => !new RegExp("\\|\\s*\\\\`" + k + "\\\\`\\s*\\|").test(reference));
+    const missing = kinds.filter((k) => !new RegExp("\\|\\s*`" + k + "`\\s*\\|").test(reference));
     assert.deepEqual(missing, [],
-      "no row in the view table of lib/dsl-reference.ts for: " + missing.join(", "));
+      "no row in docs/dsl.md's view table (lib/views/<kind>/doc.ts) for: " + missing.join(", "));
   });
 
   test("the compact grammar names every view kind", () => {
-    const m = /AGENT_GRAMMAR = `([\s\S]*?)`;/.exec(reference);
-    assert.ok(m, "could not find AGENT_GRAMMAR");
-    const named = new Set([...m![1].matchAll(/"kind":"(\w+)"/g)].map((x) => x[1]));
+    const named = new Set([...AGENT_GRAMMAR.matchAll(/"kind":"(\w+)"/g)].map((x) => x[1]));
     const missing = engineViewKinds().filter((k) => !named.has(k));
     assert.deepEqual(missing, [],
       "AGENT_GRAMMAR does not mention: " + missing.join(", ") +

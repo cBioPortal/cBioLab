@@ -1,0 +1,9 @@
+// The `actionability` view in the DSL reference: its row of the Views table, its entry in the agent grammar.
+// lib/dsl-reference.ts assembles these from lib/views/docs.ts.
+import type { KindDoc } from "../kind-doc.ts";
+
+export const actionabilityDoc: KindDoc = {
+  reference: `\`groupBy?:"<categorical attribute>", top?:8, pairBy?:{attribute, a:[values], b:[values]}\|null (default SAMPLE_TYPE Primary / Metastasis), cohorts:[names] (≤4)\` | **clinical actionability from the version-pinned OncoKB store**: each patient with a sample sequenced for mutations, at their highest sensitive therapeutic level (Level 1, 2, 3A, 3B, 4, or none) over the called mutations and high-level copy-number calls in any of their samples (structural variants too where the store levels them; the caveat says which types it holds), and separately whether any alteration carries a resistance level (R1, R2). The store's level is its highest for the alteration in any cancer type, not in the patient's own, so the shares are an upper bound — stated in the caveat. Per cohort, and with \`groupBy\` per group of that attribute per patient ("Multiple" when samples disagree; the \`top\` largest drawn, the rest pooled into a named Other). For patients with a sequenced sample on each side of \`pairBy\` (values matched case-insensitively), the 6×6 cross-table of their highest level on each side and the discordant share. "No level" means none on the genes sequenced — an unprofiled gene is unknown. Counts only, computed in each local database.`,
+  grammar: `{"kind":"actionability","groupBy":"CANCER_TYPE"?,"top":8,"pairBy":{"attribute":"SAMPLE_TYPE","a":["Primary"],"b":["Metastasis"]}|null,"cohorts":[names?(max 4)]}
+  // each patient's highest OncoKB level (1–4, none) and resistance (R1/R2), stacked per cohort/group; primary vs metastasis concordance`,
+};

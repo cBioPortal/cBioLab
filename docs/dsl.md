@@ -3851,1092 +3851,7 @@ tmb_mskcc_2018 is pan-cancer, so a plain percentile would mix histologies with v
 }
 ```
 
-### Example 56: Cohort attrition: which criterion removed whom
-
-KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six months of follow-up, beside KRAS wild-type lung adenocarcinoma. The G12C arm loses most of its patients to the genotype, and a further 78 to the follow-up requirement — the kind of step a reader needs to see before trusting a survival curve drawn from what is left.
-
-```json
-{
-  "study": "msk_chord_2024",
-  "cohorts": {
-    "LUAD KRAS G12C, immunotherapy": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE_DETAILED",
-          "values": [
-            "Lung Adenocarcinoma"
-          ]
-        },
-        {
-          "kind": "oql",
-          "q": "KRAS: G12C"
-        },
-        {
-          "kind": "event",
-          "a": {
-            "eventType": "Treatment",
-            "attrs": [
-              {
-                "key": "SUBTYPE",
-                "value": "Immuno"
-              }
-            ]
-          },
-          "rel": {
-            "type": "NONE"
-          }
-        },
-        {
-          "kind": "derived",
-          "metric": "followupMonths",
-          "range": {
-            "gte": 6
-          }
-        }
-      ]
-    },
-    "LUAD KRAS wild-type": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE_DETAILED",
-          "values": [
-            "Lung Adenocarcinoma"
-          ]
-        },
-        {
-          "not": {
-            "kind": "oql",
-            "q": "KRAS"
-          }
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "attrition",
-      "cohorts": [
-        "LUAD KRAS G12C, immunotherapy",
-        "LUAD KRAS wild-type"
-      ]
-    }
-  ]
-}
-```
-
-### Example 57: Genome-wide copy number: colorectal against breast
-
-Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal pattern is all there — 20q gained in 60%, 13q in 42%, 8q in 32%, 18q lost in 54% — beside breast cancer's 1q and 8q gains and 16q loss. The strip underneath marks every bin where the two differ at q < 0.05, coloured by which cohort is higher.
-
-```json
-{
-  "study": "msk_impact_50k_2026",
-  "cohorts": {
-    "Colorectal": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Colorectal Cancer"
-          ]
-        }
-      ]
-    },
-    "Breast": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Breast Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "genome",
-      "cohorts": [
-        "Colorectal",
-        "Breast"
-      ],
-      "binMb": 2
-    }
-  ]
-}
-```
-
-### Example 58: Oncogenic signalling pathways: colorectal against pancreatic
-
-Colorectal and pancreatic cancer in MSK-CHORD. WNT separates them almost completely (82% against 8%, nearly all APC); RTK-RAS is higher in pancreatic cancer (84%, KRAS 81%), and so is the cell cycle (39%, CDKN2A 33%); PI3K and NOTCH (FBXW7) are colorectal. The canonical pathways also show how much a targeted panel misses: 56 of WNT's 68 genes are on no panel here.
-
-```json
-{
-  "study": "msk_chord_2024",
-  "cohorts": {
-    "Colorectal": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Colorectal Cancer"
-          ]
-        }
-      ]
-    },
-    "Pancreatic": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Pancreatic Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "pathways",
-      "cohorts": [
-        "Colorectal",
-        "Pancreatic"
-      ]
-    }
-  ]
-}
-```
-
-### Example 59: Differential expression and enrichment: basal-like against luminal A breast cancer
-
-TCGA PanCancer Atlas breast cancer, PAM50 basal-like against luminal A, on mRNA z-scores. The luminal genes (ESR1, PGR, FOXA1, GATA3) and the basal ones (FOXC1, and proliferation — MKI67, CDC20, AURKB) come out as expected, and so does the enrichment: E2F targets, the G2M checkpoint and MYC targets in basal-like tumours, early estrogen response in luminal A.
-
-```json
-{
-  "study": "brca_tcga_pan_can_atlas_2018",
-  "cohorts": {
-    "Basal-like": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "SUBTYPE",
-          "values": [
-            "BRCA_Basal"
-          ]
-        }
-      ]
-    },
-    "Luminal A": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "SUBTYPE",
-          "values": [
-            "BRCA_LumA"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "diffexpr",
-      "cohorts": [
-        "Basal-like",
-        "Luminal A"
-      ],
-      "profileType": "rna_seq_v2_mrna_median_all_sample_Zscores"
-    }
-  ]
-}
-```
-
-### Example 60: Paired samples: what differs between a patient's primary and metastasis
-
-MSK-IMPACT, the 2,278 patients sequenced at both a primary and a metastatic site. Truncal drivers agree (TP53 78% concordant); what the metastasis alone carries is the resistance biology — ESR1 mutations (49 metastasis-only against 7 primary-only) and AR alterations (71 against 1), both selected under hormone therapy — and MYC amplification and CDKN2A loss.
-
-```json
-{
-  "study": "msk_impact_50k_2026",
-  "cohorts": {
-    "all patients": {
-      "all": []
-    }
-  },
-  "views": [
-    {
-      "kind": "paired",
-      "cohorts": [
-        "all patients"
-      ],
-      "genes": [
-        "TP53",
-        "KRAS",
-        "PIK3CA",
-        "ESR1",
-        "AR",
-        "CDKN2A",
-        "MYC",
-        "TERT"
-      ]
-    }
-  ]
-}
-```
-
-### Example 61: Paired samples, every gene: what the metastasis carries that the primary does not
-
-MSK-IMPACT again, the 2,278 patients with both kinds of sample, but no gene list. Of 347 genes with a discordant patient, the scan puts AR (71 metastasis-only against 1 primary-only) and ESR1 (49 against 7) first — the hormone-therapy resistance genes the hand-picked version above had to be told to look at — followed by MYC, NKX3-1 and PTEN.
-
-```json
-{
-  "study": "msk_impact_50k_2026",
-  "cohorts": {
-    "all patients": {
-      "all": []
-    }
-  },
-  "views": [
-    {
-      "kind": "paired",
-      "cohorts": [
-        "all patients"
-      ],
-      "top": 15
-    }
-  ]
-}
-```
-
-### Example 62: Before and after treatment, pooled across studies that label it differently
-
-111 patients with a sample on each side across gastroesophageal (two studies), breast (alpelisib, and a second cohort) and bladder cancer. At this size nothing survives correction across the 278 genes tested — the honest answer — and the most one-sided genes run the other way: CCND1 and MYC amplifications seen before treatment and not after (10 and 10 patients against 1 and 2), as a lower-purity post-treatment sample would also show. Read it as a lead, not a finding; the same view over a large serially sampled cohort is where acquired resistance would show.
-
-```json
-{
-  "study": "egc_msk_2017",
-  "cohorts": {
-    "before and after treatment": {
-      "studies": [
-        "egc_msk_2017",
-        "breast_alpelisib_2020",
-        "egc_trap_ccr_msk_2023",
-        "blca_cornell_2016",
-        "brca_dldccc_2022"
-      ],
-      "all": []
-    }
-  },
-  "views": [
-    {
-      "kind": "paired",
-      "cohorts": [
-        "before and after treatment"
-      ],
-      "top": 12,
-      "pairBy": {
-        "labels": {
-          "a": "before",
-          "b": "after"
-        },
-        "studies": {
-          "egc_msk_2017": {
-            "attribute": "IMPACT_PRE_POST",
-            "a": "PRE-TX",
-            "b": "POST-TX"
-          },
-          "breast_alpelisib_2020": {
-            "attribute": "SAMPLE_COLLECTION_TIMEPOINT",
-            "a": "pre-treatment",
-            "b": "post-treatment"
-          },
-          "egc_trap_ccr_msk_2023": {
-            "attribute": "PRE_OR_POST_TREATMENT",
-            "a": "Pre",
-            "b": "Post"
-          },
-          "blca_cornell_2016": {
-            "attribute": "SPECIMEN_COLLECTION_PRE_OR_POST_CHEMO",
-            "a": "pre-chemotherapy",
-            "b": "post-chemotherapy"
-          },
-          "brca_dldccc_2022": {
-            "attribute": "TREATMENT_STATUS",
-            "a": "Pre-Treatment",
-            "b": "Post-Treatment"
-          }
-        }
-      }
-    }
-  ]
-}
-```
-
-### Example 63: Acquired under therapy: the sample before a treatment against the sample after it
-
-MSK thoracic PDX: 142 patients with a systemic therapy start, 33 with a dated sample on each side of it (a median 301 days apart). Acquired calls outnumber lost ones: CDKN2B (8 acquired against 1 lost), MYC, KEAP1 — none survives correction at 33 patients, and many after-samples are PDX models, whose higher purity calls more than the tissue before them.
-
-```json
-{
-  "study": "lung_msk_pdx",
-  "cohorts": {
-    "all patients": {
-      "all": []
-    }
-  },
-  "views": [
-    {
-      "kind": "acquired",
-      "cohorts": [
-        "all patients"
-      ],
-      "anchor": {
-        "eventType": "Treatment",
-        "key": "SUBTYPE",
-        "value": "Systemic therapy"
-      },
-      "measure": "driver",
-      "top": 12
-    }
-  ]
-}
-```
-
-### Example 64: ctDNA against tissue: what a blood test sees of the tumour, and what detecting it says
-
-MSK lung cancer ctDx (1,127 patients; 682 with plasma and tissue). Plasma catches about two thirds of tissue's EGFR, KRAS and TP53 calls but only a third of STK11, KEAP1 and MET; ctDNA is detected in 68% of plasma patients, and they live about half as long (median 21.8 against 41.5 months, log-rank p≈2e-12) — the prognostic signal the paper reports.
-
-```json
-{
-  "study": "nsclc_ctdx_msk_2022",
-  "cohorts": {
-    "all patients": {
-      "all": []
-    }
-  },
-  "views": [
-    {
-      "kind": "ctdna",
-      "cohorts": [
-        "all patients"
-      ],
-      "genes": [
-        "EGFR",
-        "KRAS",
-        "TP53",
-        "STK11",
-        "KEAP1",
-        "PIK3CA",
-        "BRAF",
-        "MET",
-        "ERBB2",
-        "ALK"
-      ]
-    }
-  ]
-}
-```
-
-### Example 65: Mutual exclusivity that accounts for each tumour's burden (DISCOVER)
-
-MSK-IMPACT non-small cell lung cancer, 1,680 samples. The oncogenic drivers stay exclusive (KRAS/EGFR 19 together against 170 expected, q≈1e-56), and so do EGFR with STK11 and KEAP1; STK11/KEAP1 co-occur. What moves is what the burden explains: Fisher calls EGFR/TP53 co-occurring (q≈2e-7) because both mark heavily altered tumours, while DISCOVER expects 300 together and sees 294 (q 0.45); KEAP1/TP53, null by Fisher, turns exclusive.
-
-```json
-{
-  "study": "msk_impact_2017",
-  "cohorts": {
-    "NSCLC": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "exclusivity",
-      "cohorts": [
-        "NSCLC"
-      ],
-      "genes": [
-        "KRAS",
-        "EGFR",
-        "BRAF",
-        "STK11",
-        "KEAP1",
-        "TP53"
-      ]
-    }
-  ]
-}
-```
-
-### Example 66: Genomic instability by cancer type: aneuploidy score, FGA and arm-level changes
-
-MSK-IMPACT 50k: colorectal, breast and pancreatic cancer. Colorectal shows its textbook arms — 20q gained in 60%, 13q in 42%, 18q lost in 53% — and breast 1q and 8q gains with 16q loss. Pancreatic tumours look the most stable (median 2 arms, against 7 and 8), which is mostly purity: their low tumour content pulls every log ratio toward 0, the bias the caption names.
-
-```json
-{
-  "study": "msk_impact_50k_2026",
-  "cohorts": {
-    "Colorectal": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Colorectal Cancer"
-          ]
-        }
-      ]
-    },
-    "Breast": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Breast Cancer"
-          ]
-        }
-      ]
-    },
-    "Pancreatic": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Pancreatic Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "instability",
-      "cohorts": [
-        "Colorectal",
-        "Breast",
-        "Pancreatic"
-      ]
-    }
-  ]
-}
-```
-
-### Example 67: ctDNA with clonal haematopoiesis filtered out: MSK-ACCESS plasma against tissue
-
-MSK-ACCESS (617 patients; 449 with plasma and tissue). MSK-ACCESS already subtracts the white-cell sample in its own calling, so the filter takes out little: 83 of 2,024 plasma mutation calls in 51 patients, mostly SF3B1, DNMT3A, GNAS and IDH2 by gene and a few TP53 calls seen in the normal. What it removes is plasma-only — AR, RB1 and ATM lose plasma-only calls while every concordant call stays — and ctDNA detected moves from 74% to 73%, with survival by detection unchanged (log-rank p 3.4e-4).
-
-```json
-{
-  "study": "msk_access_2021",
-  "cohorts": {
-    "all patients": {
-      "all": []
-    }
-  },
-  "views": [
-    {
-      "kind": "ctdna",
-      "cohorts": [
-        "all patients"
-      ],
-      "plasmaPanels": [
-        "ACCESS129"
-      ],
-      "chFilter": true
-    }
-  ]
-}
-```
-
-### Example 68: Clonality, LOH and genome doubling from FACETS
-
-Colorectal against breast cancer. Tumour suppressors show the classic second hit — TP53 is ~88% clonal with its other allele lost 77–89% of the time, CDH1 in breast 95% — while the oncogene KRAS rarely loses its partner. PIK3CA is markedly more often subclonal in colorectal cancer (68% clonal) than in breast (84%), in keeping with a later event there. Around a third of both cohorts' tumours have doubled their genome.
-
-```json
-{
-  "study": "msk_impact_50k_2026",
-  "cohorts": {
-    "Colorectal": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Colorectal Cancer"
-          ]
-        }
-      ]
-    },
-    "Breast": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Breast Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "clonality",
-      "cohorts": [
-        "Colorectal",
-        "Breast"
-      ],
-      "genes": [
-        "TP53",
-        "KRAS",
-        "APC",
-        "PIK3CA",
-        "SMAD4",
-        "CDH1",
-        "GATA3"
-      ]
-    }
-  ]
-}
-```
-
-### Example 69: Brain metastasis, with death as a competing risk
-
-MSK-CHORD, from each patient's day 0, among those without a brain metastasis by then. At five years 24.7% of NSCLC patients have one — where 1 − Kaplan–Meier would have said 30.4% — against 20.6% in breast and 10.8% in colorectal cancer (1 − KM: 14.4%, a third too high, because so many colorectal patients die first).
-
-```json
-{
-  "study": "msk_chord_2024",
-  "cohorts": {
-    "NSCLC": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        }
-      ]
-    },
-    "Breast": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Breast Cancer"
-          ]
-        }
-      ]
-    },
-    "Colorectal": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Colorectal Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "incidence",
-      "cohorts": [
-        "NSCLC",
-        "Breast",
-        "Colorectal"
-      ],
-      "event": {
-        "eventType": "Diagnosis",
-        "attrs": [
-          {
-            "key": "TUMOR_SITE",
-            "value": "CNS/Brain"
-          }
-        ],
-        "label": "brain metastasis"
-      }
-    }
-  ]
-}
-```
-
-### Example 70: Real-world PFS on immunotherapy in lung cancer, by KRAS status
-
-MSK-CHORD non-small cell lung cancer, KRAS-mutant against KRAS wild-type (profiled for KRAS), from the first Immuno record. About a third of each cohort was treated. Median real-world PFS is about 2.6 months in both groups and the curves lie on top of each other (log-rank p ≈ 0.98): KRAS status alone does not mark who progresses on immunotherapy here. Progression is read from notes, so it is recorded densely; switching to time to next treatment gives medians near a year.
-
-```json
-{
-  "study": "msk_chord_2024",
-  "cohorts": {
-    "NSCLC, KRAS mutant": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        },
-        {
-          "kind": "oql",
-          "q": "KRAS: MUT"
-        }
-      ]
-    },
-    "NSCLC, KRAS wild-type": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        },
-        {
-          "not": {
-            "kind": "oql",
-            "q": "KRAS:"
-          }
-        },
-        {
-          "kind": "profiled",
-          "type": "MUTATION",
-          "gene": "KRAS"
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "txendpoints",
-      "cohorts": [
-        "NSCLC, KRAS mutant",
-        "NSCLC, KRAS wild-type"
-      ],
-      "endpoint": "rwpfs",
-      "anchor": {
-        "eventType": "Treatment",
-        "key": "SUBTYPE",
-        "value": "Immuno"
-      }
-    }
-  ]
-}
-```
-
-### Example 71: From progression to death in colorectal cancer, by stage
-
-MSK-CHORD colorectal cancer, highest recorded stage 1–3 against stage 4. Stage 4 patients progress over four times as fast (HR ≈ 4.4) and, once progressed, die about 1.7 times as fast; death without a recorded progression is rare in both. So the stage-4 survival gap comes mostly through faster progression, and partly through worse survival after it. About a third of each cohort had a progression recorded before their first sequencing and starts in the progression state; set prevalent to exclude to follow only patients not yet progressed.
-
-```json
-{
-  "study": "msk_chord_2024",
-  "cohorts": {
-    "Colorectal, stage 1-3": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Colorectal Cancer"
-          ]
-        },
-        {
-          "kind": "clinical",
-          "attribute": "STAGE_HIGHEST_RECORDED",
-          "values": [
-            "Stage 1-3"
-          ]
-        }
-      ]
-    },
-    "Colorectal, stage 4": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Colorectal Cancer"
-          ]
-        },
-        {
-          "kind": "clinical",
-          "attribute": "STAGE_HIGHEST_RECORDED",
-          "values": [
-            "Stage 4"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "multistate",
-      "cohorts": [
-        "Colorectal, stage 1-3",
-        "Colorectal, stage 4"
-      ]
-    }
-  ]
-}
-```
-
-### Example 72: Months of life gained on immunotherapy with a high tumour mutational burden, with landmarks
-
-Samstein et al.'s immunotherapy cohort (every patient treated with immune checkpoint inhibitors; OS from the first treatment), TMB under 10 against 10 or more mutations per megabase. In the first 24 months TMB-high patients lived about 3.3 months longer on average (17.7 against 14.5 months, ratio 1.23), and the gain holds at about 3.2–3.6 months among those still alive at 6 and at 12 months — the benefit is not only early.
-
-```json
-{
-  "study": "tmb_mskcc_2018",
-  "cohorts": {
-    "TMB < 10": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "TMB_NONSYNONYMOUS",
-          "range": {
-            "lt": 10
-          }
-        }
-      ]
-    },
-    "TMB ≥ 10": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "TMB_NONSYNONYMOUS",
-          "range": {
-            "gte": 10
-          }
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "rmst",
-      "cohorts": [
-        "TMB < 10",
-        "TMB ≥ 10"
-      ],
-      "tau": 24,
-      "landmarkMonths": [
-        0,
-        6,
-        12
-      ]
-    }
-  ]
-}
-```
-
-### Example 73: Which mutations change survival on immunotherapy in lung cancer?
-
-MSK-CHORD non-small cell lung cancer, 7,809 patients, 2,666 with an immunotherapy record. STK11 and KEAP1 mutations are adverse among the treated (HR 1.48 and 1.41), as reported for checkpoint inhibitors; TP53 and SMARCA4 are strongly adverse only among the untreated (HR 1.72 and 1.88 against about 1.0 and 1.1 treated; interaction q < 1e-4) — in keeping with their link to tumour mutational burden, though immortal time and who gets treated can shape such contrasts too.
-
-```json
-{
-  "study": "msk_chord_2024",
-  "cohorts": {
-    "NSCLC": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "predictive",
-      "cohorts": [
-        "NSCLC"
-      ],
-      "exposure": {
-        "eventType": "Treatment",
-        "key": "SUBTYPE",
-        "value": "Immuno"
-      },
-      "genes": [
-        "STK11",
-        "KEAP1",
-        "KRAS",
-        "TP53",
-        "EGFR",
-        "SMARCA4"
-      ]
-    }
-  ]
-}
-```
-
-### Example 74: A tumour mutational burden cut-point for survival on immunotherapy
-
-Samstein et al. 2019's 1,661 patients treated with checkpoint inhibitors (tmb_mskcc_2018). The best overall cut is TMB > 14.4 mutations/Mb: the top 19% survive markedly longer (HR 0.45, median 47 against 15 months), corrected p ≈ 0.001 against a naive 9.5e-15 that ignores the search. Per cancer type the best cut moves — 18.6 in NSCLC, 9.8 in melanoma, 11.1 in colorectal — and in renal cell carcinoma, oesophagogastric cancer and glioma no cut survives the correction, the paper's point that one threshold does not fit every histology. Every cut here is optimistic and would need validation in another cohort.
-
-```json
-{
-  "study": "tmb_mskcc_2018",
-  "cohorts": {
-    "all patients": {
-      "all": []
-    }
-  },
-  "views": [
-    {
-      "kind": "cutpoint",
-      "cohorts": [
-        "all patients"
-      ],
-      "attribute": "TMB_NONSYNONYMOUS",
-      "stratifyBy": "CANCER_TYPE"
-    }
-  ]
-}
-```
-
-### Example 75: HLA class I homozygosity and HLA loss in lung cancer, and survival
-
-MSK-IMPACT 50K, non-small cell lung cancer (6,633 patients; 5,901 typed at all three loci). 22% are homozygous at one locus or more, about the share Chowell et al. report; in this cohort, not restricted to immunotherapy, homozygosity does not move overall survival (HR 1.02). HLA LOH, called in 30% of the 4,158 patients with a call, goes with shorter survival (median 32 against 48 months, HR 1.35, 1.31 adjusted for TMB) — tumour biology, not a treatment effect.
-
-```json
-{
-  "study": "msk_impact_50k_2026",
-  "cohorts": {
-    "NSCLC": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "hla",
-      "cohorts": [
-        "NSCLC"
-      ],
-      "covariates": [
-        "TMB_SCORE"
-      ]
-    }
-  ]
-}
-```
-
-### Example 76: HLA class I homozygosity and survival on checkpoint blockade in melanoma
-
-Van Allen 2015 (ipilimumab), Snyder 2014 (ipilimumab) and Hugo 2016 (anti-PD-1): 212 patients, 22% homozygous at a locus or more. Homozygous patients have a median overall survival of 12 against 22 months (HR 1.22, 95% CI 0.82–1.82) — the direction Chowell et al. found pooling these and other cohorts, though 212 patients cannot show it alone. These studies record no HLA LOH, so that split says so.
-
-```json
-{
-  "study": "skcm_dfci_2015",
-  "cohorts": {
-    "melanoma on checkpoint blockade": {
-      "studies": [
-        "skcm_dfci_2015",
-        "skcm_mskcc_2014",
-        "mel_ucla_2016"
-      ],
-      "all": []
-    }
-  },
-  "views": [
-    {
-      "kind": "hla",
-      "cohorts": [
-        "melanoma on checkpoint blockade"
-      ]
-    }
-  ]
-}
-```
-
-### Example 77: PSA response to hormone therapy, by TP53 status
-
-Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a median of more than 95% within three months in both groups, but 93.0% of TP53 wild-type patients reach PSA50 against 85.8% of TP53-mutant ones (Fisher p = 1.4e-6), and the mutant group's upper quartile turns back upward within a year.
-
-```json
-{
-  "study": "msk_chord_2024",
-  "cohorts": {
-    "Prostate, TP53 mutant": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Prostate Cancer"
-          ]
-        },
-        {
-          "kind": "oql",
-          "q": "TP53: MUT"
-        }
-      ]
-    },
-    "Prostate, TP53 wild-type": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Prostate Cancer"
-          ]
-        },
-        {
-          "not": {
-            "kind": "oql",
-            "q": "TP53"
-          }
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "labs",
-      "cohorts": [
-        "Prostate, TP53 mutant",
-        "Prostate, TP53 wild-type"
-      ],
-      "test": "PSA",
-      "anchor": {
-        "eventType": "Treatment",
-        "key": "SUBTYPE",
-        "value": "Hormone"
-      }
-    }
-  ]
-}
-```
-
-### Example 78: A survival risk model from mutated genes in lung cancer
-
-Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 and TP53 as adverse and EGFR as favourable, as the literature does, and its risk thirds separate clearly; a held-out C-index near 0.61 says mutations alone predict survival only modestly. Five runs keep the example quick; OncoCast recommends fifty. Its Table 1 (`describe`) shows who is in each third: the high-risk third is more often male, a former or current smoker and at stage 4 than the low-risk third. KEAP1 and TP53 are marked “in the model” — the score is built from them, so their enrichment is by construction and gets no q-value — and ZFHX3, which not every panel covers, is counted over each group's patients whose panel does.
-
-```json
-{
-  "study": "msk_chord_2024",
-  "cohorts": {
-    "NSCLC": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "riskmodel",
-      "cohorts": [
-        "NSCLC"
-      ],
-      "runs": 5,
-      "describe": {
-        "attributes": [
-          "STAGE_HIGHEST_RECORDED",
-          "GENDER",
-          "SMOKING_PREDICTIONS_3_CLASSES",
-          "CURRENT_AGE_DEID"
-        ],
-        "genes": [
-          "KEAP1",
-          "TP53",
-          "ZFHX3"
-        ]
-      }
-    }
-  ]
-}
-```
-
-### Example 79: A lung cancer risk model, validated on another study
-
-Fitted on the 1,440 non-small cell lung cancer patients of MSK-IMPACT 2017 (ten runs; KEAP1, STK11 and TP53 adverse, EGFR favourable), scored on the 7,809 of MSK-CHORD. The C-index holds at 0.607 (95% CI 0.597–0.616) against 0.613 held out in training, and the training thresholds still separate the new cohort: median survival 66 months in the low-risk group against 33 and 21 months (HR 1.63 and 2.12, log-rank p ≈ 1e-72). Both studies are from MSK, so some patients may be in both under different identifiers; a study from another centre would be the stronger test.
-
-```json
-{
-  "study": "msk_impact_2017",
-  "cohorts": {
-    "NSCLC (MSK-IMPACT 2017)": {
-      "studies": [
-        "msk_impact_2017"
-      ],
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        }
-      ]
-    },
-    "NSCLC (MSK-CHORD)": {
-      "studies": [
-        "msk_chord_2024"
-      ],
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "riskmodel",
-      "cohorts": [
-        "NSCLC (MSK-IMPACT 2017)"
-      ],
-      "runs": 10,
-      "validateOn": "NSCLC (MSK-CHORD)"
-    }
-  ]
-}
-```
-
-### Example 80: Custom data: a curated biopsy site on every sample
+### Example 56: Custom data: a curated biopsy site on every sample
 
 luad_mskimpact_2021 is 93 EGFR-mutant lung adenocarcinomas with 186 primary and metastatic samples. The demo upload gives every sample a BIOPSY_SITE, grouped from the study's own SAMPLE_TYPE and free-text METASTATIC_SITE the way a reviewer would (scripts/gen-custom-demo.ts), standing in for a clinician-curated annotation. "CNS met" filters on it: 8 patients. Ordered by site, the oncoprint puts each patient's primary and metastases in their own groups. Fraction of the genome altered has a median of 0.47 in the 11 CNS samples and 0.36 in liver, against 0.21 in the 76 primaries. Split by site, TP53 is altered in 7 of 8 CNS-met patients (87.5%) against 65.6% of the patients with a primary sample. The split arms overlap, because a patient whose primary and metastasis were both sequenced belongs to both arms. With 8 to 61 patients per arm, these are illustrations, not findings.
 
@@ -5018,7 +3933,7 @@ Runs on custom data: `luad-biopsy-site` (LUAD biopsy site (demo), 186 samples, c
 }
 ```
 
-### Example 81: Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)
+### Example 57: Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)
 
 msk_spectrum_tme_2022 is 42 untreated high-grade serous ovarian cancers; 41 had scRNA-seq at several anatomical sites. scripts/gen-spectrum-sc-demo.py reads the public CELLxGENE cell annotations (cell states, per-cell pathway scores, per-cell 6p allele fraction) and summarises them per patient (solid sites pooled; ADX_ adnexal, NADX_ non-adnexal) and per cBioPortal sample (the scRNA-seq site of the same patient, 61 of 82 samples). Dysfunctional T/NK cells (TNK_DYSFUNC) have a median of 10.8% of T/NK cells in the 16 HRD-Dup tumours against 6.0% in the 14 FBI tumours, and naive/central-memory cells the reverse (7.5% against 11.1%), as in the paper's Fig. 4b. In adnexal cancer cells, JAK-STAT pathway activity has a median of 0.03 in HRD-Dup against -0.57 in FBI (Fig. 3e), and cancer-cell and T/NK-cell JAK-STAT correlate across patients (Spearman 0.74, Fig. 4e). Clonal 6p loss of heterozygosity (over 80% of cancer cells) is called in 4 patients, 3 of them HRD-Dup — the paper reports 4 of 41. By site, T cells are a median 43% of immune cells in the 22 adnexal samples against 54% in the 18 omental ones. These are summaries of public cell metadata, not the paper's statistical models.
 
@@ -5135,7 +4050,1295 @@ Runs on custom data: `spectrum-sc-composition` (SPECTRUM scRNA: cell-type compos
 }
 ```
 
-### Example 82: Composition: T and NK cell states by mutational signature (MSK SPECTRUM)
+### Example 58: Cohort attrition: which criterion removed whom
+
+KRAS G12C lung adenocarcinoma treated with immunotherapy, with at least six months of follow-up, beside KRAS wild-type lung adenocarcinoma. The G12C arm loses most of its patients to the genotype, and a further 78 to the follow-up requirement — the kind of step a reader needs to see before trusting a survival curve drawn from what is left.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "LUAD KRAS G12C, immunotherapy": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE_DETAILED",
+          "values": [
+            "Lung Adenocarcinoma"
+          ]
+        },
+        {
+          "kind": "oql",
+          "q": "KRAS: G12C"
+        },
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Treatment",
+            "attrs": [
+              {
+                "key": "SUBTYPE",
+                "value": "Immuno"
+              }
+            ]
+          },
+          "rel": {
+            "type": "NONE"
+          }
+        },
+        {
+          "kind": "derived",
+          "metric": "followupMonths",
+          "range": {
+            "gte": 6
+          }
+        }
+      ]
+    },
+    "LUAD KRAS wild-type": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE_DETAILED",
+          "values": [
+            "Lung Adenocarcinoma"
+          ]
+        },
+        {
+          "not": {
+            "kind": "oql",
+            "q": "KRAS"
+          }
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "attrition",
+      "cohorts": [
+        "LUAD KRAS G12C, immunotherapy",
+        "LUAD KRAS wild-type"
+      ]
+    }
+  ]
+}
+```
+
+### Example 59: Genome-wide copy number: colorectal against breast
+
+Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal pattern is all there — 20q gained in 60%, 13q in 42%, 8q in 32%, 18q lost in 54% — beside breast cancer's 1q and 8q gains and 16q loss. The strip underneath marks every bin where the two differ at q < 0.05, coloured by which cohort is higher.
+
+```json
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "Colorectal": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ]
+        }
+      ]
+    },
+    "Breast": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Breast Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "genome",
+      "cohorts": [
+        "Colorectal",
+        "Breast"
+      ],
+      "binMb": 2
+    }
+  ]
+}
+```
+
+### Example 60: Oncogenic signalling pathways: colorectal against pancreatic
+
+Colorectal and pancreatic cancer in MSK-CHORD. WNT separates them almost completely (82% against 8%, nearly all APC); RTK-RAS is higher in pancreatic cancer (84%, KRAS 81%), and so is the cell cycle (39%, CDKN2A 33%); PI3K and NOTCH (FBXW7) are colorectal. The canonical pathways also show how much a targeted panel misses: 56 of WNT's 68 genes are on no panel here.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Colorectal": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ]
+        }
+      ]
+    },
+    "Pancreatic": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Pancreatic Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "pathways",
+      "cohorts": [
+        "Colorectal",
+        "Pancreatic"
+      ]
+    }
+  ]
+}
+```
+
+### Example 61: Differential expression and enrichment: basal-like against luminal A breast cancer
+
+TCGA PanCancer Atlas breast cancer, PAM50 basal-like against luminal A, on mRNA z-scores. The luminal genes (ESR1, PGR, FOXA1, GATA3) and the basal ones (FOXC1, and proliferation — MKI67, CDC20, AURKB) come out as expected, and so does the enrichment: E2F targets, the G2M checkpoint and MYC targets in basal-like tumours, early estrogen response in luminal A.
+
+```json
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "Basal-like": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "SUBTYPE",
+          "values": [
+            "BRCA_Basal"
+          ]
+        }
+      ]
+    },
+    "Luminal A": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "SUBTYPE",
+          "values": [
+            "BRCA_LumA"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "diffexpr",
+      "cohorts": [
+        "Basal-like",
+        "Luminal A"
+      ],
+      "profileType": "rna_seq_v2_mrna_median_all_sample_Zscores"
+    }
+  ]
+}
+```
+
+### Example 62: Paired samples: what differs between a patient's primary and metastasis
+
+MSK-IMPACT, the 2,278 patients sequenced at both a primary and a metastatic site. Truncal drivers agree (TP53 78% concordant); what the metastasis alone carries is the resistance biology — ESR1 mutations (49 metastasis-only against 7 primary-only) and AR alterations (71 against 1), both selected under hormone therapy — and MYC amplification and CDKN2A loss.
+
+```json
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "paired",
+      "cohorts": [
+        "all patients"
+      ],
+      "genes": [
+        "TP53",
+        "KRAS",
+        "PIK3CA",
+        "ESR1",
+        "AR",
+        "CDKN2A",
+        "MYC",
+        "TERT"
+      ]
+    }
+  ]
+}
+```
+
+### Example 63: Paired samples, every gene: what the metastasis carries that the primary does not
+
+MSK-IMPACT again, the 2,278 patients with both kinds of sample, but no gene list. Of 347 genes with a discordant patient, the scan puts AR (71 metastasis-only against 1 primary-only) and ESR1 (49 against 7) first — the hormone-therapy resistance genes the hand-picked version above had to be told to look at — followed by MYC, NKX3-1 and PTEN.
+
+```json
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "paired",
+      "cohorts": [
+        "all patients"
+      ],
+      "top": 15
+    }
+  ]
+}
+```
+
+### Example 64: Before and after treatment, pooled across studies that label it differently
+
+111 patients with a sample on each side across gastroesophageal (two studies), breast (alpelisib, and a second cohort) and bladder cancer. At this size nothing survives correction across the 278 genes tested — the honest answer — and the most one-sided genes run the other way: CCND1 and MYC amplifications seen before treatment and not after (10 and 10 patients against 1 and 2), as a lower-purity post-treatment sample would also show. Read it as a lead, not a finding; the same view over a large serially sampled cohort is where acquired resistance would show.
+
+```json
+{
+  "study": "egc_msk_2017",
+  "cohorts": {
+    "before and after treatment": {
+      "studies": [
+        "egc_msk_2017",
+        "breast_alpelisib_2020",
+        "egc_trap_ccr_msk_2023",
+        "blca_cornell_2016",
+        "brca_dldccc_2022"
+      ],
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "paired",
+      "cohorts": [
+        "before and after treatment"
+      ],
+      "top": 12,
+      "pairBy": {
+        "labels": {
+          "a": "before",
+          "b": "after"
+        },
+        "studies": {
+          "egc_msk_2017": {
+            "attribute": "IMPACT_PRE_POST",
+            "a": "PRE-TX",
+            "b": "POST-TX"
+          },
+          "breast_alpelisib_2020": {
+            "attribute": "SAMPLE_COLLECTION_TIMEPOINT",
+            "a": "pre-treatment",
+            "b": "post-treatment"
+          },
+          "egc_trap_ccr_msk_2023": {
+            "attribute": "PRE_OR_POST_TREATMENT",
+            "a": "Pre",
+            "b": "Post"
+          },
+          "blca_cornell_2016": {
+            "attribute": "SPECIMEN_COLLECTION_PRE_OR_POST_CHEMO",
+            "a": "pre-chemotherapy",
+            "b": "post-chemotherapy"
+          },
+          "brca_dldccc_2022": {
+            "attribute": "TREATMENT_STATUS",
+            "a": "Pre-Treatment",
+            "b": "Post-Treatment"
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+### Example 65: Acquired under therapy: the sample before a treatment against the sample after it
+
+MSK thoracic PDX: 142 patients with a systemic therapy start, 33 with a dated sample on each side of it (a median 301 days apart). Acquired calls outnumber lost ones: CDKN2B (8 acquired against 1 lost), MYC, KEAP1 — none survives correction at 33 patients, and many after-samples are PDX models, whose higher purity calls more than the tissue before them.
+
+```json
+{
+  "study": "lung_msk_pdx",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "acquired",
+      "cohorts": [
+        "all patients"
+      ],
+      "anchor": {
+        "eventType": "Treatment",
+        "key": "SUBTYPE",
+        "value": "Systemic therapy"
+      },
+      "measure": "driver",
+      "top": 12
+    }
+  ]
+}
+```
+
+### Example 66: ctDNA against tissue: what a blood test sees of the tumour, and what detecting it says
+
+MSK lung cancer ctDx (1,127 patients; 682 with plasma and tissue). Plasma catches about two thirds of tissue's EGFR, KRAS and TP53 calls but only a third of STK11, KEAP1 and MET; ctDNA is detected in 68% of plasma patients, and they live about half as long (median 21.8 against 41.5 months, log-rank p≈2e-12) — the prognostic signal the paper reports.
+
+```json
+{
+  "study": "nsclc_ctdx_msk_2022",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "ctdna",
+      "cohorts": [
+        "all patients"
+      ],
+      "genes": [
+        "EGFR",
+        "KRAS",
+        "TP53",
+        "STK11",
+        "KEAP1",
+        "PIK3CA",
+        "BRAF",
+        "MET",
+        "ERBB2",
+        "ALK"
+      ]
+    }
+  ]
+}
+```
+
+### Example 67: ctDNA with clonal haematopoiesis filtered out: MSK-ACCESS plasma against tissue
+
+MSK-ACCESS (617 patients; 449 with plasma and tissue). MSK-ACCESS already subtracts the white-cell sample in its own calling, so the filter takes out little: 83 of 2,024 plasma mutation calls in 51 patients, mostly SF3B1, DNMT3A, GNAS and IDH2 by gene and a few TP53 calls seen in the normal. What it removes is plasma-only — AR, RB1 and ATM lose plasma-only calls while every concordant call stays — and ctDNA detected moves from 74% to 73%, with survival by detection unchanged (log-rank p 3.4e-4).
+
+```json
+{
+  "study": "msk_access_2021",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "ctdna",
+      "cohorts": [
+        "all patients"
+      ],
+      "plasmaPanels": [
+        "ACCESS129"
+      ],
+      "chFilter": true
+    }
+  ]
+}
+```
+
+### Example 68: Mutual exclusivity that accounts for each tumour's burden (DISCOVER)
+
+MSK-IMPACT non-small cell lung cancer, 1,680 samples. The oncogenic drivers stay exclusive (KRAS/EGFR 19 together against 170 expected, q≈1e-56), and so do EGFR with STK11 and KEAP1; STK11/KEAP1 co-occur. What moves is what the burden explains: Fisher calls EGFR/TP53 co-occurring (q≈2e-7) because both mark heavily altered tumours, while DISCOVER expects 300 together and sees 294 (q 0.45); KEAP1/TP53, null by Fisher, turns exclusive.
+
+```json
+{
+  "study": "msk_impact_2017",
+  "cohorts": {
+    "NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "exclusivity",
+      "cohorts": [
+        "NSCLC"
+      ],
+      "genes": [
+        "KRAS",
+        "EGFR",
+        "BRAF",
+        "STK11",
+        "KEAP1",
+        "TP53"
+      ]
+    }
+  ]
+}
+```
+
+### Example 69: Genomic instability by cancer type: aneuploidy score, FGA and arm-level changes
+
+MSK-IMPACT 50k: colorectal, breast and pancreatic cancer. Colorectal shows its textbook arms — 20q gained in 60%, 13q in 42%, 18q lost in 53% — and breast 1q and 8q gains with 16q loss. Pancreatic tumours look the most stable (median 2 arms, against 7 and 8), which is mostly purity: their low tumour content pulls every log ratio toward 0, the bias the caption names.
+
+```json
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "Colorectal": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ]
+        }
+      ]
+    },
+    "Breast": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Breast Cancer"
+          ]
+        }
+      ]
+    },
+    "Pancreatic": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Pancreatic Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "instability",
+      "cohorts": [
+        "Colorectal",
+        "Breast",
+        "Pancreatic"
+      ]
+    }
+  ]
+}
+```
+
+### Example 70: Clonality, LOH and genome doubling from FACETS
+
+Colorectal against breast cancer. Tumour suppressors show the classic second hit — TP53 is ~88% clonal with its other allele lost 77–89% of the time, CDH1 in breast 95% — while the oncogene KRAS rarely loses its partner. PIK3CA is markedly more often subclonal in colorectal cancer (68% clonal) than in breast (84%), in keeping with a later event there. Around a third of both cohorts' tumours have doubled their genome.
+
+```json
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "Colorectal": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ]
+        }
+      ]
+    },
+    "Breast": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Breast Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "clonality",
+      "cohorts": [
+        "Colorectal",
+        "Breast"
+      ],
+      "genes": [
+        "TP53",
+        "KRAS",
+        "APC",
+        "PIK3CA",
+        "SMAD4",
+        "CDH1",
+        "GATA3"
+      ]
+    }
+  ]
+}
+```
+
+### Example 71: Brain metastasis, with death as a competing risk
+
+MSK-CHORD, from each patient's day 0, among those without a brain metastasis by then. At five years 24.7% of NSCLC patients have one — where 1 − Kaplan–Meier would have said 30.4% — against 20.6% in breast and 10.8% in colorectal cancer (1 − KM: 14.4%, a third too high, because so many colorectal patients die first).
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        }
+      ]
+    },
+    "Breast": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Breast Cancer"
+          ]
+        }
+      ]
+    },
+    "Colorectal": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "incidence",
+      "cohorts": [
+        "NSCLC",
+        "Breast",
+        "Colorectal"
+      ],
+      "event": {
+        "eventType": "Diagnosis",
+        "attrs": [
+          {
+            "key": "TUMOR_SITE",
+            "value": "CNS/Brain"
+          }
+        ],
+        "label": "brain metastasis"
+      }
+    }
+  ]
+}
+```
+
+### Example 72: A tumour mutational burden cut-point for survival on immunotherapy
+
+Samstein et al. 2019's 1,661 patients treated with checkpoint inhibitors (tmb_mskcc_2018). The best overall cut is TMB > 14.4 mutations/Mb: the top 19% survive markedly longer (HR 0.45, median 47 against 15 months), corrected p ≈ 0.001 against a naive 9.5e-15 that ignores the search. Per cancer type the best cut moves — 18.6 in NSCLC, 9.8 in melanoma, 11.1 in colorectal — and in renal cell carcinoma, oesophagogastric cancer and glioma no cut survives the correction, the paper's point that one threshold does not fit every histology. Every cut here is optimistic and would need validation in another cohort.
+
+```json
+{
+  "study": "tmb_mskcc_2018",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "cutpoint",
+      "cohorts": [
+        "all patients"
+      ],
+      "attribute": "TMB_NONSYNONYMOUS",
+      "stratifyBy": "CANCER_TYPE"
+    }
+  ]
+}
+```
+
+### Example 73: HLA class I homozygosity and HLA loss in lung cancer, and survival
+
+MSK-IMPACT 50K, non-small cell lung cancer (6,633 patients; 5,901 typed at all three loci). 22% are homozygous at one locus or more, about the share Chowell et al. report; in this cohort, not restricted to immunotherapy, homozygosity does not move overall survival (HR 1.02). HLA LOH, called in 30% of the 4,158 patients with a call, goes with shorter survival (median 32 against 48 months, HR 1.35, 1.31 adjusted for TMB) — tumour biology, not a treatment effect.
+
+```json
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "hla",
+      "cohorts": [
+        "NSCLC"
+      ],
+      "covariates": [
+        "TMB_SCORE"
+      ]
+    }
+  ]
+}
+```
+
+### Example 74: HLA class I homozygosity and survival on checkpoint blockade in melanoma
+
+Van Allen 2015 (ipilimumab), Snyder 2014 (ipilimumab) and Hugo 2016 (anti-PD-1): 212 patients, 22% homozygous at a locus or more. Homozygous patients have a median overall survival of 12 against 22 months (HR 1.22, 95% CI 0.82–1.82) — the direction Chowell et al. found pooling these and other cohorts, though 212 patients cannot show it alone. These studies record no HLA LOH, so that split says so.
+
+```json
+{
+  "study": "skcm_dfci_2015",
+  "cohorts": {
+    "melanoma on checkpoint blockade": {
+      "studies": [
+        "skcm_dfci_2015",
+        "skcm_mskcc_2014",
+        "mel_ucla_2016"
+      ],
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "hla",
+      "cohorts": [
+        "melanoma on checkpoint blockade"
+      ]
+    }
+  ]
+}
+```
+
+### Example 75: Which mutations change survival on immunotherapy in lung cancer?
+
+MSK-CHORD non-small cell lung cancer, 7,809 patients, 2,666 with an immunotherapy record. STK11 and KEAP1 mutations are adverse among the treated (HR 1.48 and 1.41), as reported for checkpoint inhibitors; TP53 and SMARCA4 are strongly adverse only among the untreated (HR 1.72 and 1.88 against about 1.0 and 1.1 treated; interaction q < 1e-4) — in keeping with their link to tumour mutational burden, though immortal time and who gets treated can shape such contrasts too.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "predictive",
+      "cohorts": [
+        "NSCLC"
+      ],
+      "exposure": {
+        "eventType": "Treatment",
+        "key": "SUBTYPE",
+        "value": "Immuno"
+      },
+      "genes": [
+        "STK11",
+        "KEAP1",
+        "KRAS",
+        "TP53",
+        "EGFR",
+        "SMARCA4"
+      ]
+    }
+  ]
+}
+```
+
+### Example 76: Months of life gained on immunotherapy with a high tumour mutational burden, with landmarks
+
+Samstein et al.'s immunotherapy cohort (every patient treated with immune checkpoint inhibitors; OS from the first treatment), TMB under 10 against 10 or more mutations per megabase. In the first 24 months TMB-high patients lived about 3.3 months longer on average (17.7 against 14.5 months, ratio 1.23), and the gain holds at about 3.2–3.6 months among those still alive at 6 and at 12 months — the benefit is not only early.
+
+```json
+{
+  "study": "tmb_mskcc_2018",
+  "cohorts": {
+    "TMB < 10": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "TMB_NONSYNONYMOUS",
+          "range": {
+            "lt": 10
+          }
+        }
+      ]
+    },
+    "TMB ≥ 10": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "TMB_NONSYNONYMOUS",
+          "range": {
+            "gte": 10
+          }
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "rmst",
+      "cohorts": [
+        "TMB < 10",
+        "TMB ≥ 10"
+      ],
+      "tau": 24,
+      "landmarkMonths": [
+        0,
+        6,
+        12
+      ]
+    }
+  ]
+}
+```
+
+### Example 77: From progression to death in colorectal cancer, by stage
+
+MSK-CHORD colorectal cancer, highest recorded stage 1–3 against stage 4. Stage 4 patients progress over four times as fast (HR ≈ 4.4) and, once progressed, die about 1.7 times as fast; death without a recorded progression is rare in both. So the stage-4 survival gap comes mostly through faster progression, and partly through worse survival after it. About a third of each cohort had a progression recorded before their first sequencing and starts in the progression state; set prevalent to exclude to follow only patients not yet progressed.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Colorectal, stage 1-3": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ]
+        },
+        {
+          "kind": "clinical",
+          "attribute": "STAGE_HIGHEST_RECORDED",
+          "values": [
+            "Stage 1-3"
+          ]
+        }
+      ]
+    },
+    "Colorectal, stage 4": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ]
+        },
+        {
+          "kind": "clinical",
+          "attribute": "STAGE_HIGHEST_RECORDED",
+          "values": [
+            "Stage 4"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "multistate",
+      "cohorts": [
+        "Colorectal, stage 1-3",
+        "Colorectal, stage 4"
+      ]
+    }
+  ]
+}
+```
+
+### Example 78: Real-world PFS on immunotherapy in lung cancer, by KRAS status
+
+MSK-CHORD non-small cell lung cancer, KRAS-mutant against KRAS wild-type (profiled for KRAS), from the first Immuno record. About a third of each cohort was treated. Median real-world PFS is about 2.6 months in both groups and the curves lie on top of each other (log-rank p ≈ 0.98): KRAS status alone does not mark who progresses on immunotherapy here. Progression is read from notes, so it is recorded densely; switching to time to next treatment gives medians near a year.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "NSCLC, KRAS mutant": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        },
+        {
+          "kind": "oql",
+          "q": "KRAS: MUT"
+        }
+      ]
+    },
+    "NSCLC, KRAS wild-type": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        },
+        {
+          "not": {
+            "kind": "oql",
+            "q": "KRAS:"
+          }
+        },
+        {
+          "kind": "profiled",
+          "type": "MUTATION",
+          "gene": "KRAS"
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "txendpoints",
+      "cohorts": [
+        "NSCLC, KRAS mutant",
+        "NSCLC, KRAS wild-type"
+      ],
+      "endpoint": "rwpfs",
+      "anchor": {
+        "eventType": "Treatment",
+        "key": "SUBTYPE",
+        "value": "Immuno"
+      }
+    }
+  ]
+}
+```
+
+### Example 79: A survival risk model from mutated genes in lung cancer
+
+Non-small cell lung cancer in MSK-CHORD. The model keeps KEAP1, STK11, SMARCA4 and TP53 as adverse and EGFR as favourable, as the literature does, and its risk thirds separate clearly; a held-out C-index near 0.61 says mutations alone predict survival only modestly. Five runs keep the example quick; OncoCast recommends fifty. Its Table 1 (`describe`) shows who is in each third: the high-risk third is more often male, a former or current smoker and at stage 4 than the low-risk third. KEAP1 and TP53 are marked “in the model” — the score is built from them, so their enrichment is by construction and gets no q-value — and ZFHX3, which not every panel covers, is counted over each group's patients whose panel does.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "riskmodel",
+      "cohorts": [
+        "NSCLC"
+      ],
+      "runs": 5,
+      "describe": {
+        "attributes": [
+          "STAGE_HIGHEST_RECORDED",
+          "GENDER",
+          "SMOKING_PREDICTIONS_3_CLASSES",
+          "CURRENT_AGE_DEID"
+        ],
+        "genes": [
+          "KEAP1",
+          "TP53",
+          "ZFHX3"
+        ]
+      }
+    }
+  ]
+}
+```
+
+### Example 80: A lung cancer risk model, validated on another study
+
+Fitted on the 1,440 non-small cell lung cancer patients of MSK-IMPACT 2017 (ten runs; KEAP1, STK11 and TP53 adverse, EGFR favourable), scored on the 7,809 of MSK-CHORD. The C-index holds at 0.607 (95% CI 0.597–0.616) against 0.613 held out in training, and the training thresholds still separate the new cohort: median survival 66 months in the low-risk group against 33 and 21 months (HR 1.63 and 2.12, log-rank p ≈ 1e-72). Both studies are from MSK, so some patients may be in both under different identifiers; a study from another centre would be the stronger test.
+
+```json
+{
+  "study": "msk_impact_2017",
+  "cohorts": {
+    "NSCLC (MSK-IMPACT 2017)": {
+      "studies": [
+        "msk_impact_2017"
+      ],
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        }
+      ]
+    },
+    "NSCLC (MSK-CHORD)": {
+      "studies": [
+        "msk_chord_2024"
+      ],
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "riskmodel",
+      "cohorts": [
+        "NSCLC (MSK-IMPACT 2017)"
+      ],
+      "runs": 10,
+      "validateOn": "NSCLC (MSK-CHORD)"
+    }
+  ]
+}
+```
+
+### Example 81: PSA response to hormone therapy, by TP53 status
+
+Prostate cancer in MSK-CHORD, from the first hormone therapy. PSA falls by a median of more than 95% within three months in both groups, but 93.0% of TP53 wild-type patients reach PSA50 against 85.8% of TP53-mutant ones (Fisher p = 1.4e-6), and the mutant group's upper quartile turns back upward within a year.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Prostate, TP53 mutant": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Prostate Cancer"
+          ]
+        },
+        {
+          "kind": "oql",
+          "q": "TP53: MUT"
+        }
+      ]
+    },
+    "Prostate, TP53 wild-type": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Prostate Cancer"
+          ]
+        },
+        {
+          "not": {
+            "kind": "oql",
+            "q": "TP53"
+          }
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "labs",
+      "cohorts": [
+        "Prostate, TP53 mutant",
+        "Prostate, TP53 wild-type"
+      ],
+      "test": "PSA",
+      "anchor": {
+        "eventType": "Treatment",
+        "key": "SUBTYPE",
+        "value": "Hormone"
+      }
+    }
+  ]
+}
+```
+
+### Example 82: Cancer types summary: RAS genes across 50,000 tumours
+
+KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.
+
+```json
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "all patients": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "cancertypes",
+      "cohorts": [
+        "all patients"
+      ],
+      "genes": [
+        "KRAS",
+        "NRAS",
+        "HRAS"
+      ],
+      "minSamples": 200
+    }
+  ]
+}
+```
+
+### Example 83: Cohort overlap: how four groups share their patients
+
+TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "TP53 mutant": {
+      "all": [
+        {
+          "kind": "oql",
+          "q": "TP53: MUT"
+        }
+      ]
+    },
+    "KRAS mutant": {
+      "all": [
+        {
+          "kind": "oql",
+          "q": "KRAS: MUT"
+        }
+      ]
+    },
+    "Immunotherapy": {
+      "all": [
+        {
+          "kind": "event",
+          "a": {
+            "eventType": "Treatment",
+            "attrs": [
+              {
+                "key": "SUBTYPE",
+                "value": "Immuno"
+              }
+            ]
+          },
+          "rel": {
+            "type": "NONE"
+          }
+        }
+      ]
+    },
+    "NSCLC": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "overlap",
+      "cohorts": [
+        "TP53 mutant",
+        "KRAS mutant",
+        "Immunotherapy",
+        "NSCLC"
+      ]
+    }
+  ]
+}
+```
+
+### Example 84: Alteration enrichment: what separates colorectal from pancreatic tumours
+
+Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TCF7L2, PIK3CA, FBXW7 and SOX9 mark colorectal cancer; KRAS and CDKN2A mark pancreatic cancer.
+
+```json
+{
+  "study": "msk_chord_2024",
+  "cohorts": {
+    "Colorectal, MSS": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Colorectal Cancer"
+          ]
+        },
+        {
+          "not": {
+            "kind": "clinical",
+            "attribute": "MSI_TYPE",
+            "values": [
+              "Instable"
+            ]
+          }
+        }
+      ]
+    },
+    "Pancreatic, MSS": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Pancreatic Cancer"
+          ]
+        },
+        {
+          "not": {
+            "kind": "clinical",
+            "attribute": "MSI_TYPE",
+            "values": [
+              "Instable"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "enrichment",
+      "cohorts": [
+        "Colorectal, MSS",
+        "Pancreatic, MSS"
+      ]
+    }
+  ]
+}
+```
+
+### Example 85: Mutational signatures: what UV light and tobacco leave behind
+
+Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.
+
+```json
+{
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+    "Melanoma": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Melanoma"
+          ]
+        }
+      ]
+    },
+    "Non-small cell lung": {
+      "all": [
+        {
+          "kind": "clinical",
+          "attribute": "CANCER_TYPE",
+          "values": [
+            "Non-Small Cell Lung Cancer"
+          ]
+        }
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "assays",
+      "cohorts": [
+        "Melanoma",
+        "Non-small cell lung"
+      ],
+      "profileType": "mutational_signatures_contribution_v2"
+    }
+  ]
+}
+```
+
+### Example 86: Composition: T and NK cell states by mutational signature (MSK SPECTRUM)
 
 The 36 SPECTRUM patients with a consensus signature other than Undetermined, split as the paper splits them. Dysfunctional CXCL13+ CD8 T cells are a mean 7.0% of T/NK cells in the 16 HRD-Dup patients against 4.9% in HRD-Del and 4.4% in FBI, and naive CD4 cells the reverse (15.2% against 19.6% and 20.1%) — the direction of the paper's Fig. 4b. The clearest single difference is cycling T/NK cells, higher in HRD-Dup (8.6% against 5.7%; Welch p = 0.003, q = 0.08 across the 30 comparisons); none reaches q < 0.05 at this size, which the matrix shows as no outlined dot. Per sample, from the study's cell-type fractions, T cells are 24% of HRD-Dup samples' cells against 32% of FBI's. The paper fits a binomial model on cell counts with site and sort as covariates; this view compares shares between groups and says so.
 
@@ -5215,7 +5418,7 @@ Runs on custom data: `spectrum-sc-composition` (SPECTRUM scRNA: cell-type compos
 }
 ```
 
-### Example 83: Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)
+### Example 87: Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)
 
 crc_hta11_htan_2021 is 52 patients with colorectal polyps (Chen et al., Cell 2021). The summary covers 55 of its 61 samples; its counts equal the study's own absolute_counts profile for all 670 sample and cell-type pairs it reports. Per sample, adenoma-specific cells (ASC) are 32.1% of the epithelium in the 30 conventional adenomas against 4.1% in the 20 serrated polyps (q = 2e-5), and serrated-specific cells (SSC) 1.5% against 19.7% (q = 0.003): the two paths to malignancy the paper describes. Stem cells (STM) differ little here (3.1% against 2.5%). The study's own fractions, over every cell type, give the same picture (ASC 29.9% against 3.7%). Cohorts are patients, so a patient with polyps of both types counts in both; 5 of the 52 have both.
 
@@ -5282,113 +5485,15 @@ Runs on custom data: `hta11-sc-p` (HTAN Vanderbilt colorectal polyp scRNA-seq (C
 }
 ```
 
-### Example 84: Cancer types summary: RAS genes across 50,000 tumours
+### Example 88: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
 
-KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.
-
-```json
-{
-  "study": "msk_impact_50k_2026",
-  "cohorts": {
-    "all patients": {
-      "all": []
-    }
-  },
-  "views": [
-    {
-      "kind": "cancertypes",
-      "cohorts": [
-        "all patients"
-      ],
-      "genes": [
-        "KRAS",
-        "NRAS",
-        "HRAS"
-      ],
-      "minSamples": 200
-    }
-  ]
-}
-```
-
-### Example 85: Cohort overlap: how four groups share their patients
-
-TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.
+MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.
 
 ```json
 {
   "study": "msk_chord_2024",
   "cohorts": {
-    "TP53 mutant": {
-      "all": [
-        {
-          "kind": "oql",
-          "q": "TP53: MUT"
-        }
-      ]
-    },
-    "KRAS mutant": {
-      "all": [
-        {
-          "kind": "oql",
-          "q": "KRAS: MUT"
-        }
-      ]
-    },
-    "Immunotherapy": {
-      "all": [
-        {
-          "kind": "event",
-          "a": {
-            "eventType": "Treatment",
-            "attrs": [
-              {
-                "key": "SUBTYPE",
-                "value": "Immuno"
-              }
-            ]
-          },
-          "rel": {
-            "type": "NONE"
-          }
-        }
-      ]
-    },
-    "NSCLC": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "overlap",
-      "cohorts": [
-        "TP53 mutant",
-        "KRAS mutant",
-        "Immunotherapy",
-        "NSCLC"
-      ]
-    }
-  ]
-}
-```
-
-### Example 86: Alteration enrichment: what separates colorectal from pancreatic tumours
-
-Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TCF7L2, PIK3CA, FBXW7 and SOX9 mark colorectal cancer; KRAS and CDKN2A mark pancreatic cancer.
-
-```json
-{
-  "study": "msk_chord_2024",
-  "cohorts": {
-    "Colorectal, MSS": {
+    "Colorectal": {
       "all": [
         {
           "kind": "clinical",
@@ -5396,115 +5501,37 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
           "values": [
             "Colorectal Cancer"
           ]
-        },
-        {
-          "not": {
-            "kind": "clinical",
-            "attribute": "MSI_TYPE",
-            "values": [
-              "Instable"
-            ]
-          }
-        }
-      ]
-    },
-    "Pancreatic, MSS": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Pancreatic Cancer"
-          ]
-        },
-        {
-          "not": {
-            "kind": "clinical",
-            "attribute": "MSI_TYPE",
-            "values": [
-              "Instable"
-            ]
-          }
         }
       ]
     }
   },
   "views": [
     {
-      "kind": "enrichment",
+      "kind": "mutations",
       "cohorts": [
-        "Colorectal, MSS",
-        "Pancreatic, MSS"
-      ]
-    }
-  ]
-}
-```
-
-### Example 87: Mutational signatures: what UV light and tobacco leave behind
-
-Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.
-
-```json
-{
-  "study": "msk_impact_50k_2026",
-  "cohorts": {
-    "Melanoma": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Melanoma"
-          ]
-        }
-      ]
-    },
-    "Non-small cell lung": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Non-Small Cell Lung Cancer"
-          ]
-        }
-      ]
-    }
-  },
-  "views": [
-    {
-      "kind": "assays",
-      "cohorts": [
-        "Melanoma",
-        "Non-small cell lung"
+        "Colorectal"
       ],
-      "profileType": "mutational_signatures_contribution_v2"
-    }
-  ]
-}
-```
-
-### Example 88: Co-expression: the genes that rise and fall with ESR1
-
-TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.
-
-```json
-{
-  "study": "brca_tcga_pan_can_atlas_2018",
-  "cohorts": {
-    "all patients": {
-      "all": []
-    }
-  },
-  "views": [
-    {
-      "kind": "correlates",
-      "cohorts": [
-        "all patients"
+      "gene": "KRAS",
+      "columns": [
+        "sample",
+        "proteinChange",
+        "annotation",
+        "vaf",
+        "mutCount"
       ],
-      "gene": "ESR1",
-      "profileType": "rna_seq_v2_mrna"
+      "filters": {
+        "proteinChange": {
+          "op": "regex",
+          "value": "^G1[23]"
+        },
+        "vaf": {
+          "min": 0.2
+        }
+      },
+      "sort": {
+        "column": "vaf",
+        "desc": true
+      }
     }
   ]
 }
@@ -5645,53 +5672,26 @@ MSK-CHORD prostate cancer patients, those with the most structural variants firs
 }
 ```
 
-### Example 92: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
+### Example 92: Co-expression: the genes that rise and fall with ESR1
 
-MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.
+TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.
 
 ```json
 {
-  "study": "msk_chord_2024",
+  "study": "brca_tcga_pan_can_atlas_2018",
   "cohorts": {
-    "Colorectal": {
-      "all": [
-        {
-          "kind": "clinical",
-          "attribute": "CANCER_TYPE",
-          "values": [
-            "Colorectal Cancer"
-          ]
-        }
-      ]
+    "all patients": {
+      "all": []
     }
   },
   "views": [
     {
-      "kind": "mutations",
+      "kind": "correlates",
       "cohorts": [
-        "Colorectal"
+        "all patients"
       ],
-      "gene": "KRAS",
-      "columns": [
-        "sample",
-        "proteinChange",
-        "annotation",
-        "vaf",
-        "mutCount"
-      ],
-      "filters": {
-        "proteinChange": {
-          "op": "regex",
-          "value": "^G1[23]"
-        },
-        "vaf": {
-          "min": 0.2
-        }
-      },
-      "sort": {
-        "column": "vaf",
-        "desc": true
-      }
+      "gene": "ESR1",
+      "profileType": "rna_seq_v2_mrna"
     }
   ]
 }

@@ -28,7 +28,8 @@ for the area you are changing first. The parts most changes touch:
   evaluates them and hands each view to its runner.
 - **View kinds** — a folder `lib/views/<kind>/` plus `app/lab/kinds/<kind>.tsx`, and one line in
   each registry: `lib/views/index.ts` (runners), `lib/views/kinds.ts` (descriptors),
-  `app/lab/kinds/index.ts` (page files). **Kinds never import each other** (`local/kind-boundary`).
+  `lib/views/docs.ts` (its DSL reference, from its `doc.ts`), `app/lab/kinds/index.ts` (page files).
+  **Everything a kind adds lives in its folder** — its reference text and examples included. **Kinds never import each other** (`local/kind-boundary`).
   A kind's queries go through `viewAggregate`/`viewMeta` (`lib/federation-views.ts`) or its own
   `sql.ts`; **don't add a method per view to the resolver interfaces in `lib/federation.ts`**.
 - **Table views** supply a `RowSource`; `lib/table-query.ts` does the rest. Never build these per view.
@@ -57,8 +58,8 @@ this project is "fast"), [`ENVIRONMENT.md`](docs/ENVIRONMENT.md) (settings),
 3. **Compilers are single-study; federation happens at the analysis layer** with study-qualified
    ids. Cross-study overlap is deliberately NOT deduplicated, vocabularies NOT harmonized — and
    views and captions must say so.
-4. **Docs are generated.** Never hand-edit `docs/dsl.md`: change `lib/dsl-reference.ts`, run
-   `npm run docs:gen`, commit both. The same module feeds the Examples tab, MCP `describe_dsl` and
+4. **Docs are generated.** Never hand-edit `docs/dsl.md`: change `lib/dsl-reference.ts` (or the
+   kind's `lib/views/<kind>/doc.ts`), run `npm run docs:gen`, commit both. The same module feeds the Examples tab, MCP `describe_dsl` and
    the agent grammar. Every example runs in the gate and its cohort counts are pinned
    (`npm run docs:counts` re-pins after an intentional change — [`TESTING.md`](docs/TESTING.md)).
 5. **SQL injection surface**: user values reach SQL only through `sq()`, and cohort SQL passes
