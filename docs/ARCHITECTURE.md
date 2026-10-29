@@ -415,10 +415,8 @@ and commit both.
   `lib/chat-model.ts`: `CHAT_PROVIDER=anthropic|bedrock`, `CHAT_MODEL`, `CHAT_EFFORT`). **Where it
   runs:** a dev server (`next dev`) with `CHAT_PROVIDER` set; a built deployment only with
   `CHAT_ON_DEPLOYMENT=1`, never on Vercel (no public URL spends the key), and there only for a
-  signed-in user — a deployment that signs nobody in has none. The internal instance
-  (cbiolab.cbioportal.aws.mskcc.org) uses Bedrock with the credentials file the cluster's SAML job
-  refreshes every 3 h; Bedrock reads AWS credentials through the standard chain, re-read on every
-  request, so a refreshed file needs no restart. It must work the app exactly as an outside
+  signed-in user — a deployment that signs nobody in has none (providers and credentials:
+  [`ENVIRONMENT.md`](ENVIRONMENT.md)). It must work the app exactly as an outside
   assistant (Claude in Chrome, Claude Desktop) does: each request sends the tools the page exposes
   (`window.cohortLab.tools`), the route declares them **without implementations**, and every call
   runs in the browser through `window.cohortLab.call`. **Never give it a private way in** — no
@@ -447,3 +445,61 @@ and commit both.
   salt pinned by `test/cohort.test.ts` — changing it reshuffles every reported result.
   **A locked campaign is immutable at the database level** (triggers); never work around them in
   application code.
+- **The result cache** (`lib/next-cache.ts`; Next 16 Cache Components, `'use cache: remote'`) —
+  CLAUDE.md invariant 11. On Vercel it is Runtime Cache, shared by every function instance;
+  elsewhere it is process memory. Analyses, oncoprint contracts, Explore, the study catalog and the
+  study list all go through it, from the web routes, `/api/mcp` and chat alike.
+  - **A deploy clears it** (Next keys every entry by deployment), a data import or OncoKB release
+    does too (`dataVersion()` is an argument of every cached function), and entries regenerate
+    after a day.
+  - **Only a returned value is stored.** A refusal, a partial answer (an instance that did not
+    reply) or an abandoned query must THROW, or it is served to everyone for a day.
+  - **Read through `throughCache(cached, direct)`.** A production build replaces the message of
+    anything thrown inside a cached function, so when the cached call throws the direct one runs
+    and reports the real error. It also covers a cache that cannot be read.
+  - **An administrator clears it, and changes federation settings, at `/admin`** (the users in
+    `ADMIN_EMAILS`; account menu → Admin). `lib/settings.ts`: an `app_setting` row overrides the
+    environment variable of the same name for every process within seconds; federation code reads
+    those settings through `setting(name)`, never `process.env`. `cacheVersion()` (data version plus
+    the settings' fingerprint, which includes the last clear) is every cached entry's key argument —
+    cohort locks keep `dataVersion()` alone. Database addresses and credentials are never editable.
+  - **`RESULT_CACHE=off` turns it off.** `throughCache` then runs the direct call on every request,
+    so a server answers everything cold — for measuring what a first reader waits for. Without a
+    cache handler configured (anywhere but Vercel), the cache is the Node process's own LRU
+    (`cacheMaxMemorySize`, 50 MB unless `RESULT_CACHE_MB` says otherwise): lost on restart, and not
+    shared between replicas.
+  - **Arguments are the key.** A cached function takes only serializable arguments and computes
+    everything else itself; a function passed in cannot be called. Anything that changes the
+    answer must be an argument.
+  - Entries are gzipped JSON as base64 text (`pack`): Runtime Cache refuses items over 2 MB, and
+    has handed typed arrays back corrupted.
+  - `next/cache` exists only under Next, so the stdio MCP server, CLI and tests run the engine
+    uncached; `registerTools` takes the engine to use.
+- **Method records** (`lib/method.ts`) — CLAUDE.md invariant 12. A view's result carries each step
+  from its queries' rows to its numbers, built from the values that computation used, plus a Python
+  script that recomputes the numbers with standard libraries; `check:methods` re-runs them
+  ([`docs/TESTING.md`](TESTING.md)). Numbers and settings in a record's text come from variables or
+  named constants, never typed in. **A record's script is also a notebook**: the panel's "download
+  as notebook" posts the document to `POST /api/analysis/notebook`, which re-runs it, rebuilds the
+  files the script reads from the view's own recorded queries (`lib/method-data.ts` — the same code
+  `check:methods` runs, so the export is what was checked; no SQL is ever accepted from a caller)
+  and assembles the `.ipynb` (`lib/method-notebook.ts`). A view with rows from a federated peer is
+  refused (403) and the notebook is capped at `NOTEBOOK_MAX_BYTES` (413). A new view kind whose
+  script reads a file needs its rebuild in `methodFiles`, or the notebook says the file is missing.
+- **Every build knows its commit.** `next.config.mjs` stamps it as `GIT_COMMIT`: Vercel's
+  `VERCEL_GIT_COMMIT_SHA`, else a `GIT_COMMIT` passed in (the Docker image takes it as a build
+  argument — `.git` is not in its context — and CI passes `github.sha`), else `git rev-parse HEAD`
+  with `+dirty` for a changed tree; `next dev` says `dev`. `lib/build-info.ts` reads it; every page's
+  footer shows it, linked to the commit, and `GET /api/version` returns it. A build that could find
+  no commit (a hand-run `docker build` without `--build-arg GIT_COMMIT=…`) reads "unknown", never
+  blank.
+- **Cohorts on the analysis page** — the page shows the document's cohort store as a summary
+  ("Cohorts in this analysis": size, studies, which views draw each). Since DSL 2.5 a view without
+  a `cohorts` list is empty and the page shows it waiting for one; cohorts come in through a view's
+  "+ Add cohort" (`app/lab/add-cohort-dialog.tsx`: the analysis's own, the library, or Explore in
+  add mode, which returns the selection to that view).
+- **Provenance** (`lib/provenance.ts`) — every result lists its `sources`: each database and
+  federation peer, with what a peer reports about itself in every answer (name, build, each study's
+  import date), and each view's participation points into that list. The document panel shows each
+  cohort's compiled SQL, and every view shows the aggregate queries that produced its numbers
+  (resolvers log what they run; a peer returns its own log, marked as having executed there).

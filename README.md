@@ -13,7 +13,7 @@ Users define cohorts by relationships between events — "progression within 180
   OQL, and the timeline sub-DSL's BEFORE/DURING/NOT_FOLLOWED_BY relations, guards and treatment lines)
 - `lib/ch.ts` — server-side ClickHouse HTTP client; credentials come from env and never reach the client
 
-The full map, with the invariants, is in [`CLAUDE.md`](CLAUDE.md).
+The full map is [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the invariants are in [`CLAUDE.md`](CLAUDE.md).
 
 ## The DSL
 

@@ -168,7 +168,7 @@ export function survivalAxis(curves: { points: { t: number }[] }[], opts?: { cut
 // Multivariate Cox proportional-hazards regression (Efron partial likelihood).
 //
 // Unlike KM/log-rank, this takes one row per SUBJECT rather than per-site
-// counts — see cohort-lab's CLAUDE.md and the PR notes for why that's fine
+// counts — see docs/DATA-BOUNDARY.md for why that's fine
 // here: it never leaves the resolver that already holds those rows, and
 // federating it across untrusted remote peers isn't a goal. Ties are handled
 // with Efron's approximation (the modern default — R's coxph, lifelines),
