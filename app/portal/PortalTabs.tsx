@@ -1,12 +1,13 @@
 "use client";
 // A cBioPortal-style page over ONE analysis document (app/portal/page-doc.ts): tabs (and a tab's
-// sub-tabs) list the indices of the views they show; opening a tab sends that slice —
-// {study, the cohorts its views use, views: the tab's} (tabSlice) — as an ordinary analysis request, kept until one of its views
+// sub-tabs) list the indices of the views they show; opening a tab sends each of its views as its
+// own slice — {study, the cohorts the view uses, views: [it]} (tabSlice) — an ordinary analysis
+// request each, side by side, so a quick view is drawn without waiting for a slow one beside it, kept until one of its views
 // changes. A setting changed here is an edit to the document (onDoc), which the page writes to the
 // URL; the oncoprint's display and sort are applied in the browser and never re-run anything.
 import { ViewFigure } from "../lab/figure.tsx";
 import { useEffect, useRef, useState } from "react";
-import type { AnalysisDoc, AnalysisResult, View } from "../../lib/types";
+import type { AnalysisDoc, AnalysisResult, View, ViewResult } from "../../lib/types";
 import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
 import { KindCardBody, KindCardControls, hasKindCard, drawsOwnWaiting, figureView } from "../lab/kind-cards";
 import { dataPart } from "../_oncoprint/view-display.ts";
@@ -23,7 +24,7 @@ import { cn } from "../../lib/cn";
 type Patch = Record<string, unknown>;
 
 
-type TabState = { sent: string; result?: AnalysisResult; error?: string; loading: boolean };
+type ViewState = { sent: string; result?: ViewResult; error?: string; loading: boolean };
 
 export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, onCounts, catalog, fixedPatient }: {
   doc: AnalysisDoc; tabs: PageTab[]; titles: string[];
@@ -41,7 +42,7 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
   /** the page is about one patient (the Patient page), so its patient views do not step through others */
   fixedPatient?: boolean;
 }) {
-  const [state, setState] = useState<Record<string, TabState>>({});
+  const [state, setState] = useState<Record<string, ViewState>>({});
   const gen = useRef<Record<string, number>>({});
   // which header menus are open, kept outside the cards so a re-render does not close them
   const menus = useRef(new Map<string, boolean>());
@@ -55,25 +56,32 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
   const sub = tab?.sub ? tab.sub.find((x) => x.title === subTitle) || tab.sub[0] : null;
   const key = tab ? (sub ? tab.title + " › " + sub.title : tab.title) : "";
   const idx = (sub ? sub.views : tab?.views) || [];
-  const slice = tabSlice(doc, idx);
-  // what decides a re-run: the slice without what the oncoprint applies in the browser
-  const sent = JSON.stringify({ ...slice, views: (slice.views || []).map((v) => dataPart(v as unknown as Record<string, unknown>)) });
+  // each view's request, by the view's place on the page; what decides a re-run is the request
+  // without what the oncoprint applies in the browser
+  const asked = idx.map((vi) => {
+    const slice = tabSlice(doc, [vi]);
+    return { vi, at: key + " › " + titles[vi], slice,
+      sent: JSON.stringify({ ...slice, views: (slice.views || []).map((v) => dataPart(v as unknown as Record<string, unknown>)) }) };
+  });
+  const sentAll = asked.map((a) => a.sent).join("\n");
 
   useEffect(() => {
-    if (!idx.length || state[key]?.sent === sent) return;
-    const g = (gen.current[key] || 0) + 1;
-    gen.current[key] = g;
-    setState((s) => ({ ...s, [key]: { ...s[key], sent, loading: true, error: undefined } }));
-    // the oncoprint comes back as a spec the interactive figure draws; every other view as a figure
-    api.analysis(slice, { query: "?oncoprint=spec" })
-      .then((r) => r.json())
-      .then((j) => {
-        if (gen.current[key] !== g) return;
-        setState((s) => ({ ...s, [key]: j.error ? { sent, loading: false, error: j.error } : { sent, loading: false, result: j } }));
-        if (!j.error && onCounts) onCounts(Object.fromEntries(Object.entries(j.cohorts || {}).map(([n, c]) => [n, (c as { count: number }).count])));
-      })
-      .catch((e) => { if (gen.current[key] === g) setState((s) => ({ ...s, [key]: { sent, loading: false, error: String(e) } })); });
-  }, [key, sent]);   // eslint-disable-line react-hooks/exhaustive-deps
+    for (const { at, slice, sent } of asked) {
+      if (state[at]?.sent === sent) continue;
+      const g = (gen.current[at] || 0) + 1;
+      gen.current[at] = g;
+      setState((s) => ({ ...s, [at]: { ...s[at], sent, loading: true, error: undefined } }));
+      // the oncoprint comes back as a spec the interactive figure draws; every other view as a figure
+      api.analysis(slice, { query: "?oncoprint=spec" })
+        .then((r) => r.json())
+        .then((j) => {
+          if (gen.current[at] !== g) return;
+          setState((s) => ({ ...s, [at]: j.error ? { sent, loading: false, error: j.error } : { sent, loading: false, result: (j as AnalysisResult).views[0] } }));
+          if (!j.error && onCounts) onCounts(Object.fromEntries(Object.entries(j.cohorts || {}).map(([n, c]) => [n, (c as { count: number }).count])));
+        })
+        .catch((e) => { if (gen.current[at] === g) setState((s) => ({ ...s, [at]: { sent, loading: false, error: String(e) } })); });
+    }
+  }, [key, sentAll]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // an edit to one view; a tab that keeps its views in step (its link) adjusts the others
   const edit = (i: number, next: View) => {
@@ -82,7 +90,6 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
     const mine = link(idx.map((j) => j === i ? next : views[j]), k);
     onDoc({ ...doc, views: views.map((v, j) => { const m = idx.indexOf(j); return m >= 0 ? mine[m] : v; }) });
   };
-  const st = state[key];
   const chooser = tab && !sub ? tab.chooser : undefined;
   const chooseFrom = (o: string) => {
     const next = chooser!.apply(idx.map((i) => views[i]), o);
@@ -136,10 +143,13 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
       {idx.map((vi, i) => {
         const spec = views[vi] as unknown as Record<string, unknown>;
         // a result belongs to the request that produced it; while a newer one runs, the cover says so
-        const v = st?.result?.views[i];
+        const { at, slice, sent } = asked[i];
+        const st = state[at];
+        const v = st?.result;
         // waiting from the render the edit lands in, not only once the effect has sent it
-        const busy = !!st?.loading || (!!st && st.sent !== sent);
-        const mc = { vi: i, spec, v: v || {}, busy, updating: busy, attrs: [], profiles: [], assays: [], events: [], locked: tab?.chooser?.locks || [], fixedPatient,
+        const busy = !st || st.loading || st.sent !== sent;
+        // vi and docJson name the view in the request it came from, which a table pages through
+        const mc = { vi: 0, spec, v: v || {}, busy, updating: busy, attrs: [], profiles: [], assays: [], events: [], locked: tab?.chooser?.locks || [], fixedPatient,
           patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
         const body = v && !v.error && v.kind === "hotspots" && v.hotspots
           ? <HotspotsBody v={v} hide={spec.hide as string[] | undefined} onHide={(h) => edit(vi, { ...spec, hide: h } as unknown as View)} />
@@ -160,7 +170,7 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
             : <ViewFigure v={figureView(spec, v)} />)}
         </>;
         return (
-          <section key={key + " › " + titles[vi]} className={cn("card viewcard", busy && !v && "viewloading")} aria-busy={busy || undefined}>
+          <section key={at} className={cn("card viewcard", busy && !v && "viewloading")} aria-busy={busy || undefined}>
             <ViewHead menuStore={menus.current} v={v && !v.error ? v : { kind: spec.kind }} title={titles[vi]}
               sub={drawn.length ? drawn.join(drawn.length === 2 ? " vs " : ", ") : undefined} />
             {hasKindCard(spec.kind as string) && <KindCardControls c={mc} />}

@@ -112,10 +112,13 @@ const param = (k: string): string | null => { try { return new URLSearchParams(w
  * made to them. A page laid out in two steps (`partial`) keeps the changes for views it does not
  * have yet, and applies them when they arrive; once the whole page is laid out, a change that
  * still names no view of it is reported. `input` is what of the link's ?doc= the page is built from
- * (the comparison page's cohorts), kept in the URL beside the changes.
+ * (the comparison page's cohorts), kept in the URL beside the changes. `layout` is the layout `doc`
+ * was built on: a page draws its tabs from it, never from a newer `fresh` whose views the document
+ * does not hold yet.
  */
 export function usePageDoc(fresh: PageLayout | null, input: AnalysisDoc | null = null) {
   const [doc, setDoc] = useState<AnalysisDoc | null>(null);
+  const [layout, setLayout] = useState<PageLayout | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [open, setOpen] = useState<string>(() => param("tab") || "");
   const [linked] = useState(() => readUrlJson<PageChanges>(param("changes")) || {});
@@ -125,19 +128,20 @@ export function usePageDoc(fresh: PageLayout | null, input: AnalysisDoc | null =
     if (!fresh) return;
     const { views, missed } = applyChanges(fresh.names, fresh.doc.views || [], changes.current);
     setDoc({ ...fresh.doc, views });
+    setLayout(fresh);
     setNote(missed.length && !fresh.partial
       ? "this link's settings for " + missed.join(", ") + " do not apply to this page as it is now, so " + (missed.length === 1 ? "that view shows its" : "those views show their") + " defaults"
       : null);
   }, [freshKey]);   // eslint-disable-line react-hooks/exhaustive-deps
   const update = (d: AnalysisDoc) => {
     setDoc(d);
-    if (!fresh) return;
+    if (!layout) return;
     // changes for views the page has not laid out yet are kept until it has
-    const waiting = fresh.partial ? Object.fromEntries(Object.entries(changes.current).filter(([n]) => !fresh.names.includes(n))) : {};
-    const c = { ...waiting, ...pageChanges(fresh.names, fresh.doc.views || [], d.views || []) };
+    const waiting = layout.partial ? Object.fromEntries(Object.entries(changes.current).filter(([n]) => !layout.names.includes(n))) : {};
+    const c = { ...waiting, ...pageChanges(layout.names, layout.doc.views || [], d.views || []) };
     changes.current = c;
     syncUrl({ changes: Object.keys(c).length ? encodeUrlJson(c) : null, doc: input ? encodeDoc(input) : null });
   };
   const openTab = (k: string) => { setOpen(k); syncUrl({ tab: k }); };
-  return { doc, note, open, update, openTab };
+  return { doc, layout, note, open, update, openTab };
 }

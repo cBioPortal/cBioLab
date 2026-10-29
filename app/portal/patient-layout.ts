@@ -14,6 +14,8 @@ export interface PatientData {
   profileCatalog: ProfileInfo[];
   /** the genomic data types the study holds */
   held: ("MUTATION" | "CNA" | "SV")[];
+  /** the profiles are not known yet: the Mutational Signatures tab, which they decide, follows */
+  partial?: boolean;
 }
 
 export const PATIENT_COHORT = "Patient";
@@ -53,5 +55,5 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
     ...(signatures ? [{ title: "Mutational Signatures", views: [], pending: "The patient's samples' signature contributions from " + signatures.profile + ", as the portal's Mutational Signatures tab draws them: a bar per signature, and the 96-channel spectrum." }] : []),
     { title: "Files & Links", views: [], pending: "Links out for the patient and each sample: the study's resource data (pathology reports, slide images) as the portal's Files & Links tab lists them." },
     { title: "Clinical Trials", views: [], pending: "Trials the patient's OncoKB-annotated alterations and cancer type match, as the portal's Clinical Trials tab lists them." },
-  ], left);
+  ], left, { partial: data.partial });
 }

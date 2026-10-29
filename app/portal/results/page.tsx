@@ -79,7 +79,7 @@ export default function ResultsPage() {
   if (tooMany) return flow(tooMany);
   if (genes.length > RESULTS_MAX_GENES) return shell(<p className="note">a results page takes at most {RESULTS_MAX_GENES} genes, the oncoprint&apos;s rows; this asks for {genes.length}</p>);
   if (error) return shell(<div className="error">{error}</div>);
-  const ready = !!(fresh && page.doc);
+  const ready = !!(page.layout && page.doc);
   const ids = studies.length <= IDS_SHOWN ? studies.join(", ") : studies.slice(0, IDS_SHOWN).join(", ") + " +" + (studies.length - IDS_SHOWN) + " more";
   // as cBioPortal does: no expression profiles to draw across studies its rule does not allow
   const profiles = known ? known.profiles.filter((p) => across || !isExpressionProfile(p)) : [];
@@ -115,7 +115,7 @@ export default function ResultsPage() {
     {page.note && <p className="note">{page.note}</p>}
     {!ready
       ? <PortalLoading />
-      : <PortalTabs doc={page.doc!} tabs={fresh!.tabs} titles={fresh!.titles} partial={fresh!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
+      : <PortalTabs doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
           catalog={{ attrs: known?.attrs || [], profiles, profileCatalog, loading: !known }} />}
   </>);
 }
