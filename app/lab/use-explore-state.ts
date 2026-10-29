@@ -617,6 +617,13 @@ export function useExploreState(page: ExplorePage) {
   const setExploreStudies = (ids: string[]) => {
     exSel.current = ids;
     setExStudies(ids);
+    // the URL's ?study= follows the selection, so a refresh or a copied link opens on it (page.tsx
+    // reads it); Explore opened for one cohort is that cohort's, not the page's, and leaves it be
+    if (!addMode) try {
+      const q = new URLSearchParams(location.search);
+      if (ids.length) q.set("study", ids.join(",")); else q.delete("study");
+      history.replaceState(history.state, "", "?" + q.toString());
+    } catch { /* URL state is a convenience, never a failure */ }
     if (ids.length) setStudy(ids[0]); // doc-level default for study-less defs (examples, hand edits)
     let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
     if (!d || !Array.isArray(d.all)) d = { all: [] };
