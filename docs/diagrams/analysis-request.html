@@ -1,0 +1,96 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  body { margin: 0; background: #fff; font: 14px/1.35 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: #1f2328; }
+  .wrap { width: 1180px; padding: 28px 32px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lede { color: #59636e; margin: 0 0 20px; }
+  .lane { border-radius: 12px; padding: 14px 16px 16px; margin-bottom: 0; position: relative; }
+  .lane h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 10px; }
+  .b { background: #eef4ff; border: 1px solid #c4d7f5; } .b h2 { color: #2a5bb5; }
+  .s { background: #f3f0ff; border: 1px solid #d5cdf5; } .s h2 { color: #5b3fc4; }
+  .step { display: grid; grid-template-columns: 34px 1fr 300px; gap: 12px; align-items: start;
+          background: #fff; border: 1px solid #d8dee4; border-radius: 9px; padding: 10px 12px; margin-top: 8px; }
+  .n { width: 26px; height: 26px; border-radius: 50%; background: #1f2328; color: #fff; font-weight: 700;
+       display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .t { font-weight: 650; margin-bottom: 4px; }
+  code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: #f6f8fa; border-radius: 4px; padding: 1px 4px; }
+  .rows div { margin: 2px 0; }
+  .rows .sub { padding-left: 18px; color: #3d444d; }
+  .note { font-size: 13px; border-radius: 7px; padding: 8px 10px; }
+  .sql { background: #fff4e5; border: 1px solid #f0c98a; }
+  .jsx { background: #e9f8ee; border: 1px solid #9fd8b0; }
+  .fig { background: #fdeef3; border: 1px solid #f0b3c8; }
+  .plain { background: #f6f8fa; border: 1px solid #d8dee4; color: #3d444d; }
+  .arrow { text-align: center; color: #59636e; font-size: 12.5px; margin: 6px 0; }
+  .arrow b { font-size: 18px; display: block; line-height: 1; color: #8c959f; }
+  .onc { margin-top: 6px; font-size: 13px; color: #3d444d; border-left: 3px solid #8c959f; padding-left: 8px; }
+</style></head><body><div class="wrap">
+<h1>How an analysis request is processed</h1>
+<p class="lede">From an edit on the analysis page to a figure in a card. The oncoprint follows the same path, apart from the grey notes.</p>
+
+<div class="lane b"><h2>Browser</h2>
+  <div class="step"><div class="n">1</div>
+    <div class="rows">
+      <div class="t">The page sends the document</div>
+      <div><code>app/lab/page.tsx</code> → hooks → <code>doc-store.ts</code> changes the document</div>
+      <div><code>use-analysis.ts</code> (React Query) → <code>api.ts</code> → <code>POST /api/analysis?oncoprint=spec</code></div>
+    </div>
+    <div class="note plain">Only the document JSON is sent. Clients never send SQL.</div>
+  </div>
+</div>
+<div class="arrow"><b>↓</b>document JSON</div>
+
+<div class="lane s"><h2>Server</h2>
+  <div class="step"><div class="n">2</div>
+    <div class="rows">
+      <div class="t">The route</div>
+      <div><code>app/api/analysis/route.ts</code>: <code>parseBody</code> (<code>lib/api-schemas.ts</code>) → <code>withRequestCustomData</code></div>
+      <div><code>cachedAnalysis</code> (<code>lib/next-cache.ts</code>): a cached result, or run the engine</div>
+    </div>
+    <div class="note plain">Uploads and stored id sets are attached here.</div>
+  </div>
+
+  <div class="step"><div class="n">3</div>
+    <div class="rows">
+      <div class="t">The engine: <code>runAnalysis(doc)</code> in <code>lib/analysis.ts</code></div>
+      <div>upgrade the doc, fill in params, expand splits</div>
+      <div><b>for each cohort × study:</b></div>
+      <div class="sub"><code>resolverFor(study)</code> (<code>lib/federation.ts</code>)</div>
+      <div class="sub"><code>res.cohortSql(def)</code> → <code>compileCohortDef</code> (<code>lib/cohort2.ts</code>; <code>oql.ts</code>, <code>compiler.ts</code>)</div>
+      <div class="sub">count it in ClickHouse (<code>lib/ch.ts</code>)</div>
+      <div><b>for each view:</b> <code>viewRunner(kind)</code> (<code>lib/views/index.ts</code>) → <code>lib/views/&lt;kind&gt;/run.ts</code></div>
+    </div>
+    <div class="note sql"><b>SQL, layer 1:</b> a cohort definition is compiled to SQL here, once per study.</div>
+  </div>
+
+  <div class="step"><div class="n">4</div>
+    <div class="rows">
+      <div class="t">The view's runner: <code>lib/views/&lt;kind&gt;/run.ts</code></div>
+      <div>asks the resolver for numbers, e.g. <code>res.geneCounts(cohort, genes)</code></div>
+      <div class="sub">the view's query wraps the cohort SQL as a subquery, then runs on ClickHouse (a peer instance gets an HTTP call instead)</div>
+      <div>computes the statistics and its method record (<code>method.ts</code>)</div>
+      <div>returns a <b>ViewResult</b>: plain JSON numbers, with no JSX and no SVG</div>
+      <div class="onc">Oncoprint: <code>lib/oncoprint.ts</code> fetches rows → <code>oncoprint-assemble.ts</code> (pure) → the "contract" JSON</div>
+    </div>
+    <div class="note sql"><b>SQL, layer 2:</b> the view's aggregate query, built in the kind's <code>sql.ts</code>, or in <code>lib/federation.ts</code> / <code>federation-views.ts</code>.</div>
+  </div>
+</div>
+<div class="arrow"><b>↓</b>result JSON: numbers, method, queries, provenance</div>
+
+<div class="lane b"><h2>Browser</h2>
+  <div class="step"><div class="n">5</div>
+    <div class="rows">
+      <div class="t">Cards and figures</div>
+      <div><code>app/lab/view-cards.tsx</code>: one card per view, chosen by <code>kindUi(kind)</code> → <code>app/lab/kinds/&lt;kind&gt;.tsx</code></div>
+      <div class="sub">shared card (<code>kind-cards.tsx</code>): header + the kind's Controls + <code>&lt;ViewFigure&gt;</code></div>
+      <div class="sub"><code>&lt;ViewFigure&gt;</code> (<code>app/lab/figure.tsx</code>) → <code>viewToSvg(result)</code> (<code>lib/view-svg.ts</code>)</div>
+      <div class="sub">→ <code>lib/views/&lt;kind&gt;/figure.ts</code> returns an <b>SVG string</b> (laid out with <code>lib/chart/</code>) → placed in the card at its width</div>
+      <div class="onc">Oncoprint: its own Card → <code>app/_oncoprint/OncoprintCard.tsx</code> → <code>OncoprintFigure</code> draws the contract on a canvas</div>
+    </div>
+    <div>
+      <div class="note jsx"><b>JSX</b> lives only in <code>app/lab/</code>: the cards, plus each kind's <code>kinds/&lt;kind&gt;.tsx</code>.</div>
+      <div class="note fig" style="margin-top:8px"><b>Figures</b> are pure functions from result JSON to SVG. MCP calls the same <code>figure.ts</code> on the server (<code>?figures=svg</code>).</div>
+    </div>
+  </div>
+</div>
+</div></body></html>

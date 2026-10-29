@@ -91,57 +91,8 @@ optional, additive experiment on top — the load-bearing path never depends on 
 Every surface reads and writes the same document; the engine owns all semantics; data access is
 read-only with the licensed annotation store isolated behind its own database grant; and the
 DSL's documentation, agent grammar, and MCP self-description all render from one source module.
-
-```mermaid
-flowchart TB
-    subgraph SURFACES["Surfaces — all speak the same document"]
-        UI["Web UI<br/>Explore · Cohorts · Analysis"]
-        CHAT["Browser assistant (WebMCP)<br/>the page's tools: read · edit · undo"]
-        MCP["MCP clients<br/>run_analysis · render_oncoprint · describe_dsl"]
-    end
-
-    DOC[["<b>Analysis document</b> (JSON)<br/>{ study, cohorts: {name: def}, views: [...] }<br/>shareable / re-runnable as ?doc= links"]]
-
-    UI <--> DOC
-    CHAT <--> DOC
-    MCP <--> DOC
-
-    subgraph ENGINE["Server engine — clients never send SQL"]
-        RA["runAnalysis — lib/analysis.ts<br/>per-study evaluation · federation by SUMMING aggregates<br/>(ids cross an instance boundary only for the oncoprint's own columns; no dedup, labeled)"]
-        COMP["Cohort compilers<br/>lib/cohort2.ts · lib/oql.ts · lib/compiler.ts<br/><i>loud rejection of anything unanswerable</i>"]
-        VIEWS["Views<br/>compare (Fisher, panel-aware denominators)<br/>survival (KM + left-truncation caveat)<br/>oncoprint"]
-        CONTRACT["Render contract — lib/oncoprint.ts<br/>bitmask cells · NOT_PROFILED first-class<br/>declarative sort · clinical + heatmap tracks"]
-    end
-
-    DOC --> RA
-    RA --> COMP
-    RA --> VIEWS
-    VIEWS --> CONTRACT
-
-    subgraph DATA["Data — read-only"]
-        CH[("ClickHouse<br/>cBioPortal derived tables<br/>542 studies")]
-        OKB[("oncokb_annotation<br/>separate DB · version-pinned<br/>license = GRANT boundary")]
-    end
-    COMP -- "compiled SQL" --> CH
-    COMP -- "DRIVER joins the pin" --> OKB
-
-    subgraph OUT["Outputs — renderers hold zero data logic"]
-        SVG["server SVG → PNG<br/>(any chat client)"]
-        CANVAS["browser canvas<br/>(interactive web app)"]
-        APP["MCP App iframe<br/>(optional enhancement)"]
-        PROV["Provenance<br/>readback + compiled SQL + live editor link"]
-    end
-    CONTRACT --> SVG
-    CONTRACT --> CANVAS
-    CONTRACT --> APP
-    RA --> PROV
-    PROV -. "one click back to" .-> UI
-
-    REF["lib/dsl-reference.ts<br/><b>single source of DSL truth</b>"]
-    REF -- "generates docs/dsl.md<br/>(examples CI-executed)" --> DOCS["docs/dsl.md"]
-    REF -- "grammar" --> CHAT
-    REF -- "describe_dsl" --> MCP
-```
+The diagrams of how the parts fit, and the map of the code behind them, are in
+[`docs/ARCHITECTURE.md`](https://github.com/cBioPortal/cBioLab/blob/master/docs/ARCHITECTURE.md).
 
 ## Methodological honesty, with concrete examples
 

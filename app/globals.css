@@ -883,16 +883,6 @@ main.analysis-main { max-width: min(132rem, 100%); }
   margin: 0 0 0.9rem; padding-left: 0.9rem; border-left: 3px solid var(--line); color: var(--muted);
 }
 
-.mermaid-diagram {
-  overflow-x: auto; margin: 1rem 0 1.4rem; padding: 0.8rem;
-  background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
-}
-.mermaid-diagram svg { max-width: 100%; height: auto; }
-.mermaid-fallback {
-  overflow-x: auto; font-size: var(--t-sm); padding: 0.8rem; margin: 1rem 0 1.4rem;
-  background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--r-lg);
-}
-
 /* Settings inside a view's gear menu. The controls that used to sit in a
    .basis bar under the header live here instead: they are read once when
    setting a chart up, then rarely, so they should not compete with the figure

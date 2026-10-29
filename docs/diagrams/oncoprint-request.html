@@ -1,0 +1,107 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  body { margin: 0; background: #fff; font: 14px/1.35 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: #1f2328; }
+  .wrap { width: 1180px; padding: 28px 32px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lede { color: #59636e; margin: 0 0 20px; }
+  .lane { border-radius: 12px; padding: 14px 16px 16px; margin-bottom: 0; position: relative; }
+  .lane h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 10px; }
+  .b { background: #eef4ff; border: 1px solid #c4d7f5; } .b h2 { color: #2a5bb5; }
+  .s { background: #f3f0ff; border: 1px solid #d5cdf5; } .s h2 { color: #5b3fc4; }
+  .step { display: grid; grid-template-columns: 34px 1fr 300px; gap: 12px; align-items: start;
+          background: #fff; border: 1px solid #d8dee4; border-radius: 9px; padding: 10px 12px; margin-top: 8px; }
+  .n { width: 26px; height: 26px; border-radius: 50%; background: #1f2328; color: #fff; font-weight: 700;
+       display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .t { font-weight: 650; margin-bottom: 4px; }
+  code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: #f6f8fa; border-radius: 4px; padding: 1px 4px; }
+  .rows div { margin: 2px 0; }
+  .rows .sub { padding-left: 18px; color: #3d444d; }
+  .note { font-size: 13px; border-radius: 7px; padding: 8px 10px; }
+  .sql { background: #fff4e5; border: 1px solid #f0c98a; }
+  .jsx { background: #e9f8ee; border: 1px solid #9fd8b0; }
+  .fig { background: #fdeef3; border: 1px solid #f0b3c8; }
+  .plain { background: #f6f8fa; border: 1px solid #d8dee4; color: #3d444d; }
+  .arrow { text-align: center; color: #59636e; font-size: 12.5px; margin: 6px 0; }
+  .arrow b { font-size: 18px; display: block; line-height: 1; color: #8c959f; }
+  .onc { margin-top: 6px; font-size: 13px; color: #3d444d; border-left: 3px solid #8c959f; padding-left: 8px; }
+</style></head><body><div class="wrap">
+<h1>How an oncoprint is drawn on the analysis page</h1>
+<p class="lede">Two requests: the analysis run says <i>what</i> to draw, then the card fetches the oncoprint itself from its own endpoint.</p>
+
+<div class="lane b"><h2>Browser</h2>
+  <div class="step"><div class="n">1</div>
+    <div class="rows">
+      <div class="t">The analysis request, as for every view</div>
+      <div><code>use-analysis.ts</code> → <code>api.ts</code> → <code>POST /api/analysis?oncoprint=spec</code></div>
+    </div>
+    <div class="note plain"><code>?oncoprint=spec</code> means "the page draws the oncoprint itself; just tell it what to fetch".</div>
+  </div>
+</div>
+<div class="arrow"><b>↓</b>document JSON</div>
+
+<div class="lane s"><h2>Server: request 1, the analysis</h2>
+  <div class="step"><div class="n">2</div>
+    <div class="rows">
+      <div class="t"><code>runAnalysis</code> → <code>lib/views/oncoprint/run.ts</code> in spec mode</div>
+      <div>cohorts are compiled and counted as usual (step 3 of the analysis call stack)</div>
+      <div>the oncoprint runner then runs <b>no queries</b>; it returns a <b>spec</b>:</div>
+      <div class="sub">the studies it may use · genes · clinical + heatmap tracks · sort · display · any z-score reference across studies</div>
+      <div class="sub">the cohort <b>definitions</b> (not their SQL)</div>
+    </div>
+    <div class="note plain">Compiled SQL never leaves the server, so the page receives definitions and the next request compiles them again.</div>
+  </div>
+</div>
+<div class="arrow"><b>↓</b>analysis result: other views' numbers, plus the oncoprint's spec</div>
+
+<div class="lane b"><h2>Browser</h2>
+  <div class="step"><div class="n">3</div>
+    <div class="rows">
+      <div class="t">The card fetches its own figure</div>
+      <div><code>app/lab/kinds/oncoprint.tsx</code> → <code>app/_oncoprint/OncoprintCard.tsx</code> → <code>OncoprintFigure.tsx</code></div>
+      <div><code>api.oncoprint(spec)</code> → <code>POST /api/oncoprint?format=bin</code></div>
+    </div>
+    <div class="note plain">Fetched again only when the spec changes. The other cards are already drawn by now.</div>
+  </div>
+</div>
+<div class="arrow"><b>↓</b>spec JSON</div>
+
+<div class="lane s"><h2>Server: request 2, the oncoprint</h2>
+  <div class="step"><div class="n">4</div>
+    <div class="rows">
+      <div class="t"><code>app/api/oncoprint/route.ts</code></div>
+      <div><code>parseBody</code> → <code>withRequestCustomData</code> → <code>cachedContract</code> (<code>lib/next-cache.ts</code>)</div>
+      <div>→ <code>buildContract</code> (<code>lib/oncoprint.ts</code>): compiles the cohorts again, queries ClickHouse (a peer instance answers its own share)</div>
+      <div>→ <code>assembleContract</code> (<code>lib/oncoprint-assemble.ts</code>, pure): one column per patient, cells as bitmasks, "not profiled" as its own state</div>
+      <div>→ <code>packContract</code> (<code>lib/oncoprint-binary.ts</code>): the OPB1 binary, gzipped</div>
+    </div>
+    <div class="note sql"><b>SQL:</b> the cohorts are compiled a second time here, then the oncoprint's own row queries are built in <code>lib/oncoprint.ts</code>.</div>
+  </div>
+</div>
+<div class="arrow"><b>↓</b>binary contract: typed arrays, about half of it patient ids</div>
+
+<div class="lane b"><h2>Browser</h2>
+  <div class="step"><div class="n">5</div>
+    <div class="rows">
+      <div class="t">Decode and draw on a canvas</div>
+      <div><code>unpackContract</code> → <code>app/_oncoprint/canvas.ts</code> <code>draw()</code>, with its colours and glyphs from <code>lib/oncoprint-style.ts</code></div>
+      <div><b>interactions go back to the same endpoint family:</b></div>
+      <div class="sub">hover a column → <code>/api/oncoprint/detail</code> (the details behind that column's bitmask)</div>
+      <div class="sub">drag-select sample columns → <code>/api/oncoprint/patients-of</code> → a patient cohort</div>
+      <div class="sub">download → <code>/api/oncoprint?format=svg</code> or <code>tsv</code>, with the sort shown on screen</div>
+    </div>
+    <div class="note jsx"><b>JSX</b>: <code>OncoprintCard</code> / <code>OncoprintFigure</code>. The figure is canvas pixels, not an SVG string.</div>
+  </div>
+</div>
+
+<div class="lane" style="margin-top:22px;background:#f6f8fa;border:1px solid #d8dee4">
+  <h2 style="color:#3d444d">Why the oncoprint has its own endpoint</h2>
+  <div class="rows" style="font-size:13.5px">
+    <div>• <b>Size:</b> other views return a few hundred numbers. An oncoprint has one column per patient, often tens of thousands, so it goes as packed binary, not JSON.</div>
+    <div>• <b>Nothing waits for it:</b> the analysis response holds no oncoprint queries, so the other cards draw first.</div>
+    <div>• <b>Its own cache entry:</b> the contract is cached by its spec, so re-running the analysis for an unrelated change can reuse it.</div>
+    <div>• <b>Other callers:</b> <code>/local</code> (pasted Oncoprinter tables, no database), <code>/notebook</code> (the figure as a Jupyter notebook), the <code>/oncoprint-lab</code> pages.</div>
+    <div>• <b>Other routes:</b> MCP asks <code>?oncoprint=svg</code>. The runner then builds the contract in the same request, reusing the cohort SQL it already compiled (<code>PIDS_SQL</code>), and returns server SVG (<code>lib/oncoprint-svg.ts</code>). The CLI and <code>python/cohortlab</code> draw the same contract.</div>
+    <div>• <b>Cost:</b> on the page, each cohort is compiled twice: once in step 2 to count it, and again in step 4 from the definitions in the spec.</div>
+  </div>
+</div>
+</div></body></html>

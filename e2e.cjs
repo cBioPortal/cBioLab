@@ -214,22 +214,20 @@ async function main() {
       errors.splice(errsBefore404, errors.length - errsBefore404,
         ...errors.slice(errsBefore404).filter(e => !/404/.test(e)));
 
-      // /rationale renders RATIONALE.md, including its Mermaid architecture
-      // diagram as real SVG (not a leftover code fence — that would mean the
-      // client-side render failed and silently fell back). Console errors here
-      // are still caught by the scheme-wide "no JS errors" check below.
+      // /rationale renders RATIONALE.md: its sections as HTML (not raw markdown),
+      // under a header that marks the page. Console errors here are still caught
+      // by the scheme-wide "no JS errors" check below.
       await page.goto(BASE + "/rationale");
       let rationaleOk = false, rationaleInfo = "";
       try {
         await page.waitForSelector(".rationale-doc h1", { timeout: 60000 });
-        await page.waitForFunction(() => document.querySelector(".mermaid-diagram svg") !== null, null, { timeout: 30000 });
-        const svgCount = await page.locator(".mermaid-diagram svg").count();
-        const fallback = await page.locator(".mermaid-fallback").count();
+        const sections = await page.locator(".rationale-doc h2").count();
+        const rawHeadings = await page.locator(".rationale-doc p", { hasText: /^## / }).count();
         const here = await page.locator("header a.toplink[aria-current=page]").innerText();
-        rationaleOk = svgCount > 0 && fallback === 0 && here === "rationale";
-        rationaleInfo = "svg=" + svgCount + " fallback=" + fallback + " header marks=" + here;
+        rationaleOk = sections > 3 && rawHeadings === 0 && here === "rationale";
+        rationaleInfo = "h2=" + sections + " raw headings=" + rawHeadings + " header marks=" + here;
       } catch (e) { rationaleInfo = String(e.message || e).slice(0, 100); }
-      ok("/rationale renders with a live Mermaid diagram", rationaleOk, rationaleInfo);
+      ok("/rationale renders RATIONALE.md", rationaleOk, rationaleInfo);
 
       // /verification shows the recorded results of every check, and none of them failing.
       await page.goto(BASE + "/verification");

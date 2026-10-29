@@ -3,6 +3,99 @@
 The map of the code: what each part does, where it lives, and the one place each rule is kept.
 [`CLAUDE.md`](../CLAUDE.md) indexes it, and holds the invariants that outrank it.
 
+## The shape of the system
+
+Every surface reads and writes the same document; the engine owns all semantics; the warehouse is
+read-only, with the licensed annotation store isolated behind its own database grant; what people
+keep lives in a separate, writable Postgres; another instance is reached through the federation
+API, never MCP; and the DSL's documentation, agent grammar and MCP self-description all render
+from one source module.
+
+```mermaid
+flowchart TB
+    subgraph SURFACES["Surfaces — all speak the same document"]
+        UI["Web UI — app/<br/>home · Explore · Analysis · portal pages · saved work · campaigns · admin"]
+        CHAT["Browser assistants — WebMCP, lib/webmcp.ts<br/>Claude in Chrome, or the app's chat sidebar /api/chat<br/>the page's tools only: read · edit · undo"]
+        MCP["MCP clients — /api/mcp, mcp/tools.ts<br/>describe_dsl · run_analysis · render_oncoprint<br/>query_cohort · campaign_*"]
+        LOCAL["Local tables — CLI, python/cohortlab<br/>oncoprints from Oncoprinter-style TSVs"]
+    end
+
+    DOC[["<b>Analysis document</b> (JSON)<br/>study, cohorts by name, views<br/>shareable / re-runnable as ?doc= links"]]
+
+    UI <--> DOC
+    CHAT <--> DOC
+    MCP <--> DOC
+
+    subgraph SERVER["Server — clients never send SQL"]
+        ROUTES["API routes — app/api/<br/>envelopes in lib/api-schemas.ts"]
+        CACHE["Result cache — lib/next-cache.ts<br/>keyed by data version + settings"]
+        RA["runAnalysis — lib/analysis.ts<br/>cohorts per study · federation by SUMMING aggregates<br/>no dedup across studies, labeled"]
+        COMP["Cohort compilers<br/>lib/cohort2.ts · lib/oql.ts · lib/compiler.ts<br/><i>loud rejection of anything unanswerable</i>"]
+        VIEWS["View kinds — lib/views/&lt;kind&gt;/<br/>~50 runners: compare, survival, oncoprint, plot, timeline…<br/>each with its method record"]
+        RES["Resolvers — lib/federation.ts<br/>PatientLevel · Aggregate · Remote<br/>the patient-data boundary is a missing method"]
+    end
+
+    DOC --> ROUTES
+    ROUTES --> CACHE --> RA
+    RA --> COMP
+    RA --> VIEWS
+    VIEWS --> RES
+    COMP -- "compiled SQL" --> RES
+
+    subgraph DATA["Warehouse — read-only, lib/ch.ts"]
+        CH[("ClickHouse<br/>cBioPortal derived tables<br/>one or two databases")]
+        OKB[("oncokb_annotation<br/>separate DB · version-pinned<br/>license = GRANT boundary")]
+    end
+    RES --> CH
+    RES -- "DRIVER joins the pin" --> OKB
+
+    PEER["Peer cbio-lab instance<br/>/api/federation/v1/&lt;op&gt;<br/>lib/federation-api.ts · client lib/federation-remote.ts<br/>aggregates always; patient rows only where both sides allow"]
+    RES <-- "HTTP, named ops — never SQL" --> PEER
+
+    subgraph STORE["Writable store — Postgres, lib/db.ts"]
+        PG[("saved cohorts + analyses · custom data<br/>stored id sets · campaigns · users + groups<br/>settings · migrations db/migrations/")]
+    end
+    ROUTES <--> PG
+    AUTH["Sign-in — lib/auth.ts · lib/oidc.ts<br/>sharing rules — lib/access.ts"]
+    AUTH --- PG
+
+    subgraph OUT["Outputs — renderers hold zero data logic"]
+        SVG["server SVG → PNG<br/>MCP, /provenance, CLI"]
+        CANVAS["browser figures<br/>same SVG drawers + oncoprint canvas"]
+        PY["matplotlib<br/>python/cohortlab, reads style.json"]
+        PROV["Provenance + method<br/>readback · compiled SQL · sources · notebook"]
+    end
+    VIEWS --> SVG
+    VIEWS --> CANVAS
+    LOCAL --> PY
+    RA --> PROV
+    PROV -. "one click back to" .-> UI
+
+    REF["lib/dsl-reference.ts<br/><b>single source of DSL truth</b>"]
+    REF -- "generates docs/dsl.md<br/>(examples CI-executed)" --> DOCS["docs/dsl.md · Examples tab"]
+    REF -- "grammar" --> CHAT
+    REF -- "describe_dsl" --> MCP
+```
+
+## How a request is processed
+
+An analysis request, from the page to the SQL and back to each view's card and figure: where
+cohort SQL is compiled (`lib/cohort2.ts`), where each view's queries are built (its `sql.ts`, or
+`lib/federation.ts` / `lib/federation-views.ts`), and where JSX and figures come from (`app/lab/`
+for JSX; each kind's `figure.ts` for an SVG string).
+
+![How an analysis request is processed](diagrams/analysis-request.png)
+
+The oncoprint takes a second request: the analysis run returns only its spec, and the card fetches
+the contract from `/api/oncoprint` as binary and draws it on a canvas.
+
+![How an oncoprint is drawn on the analysis page](diagrams/oncoprint-request.png)
+
+Both are drawn from HTML in `docs/diagrams/`: edit the HTML, run `node scripts/render-diagrams.cjs`,
+and commit both.
+
+## The parts
+
 - **`lib/cohort2.ts`** — DSL v2 cohort compiler: `{all:[clause]}`, clause = leaf | `{any:[...]}`
   | `{not:leaf}`; leaf kinds: `oql`, `clinical`, `event` (v1 timeline sub-DSL), `patients`,
   `profiled`, `caseList`, `genomicData`, `genericAssay` (+deprecated `alteration`→OQL).
