@@ -380,7 +380,15 @@ export default function AnalysisPage() {
   const savedReady = loggedIn && !savedArtifacts.cohortsState.pending && !savedArtifacts.cohortsState.error;
   const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, storeLists, study });
   const { lockCohorts, unlockCohort, unlockAll, analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells } = cohortEdits;
-  const exploreState = useExploreState({ addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
+  // the studies the link opens Explore on, known from `sp` at the first render (the server's
+  // included), so the study list is not drawn open for a frame before the mount effect selects them
+  const [linkedStudies] = useState<string[]>(() => {
+    try {
+      if (typeof sp.doc === "string") { const d = decodeUrlJson<AnalysisDoc>(sp.doc).study; return d ? [d] : []; }
+      return (typeof sp.study === "string" ? sp.study : "").split(",").map((x) => x.trim().replace(/[^A-Za-z0-9._-]/g, "")).filter(Boolean);
+    } catch { return []; }
+  });
+  const exploreState = useExploreState({ linkedStudies, addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
   const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
   // The saved-work manager, opened over this page, opens what is chosen in it here, in place
   const savedWork = useSaved();
