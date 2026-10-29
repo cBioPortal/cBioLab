@@ -1,6 +1,6 @@
 // Building and editing a partition's arms — pure and browser-safe, shared by the server's "split
-// by" proposal, Explore's "split by this", the analysis page's partition panel and the
-// assistant's tools, so every path picks arms by the same rule.
+// by" proposal, Explore's "Compare groups" (arms as the comparison page's cohorts), the analysis
+// page's partition panel and the assistant's tools, so every path picks arms by the same rule.
 import type { Clause, CohortDef, Leaf, PartitionArm, PartitionDef, SplitDef } from "./types.ts";
 
 export const SPLIT_BY_DEFAULT_MAX_ARMS = 8;
@@ -56,6 +56,95 @@ export function partitionFromOql(of: string, queries: string[]): PartitionDef {
 export function armLabel(v: string): string {
   const s = String(v).trim() || "(blank)";
   return s.length > 80 ? s.slice(0, 79) + "…" : s;
+}
+
+/** the cut points of `n` equal-count groups: 2 → [0.5], 4 → [0.25, 0.5, 0.75] */
+export function quantilePoints(n: number): number[] {
+  if (!Number.isInteger(n) || n < 2 || n > 10) throw new Error("quantiles must be a whole number from 2 to 10, got " + n);
+  return Array.from({ length: n - 1 }, (_, i) => (i + 1) / n);
+}
+
+/** a number as an arm's name shows it: three significant figures, no grouping commas */
+const cutText = (x: number): string => String(Number(x.toPrecision(3)));
+
+/**
+ * One arm per interval between ascending `cuts`: at or below the first, each (cut, next cut], and
+ * above the last — the intervals a histogram bar uses, so every value lands in exactly one arm.
+ * Cuts that coincide (a value shared by more than a group's worth of cases) are one cut, so tied
+ * values never straddle two arms and no arm is empty by construction.
+ */
+export function rangeArms(label: string, cuts: number[], where: (range: { gt?: number; lte?: number }) => Clause): PartitionArm[] {
+  const cs: number[] = [];
+  for (const c of cuts) if (Number.isFinite(c) && (!cs.length || c > cs[cs.length - 1])) cs.push(c);
+  if (!cs.length) throw new Error(label + " has no values to cut");
+  const arms: PartitionArm[] = [{ name: armLabel(label + " ≤ " + cutText(cs[0])), where: where({ lte: cs[0] }) }];
+  for (let i = 1; i < cs.length; i++)
+    arms.push({ name: armLabel(label + " " + cutText(cs[i - 1]) + "–" + cutText(cs[i])), where: where({ gt: cs[i - 1], lte: cs[i] }) });
+  arms.push({ name: armLabel(label + " > " + cutText(cs[cs.length - 1])), where: where({ gt: cs[cs.length - 1] }) });
+  return arms;
+}
+
+/** the most groups the comparison page compares at once (its enrichment, table and assay views take 6 cohorts) */
+export const COMPARISON_MAX_ACTIVE = 6;
+/** the most groups it holds: those past COMPARISON_MAX_ACTIVE open taken out, and are swapped in by hand */
+export const COMPARISON_MAX_GROUPS = 20;
+/** the most clauses a cohort takes (lib/cohort2.ts) */
+const COHORT_MAX_CLAUSES = 8;
+
+/**
+ * Groups for the comparison page from one chart: each arm is its own cohort, the selection's other
+ * clauses (`base`) and the arm's own, evaluated where the selection is (`scope`: its study or
+ * studies). Unlike a split's children these are not first-match-wins: a patient in two arms (two
+ * genes' mutations) is in both groups, as on cBioPortal, and the page's Overlap tab shows it.
+ */
+export function comparisonCohorts(scope: Pick<CohortDef, "study" | "studies">, base: Clause[], arms: PartitionArm[]): Record<string, CohortDef> {
+  if (arms.length < 2) throw new Error("a comparison needs at least 2 groups, and this chart gives " + arms.length);
+  if (arms.length > COMPARISON_MAX_GROUPS)
+    throw new Error("the comparison page holds at most " + COMPARISON_MAX_GROUPS + " groups, and this chart gives " + arms.length);
+  if (base.length + 1 > COHORT_MAX_CLAUSES)
+    throw new Error("each group would need " + (base.length + 1) + " conditions (the selection's " + base.length + " and its own), and a cohort takes at most " + COHORT_MAX_CLAUSES + " — remove a filter first");
+  const out: Record<string, CohortDef> = {};
+  for (const a of arms) {
+    let n = a.name, k = 2;
+    while (out[n]) n = a.name + " " + k++;
+    out[n] = { ...(scope.study ? { study: scope.study } : {}), ...(scope.studies ? { studies: scope.studies } : {}), all: [...base, a.where] };
+  }
+  return out;
+}
+
+/**
+ * The comparison page's "exclude overlapping samples": each group without the samples any other
+ * group also holds. A group's own conditions plus "and not in any other group" — written as
+ * clauses, so it stays a cohort definition the engine compiles like any other. Another group can
+ * be subtracted when it differs from this one by a single condition (the groups a chart opens all
+ * do: the selection's clauses and one arm each), since then not-in-it is not-that-condition;
+ * anything else is refused, naming the two groups.
+ */
+export function exclusiveCohorts(groups: Record<string, CohortDef>): Record<string, CohortDef> {
+  const key = (x: unknown) => JSON.stringify(x);
+  const where = (d: CohortDef) => key([d.study || null, d.studies || null]);
+  const out: Record<string, CohortDef> = {};
+  for (const [name, g] of Object.entries(groups)) {
+    if (g.lock || g.extends || g.a) throw new Error("“" + name + "” is not a plain list of conditions (a locked, inherited or event cohort), so its overlap with the other groups cannot be removed");
+    const own = g.all || [], mine = new Set(own.map(key));
+    const neg: Leaf[] = [], pos: Clause[] = [];
+    for (const [other, o] of Object.entries(groups)) {
+      if (other === name) continue;
+      if (where(o) !== where(g)) throw new Error("“" + name + "” and “" + other + "” are evaluated over different studies, so their overlap cannot be removed");
+      const diff = (o.all || []).filter((c) => !mine.has(key(c)));
+      if (!diff.length) throw new Error("“" + name + "” lies wholly within “" + other + "”, so without the overlap it would be empty");
+      if (diff.length > 1) throw new Error("“" + other + "” differs from “" + name + "” in " + diff.length + " conditions; overlap can be removed only between groups that differ in one");
+      const c = diff[0] as any;
+      if (c.not) { if (!mine.has(key(c.not)) && !pos.some((x) => key(x) === key(c.not))) pos.push(c.not); }
+      else neg.push(...(c.any || [c]));
+    }
+    const leaves = [...new Map(neg.map((l) => [key(l), l])).values()];
+    if (leaves.length > COHORT_MAX_CLAUSES) throw new Error("removing the overlap from “" + name + "” needs " + leaves.length + " conditions in one “not any of”, and it takes at most " + COHORT_MAX_CLAUSES);
+    const all = [...own, ...pos, ...(leaves.length ? [{ not: { any: leaves } }] : [])];
+    if (all.length > COHORT_MAX_CLAUSES) throw new Error("“" + name + "” without the overlap would need " + all.length + " conditions, and a cohort takes at most " + COHORT_MAX_CLAUSES);
+    out[name] = { ...g, all };
+  }
+  return out;
 }
 
 /** `base`, or `base 2`, `base 3`, … — the first not already taken. */
@@ -225,12 +314,11 @@ export function armsFromSelection(draft: { all: Clause[] }, chart: ChartKey):
 }
 
 /**
- * Arms given item by item — a chart's checked rows — over the draft without that chart's own
- * clauses: only the checked items divide the cohort, whatever the chart already filters it by.
+ * The draft without a chart's own clauses — what groups given item by item (a chart's checked rows
+ * or bars) are drawn from: only those items divide it, whatever the chart already filters it by.
  */
-export function armsFromItems(draft: { all: Clause[] }, chart: ChartKey, arms: PartitionArm[]):
-  { base: { all: Clause[] }; arms: PartitionArm[] } {
-  return { base: { all: chartSelection(draft, chart).rest }, arms: nameArms(arms, "items are checked") };
+export function withoutChart(draft: { all: Clause[] }, chart: ChartKey): Clause[] {
+  return chartSelection(draft, chart).rest;
 }
 
 /**

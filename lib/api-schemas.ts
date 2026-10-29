@@ -98,6 +98,7 @@ export const PartitionRequest = z.object({
   name: z.string().optional(),
   maxArms: z.number().optional(),
   minCount: z.number().optional(),
+  quantiles: z.number().optional(),
   ...customData,
 });
 

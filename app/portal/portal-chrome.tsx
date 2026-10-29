@@ -8,16 +8,23 @@ import { Info, Pencil } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
+import { cn } from "../../lib/cn";
 
-/** one group's swatch, name and size; the swatch is the colour the figures draw it in */
-function GroupChip({ name, i, n }: { name: string; i: number; n?: number }) {
-  return (
-    <span className="inline-flex h-7 items-center gap-1.5 rounded-pill border bg-paper px-2.5 text-sm">
-      <SeriesSwatch i={i} />
-      <span className="font-medium">{name}</span>
-      {n != null && <span className="text-muted-foreground tabular-nums">{fmtInt(n)}</span>}
-    </span>
-  );
+/**
+ * one group's swatch, name and size; the swatch is the colour the figures draw it in. With
+ * `onToggle` the chip is a button that takes the group out of every tab and puts it back; a group
+ * that is out (`i` null) shows no colour, since no figure draws it.
+ */
+function GroupChip({ name, i, n, onToggle, lock }: { name: string; i: number | null; n?: number; onToggle?: () => void; lock?: string }) {
+  const body = <>
+    {i == null ? <span className="cohortswatch border border-muted-foreground/50" aria-hidden="true" /> : <SeriesSwatch i={i} />}
+    <span className={cn("font-medium", i == null && "text-muted-foreground line-through")}>{name}</span>
+    {n != null && i != null && <span className="text-muted-foreground tabular-nums">{fmtInt(n)}</span>}
+  </>;
+  const chip = "inline-flex h-7 items-center gap-1.5 rounded-pill border bg-paper px-2.5 text-sm";
+  if (!onToggle) return <span className={chip}>{body}</span>;
+  return <button type="button" className={cn(chip, "groupchip cursor-pointer hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70")} aria-pressed={i != null}
+    disabled={!!lock} data-tip={lock || (i == null ? "add " + name + " back to the comparison" : "leave " + name + " out of the comparison")} onClick={onToggle}>{body}</button>;
 }
 
 /** what the page leaves out for this study (tabs it has no data for, and caveats on its groups), behind a small info button */
@@ -39,7 +46,7 @@ function LeftOut({ left }: { left: string[] }) {
  * genes), the headline answer beside it, the groups every tab compares on a page that compares
  * them — and an info button listing what the page left out for this study, so a missing tab is never silent.
  */
-export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes, onEditGenes, groups, counts, left, stat, action, aside, children }: {
+export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes, onEditGenes, groups, counts, left, off = [], onToggleGroup, maxOn = Infinity, stat, action, aside, children }: {
   eyebrow: string; title: string;
   /** the study id, or the ids summarised; `studyTitle` lists them all */
   study: string; studyTitle?: string; detail?: React.ReactNode; genes?: string[];
@@ -47,6 +54,10 @@ export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes
   onEditGenes?: () => void;
   /** the groups every tab compares (the Comparison page); a page that draws one cohort lists none */
   groups?: string[]; counts?: Record<string, number> | null; left: string[];
+  /** the groups taken out of the comparison, and how to take one out or put it back (the Comparison page) */
+  off?: string[]; onToggleGroup?: (name: string) => void;
+  /** the most groups compared at once: past it, a group taken out stays out until another is */
+  maxOn?: number;
   /** the headline number, right of the title */
   stat?: { value: number; of: number; label: string } | null;
   /** a control over the whole page (the Results page's "Modify query"): at the end of the groups row, or right of the title without one */
@@ -92,7 +103,12 @@ export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes
       {groups && (
         <div className="mt-4 flex flex-wrap items-center gap-2.5 border-t pt-2.5">
           <span className="text-sm font-semibold tracking-[0.12em] text-muted-foreground uppercase">Groups</span>
-          {groups.length ? groups.map((n, i) => <GroupChip key={n} name={n} i={i} n={counts?.[n]} />) : <span className="skeleton h-7 w-48" />}
+          {groups.length ? groups.map((n) => {
+            const on = groups.filter((g) => !off.includes(g)), i = on.indexOf(n);
+            const lock = !onToggleGroup ? undefined : i >= 0 && on.length <= 2 ? "a comparison needs at least 2 groups"
+              : i < 0 && on.length >= maxOn ? maxOn + " groups are compared at once — take one out to add " + n : undefined;
+            return <GroupChip key={n} name={n} i={i < 0 ? null : i} n={counts?.[n]} lock={lock} onToggle={onToggleGroup && (() => onToggleGroup(n))} />;
+          }) : <span className="skeleton h-7 w-48" />}
           {action && <span className="ml-auto">{action}</span>}
         </div>
       )}

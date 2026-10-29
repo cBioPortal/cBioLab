@@ -320,6 +320,8 @@ export interface PartitionDef {
    * determines the children.
    */
   source?: { attribute?: string; gene?: string; oql?: string[]; minCount?: number; median?: boolean;
+    /** a numeric value cut into this many groups of (near) equal size within the cohort, at cuts written into the arms */
+    quantiles?: number;
     /** a generic-assay entity the arms read */
     assay?: { profileType: string; entity: string };
     /** values seen but given no arm of their own (too few patients, or past the arm limit), up to 50 */
