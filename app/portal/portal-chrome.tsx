@@ -1,10 +1,12 @@
 "use client";
 // The chrome the portal pages share: the summary card over the
-// tabs (the study, the query, the groups and their sizes).
+// tabs (the study, the query, and on the Comparison page the groups and their sizes).
 import { SeriesSwatch } from "../lab/view-chrome.tsx";
 import { Badge } from "../_ui/badge";
 import { Button } from "../_ui/button";
-import { Pencil } from "lucide-react";
+import { Info, Pencil } from "lucide-react";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
 
 /** one group's swatch, name and size; the swatch is the colour the figures draw it in */
@@ -18,22 +20,39 @@ function GroupChip({ name, i, n }: { name: string; i: number; n?: number }) {
   );
 }
 
+/** what the page leaves out for this study (tabs it has no data for, and caveats on its groups), behind a small info button */
+function LeftOut({ left }: { left: string[] }) {
+  const [open, setOpen] = useState(false);
+  return <>
+    <Button variant="ghost" size="icon-xs" className="leftout text-muted-foreground" aria-label="what this page leaves out" data-tip="what this page leaves out" aria-haspopup="dialog" onClick={() => setOpen(true)}><Info /></Button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent aria-describedby={undefined} className="max-w-lg">
+        <DialogHeader><DialogTitle className="text-base">What this page leaves out</DialogTitle></DialogHeader>
+        <ul className="m-0 list-disc space-y-1.5 pl-5 text-md">{left.map((l) => <li key={l}>{l}</li>)}</ul>
+      </DialogContent>
+    </Dialog>
+  </>;
+}
+
 /**
  * The card over a portal page's tabs: what was asked (the study and, on the Results page, the
- * genes), the headline answer beside it, and the groups every tab compares — with what the page
- * left out for this study, so a missing tab is never silent.
+ * genes), the headline answer beside it, the groups every tab compares on a page that compares
+ * them — and an info button listing what the page left out for this study, so a missing tab is never silent.
  */
-export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes, onEditGenes, groups, counts, left, stat, action, children }: {
+export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes, onEditGenes, groups, counts, left, stat, action, aside, children }: {
   eyebrow: string; title: string;
   /** the study id, or the ids summarised; `studyTitle` lists them all */
   study: string; studyTitle?: string; detail?: React.ReactNode; genes?: string[];
   /** opens the gene query on the page's own genes (the Results page) */
   onEditGenes?: () => void;
-  groups: string[]; counts: Record<string, number> | null; left: string[];
+  /** the groups every tab compares (the Comparison page); a page that draws one cohort lists none */
+  groups?: string[]; counts?: Record<string, number> | null; left: string[];
   /** the headline number, right of the title */
   stat?: { value: number; of: number; label: string } | null;
-  /** a control over the whole page (the Results page's "Modify query"), at the end of the groups row */
+  /** a control over the whole page (the Results page's "Modify query"): at the end of the groups row, or right of the title without one */
   action?: React.ReactNode;
+  /** right of the title, in place of `stat` (the Patient page's navigation through a cohort) */
+  aside?: React.ReactNode;
   /** below the groups */
   children?: React.ReactNode;
 }) {
@@ -51,8 +70,11 @@ export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes
               <span className="inline-flex flex-wrap items-center gap-1">{genes.map((g) => <Badge key={g} variant="outline" className="font-mono">{g}</Badge>)}
                 {onEditGenes && <Button variant="ghost" size="icon-xs" className="editgenes" aria-label="edit genes" data-tip="edit the query's genes" onClick={onEditGenes}><Pencil /></Button>}</span>
             </>}
+            {left.length > 0 && <LeftOut left={left} />}
           </div>
         </div>
+        {aside && <div className="sm:ml-auto">{aside}</div>}
+        {(stat || (action && !groups)) && <div className="flex items-start gap-6 sm:ml-auto">
         {stat && (
           <div className="min-w-56 sm:text-right">
             <div className="text-2xl leading-tight font-semibold text-accent-foreground tabular-nums">
@@ -64,15 +86,16 @@ export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes
             </div>
           </div>
         )}
+        {action && !groups && action}
+        </div>}
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2.5 border-t pt-2.5">
-        <span className="text-sm font-semibold tracking-[0.12em] text-muted-foreground uppercase">Groups</span>
-        {groups.length ? groups.map((n, i) => <GroupChip key={n} name={n} i={i} n={counts?.[n]} />) : <span className="skeleton h-7 w-48" />}
-        <span className="ml-auto flex flex-wrap items-center justify-end gap-2.5">
-          {left.length > 0 && <span className="text-sm text-muted-foreground" data-tip="tabs this page leaves out for this study">not shown: {left.join("; ")}</span>}
-          {action}
-        </span>
-      </div>
+      {groups && (
+        <div className="mt-4 flex flex-wrap items-center gap-2.5 border-t pt-2.5">
+          <span className="text-sm font-semibold tracking-[0.12em] text-muted-foreground uppercase">Groups</span>
+          {groups.length ? groups.map((n, i) => <GroupChip key={n} name={n} i={i} n={counts?.[n]} />) : <span className="skeleton h-7 w-48" />}
+          {action && <span className="ml-auto">{action}</span>}
+        </div>
+      )}
       {children}
     </section>
   );

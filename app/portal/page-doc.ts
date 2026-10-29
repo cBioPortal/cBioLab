@@ -4,9 +4,8 @@
 // and opening one sends only that slice as an analysis request, so the engine never sees a tab or
 // more views than one run computes. A setting changed on the page is an edit to that view in this
 // document, and the URL carries how the views differ from the page's defaults (?changes=,
-// page-changes.ts), so a shared link reproduces it. A link made before that carries the whole
-// document in ?doc=, and still opens.
-import { useEffect, useState } from "react";
+// page-changes.ts), each by the view's name, so a shared link reproduces it.
+import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, View } from "../../lib/types";
 import { encodeUrlJson, readUrlJson } from "../../lib/url-json.ts";
 import { applyChanges, pageChanges, type PageChanges } from "./page-changes.ts";
@@ -39,6 +38,10 @@ export interface PageLayout {
   tabs: PageTab[];
   /** each view's title on the page, by index */
   titles: string[];
+  /** each view's name in a link's changes, by index: "Tab › View", or "Tab › Sub-tab › View" */
+  names: string[];
+  /** the page's first tabs only: what decides the rest is still being asked, and they follow */
+  partial?: boolean;
   /** tabs left out for this study, and why */
   left: string[];
 }
@@ -51,18 +54,26 @@ export const encodeDoc = (d: AnalysisDoc): string => encodeParam(d);
 export const decodeDoc = (s: string | null): AnalysisDoc | null => decodeParam<AnalysisDoc>(s);
 
 /**
- * The document a link carries, if it is this page's: the same cohorts and the same kinds of view
- * in the same places as the page lays out now. Otherwise null — the page was changed since the
- * link was made, or the link is another page's — and the page falls back to its defaults and
- * says so.
+ * What opening a tab sends: its views, and only the page's cohorts they draw or name — a view
+ * without its own `cohorts` draws them all, and a cohort a view names anywhere else (a plot's
+ * points, an oncoprint's derived rows) or one a kept cohort extends comes along — so a tab is not
+ * kept waiting on counting cohorts it never shows.
  */
-export function compatible(linked: AnalysisDoc | null, fresh: AnalysisDoc): AnalysisDoc | null {
-  if (!linked || !Array.isArray(linked.views)) return null;
-  const a = linked.views, b = fresh.views || [];
-  if (a.length !== b.length || a.some((v, i) => (v as View).kind !== b[i].kind)) return null;
-  // the cohorts must be the page's own exactly: on a results page they ARE the genes asked for
-  if (JSON.stringify(linked.cohorts || {}) !== JSON.stringify(fresh.cohorts || {})) return null;
-  return { ...fresh, views: a };
+export function tabSlice(doc: AnalysisDoc, idx: number[]): AnalysisDoc {
+  const all = doc.cohorts || {};
+  const views = idx.map((i) => (doc.views || [])[i]);
+  const names = new Set<string>();
+  const named = (x: unknown): void => {
+    if (typeof x === "string") { if (Object.hasOwn(all, x)) names.add(x); }
+    else if (Array.isArray(x)) x.forEach(named);
+    else if (x && typeof x === "object") Object.values(x).forEach(named);
+  };
+  for (const v of views) {
+    if (!Array.isArray((v as { cohorts?: unknown }).cohorts)) Object.keys(all).forEach((n) => names.add(n));
+    named(v);
+  }
+  for (const n of [...names]) for (let p = all[n]?.extends; p && !names.has(p); p = all[p]?.extends) names.add(p);
+  return { study: doc.study, cohorts: Object.fromEntries(Object.entries(all).filter(([n]) => names.has(n))), views };
 }
 
 /** the URL's state written back in place (no history entry per click, as the lab does) */
@@ -78,13 +89,19 @@ export function syncUrl(params: Record<string, string | null>) {
 export type TabSpec = { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[]; chooser?: TabChooser; link?: TabLink; pending?: string };
 
 /** The page's one document and the tabs' index maps, from the tabs as written. */
-export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left: string[]): PageLayout {
-  const views: View[] = [], titles: string[] = [];
-  const place = (vs: { title: string; view: View }[]) => vs.map((x) => { titles.push(x.title); return views.push(x.view) - 1; });
+export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left: string[], opts: { partial?: boolean } = {}): PageLayout {
+  const views: View[] = [], titles: string[] = [], names: string[] = [];
+  const place = (where: string, vs: { title: string; view: View }[]) => vs.map((x) => {
+    titles.push(x.title);
+    let name = where + " › " + x.title;
+    for (let n = 2; names.includes(name); n++) name = where + " › " + x.title + " " + n;
+    names.push(name);
+    return views.push(x.view) - 1;
+  });
   const tabs: PageTab[] = spec.map((t) => t.sub
-    ? { title: t.title, sub: t.sub.map((s) => ({ title: s.title, views: place(s.views) })) }
-    : { title: t.title, views: place(t.views || []), ...(t.chooser ? { chooser: t.chooser } : {}), ...(t.link ? { link: t.link } : {}), ...(t.pending ? { pending: t.pending } : {}) });
-  return { doc: { ...base, views }, tabs, titles, left };
+    ? { title: t.title, sub: t.sub.map((s) => ({ title: s.title, views: place(t.title + " › " + s.title, s.views) })) }
+    : { title: t.title, views: place(t.title, t.views || []), ...(t.chooser ? { chooser: t.chooser } : {}), ...(t.link ? { link: t.link } : {}), ...(t.pending ? { pending: t.pending } : {}) });
+  return { doc: { ...base, views }, tabs, titles, names, left, ...(opts.partial ? { partial: true } : {}) };
 }
 
 
@@ -92,33 +109,34 @@ const param = (k: string): string | null => { try { return new URLSearchParams(w
 
 /**
  * The page's document and open tab, kept in the URL: the page's defaults with the link's changes
- * made to them when they were made on this layout, else the link's whole document when it is this
- * page's, else the defaults (and a note saying the link's could not be used). `input` is what of
- * the link's ?doc= the page is built from (the comparison page's cohorts), kept in the URL without
- * the views; a page built from its query alone drops ?doc= once it writes its changes.
+ * made to them. A page laid out in two steps (`partial`) keeps the changes for views it does not
+ * have yet, and applies them when they arrive; once the whole page is laid out, a change that
+ * still names no view of it is reported. `input` is what of the link's ?doc= the page is built from
+ * (the comparison page's cohorts), kept in the URL beside the changes.
  */
-export function usePageDoc(fresh: PageLayout | null, linked: AnalysisDoc | null, input: AnalysisDoc | null = null) {
+export function usePageDoc(fresh: PageLayout | null, input: AnalysisDoc | null = null) {
   const [doc, setDoc] = useState<AnalysisDoc | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [open, setOpen] = useState<string>(() => param("tab") || "");
-  const [changes] = useState(() => readUrlJson<PageChanges>(param("changes")));
-  const freshKey = fresh ? JSON.stringify(fresh.doc) : "";
+  const [linked] = useState(() => readUrlJson<PageChanges>(param("changes")) || {});
+  const changes = useRef<PageChanges>(linked);
+  const freshKey = fresh ? JSON.stringify(fresh.doc) + (fresh.partial ? "…" : "") : "";
   useEffect(() => {
     if (!fresh) return;
-    if (changes) {
-      const views = applyChanges(fresh.doc.views || [], changes);
-      setDoc(views ? { ...fresh.doc, views } : fresh.doc);
-      setNote(views ? null : "the settings in this link were made on another layout of this page, so its views are shown with their defaults");
-      return;
-    }
-    const kept = compatible(linked, fresh.doc);
-    setDoc(kept || fresh.doc);
-    setNote(linked && linked.views && linked.views.length && !kept ? "the views in this link are not this page's own, so the page's are shown with their defaults" : null);
+    const { views, missed } = applyChanges(fresh.names, fresh.doc.views || [], changes.current);
+    setDoc({ ...fresh.doc, views });
+    setNote(missed.length && !fresh.partial
+      ? "this link's settings for " + missed.join(", ") + " do not apply to this page as it is now, so " + (missed.length === 1 ? "that view shows its" : "those views show their") + " defaults"
+      : null);
   }, [freshKey]);   // eslint-disable-line react-hooks/exhaustive-deps
   const update = (d: AnalysisDoc) => {
     setDoc(d);
-    const c = fresh ? pageChanges(fresh.doc.views || [], d.views || []) : null;
-    syncUrl({ changes: c ? encodeUrlJson(c) : null, doc: input ? encodeDoc(input) : null });
+    if (!fresh) return;
+    // changes for views the page has not laid out yet are kept until it has
+    const waiting = fresh.partial ? Object.fromEntries(Object.entries(changes.current).filter(([n]) => !fresh.names.includes(n))) : {};
+    const c = { ...waiting, ...pageChanges(fresh.names, fresh.doc.views || [], d.views || []) };
+    changes.current = c;
+    syncUrl({ changes: Object.keys(c).length ? encodeUrlJson(c) : null, doc: input ? encodeDoc(input) : null });
   };
   const openTab = (k: string) => { setOpen(k); syncUrl({ tab: k }); };
   return { doc, note, open, update, openTab };

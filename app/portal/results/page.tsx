@@ -6,11 +6,11 @@
 // (?filters=) or not; ?genes= is the query, as OQL. The page's state — every setting changed on
 // it — is one analysis document built by results-layout.ts, whose changes travel in ?changes=
 // (page-doc.ts).
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PortalTabs } from "../PortalTabs";
 import { useQueryKnown, expressionProfile, discreteCnaProfile, assayComparisonProfiles } from "../study-known";
-import { decodeDoc, usePageDoc } from "../page-doc";
+import { usePageDoc } from "../page-doc";
 import { resultsLayout } from "../results-layout.ts";
 import { Button } from "../../_ui/button";
 import { TB } from "../../_ui/toolbar.ts";
@@ -18,6 +18,7 @@ import { Pencil } from "lucide-react";
 import CohortPills from "../../lab/pills.tsx";
 import { usePublicEnv } from "../../_env/public-env-context.tsx";
 import { fmtInt } from "../../../lib/chart/format.ts";
+import { api } from "../../lab/api.ts";
 import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
 import { SiteHeader } from "../../_ui/site-header.tsx";
 import { QueryGenesDialog, RESULTS_MAX_GENES, readResultsTarget, studiesProblem } from "../query-editor.tsx";
@@ -39,17 +40,32 @@ export default function ResultsPage() {
   const queryError = check.error || check.entries.filter((e) => e.error).map((e) => e.text + ": " + e.error).join("; ") || null;
   const oqlNarrows = check.entries.some((e) => e.meaning !== "any alteration");
   const tooMany = studiesProblem(studies.length, resultsMaxStudies(env));
-  const linked = useMemo(() => decodeDoc(q.get("doc")), []);   // eslint-disable-line react-hooks/exhaustive-deps
-  const { known, error } = useQueryKnown(tooMany ? [] : studies, filters);
+  const { basics, known, error } = useQueryKnown(tooMany ? [] : studies, filters);
   const across = expressionAcross(studies, crossStudyExpression(env));
-  const fresh = useMemo(() => known && genes.length && genes.length <= RESULTS_MAX_GENES && !queryError
-    ? resultsLayout({ studies, filters, entries: check.entries.map((e) => e.text), genes }, {
+  // laid out in two steps: from the study list the tabs that need nothing else, so the oncoprint
+  // starts at once; with the profiles and attributes Explore's facets give, the rest
+  const fresh = useMemo(() => basics && genes.length && genes.length <= RESULTS_MAX_GENES && !queryError
+    ? resultsLayout({ studies, filters, entries: check.entries.map((e) => e.text), genes }, known ? {
         expr: expressionProfile(known.profileCatalog), cna: discreteCnaProfile(known.profileCatalog), clinical: known.clinical,
         numeric: known.attrs.filter((a) => a.kind === "num").map((a) => a.attribute), expressionAcross: across, held: known.held,
-        assays: assayComparisonProfiles(known.profileCatalog) })
-    : null, [known, studies, filters, check, genes, queryError, across]);
-  const page = usePageDoc(fresh, linked);
-  const [counts, setCounts] = useState<Record<string, number> | null>(null);
+        assays: assayComparisonProfiles(known.profileCatalog) }
+      : { expr: null, cna: null, clinical: [], numeric: [], expressionAcross: across, held: basics.held, partial: true })
+    : null, [basics, known, studies, filters, check, genes, queryError, across]);
+  const page = usePageDoc(fresh);
+  // the header's "altered in N of the queried": its own request, beside the tabs', so no tab waits for it
+  const [altered, setAltered] = useState<{ altered: number; queried: number } | null>(null);
+  const groups = fresh?.doc.cohorts;
+  const groupsKey = JSON.stringify(groups || null);
+  useEffect(() => {
+    setAltered(null);
+    if (!groups) return;
+    const ctl = new AbortController();
+    api.analysis({ study: fresh!.doc.study, cohorts: { Altered: groups.Altered, Queried: groups.Queried }, views: [] }, { signal: ctl.signal })
+      .then((r) => r.json())
+      .then((j) => { if (!j.error) setAltered({ altered: j.cohorts?.Altered?.count ?? 0, queried: j.cohorts?.Queried?.count ?? 0 }); })
+      .catch(() => {});
+    return () => ctl.abort();
+  }, [groupsKey]);   // eslint-disable-line react-hooks/exhaustive-deps -- `groupsKey` is the groups, by value
   const [modifying, setModifying] = useState(false);
   const [editingGenes, setEditingGenes] = useState(false);
   const shell = (body: React.ReactNode) => <><SiteHeader page="query results" /><main className="analysis-main">{body}</main></>;
@@ -64,20 +80,16 @@ export default function ResultsPage() {
   if (genes.length > RESULTS_MAX_GENES) return shell(<p className="note">a results page takes at most {RESULTS_MAX_GENES} genes, the oncoprint&apos;s rows; this asks for {genes.length}</p>);
   if (error) return shell(<div className="error">{error}</div>);
   const ready = !!(fresh && page.doc);
-  // Altered and Unaltered are the profiled patients; the rest of the queried are named, not compared
-  const altered = counts?.Altered, profiled = counts ? (counts.Altered ?? 0) + (counts.Unaltered ?? 0) : 0;
-  const unprofiled = counts && counts.Queried != null ? counts.Queried - profiled : null;
   const ids = studies.length <= IDS_SHOWN ? studies.join(", ") : studies.slice(0, IDS_SHOWN).join(", ") + " +" + (studies.length - IDS_SHOWN) + " more";
   // as cBioPortal does: no expression profiles to draw across studies its rule does not allow
   const profiles = known ? known.profiles.filter((p) => across || !isExpressionProfile(p)) : [];
   const profileCatalog = known ? known.profileCatalog.filter((p) => across || !isExpressionType(p.type)) : [];
   return shell(<>
-    <PortalSummary eyebrow="Query results" title={known ? known.name : studies.length === 1 ? studies[0] : studies.length + " studies"} study={ids}
-      studyTitle={studies.map((s) => s + (known?.names[s] ? " — " + known.names[s] : "")).join("\n")} genes={check.entries.map((e) => e.text)}
+    <PortalSummary eyebrow="Query results" title={basics ? basics.name : studies.length === 1 ? studies[0] : studies.length + " studies"} study={ids}
+      studyTitle={studies.map((s) => s + (basics?.names[s] ? " — " + basics.names[s] : "")).join("\n")} genes={check.entries.map((e) => e.text)}
       detail={known && <span className="tabular-nums">{filters.length ? fmtInt(known.patients) + " patients after filters" : fmtInt(known.samples) + " samples · " + fmtInt(known.patients) + " patients"}</span>}
-      onEditGenes={() => setEditingGenes(true)}
-      groups={Object.keys(fresh?.doc.cohorts || {})} counts={counts} left={fresh?.left || []}
-      stat={altered != null && profiled ? { value: altered, of: profiled, label: "of " + fmtInt(profiled) + " profiled patients altered in " + (check.entries.length === 1 ? check.entries[0].text : "any of the " + check.entries.length + " query lines") } : null}
+      onEditGenes={() => setEditingGenes(true)} left={fresh?.left || []}
+      stat={altered && altered.queried ? { value: altered.altered, of: altered.queried, label: "of " + fmtInt(altered.queried) + " queried patients altered in the queried genes" } : null}
       action={<Button variant="outline" size="sm" className={TB} aria-haspopup="dialog" onClick={() => setModifying(true)}><Pencil />Modify query</Button>}>
       {filters.length > 0 && (
         <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">
@@ -85,15 +97,14 @@ export default function ResultsPage() {
           <CohortPills def={{ all: filters }} />
         </div>
       )}
-      {(unprofiled || oqlNarrows) ? (
+      {oqlNarrows && (
         <p className="mt-2.5 mb-0 text-sm text-muted-foreground">
-          {unprofiled ? fmtInt(unprofiled) + " queried patient" + (unprofiled === 1 ? " was" : "s were") + " not profiled for the query's genes, so Comparison/Survival leaves them out of both Altered and Unaltered. " : ""}
-          {oqlNarrows ? "The query's OQL decides who is Altered; the oncoprint and the gene tabs draw every alteration of " + (genes.length === 1 ? "its gene." : "its genes.") : ""}
+          The query&apos;s OQL decides who is Altered; the oncoprint and the gene tabs draw every alteration of {genes.length === 1 ? "its gene." : "its genes."}
         </p>
-      ) : null}
+      )}
     </PortalSummary>
     <QueryGenesDialog target={editingGenes ? { studies, filters, query: target.query, title: "Edit genes" } : null}
-      names={new Map(Object.entries(known?.names || {}))} onClose={() => setEditingGenes(false)} />
+      names={new Map(Object.entries(basics?.names || {}))} onClose={() => setEditingGenes(false)} />
     <Dialog open={modifying} onOpenChange={setModifying}>
       <DialogContent aria-describedby={undefined}
         className="modifyquerydialog flex h-[90vh] w-[94vw] max-w-[94vw] flex-col gap-3 overflow-auto p-6 sm:max-w-[94vw]">
@@ -104,8 +115,7 @@ export default function ResultsPage() {
     {page.note && <p className="note">{page.note}</p>}
     {!ready
       ? <PortalLoading />
-      : <PortalTabs doc={page.doc!} tabs={fresh!.tabs} titles={fresh!.titles} open={page.open} onOpen={page.openTab} onDoc={page.update}
-          catalog={{ attrs: known!.attrs, profiles, profileCatalog, loading: false }}
-          onCounts={(c) => setCounts((o) => o || c)} />}
+      : <PortalTabs doc={page.doc!} tabs={fresh!.tabs} titles={fresh!.titles} partial={fresh!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
+          catalog={{ attrs: known?.attrs || [], profiles, profileCatalog, loading: !known }} />}
   </>);
 }

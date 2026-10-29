@@ -6,17 +6,21 @@
 // the same page over that one sample. The header (patient-header.tsx) lists the patient's samples
 // as the portal's does, a sample's id opening its sample view. The page's state is one analysis
 // document built by patient-layout.ts, whose changes travel in ?changes= (page-doc.ts); a switch
-// between patient and sample remounts it, as the portal's page is keyed by its ids.
+// between patient and sample remounts it, as the portal's page is keyed by its ids. With ?cohort=
+// (Explore's "View patients") it steps through that cohort's patients (cohort-nav.tsx); with a
+// cohort and no patient it opens the cohort's first.
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PortalTabs } from "../PortalTabs";
 import { useStudyKnown } from "../study-known";
-import { decodeDoc, usePageDoc } from "../page-doc";
-import { patientLayout, PATIENT_COHORT, SAMPLE_COHORT, type PatientQuery } from "../patient-layout.ts";
+import { usePageDoc } from "../page-doc";
+import { patientLayout, SAMPLE_COHORT, type PatientQuery } from "../patient-layout.ts";
 import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
 import { SiteHeader } from "../../_ui/site-header.tsx";
 import { api } from "../../lab/api.ts";
 import { PatientHeader, usePatientRecord } from "../patient-header.tsx";
+import { CohortNav, useCohortPosition } from "../cohort-nav.tsx";
+import { navigationParams, patientHref, readNavigation, type CohortNavigation } from "../cohort-navigation.ts";
 
 const ID = /[^A-Za-z0-9._-]/g;
 
@@ -50,27 +54,39 @@ export default function PatientPage() {
   const sample = (q.get("sample") || q.get("sampleId") || "").replace(ID, "");
   // as on the portal, a sample in the link makes it the sample view, whatever patient is named too
   const patient = sample ? "" : (q.get("patient") || q.get("caseId") || "").replace(ID, "");
-  return <PatientView key={study + "|" + patient + "|" + sample} study={study} patient={patient} sample={sample} />;
+  const { nav, error } = useMemo(() => readNavigation(q), [q]);
+  if (error) return <><SiteHeader page="patient" /><main className="analysis-main"><div className="error">{error}</div></main></>;
+  if (nav && !patient && !sample) return <CohortStart nav={nav} tab={q.get("tab")} />;
+  return <PatientView key={study + "|" + patient + "|" + sample} study={study} patient={patient} sample={sample} nav={nav} tab={q.get("tab")} />;
 }
 
-/** The page's link for the patient view or a sample's: the open tab kept, the rest of the page's state left behind. */
-function hrefFor(study: string, to: { patient: string } | { sample: string }): string {
-  const next = new URLSearchParams({ study, ...to });
-  try { const tab = new URLSearchParams(window.location.search).get("tab"); if (tab) next.set("tab", tab); } catch { /* no window: no tab to keep */ }
-  return "/portal/patient?" + next.toString();
+/** A cohort with no patient named yet: open its first patient. */
+function CohortStart({ nav, tab }: { nav: CohortNavigation; tab: string | null }) {
+  const router = useRouter();
+  const { list, error } = useCohortPosition(nav, null);
+  const first = list?.rows[0];
+  useEffect(() => { if (first) router.replace(patientHref({ study: first.study, id: first.patient }, nav, tab)); }, [first, nav, tab, router]);
+  const body = error ? <div className="error">the cohort's patients could not be listed: {error}</div>
+    : list && !first ? <p className="note">No patients in this cohort{list.excluded?.length ? " that may be listed here (" + list.excluded.map((x) => x.study + ": " + x.reason).join("; ") + ")" : ""}.</p>
+    : <PortalLoading />;
+  return <><SiteHeader page="patient" /><main className="analysis-main">{body}</main></>;
 }
 
-function PatientView({ study, patient, sample }: { study: string; patient: string; sample: string }) {
-  const q = useSearchParams();
-  const linked = useMemo(() => decodeDoc(q.get("doc")), []);   // eslint-disable-line react-hooks/exhaustive-deps
+/** The page's link for the patient view or a sample's: the open tab and the cohort being stepped through kept, the rest of the page's state left behind. */
+function hrefFor(study: string, to: { patient: string } | { sample: string }, nav: CohortNavigation | null, tab: string | null): string {
+  return "/portal/patient?" + new URLSearchParams({ study, ...to, ...(tab ? { tab } : {}), ...navigationParams(nav) }).toString();
+}
+
+function PatientView({ study, patient, sample, nav, tab }: { study: string; patient: string; sample: string; nav: CohortNavigation | null; tab: string | null }) {
   const { known, error } = useStudyKnown(study && (patient || sample) ? study : "");
   const owner = useSamplePatient(study, sample);
-  const { record, error: recordError } = usePatientRecord(study, sample ? owner.patient : patient);
+  const owned = sample ? owner.patient : patient;
+  const { record, error: recordError } = usePatientRecord(study, owned);
   const query: PatientQuery | null = sample ? { study, sample } : patient ? { study, patient } : null;
   const fresh = useMemo(() => known && query
     ? patientLayout(query, { profileCatalog: known.profileCatalog, held: known.held.every })
     : null, [known, study, patient, sample]);   // eslint-disable-line react-hooks/exhaustive-deps -- `query` is rebuilt every render from these ids
-  const page = usePageDoc(fresh, linked);
+  const page = usePageDoc(fresh);
   const shell = (body: React.ReactNode) => <><SiteHeader page={sample ? "sample" : "patient"} /><main className="analysis-main">{body}</main></>;
   if (!study || !query) return shell(<p className="note">This page shows one patient, or one sample: give the study and the patient as <code>?study=&lt;study id&gt;&amp;patient=&lt;patient id&gt;</code>, or a sample as <code>?study=&lt;study id&gt;&amp;sample=&lt;sample id&gt;</code>.</p>);
   if (error || owner.error) return shell(<div className="error">{error || owner.error}</div>);
@@ -78,9 +94,10 @@ function PatientView({ study, patient, sample }: { study: string; patient: strin
   return shell(<>
     <PortalSummary eyebrow={sample ? "Sample" : "Patient"} title={sample || patient} study={study}
       detail={known && <span>{known.name}</span>}
-      groups={[sample ? SAMPLE_COHORT : PATIENT_COHORT]} counts={null} left={fresh?.left || []}>
+      left={fresh?.left || []}
+      aside={nav && owned ? <CohortNav nav={nav} at={{ study, id: owned }} tab={tab} /> : undefined}>
       {record
-        ? <PatientHeader record={record} sample={sample || null} hrefFor={(to) => hrefFor(study, to)} />
+        ? <PatientHeader record={record} sample={sample || null} hrefFor={(to) => hrefFor(study, to, nav, tab)} />
         : recordError ? <p className="note">{recordError}</p>
         : <div data-tw className="mt-3 flex flex-col gap-1.5" role="status" aria-label="loading the patient's header"><span className="skeleton h-5 w-96" /><span className="skeleton h-5 w-80" /></div>}
     </PortalSummary>

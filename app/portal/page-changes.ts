@@ -3,48 +3,45 @@
 // cohorts, so a link with nothing changed carries nothing, and a changed setting costs its own
 // bytes rather than every view's.
 //
-// The changes are tied to the page's layout — the kinds of its views, in order — by a short key.
-// When the layout has changed since the link was made (a tab added, a view moved), an index would
-// name another view, so the changes are not applied at all and the page says so. A default whose
-// value changed under an unchanged layout is taken up: the link holds what the reader changed, not
-// what they left alone.
+// Each change names its view as the page shows it — "Tab › View", or "Tab › Sub-tab › View"
+// (arrange in page-doc.ts) — and stands on its own: it applies wherever the page still has that
+// view, of the same kind, and is reported as not applying where it does not. A default whose value
+// changed since is taken up: the link holds what the reader changed, not what they left alone.
 import type { View } from "../../lib/types";
 
-/** each changed view: its index, its settings that differ, and the default settings it no longer has */
-export type ViewChange = [index: number, set: Record<string, unknown>, unset?: string[]];
-export interface PageChanges { layout: string; views: ViewChange[] }
-
-/** a short key for the kinds of a page's views, in order (FNV-1a) */
-export function layoutKey(views: View[]): string {
-  let h = 0x811c9dc5;
-  for (const ch of views.map((v) => v.kind).join(",")) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
-  return h.toString(36);
-}
+/** one changed view's settings that differ, and the default settings it no longer has */
+export type ViewChange = [set: Record<string, unknown>, unset?: string[]];
+/** the page's changed views, by name */
+export type PageChanges = Record<string, ViewChange>;
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-/** how `now` differs from the page's defaults `fresh`; null when it does not */
-export function pageChanges(fresh: View[], now: View[]): PageChanges | null {
-  const views: ViewChange[] = [];
+/** how `now` differs from the page's defaults `fresh`, by the views' `names`; null when it does not */
+export function pageChanges(names: string[], fresh: View[], now: View[]): PageChanges | null {
+  const out: PageChanges = {};
   now.forEach((v, i) => {
     const d = (fresh[i] || {}) as unknown as Record<string, unknown>, n = v as unknown as Record<string, unknown>;
     const set = Object.fromEntries(Object.entries(n).filter(([k, x]) => !same(x, d[k])));
     const unset = Object.keys(d).filter((k) => !(k in n));
-    if (Object.keys(set).length || unset.length) views.push(unset.length ? [i, set, unset] : [i, set]);
+    if (Object.keys(set).length || unset.length) out[names[i]] = unset.length ? [set, unset] : [set];
   });
-  return views.length ? { layout: layoutKey(fresh), views } : null;
+  return Object.keys(out).length ? out : null;
 }
 
-/** the page's views with a link's changes made to them; null when they were made on another layout */
-export function applyChanges(fresh: View[], c: PageChanges): View[] | null {
-  if (!c || c.layout !== layoutKey(fresh) || !Array.isArray(c.views)) return null;
-  const out = fresh.slice();
-  for (const [i, set, unset] of c.views) {
-    if (!Number.isInteger(i) || !out[i] || !set || typeof set !== "object") return null;
-    const v = { ...out[i], ...set } as Record<string, unknown>;
-    for (const k of unset || []) delete v[k];
-    if (v.kind !== fresh[i].kind) return null;
-    out[i] = v as unknown as View;
+/**
+ * The page's views with a link's changes made to them, and the names of the changes that did not
+ * apply: no view of that name, or one the change would make another kind.
+ */
+export function applyChanges(names: string[], fresh: View[], c: PageChanges | null): { views: View[]; missed: string[] } {
+  const views = fresh.slice(), missed: string[] = [];
+  for (const [name, change] of Object.entries(c && typeof c === "object" && !Array.isArray(c) ? c : {})) {
+    const i = names.indexOf(name);
+    const [set, unset] = Array.isArray(change) ? change : [];
+    if (i < 0 || !set || typeof set !== "object") { missed.push(name); continue; }
+    const v = { ...views[i], ...set } as Record<string, unknown>;
+    for (const k of Array.isArray(unset) ? unset : []) delete v[k];
+    if (v.kind !== fresh[i].kind) { missed.push(name); continue; }
+    views[i] = v as unknown as View;
   }
-  return out;
+  return { views, missed };
 }
