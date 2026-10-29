@@ -112,7 +112,8 @@ and commit both.
   12), `figure.ts` (its SVG), `kind.ts` (its descriptor: figure, title, results text, help,
   federation need, marks — `ViewKindDef` in `lib/views/kind-def.ts`) and `doc.ts` (its part of the DSL
   reference: its row of the Views table, its agent-grammar entry and its own gallery examples —
-  `KindDoc` in `lib/views/kind-doc.ts`; never add a kind's text to `lib/dsl-reference.ts` itself). The page file is its
+  `KindDoc` in `lib/views/kind-doc.ts`; never add a kind's text to `lib/dsl-reference.ts` itself). A kind with more to explain than that has a `README.md` in its folder; read it before
+  changing the kind, and write one rather than adding the kind's own story to this file. The page file is its
   `KindUi` (`app/lab/kinds/kind-ui.ts`): its add-view dialog entry, the category it is listed under
   (`VIEW_CATEGORIES`, the dialog's sidebar; `app/lab/add-view-dialog.tsx`) and why it is disabled, the view a new
   one starts from, how many cohorts it draws, and its card — the shared card
@@ -173,28 +174,11 @@ and commit both.
   `POST /api/view-page` (a page, or a column's values) and `POST /api/table` (the CSV) serve every
   table view. A view holding several tables (`alterations`) names one with `table` in those
   requests (`RunOpts.table`), and `pagedTable()` in `lib/views/rows.ts` picks it from the result.
-- **The `alterations` view** (cBioPortal's patient-view genomic tables, runner `lib/views/alterations/run.ts`) — one
-  patient's Mutations, Copy Number Alterations and Structural Variants as three table views in one card, each
-  with its own query under its own spec key (`mutations`, `cna`, `sv`); the top-level query is the patient list's.
-  Row sources in **`lib/patient-alterations.ts`** (one row per variant / call / event however many of the
-  patient's samples carry it). Local patient-level participants, and a peer whose rules allow `alterations`
-  (opt-in patient-level federation, below): the peer pages each table in its own database.
-  Its navigator is the timeline's: **`app/lab/patient-nav.tsx`** (‹ prev / next ›, the List/Search dialog,
-  ← / →) serves every view that shows one patient of a cohort at a time, stepping by the result's `position`
-  (`listPosition()` in `lib/views/rows.ts`).
-- **The `timeline` view** (cBioPortal's patient-view Timeline, runner `lib/views/timeline/run.ts`) — one
-  patient's clinical events as tracks, with its cohort's patients (a table view) to pick from. **`lib/timeline-tracks.ts`** is
-  the track model, ported from cbioportal-frontend's `cbioportal-clinical-timeline` package and
-  `patientView/timeline/timeline_helpers.tsx`: the portal's track order and `trackStructures`
-  nesting, lone-"Other" absorption, line charts for all-numeric lab results, numbered sample
-  markers, the year axis with empty runs cut. **`lib/timeline-svg.ts`** draws it, browser-safe:
-  the lab card (`app/lab/timeline-body.tsx`) and the MCP figure are the same drawing. The queries
-  (`lib/patient-timeline.ts`) name a patient, so they run only through
-  `PatientLevelResolver.patientTimeline`/`rowsPage`/`rowsRank`. The view reads one cohort; its
-  navigator (cohort, the patient list — a `<dialog>` holding the `DataTable` — and ‹ prev / next ›) steps by the result's `position` — the drawn patient's place
-  in the list's order (`rankSql`) and its neighbours — setting `patient`. The chosen `patient`, folded `collapsed`
-  tracks and `expandGaps` are in the spec; the last two are drawn in the browser (`dataPart`).
-  **Opt-in patient-level federation** serves this view, `alterations`, a plot's cases (`plot`;
+- **Patient views** — views that show one patient of a cohort at a time (`timeline`, `alterations`)
+  share a navigator, **`app/lab/patient-nav.tsx`** (‹ prev / next ›, the List/Search dialog, ← / →),
+  stepping by the result's `position` (`listPosition()` in `lib/views/rows.ts`). Their queries name a
+  patient, so they run only through `PatientLevelResolver`. Each has a `README.md` in its folder.
+- **Opt-in patient-level federation** serves the patient views, a plot's cases (`plot`;
   a plot's aggregates cross for any peer through the federation API's `plot` op) and an oncoprint's
   columns (`oncoprint`: the peer answers its study's share, `StudyInputs` in `lib/oncoprint.ts`, and
   the contract is assembled from it beside the local studies' rows), per study and kind
@@ -246,14 +230,6 @@ and commit both.
   what it does not know. A change to the document's shape, or to what an unchanged document means,
   bumps DOC_VERSION and adds an upgrade step there; never re-interpret an old shape anywhere else.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
-- **The `composition` view** (runner `lib/views/composition/run.ts`, SQL `lib/composition.ts`, figure
-  `lib/views/composition/figure.ts`) — parts of a whole per case (cell types, cell states, signatures):
-  a generic-assay profile's entities or 2–16 numeric clinical attributes (`custom:` included). Each
-  case's vector is built in the database (`casesCte`); every participant returns only sums
-  (`compositionMomentsSql`), and the per-case stacked bars come from `PatientLevelResolver.viewRows`
-  alone, without ids. Each cohort is tested against the others pooled, part by part (Welch from
-  moments, BH). Gallery example on the bundled SPECTRUM single-cell data (`lib/spectrum-sc-demo.ts`,
-  regenerated by `scripts/gen-spectrum-sc-demo.py` from the public CELLxGENE files).
 - **Cell Explorer links** (`lib/cell-explorer.ts` browser-safe, `lib/cell-explorer-server.ts`,
   `POST /api/cell-explorer`) — a cohort's patients opened as a donor filter on a study's
   cell-explorer.cbioportal.org dataset (the cohort menu), and a Cell Explorer link or donor ids

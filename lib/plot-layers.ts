@@ -4,7 +4,7 @@
 /**
  * How many cases a plot draws as points before it stops being a drawing: at or under it every case
  * is a point; past it the plotted cohort is density, and the point layers share this many points.
- * Set from a measurement (docs/plot-case-level.md): an SVG of n points paints in about 18 ms per
+ * Set from a measurement (lib/views/plot/CASE-LEVEL.md): an SVG of n points paints in about 18 ms per
  * thousand on the dev server's headless Chrome, so 10,000 keeps a redraw near 200 ms; the points
  * travel as about 44 bytes each.
  */
