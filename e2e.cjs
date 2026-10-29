@@ -1825,6 +1825,13 @@ async function main() {
         JSON.stringify(g) + " · queried " + queried);
       // a link that opens on a tab only the whole page has, with a setting for it and one for a view the page lacks:
       // the tab is waited for, never swapped for the first, and only the setting that names no view is reported
+      // and asks only for what that tab draws: no other view, and no oncoprint, is requested on the way
+      const asked = [];
+      const onAsk = (r) => {
+        if (r.url().includes("/api/oncoprint")) asked.push("oncoprint");
+        else if (r.url().includes("/api/analysis")) try { asked.push(...(JSON.parse(r.postData() || "{}").views || []).map((x) => x.kind)); } catch { asked.push("?"); }
+      };
+      page.on("request", onAsk);
       await page.goto(BASE + "/portal/results?study=brca_tcga&genes=KRAS%0ATP53&tab=Plots&changes=" +
         enc({ "Plots › Plot": [{ points: [] }], "Gone › Nothing": [{ x: 1 }] }), { waitUntil: "domcontentloaded" });
       const active = new Set();
@@ -1836,9 +1843,11 @@ async function main() {
       active.add(await page.locator("[aria-label='results tabs'] [role=tab][data-state=active]").innerText());
       const linkNote = await page.locator("p.note").first().innerText().catch(() => "");
       const layers = await page.locator(".plot-solo button").allInnerTexts();
+      page.off("request", onAsk);
       ok("results: a link to a tab the page lays out last waits for it, and applies its setting by the view's name",
-        !active.has("Oncoprint") && active.has("Plots") && /Gone › Nothing/.test(linkNote) && !/Plots › Plot/.test(linkNote) && layers.length === 0,
-        [...active].join(" → ") + " · layers " + JSON.stringify(layers) + " · " + linkNote);
+        !active.has("Oncoprint") && active.has("Plots") && /Gone › Nothing/.test(linkNote) && !/Plots › Plot/.test(linkNote) && layers.length === 0 &&
+          asked.length > 0 && asked.every((k) => k === "plot"),
+        [...active].join(" → ") + " · layers " + JSON.stringify(layers) + " · asked " + JSON.stringify(asked) + " · " + linkNote);
       await page.goto(BASE + "/portal/results?studies=brca_tcga_pan_can_atlas_2018,coadread_tcga_pan_can_atlas_2018&filters=" +
         enc([{ kind: "clinical", attribute: "SEX", values: ["Female"] }]) + "&genes=KRAS", { waitUntil: "domcontentloaded" });
       await settle();
