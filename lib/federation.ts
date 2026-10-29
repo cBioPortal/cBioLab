@@ -20,7 +20,8 @@
 // (data-level federation) or a federation API client to a remote cbio-lab
 // (document-level federation) behind the same interface.
 import { survivalCountsSql, anchoredSurvivalSql, coxRowsSql, survivalEndpointsSql } from "./survival-queries.ts";
-import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, type ChConn } from "./ch.ts";
+import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, registerChExternal, hasChExternal, inChContext, type ChConn } from "./ch.ts";
+import { createHash } from "node:crypto";
 import { sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
@@ -59,6 +60,7 @@ import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } 
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
 import { finiteSql } from "./sql-number.ts";
+import { driverAnnotationJoin } from "./oql.ts";
 import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type CohortSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
@@ -313,14 +315,7 @@ export function inCohortClinical(study: string, alias = ""): string {
 export const ALTERED_COND = "((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)";
 
 export function driverJoin(pin: string): string {
-  return (
-    "  LEFT JOIN oncokb_annotation.variant_annotation ann\n" +
-    "    ON ann.oncokb_version = " + sq(pin) + " AND ann.is_driver\n" +
-    "   AND ann.hugo_gene_symbol = g.hugo_gene_symbol\n" +
-    "   AND ((g.variant_type = 'mutation' AND ann.alteration_type = 'MUTATION' AND ann.alteration = g.mutation_variant)\n" +
-    "     OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))\n" +
-    "     OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))\n"
-  );
+  return driverAnnotationJoin(pin, "LEFT");
 }
 
 /**
@@ -1394,7 +1389,8 @@ abstract class BaseResolver implements AggregateCapable {
   }
   /** the one place a resolver's statement reaches the database and its log; the typed runners above and PatientLevelResolver's decide what may */
   protected async logged<R>(label: string, sql: string, conn: ChConn): Promise<ChResult<R>> {
-    const entry: QueryLogEntry = { label, sql };
+    // logged with each resolved cohort's definition in place of its rows, so the entry runs on its own
+    const entry: QueryLogEntry = { label, sql: withCohortDefinitions(sql) };
     this.queries.push(entry);
     const r = await chQuery<R>(sql, conn);
     entry.ms = r._ms;
@@ -1405,8 +1401,13 @@ abstract class BaseResolver implements AggregateCapable {
     this.ctx = ctx;
   }
 
-  cohortSql(def: CohortDef | null | undefined): CohortSql {
+  /** the cohort's compiled definition: what provenance shows */
+  definitionSql(def: CohortDef | null | undefined): CohortSql {
     return cohortSubquery(compileCohortDef(def, { ...this.ctx, study: this.study, db: this.instance.conn.db }));
+  }
+  /** the cohort as this resolver's queries read it */
+  cohortSql(def: CohortDef | null | undefined): CohortSql {
+    return this.definitionSql(def);
   }
   async count(def: CohortDef | null | undefined): Promise<number> {
     return (await this.sizes(def)).patients;
@@ -1907,6 +1908,23 @@ abstract class BaseResolver implements AggregateCapable {
  * marker of the entitlement, and the type system routes any future feature that
  * genuinely needs identities to an instance permitted to give them.
  */
+/** Rows past which a cohort is read as its definition rather than shipped with every view query. */
+const COHORT_IDS_LIMIT = Number(process.env.COHORT_IDS_LIMIT || 50000);
+/** a resolved cohort's subquery -> its compiled definition, for the query log (withCohortDefinitions) */
+const resolvedDefinitions = new Map<string, string>();
+const RESOLVED_TABLE_RE = /SELECT pid, sid FROM _cohort_rows_[0-9a-f]{16}/g;
+/** `sql` with each resolved cohort's rows replaced by the definition they were evaluated from */
+export function withCohortDefinitions(sql: string): string {
+  return sql.replace(RESOLVED_TABLE_RE, (m) => resolvedDefinitions.get(m) ?? m);
+}
+/**
+ * The external table a resolved cohort is published as: one per (connection, compiled definition).
+ * The connection's database name is left out of the hash: it is fixed for the connection, and the
+ * view snapshots replay the same statements under another name.
+ */
+const resolvedCohortTable = (conn: ChConn, sql: string): string =>
+  "_cohort_rows_" + createHash("sha256").update(conn.id + "\0" + sql.split(conn.db + ".").join(".")).digest("hex").slice(0, 16);
+
 export class PatientLevelResolver extends BaseResolver implements PatientLevelCapable {
   readonly instance: Instance & { mode: "patient-level" };
   /** a statement whose rows name patients or samples: only this class can run one */
@@ -1920,6 +1938,38 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   constructor(study: string, ctx: Partial<CompileCtx>, instance: Instance) {
     super(study, ctx);
     this.instance = { ...instance, mode: "patient-level" };
+  }
+  /** the cohort as its queries read it: its rows, once resolveCohort has published them for this request; else its definition */
+  cohortSql(def: CohortDef | null | undefined): CohortSql {
+    const sql = this.definitionSql(def);
+    const table = resolvedCohortTable(this.instance.conn, sql);
+    if (!hasChExternal(table)) return sql;
+    const rows = "SELECT pid, sid FROM " + table;
+    if (!resolvedDefinitions.has(rows)) {
+      // bounded: an entry is needed only while a request that resolved it is still logging
+      if (resolvedDefinitions.size >= 5000) resolvedDefinitions.delete(resolvedDefinitions.keys().next().value!);
+      resolvedDefinitions.set(rows, sql);
+    }
+    return cohortSubquery(rows);
+  }
+  /**
+   * Evaluates the cohort once and publishes its `(pid, sid)` rows as an external table for the
+   * rest of the request, bound to this instance's connection, so each view query reads the rows
+   * instead of evaluating the definition again: a timeline cohort runs 3-6x faster over an
+   * analysis (docs/PERFORMANCE.md, "One cohort evaluation per analysis"). Returns the cohort's
+   * sizes, or null when it stays a definition: no request context, or more than
+   * COHORT_IDS_LIMIT rows.
+   */
+  async resolveCohort(def: CohortDef | null | undefined): Promise<CohortSizes | null> {
+    if (!inChContext()) return null;
+    const sql = this.definitionSql(def);
+    const r = await this.runPatientQuiet<ChRow>(patientSql("SELECT DISTINCT pid, sid FROM (" + sql + ") LIMIT " + (COHORT_IDS_LIMIT + 1)));
+    if (r.data.length > COHORT_IDS_LIMIT) return null;
+    const clean = (v: unknown): string => String(v).replace(/[\t\n\\]/g, "");
+    const data = r.data.map((x) => clean(x.pid) + "\t" + clean(x.sid) + "\n").join("");
+    if (!registerChExternal({ name: resolvedCohortTable(this.instance.conn, sql), structure: "pid String, sid String", data, conn: this.instance.conn.id }))
+      return null;
+    return { patients: new Set(r.data.map((x) => String(x.pid))).size, samples: new Set(r.data.map((x) => String(x.sid))).size };
   }
   /**
    * The points behind a box plot, with their case ids, so a reader can find one on the figure:

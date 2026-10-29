@@ -7,7 +7,7 @@
 // re-derives its columns inside the owning database.
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
 import { applyLocks, lockDate } from "./cohort-lock.ts";
-import { chQuery, STUDY, PRIMARY, type ChConn } from "./ch.ts";
+import { chQuery, STUDY, PRIMARY, ensureChContext, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 import { describeCohortDef } from "./cohort2.ts";
@@ -330,7 +330,12 @@ async function assayPartition(cohort: string, def: CohortDef, docStudy: string, 
       other: short + " at or below median", source: { ...source, median: true } } };
 }
 
-export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: RunOpts = {}): Promise<AnalysisResult> {
+/** One request context for the whole analysis, so a cohort resolved once is read by every view (resolveCohort). */
+export function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: RunOpts = {}): Promise<AnalysisResult> {
+  return ensureChContext(() => runAnalysisIn(template, opts));
+}
+
+async function runAnalysisIn(template: AnalysisDoc | TemplateDoc, opts: RunOpts = {}): Promise<AnalysisResult> {
   const t0 = Date.now();
   // Parameters are resolved FIRST, so everything downstream — compilers,
   // validators, provenance — sees an ordinary document and cannot tell a
@@ -401,14 +406,15 @@ export async function runAnalysis(template: AnalysisDoc | TemplateDoc, opts: Run
       // cohortSql() reads what it reported.
       const local = res instanceof PatientLevelResolver || res instanceof AggregateResolver;
       const rowsOf = opts.count;
+      // provenance is the definition, read before resolveCohort makes the queries read its rows
+      const sql = res.cohortSql(def);
       const { patients, samples } = local && rowsOf
         ? await (async () => {
-          const sql = res.cohortSql(def);
           const [patients, samples] = await Promise.all([rowsOf(res.instance.conn, "SELECT DISTINCT pid FROM (" + sql + ")"), rowsOf(res.instance.conn, sql)]);
           return { patients, samples };
         })()
-        : await res.sizes(def);
-      return { s, res, sql: res.cohortSql(def), count: patients, samples };
+        : (res instanceof PatientLevelResolver && await res.resolveCohort(def)) || await res.sizes(def);
+      return { s, res, sql, count: patients, samples };
     }));
     for (const { s, res, sql, count, samples } of evals) {
       perStudy[s] = { sql, count, samples, mode: res.instance.mode };

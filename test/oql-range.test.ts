@@ -68,7 +68,7 @@ describe("OQL position range: SQL", () => {
     assert.match(sql("APC: MUT_(1400-)"), /g\.pos_start IS NOT NULL AND g\.pos_end IS NOT NULL AND g\.pos_start != -1 AND g\.pos_end != -1 AND g\.pos_start <= g\.pos_end/);
   });
   test("DRIVER still joins the pinned OncoKB store", () => {
-    assert.match(sql("APC: TRUNC_(1400-)_DRIVER"), /oncokb_annotation\.variant_annotation ann/);
+    assert.match(sql("APC: TRUNC_(1400-)_DRIVER"), /FROM oncokb_annotation\.variant_annotation\s+WHERE oncokb_version = '[^']+' AND is_driver\) ann/);
   });
   test("an entry without a range is unchanged", () => {
     assert.match(sql("APC: TRUNC"), /FROM db\.genomic_event_derived g/);

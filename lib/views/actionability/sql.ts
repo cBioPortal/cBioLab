@@ -3,6 +3,7 @@ import { pidOf } from "../../federation-views.ts";
 import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { sq } from "../../compiler.ts";
+import { annotationMatchSql } from "../../oql.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 /**
@@ -97,10 +98,7 @@ function actionCtes(cohortSql: string, study: string, db: string, pin: string): 
     "  INNER JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, highest_sensitive_level, highest_resistance_level\n" +
     "      FROM oncokb_annotation.variant_annotation\n" +
     "      WHERE oncokb_version = " + sq(pin) + " AND (highest_sensitive_level != '' OR highest_resistance_level != '')) ann\n" +
-    "    ON ann.hugo_gene_symbol = g.hugo_gene_symbol\n" +
-    "   AND ((g.variant_type = 'mutation' AND ann.alteration_type = 'MUTATION' AND ann.alteration = g.mutation_variant)\n" +
-    "     OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))\n" +
-    "     OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))\n" +
+    "    ON " + annotationMatchSql("ann", "g") +
     "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
     "    AND ((g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED') OR (g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2) OR g.variant_type = 'structural_variant')\n" +
     "    AND g.sample_unique_id IN (SELECT sid FROM seq)\n" +

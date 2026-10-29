@@ -91,9 +91,10 @@ export function connById(id: string): ChConn | null {
  *   database evaluates the definition a single time per request. Keyed by table name, so the
  *   studies of a federated request register side by side without colliding.
  */
-export interface ChExternal { name: string; structure: string; data: string }
+/** `conn`: the one connection whose statements may carry it (ids go back only to the database they came from) */
+export interface ChExternal { name: string; structure: string; data: string; conn?: string }
 /** The payload is encoded once per request, not once per query that carries it. */
-interface ChExternalEnc { name: string; structure: string; blob: Blob }
+interface ChExternalEnc { name: string; structure: string; blob: Blob; conn?: string }
 interface ChCtx { signal?: AbortSignal; externals: Map<string, ChExternalEnc> }
 const ctxStore = new AsyncLocalStorage<ChCtx>();
 
@@ -136,8 +137,16 @@ export function ensureChContext<T>(fn: () => Promise<T>): Promise<T> {
 export function registerChExternal(ext: ChExternal): boolean {
   const s = ctxStore.getStore();
   if (!s) return false;
-  s.externals.set(ext.name, { name: ext.name, structure: ext.structure, blob: new Blob([ext.data]) });
+  s.externals.set(ext.name, { name: ext.name, structure: ext.structure, blob: new Blob([ext.data]), ...(ext.conn ? { conn: ext.conn } : {}) });
   return true;
+}
+/** Whether there is a request context to publish external tables in. */
+export function inChContext(): boolean {
+  return !!ctxStore.getStore();
+}
+/** Whether this request has published an external table by this name. */
+export function hasChExternal(name: string): boolean {
+  return !!ctxStore.getStore()?.externals.has(name);
 }
 export function chExternalRegistered(name: string): boolean {
   return !!ctxStore.getStore()?.externals.has(name);
@@ -191,11 +200,12 @@ export function chException(body: string): string {
 }
 
 /** External tables this statement actually names — an unreferenced cohort is not uploaded. */
-function externalsFor(query: string): ChExternalEnc[] {
+function externalsFor(query: string, conn: string): ChExternalEnc[] {
   const s = ctxStore.getStore();
   if (!s || !s.externals.size) return [];
   const out: ChExternalEnc[] = [];
   for (const ext of s.externals.values()) {
+    if (ext.conn && ext.conn !== conn) continue;
     // identifier boundary, so `_cohort_brca` does not drag in `_cohort_brca_tcga`
     if (new RegExp("(^|[^A-Za-z0-9_])" + ext.name + "([^A-Za-z0-9_]|$)").test(query)) out.push(ext);
   }
@@ -254,7 +264,7 @@ async function post(sql: string, conn: ChConn, format: string): Promise<string> 
   const query = sql + "\nFORMAT " + format;
   // uploaded custom data and stored id sets ride along only with a statement that names them
   // (lib/custom-data.ts, lib/id-sets.ts)
-  const externals = [...externalsFor(query),
+  const externals = [...externalsFor(query, conn.id),
     ...[...customExternalsFor(query, conn.id), ...idSetExternalsFor(query, conn.id)]
       .map((e) => ({ name: e.name, structure: e.structure, blob: new Blob([e.data]) }))];
   if (transport) return transport({ conn, format, query, externals }, (settings) => postToDatabase(conn, query, externals, ctx, settings));
