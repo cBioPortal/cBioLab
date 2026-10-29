@@ -5,6 +5,7 @@ node_modules
 server.log
 nohup.out
 *.png
+!docs/diagrams/*.png
 mcp.log
 server-*.log
 HANDOFF.local.md

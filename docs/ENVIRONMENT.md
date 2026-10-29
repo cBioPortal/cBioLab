@@ -127,6 +127,11 @@ see the security notes below.
 | `CHAT_EFFORT` | `medium` | `low`, `medium`, `high`, `xhigh` or `max` |
 | `CHAT_ON_DEPLOYMENT` | — | `1`: also on a built deployment (never on Vercel), for signed-in users only |
 
+Bedrock reads AWS credentials through the standard chain, re-read on every request, so a
+refreshed credentials file needs no restart. The internal instance
+(cbiolab.cbioportal.aws.mskcc.org) relies on that: it uses Bedrock with the credentials file the
+cluster's SAML job refreshes every 3 h.
+
 ## Performance and limits
 
 | var | default | meaning |

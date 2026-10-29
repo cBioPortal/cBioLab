@@ -1,6 +1,7 @@
 // Every view kind's descriptor (lib/views/<kind>/kind.ts), by kind: what the pages, the figures, the
 // results text, the help and the federation rules read about a kind. A new kind is one entry here,
-// one in lib/views/index.ts (its runner) and one in app/lab/kinds/index.ts (its page file). Browser-safe.
+// one in lib/views/index.ts (its runner), one in lib/views/docs.ts (its DSL reference) and one in
+// app/lab/kinds/index.ts (its page file). Browser-safe.
 import type { ViewKind, ViewResult } from "../types.ts";
 import type { SvgOpts } from "../svg-kit.ts";
 import type { ViewHelp } from "../view-help.ts";

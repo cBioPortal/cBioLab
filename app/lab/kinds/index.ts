@@ -1,6 +1,7 @@
 // Every view kind's page-side description (app/lab/kinds/<kind>.tsx), in the add menu's order: what the
 // analysis page and the portal tabs read about a kind. A new kind is one file there and one entry here,
-// beside its descriptor in lib/views/kinds.ts and its runner in lib/views/index.ts.
+// beside its descriptor in lib/views/kinds.ts, its runner in lib/views/index.ts and its DSL reference in
+// lib/views/docs.ts.
 import type { ViewKind } from "../../../lib/types.ts";
 import type { KindUi } from "./kind-ui.ts";
 import { acquiredUi } from "./acquired.tsx";

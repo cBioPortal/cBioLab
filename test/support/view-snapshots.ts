@@ -54,65 +54,13 @@ import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
 import { viewKinds } from "./view-kinds.ts";
 
 /**
- * One case per view kind: the smallest gallery example that draws it (the oncoprint is pinned by
- * test/oncoprint-svg.test.ts), and one per option that changes what a view asks; then examples
- * that combine studies, where a view adds up answers from several databases.
+ * The cases: every gallery example marked `snapshot` (lib/views/kind-doc.ts), by that name, in gallery
+ * order. One per view kind — the smallest gallery example that draws it, in the kind's doc.ts or the
+ * guide's examples (the oncoprint is pinned by test/oncoprint-svg.test.ts) — and one per option that
+ * changes what a view asks; then examples that combine studies, where a view adds up answers from
+ * several databases.
  */
-const CASES: Record<string, string> = {
-  compare: "A missing alteration type is disclosed, never a false negative",
-  survival: "A non-standard survival endpoint, named directly",
-  cox: "Cox with a gene-SET covariate: any of three genes, one term",
-  logistic: "Logistic regression: does APC status predict MSI-high status",
-  course: "The clinical course: who is still on treatment, and when",
-  sequence: "What comes after what: lines of therapy, and what ending a path means",
-  hotspots: "Lollipop plot: mutations by protein position",
-  plot: "Plot axes from the study's own profiles",
-  coexpression: "Co-expression from sums alone",
-  clinical: "Median/IQR and a rank-sum test, single-study only",
-  cooccurrence: "Co-occurrence and mutual exclusivity in NSCLC",
-  attrition: "Cohort attrition: which criterion removed whom",
-  genome: "Genome-wide copy number: colorectal against breast",
-  pathways: "Oncogenic signalling pathways: colorectal against pancreatic",
-  diffexpr: "Differential expression and enrichment",
-  paired: "Paired samples: what differs between a patient's primary and",
-  clonality: "Clonality, LOH and genome doubling from FACETS",
-  incidence: "Brain metastasis, with death as a competing risk",
-  labs: "PSA response to hormone therapy, by TP53 status",
-  riskmodel: "A survival risk model from mutated genes in lung cancer",
-  cancertypes: "Cancer types summary: RAS genes across 50,000 tumours",
-  overlap: "Cohort overlap: how four groups share their patients",
-  enrichment: "Alteration enrichment: what separates colorectal from pancreatic",
-  assays: "Mutational signatures: what UV light and tobacco leave behind",
-  composition: "Composition: T and NK cell states by mutational signature",
-  correlates: "Co-expression: the genes that rise and fall with ESR1",
-  table: "Clinical data: every pancreatic cancer sample, oldest patients first",
-  timeline: "A patient's timeline: treatments, diagnoses, samples and lab",
-  mutations: "KRAS codon 12/13 mutations in colorectal cancer",
-  alterations: "A patient's mutations, copy-number alterations and structural",
-  rmst: "Months of life gained on immunotherapy with a high tumour mutational b",
-  acquired: "Acquired under therapy: the sample before a treatment against the samp",
-  germline: "Germline carriers in metastatic prostate cancer, and their tumours' se",
-  hla: "HLA class I homozygosity and survival on checkpoint blockade in melano",
-  actionability: "Clinical actionability: OncoKB levels across 50,000 tumours, and prima",
-  molsubtype: "The endometrial classifier against TCGA's own molecular subtypes",
-  ctdna: "ctDNA against tissue: what a blood test sees of the tumour, and what d",
-  exclusivity: "Mutual exclusivity that accounts for each tumour's burden (DISCOVER)",
-  cutpoint: "A tumour mutational burden cut-point for survival on immunotherapy",
-  drivernegative: "Driver-negative lung cancer: what is mutated when no canonical driver",
-  instability: "Genomic instability by cancer type: aneuploidy score, FGA and arm-leve",
-  txendpoints: "Real-world PFS on immunotherapy in lung cancer, by KRAS status",
-  organotropism: "Brain metastasis in lung cancer by EGFR, from dated tumour sites",
-  multistate: "From progression to death in colorectal cancer, by stage",
-  adjusted: "Adjusted enrichment: early-onset colorectal cancer, adjusted for MSI a",
-  predictive: "Which mutations change survival on immunotherapy in lung cancer?",
-  forest: "Pan-cancer forest: TP53 mutation and survival in 30 cancer types",
-  "ctdna-chfilter": "ctDNA with clonal haematopoiesis filtered out: MSK-ACCESS plasma again",
-  "riskmodel-validateon": "A lung cancer risk model, validated on another study",
-  "two-studies-survival": "Study-stratified survival across two studies",
-  "two-studies-four-views": "Federated end to end: two studies, four views",
-  "two-studies-plot": "Point layers across two studies",
-  "pooled-paired": "Before and after treatment, pooled across studies",
-};
+const CASES: Record<string, string> = Object.fromEntries(EXAMPLES.flatMap((e) => e.snapshot ? [[e.snapshot, e.title]] : []));
 
 const DIR = join(import.meta.dirname, "..", "snapshots");
 const ANSWERS = join(DIR, "answers");
@@ -230,7 +178,7 @@ async function runCase(ex: (typeof EXAMPLES)[number], recorded: Record<string, s
 /** One shard's tests, as [name, test] pairs: every `of`-th case from `shard` (1-based), in CASES order. */
 export function snapshotCases(shard: number, of: number): [string, () => Promise<void>][] {
   return Object.entries(CASES).filter((_, i) => i % of === shard - 1).map(([kind, title]) => ["snapshot: " + kind, async () => {
-    const ex = EXAMPLES.find((e) => e.title.startsWith(title));
+    const ex = EXAMPLES.find((e) => e.title === title);
     assert.ok(ex, "no gallery example titled “" + title + "…”");
     const answersFile = join(ANSWERS, kind + ".json.gz");
     const recorded: Record<string, string> = {};
@@ -254,8 +202,10 @@ export function snapshotCases(shard: number, of: number): [string, () => Promise
   }]);
 }
 
-/** That CASES covers every view kind; the first shard runs it. */
+/** That CASES covers every view kind, each case name once; the first shard runs it. */
 export function everyKindHasACase(): void {
+  const names = EXAMPLES.flatMap((e) => e.snapshot ? [e.snapshot] : []);
+  assert.deepEqual(names.filter((n, i) => names.indexOf(n) !== i), [], "a snapshot case name is used by two examples");
   assert.deepEqual(viewKinds().filter((k) => k !== "oncoprint" && !(k in CASES)), [],
-    "add a case for each to CASES above (its smallest gallery example), then RECORD_SNAPSHOTS=1");
+    "mark each one's smallest gallery example `snapshot: \"<kind>\"` (its lib/views/<kind>/doc.ts), then RECORD_SNAPSHOTS=1");
 }

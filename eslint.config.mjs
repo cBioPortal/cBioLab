@@ -17,8 +17,8 @@ import path from "node:path";
 // kind; a shared view module imports no kind at all. So a change to one view cannot break another,
 // and what two kinds need goes into a shared module.
 const SHARED_VIEW_MODULES = ["lib/views/run.ts", "lib/views/shared.ts", "lib/views/rows.ts", "lib/views/covariates.ts",
-  "lib/views/kind-def.ts", "lib/views/text.ts", "app/lab/kinds/kind-ui.ts", "app/lab/kinds/parts.tsx"];
-const VIEW_REGISTRIES = ["lib/views/index.ts", "lib/views/kinds.ts", "app/lab/kinds/index.ts"];
+  "lib/views/kind-def.ts", "lib/views/kind-doc.ts", "lib/views/text.ts", "app/lab/kinds/kind-ui.ts", "app/lab/kinds/parts.tsx"];
+const VIEW_REGISTRIES = ["lib/views/index.ts", "lib/views/kinds.ts", "lib/views/docs.ts", "app/lab/kinds/index.ts"];
 const kindBoundary = {
   meta: { type: "problem", schema: [] },
   create(context) {

@@ -3,6 +3,99 @@
 The map of the code: what each part does, where it lives, and the one place each rule is kept.
 [`CLAUDE.md`](../CLAUDE.md) indexes it, and holds the invariants that outrank it.
 
+## The shape of the system
+
+Every surface reads and writes the same document; the engine owns all semantics; the warehouse is
+read-only, with the licensed annotation store isolated behind its own database grant; what people
+keep lives in a separate, writable Postgres; another instance is reached through the federation
+API, never MCP; and the DSL's documentation, agent grammar and MCP self-description all render
+from one source module.
+
+```mermaid
+flowchart TB
+    subgraph SURFACES["Surfaces — all speak the same document"]
+        UI["Web UI — app/<br/>home · Explore · Analysis · portal pages · saved work · campaigns · admin"]
+        CHAT["Browser assistants — WebMCP, lib/webmcp.ts<br/>Claude in Chrome, or the app's chat sidebar /api/chat<br/>the page's tools only: read · edit · undo"]
+        MCP["MCP clients — /api/mcp, mcp/tools.ts<br/>describe_dsl · run_analysis · render_oncoprint<br/>query_cohort · campaign_*"]
+        LOCAL["Local tables — CLI, python/cohortlab<br/>oncoprints from Oncoprinter-style TSVs"]
+    end
+
+    DOC[["<b>Analysis document</b> (JSON)<br/>study, cohorts by name, views<br/>shareable / re-runnable as ?doc= links"]]
+
+    UI <--> DOC
+    CHAT <--> DOC
+    MCP <--> DOC
+
+    subgraph SERVER["Server — clients never send SQL"]
+        ROUTES["API routes — app/api/<br/>envelopes in lib/api-schemas.ts"]
+        CACHE["Result cache — lib/next-cache.ts<br/>keyed by data version + settings"]
+        RA["runAnalysis — lib/analysis.ts<br/>cohorts per study · federation by SUMMING aggregates<br/>no dedup across studies, labeled"]
+        COMP["Cohort compilers<br/>lib/cohort2.ts · lib/oql.ts · lib/compiler.ts<br/><i>loud rejection of anything unanswerable</i>"]
+        VIEWS["View kinds — lib/views/&lt;kind&gt;/<br/>~50 runners: compare, survival, oncoprint, plot, timeline…<br/>each with its method record"]
+        RES["Resolvers — lib/federation.ts<br/>PatientLevel · Aggregate · Remote<br/>the patient-data boundary is a missing method"]
+    end
+
+    DOC --> ROUTES
+    ROUTES --> CACHE --> RA
+    RA --> COMP
+    RA --> VIEWS
+    VIEWS --> RES
+    COMP -- "compiled SQL" --> RES
+
+    subgraph DATA["Warehouse — read-only, lib/ch.ts"]
+        CH[("ClickHouse<br/>cBioPortal derived tables<br/>one or two databases")]
+        OKB[("oncokb_annotation<br/>separate DB · version-pinned<br/>license = GRANT boundary")]
+    end
+    RES --> CH
+    RES -- "DRIVER joins the pin" --> OKB
+
+    PEER["Peer cbio-lab instance<br/>/api/federation/v1/&lt;op&gt;<br/>lib/federation-api.ts · client lib/federation-remote.ts<br/>aggregates always; patient rows only where both sides allow"]
+    RES <-- "HTTP, named ops — never SQL" --> PEER
+
+    subgraph STORE["Writable store — Postgres, lib/db.ts"]
+        PG[("saved cohorts + analyses · custom data<br/>stored id sets · campaigns · users + groups<br/>settings · migrations db/migrations/")]
+    end
+    ROUTES <--> PG
+    AUTH["Sign-in — lib/auth.ts · lib/oidc.ts<br/>sharing rules — lib/access.ts"]
+    AUTH --- PG
+
+    subgraph OUT["Outputs — renderers hold zero data logic"]
+        SVG["server SVG → PNG<br/>MCP, /provenance, CLI"]
+        CANVAS["browser figures<br/>same SVG drawers + oncoprint canvas"]
+        PY["matplotlib<br/>python/cohortlab, reads style.json"]
+        PROV["Provenance + method<br/>readback · compiled SQL · sources · notebook"]
+    end
+    VIEWS --> SVG
+    VIEWS --> CANVAS
+    LOCAL --> PY
+    RA --> PROV
+    PROV -. "one click back to" .-> UI
+
+    REF["lib/dsl-reference.ts<br/><b>single source of DSL truth</b>"]
+    REF -- "generates docs/dsl.md<br/>(examples CI-executed)" --> DOCS["docs/dsl.md · Examples tab"]
+    REF -- "grammar" --> CHAT
+    REF -- "describe_dsl" --> MCP
+```
+
+## How a request is processed
+
+An analysis request, from the page to the SQL and back to each view's card and figure: where
+cohort SQL is compiled (`lib/cohort2.ts`), where each view's queries are built (its `sql.ts`, or
+`lib/federation.ts` / `lib/federation-views.ts`), and where JSX and figures come from (`app/lab/`
+for JSX; each kind's `figure.ts` for an SVG string).
+
+![How an analysis request is processed](diagrams/analysis-request.png)
+
+The oncoprint takes a second request: the analysis run returns only its spec, and the card fetches
+the contract from `/api/oncoprint` as binary and draws it on a canvas.
+
+![How an oncoprint is drawn on the analysis page](diagrams/oncoprint-request.png)
+
+Both are drawn from HTML in `docs/diagrams/`: edit the HTML, run `node scripts/render-diagrams.cjs`,
+and commit both.
+
+## The parts
+
 - **`lib/cohort2.ts`** — DSL v2 cohort compiler: `{all:[clause]}`, clause = leaf | `{any:[...]}`
   | `{not:leaf}`; leaf kinds: `oql`, `clinical`, `event` (v1 timeline sub-DSL), `patients`,
   `profiled`, `caseList`, `genomicData`, `genericAssay` (+deprecated `alteration`→OQL).
@@ -12,18 +105,22 @@ The map of the code: what each part does, where it lives, and the one place each
 - **`lib/analysis.ts`** — `runAnalysis(doc)`: evaluates cohorts (per-study; cross-study
   federation via study-qualified member ids), then hands each view to its kind's runner.
 - **View kinds** — **each kind is a folder, `lib/views/<kind>/`, plus one page file,
-  `app/lab/kinds/<kind>.tsx`, and a line in each of three registries.** The folder holds `types.ts`
+  `app/lab/kinds/<kind>.tsx`, and a line in each of four registries.** The folder holds `types.ts`
   (the kind's spec and result fields: it adds its entry to `ViewSpecs`, `ViewResultFields` and
   `ViewResultMain` in `lib/types.ts` by `declare module`), `run.ts` (the runner), `sql.ts` (its
   queries; `test/boundary.test.ts` sweeps every kind's), `method.ts` (its method record, invariant
-  12), `figure.ts` (its SVG) and `kind.ts` (its descriptor: figure, title, results text, help,
-  federation need, marks — `ViewKindDef` in `lib/views/kind-def.ts`). The page file is its
+  12), `figure.ts` (its SVG), `kind.ts` (its descriptor: figure, title, results text, help,
+  federation need, marks — `ViewKindDef` in `lib/views/kind-def.ts`) and `doc.ts` (its part of the DSL
+  reference: its row of the Views table, its agent-grammar entry, its phrase in MCP `run_analysis`'s
+  description and its own gallery examples, one marked as its view snapshot case —
+  `KindDoc` in `lib/views/kind-doc.ts`; never add a kind's text to `lib/dsl-reference.ts` itself). A kind with more to explain than that has a `README.md` in its folder; read it before
+  changing the kind, and write one rather than adding the kind's own story to this file. The page file is its
   `KindUi` (`app/lab/kinds/kind-ui.ts`): its add-view dialog entry, the category it is listed under
   (`VIEW_CATEGORIES`, the dialog's sidebar; `app/lab/add-view-dialog.tsx`) and why it is disabled, the view a new
   one starts from, how many cohorts it draws, and its card — the shared card
   (`app/lab/kind-cards.tsx`) with its subtitle, controls and body, or a `Card` of its own. The
-  registries are `lib/views/index.ts` (runners), `lib/views/kinds.ts` (descriptors) and
-  `app/lab/kinds/index.ts` (page files); each is typed by `ViewKind`, the `View` union's kinds, so
+  registries are `lib/views/index.ts` (runners), `lib/views/kinds.ts` (descriptors),
+  `lib/views/docs.ts` (DSL reference) and `app/lab/kinds/index.ts` (page files); each is typed by `ViewKind`, the `View` union's kinds, so
   a kind missing from any of them does not compile, and everything else (`lib/view-svg.ts`,
   `lib/result-text.ts`, `VIEW_HELP`, `viewNeed`, the add menu, the cards) reads them. A runner gets
   the run's context (`ViewRun` in `lib/views/run.ts`: the document, evaluated cohorts, resolvers,
@@ -78,28 +175,11 @@ The map of the code: what each part does, where it lives, and the one place each
   `POST /api/view-page` (a page, or a column's values) and `POST /api/table` (the CSV) serve every
   table view. A view holding several tables (`alterations`) names one with `table` in those
   requests (`RunOpts.table`), and `pagedTable()` in `lib/views/rows.ts` picks it from the result.
-- **The `alterations` view** (cBioPortal's patient-view genomic tables, runner `lib/views/alterations/run.ts`) — one
-  patient's Mutations, Copy Number Alterations and Structural Variants as three table views in one card, each
-  with its own query under its own spec key (`mutations`, `cna`, `sv`); the top-level query is the patient list's.
-  Row sources in **`lib/patient-alterations.ts`** (one row per variant / call / event however many of the
-  patient's samples carry it). Local patient-level participants, and a peer whose rules allow `alterations`
-  (opt-in patient-level federation, below): the peer pages each table in its own database.
-  Its navigator is the timeline's: **`app/lab/patient-nav.tsx`** (‹ prev / next ›, the List/Search dialog,
-  ← / →) serves every view that shows one patient of a cohort at a time, stepping by the result's `position`
-  (`listPosition()` in `lib/views/rows.ts`).
-- **The `timeline` view** (cBioPortal's patient-view Timeline, runner `lib/views/timeline/run.ts`) — one
-  patient's clinical events as tracks, with its cohort's patients (a table view) to pick from. **`lib/timeline-tracks.ts`** is
-  the track model, ported from cbioportal-frontend's `cbioportal-clinical-timeline` package and
-  `patientView/timeline/timeline_helpers.tsx`: the portal's track order and `trackStructures`
-  nesting, lone-"Other" absorption, line charts for all-numeric lab results, numbered sample
-  markers, the year axis with empty runs cut. **`lib/timeline-svg.ts`** draws it, browser-safe:
-  the lab card (`app/lab/timeline-body.tsx`) and the MCP figure are the same drawing. The queries
-  (`lib/patient-timeline.ts`) name a patient, so they run only through
-  `PatientLevelResolver.patientTimeline`/`rowsPage`/`rowsRank`. The view reads one cohort; its
-  navigator (cohort, the patient list — a `<dialog>` holding the `DataTable` — and ‹ prev / next ›) steps by the result's `position` — the drawn patient's place
-  in the list's order (`rankSql`) and its neighbours — setting `patient`. The chosen `patient`, folded `collapsed`
-  tracks and `expandGaps` are in the spec; the last two are drawn in the browser (`dataPart`).
-  **Opt-in patient-level federation** serves this view, `alterations`, a plot's cases (`plot`;
+- **Patient views** — views that show one patient of a cohort at a time (`timeline`, `alterations`)
+  share a navigator, **`app/lab/patient-nav.tsx`** (‹ prev / next ›, the List/Search dialog, ← / →),
+  stepping by the result's `position` (`listPosition()` in `lib/views/rows.ts`). Their queries name a
+  patient, so they run only through `PatientLevelResolver`. Each has a `README.md` in its folder.
+- **Opt-in patient-level federation** serves the patient views, a plot's cases (`plot`;
   a plot's aggregates cross for any peer through the federation API's `plot` op) and an oncoprint's
   columns (`oncoprint`: the peer answers its study's share, `StudyInputs` in `lib/oncoprint.ts`, and
   the contract is assembled from it beside the local studies' rows), per study and kind
@@ -151,14 +231,6 @@ The map of the code: what each part does, where it lives, and the one place each
   what it does not know. A change to the document's shape, or to what an unchanged document means,
   bumps DOC_VERSION and adds an upgrade step there; never re-interpret an old shape anywhere else.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
-- **The `composition` view** (runner `lib/views/composition/run.ts`, SQL `lib/composition.ts`, figure
-  `lib/views/composition/figure.ts`) — parts of a whole per case (cell types, cell states, signatures):
-  a generic-assay profile's entities or 2–16 numeric clinical attributes (`custom:` included). Each
-  case's vector is built in the database (`casesCte`); every participant returns only sums
-  (`compositionMomentsSql`), and the per-case stacked bars come from `PatientLevelResolver.viewRows`
-  alone, without ids. Each cohort is tested against the others pooled, part by part (Welch from
-  moments, BH). Gallery example on the bundled SPECTRUM single-cell data (`lib/spectrum-sc-demo.ts`,
-  regenerated by `scripts/gen-spectrum-sc-demo.py` from the public CELLxGENE files).
 - **Cell Explorer links** (`lib/cell-explorer.ts` browser-safe, `lib/cell-explorer-server.ts`,
   `POST /api/cell-explorer`) — a cohort's patients opened as a donor filter on a study's
   cell-explorer.cbioportal.org dataset (the cohort menu), and a Cell Explorer link or donor ids
@@ -322,10 +394,8 @@ The map of the code: what each part does, where it lives, and the one place each
   `lib/chat-model.ts`: `CHAT_PROVIDER=anthropic|bedrock`, `CHAT_MODEL`, `CHAT_EFFORT`). **Where it
   runs:** a dev server (`next dev`) with `CHAT_PROVIDER` set; a built deployment only with
   `CHAT_ON_DEPLOYMENT=1`, never on Vercel (no public URL spends the key), and there only for a
-  signed-in user — a deployment that signs nobody in has none. The internal instance
-  (cbiolab.cbioportal.aws.mskcc.org) uses Bedrock with the credentials file the cluster's SAML job
-  refreshes every 3 h; Bedrock reads AWS credentials through the standard chain, re-read on every
-  request, so a refreshed file needs no restart. It must work the app exactly as an outside
+  signed-in user — a deployment that signs nobody in has none (providers and credentials:
+  [`ENVIRONMENT.md`](ENVIRONMENT.md)). It must work the app exactly as an outside
   assistant (Claude in Chrome, Claude Desktop) does: each request sends the tools the page exposes
   (`window.cohortLab.tools`), the route declares them **without implementations**, and every call
   runs in the browser through `window.cohortLab.call`. **Never give it a private way in** — no
@@ -354,3 +424,61 @@ The map of the code: what each part does, where it lives, and the one place each
   salt pinned by `test/cohort.test.ts` — changing it reshuffles every reported result.
   **A locked campaign is immutable at the database level** (triggers); never work around them in
   application code.
+- **The result cache** (`lib/next-cache.ts`; Next 16 Cache Components, `'use cache: remote'`) —
+  CLAUDE.md invariant 11. On Vercel it is Runtime Cache, shared by every function instance;
+  elsewhere it is process memory. Analyses, oncoprint contracts, Explore, the study catalog and the
+  study list all go through it, from the web routes, `/api/mcp` and chat alike.
+  - **A deploy clears it** (Next keys every entry by deployment), a data import or OncoKB release
+    does too (`dataVersion()` is an argument of every cached function), and entries regenerate
+    after a day.
+  - **Only a returned value is stored.** A refusal, a partial answer (an instance that did not
+    reply) or an abandoned query must THROW, or it is served to everyone for a day.
+  - **Read through `throughCache(cached, direct)`.** A production build replaces the message of
+    anything thrown inside a cached function, so when the cached call throws the direct one runs
+    and reports the real error. It also covers a cache that cannot be read.
+  - **An administrator clears it, and changes federation settings, at `/admin`** (the users in
+    `ADMIN_EMAILS`; account menu → Admin). `lib/settings.ts`: an `app_setting` row overrides the
+    environment variable of the same name for every process within seconds; federation code reads
+    those settings through `setting(name)`, never `process.env`. `cacheVersion()` (data version plus
+    the settings' fingerprint, which includes the last clear) is every cached entry's key argument —
+    cohort locks keep `dataVersion()` alone. Database addresses and credentials are never editable.
+  - **`RESULT_CACHE=off` turns it off.** `throughCache` then runs the direct call on every request,
+    so a server answers everything cold — for measuring what a first reader waits for. Without a
+    cache handler configured (anywhere but Vercel), the cache is the Node process's own LRU
+    (`cacheMaxMemorySize`, 50 MB unless `RESULT_CACHE_MB` says otherwise): lost on restart, and not
+    shared between replicas.
+  - **Arguments are the key.** A cached function takes only serializable arguments and computes
+    everything else itself; a function passed in cannot be called. Anything that changes the
+    answer must be an argument.
+  - Entries are gzipped JSON as base64 text (`pack`): Runtime Cache refuses items over 2 MB, and
+    has handed typed arrays back corrupted.
+  - `next/cache` exists only under Next, so the stdio MCP server, CLI and tests run the engine
+    uncached; `registerTools` takes the engine to use.
+- **Method records** (`lib/method.ts`) — CLAUDE.md invariant 12. A view's result carries each step
+  from its queries' rows to its numbers, built from the values that computation used, plus a Python
+  script that recomputes the numbers with standard libraries; `check:methods` re-runs them
+  ([`docs/TESTING.md`](TESTING.md)). Numbers and settings in a record's text come from variables or
+  named constants, never typed in. **A record's script is also a notebook**: the panel's "download
+  as notebook" posts the document to `POST /api/analysis/notebook`, which re-runs it, rebuilds the
+  files the script reads from the view's own recorded queries (`lib/method-data.ts` — the same code
+  `check:methods` runs, so the export is what was checked; no SQL is ever accepted from a caller)
+  and assembles the `.ipynb` (`lib/method-notebook.ts`). A view with rows from a federated peer is
+  refused (403) and the notebook is capped at `NOTEBOOK_MAX_BYTES` (413). A new view kind whose
+  script reads a file needs its rebuild in `methodFiles`, or the notebook says the file is missing.
+- **Every build knows its commit.** `next.config.mjs` stamps it as `GIT_COMMIT`: Vercel's
+  `VERCEL_GIT_COMMIT_SHA`, else a `GIT_COMMIT` passed in (the Docker image takes it as a build
+  argument — `.git` is not in its context — and CI passes `github.sha`), else `git rev-parse HEAD`
+  with `+dirty` for a changed tree; `next dev` says `dev`. `lib/build-info.ts` reads it; every page's
+  footer shows it, linked to the commit, and `GET /api/version` returns it. A build that could find
+  no commit (a hand-run `docker build` without `--build-arg GIT_COMMIT=…`) reads "unknown", never
+  blank.
+- **Cohorts on the analysis page** — the page shows the document's cohort store as a summary
+  ("Cohorts in this analysis": size, studies, which views draw each). Since DSL 2.5 a view without
+  a `cohorts` list is empty and the page shows it waiting for one; cohorts come in through a view's
+  "+ Add cohort" (`app/lab/add-cohort-dialog.tsx`: the analysis's own, the library, or Explore in
+  add mode, which returns the selection to that view).
+- **Provenance** (`lib/provenance.ts`) — every result lists its `sources`: each database and
+  federation peer, with what a peer reports about itself in every answer (name, build, each study's
+  import date), and each view's participation points into that list. The document panel shows each
+  cohort's compiled SQL, and every view shows the aggregate queries that produced its numbers
+  (resolvers log what they run; a peer returns its own log, marked as having executed there).

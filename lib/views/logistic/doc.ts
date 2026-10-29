@@ -1,0 +1,9 @@
+// The `logistic` view in the DSL reference: its row of the Views table, its entry in the agent grammar.
+// lib/dsl-reference.ts assembles these from lib/views/docs.ts.
+import type { KindDoc } from "../kind-doc.ts";
+
+export const logisticDoc: KindDoc = {
+  summary: "multivariate logistic regression on a binary outcome, odds ratios",
+  reference: `\`outcome:axis, outcomeEvent?:"<level>", covariates:[axis, ...(max 8)], cohorts:[names]\` | multivariate logistic regression: a BINARY outcome (not time-to-event \u2014 no endpoint/months convention here) regressed on several covariates at once, reported as odds ratios with Wald confidence intervals, drawn as a forest plot the same shape as \`cox\`'s. \`outcome\` is a plot axis, exactly like a covariate (clinical, molecular, or alteration status). A categorical outcome (a clinical attribute, or an alteration axis) needs \`outcomeEvent\` naming which observed value counts as the event (1) \u2014 every other observed value collapses into "not event" (0), and which values got collapsed is disclosed in the caveat; omitting it, or naming a value never observed, is refused with the actual observed values listed rather than guessed at. A numeric outcome must already be coded exactly 0/1 (refused otherwise) and must NOT be given \`outcomeEvent\`. Covariates use the exact same dummy-coding and reference-level rules as \`cox\` (see above): a mutated-vs-not axis defaults to \`\"Not mutated\"\`, others default to the most frequent level, \`reference\` overrides either. Same patient-level-only boundary as \`cox\``,
+  grammar: `{"kind":"logistic","outcome":<axis>,"outcomeEvent":"<level>"?,"covariates":[axis, ...(max 8)],"cohorts":[names?]}`,
+};
