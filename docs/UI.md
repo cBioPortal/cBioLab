@@ -78,8 +78,8 @@ still holds, against a running server.
 - **Look at a UI change, then measure it — "renders without errors" is not done.** Screenshot the
   changed region itself at `deviceScaleFactor: 2` (a whole card at 1× hides a few pixels of
   misalignment) and compare it with the same kind of control in a neighbouring view: centre
-  lines, heights, type size, spacing. Then assert the geometry in `e2e.cjs`:
-  `misalignedControls(page, scope)` fails any toolbar zone under `scope` whose controls are not
+  lines, heights, type size, spacing. Then assert the geometry in the area's `test/e2e/` file:
+  `misalignedControls(page, scope)` (`test/e2e/helpers.cjs`) fails any toolbar zone under `scope` whose controls are not
   one `--ctl-h` tall on one centre line. A view that adds a control row calls it.
 - **Apparatus goes in `.vfoot`.** Legend, methodology caveats and provenance stay on the page and
   a step down in weight, so they read as apparatus rather than as findings.

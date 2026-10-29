@@ -69,7 +69,9 @@ than skipping when it isn't — a missing dependency must fail loud, not silentl
 
 ## Browser checks (e2e)
 
-`node e2e.cjs` — the browser checks (Playwright) against a running server. The checks that need no server (`check:examples`, `check:denominators`,
+`node e2e.cjs` — the browser checks (Playwright) against a running server. They live by area in
+`test/e2e/` (one file per area, run in the order `e2e.cjs` lists); a new check goes in its area's
+file. The checks that need no server (`check:examples`, `check:denominators`,
 `check:genefacets`, `check:values`, `check:splitby-perf`) are stages of `scripts/gate.sh` of their
 own, and the boundary suite is in `npm test`.
 

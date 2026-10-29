@@ -114,7 +114,7 @@ change. The ones most often broken:
 - **Tooltips are `data-tip`, never `title`** (`app/_ui/tooltip.tsx`; docs/UI.md says why).
 - **Keystrokes stay in the field** (a small component owns the draft); **one way to change the
   document** (`app/lab/doc-store.ts`).
-- **Look at a UI change, then measure it** (`misalignedControls` in `e2e.cjs`), and verify waiting
+- **Look at a UI change, then measure it** (`misalignedControls` in `test/e2e/helpers.cjs`), and verify waiting
   states by holding the request.
 
 ## Code standards — what `npm run lint` enforces
