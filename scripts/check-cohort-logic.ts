@@ -228,6 +228,15 @@ const fold = (v: string) => v.trim().toLowerCase();
 /** the spellings of "no value recorded" (cBioPortal's study view, isAttributeValueNA): never a match */
 const MISSING = ["", "na", "n/a", "nan"];
 const finite = (v: string) => { const x = v.trim() === "" ? NaN : Number(v); return Number.isFinite(x) ? x : null; };
+/**
+ * a value as a comparison open on one side reads it, as cBioPortal's filter does: ">90" just above
+ * 90 and ">=90" 90 when nothing bounds it above, "<18" just below 18 when nothing bounds it below
+ */
+const bounded = (v: string, open: ">" | "<" | null) => {
+  if (open && v.startsWith(open + "=")) return finite(v.slice(2));
+  if (open && v.startsWith(open)) { const x = finite(v.slice(1)); return x == null ? null : open === ">" ? x + 1e-10 : x - 1e-10; }
+  return finite(v);
+};
 
 /**
  * The samples a leaf selects, read off the raw rows by the DSL reference's rules: a sample-level
@@ -252,11 +261,12 @@ function evalLeaf(raw: RawStudy, leaf: any): Set<string> {
     const ok = (v: string) => {
       if (leaf.values) return leaf.values.map(fold).includes(fold(v));
       if (leaf.range) {
-        const x = finite(v);
+        const lower = leaf.range.gt != null || leaf.range.gte != null, upper = leaf.range.lt != null || leaf.range.lte != null;
+        const x = bounded(v, lower && !upper ? ">" : upper && !lower ? "<" : null);
         return x != null && (leaf.range.gte == null || x >= leaf.range.gte) && (leaf.range.lt == null || x < leaf.range.lt);
       }
       if (typeof leaf.value === "number") {
-        const x = finite(v);
+        const x = bounded(v, leaf.op[0] === ">" ? ">" : leaf.op[0] === "<" ? "<" : null);
         return x != null && (leaf.op === ">=" ? x >= leaf.value : leaf.op === "<" ? x < leaf.value : leaf.op === "=" ? x === leaf.value : x !== leaf.value);
       }
       return leaf.op === "=" ? fold(v) === fold(leaf.value) : fold(v) !== fold(leaf.value);

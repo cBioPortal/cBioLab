@@ -49,7 +49,8 @@ changing first. The parts, and the one place each rule lives:
 - **THE one place for:** timeline event-name folding — `lib/event-names.ts`; who enters a survival
   analysis and what is an event — `lib/survival-sql.ts` (its queries `lib/survival-queries.ts`, and every
   view reading an endpoint names who it leaves out, `reportsLeftOut` in `lib/views/index.ts`); a treatment line —
-  `lib/treatment-lines.ts`; template parameters — `lib/params.ts`; splits — `lib/partition-arms.ts`
+  `lib/treatment-lines.ts`; a numeric histogram's bars, as cBioPortal lays them out — `lib/data-binner.ts`;
+  template parameters — `lib/params.ts`; splits — `lib/partition-arms.ts`
   and `lib/cohort-partitions.ts`; upgrading an older document — `lib/doc-version.ts`; a setting
   reaching the browser — `lib/public-env.ts`; a page's request — `app/lab/api.ts` with
   `lib/api-schemas.ts`; reading `clinical_data_derived`/`clinical_attribute_meta` —

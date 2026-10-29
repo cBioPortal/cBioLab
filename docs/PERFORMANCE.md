@@ -681,11 +681,15 @@ Measured scope, across the whole database:
 | STRUCTURAL_VARIANT | 221 | **0** | 0 |
 | COPY_NUMBER_ALTERATION | 353 | **101** | 37,994 of 282,726 |
 
-Fixed by counting `uniqExact(sample_unique_id)` rather than rows. One residual
-remains and is deliberate: a sample on two **different** panels is still counted
-once per panel, because deduplicating that needs the sample-level join the
-per-panel CTE exists to avoid (13s on a 290k-sample study). It is 328 samples
-across the entire database, against 37,666 cured.
+Fixed by counting `uniqExact(sample_unique_id)` rather than rows. A sample on two
+**different** panels (or a panel and whole-exome) was still counted once per panel,
+as cBioPortal's study view counts it (nsclc_ctdx_msk_2022: EGFR copy number 2,840
+profiled in a 2,621-sample study), while the views counted it once. Deduplicating
+everything needs the sample-level join the per-panel CTE exists to avoid (13s on a
+290k-sample study), so Explore subtracts a per-gene surplus computed at the sample
+level over only the samples with more than one panel (October 2026). Measured,
+interleaved 3 × 3 runs, gene tables alone: msk_impact_50k_2026 ~310 → ~340 ms,
+msk_ch_2023 ~165 → ~220 ms, three large MSK studies pooled ~325 → ~405 ms.
 
 **2. The per-study merge dropped profiled samples, biasing frequencies high.**
 A study's gene table has a row only for genes it saw altered, and the merge sums
@@ -754,8 +758,13 @@ fallback for the gene tables (416 queries).
 Every Explore query now runs once per connection over all its studies, the study in its
 `GROUP BY` and `LIMIT … BY study` where it had a per-study limit, and each study's rows are
 handed back to it (`prefetchFacets`), so classification, disjunctive values and `mergeExplore`
-are unchanged. Histograms bin every study at once against the shared edges, outlier bars in the
-same scan (`pooledHistograms`). Under a draft each study's cohort is resolved once up front and
+are unchanged. Histograms read every study's values at once, one query per connection returning
+each recorded value with how many hold it (`numericValueCounts`), and draw the bars in TypeScript
+by cBioPortal's own binner (`lib/data-binner.ts`, October 2026; it replaced SQL bins over shared
+edges, which disagreed with the portal's layout and misplaced values on an edge). Measured
+interleaved 3 × 3 runs, Explore without gene tables: msk_impact_50k_2026 ~760 ms either way,
+msk_chord_2024 NSCLC ~540 → ~415 ms, three large studies pooled ~1.06 → ~1.27 s (37,000 distinct
+values; binning them takes ~0.1 s). Under a draft each study's cohort is resolved once up front and
 the pooled queries read them as one set of study-qualified ids (`pooledPatientSet`). One study is
 the list of length one: single-study output is identical to the per-study code's.
 
