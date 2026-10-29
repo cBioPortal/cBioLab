@@ -28,15 +28,23 @@ export function labCourseSql(cohortSql: string, study: string, db: string, lab: 
  * baseline, and with any value after the anchor.
  */
 export function labBestSql(cohortSql: string, study: string, db: string, lab: LabSpec, anchor: IncidenceAnchor, o: LabOpts, responseDrop: number): AggregateSql {
-  const best = "(SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid)";
+  // every count from one pass over the anchored patients (pb), not one pass per count
   return aggregateSql((
-    labCtes(cohortSql, study, db, lab, anchor, o) + "\n" +
-    "SELECT 'best' AS what, " + pctBin("best") + " AS pbin, count() AS n FROM " + best + " GROUP BY pbin\n" +
-    "UNION ALL SELECT 'responders' AS what, 0 AS pbin, countIf(best <= " + (-Math.abs(Number(responseDrop))) + ") AS n FROM " + best + "\n" +
-    "UNION ALL SELECT 'anchored' AS what, 0 AS pbin, count() AS n FROM anch\n" +
-    "UNION ALL SELECT 'baseline' AS what, 0 AS pbin, count() AS n FROM base\n" +
-    "UNION ALL SELECT 'positive_baseline' AS what, 0 AS pbin, countIf(b > 0) AS n FROM base\n" +
-    "UNION ALL SELECT 'after' AS what, 0 AS pbin, uniqExactIf(pid, rel > 0) AS n FROM chg"
+    labCtes(cohortSql, study, db, lab, anchor, o) + ",\n" +
+    "pbest AS (\n" +
+    "  SELECT has_base, b, has_base AND b > 0 AND notEmpty(after) AS ok, arrayMin(after) AS best\n" +
+    "  FROM (SELECT has_base, b, arrayMap((x) -> 100 * (x.2 - b) / b, arrayFilter((x) -> x.1 > 0 AND " + inWindow("x.1", o) + ", xs)) AS after FROM pb)\n" +
+    "),\n" +
+    "tot AS (\n" +
+    "  SELECT count() AS anchored, countIf(has_base) AS baseline, countIf(has_base AND b > 0) AS positive_baseline,\n" +
+    "         countIf(ok) AS after, countIf(ok AND best <= " + (-Math.abs(Number(responseDrop))) + ") AS responders,\n" +
+    "         sumMapIf([" + pctBin("if(ok, best, 0)") + "], [toUInt64(1)], ok) AS hist\n" +
+    "  FROM pbest\n" +
+    ")\n" +
+    "SELECT r.1 AS what, r.2 AS pbin, r.3 AS n FROM tot\n" +
+    "ARRAY JOIN arrayConcat(arrayMap((k, v) -> ('best', k, v), hist.1, hist.2),\n" +
+    "  [('responders', toInt32(0), responders), ('anchored', toInt32(0), anchored), ('baseline', toInt32(0), baseline),\n" +
+    "   ('positive_baseline', toInt32(0), positive_baseline), ('after', toInt32(0), after)]) AS r"
   ));
 }
 
@@ -91,6 +99,7 @@ function labCtes(cohortSql: string, study: string, db: string, lab: LabSpec, anc
     "    AND " + inCohortPatients("p.stable_id") + "\n" +
     "  GROUP BY pid\n" +
     "),\n" +
+    // the study's readings of the test: joined to the anchored patients once, below
     "lab AS (\n" +
     "  SELECT p.stable_id AS pid, ce.start_date AS day, " + finiteSql("r.value") + " AS v\n" +
     "  FROM " + db + ".clinical_event ce\n" +
@@ -99,24 +108,35 @@ function labCtes(cohortSql: string, study: string, db: string, lab: LabSpec, anc
     "  JOIN " + db + ".clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("t.key", lab.testKey) + " AND " + foldedEqualsSql("t.value", lab.test) + "\n" +
     "  JOIN " + db + ".clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND " + foldedEqualsSql("r.key", lab.resultKey) + "\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(study) + " AND " + foldedEqualsSql("ce.event_type", lab.eventType) + "\n" +
-    "    AND " + inCohortPatients("p.stable_id", "anch") + " AND " + finiteSql("r.value") + " IS NOT NULL\n" +
+    "    AND " + finiteSql("r.value") + " IS NOT NULL\n" +
     "),\n" +
-    "base AS (\n" +
+    // One row per anchored patient, its readings as (days from the anchor, value). Everything
+    // below reads this row, so each statement evaluates lab and anch once: a CTE named twice is
+    // evaluated twice.
+    "per AS (\n" +
+    "  SELECT anch.pid AS pid, groupArrayIf((lab.day - anch.day, assumeNotNull(lab.v)), lab.pid != '') AS xs\n" +
+    "  FROM anch LEFT JOIN lab ON lab.pid = anch.pid\n" +
+    "  GROUP BY anch.pid\n" +
+    "),\n" +
     // the baseline is the mean of the readings on the last day with any, so several readings that day
     // give one answer rather than whichever row came first
-    "  SELECT lab.pid AS pid, max(lab.day) AS bday,\n" +
-    "         arrayAvg(arrayMap((x) -> assumeNotNull(x.1), arrayFilter((x) -> x.2 = bday, groupArray((lab.v, lab.day))))) AS b\n" +
-    "  FROM lab INNER JOIN anch ON anch.pid = lab.pid\n" +
-    "  WHERE lab.day >= anch.day - " + Math.floor(o.baselineDays) + " AND lab.day <= anch.day GROUP BY lab.pid\n" +
+    "pb AS (\n" +
+    "  SELECT pid, xs, arrayFilter((x) -> x.1 >= -" + Math.floor(o.baselineDays) + " AND x.1 <= 0, xs) AS pre, notEmpty(pre) AS has_base,\n" +
+    "         arrayMax(arrayMap((x) -> x.1, pre)) AS brel,\n" +
+    "         arrayAvg(arrayMap((x) -> x.2, arrayFilter((x) -> x.1 = brel, pre))) AS b\n" +
+    "  FROM per\n" +
     "),\n" +
     "chg AS (\n" +
-    "  SELECT lab.pid AS pid, lab.day - anch.day AS rel, 100 * (lab.v - base.b) / base.b AS pc\n" +
-    "  FROM lab INNER JOIN anch ON anch.pid = lab.pid INNER JOIN base ON base.pid = lab.pid\n" +
-    "  WHERE base.b > 0 AND lab.day != base.bday\n" +
-    "    AND lab.day - anch.day >= " + Math.floor(o.fromDays) + " AND lab.day - anch.day <= " + Math.floor(o.toDays) + "\n" +
+    "  SELECT pid, x.1 AS rel, 100 * (x.2 - b) / b AS pc\n" +
+    "  FROM pb ARRAY JOIN xs AS x\n" +
+    "  WHERE has_base AND b > 0 AND " + inWindow("x.1", o) + "\n" +
     ")"
   );
 }
+
+/** a reading `rel` days from the anchor that counts as a change: in the window, and not on the baseline's day */
+const inWindow = (rel: string, o: LabOpts): string =>
+  rel + " != brel AND " + rel + " >= " + Math.floor(o.fromDays) + " AND " + rel + " <= " + Math.floor(o.toDays);
 
 export const pctBin = (x: string) =>
   "toInt32(floor((least(" + LAB_PCT_MAX + ", greatest(" + LAB_PCT_MIN + ", " + x + ")) - (" + LAB_PCT_MIN + ") + " + (LAB_PCT_BIN / 2) + ") / " + LAB_PCT_BIN + "))";

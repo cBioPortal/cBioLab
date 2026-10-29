@@ -91,12 +91,11 @@ ps AS (
 alt AS (
   SELECT g.hugo_gene_symbol AS gene, ps.pid AS pid, ps.side AS side, max(ann.is_driver) AS hit
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN oncokb_annotation.variant_annotation ann
-    ON ann.oncokb_version = 'v7.5' AND ann.is_driver
-   AND ann.hugo_gene_symbol = g.hugo_gene_symbol
-   AND ((g.variant_type = 'mutation' AND ann.alteration_type = 'MUTATION' AND ann.alteration = g.mutation_variant)
-     OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))
-     OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+      WHERE oncokb_version = 'v7.5' AND is_driver) ann
+    ON ann.hugo_gene_symbol = g.hugo_gene_symbol
+   AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
+   AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
   INNER JOIN ps ON ps.suid = g.sample_unique_id
   WHERE g.cancer_study_identifier = 'lung_msk_pdx' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps)

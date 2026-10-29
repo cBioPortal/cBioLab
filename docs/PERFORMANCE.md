@@ -892,3 +892,106 @@ Explore's (§ "Two fixes" above).
 
 The inline id ceiling is unchanged in kind: a stored id set or a lock is now a sample list, so a
 cohort's ~12,000-id inline limit counts samples.
+
+# Where the database time goes (October 2026)
+
+Measured 2026-10-28 by running every gallery example in-process (`runAnalysis`, `RESULT_CACHE=off`)
+with each ClickHouse response's `X-ClickHouse-Summary` recorded beside its statement: server time,
+rows read, peak memory. The warehouse is shared with other sessions, so a single end-to-end time
+can move 2x from run to run (one co-expression query measured 12-27s in the same form); every
+"before → after" below on one query was taken alternating old and new SQL, best of two each.
+
+**The database is the cost, and the network is not.** 89% of the gallery's wall clock had a query
+in flight, and ClickHouse's own elapsed time summed to within 5% of what the app waited. The
+exceptions are Node-bound: `riskmodel` (8-11s in `lib/coxnet.ts`, single-threaded), `incidence`
+(~4s of CPU) and a genie_public oncoprint (45 MB of rows read into the process; 0.6s of it in
+ClickHouse).
+
+**Scheduling harder does not help.** Raising `CLICKHOUSE_MAX_INFLIGHT` from 8 to 32 moved single
+analyses 5-20%, inside the noise. Fired straight at the service, one heavy scan (2.0s alone) ran
+2 at a time at full speed — one per replica — and 4, 8, 16 at no more throughput than 2; at 32, 30
+of 32 failed with `MEMORY_LIMIT_EXCEEDED` (each replica caps near 29 GiB). The fixes below remove
+work instead.
+
+## 1. The OncoKB driver join: an equality join, not an OR
+
+Matching an event to its OncoKB row was written as an OR of three per-type conditions
+(`(mutation AND …) OR (cna AND …) OR (sv AND …)`), which ClickHouse runs as a slow multi-key join.
+The same match as three equalities on columns derived from the event (`annotationMatchSql` in
+`lib/oql.ts`, used by `driverJoin`, OQL's `DRIVER` and actionability) is the same rows:
+
+| | OR form | equality form |
+|---|---|---|
+| organotropism's driver CTE, msk_met_2021 (12M rows read either way) | 5.77s | **0.09s** |
+| all 78 distinct captured queries carrying it, summed | 104s | **51s** |
+
+71 of the 78 return identical rows; the other 7 need custom-data tables the replay did not send.
+
+## 2. One cohort evaluation per analysis
+
+91% of the gallery's database time was in view queries that spliced the cohort's compiled
+definition in (`WITH cohort AS (<definition>)`), and an analysis sent the same definition in ~3
+statements on average, up to 25. A timeline cohort is expensive to evaluate — first-line's read
+230M rows per statement — so it was paid for again in every one.
+
+`runAnalysis` now evaluates each cohort once per study as it counts it
+(`PatientLevelResolver.resolveCohort`) and publishes its `(pid, sid)` rows as an external table for
+the rest of the request, bound to that instance's connection; every view statement then reads
+`SELECT pid, sid FROM _cohort_rows_<hash>`. The same "resolve once, ship the ids" fix as Explore's
+and the oncoprint's. Only a patient-level resolver does this — it may already read its own case
+ids; an aggregate-only or remote participant keeps the definition — and past `COHORT_IDS_LIMIT`
+(50,000 rows) or outside a request context the definition is read as before. The query log keeps
+the definition in place of the table (`withCohortDefinitions`), so every logged statement and
+method script still runs on its own.
+
+`WITH cohort AS MATERIALIZED (…)` (ClickHouse's `enable_materialized_cte`, Experimental in 26.6)
+was measured as the alternative and is not used: it evaluates the cohort once per *statement*, not
+once per analysis.
+
+| | inline | `MATERIALIZED` | resolved once |
+|---|---|---|---|
+| first-line, fast vs durable control | 16.7s | 10.6s | **4.8s** |
+| treatment lines | 16.2s | 10.8s | **6.8s** |
+| progression on immunotherapy | 13.1s | 9.2s | **1.9s** |
+| PSA above 100 | 9.7s | 6.2s | **1.8s** |
+
+(Database time over each example's cohort-reading statements. The last column was measured in a
+separate run from the first two.)
+
+## 3. `labs`: one pass over the anchored patients
+
+The labs view's CTEs (`anch` → `lab` → `base` → `chg`) named each other several times, and its
+best-response statement named `chg` and an inline `best` subquery in six `UNION ALL` arms — and a
+CTE named twice is evaluated twice. `lab` joins `clinical_event_data` (17M rows, no study column)
+twice, so every mention re-read it. Each anchored patient's readings are now folded into one array
+row (`per`), the baseline and changes are derived from it, and the best-response counts come from
+one aggregation, emitted as rows by `ARRAY JOIN`.
+
+## End to end
+
+The gallery, all three changes against the base, same harness:
+
+| | base | after |
+|---|---|---|
+| 94 examples, total wall clock | 279s | **160s** (cohorts and driver join only) |
+| rows read | 17.1 B | **8.4 B** |
+| first-line, fast vs durable control | 17.5s | **1.7s** |
+| treatment lines | 16.1s | **1.6s** |
+| organotropism | 12.3s | **1.4s** |
+| progression on immunotherapy | 9.8s | **1.1s** |
+| PSA response by TP53 (`labs`) | 13.6s | **2.7s** (1.46 B → 0.35 B rows) |
+| clinical actionability | 5.9s | **0.6s** |
+
+Verified: the 53 view snapshots were recorded again against the warehouse with the new code, and
+their outputs — every number, figure, results text and card — compared with the committed ones
+(`git diff`): unchanged except `diffexpr.json`, in the last digits of float sums, as any recording
+moves them. Only the queries and their recorded answers changed. The values the recording never
+writes held too: every gallery example's pinned counts and method scripts (`check:examples`), the
+denominator pins and the comparisons against cBioPortal's API.
+
+What is left: `acquired` (696M rows; the same CTE re-naming as `labs`), co-expression and
+differential expression, and the Node-bound views above. Co-expression's read of
+`genetic_alteration_derived` uses its key — 17,213 of 1,256,277 granules for one study's
+`rna_seq_v2_mrna`, 141M rows read in 0.12s — and its time is in what follows: averaging per
+(sample, gene) took 4.1s and 2.1 GB on its own, then the join to the reference gene and two `rank()`
+windows over 22M rows.

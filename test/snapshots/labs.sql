@@ -83,26 +83,38 @@ lab AS (
   JOIN snapshot_db.clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(t.key)) = lowerUTF8(trimBoth('TEST')) AND lowerUTF8(trimBoth(t.value)) = lowerUTF8(trimBoth('PSA'))
   JOIN snapshot_db.clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(r.key)) = lowerUTF8(trimBoth('RESULT'))
   WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND lowerUTF8(trimBoth(ce.event_type)) = lowerUTF8(trimBoth('Lab_Test'))
-    AND p.stable_id IN (SELECT pid FROM anch) AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
+    AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
 ),
-base AS (
-  SELECT lab.pid AS pid, max(lab.day) AS bday,
-         arrayAvg(arrayMap((x) -> assumeNotNull(x.1), arrayFilter((x) -> x.2 = bday, groupArray((lab.v, lab.day))))) AS b
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid
-  WHERE lab.day >= anch.day - 90 AND lab.day <= anch.day GROUP BY lab.pid
+per AS (
+  SELECT anch.pid AS pid, groupArrayIf((lab.day - anch.day, assumeNotNull(lab.v)), lab.pid != '') AS xs
+  FROM anch LEFT JOIN lab ON lab.pid = anch.pid
+  GROUP BY anch.pid
+),
+pb AS (
+  SELECT pid, xs, arrayFilter((x) -> x.1 >= -90 AND x.1 <= 0, xs) AS pre, notEmpty(pre) AS has_base,
+         arrayMax(arrayMap((x) -> x.1, pre)) AS brel,
+         arrayAvg(arrayMap((x) -> x.2, arrayFilter((x) -> x.1 = brel, pre))) AS b
+  FROM per
 ),
 chg AS (
-  SELECT lab.pid AS pid, lab.day - anch.day AS rel, 100 * (lab.v - base.b) / base.b AS pc
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid INNER JOIN base ON base.pid = lab.pid
-  WHERE base.b > 0 AND lab.day != base.bday
-    AND lab.day - anch.day >= -84 AND lab.day - anch.day <= 364
+  SELECT pid, x.1 AS rel, 100 * (x.2 - b) / b AS pc
+  FROM pb ARRAY JOIN xs AS x
+  WHERE has_base AND b > 0 AND x.1 != brel AND x.1 >= -84 AND x.1 <= 364
+),
+pbest AS (
+  SELECT has_base, b, has_base AND b > 0 AND notEmpty(after) AS ok, arrayMin(after) AS best
+  FROM (SELECT has_base, b, arrayMap((x) -> 100 * (x.2 - b) / b, arrayFilter((x) -> x.1 > 0 AND x.1 != brel AND x.1 >= -84 AND x.1 <= 364, xs)) AS after FROM pb)
+),
+tot AS (
+  SELECT count() AS anchored, countIf(has_base) AS baseline, countIf(has_base AND b > 0) AS positive_baseline,
+         countIf(ok) AS after, countIf(ok AND best <= -50) AS responders,
+         sumMapIf([toInt32(floor((least(300, greatest(-100, if(ok, best, 0))) - (-100) + 1) / 2))], [toUInt64(1)], ok) AS hist
+  FROM pbest
 )
-SELECT 'best' AS what, toInt32(floor((least(300, greatest(-100, best)) - (-100) + 1) / 2)) AS pbin, count() AS n FROM (SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid) GROUP BY pbin
-UNION ALL SELECT 'responders' AS what, 0 AS pbin, countIf(best <= -50) AS n FROM (SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid)
-UNION ALL SELECT 'anchored' AS what, 0 AS pbin, count() AS n FROM anch
-UNION ALL SELECT 'baseline' AS what, 0 AS pbin, count() AS n FROM base
-UNION ALL SELECT 'positive_baseline' AS what, 0 AS pbin, countIf(b > 0) AS n FROM base
-UNION ALL SELECT 'after' AS what, 0 AS pbin, uniqExactIf(pid, rel > 0) AS n FROM chg
+SELECT r.1 AS what, r.2 AS pbin, r.3 AS n FROM tot
+ARRAY JOIN arrayConcat(arrayMap((k, v) -> ('best', k, v), hist.1, hist.2),
+  [('responders', toInt32(0), responders), ('anchored', toInt32(0), anchored), ('baseline', toInt32(0), baseline),
+   ('positive_baseline', toInt32(0), positive_baseline), ('after', toInt32(0), after)]) AS r
 
 -- view 0 labs: labs:best:Prostate, TP53 wild-type · msk_chord_2024
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
@@ -145,26 +157,38 @@ lab AS (
   JOIN snapshot_db.clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(t.key)) = lowerUTF8(trimBoth('TEST')) AND lowerUTF8(trimBoth(t.value)) = lowerUTF8(trimBoth('PSA'))
   JOIN snapshot_db.clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(r.key)) = lowerUTF8(trimBoth('RESULT'))
   WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND lowerUTF8(trimBoth(ce.event_type)) = lowerUTF8(trimBoth('Lab_Test'))
-    AND p.stable_id IN (SELECT pid FROM anch) AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
+    AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
 ),
-base AS (
-  SELECT lab.pid AS pid, max(lab.day) AS bday,
-         arrayAvg(arrayMap((x) -> assumeNotNull(x.1), arrayFilter((x) -> x.2 = bday, groupArray((lab.v, lab.day))))) AS b
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid
-  WHERE lab.day >= anch.day - 90 AND lab.day <= anch.day GROUP BY lab.pid
+per AS (
+  SELECT anch.pid AS pid, groupArrayIf((lab.day - anch.day, assumeNotNull(lab.v)), lab.pid != '') AS xs
+  FROM anch LEFT JOIN lab ON lab.pid = anch.pid
+  GROUP BY anch.pid
+),
+pb AS (
+  SELECT pid, xs, arrayFilter((x) -> x.1 >= -90 AND x.1 <= 0, xs) AS pre, notEmpty(pre) AS has_base,
+         arrayMax(arrayMap((x) -> x.1, pre)) AS brel,
+         arrayAvg(arrayMap((x) -> x.2, arrayFilter((x) -> x.1 = brel, pre))) AS b
+  FROM per
 ),
 chg AS (
-  SELECT lab.pid AS pid, lab.day - anch.day AS rel, 100 * (lab.v - base.b) / base.b AS pc
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid INNER JOIN base ON base.pid = lab.pid
-  WHERE base.b > 0 AND lab.day != base.bday
-    AND lab.day - anch.day >= -84 AND lab.day - anch.day <= 364
+  SELECT pid, x.1 AS rel, 100 * (x.2 - b) / b AS pc
+  FROM pb ARRAY JOIN xs AS x
+  WHERE has_base AND b > 0 AND x.1 != brel AND x.1 >= -84 AND x.1 <= 364
+),
+pbest AS (
+  SELECT has_base, b, has_base AND b > 0 AND notEmpty(after) AS ok, arrayMin(after) AS best
+  FROM (SELECT has_base, b, arrayMap((x) -> 100 * (x.2 - b) / b, arrayFilter((x) -> x.1 > 0 AND x.1 != brel AND x.1 >= -84 AND x.1 <= 364, xs)) AS after FROM pb)
+),
+tot AS (
+  SELECT count() AS anchored, countIf(has_base) AS baseline, countIf(has_base AND b > 0) AS positive_baseline,
+         countIf(ok) AS after, countIf(ok AND best <= -50) AS responders,
+         sumMapIf([toInt32(floor((least(300, greatest(-100, if(ok, best, 0))) - (-100) + 1) / 2))], [toUInt64(1)], ok) AS hist
+  FROM pbest
 )
-SELECT 'best' AS what, toInt32(floor((least(300, greatest(-100, best)) - (-100) + 1) / 2)) AS pbin, count() AS n FROM (SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid) GROUP BY pbin
-UNION ALL SELECT 'responders' AS what, 0 AS pbin, countIf(best <= -50) AS n FROM (SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid)
-UNION ALL SELECT 'anchored' AS what, 0 AS pbin, count() AS n FROM anch
-UNION ALL SELECT 'baseline' AS what, 0 AS pbin, count() AS n FROM base
-UNION ALL SELECT 'positive_baseline' AS what, 0 AS pbin, countIf(b > 0) AS n FROM base
-UNION ALL SELECT 'after' AS what, 0 AS pbin, uniqExactIf(pid, rel > 0) AS n FROM chg
+SELECT r.1 AS what, r.2 AS pbin, r.3 AS n FROM tot
+ARRAY JOIN arrayConcat(arrayMap((k, v) -> ('best', k, v), hist.1, hist.2),
+  [('responders', toInt32(0), responders), ('anchored', toInt32(0), anchored), ('baseline', toInt32(0), baseline),
+   ('positive_baseline', toInt32(0), positive_baseline), ('after', toInt32(0), after)]) AS r
 
 -- view 0 labs: labs:course:Prostate, TP53 mutant · msk_chord_2024
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
@@ -204,19 +228,23 @@ lab AS (
   JOIN snapshot_db.clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(t.key)) = lowerUTF8(trimBoth('TEST')) AND lowerUTF8(trimBoth(t.value)) = lowerUTF8(trimBoth('PSA'))
   JOIN snapshot_db.clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(r.key)) = lowerUTF8(trimBoth('RESULT'))
   WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND lowerUTF8(trimBoth(ce.event_type)) = lowerUTF8(trimBoth('Lab_Test'))
-    AND p.stable_id IN (SELECT pid FROM anch) AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
+    AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
 ),
-base AS (
-  SELECT lab.pid AS pid, max(lab.day) AS bday,
-         arrayAvg(arrayMap((x) -> assumeNotNull(x.1), arrayFilter((x) -> x.2 = bday, groupArray((lab.v, lab.day))))) AS b
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid
-  WHERE lab.day >= anch.day - 90 AND lab.day <= anch.day GROUP BY lab.pid
+per AS (
+  SELECT anch.pid AS pid, groupArrayIf((lab.day - anch.day, assumeNotNull(lab.v)), lab.pid != '') AS xs
+  FROM anch LEFT JOIN lab ON lab.pid = anch.pid
+  GROUP BY anch.pid
+),
+pb AS (
+  SELECT pid, xs, arrayFilter((x) -> x.1 >= -90 AND x.1 <= 0, xs) AS pre, notEmpty(pre) AS has_base,
+         arrayMax(arrayMap((x) -> x.1, pre)) AS brel,
+         arrayAvg(arrayMap((x) -> x.2, arrayFilter((x) -> x.1 = brel, pre))) AS b
+  FROM per
 ),
 chg AS (
-  SELECT lab.pid AS pid, lab.day - anch.day AS rel, 100 * (lab.v - base.b) / base.b AS pc
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid INNER JOIN base ON base.pid = lab.pid
-  WHERE base.b > 0 AND lab.day != base.bday
-    AND lab.day - anch.day >= -84 AND lab.day - anch.day <= 364
+  SELECT pid, x.1 AS rel, 100 * (x.2 - b) / b AS pc
+  FROM pb ARRAY JOIN xs AS x
+  WHERE has_base AND b > 0 AND x.1 != brel AND x.1 >= -84 AND x.1 <= 364
 )
 SELECT tbin, pbin, count() AS n FROM (
   SELECT pid, toInt32(floor(rel / 28)) AS tbin, toInt32(floor((least(300, greatest(-100, avg(pc))) - (-100) + 1) / 2)) AS pbin
@@ -264,19 +292,23 @@ lab AS (
   JOIN snapshot_db.clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(t.key)) = lowerUTF8(trimBoth('TEST')) AND lowerUTF8(trimBoth(t.value)) = lowerUTF8(trimBoth('PSA'))
   JOIN snapshot_db.clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(r.key)) = lowerUTF8(trimBoth('RESULT'))
   WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND lowerUTF8(trimBoth(ce.event_type)) = lowerUTF8(trimBoth('Lab_Test'))
-    AND p.stable_id IN (SELECT pid FROM anch) AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
+    AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
 ),
-base AS (
-  SELECT lab.pid AS pid, max(lab.day) AS bday,
-         arrayAvg(arrayMap((x) -> assumeNotNull(x.1), arrayFilter((x) -> x.2 = bday, groupArray((lab.v, lab.day))))) AS b
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid
-  WHERE lab.day >= anch.day - 90 AND lab.day <= anch.day GROUP BY lab.pid
+per AS (
+  SELECT anch.pid AS pid, groupArrayIf((lab.day - anch.day, assumeNotNull(lab.v)), lab.pid != '') AS xs
+  FROM anch LEFT JOIN lab ON lab.pid = anch.pid
+  GROUP BY anch.pid
+),
+pb AS (
+  SELECT pid, xs, arrayFilter((x) -> x.1 >= -90 AND x.1 <= 0, xs) AS pre, notEmpty(pre) AS has_base,
+         arrayMax(arrayMap((x) -> x.1, pre)) AS brel,
+         arrayAvg(arrayMap((x) -> x.2, arrayFilter((x) -> x.1 = brel, pre))) AS b
+  FROM per
 ),
 chg AS (
-  SELECT lab.pid AS pid, lab.day - anch.day AS rel, 100 * (lab.v - base.b) / base.b AS pc
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid INNER JOIN base ON base.pid = lab.pid
-  WHERE base.b > 0 AND lab.day != base.bday
-    AND lab.day - anch.day >= -84 AND lab.day - anch.day <= 364
+  SELECT pid, x.1 AS rel, 100 * (x.2 - b) / b AS pc
+  FROM pb ARRAY JOIN xs AS x
+  WHERE has_base AND b > 0 AND x.1 != brel AND x.1 >= -84 AND x.1 <= 364
 )
 SELECT tbin, pbin, count() AS n FROM (
   SELECT pid, toInt32(floor(rel / 28)) AS tbin, toInt32(floor((least(300, greatest(-100, avg(pc))) - (-100) + 1) / 2)) AS pbin
@@ -321,19 +353,23 @@ lab AS (
   JOIN snapshot_db.clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(t.key)) = lowerUTF8(trimBoth('TEST')) AND lowerUTF8(trimBoth(t.value)) = lowerUTF8(trimBoth('PSA'))
   JOIN snapshot_db.clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(r.key)) = lowerUTF8(trimBoth('RESULT'))
   WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND lowerUTF8(trimBoth(ce.event_type)) = lowerUTF8(trimBoth('Lab_Test'))
-    AND p.stable_id IN (SELECT pid FROM anch) AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
+    AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
 ),
-base AS (
-  SELECT lab.pid AS pid, max(lab.day) AS bday,
-         arrayAvg(arrayMap((x) -> assumeNotNull(x.1), arrayFilter((x) -> x.2 = bday, groupArray((lab.v, lab.day))))) AS b
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid
-  WHERE lab.day >= anch.day - 90 AND lab.day <= anch.day GROUP BY lab.pid
+per AS (
+  SELECT anch.pid AS pid, groupArrayIf((lab.day - anch.day, assumeNotNull(lab.v)), lab.pid != '') AS xs
+  FROM anch LEFT JOIN lab ON lab.pid = anch.pid
+  GROUP BY anch.pid
+),
+pb AS (
+  SELECT pid, xs, arrayFilter((x) -> x.1 >= -90 AND x.1 <= 0, xs) AS pre, notEmpty(pre) AS has_base,
+         arrayMax(arrayMap((x) -> x.1, pre)) AS brel,
+         arrayAvg(arrayMap((x) -> x.2, arrayFilter((x) -> x.1 = brel, pre))) AS b
+  FROM per
 ),
 chg AS (
-  SELECT lab.pid AS pid, lab.day - anch.day AS rel, 100 * (lab.v - base.b) / base.b AS pc
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid INNER JOIN base ON base.pid = lab.pid
-  WHERE base.b > 0 AND lab.day != base.bday
-    AND lab.day - anch.day >= -84 AND lab.day - anch.day <= 364
+  SELECT pid, x.1 AS rel, 100 * (x.2 - b) / b AS pc
+  FROM pb ARRAY JOIN xs AS x
+  WHERE has_base AND b > 0 AND x.1 != brel AND x.1 >= -84 AND x.1 <= 364
 )
 SELECT round(best, 1) AS best FROM (SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid)
 ORDER BY best LIMIT 5000
@@ -379,19 +415,23 @@ lab AS (
   JOIN snapshot_db.clinical_event_data t ON t.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(t.key)) = lowerUTF8(trimBoth('TEST')) AND lowerUTF8(trimBoth(t.value)) = lowerUTF8(trimBoth('PSA'))
   JOIN snapshot_db.clinical_event_data r ON r.clinical_event_id = ce.clinical_event_id AND lowerUTF8(trimBoth(r.key)) = lowerUTF8(trimBoth('RESULT'))
   WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND lowerUTF8(trimBoth(ce.event_type)) = lowerUTF8(trimBoth('Lab_Test'))
-    AND p.stable_id IN (SELECT pid FROM anch) AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
+    AND if(isFinite(ifNull(toFloat64OrNull(r.value), nan)), toFloat64OrNull(r.value), NULL) IS NOT NULL
 ),
-base AS (
-  SELECT lab.pid AS pid, max(lab.day) AS bday,
-         arrayAvg(arrayMap((x) -> assumeNotNull(x.1), arrayFilter((x) -> x.2 = bday, groupArray((lab.v, lab.day))))) AS b
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid
-  WHERE lab.day >= anch.day - 90 AND lab.day <= anch.day GROUP BY lab.pid
+per AS (
+  SELECT anch.pid AS pid, groupArrayIf((lab.day - anch.day, assumeNotNull(lab.v)), lab.pid != '') AS xs
+  FROM anch LEFT JOIN lab ON lab.pid = anch.pid
+  GROUP BY anch.pid
+),
+pb AS (
+  SELECT pid, xs, arrayFilter((x) -> x.1 >= -90 AND x.1 <= 0, xs) AS pre, notEmpty(pre) AS has_base,
+         arrayMax(arrayMap((x) -> x.1, pre)) AS brel,
+         arrayAvg(arrayMap((x) -> x.2, arrayFilter((x) -> x.1 = brel, pre))) AS b
+  FROM per
 ),
 chg AS (
-  SELECT lab.pid AS pid, lab.day - anch.day AS rel, 100 * (lab.v - base.b) / base.b AS pc
-  FROM lab INNER JOIN anch ON anch.pid = lab.pid INNER JOIN base ON base.pid = lab.pid
-  WHERE base.b > 0 AND lab.day != base.bday
-    AND lab.day - anch.day >= -84 AND lab.day - anch.day <= 364
+  SELECT pid, x.1 AS rel, 100 * (x.2 - b) / b AS pc
+  FROM pb ARRAY JOIN xs AS x
+  WHERE has_base AND b > 0 AND x.1 != brel AND x.1 >= -84 AND x.1 <= 364
 )
 SELECT round(best, 1) AS best FROM (SELECT pid, min(pc) AS best FROM chg WHERE rel > 0 GROUP BY pid)
 ORDER BY best LIMIT 5000

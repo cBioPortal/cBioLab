@@ -101,13 +101,26 @@ const mutationsWithPositions = (db: string, study: string, gene: string): string
   "          CAST(NULL AS Nullable(Int8)) AS cna_alteration, ifNull(mutationStatus, '') AS mutation_status\n" +
   "     FROM " + db + ".mutation_derived WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + ") g\n";
 
-const DRIVER_JOIN = (pin: string): string =>
-  "  JOIN oncokb_annotation.variant_annotation ann\n" +
-  "    ON ann.oncokb_version = " + sq(pin) + " AND ann.is_driver\n" +
-  "   AND ann.hugo_gene_symbol = g.hugo_gene_symbol\n" +
-  "   AND ((g.variant_type = 'mutation' AND ann.alteration_type = 'MUTATION' AND ann.alteration = g.mutation_variant)\n" +
-  "     OR (g.variant_type = 'cna' AND ann.alteration_type = 'CNA' AND ann.alteration = if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'))\n" +
-  "     OR (g.variant_type = 'structural_variant' AND ann.alteration_type = 'SV' AND ann.alteration = 'Fusion'))\n";
+/**
+ * An event row `g` matched to the OncoKB store's row `ann` for it: equal on gene, alteration type
+ * and alteration, each derived from the event. Kept a plain equality join on purpose: ClickHouse
+ * runs the same match written as an OR of per-type conditions ~65x slower (5.8s against 0.09s over
+ * msk_met_2021's mutations).
+ */
+export const annotationMatchSql = (ann: string, g: string): string =>
+  ann + ".hugo_gene_symbol = " + g + ".hugo_gene_symbol\n" +
+  "   AND " + ann + ".alteration_type = multiIf(" + g + ".variant_type = 'mutation', 'MUTATION', " + g + ".variant_type = 'cna', 'CNA', " +
+  g + ".variant_type = 'structural_variant', 'SV', '')\n" +
+  "   AND " + ann + ".alteration = multiIf(" + g + ".variant_type = 'mutation', " + g + ".mutation_variant, " + g + ".variant_type = 'cna', " +
+  "if(" + g + ".cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')\n";
+
+/** The store's driver rows at the pin, joined to each event `g` (`kind`: INNER or LEFT). */
+export const driverAnnotationJoin = (pin: string, kind: "INNER" | "LEFT"): string =>
+  "  " + kind + " JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation\n" +
+  "      WHERE oncokb_version = " + sq(pin) + " AND is_driver) ann\n" +
+  "    ON " + annotationMatchSql("ann", "g");
+
+const DRIVER_JOIN = (pin: string): string => driverAnnotationJoin(pin, "INNER");
 
 // full OQL leaf -> SQL of matching patient stable ids (portal semantics: altered by ANY entry)
 export function oqlLeafSql(q: string, opts: { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string } = {}): string {

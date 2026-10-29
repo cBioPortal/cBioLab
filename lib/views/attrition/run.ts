@@ -1,6 +1,7 @@
 // Attrition view: how each cohort's clauses narrow the study, one step at a time
 import type { CohortDef, ViewResult } from "../../types.ts";
 import { cohortClauses, describeClause } from "../../cohort2.ts";
+import { withCohortDefinitions } from "../../federation.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit } from "../shared.ts";
 import type { AttritionView, AttritionPanel } from "./types.ts";
@@ -31,7 +32,7 @@ export async function runAttrition(view: AttritionView, ctx: ViewRun): Promise<V
         // step's query is recorded here — after the count, because a remote peer only reports
         // its compiled SQL once it has answered.
         queries.push({ study: st, label: "attrition:" + name + ":step " + k,
-          sql: "SELECT count() AS n FROM (" + resolvers[st].cohortSql(prefix(k)) + ")",
+          sql: withCohortDefinitions("SELECT count() AS n FROM (" + resolvers[st].cohortSql(prefix(k)) + ")"),
           ...(resolvers[st].instance.id === "peer" ? { remote: true } : {}) });
         return n;
       }));
