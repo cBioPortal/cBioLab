@@ -111,7 +111,8 @@ and commit both.
   queries; `test/boundary.test.ts` sweeps every kind's), `method.ts` (its method record, invariant
   12), `figure.ts` (its SVG), `kind.ts` (its descriptor: figure, title, results text, help,
   federation need, marks — `ViewKindDef` in `lib/views/kind-def.ts`) and `doc.ts` (its part of the DSL
-  reference: its row of the Views table, its agent-grammar entry and its own gallery examples —
+  reference: its row of the Views table, its agent-grammar entry, its phrase in MCP `run_analysis`'s
+  description and its own gallery examples, one marked as its view snapshot case —
   `KindDoc` in `lib/views/kind-doc.ts`; never add a kind's text to `lib/dsl-reference.ts` itself). A kind with more to explain than that has a `README.md` in its folder; read it before
   changing the kind, and write one rather than adding the kind's own story to this file. The page file is its
   `KindUi` (`app/lab/kinds/kind-ui.ts`): its add-view dialog entry, the category it is listed under

@@ -7,6 +7,7 @@ import { POINTS_CAP } from "../../plot-layers.ts";
 const POINTS_CAP_TEXT = POINTS_CAP.toLocaleString("en-US");
 
 export const plotDoc: KindDoc = {
+  summary: "scatter/box/table of any two axes",
   reference: `\`x:axis, y:axis, unit?:"sample"\\|"patient", bins?:[240,160], allPoints?:true, points?:[layer(max 4)], colorBy?:axis, ringBy?:axis, cohorts:[names]\` | two axes over the same cases, aggregated **inside the database**: a scatter comes back as counts per grid cell, a box as quartiles per group, two categoricals as a contingency table. The payload is a few kilobytes whatever the cohort's size. A point is a sample, as on cBioPortal's Plots tab; \`unit:"patient"\` makes it a patient, combining a patient's samples: a numeric value is their mean, a category their common value or "Multiple" where they differ, an alteration counts if any sample has it, and the caption says how many patients had more than one sample. Every case is a point up to ${POINTS_CAP_TEXT} (\`allPoints: false\` turns that off), from a participant that may show cases; \`points\` lists up to four subsets drawn in colour over it — \`{rule:"outliers",n?}\` (the default), \`{rule:"extremes",axis,n}\`, \`{rule:"trend",n}\`, \`{cohort}\` — see **Points** below`,
   grammar: `{"kind":"plot","x":<axis>,"y":<axis>,"unit":"sample|patient","cohorts":[names?],
  "colorBy":<axis>?,"ringBy":<axis>?,"allPoints":true,"bins":[240,160],

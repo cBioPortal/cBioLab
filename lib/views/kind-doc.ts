@@ -21,9 +21,17 @@ export interface DslExample {
    * with the run, exactly as the page does.
    */
   customData?: CustomDataset[];
+  /**
+   * The name of the view snapshot case this example is (test/support/view-snapshots.ts): its
+   * recorded answers and pinned output are test/snapshots/answers/<name>.json.gz and
+   * test/snapshots/<name>.*. Each view kind's smallest example is its kind's case.
+   */
+  snapshot?: string;
 }
 
 export interface KindDoc {
+  /** a phrase on what it draws, for MCP run_analysis's description: "<kind> (<summary>)" */
+  summary?: string;
   /** its row of the Views table, after the kind's own cell: "`fields` | semantics" (markdown) */
   reference: string;
   /** its entry in the agent grammar's "views" list: the view object, then any "//" notes */

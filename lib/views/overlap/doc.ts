@@ -3,12 +3,14 @@
 import type { KindDoc } from "../kind-doc.ts";
 
 export const overlapDoc: KindDoc = {
+  summary: "how cohorts' patients intersect, as an UpSet plot",
   reference: `\`cohorts:[names] (2–6)\` | **how cohorts' patients intersect**, cBioPortal's group-comparison Overlap tab: for every combination of the cohorts, the patients — and their samples — in exactly those cohorts and none of the others, with each cohort's own size. Two or three cohorts are drawn as the portal draws them, area-proportional diagrams of samples and of patients side by side; more as an UpSet plot. A cohort is a set of patients, so a patient's samples go wherever the patient does. Each study's database answers with one count per combination (a bitmask of membership) — counts only — and a cohort's size here must equal its own count, or the view says the definition gave two answers. Ids are study-qualified, so patients only ever overlap within a study`,
   grammar: `{"kind":"overlap","cohorts":[names?(2-6)]}
   // UpSet plot: patients in exactly each combination of cohorts`,
   examples: [
     {
       title: "Cohort overlap: how four groups share their patients",
+      snapshot: "overlap",
       demonstrates: "An `overlap` view, the portal's Overlap tab drawn as an UpSet plot: for every combination of cohorts, the patients in exactly those cohorts and no other. Each study answers with one count per combination, and every cohort's size here equals its own count.",
       tags: ["upset"],
       note: "TP53-mutant, KRAS-mutant, immunotherapy-treated and NSCLC patients in MSK-CHORD. 5,314 TP53-mutant patients belong to none of the other three groups; 435 are in all four.",

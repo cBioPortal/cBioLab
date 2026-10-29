@@ -31,7 +31,8 @@ compare its compiled SQL and queries, computed result, figure and results text w
 `RECORD_SNAPSHOTS=1 node --env-file=.env.local --test test/view-snapshots*.test.ts` (public
 warehouse only; the answers hold public studies' patient-level rows).
 
-A new view kind adds its case to `CASES` there (a check fails until it does). Each case also runs with its answers
+The cases are the gallery examples marked `snapshot: "<name>"`: a new view kind marks its smallest
+example in its `lib/views/<kind>/doc.ts` (a check fails until it does). Each case also runs with its answers
 delivered in reverse, and must not change: a runner combines what it asked for after every answer
 is in, in the view's order (`askEachSite` in `lib/views/shared.ts`), never inside the callback as
 each one lands.

@@ -21,12 +21,10 @@ const { viewNeed } = await import("../lib/view-coverage.ts");
 const { previewPending } = await import("../lib/preview-kinds.ts");
 const { isNewKind } = await import("../lib/new-in-lab.ts");
 const { viewTitle } = await import("../lib/view-svg.ts");
+const { viewKinds } = await import("./support/view-kinds.ts");
 
-const KINDS = ["compare", "survival", "cox", "logistic", "oncoprint", "hotspots", "plot", "cooccurrence", "clinical", "coexpression",
-  "course", "sequence", "attrition", "genome", "pathways", "diffexpr", "paired", "clonality", "incidence", "labs", "riskmodel",
-  "cancertypes", "overlap", "enrichment", "assays", "composition", "correlates", "table", "mutations", "alterations", "timeline",
-  "acquired", "ctdna", "exclusivity", "txendpoints", "multistate", "rmst", "predictive", "cutpoint", "hla", "forest", "adjusted",
-  "instability", "actionability", "drivernegative", "organotropism", "molsubtype", "germline"];
+/** every view kind the document language has */
+const KINDS = viewKinds();
 
 const RICH = {
   genes: ["TP53", "KRAS", "EGFR", "STK11", "KEAP1", "PIK3CA", "APC", "BRAF", "ERBB2"],

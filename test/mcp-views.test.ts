@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { viewKinds } from "./support/view-kinds.ts";
 import { KINDS } from "../lib/views/kinds.ts";
 import { analysisText } from "../lib/result-text.ts";
-import { AGENT_GRAMMAR, renderDslMarkdown } from "../lib/dsl-reference.ts";
+import { AGENT_GRAMMAR, renderDslMarkdown, viewsSummary } from "../lib/dsl-reference.ts";
 
 const tools = readFileSync(new URL("../mcp/tools.ts", import.meta.url), "utf8");
 // the per-view text lives in lib/result-text.ts, shared by run_analysis and the WebMCP tools
@@ -47,12 +47,12 @@ describe("MCP run_analysis describes every view the engine can produce", () => {
   test("the tool description and describe_dsl's views table name every kind", () => {
     // A client reads the tool description before anything else; a kind missing from it
     // is one the model will not think to ask for.
-    const desc = /"run_analysis",\s*"([^"]+)"/.exec(tools);
-    assert.ok(desc, "could not find the run_analysis description in mcp/tools.ts");
+    assert.match(tools, /"run_analysis",\s*"[^"]+" \+ viewsSummary\(\) \+/, "run_analysis's description lists the views from viewsSummary()");
+    const views = viewsSummary();
     const table = reference.slice(reference.indexOf("\n## Views"), reference.indexOf("\n### Plot axes"));
     assert.ok(table.length > 100, "could not find the views table in describe_dsl's reference");
     for (const k of engineViewKinds()) {
-      assert.match(desc![1], new RegExp("\\b" + k + "\\b"), "run_analysis's description never mentions the " + k + " view");
+      assert.match(views, new RegExp("\\b" + k + "\\b"), "run_analysis's description never mentions the " + k + " view");
       assert.match(table, new RegExp("\\n\\| `" + k + "` \\|"), "describe_dsl's views table has no " + k + " row");
     }
   });
