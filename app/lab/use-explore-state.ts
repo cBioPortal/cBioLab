@@ -33,6 +33,8 @@ import type { SavedCohort } from "./use-saved.ts";
 
 /** What Explore needs from the analysis page: the document, the study, and the page's own actions. */
 export interface ExplorePage {
+  /** the studies the page's link opens Explore on, from its first render */
+  linkedStudies: string[];
   doc: AnalysisDoc;
   docs: DocStore;
   study: string;
@@ -63,7 +65,7 @@ const DEFAULT_DERIVED: DerivedRequest[] = SHOW_DERIVED_FACETS
   ? [{ metric: "followupMonths" }, { metric: "historyMonths" }, { metric: "alteredGenes" }] : [];
 
 export function useExploreState(page: ExplorePage) {
-  const { addCohortToView, analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, setError, setStudy, study } = page;
+  const { linkedStudies, addCohortToView, analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, setError, setStudy, study } = page;
   const [exMsg, setExMsg] = useState<string | null>(null);
   /** the facet whose "split by this" is waiting on the server's proposed arms */
   const [splittingBy, setSplittingBy] = useState<string | null>(null);
@@ -89,9 +91,9 @@ export function useExploreState(page: ExplorePage) {
   const { explore, busy: exploreBusy } = exploring;
   const [sQuery, setSQuery] = useState("");                             // study-panel search
   const [sCaps, setSCaps] = useState<Set<string>>(() => new Set());                  // study-panel capability filters
-  const [exStudies, setExStudies] = useState<string[]>([]); // studies being explored (checkboxes); none until the reader picks
+  const [exStudies, setExStudies] = useState<string[]>(linkedStudies); // studies being explored (checkboxes); the link's, else none until the reader picks
   const [exPanelOpen, setExPanelOpen] = useState(false);                // study panel expanded?
-  const exSel = useRef<string[]>([]);                   // current selection (ref: immune to state races)
+  const exSel = useRef<string[]>(linkedStudies);        // current selection (ref: immune to state races)
   const exFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);                                    // debounce for multi-toggle refetch
   /**
    * Minimum share of the selected studies an attribute must appear in to be
