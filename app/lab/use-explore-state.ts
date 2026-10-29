@@ -10,14 +10,14 @@ import { normalizeDef } from "./pills";
 import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, PartitionArm, PartitionDef } from "../../lib/types.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { type SplitSpec } from "./partitions.tsx";
-import { armsFromItems, armsFromSelection, editSplits, splitKey, type ChartKey } from "../../lib/partition-arms.ts";
+import { armsFromSelection, withoutChart, comparisonCohorts, type ChartKey } from "../../lib/partition-arms.ts";
 import { DOC_VERSION } from "../../lib/doc-version.ts";
 import { saveToServer, customDataKey, featureFromCohort, type StoredDataset } from "./custom-data-client.ts";
 import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
 import type { CustomDataTab } from "./custom-data-panel.tsx";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useExplore, type ExploreAsk } from "./use-explore.ts";
-import { storeCohortLists } from "./id-sets-client.ts";
+import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
 import { encodeParam } from "../portal/page-doc.ts";
 import { SPEC_URL_MAX } from "../../lib/lab-links.ts";
 
@@ -49,7 +49,7 @@ export interface ExplorePage {
   analysisStudies: () => string[];
   /** run an edited document */
   runEdited: (d: AnalysisDoc) => void;
-  proposePartition: (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; name?: string; maxArms?: number; minCount?: number }) => Promise<{ name: string; def: PartitionDef; note?: string }>;
+  proposePartition: (req: { doc: AnalysisDoc; cohort: string; attribute?: string; gene?: string; oql?: string[]; assay?: { profileType: string; entity: string }; name?: string; maxArms?: number; minCount?: number; quantiles?: number }) => Promise<{ name: string; def: PartitionDef; note?: string }>;
   /** put a new cohort in the view add mode was opened for (use-view-edits.ts) */
   addCohortToView: (target: AddCohortTarget, name: string, def?: CohortDef, studyHint?: string) => void;
 }
@@ -65,7 +65,7 @@ const DEFAULT_DERIVED: DerivedRequest[] = SHOW_DERIVED_FACETS
 export function useExploreState(page: ExplorePage) {
   const { addCohortToView, analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, setError, setStudy, study } = page;
   const [exMsg, setExMsg] = useState<string | null>(null);
-  /** the facet whose "split by this" is waiting on the server's proposed arms */
+  /** the chart whose comparison is waiting on the server's cuts */
   const [splittingBy, setSplittingBy] = useState<string | null>(null);
   /**
    * Explore opened over the page for one cohort, with the Explore state it replaced, restored when
@@ -202,70 +202,77 @@ export function useExploreState(page: ExplorePage) {
     goTab("analysis");
   };
   /**
-   * Analyze the selection split by one facet: the same fresh analysis as Analyze, with the
-   * selection divided into arms that add up to it, for the views the reader adds to compare. The arms
-   * come from the server (counted per patient within the selection), not from the facet's own
-   * bars, which may count samples or show only the top values.
+   * Open cBioPortal's group comparison on `arms` of the selection, as the portal's study view does
+   * from a chart: each arm a group of its own (the selection's `base` clauses and the arm's), in a
+   * new tab so the selection stays here. The tab is opened before anything is awaited (a window
+   * opened later is a blocked pop-up) and sent on once the groups are known; a refusal closes it
+   * and is said here. A link too long for the address bar has its id lists stored first.
    */
-  const splitDraftBy = async (spec: SplitSpec, label: string) => {
+  const openComparison = async (w: Window | null, groups: () => Promise<Record<string, CohortDef>>) => {
+    setExMsg(null);
+    try {
+      let nd: AnalysisDoc = { dsl: DOC_VERSION, study: exSel.current[0] || study, cohorts: await groups(), views: [] };
+      if (encodeParam(nd).length > SPEC_URL_MAX) nd = await storeDocLists(nd);
+      const n = encodeParam(nd).length;
+      if (n > SPEC_URL_MAX)
+        throw new Error("these groups' definitions are too long for a link (" + Math.round(n / 1000) + " KB of " + SPEC_URL_MAX / 1000 + " KB) — their id lists are stored only for a signed-in reader: sign in, or narrow the selection");
+      const url = "/portal/comparison?" + new URLSearchParams({ doc: encodeParam(nd) }).toString();
+      if (w && !w.closed) w.location.href = url; else window.location.assign(url);
+    } catch (e) {
+      w?.close();
+      setExMsg("Could not compare: " + String((e as Error)?.message || e));
+    }
+  };
+  /** a new tab saying it is waiting for its groups, or null when the browser blocks it */
+  const comparisonTab = (): Window | null => {
+    const w = window.open("", "_blank");
+    try { if (w) { w.document.title = "Group comparison"; w.document.body.textContent = "Preparing the groups to compare…"; } } catch { /* a cross-origin or blocked tab still navigates */ }
+    return w;
+  };
+  /** what the selection is drawn from: its studies, as the draft names them */
+  const selectionScope = (): CohortDef => parseDraft() || draftScaffold(exSel.current);
+  /**
+   * Compare a numeric chart's equal-count groups within the selection — its quartiles (4) or the
+   * halves either side of its median (2) — cut by the server over the selection's own values, each
+   * cut written into its group.
+   */
+  const compareQuantiles = (spec: SplitSpec, quantiles: number, label: string) => {
     const d = barDef();
     if (!d) { setExMsg("select at least one study first"); return; }
-    setExMsg(null); setSplittingBy(label);
+    const w = comparisonTab();
+    setSplittingBy(label);
     const name = barDefaultName();
-    const nextStudy = exSel.current[0] || study;
-    const base: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: d }, views: [] };
-    try {
-      const { name: sn, def } = await proposePartition({ doc: base, cohort: name, ...spec });
-      const nd: AnalysisDoc = editSplits(base,
-        (f) => ({ ...f, partitions: { [splitKey(name, sn)]: { ...def, split: sn } } }));
-      setStudy(nextStudy);
-      docs.replace(nd);
-      setError(null);
-      goTab("analysis");
-    } catch (e) { setExMsg("Could not split by " + label + ": " + String((e as Error)?.message || e)); }
-    setSplittingBy(null);
+    const base: AnalysisDoc = { dsl: DOC_VERSION, study: exSel.current[0] || study, cohorts: { [name]: d }, views: [] };
+    void openComparison(w, async () => {
+      const { def } = await proposePartition({ doc: base, cohort: name, quantiles, ...spec });
+      return comparisonCohorts(d, d.all as Clause[], def.arms);
+    }).finally(() => setSplittingBy(null));
   };
-  /**
-   * Analyze the selection with one chart's selected items as the arms: each item an arm, in the
-   * order clicked, and the rest of the selection as the cohort being split. No server proposal —
-   * the arms are the clauses already on screen.
-   */
+  /** How many items one chart has selected (each its own group when compared); 9 for more than 8. */
   const selectionArmCount = (chart: ChartKey): number => {
     const d = parseDraft();
     if (!d) return 0;
     try { return armsFromSelection(d, chart)?.arms.length ?? 0; } catch { return 9; }
   };
-  /** the analysis of the selection's `base` divided into `arms`, replacing the document */
-  const analyzeArms = (d: CohortDef, r: { base: { all: Clause[] }; arms: PartitionArm[] }, label: string) => {
-    setExMsg(null);
-    const name = r.base.all.length ? "explored cohort"
-      : exSel.current.length === 1 ? "all of " + exSel.current[0] : "all selected studies";
-    const parent: CohortDef = r.base.all.length ? { ...d, all: r.base.all } : { ...(draftScaffold(exSel.current) as CohortDef) };
-    const nextStudy = exSel.current[0] || study;
-    const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: { ...parent, splits: { [label]: { arms: r.arms } } } },
-      views: [] };
-    setStudy(nextStudy);
-    docs.replace(nd);
-    setError(null);
-    goTab("analysis");
-  };
-  const splitDraftBySelection = (chart: ChartKey, label: string) => {
+  /** Compare a chart's selected items, each its own group, over the rest of the selection. */
+  const compareSelection = (chart: ChartKey) => {
     const d = parseDraft();
     if (!d) return;
-    let r: ReturnType<typeof armsFromSelection>;
-    try { r = armsFromSelection(d, chart); } catch (e) { setExMsg("Could not split by the selected " + label + ": " + String((e as Error)?.message || e)); return; }
-    if (r) analyzeArms(d, r, label);
+    void openComparison(comparisonTab(), async () => {
+      const r = armsFromSelection(d, chart);
+      if (!r) throw new Error("nothing is selected in this chart");
+      return comparisonCohorts(d, r.base.all, r.arms);
+    });
   };
   /**
-   * Analyze the selection with a chart's CHECKED rows as the arms, in the order checked: the
-   * cohort split is the draft without that chart's own clauses, so only the checked items divide it.
+   * Compare the given items of one chart — its checked rows, its values or its bins — each a group,
+   * over the selection without that chart's own clauses, so a value the chart already filters to
+   * does not empty the others.
    */
-  const splitDraftByPicks = (chart: ChartKey, arms: PartitionArm[], label: string) => {
+  const compareItems = (chart: ChartKey, arms: PartitionArm[]) => {
     if (!exSel.current.length) { setExMsg("select at least one study first"); return; }
     const d = parseDraft() || { all: [] };
-    let r: ReturnType<typeof armsFromItems>;
-    try { r = armsFromItems(d, chart, arms); } catch (e) { setExMsg("Could not split by the checked " + label + ": " + String((e as Error)?.message || e)); return; }
-    analyzeArms(d, r, label);
+    void openComparison(comparisonTab(), async () => comparisonCohorts(selectionScope(), withoutChart(d, chart), arms));
   };
   /**
    * Saving asks for a name when you ask to save, rather than keeping a field in
@@ -694,7 +701,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, splitDraftBy, selectionArmCount, splitDraftBySelection, splitDraftByPicks, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

@@ -3,10 +3,10 @@
 // cards. The page owns Explore's state (app/lab/use-explore.ts and the draft) and hands every
 // section the same ExploreCtx — what it reads and the edits it can make.
 import { useState } from "react";
-import type { Clause, Leaf } from "../../lib/types";
+import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import CohortPills from "./pills";
-import { ChartMenu } from "./partitions.tsx";
-import { armLabel, type ChartKey } from "../../lib/partition-arms.ts";
+import { ChartMenu, type ChartAction } from "./partitions.tsx";
+import { armLabel, COMPARISON_MAX_ACTIVE, COMPARISON_MAX_GROUPS, type ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
 import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
@@ -221,7 +221,8 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
     {(() => {
       const d = parseDraft();
       const clauses = d && Array.isArray(d.all) ? d.all.length : 0;
-      if (!clauses) return null;
+      // with no filters there is no bar, but a chart menu's refusal ("Could not compare: …") still shows
+      if (!clauses) return exMsg && !addMode ? <p className="note exmsg">{exMsg}</p> : null;
       const ready = exStudies.length > 0;
       return (
         <div className="card exbar">
@@ -597,16 +598,52 @@ function Histogram({ ticks, na, children }: { ticks: string[]; na: string | null
 }
 
 /**
- * The chart menu's split for a list with checkboxes: its checked rows, each its own arm, or — with
- * none checked — a disabled item saying to check some. A list splits by what was checked, never
- * by all of its values.
+ * A chart menu's "Compare groups", as the portal's study view opens group comparison from a chart:
+ * the rows the reader checked, each a group, or — with none checked — the chart's values, the most
+ * frequent first, up to the most groups the comparison page takes (the item says when it leaves
+ * values out). `checked` is null for a chart without checkboxes.
  */
-function splitChecked(n: number, arms: string, onClick: () => void) {
-  return n ? { label: "Split by checked (" + n + ")", onClick,
-    title: "Analyze with each checked " + arms + " as its own arm (in the order you checked them), the rest of your selection as the cohort they split, and everyone else in Other" }
-    : { label: "Check rows to split by them", disabled: true, onClick: () => {},
-      title: "a list splits by the rows you check — check the " + arms.replace(/ of .*/, "") + "s to make arms of, then split" };
+function compareAction(values: (PartitionArm & { n: number })[], checked: PartitionArm[] | null, what: string, onCompare: (arms: PartitionArm[]) => void): ChartAction {
+  if (checked && checked.length === 1)
+    return { label: "Check another row to compare", disabled: true, title: "a comparison needs at least 2 groups — check another " + what };
+  if (checked && checked.length > COMPARISON_MAX_GROUPS)
+    return { label: "Compare checked groups (" + checked.length + ")", disabled: true, title: "the comparison page holds at most " + COMPARISON_MAX_GROUPS + " groups — uncheck " + (checked.length - COMPARISON_MAX_GROUPS) };
+  if (checked && checked.length)
+    return { label: "Compare checked groups (" + checked.length + ")", onClick: () => onCompare(checked),
+      title: "open group comparison with each checked " + what + " as a group (the rest of your selection, without this chart's own filter)" + past(checked.length) };
+  const top = [...values].filter((v) => v.n > 0).sort((x, y) => y.n - x.n).slice(0, COMPARISON_MAX_GROUPS);
+  const more = values.filter((v) => v.n > 0).length - top.length;
+  if (top.length < 2) return { label: "Compare groups", disabled: true, title: "a comparison needs at least 2 groups, and this chart has " + top.length + " " + what };
+  return { label: more ? "Compare top " + top.length + " groups" : "Compare groups", onClick: () => onCompare(top),
+    title: "open group comparison with each " + what + " as a group" + (more ? " — the " + top.length + " most frequent; " + more + " more are left out (check rows to choose)" : "") +
+      ", over the rest of your selection" + past(top.length) };
 }
+
+/** what a tooltip adds when the page will open with some groups taken out */
+const past = (n: number) => n > COMPARISON_MAX_ACTIVE ? "; the page compares " + COMPARISON_MAX_ACTIVE + " at a time, so it opens with the first " + COMPARISON_MAX_ACTIVE + " and you swap the others in" : "";
+
+/** a numeric chart's "Compare groups ▸ Quartiles / Median / Current bins", as on cBioPortal */
+function compareNumeric(label: string, singleStudy: boolean, working: boolean, quantiles: (n: number) => void, bins: PartitionArm[], onBins: () => void): ChartAction {
+  const multi = "cut points are computed within one study; select a single study to compare its quartiles or median";
+  return { label: "Compare groups", working, disabled: working, title: "open group comparison with " + label + " divided into groups", sub: [
+    { label: "Quartiles", disabled: !singleStudy, onClick: () => quantiles(4), title: singleStudy ? "four groups of (near) equal size, cut at " + label + "'s quartiles within your selection" : multi },
+    { label: "Median", disabled: !singleStudy, onClick: () => quantiles(2), title: singleStudy ? "two groups, at or below / above " + label + "'s median within your selection" : multi },
+    { label: "Current bins", disabled: bins.length < 2 || bins.length > COMPARISON_MAX_GROUPS, onClick: onBins,
+      title: bins.length < 2 ? "the chart has fewer than 2 bins with cases" : bins.length > COMPARISON_MAX_GROUPS
+        ? "the chart has " + bins.length + " bins with cases, and the comparison page holds at most " + COMPARISON_MAX_GROUPS : "one group per bar of the chart (" + bins.length + ")" + past(bins.length) }
+  ] };
+}
+
+/** a clinical histogram bar as a filter: a word ("Negative"), one value (start = end), an outlier bar or an interval (start, end] */
+function binClause(attribute: string, b: any): Clause {
+  if (b.value != null) return { kind: "clinical", attribute, values: [b.value] };
+  if (b.special === "<=") return { kind: "clinical", attribute, range: { lte: b.end } };
+  if (b.special === ">") return { kind: "clinical", attribute, range: { gt: b.start } };
+  if (b.start === b.end) return { kind: "clinical", attribute, op: "=", value: b.start };
+  return { kind: "clinical", attribute, range: { gt: b.start, lte: b.end } };
+}
+const binLabel = (b: any): string => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start)
+  : b.start === b.end ? fmtNum(b.start) : fmtNum(b.start) + "–" + fmtNum(b.end);
 
 export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
   const { visibleClinical } = ctx;
@@ -622,7 +659,7 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
    change when the draft does. One tile per attribute, the portal's
    own study-view density — see .facetgrid's own comment. */
 function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clinical"][number]; ctx: ExploreCtx }) {
-  const { addClause, addMode, parseDraft, selectionArmCount, splitDraftBy, splitDraftByPicks, splitDraftBySelection, splittingBy } = ctx;
+  const { addClause, addMode, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy } = ctx;
   const picks = usePicks();
   return (
     <div data-attr={c.per + "|" + c.attribute}
@@ -653,20 +690,17 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                 const n = selectionArmCount(chart);
                 const checked = c.kind === "cat" ? c.values.filter((v: any) => picks.has(String(v.v)))
                   .sort((x: any, y: any) => picks.picked.indexOf(String(x.v)) - picks.picked.indexOf(String(y.v))) : [];
-                if (c.kind === "cat" && !PIE_ATTRIBUTES.has(c.attribute)) return <ChartMenu label={label} actions={addMode ? [] : [
-                  splitChecked(checked.length, "value of " + label, () => splitDraftByPicks(chart, checked.map((v: any) => ({ name: armLabel(String(v.v)),
-                    where: { kind: "clinical", attribute: c.attribute, values: [v.v] } as Leaf })), label))]} />;
+                const valueArm = (v: any) => ({ name: armLabel(String(v.v)), where: { kind: "clinical", attribute: c.attribute, values: [v.v] } as Leaf, n: v.n });
+                const selected = n > 1 ? [{ label: "Compare selected (" + (n > 8 ? "8+" : n) + ")",
+                  title: "open group comparison with each selected " + (c.kind === "num" ? "range" : "value") + " of " + label + " as a group, over the rest of your selection",
+                  onClick: () => compareSelection(chart) }] : [];
+                if (c.kind === "cat") return <ChartMenu label={label} actions={addMode ? [] : [
+                  compareAction(c.values.map(valueArm), PIE_ATTRIBUTES.has(c.attribute) ? null : checked.map(valueArm), "value of " + label, (arms) => compareItems(chart, arms)),
+                  ...selected]} />;
+                const bins = (c.bins || []).filter((b: any) => b.count > 0).map((b: any) => ({ name: armLabel(c.attribute + " " + binLabel(b)), where: binClause(c.attribute, b) as Leaf }));
                 return <ChartMenu label={label} actions={addMode ? [] : [
-                  { label: "Split by this", disabled: !!splittingBy, working: splittingBy === label,
-                    title: "Analyze the current selection split by " + label + (c.kind === "num"
-                      ? ": below / at or above its median within the selection" : ": one arm per value with at least 10 patients, the rest in Other") +
-                      " — arms that never overlap and add up to the selection",
-                    onClick: () => void splitDraftBy({ attribute: c.attribute }, label) },
-                  ...(n > 0 ? [{ label: "Split by selected (" + (n > 8 ? "8+" : n) + ")",
-                    title: "Analyze with each selected " + (c.kind === "num" ? "range" : "value") + " of " + label +
-                      " as its own arm (tested in the order you clicked them), the rest of your selection as the cohort they split, and everyone else in Other",
-                    onClick: () => splitDraftBySelection(chart, label) }] : [])
-                ]} />;
+                  compareNumeric(label, exStudies.length === 1, splittingBy === label, (q) => compareQuantiles({ attribute: c.attribute }, q, label), bins, () => compareItems(chart, bins)),
+                  ...selected]} />;
               })()}
             </div>
           );
@@ -747,15 +781,8 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
         {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
           const maxN = Math.max(...c.bins.map((b: any) => b.count), 1);
           // a bar is a word ("Negative"), one value (start = end), an outlier bar or an interval (start, end]
-          const clauseFor = (b: any) => {
-            if (b.value != null) return { kind: "clinical", attribute: c.attribute, values: [b.value] };
-            if (b.special === "<=") return { kind: "clinical", attribute: c.attribute, range: { lte: b.end } };
-            if (b.special === ">") return { kind: "clinical", attribute: c.attribute, range: { gt: b.start } };
-            if (b.start === b.end) return { kind: "clinical", attribute: c.attribute, op: "=", value: b.start };
-            return { kind: "clinical", attribute: c.attribute, range: { gt: b.start, lte: b.end } };
-          };
-          const label = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start)
-            : b.start === b.end ? fmtNum(b.start) : fmtNum(b.start) + "–" + fmtNum(b.end);
+          const clauseFor = (b: any) => binClause(c.attribute, b);
+          const label = binLabel;
           const tick = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start);
           return (
             <Histogram ticks={c.bins.map(tick)} na={c.naCount ? "NA " + fmtInt(c.naCount) : null}>
@@ -816,7 +843,7 @@ export function AssayFacets({ ctx }: { ctx: ExploreCtx }) {
 }
 
 function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore"]>["assayFacets"]>[number]; ctx: ExploreCtx }) {
-  const { addClause, exStudies, unchartAssay, addMode, splittingBy, splitDraftBy, splitDraftByPicks } = ctx;
+  const { addClause, exStudies, unchartAssay, addMode, splittingBy, compareQuantiles, compareItems } = ctx;
   const explore = ctx.explore!;
   const picks = usePicks();
   const profileName = (explore.profileCatalog || []).find((p) => p.profile === f.profileType)?.name || f.profileType;
@@ -826,18 +853,20 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
   const why = clickable ? "" : " — held by " + f.studies.length + " of " + exStudies.length + " selected studies, so it cannot filter them all";
   const base = { kind: "genericAssay", profileType: f.profileType, entity: f.entity };
   const checked = f.kind === "cat" ? picks.picked.filter((k) => (f.values || []).some((v) => v.v === k)) : [];
+  const chart: ChartKey = { kind: "assay", profileType: f.profileType, entity: f.entity };
+  const short = f.name || entityShortName(f.entity, f.profileType);
+  const valueArm = (v: string) => ({ name: armLabel(v), where: { ...base, values: [v] } as Leaf });
+  const binRange = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? { lte: b.end } : b.special === ">" ? { gt: b.start } : { gt: b.start, lte: b.end };
+  const binText = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!) + "–" + fmtNum(b.end!);
+  const binArms = (f.bins || []).filter((b) => b.count > 0).map((b) => ({ name: armLabel(short + " " + binText(b)), where: { ...base, range: binRange(b) } as Leaf }));
   return (
     <div data-assayfacet={f.profileType + "|" + f.entity} className="card">
       <div className="facettitle flex items-center gap-1">
         <span className="min-w-0 flex-1 truncate" data-tip={f.entity}>{title}</span>
         <ChartMenu label={title} actions={addMode || exStudies.length > 1 ? [] : f.kind === "cat" ? [
-          splitChecked(checked.length, "value of " + title, () => splitDraftByPicks({ kind: "assay", profileType: f.profileType, entity: f.entity },
-            checked.map((v) => ({ name: armLabel(v), where: { ...base, values: [v] } as Leaf })), title))] : [
-          { label: "Split by this", disabled: !!splittingBy, working: splittingBy === title,
-            title: "Analyze the current selection split by " + title + (f.kind === "num"
-              ? ": above / at or below its median within the selection" : ": one arm per value with at least 10 patients, the rest in Other") +
-              "; patients with no value get their own arm",
-            onClick: () => void splitDraftBy({ assay: { profileType: f.profileType, entity: f.entity } }, title) }]} />
+          compareAction((f.values || []).map((v) => ({ ...valueArm(v.v), n: v.n })), checked.map(valueArm), "value of " + title, (arms) => compareItems(chart, arms))] : [
+          compareNumeric(title, true, splittingBy === title, (q) => compareQuantiles({ assay: { profileType: f.profileType, entity: f.entity } }, q, title),
+            binArms, () => compareItems(chart, binArms))]} />
         <Button variant="ghost" size="icon-xs" data-tip="stop charting this" aria-label={"stop charting " + f.entity}
           onClick={() => unchartAssay(f.profileType, f.entity)}><X /></Button>
       </div>
@@ -851,8 +880,8 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
       )}
       {f.kind === "num" && f.bins && f.bins.length > 1 && (() => {
         const maxN = Math.max(...f.bins.map((b) => b.count), 1);
-        const range = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? { lte: b.end } : b.special === ">" ? { gt: b.start } : { gt: b.start, lte: b.end };
-        const label = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!) + "–" + fmtNum(b.end!);
+        const range = binRange;
+        const label = binText;
         const tick = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!);
         return (
           <Histogram ticks={f.bins.map(tick)} na={f.total > f.measured ? "NA " + fmtInt(f.total - f.measured) : null}>
@@ -995,7 +1024,7 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
 const GENEROW_H = 26;
 
 function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: ExploreCtx }) {
-  const { addClause, addMode, geneFilter, setGeneFilter, splitDraftByPicks } = ctx;
+  const { addClause, addMode, geneFilter, setGeneFilter, compareItems } = ctx;
   const explore = ctx.explore!;
   const picks = usePicks();
   const meta = {
@@ -1026,8 +1055,9 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
           const chart: ChartKey = { kind: "genes", specs: kind === "mutated" ? [": MUT"] : kind === "cna" ? [": AMP", ": HOMDEL"] : [": FUSION"] };
           const checked = picks.picked.map((k) => byKey.get(k)).filter(Boolean);
           return <ChartMenu label={meta.title} actions={addMode ? [] : [
-            splitChecked(checked.length, "gene", () => splitDraftByPicks(chart, checked.map((g: any) => ({ name: armLabel(meta.oql(g)), where: { kind: "oql", q: meta.oql(g) } as Leaf })),
-              kind === "mutated" ? "mutated genes" : kind === "cna" ? "CNA genes" : "SV genes"))]} />;
+            checked.length < 2
+              ? { label: "Check genes to compare", disabled: true, title: "check at least 2 genes: each becomes a group of the cases altered in it (a case altered in both is in both)" }
+              : compareAction([], checked.map((g: any) => ({ name: armLabel(meta.oql(g)), where: { kind: "oql", q: meta.oql(g) } as Leaf })), "gene", (arms) => compareItems(chart, arms))]} />;
         })()}
       </div>
       {/* the portal's columns: the gene, its event count (mutations, SVs) or cytoband and call

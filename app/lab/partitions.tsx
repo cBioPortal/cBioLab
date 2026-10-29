@@ -9,7 +9,7 @@ import type { PartitionDef, PartitionResult } from "../../lib/types.ts";
 import { moveArm, removeArm, mergeArms, canMergeArms } from "../../lib/partition-arms.ts";
 import { ArrowDown, ArrowUp, Ellipsis, LoaderCircle, Merge, Minus, Plus, Split, X } from "lucide-react";
 import { Button } from "../_ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../_ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "../_ui/dropdown-menu";
 import { Input } from "../_ui/input";
 import { Textarea } from "../_ui/textarea";
 import { Choice } from "../_ui/choice.tsx";
@@ -217,7 +217,25 @@ export function PartitionPanel({ name, partitions, results, cohortText, attrs, b
   );
 }
 
-export interface ChartAction { label: string; title: string; onClick: () => void; disabled?: boolean; working?: boolean }
+export interface ChartAction { label: string; title: string; onClick?: () => void; disabled?: boolean; working?: boolean;
+  /** the choices this item opens beside it (the portal's "Compare Groups ▸ Quartiles / Median / Current bins") */
+  sub?: ChartAction[] }
+
+function ChartMenuItem({ a }: { a: ChartAction }) {
+  if (a.sub) return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger disabled={a.disabled} data-tip={a.title}>{a.working && <LoaderCircle className="animate-spin" />}{a.label}</DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="min-w-40">
+        {a.sub.map((s) => <ChartMenuItem key={s.label} a={s} />)}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+  return (
+    <DropdownMenuItem disabled={a.disabled} data-tip={a.title} onSelect={a.onClick}>
+      {a.working && <LoaderCircle className="animate-spin" />}{a.label}
+    </DropdownMenuItem>
+  );
+}
 
 /** an Explore chart's "⋯" menu, pinned to the chart's corner; renders nothing without actions */
 export function ChartMenu({ actions, label }: { actions: ChartAction[]; label: string }) {
@@ -228,11 +246,7 @@ export function ChartMenu({ actions, label }: { actions: ChartAction[]; label: s
         <Button variant="outline" size="icon-xs" className="chartgear" data-tip={"actions for " + label} aria-label={"actions for " + label}><Ellipsis /></Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
-        {actions.map((a) => (
-          <DropdownMenuItem key={a.label} disabled={a.disabled} data-tip={a.title} onSelect={a.onClick}>
-            {a.working && <LoaderCircle className="animate-spin" />}{a.label}
-          </DropdownMenuItem>
-        ))}
+        {actions.map((a) => <ChartMenuItem key={a.label} a={a} />)}
       </DropdownMenuContent>
     </DropdownMenu>
   );

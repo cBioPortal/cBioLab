@@ -727,6 +727,25 @@ export function attributeQuantileSql(cohortSql: string, attribute: string, p: nu
   ));
 }
 
+/**
+ * The cut points of equal-count groups of a numeric clinical attribute within one cohort (exact
+ * quantiles at `ps`), with the largest value, over its values at the level the study records it —
+ * the cohort's quartiles or median for the comparison page. Aggregates only, like
+ * attributeQuantileSql.
+ */
+export function attributeCutsSql(cohortSql: string, attribute: string, ps: number[], study: string, db: string = DB): AggregateSql {
+  if (!ps.length || ps.some((p) => !(p > 0 && p < 1))) throw new Error("attributeCutsSql: every p must be between 0 and 1 (exclusive), got " + ps.join(", "));
+  return aggregateSql((
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT quantilesExact(" + ps.join(", ") + ")(" + finiteSql("attribute_value") + ") AS qs, max(" + finiteSql("attribute_value") + ") AS hi,\n" +
+    "       count(" + finiteSql("attribute_value") + ") AS n\n" +
+    "FROM " + clinicalTable(db, [attribute]) + "\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attribute) + "\n" +
+    "  AND attribute_value != ''\n" +
+    "  AND " + inCohortClinical(study)
+  ));
+}
+
 /** an axis that can answer "Not profiled": a gene's alterations, or a discrete copy-number profile */
 function undecidable(a: PlotAxis): boolean {
   return a.source === "alteration" || (a.source === "molecular" && !!a.discrete);

@@ -92,6 +92,14 @@ export function assayCohortMedianSql(cohortSql: string, study: string, db: strin
     "       quantileExactIf(0.5)(" + finiteSql("value") + ", " + finiteSql("value") + " IS NOT NULL) AS median FROM rows");
 }
 
+/** Over the cohort's numeric values of one entity: exact quantiles at `ps`, the largest value and the count. */
+export function assayCohortCutsSql(cohortSql: string, study: string, db: string, profileType: string, entity: string, ps: number[]): AggregateSql {
+  if (!ps.length || ps.some((p) => !(p > 0 && p < 1))) throw new Error("assayCohortCutsSql: every p must be between 0 and 1 (exclusive), got " + ps.join(", "));
+  const v = finiteSql("value");
+  return aggregateSql(cohortRowsCte(cohortSql, study, db, profileType, entity) +
+    "SELECT quantilesExactIf(" + ps.join(", ") + ")(" + v + ", " + v + " IS NOT NULL) AS qs, max(" + v + ") AS hi, countIf(" + v + " IS NOT NULL) AS n FROM rows");
+}
+
 /** Each value of one categorical entity over the cohort, with how many of its cases (samples, or patients for a patient-level profile) take it; "not called" left out. */
 export function assayCohortValuesSql(cohortSql: string, study: string, db: string, profileType: string, entity: string): AggregateSql {
   return aggregateSql(cohortRowsCte(cohortSql, study, db, profileType, entity) +

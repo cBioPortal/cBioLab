@@ -11,17 +11,17 @@ import { chQuery, STUDY, PRIMARY, ensureChContext, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 import { describeCohortDef } from "./cohort2.ts";
-import type { AnalysisDoc, AnalysisResult, CohortDef, PartitionDef, ViewResult, ViewKind, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
+import type { AnalysisDoc, AnalysisResult, Clause, CohortDef, PartitionDef, ViewResult, ViewKind, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
 import { plainResult } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
-import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, hasViewAggregates, type Resolver } from "./federation.ts";
+import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, hasViewAggregates, attributeCutsSql, type Resolver } from "./federation.ts";
 import { cantDraw } from "./view-coverage.ts";
 import { describeSources, sourceIndex } from "./provenance.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
-import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey, chooseArmValues, armLabel, SPLIT_BY_DEFAULT_MIN_COUNT } from "./partition-arms.ts";
-import { ENTITY_RE, isCategoricalAssay, assayCohortMedianSql, assayCohortValuesSql } from "./generic-assay.ts";
+import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey, chooseArmValues, armLabel, quantilePoints, rangeArms, SPLIT_BY_DEFAULT_MIN_COUNT } from "./partition-arms.ts";
+import { ENTITY_RE, isCategoricalAssay, assayCohortMedianSql, assayCohortValuesSql, assayCohortCutsSql } from "./generic-assay.ts";
 import { entityShortName } from "./profile-names.ts";
 import { upgradeDocument } from "./doc-version.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
@@ -217,6 +217,9 @@ export interface PartitionProposalRequest {
   /** a generic-assay entity: a median split of its numbers, or an arm per value of its categories */
   assay?: { profileType: string; entity: string };
   maxArms?: number; minCount?: number;
+  /** a numeric attribute or entity cut into this many equal-count groups (2: at its median, 4: its
+   *  quartiles) within the cohort, every group an arm of its own range, instead of the median split */
+  quantiles?: number;
   /** the partition's name; default "<cohort> by <attribute|gene>" */
   name?: string;
 }
@@ -263,7 +266,7 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
     return { name, def: { ...p, split: name } };
   }
   if (req.oql) { const name = nameFor("OQL"); return { name, def: { ...partitionFromOql(cohort, req.oql), split: name } }; }
-  if (req.assay) return assayPartition(cohort, def, docStudy, req.assay, nameFor, { maxArms: req.maxArms, minCount: req.minCount });
+  if (req.assay) return assayPartition(cohort, def, docStudy, req.assay, nameFor, { maxArms: req.maxArms, minCount: req.minCount, quantiles: req.quantiles });
 
   const attribute = String(req.attribute).trim();
   if (!ATTR_NAME_RE.test(attribute)) throw new Error("'" + attribute + "' is not a valid attribute name");
@@ -280,10 +283,18 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
     // resolves the cutoff live from this cohort's own values, at the level the study records them.
     if (studies.length > 1) throw new Error("'" + attribute + "' is numeric, and a median split needs a cohort in a single study (“" + cohort + "” spans " + studies.length + ")");
     const name = nameFor(attribute);
+    if (req.quantiles != null) {
+      const r = await resolverOf(studies[0]);
+      if (!hasViewAggregates(r)) throw new Error(studies[0] + " cannot answer a quantile split here");
+      const ps = quantilePoints(req.quantiles);
+      const [m] = await r.viewAggregate("partition:quantiles", def, (c, s, d) => attributeCutsSql(c, attribute, ps, s, d));
+      return quantilePartition(cohort, name, attribute, req.quantiles, m, (range) => ({ kind: "clinical", attribute, range }), { attribute });
+    }
     return { name, note: "split at the median of " + attribute + " within “" + cohort + "”",
       def: { of: cohort, split: name, arms: [{ name: attribute + " below median", where: { kind: "clinical", attribute, op: "<", percentile: 0.5, percentileOf: cohort } }],
         other: attribute + " at or above median", source: { attribute, median: true } } };
   }
+  if (req.quantiles != null) throw new Error("'" + attribute + "' is categorical; only a numeric attribute is cut into quantiles");
   const { def: p, pooled } = partitionFromValues(cohort, attribute, dist.values || [], { maxArms: req.maxArms, minCount: req.minCount });
   if (dist.partial && p.source) p.source.otherValuesTruncated = true;
   const name = nameFor(attribute);
@@ -299,7 +310,7 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
  * "No … measured" child, never to an arm.
  */
 async function assayPartition(cohort: string, def: CohortDef, docStudy: string, assay: { profileType: string; entity: string },
-  nameFor: (what: string) => string, opts: { maxArms?: number; minCount?: number }): Promise<{ name: string; def: PartitionDef; note?: string }> {
+  nameFor: (what: string) => string, opts: { maxArms?: number; minCount?: number; quantiles?: number }): Promise<{ name: string; def: PartitionDef; note?: string }> {
   const { profileType, entity } = assay;
   if (!/^[A-Za-z0-9_.-]{1,64}$/.test(profileType) || !ENTITY_RE.test(entity)) throw new Error("name a generic-assay profile and one of its entities to split by");
   const studies: string[] = [];
@@ -315,6 +326,7 @@ async function assayPartition(cohort: string, def: CohortDef, docStudy: string, 
   const source = { assay: { profileType, entity } };
   const [m] = await r.viewAggregate("partition:assay", def, (c, s, d) => assayCohortMedianSql(c, s, d, profileType, entity));
   if (isCategoricalAssay(String(m?.dt || ""))) {
+    if (opts.quantiles != null) throw new Error(short + " is categorical; only a numeric entity is cut into quantiles");
     const rows = await r.viewAggregate("partition:assay values", def, (c, s, d) => assayCohortValuesSql(c, s, d, profileType, entity));
     const minCount = opts.minCount ?? SPLIT_BY_DEFAULT_MIN_COUNT;
     const { own, pooled } = chooseArmValues(rows.map((x) => ({ v: String(x.v), n: Number(x.n) })), opts.maxArms, minCount);
@@ -324,10 +336,35 @@ async function assayPartition(cohort: string, def: CohortDef, docStudy: string, 
       ...(pooled.length ? { note: pooled.length + " value" + (pooled.length === 1 ? "" : "s") + " with fewer patients go to Other: " + pooled.slice(0, 12).map((x) => x.v).join(", ") } : {}) };
   }
   if (!(Number(m?.n) > 0)) throw new Error("no patient of “" + cohort + "” has a value for " + short);
+  if (opts.quantiles != null) {
+    const ps = quantilePoints(opts.quantiles);
+    const [q] = await r.viewAggregate("partition:assay quantiles", def, (c, s, d) => assayCohortCutsSql(c, s, d, profileType, entity, ps));
+    return quantilePartition(cohort, name, short, opts.quantiles, q, (range) => ({ kind: "genericAssay", profileType, entity, range }), source);
+  }
   const cut = Number(m.median);
   return { name, note: "split at the median of " + short + " within “" + cohort + "” (" + cut.toPrecision(4) + ", over its samples' values)",
     def: { of: cohort, split: name, arms: [{ name: short + " above median", where: { kind: "genericAssay", profileType, entity, range: { gt: cut } } }],
       other: short + " at or below median", source: { ...source, median: true } } };
+}
+
+/**
+ * A numeric value cut into `n` equal-count groups within the cohort, from its exact quantiles (`m`:
+ * `qs`, `hi` the largest value, `n` how many values): an arm per interval, each with its cut
+ * written in, so re-running cannot move it. A cut at the largest value would leave the arm above it
+ * empty, and a cut shared by tied values would make an empty interval; both are dropped, so there
+ * may be fewer groups than asked for, and the note says so. Fewer than two is refused.
+ */
+function quantilePartition(cohort: string, name: string, label: string, n: number, m: Record<string, unknown> | undefined,
+  where: (range: { gt?: number; lte?: number }) => Clause, source: PartitionDef["source"]): { name: string; def: PartitionDef; note: string } {
+  const count = Number(m?.n) || 0;
+  if (!count) throw new Error("no case of “" + cohort + "” has a value for " + label);
+  const hi = Number(m!.hi);
+  const cuts = (Array.isArray(m!.qs) ? m!.qs : []).map(Number).filter((c) => Number.isFinite(c) && c < hi);
+  if (!cuts.length) throw new Error(label + " takes a single value across the " + count + " cases of “" + cohort + "” that have one — nothing to cut");
+  const arms = rangeArms(label, cuts, where);
+  const what = n === 2 ? "its median" : n === 4 ? "its quartiles" : n + " equal-count groups";
+  return { name, note: label + " cut at " + what + " within “" + cohort + "”" + (arms.length < n ? " — " + arms.length + " groups, not " + n + ", because tied values cannot be divided" : ""),
+    def: { of: cohort, split: name, arms, source: { ...source, quantiles: n } } };
 }
 
 /** One request context for the whole analysis, so a cohort resolved once is read by every view (resolveCohort). */
