@@ -81,6 +81,14 @@ write; `lib/importer/lab-schema.ts` has the details.
   comparing them: `node scripts/check-legacy-diff.ts --prefix labv_ <study>` compares the views with
   cBioPortal's own importer exactly as it compares the legacy tables.
 
+In `new` and `both` modes an import is merged into the `lab_` tables rather than replacing
+them: rows are staged, then only rows that are new or changed are written and stored rows the
+import no longer has get a deletion marker (`ReplacingMergeTree` versions; the views read
+`FINAL`), so importing an unchanged study writes no data rows. `npm run import -- --update
+<folder>` (new mode) takes a folder holding some samples of an imported study — their clinical
+rows and their lines of the data files — and replaces just those samples, and only the kinds of
+data the folder holds; the study's counts and the patients' SAMPLE_COUNT are then recomputed.
+
 The importer applies cBioPortal's rules once: it produces rows for cBioPortal's tables, and
 `lib/importer/lab-writer.ts` turns each into its `lab_` row. Shared reference data (genes, aliases,
 gene panels, cancer types) stays in cBioPortal's tables in every mode.

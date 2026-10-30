@@ -14,7 +14,7 @@ import { importDiscreteLong, importMatrix } from "./matrix.ts";
 import { fractionGenomeAltered, importGenePanelMatrix, importSegments, importStructuralVariants, importTimeline, type SegmentTotals } from "./other.ts";
 import { importGenePanel } from "./panels.ts";
 import { derivedTablesSql, schemaMode } from "./setup.ts";
-import { removeLabStudy, writesLab, writesLegacy, type SchemaMode } from "./lab-schema.ts";
+import { refreshLabStudy, removeLabStudy, writesLab, writesLegacy, type SchemaMode } from "./lab-schema.ts";
 import { openTable, readStudyFolder, type DataFile, type StudyFolder } from "./study.ts";
 
 export interface ImportResult {
@@ -31,7 +31,12 @@ export interface ImportResult {
 
 const ORDER: DataFile["kind"][] = ["clinical_sample", "clinical_patient", "mutations", "cna_discrete", "cna_discrete_long", "matrix", "sv", "segments", "timeline", "gene_panel_matrix"];
 
-export async function importStudy(conn: WriteConn, dataDir: string, dir: string, fallbackStudyId: string, progress: Progress): Promise<ImportResult> {
+/**
+ * `update`: the folder holds some samples of a study already imported (their clinical rows, their
+ * lines of the data files) and replaces just those samples, leaving the rest of the study as it
+ * is. Only a database in the new schema can take one (lib/importer/lab-schema.ts).
+ */
+export async function importStudy(conn: WriteConn, dataDir: string, dir: string, fallbackStudyId: string, progress: Progress, update = false): Promise<ImportResult> {
   const t0 = Date.now();
   const folder = await readStudyFolder(dir, fallbackStudyId);
   const studyId = folder.study.cancer_study_identifier;
@@ -40,9 +45,14 @@ export async function importStudy(conn: WriteConn, dataDir: string, dir: string,
   const genes = await GeneResolver.load(conn);
   const mode = await schemaMode(conn);
   const ctx = new ImportContext(conn, genes, studyId, progress, mode);
+  if (update && mode !== "new") throw new Error("Updating some samples of a study needs a database in the new schema (--schema new); this one is " + mode + ".");
+  if (ctx.lab && update) ctx.lab.scope = "samples";
 
-  progress({ step: "Removing any earlier import of " + studyId });
-  await removeStudy(conn, studyId, mode);
+  // the lab_ tables replace only what changed, when the import is merged in (lib/importer/lab-writer.ts)
+  if (writesLegacy(mode)) {
+    progress({ step: "Removing any earlier import of " + studyId });
+    await removeStudy(conn, studyId, "legacy");
+  }
   for (const p of folder.panels) {
     const r = await importGenePanel(conn, genes, await readFile(p, "utf8"));
     if (r.warning) ctx.warnings.push(r.warning);
@@ -82,6 +92,7 @@ export async function importStudy(conn: WriteConn, dataDir: string, dir: string,
   if (ctx.lab) {
     progress({ step: "Writing the lab_ tables" });
     await ctx.lab.finish(counts, ctx.referenceGenome);
+    if (update) await refreshLabStudy(conn, studyId, [...ctx.patients.keys()]);
   }
   if (ctx.implicitSamples.length)
     ctx.warnings.push(ctx.implicitSamples.length + " samples appear in data files but not in a clinical sample file; they were created with a patient of the same id (e.g. " + ctx.implicitSamples.slice(0, 3).join(", ") + ")");

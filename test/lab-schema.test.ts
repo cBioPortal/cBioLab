@@ -3,7 +3,7 @@
 // built from cBioPortal's own derived-table SQL by renaming tables, never by editing it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LAB_TABLES, baseViews, derivedSelects, labTableDdl, renameTables } from "../lib/importer/lab-schema.ts";
+import { LAB_TABLES, baseViews, columnsOf, derivedSelects, labTableDdl, renameTables } from "../lib/importer/lab-schema.ts";
 
 test("every lab_ table has a study_id column and sorts by it first", () => {
   for (const [name, t] of Object.entries(LAB_TABLES)) {
@@ -43,4 +43,9 @@ test("the derived-table script yields each table's SELECTs, in order", () => {
     "EXCHANGE TABLES a_derived AND a_derived_temp;"
   ].join("\n");
   assert.deepEqual([...derivedSelects(script)], [["a_derived", ["SELECT 1", "SELECT 2"]]]);
+});
+
+test("column lists split at top-level commas only, so Map(String, String) stays one column", () => {
+  assert.deepEqual(columnsOf("lab_timeline_event"), ["study_id", "patient_id", "event_index", "event_type", "start_date", "stop_date", "data"]);
+  for (const name of Object.keys(LAB_TABLES)) assert.ok(columnsOf(name).every((c) => /^\w+$/.test(c)), name);
 });
