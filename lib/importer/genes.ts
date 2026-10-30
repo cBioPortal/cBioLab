@@ -13,6 +13,7 @@ export class GeneResolver {
   private readonly byEntrez = new Map<number, Gene>();
   private readonly byHugo = new Map<string, Gene>();
   private readonly byAlias = new Map<string, Gene[]>();
+  private byEntityId: Map<number, Gene> | null = null;
 
   static async load(conn: WriteConn): Promise<GeneResolver> {
     const genes = await query<{ e: number; h: string; t: string | null; g: number }>(conn,
@@ -40,6 +41,12 @@ export class GeneResolver {
   }
 
   entrez(id: number): Gene | null { return this.byEntrez.get(id) ?? null; }
+
+  /** The gene whose genetic entity id this is. */
+  byEntity(entityId: number): Gene | null {
+    if (!this.byEntityId || !this.byEntityId.has(entityId)) this.byEntityId = new Map([...this.byEntrez.values()].map((g) => [g.entityId, g]));
+    return this.byEntityId.get(entityId) ?? null;
+  }
 
   /** `DaoGeneOptimized.getGene(symbol)`: the gene with this Hugo symbol, ignoring case; aliases are not searched. */
   hugo(symbol: string): Gene | null { return this.byHugo.get(symbol.toUpperCase()) ?? null; }

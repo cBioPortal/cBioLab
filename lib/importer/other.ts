@@ -1,7 +1,6 @@
 // Structural variants, copy-number segments, timelines and the gene panel matrix
 // (notes/legacy-java-importer.md §V, §S, §P).
 import path from "node:path";
-import { Inserter, insertAll } from "./ch-write.ts";
 import { ImportContext, skip, sampleId, isNormalBarcode } from "./context.ts";
 import { openTable, type DataFile } from "./study.ts";
 
@@ -18,7 +17,7 @@ export async function importStructuralVariants(ctx: ImportContext, f: DataFile, 
   const t = await openTable(f.file);
   const h = new Map(t.header.map((x, i) => [x.toLowerCase(), i]));
   const at = (row: string[], k: string) => { const i = h.get(k); return i === undefined ? "" : (row[i] ?? "").trim(); };
-  const ins = new Inserter(ctx.conn, "structural_variant"), dIns = new Inserter(ctx.conn, "alteration_driver_annotation");
+  const ins = ctx.sink("structural_variant"), dIns = ctx.sink("alteration_driver_annotation");
   const seen = new Set<string>();
   const site = (row: string[], n: 1 | 2) => {
     const e = at(row, "site" + n + "_entrez_gene_id"), hugo = at(row, "site" + n + "_hugo_symbol");
@@ -62,9 +61,9 @@ export type SegmentTotals = Map<number, [number, number]>;
 export async function importSegments(ctx: ImportContext, f: DataFile, totals: SegmentTotals): Promise<void> {
   const r = ctx.report(path.basename(f.file), "copy-number segments");
   const t = await openTable(f.file);
-  await insertAll(ctx.conn, "copy_number_seg_file", [{ seg_file_id: ctx.id("segFile"), cancer_study_id: ctx.cancerStudyId,
+  await ctx.insertAll("copy_number_seg_file", [{ seg_file_id: ctx.id("segFile"), cancer_study_id: ctx.cancerStudyId,
     reference_genome_id: f.meta.reference_genome_id || "hg19", description: f.meta.description || "", filename: path.basename(f.file) }]);
-  const ins = new Inserter(ctx.conn, "copy_number_seg");
+  const ins = ctx.sink("copy_number_seg");
   for await (const row of t.rows) {
     r.read++;
     const [raw, chrom, s, e, probes, mean] = row.map((x) => (x ?? "").trim());
@@ -98,7 +97,7 @@ export async function importTimeline(ctx: ImportContext, f: DataFile): Promise<v
   const up = t.header.map((x) => x.toUpperCase());
   const iP = up.indexOf("PATIENT_ID"), iS = up.indexOf("START_DATE"), iE = up.indexOf("STOP_DATE"), iT = up.indexOf("EVENT_TYPE");
   if (iP < 0 || iS < 0 || iT < 0) throw new Error(path.basename(f.file) + " needs PATIENT_ID, START_DATE and EVENT_TYPE columns");
-  const ev = new Inserter(ctx.conn, "clinical_event"), data = new Inserter(ctx.conn, "clinical_event_data");
+  const ev = ctx.sink("clinical_event"), data = ctx.sink("clinical_event_data");
   for await (const row of t.rows) {
     r.read++;
     const pid = (row[iP] ?? "").trim();
@@ -107,6 +106,7 @@ export async function importTimeline(ctx: ImportContext, f: DataFile): Promise<v
     if (!ctx.patients.has(pid)) { skip(r, "patient not in the clinical files"); continue; }
     const stopText = iE >= 0 ? (row[iE] ?? "").trim() : "";
     const id = ctx.id("clinicalEvent");
+    if ((row[iT] ?? "").trim().toUpperCase() === "TREATMENT") ctx.treatedPatients.add(ctx.patients.get(pid)!);
     await ev.add({ clinical_event_id: id, patient_id: ctx.patients.get(pid)!, start_date: Math.trunc(start),
       stop_date: stopText && Number.isFinite(Number(stopText)) ? Math.trunc(Number(stopText)) : null, event_type: (row[iT] ?? "").trim() });
     for (let i = 0; i < t.header.length; i++) {
