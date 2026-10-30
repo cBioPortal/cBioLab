@@ -28,7 +28,8 @@ const ID_SOURCES = {
   segFile: "seg_file_id FROM copy_number_seg_file",
   clinicalEvent: "clinical_event_id FROM clinical_event",
   sampleList: "list_id FROM sample_list",
-  sv: "internal_id FROM structural_variant"
+  sv: "internal_id FROM structural_variant",
+  geneticEntity: "id FROM genetic_entity"
 } as const;
 export type IdKind = keyof typeof ID_SOURCES;
 
