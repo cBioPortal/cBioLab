@@ -85,7 +85,7 @@ sm0 AS (
 mu0 AS (
   SELECT patientId AS pid, uniqExact(tuple(`GENE.hugoGeneSymbol`, proteinChange, mutationType, variantType, chr, startPosition, endPosition, referenceAllele, tumorSeqAllele)) AS n
   FROM snapshot_db.mutation_derived
-  WHERE studyId = 'msk_chord_2024' AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c0)
+  WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c0)
   GROUP BY pid
 ),
 cn0 AS (
@@ -118,7 +118,7 @@ WITH m AS (
          referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon,
          if(tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f
   FROM snapshot_db.mutation_derived
-  WHERE studyId = 'msk_chord_2024' AND patientId = 'P-0024249' AND molecularProfileId NOT LIKE '%uncalled%'
+  WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND patientId = 'P-0024249' AND molecularProfileId NOT LIKE '%uncalled%'
 ),
 g AS (
   SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, arrayStringConcat(arraySort(x -> if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid))) AS so,
@@ -154,7 +154,7 @@ WITH m AS (
          referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon,
          if(tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f
   FROM snapshot_db.mutation_derived
-  WHERE studyId = 'msk_chord_2024' AND patientId = 'P-0024249' AND molecularProfileId NOT LIKE '%uncalled%'
+  WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND patientId = 'P-0024249' AND molecularProfileId NOT LIKE '%uncalled%'
 ),
 g AS (
   SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, arrayStringConcat(arraySort(x -> if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid))) AS so,
@@ -207,7 +207,7 @@ sm0 AS (
 mu0 AS (
   SELECT patientId AS pid, uniqExact(tuple(`GENE.hugoGeneSymbol`, proteinChange, mutationType, variantType, chr, startPosition, endPosition, referenceAllele, tumorSeqAllele)) AS n
   FROM snapshot_db.mutation_derived
-  WHERE studyId = 'msk_chord_2024' AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c0)
+  WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c0)
   GROUP BY pid
 ),
 cn0 AS (
@@ -256,7 +256,7 @@ sm0 AS (
 mu0 AS (
   SELECT patientId AS pid, uniqExact(tuple(`GENE.hugoGeneSymbol`, proteinChange, mutationType, variantType, chr, startPosition, endPosition, referenceAllele, tumorSeqAllele)) AS n
   FROM snapshot_db.mutation_derived
-  WHERE studyId = 'msk_chord_2024' AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c0)
+  WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c0)
   GROUP BY pid
 ),
 cn0 AS (
@@ -306,7 +306,7 @@ sm0 AS (
 mu0 AS (
   SELECT patientId AS pid, uniqExact(tuple(`GENE.hugoGeneSymbol`, proteinChange, mutationType, variantType, chr, startPosition, endPosition, referenceAllele, tumorSeqAllele)) AS n
   FROM snapshot_db.mutation_derived
-  WHERE studyId = 'msk_chord_2024' AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c0)
+  WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND molecularProfileId NOT LIKE '%uncalled%' AND patientId IN (SELECT pid FROM c0)
   GROUP BY pid
 ),
 cn0 AS (

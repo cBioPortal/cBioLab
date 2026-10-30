@@ -22,7 +22,7 @@
 import { survivalCountsSql, anchoredSurvivalSql, coxRowsSql, survivalEndpointsSql } from "./survival-queries.ts";
 import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, registerChExternal, hasChExternal, inChContext, type ChConn } from "./ch.ts";
 import { createHash } from "node:crypto";
-import { sq } from "./compiler.ts";
+import { mutationStudySql, sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
 import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql, inCohortSamples, inCohortPatients, bareSampleId } from "./cohort2.ts";
@@ -523,7 +523,7 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
     "     m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,\n" +
     "                  patientId AS pid, sampleId AS sid, mutationStatus AS status, " + driver + " AS driver\n" +
     "           FROM " + db + ".mutation_derived\n" +
-    "           WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
+    "           WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
     "             AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''\n" +
     "             AND " + inCohortSamples("sampleId") + "),\n" +
     "     kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= " + floor + ")\n"

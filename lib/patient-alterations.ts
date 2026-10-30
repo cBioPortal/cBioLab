@@ -3,7 +3,7 @@
 // choose from. Every row names a patient, so — like the mutation table — the queries live here,
 // outside lib/federation*.ts's aggregate builders, and run only through PatientLevelResolver's
 // rows* methods: a participant that may not disclose a patient has no such method.
-import { sq } from "./compiler.ts";
+import { mutationStudySql, sq } from "./compiler.ts";
 import type { QueryColumn, RowSource } from "./table-query.ts";
 import type { TablePart } from "./mutation-table.ts";
 import { patientSamplesSql } from "./patient-timeline.ts";
@@ -120,7 +120,7 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon,\n" +
       "         if(tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f\n" +
       "  FROM " + db + ".mutation_derived\n" +
-      "  WHERE studyId = " + st + " AND patientId = " + sq(patient) + " AND molecularProfileId NOT LIKE '%uncalled%'" + onlyCohort("sampleId", samples) + "\n" +
+      "  WHERE " + mutationStudySql(p.study) + " AND patientId = " + sq(patient) + " AND molecularProfileId NOT LIKE '%uncalled%'" + onlyCohort("sampleId", samples) + "\n" +
       "),\n" +
       "g AS (\n" +
       "  SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, " + sampleCols(order) + ",\n" +
@@ -271,7 +271,7 @@ export function alterationPatientRowSource(parts: AlterationPart[], db: string, 
       "mu" + i + " AS (\n" +
       "  SELECT patientId AS pid, uniqExact(tuple(`GENE.hugoGeneSymbol`, proteinChange, mutationType, variantType, chr, startPosition, endPosition, referenceAllele, tumorSeqAllele)) AS n\n" +
       "  FROM " + db + ".mutation_derived\n" +
-      "  WHERE studyId = " + st + " AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortPatients("patientId", "c" + i) + onlyCohort("sampleId", samples, "c" + i) + "\n" +
+      "  WHERE " + mutationStudySql(p.study) + " AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortPatients("patientId", "c" + i) + onlyCohort("sampleId", samples, "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n" +
       "cn" + i + " AS (\n" +

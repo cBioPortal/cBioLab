@@ -2,7 +2,7 @@
 import { survivalMonthsSql, survivalEventSql } from "../../survival-sql.ts";
 import { sideCountsTail, pidOf } from "../../federation-views.ts";
 import { clinicalTable } from "../../custom-data.ts";
-import { sq } from "../../compiler.ts";
+import { mutationStudySql, sq } from "../../compiler.ts";
 import { clinicalValueFoldSql, foldedEqualsSql, foldedInSql } from "../../event-names.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
@@ -154,7 +154,7 @@ function ctdnaChCte(study: string, db: string, ch: NonNullable<CtdnaSides["ch"]>
         "         max(normalAltCount >= " + Math.floor(ch.normalMinAlt!) + " AND normalAltCount / (normalAltCount + normalRefCount) >= " + Number(ch.normalMinRatio) +
         " * tumorAltCount / greatest(1, tumorAltCount + tumorRefCount)) AS hit, max(normalAltCount IS NOT NULL) AS loaded\n" +
         "  FROM " + db + ".mutation_derived\n" +
-        "  WHERE studyId = " + sq(study) + " AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')\n" +
+        "  WHERE " + mutationStudySql(study) + " AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')\n" +
         "  GROUP BY suid, gene, mv\n" +
         "),\n"
       : "") +

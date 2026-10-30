@@ -291,7 +291,8 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
   const tally: HotspotGene["tally"] = { missense: { driver: 0, vus: 0 }, truncating: { driver: 0, vus: 0 }, inframe: { driver: 0, vus: 0 },
     splice: { driver: 0, vus: 0 }, fusion: { driver: 0, vus: 0 }, other: { driver: 0, vus: 0 } };
   for (const t of types.values()) tally[impactType(canonicalType(t.mtype))][t.driver ? "driver" : "vus"] += t.rows;
-  const topChanges = [...changes.values()].sort((a, b) => b.n - a.n).slice(0, 10)
+  // ties broken by codon then change, so which tied change makes the ten never follows row order
+  const topChanges = [...changes.values()].sort((a, b) => b.n - a.n || (a.pos ?? Infinity) - (b.pos ?? Infinity) || (a.change < b.change ? -1 : a.change > b.change ? 1 : 0)).slice(0, 10)
     .map((c) => ({ change: c.change, pos: c.pos, n: c.n, pct: mutated ? Math.round((1000 * c.n) / mutated) / 10 : 0 }));
   return {
     gene, mutated, mutations: pairs, positions, domains, topChanges,

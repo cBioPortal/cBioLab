@@ -22,6 +22,16 @@ export interface ProfileInfo {
 }
 
 /**
+ * Whether a profile's values are stored in genetic_alteration_derived, which keeps every profile
+ * but these four types (mutations and structural variants have their own tables, generic assays
+ * generic_assay_data_derived). Lets a study's profile types be read from genetic_profile, a few
+ * thousand rows, instead of a DISTINCT over the derived table's tens of millions for the study.
+ */
+export function inGeneticAlterationDerived(type: string): boolean {
+  return !["GENERIC_ASSAY", "STRUCTURAL_VARIANT", "MUTATION_EXTENDED", "MUTATION_UNCALLED"].includes(type.toUpperCase());
+}
+
+/**
  * What an axis does with a profile, from its type and datatype: a mutation (grouped by mutation
  * type, or mutated or not), a structural variant (present or not), a discrete copy-number call
  * (one category per level), a number per case (continuous, z-scores, log2), or, for a generic assay,

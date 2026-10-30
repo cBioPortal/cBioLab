@@ -27,7 +27,7 @@ nm AS (
   SELECT concat(studyId, '_', sampleId) AS suid, `GENE.hugoGeneSymbol` AS gene, proteinChange AS mv,
          max(normalAltCount >= 2 AND normalAltCount / (normalAltCount + normalRefCount) >= 0.3 * tumorAltCount / greatest(1, tumorAltCount + tumorRefCount)) AS hit, max(normalAltCount IS NOT NULL) AS loaded
   FROM snapshot_db.mutation_derived
-  WHERE studyId = 'msk_access_2021' AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')
+  WHERE startsWith(molecularProfileId, 'msk_access_2021_') AND studyId = 'msk_access_2021' AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')
   GROUP BY suid, gene, mv
 ),
 chx AS (
@@ -69,7 +69,7 @@ nm AS (
   SELECT concat(studyId, '_', sampleId) AS suid, `GENE.hugoGeneSymbol` AS gene, proteinChange AS mv,
          max(normalAltCount >= 2 AND normalAltCount / (normalAltCount + normalRefCount) >= 0.3 * tumorAltCount / greatest(1, tumorAltCount + tumorRefCount)) AS hit, max(normalAltCount IS NOT NULL) AS loaded
   FROM snapshot_db.mutation_derived
-  WHERE studyId = 'msk_access_2021' AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')
+  WHERE startsWith(molecularProfileId, 'msk_access_2021_') AND studyId = 'msk_access_2021' AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')
   GROUP BY suid, gene, mv
 ),
 chx AS (
@@ -122,7 +122,7 @@ nm AS (
   SELECT concat(studyId, '_', sampleId) AS suid, `GENE.hugoGeneSymbol` AS gene, proteinChange AS mv,
          max(normalAltCount >= 2 AND normalAltCount / (normalAltCount + normalRefCount) >= 0.3 * tumorAltCount / greatest(1, tumorAltCount + tumorRefCount)) AS hit, max(normalAltCount IS NOT NULL) AS loaded
   FROM snapshot_db.mutation_derived
-  WHERE studyId = 'msk_access_2021' AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')
+  WHERE startsWith(molecularProfileId, 'msk_access_2021_') AND studyId = 'msk_access_2021' AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')
   GROUP BY suid, gene, mv
 ),
 chx AS (
@@ -185,7 +185,7 @@ nm AS (
   SELECT concat(studyId, '_', sampleId) AS suid, `GENE.hugoGeneSymbol` AS gene, proteinChange AS mv,
          max(normalAltCount >= 2 AND normalAltCount / (normalAltCount + normalRefCount) >= 0.3 * tumorAltCount / greatest(1, tumorAltCount + tumorRefCount)) AS hit, max(normalAltCount IS NOT NULL) AS loaded
   FROM snapshot_db.mutation_derived
-  WHERE studyId = 'msk_access_2021' AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')
+  WHERE startsWith(molecularProfileId, 'msk_access_2021_') AND studyId = 'msk_access_2021' AND concat(studyId, '_', sampleId) IN (SELECT suid FROM sides WHERE side = 'b')
   GROUP BY suid, gene, mv
 ),
 chx AS (

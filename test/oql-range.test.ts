@@ -50,7 +50,7 @@ describe("OQL position range: SQL", () => {
   const sql = (q: string) => oqlLeafSql(q, { study: "s1", db: "db", oncokbPin: "v1" });
   test("reads positions from mutation_derived, restricted to the study and gene", () => {
     const s = sql("APC: TRUNC_(1400-)");
-    assert.match(s, /FROM \(SELECT .* FROM db\.mutation_derived WHERE studyId = 's1' AND `GENE\.hugoGeneSymbol` = 'APC'\) g/s);
+    assert.match(s, /FROM \(SELECT .* FROM db\.mutation_derived WHERE startsWith\(molecularProfileId, 's1_'\) AND studyId = 's1' AND `GENE\.hugoGeneSymbol` = 'APC'\) g/s);
     assert.doesNotMatch(s, /genomic_event_derived/);
     assert.match(s, /NOT IN \('missense', 'inframe'\)/);
   });

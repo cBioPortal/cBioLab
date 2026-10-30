@@ -18,7 +18,7 @@
 // renderable as a sentence. Back-compat: the v1 flat event
 // shape {a, b?, rel, ...} is accepted anywhere a definition is expected.
 import { DB, STUDY } from "./ch.ts";
-import { compileCohort, sq, LINE_TYPE } from "./compiler.ts";
+import { compileCohort, mutationStudySql, sq, LINE_TYPE } from "./compiler.ts";
 import { oqlCasesSql } from "./oql.ts";
 import { clinicalValueFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
@@ -419,7 +419,7 @@ function proteinPositionLeafSql(leaf: ProteinPositionLeaf, ctx: Ctx): LeafIds {
   if (!conds.length) throw new Error("proteinPosition clause needs range{gt,gte,lt,lte}");
   return ofSamples("SELECT DISTINCT sampleId AS sid\n" +
     "  FROM " + dbOf(ctx) + ".mutation_derived\n" +
-    "  WHERE studyId = " + sq(ctx.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
+    "  WHERE " + mutationStudySql(ctx.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
     "    AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''\n" +
     "    AND " + conds.join(" AND "));
 }

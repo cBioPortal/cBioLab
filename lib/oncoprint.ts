@@ -5,7 +5,7 @@
 // Contract: sorted columns, typed cells (bitmask for gene tracks, NOT_PROFILED = -1),
 //   panel-aware track frequencies, group ranges. The renderer does zero data logic.
 import { chQuery, chQueryRows, DB, STUDY, PRIMARY, ensureChContext, registerChExternal, type ChConn } from "./ch.ts";
-import { compileCohort, sq } from "./compiler.ts";
+import { compileCohort, mutationStudySql, sq } from "./compiler.ts";
 import type { CohortDef, Contract, ChRow } from "./types.ts";
 
 // Internal-only: analysis.js passes an evaluated cohort's SQL as a subquery via this
@@ -30,6 +30,7 @@ import { compileCohortDef, baseSamplesSql } from "./cohort2.ts";
 import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
 
 import { PROFILED_TYPES, type ProfiledType } from "./profile-names.ts";
+import { inGeneticAlterationDerived } from "./profile-catalog.ts";
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
 import { clinicalTable, assertCustomDataPresent } from "./custom-data.ts";
@@ -205,8 +206,10 @@ const _profCache = new Map<string, Set<string>>();
 async function studyProfileTypes(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Set<string>> {
   const key = conn.id + "." + db + "." + study;
   if (_profCache.has(key)) return _profCache.get(key)!;
-  const r = await chQuery("SELECT DISTINCT profile_type FROM " + db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study), conn);
-  const set = new Set((r.data as ChRow[]).map((x) => x.profile_type));
+  const r = await chQuery("SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt, gp.genetic_alteration_type AS type\n" +
+    "FROM " + db + ".genetic_profile gp JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study), conn);
+  const set = new Set((r.data as ChRow[]).filter((x) => inGeneticAlterationDerived(String(x.type))).map((x) => String(x.pt)));
   _profCache.set(key, set);
   return set;
 }
@@ -231,7 +234,7 @@ const _vafCache = new Map<string, boolean>();
 async function vafAvailable(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<boolean> {
   const key = conn.id + "." + db + "." + study;
   if (_vafCache.has(key)) return _vafCache.get(key)!;
-  const r = await chQuery("SELECT 1 FROM " + db + ".mutation_derived WHERE studyId = " + sq(study) + " AND tumorAltCount > 0 LIMIT 1", conn);
+  const r = await chQuery("SELECT 1 FROM " + db + ".mutation_derived WHERE " + mutationStudySql(study) + " AND tumorAltCount > 0 LIMIT 1", conn);
   const ok = r.data.length > 0;
   _vafCache.set(key, ok);
   return ok;
@@ -240,7 +243,7 @@ export function vafSql(genes: string[], study: string = STUDY, db: string = DB, 
   return "SELECT " + (unit === "sample" ? "sampleId" : "patientId") + " AS pid, `GENE.hugoGeneSymbol` AS gene,\n" +
     "       max(tumorAltCount / (tumorAltCount + tumorRefCount)) AS v\n" +
     "FROM " + db + ".mutation_derived\n" +
-    "WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
+    "WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND tumorAltCount > 0 AND tumorRefCount >= 0 AND molecularProfileId NOT LIKE '%uncalled%'\n" +
     (samples ? "  AND sampleId IN (" + samples + ")\n" : "") +
     "GROUP BY pid, gene";
