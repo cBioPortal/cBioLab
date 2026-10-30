@@ -32,6 +32,9 @@ const halo = (p: Pal) => `stroke="${p.bg}" stroke-width="0.6"`;
 /** a mark's case, which the page's hover (app/lab/plot-hover.tsx) reads to find the point under the pointer */
 const caseAttr = (id: string) => ` data-id="${esc(id)}"`;
 
+/** a plot's tips are its points' (app/lab/plot-hover.tsx) and its boxes': hovering anything else shows none */
+const NO_FIGURE_TIP = { tip: false };
+
 /** the plot's height for a figure `w` wide */
 const plotHeight = (w: number) => Math.round(Math.max(240, Math.min(420, w * 0.36)));
 
@@ -157,7 +160,7 @@ function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: Pl
     ? "Darker is more " + (d.n > 1 ? "cases" : "case") + "; the shade is logarithmic." + (own.length ? " Each dot is one case." : "")
     : "Each dot is one case.") +
     (st && st.slope != null ? " The dashed line is the least-squares fit over every case." : ""), W, y, p.muted);
-  return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, false, "Plot — " + yTitle + " against " + xTitle);
+  return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, false, "Plot — " + yTitle + " against " + xTitle, NO_FIGURE_TIP);
 }
 
 function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotData, W0: number, p: Pal): string {
@@ -358,7 +361,7 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
       " past the whiskers and " + (ptOffScale === 1 ? "is" : "are") + " drawn as a triangle at the frame's edge." : "") +
     (offScale ? " " + fmtInt(offScale) + (offScale === 1 ? " value of a point layer lies" : " values of point layers lie") +
       " more than a whisker span past the whiskers and " + (offScale === 1 ? "is" : "are") + " drawn as a triangle at the frame's edge." : ""), W, y, p.muted);
-  return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, W > W0, "Plot — " + numTitle + " by " + catTitle);
+  return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, W > W0, "Plot — " + numTitle + " by " + catTitle, NO_FIGURE_TIP);
 }
 
 function table(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotData, W0: number, p: Pal): string {
@@ -414,6 +417,6 @@ function table(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: Plot
   y += FS.body + 12;
   const cap = caption((v.note ? v.note + "  " : "") + xTitle + " across, " + yTitle + " down. " + fmtInt(d.n) + " cases counted in the database." +
     (counts ? "" : " There are too many columns to print every count; each cell gives its count on hover."), W, y, p.muted);
-  return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, W > W0, "Plot — " + xTitle + " by " + yTitle);
+  return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, W > W0, "Plot — " + xTitle + " by " + yTitle, NO_FIGURE_TIP);
 }
 

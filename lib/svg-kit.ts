@@ -47,10 +47,13 @@ export const pFmt = (p: number): string => fmtP(p);
  * container (every label would shrink below legibility), so it keeps its width as a minimum and
  * the container scrolls. A figure at its requested width still scales to fit, as before.
  */
-export function frame(w: number, h: number, body: string, bg: string, grown = false, title?: string): string {
+export function frame(w: number, h: number, body: string, bg: string, grown = false, title?: string, opts: { tip?: boolean } = {}): string {
   w = Math.ceil(w); h = Math.ceil(h);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" role="img"` +
     (title ? ` aria-label="${esc(title)}"` : "") +
+    // `tip: false`: the title names the figure but is not shown on hovering it (app/_ui/tooltip.tsx
+    // reads an empty data-tip as "no tip here"), for a figure whose marks carry tips of their own
+    (opts.tip === false ? ` data-tip=""` : "") +
     ` style="max-width:${w}px;${grown ? `min-width:${w}px;` : ""}height:auto;display:block;font-family:'IBM Plex Sans',system-ui,sans-serif">` +
     (title ? `<title>${esc(title)}</title>` : "") +
     `<rect width="${w}" height="${h}" fill="${bg}"/>${body}</svg>`;
