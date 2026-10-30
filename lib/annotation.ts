@@ -88,10 +88,7 @@ async function syncedStudies(): Promise<string[]> {
 
 export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], study?: string | string[]): Promise<AnnotationIndex> {
   try {
-    const pin = process.env.ONCOKB_PIN ||
-      (await chQuery(
-        `SELECT oncokb_version FROM ${ANNOT_DB}.variant_annotation
-         GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1`)).data[0]?.oncokb_version;
+    const pin = await oncokbPin();
     if (!pin) throw new Error("annotation store is empty");
     const rows = await chQuery(
       `SELECT alteration_type AS t, hugo_gene_symbol AS gene, alteration, max(is_driver) AS is_driver

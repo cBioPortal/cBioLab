@@ -14,7 +14,7 @@
 // CNA (+-2) is stored), EXP/PROT without a threshold, GERMLINE/SOMATIC (public studies are
 // germline-stripped).
 import { DB, STUDY } from "./ch.ts";
-import { sq } from "./compiler.ts";
+import { mutationStudySql, sq } from "./compiler.ts";
 
 export { parseOql } from "./oql-parse.ts";
 export type { OqlSpecType, OqlRange, OqlSpec, OqlEntry } from "./oql-parse.ts";
@@ -99,7 +99,7 @@ const mutationsWithPositions = (db: string, study: string, gene: string): string
   "          studyId AS cancer_study_identifier, `GENE.hugoGeneSymbol` AS hugo_gene_symbol, 'mutation' AS variant_type,\n" +
   "          proteinChange AS mutation_variant, mutationType AS mutation_type, proteinPosStart AS pos_start, proteinPosEnd AS pos_end,\n" +
   "          CAST(NULL AS Nullable(Int8)) AS cna_alteration, ifNull(mutationStatus, '') AS mutation_status\n" +
-  "     FROM " + db + ".mutation_derived WHERE studyId = " + sq(study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + ") g\n";
+  "     FROM " + db + ".mutation_derived WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + ") g\n";
 
 /**
  * An event row `g` matched to the OncoKB store's row `ann` for it: equal on gene, alteration type

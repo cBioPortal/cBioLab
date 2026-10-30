@@ -26,6 +26,16 @@ export interface ValidSelector {
 
 export function sq(s: unknown): string { return "'" + String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'"; }
 
+/**
+ * One study's rows of mutation_derived. The table is sorted by molecularProfileId, never by
+ * studyId, and a study's profile ids all start "<study>_": the prefix lets ClickHouse skip every
+ * other study's granules instead of scanning all 19M rows. The prefix also matches sibling studies
+ * named after this one (brca_tcga_ → brca_tcga_pub_…), so studyId still decides which rows count.
+ */
+export function mutationStudySql(study: string): string {
+  return "startsWith(molecularProfileId, " + sq(study + "_") + ") AND studyId = " + sq(study);
+}
+
 function studyPatientsCte(db: string, study: string): string {
   return "study_patients AS (\n  SELECT p.internal_id FROM " + db + ".patient p\n" +
     "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +

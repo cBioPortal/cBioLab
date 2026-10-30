@@ -5,7 +5,7 @@ Cohorts:
 
 Mutations by protein position (commonest changes; share of patients mutated in THAT gene):
   KRAS: 2,355 mutated, 2,410 mutations on 12 codons — G12D 687 (29.2%), G12V 484 (20.6%), G13D 426 (18.1%), G12C 158 (6.7%), A146T 140 (5.9%), G12S 109 (4.6%)  [52 below the suppression floor]
-  BRAF: 618 mutated, 653 mutations on 11 codons — V600E 438 (70.9%), D594G 38 (6.1%), A404Cfs*9 10 (1.6%), G469A 9 (1.5%), P403Lfs*8 9 (1.5%), D594N 8 (1.3%)  [108 below the suppression floor]
+  BRAF: 618 mutated, 653 mutations on 11 codons — V600E 438 (70.9%), D594G 38 (6.1%), A404Cfs*9 10 (1.6%), P403Lfs*8 9 (1.5%), G469A 9 (1.5%), D594N 8 (1.3%)  [108 below the suppression floor]
   PIK3CA: 1,144 mutated, 1,327 mutations on 37 codons — E545K 251 (21.9%), H1047R 189 (16.5%), E542K 159 (13.9%), R88Q 47 (4.1%), Q546K 41 (3.6%), C420R 39 (3.4%)  [233 below the suppression floor]
   TP53: 4,068 mutated, 4,417 mutations on 140 codons — R175H 391 (9.6%), R282W 219 (5.4%), R248Q 183 (4.5%), R273C 182 (4.5%), R273H 178 (4.4%), R248W 146 (3.6%)  [718 below the suppression floor]
   KRAS: somatic mutation frequency 42.5%; mutation rows missense 2,350 driver / 3 VUS, inframe 5 driver / 0 VUS. BRAF: somatic mutation frequency 11.1%; mutation rows missense 518 driver / 8 VUS, truncating 0 driver / 19 VUS. PIK3CA: somatic mutation frequency 20.6%; mutation rows missense 1,034 driver / 38 VUS, truncating 0 driver / 8 VUS, inframe 14 driver / 0 VUS. TP53: somatic mutation frequency 73.4%; mutation rows missense 2,616 driver / 26 VUS, truncating 787 driver / 0 VUS, inframe 29 driver / 0 VUS, splice 241 driver / 0 VUS.

@@ -2,7 +2,7 @@
 // cBioPortal's Mutations tab lists. Its rows name samples, so — like the clinical table — the query
 // lives here, outside lib/federation*.ts's aggregate builders, and runs only through
 // PatientLevelResolver.rowsPage: a participant that may not disclose a patient has no such method.
-import { sq } from "./compiler.ts";
+import { mutationStudySql, sq } from "./compiler.ts";
 import type { QueryColumn, RowSource } from "./table-query.ts";
 import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS } from "./lollipop.ts";
 import { clinicalTable } from "./custom-data.ts";
@@ -80,7 +80,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "  SELECT patientId AS pid, sampleId AS sid, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,\n" +
     "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS altCount, tumorRefCount AS refCount, mutationStatus AS status, proteinPosStart AS pos\n" +
     "  FROM " + db + ".mutation_derived\n" +
-    "  WHERE studyId = " + sq(p.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
+    "  WHERE " + mutationStudySql(p.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
     "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + "\n" +
     "),\n" +
     attr("CANCER_TYPE_DETAILED", "ct" + i) + ",\n" +

@@ -9,7 +9,7 @@
 import { applyLocks, lockDate } from "./cohort-lock.ts";
 import { chQuery, STUDY, PRIMARY, ensureChContext, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
-import type { ProfileInfo } from "./profile-catalog.ts";
+import { inGeneticAlterationDerived, type ProfileInfo } from "./profile-catalog.ts";
 import { describeCohortDef } from "./cohort2.ts";
 import type { AnalysisDoc, AnalysisResult, Clause, CohortDef, PartitionDef, ViewResult, ViewKind, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
 import { plainResult } from "./types.ts";
@@ -29,14 +29,7 @@ import { ATTR_NAME_RE, assertCustomDataPresent } from "./custom-data.ts";
 import { viewRunner } from "./views/index.ts";
 import { Untimed, type ViewRun, type RiskFitter, type EvaluatedCohort } from "./views/run.ts";
 import { overLimit } from "./views/shared.ts";
-
-async function oncokbPin(): Promise<string | null> {
-  try {
-    const r = await chQuery(
-      "SELECT oncokb_version FROM oncokb_annotation.variant_annotation GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1");
-    return r.data[0]?.oncokb_version || null;
-  } catch { return null; }
-}
+import { oncokbPin } from "./annotation.ts";
 
 const _profileCache = new Map<string, StudyProfiles>(); // per-study
 export interface StudyProfiles {
@@ -45,13 +38,11 @@ export interface StudyProfiles {
   catalog: ProfileInfo[];
 }
 /**
- * Each study's profiles, many studies at once (studyProfiles is the list of one), rather than three
- * queries per study one after another —
- * Explore over all 551 studies spent ~30s on that before its first query; this takes ~6s. The two
- * genetic_profile queries run once per connection over every study not yet cached (30-60ms). The
- * profile types stay one query per study, in parallel: genetic_alteration_derived is read by its
- * study key that way, and one pooled DISTINCT over it measured 72s at 551 studies against 5.6s.
- * Fills the same cache studyProfiles reads.
+ * Each study's profiles, many studies at once (studyProfiles is the list of one), rather than
+ * queries per study one after another. Two genetic_profile queries run once per connection over
+ * every study not yet cached (30-60ms); the profile types are the catalog's profiles whose values
+ * genetic_alteration_derived holds (inGeneticAlterationDerived), not a DISTINCT over that table,
+ * which read 35M rows for one large study. Fills the same cache studyProfiles reads.
  */
 export async function studyProfilesMany(studies: string[]): Promise<Map<string, StudyProfiles>> {
   const { peerForStudy, remoteProfiles } = await import("./federation-remote.ts");
@@ -79,10 +70,7 @@ export async function studyProfilesMany(studies: string[]): Promise<Map<string, 
   });
   await Promise.all([...groups.values()].map(async ({ conn, studies: ss }) => {
     const IN = "(" + ss.map(sq).join(",") + ")";
-    const [types, ga, cat] = await Promise.all([
-      Promise.all(ss.map(async (s) => (await chQuery(
-        "SELECT DISTINCT profile_type FROM " + conn.db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(s), conn))
-        .data.map((r) => ({ s, profile_type: r.profile_type })))).then((rows) => ({ data: rows.flat() })),
+    const [ga, cat] = await Promise.all([
       // by the study's own id, not a prefix of the profile id, which also matches sibling studies
       chQuery("SELECT DISTINCT cs.cancer_study_identifier AS s, replaceOne(gp.stable_id, concat(cs.cancer_study_identifier, '_'), '') AS pt FROM " + conn.db + ".genetic_profile gp\n" +
         "JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
@@ -95,7 +83,7 @@ export async function studyProfilesMany(studies: string[]): Promise<Map<string, 
         "WHERE cs.cancer_study_identifier IN " + IN, conn),
     ]);
     const out = new Map<string, StudyProfiles>(ss.map((s) => [s, { profiles: [], gaProfiles: [], catalog: [] }]));
-    for (const r of types.data) out.get(String(r.s))?.profiles.push(r.profile_type);
+    for (const r of cat.data) if (inGeneticAlterationDerived(String(r.type))) out.get(String(r.s))?.profiles.push(String(r.profile));
     for (const r of ga.data) out.get(String(r.s))?.gaProfiles.push(r.pt);
     for (const r of cat.data) out.get(String(r.s))?.catalog.push({
       profile: String(r.profile), type: String(r.type), datatype: String(r.datatype), name: String(r.name), study: String(r.s),

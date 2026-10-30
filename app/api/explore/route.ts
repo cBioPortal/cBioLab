@@ -7,7 +7,7 @@ import { mergeExplore } from "../../../lib/explore.ts";
 import { PRIMARY, withChContext, ensureChContext, withoutFailedQueries } from "../../../lib/ch.ts";
 import { pack, throughCache, cacheVersion, resultEntry } from "../../../lib/next-cache.ts";
 import { studyProfilesMany, resolveStudy } from "../../../lib/analysis.ts";
-import { chQuery } from "../../../lib/ch.ts";
+import { oncokbPin } from "../../../lib/annotation.ts";
 import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { assertCustomDataPresent } from "../../../lib/custom-data.ts";
@@ -15,13 +15,6 @@ import { idSetRefsIn } from "../../../lib/id-sets.ts";
 import type { DerivedRequest } from "../../../lib/types.ts";
 
 export const maxDuration = 60;
-
-async function oncokbPin() {
-  try {
-    const r = await chQuery("SELECT oncokb_version FROM oncokb_annotation.variant_annotation GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1");
-    return r.data[0]?.oncokb_version || null;
-  } catch { return null; }
-}
 
 export async function POST(req: Request) {
   // Every query this request issues runs inside the reader's connection: when they supersede
