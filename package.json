@@ -12,7 +12,7 @@
     "docs:counts": "UPDATE_COUNTS=1 node --env-file=.env.local scripts/check-dsl-doc.ts",
     "check:methods": "node --env-file=.env.local scripts/check-method-scripts.ts",
     "check:examples": "node --env-file=.env.local scripts/check-examples.ts",
-    "test": "node --test \"test/**/*.test.ts\"",
+    "test": "CH_RUN_CACHE= node --test \"test/**/*.test.ts\"",
     "lint": "eslint . && knip && npm run lint:py",
     "lint:py": "python/.venv/bin/ruff check python",
     "report:dupes": "jscpd",

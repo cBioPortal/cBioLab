@@ -8,40 +8,29 @@
 // grant is revoked (or the store is empty) this degrades to the rule-based MOCK below,
 // clearly labeled as such. Pin a specific release with ONCOKB_PIN; default is the
 // most recently synced version in the store.
-import { chQuery, isAbortError, noteFailedQuery } from "./ch.ts";
+import { chQuery, isAbortError} from "./ch.ts";
 import type { ChRow } from "./types.ts";
 import { sq } from "./compiler.ts";
 
-// The lookup itself is kept, so callers arriving while it is in flight wait for it rather than each
-// asking. A failed lookup is the null pin, as before, and each caller notes the failure in its own
-// result, so a cached result never keeps a pin that was missing only because a query failed.
-let pinCache: { at: number; pin: Promise<{ pin: string | null; failed?: true }> } | null = null;
 /**
  * The store's most recent release, or the ONCOKB_PIN override. Cached: it is asked for once
  * per cohort compilation, and the answer changes only when the store is re-synced.
  */
+let pinCache: { at: number; pin: string | null } | null = null;
 export async function oncokbPin(): Promise<string | null> {
   if (process.env.ONCOKB_PIN) return process.env.ONCOKB_PIN;
-  const fresh = !!pinCache && Date.now() - pinCache.at < 5 * 60_000;
-  if (!fresh) pinCache = {
-    at: Date.now(),
-    pin: chQuery(`SELECT oncokb_version FROM ${ANNOT_DB}.variant_annotation GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1`)
-      .then((r) => ({ pin: (r.data[0] as { oncokb_version?: string })?.oncokb_version || null }),
-        (e) => { if (isAbortError(e)) throw e; return { pin: null, failed: true as const }; }),
-  };
-  const entry = pinCache!;
+  if (pinCache && Date.now() - pinCache.at < 5 * 60_000) return pinCache.pin;
   try {
-    const r = await entry.pin;
-    if (r.failed) noteFailedQuery();
-    return r.pin;
+    const r = await chQuery(
+      `SELECT oncokb_version FROM ${ANNOT_DB}.variant_annotation GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1`);
+    pinCache = { at: Date.now(), pin: (r.data[0] as { oncokb_version?: string })?.oncokb_version || null };
   } catch (e) {
     // A cancelled query is not an answer: caching a null pin here would refuse every
-    // `OQL ... DRIVER` clause for the next five minutes because one reader walked away. The reader
-    // who left gets the abort; one who was only waiting on that lookup asks again.
-    if (pinCache === entry) pinCache = null;
-    if (!fresh) throw e;
-    return oncokbPin();
+    // `OQL ... DRIVER` clause for the next five minutes because one reader walked away.
+    if (isAbortError(e)) throw e;
+    pinCache = { at: Date.now(), pin: null };
   }
+  return pinCache.pin;
 }
 
 export const MOCK_SOURCE = "MOCK-2026.08 (rule-based placeholder — NOT OncoKB)";

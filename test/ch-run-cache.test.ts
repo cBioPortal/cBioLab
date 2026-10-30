@@ -1,7 +1,6 @@
 // The gate's run cache (CH_RUN_CACHE, lib/ch.ts): within one run a statement is sent to the
 // database once and every later ask — from any script — is answered from the run's folder; a
-// failed statement is not kept. And the OncoKB pin: callers arriving together share one lookup.
-// The database is a stub `fetch` that counts what reaches it.
+// failed statement is not kept. The database is a stub `fetch` that counts what reaches it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
@@ -12,9 +11,7 @@ process.env.CLICKHOUSE_URL = "http://stub.invalid";
 process.env.CLICKHOUSE_USER = "u";
 process.env.CLICKHOUSE_PASSWORD = "p";
 process.env.CLICKHOUSE_DB = "db";
-delete process.env.ONCOKB_PIN;
 const { chQuery } = await import("../lib/ch.ts");
-const { oncokbPin } = await import("../lib/annotation.ts");
 
 let sent: string[] = [];
 let fail = false;
@@ -23,8 +20,7 @@ globalThis.fetch = (async (_url: string, init: RequestInit) => {
   sent.push(q);
   await new Promise((r) => setTimeout(r, 5));
   if (fail) return new Response("Code: 60. DB::Exception: no such table", { status: 404 });
-  const v = /oncokb_version/.test(q) ? { oncokb_version: "v4.2" } : { n: sent.length };
-  return new Response(JSON.stringify({ meta: [], data: [v], rows: 1 }));
+  return new Response(JSON.stringify({ meta: [], data: [{ n: sent.length }], rows: 1 }));
 }) as typeof fetch;
 
 test("with CH_RUN_CACHE a statement reaches the database once per run, and a failure is asked again", async () => {
@@ -53,11 +49,4 @@ test("with CH_RUN_CACHE a statement reaches the database once per run, and a fai
   await chQuery("SELECT 1 AS n");
   await chQuery("SELECT 1 AS n");
   assert.equal(sent.length, 2, "without CH_RUN_CACHE nothing is kept");
-});
-
-test("callers asking for the OncoKB pin together share one lookup", async () => {
-  sent = [];
-  const pins = await Promise.all(Array.from({ length: 10 }, () => oncokbPin()));
-  assert.deepEqual(new Set(pins), new Set(["v4.2"]));
-  assert.equal(sent.filter((q) => /oncokb_version/.test(q)).length, 1);
 });

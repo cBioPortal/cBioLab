@@ -199,9 +199,11 @@ function run(dir: string, guard: Guard, file?: string): { ok: boolean; failures:
   // a guard run against a planted bug must never write a report; the portal's answers are kept
   // between runs (PORTAL_CACHE in check-portal-parity.ts), since a planted bug cannot change them,
   // and so are the warehouse's (CH_RUN_CACHE in lib/ch.ts): a bug that changes a statement asks
-  // the warehouse anew, and one that changes only what is done with the answer gets the same answer
-  const { RECORD, REPORT_DIR, ...rest } = process.env;
-  const env = { ...rest, PORTAL_CACHE: join(dir, ".portal-cache"), CH_RUN_CACHE: rest.CH_RUN_CACHE || join(dir, ".ch-cache") };
+  // the warehouse anew, and one that changes only what is done with the answer gets the same answer.
+  // Never the unit guard's: its tests answer statements with stubs, which would be kept as the warehouse's.
+  const { RECORD, REPORT_DIR, CH_RUN_CACHE, ...rest } = process.env;
+  const env = { ...rest, PORTAL_CACHE: join(dir, ".portal-cache"),
+    ...(guard === "unit" ? {} : { CH_RUN_CACHE: CH_RUN_CACHE || join(dir, ".ch-cache") }) };
   const r = spawnSync(cmd, args, { cwd: dir, env, encoding: "utf8", maxBuffer: 64 << 20, timeout: 600_000 });
   const out = (r.stdout || "") + (r.stderr || "");
   const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
