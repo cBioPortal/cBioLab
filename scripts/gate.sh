@@ -70,8 +70,18 @@ splitby_cost() {
   phase "splitBy cost"              && npm run check:splitby-perf 2>&1 | summary grep -E "^FAIL|checks passed|FAILED"
 }
 
-# The checks that query the warehouse (and cbioportal.org) from a script, without a server.
-warehouse_checks() {
+# The checks that query the warehouse (and cbioportal.org) from a script, without a server. They run
+# outside the Next result cache and ask the same questions of the same studies over and over, so
+# they share one cache of the warehouse's answers for this run (CH_RUN_CACHE, lib/ch.ts): a folder
+# on disk (not /tmp, which may be memory), deleted when the lane ends. A subshell, so the variable
+# never reaches the e2e server, which caches through Next and must see the database's own answers.
+warehouse_checks() (
+  mkdir -p .gate-cache
+  # a run killed before its trap ran leaves its folder; none is read by a later run
+  find .gate-cache -mindepth 1 -maxdepth 1 -mmin +720 -exec rm -rf {} +
+  CH_RUN_CACHE=$(mktemp -d .gate-cache/run-XXXXXX)
+  export CH_RUN_CACHE="$PWD/$CH_RUN_CACHE"
+  trap 'rm -rf "$CH_RUN_CACHE"' EXIT
   phase "counts against cBioPortal" && npm run check:portal 2>&1 | summary grep -E "^FAIL|comparisons"
   phase "cohort logic"              && npm run check:cohorts 2>&1 | summary grep -E "^FAIL|cohort-logic checks"
   phase "pooled paths, independent counts" && npm run check:pooled 2>&1 | summary grep -E "^FAIL|pooled checks"
@@ -81,8 +91,8 @@ warehouse_checks() {
   phase "denominators"              && npm run check:denominators 2>&1 | summary grep -E "^FAIL|checks passed|FAILED"
   phase "gene facets"               && npm run check:genefacets 2>&1 | summary grep -E "^FAIL|checks passed|FAILED"
   phase "value folding"             && npm run check:values 2>&1 | summary grep -E "^FAIL|checks passed|FAILED"
-  phase "warehouse checks done"
-}
+  phase "warehouse checks done ($(ls "$CH_RUN_CACHE" | wc -l) distinct statements asked)"
+)
 
 # the browser suite against the build, then federation; sets RC rather than stopping at a failure
 e2e() {

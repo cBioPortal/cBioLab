@@ -169,6 +169,7 @@ cluster's SAML job refreshes every 3 h.
 | `UPDATE_GOLDEN` | the oncoprint golden tests (TypeScript and Python) | accept an intentional change to the golden SVG and raster |
 | `VISUAL_BASE` / `VISUAL_CONCURRENCY` / `VISUAL_NOISE_PX` | `npm run visual` | the server it screenshots (default `http://127.0.0.1:3109`), pages at once (`2`), and the pixel difference below which a change is noise (`50`) |
 | `FIGURE_CHECK_ONLY` / `FIGURE_CHECK_VERBOSE` | `check:figures` | lint only figures whose name contains this; list every issue, not the first five per figure |
+| `CH_RUN_CACHE` | any script that queries ClickHouse | keep each ClickHouse answer in this folder, keyed by the whole statement, and answer a repeat from it; for one gate run only (`scripts/gate.sh` sets it for the warehouse lane, `check:mutants` for its runs), never for a server |
 | `PORTAL_CACHE` | `check:portal` | keep cBioPortal's answers in this folder and reuse them for repeated requests (`check:mutants` sets it for its runs) |
 | `METHOD_CHECK_ONLY` | `check:methods` | run only the examples whose name contains this |
 | `MUTANT_ONLY` | `check:mutants` | plant only the bug with this id |
