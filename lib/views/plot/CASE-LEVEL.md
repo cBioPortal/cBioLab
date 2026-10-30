@@ -107,10 +107,13 @@ One commit per item; `npm test` and a focused check per item; the gate before ea
    CNA/SV, "not profiled" its own class (panel coverage, reuse the oncoprint's). On scatters too;
    the rare classes become a point layer over the cap. Check per-class counts against the portal's
    Plots tab for one study and gene.
-9. **Interaction** (phase 3): one overlay over the SVG maps the cursor to the nearest point (a grid
-   index over the drawn points); hover tooltip (sample id linking to the patient view, values,
-   alterations), case-id / protein-change search whose matches come back
-   from the server as a layer.
+9. **Interaction** (phase 3). **Hover done:** each point mark carries `data-id`; one listener over
+   the figure (`app/lab/plot-hover.tsx`) finds the nearest visible mark through a grid index and
+   shows the portal's tip from the result (`point-tip.ts`): the case (linking to its page when the
+   plot is over one study), both axes' values, colour and ring, the layers it is in. Every dot is
+   one size (radius 2.8 under a 0.6 outline). Still to do: the case's alterations in the tip
+   (protein change, CNA, SV, as the portal lists them), and case-id / protein-change search whose
+   matches come back from the server as a layer.
 10. **Brush and drill-down** (phase 4): a region or a cell returns its cases as a layer; "N cases →
    study view" built from the full list on the server.
 11. **Sidebar parity** (phase 5): "same gene", Driver vs VUS and VAF axes, box category filter and

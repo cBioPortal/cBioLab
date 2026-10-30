@@ -400,7 +400,7 @@ describe("plot point layers: subsets drawn over the plotted cohort", () => {
     const svg = viewToSvg(v)!;
     assert.match(svg, new RegExp('<rect [^>]*fill="' + LAYER_COLORS[1] + '" fill-opacity="0.85"'), "S is a box of its own");
     assert.equal((svg.match(new RegExp('<circle [^>]*fill="' + LAYER_COLORS[0] + '" fill-opacity', "g")) || []).length, 1, "the value inside the whiskers is a dot");
-    assert.match(svg, new RegExp('<path d="M[^"]*Z" fill="' + LAYER_COLORS[0] + '"'), "the value past them is a triangle at the edge");
+    assert.match(svg, new RegExp('<path data-id="[^"]*" d="M[^"]*Z" fill="' + LAYER_COLORS[0] + '"'), "the value past them is a triangle at the edge");
     assert.match(svg, /1 value of a point layer lies more than a whisker span past the/);
   });
 
@@ -412,7 +412,7 @@ describe("plot point layers: subsets drawn over the plotted cohort", () => {
     assert.match(svg, /<g data-layer="base">/);
     assert.match(svg, /<g data-layer="0"><circle/);
     assert.match(svg, /<g data-layer="1"><circle[^>]*fill="#0072B2"/);
-    assert.match(svg, /<g data-layer="1" data-shared="" data-owner="0" display="none"><circle cx="[^"]*" cy="[^"]*" r="2.5" fill="#0072B2"/,
+    assert.match(svg, /<g data-layer="1" data-shared="" data-owner="0" display="none"><circle data-id="a" cx="[^"]*" cy="[^"]*" r="2.8" fill="#0072B2"/,
       "the case layer 0 drew is drawn for layer 1 too, hidden until layer 0 is hidden");
   });
 
@@ -477,7 +477,7 @@ describe("plot points: every case, or the outliers over the density", () => {
         points: [{ id: "a", g: "A", v: 15 }, { id: "b", g: "A", v: 570 }] }] } as any })!;
     assert.match(svg, />20<\/text>/, "the axis tops out at whisker + one whisker span (10 + 10)");
     assert.equal((svg.match(/<circle [^>]*fill-opacity/g) || []).length, 1, "the 15 is a dot on the axis");
-    assert.equal((svg.match(/<path d="M[^"]*Z"/g) || []).length, 1, "the 570 is a triangle at the edge");
+    assert.equal((svg.match(/<path data-id="[^"]*" d="M[^"]*Z"/g) || []).length, 1, "the 570 is a triangle at the edge");
     assert.match(svg, /1 value of a point layer lies more than a whisker span past the whiskers and is drawn as a triangle/);
     // the violin stops at the whiskers: its bin at 15..16 lies past them but inside the axis, where the points are
     assert.equal((svg.match(/fill-opacity="0\.28"/g) || []).length, 1, "one violin bin drawn, the one inside the whiskers");

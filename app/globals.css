@@ -1287,6 +1287,9 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 .plot-figure[data-hide~="1"] g[data-shared][data-owner="1"],
 .plot-figure[data-hide~="2"] g[data-shared][data-owner="2"],
 .plot-figure[data-hide~="3"] g[data-shared][data-owner="3"] { display: inline; }
+/* the plot's hovered point, drawn again on top and ringed (app/lab/plot-hover.tsx) */
+.plot-hover-mark { pointer-events: none; }
+.plot-hover-mark > circle:last-child { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 /* a plot's axis controls: source, then whatever that source needs */
 .axispick { display: inline-flex; align-items: center; gap: var(--s1); }
 
