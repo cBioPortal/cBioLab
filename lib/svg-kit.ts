@@ -51,11 +51,12 @@ export function frame(w: number, h: number, body: string, bg: string, grown = fa
   w = Math.ceil(w); h = Math.ceil(h);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" role="img"` +
     (title ? ` aria-label="${esc(title)}"` : "") +
-    // `tip: false`: the title names the figure but is not shown on hovering it (app/_ui/tooltip.tsx
-    // reads an empty data-tip as "no tip here"), for a figure whose marks carry tips of their own
+    // `tip: false`: the title names the figure (aria-label) but is not shown on hovering it — no
+    // <title>, which the browser would show as its own tooltip, and an empty data-tip, which
+    // app/_ui/tooltip.tsx reads as "no tip here" — for a figure whose page shows its marks' tips
     (opts.tip === false ? ` data-tip=""` : "") +
     ` style="max-width:${w}px;${grown ? `min-width:${w}px;` : ""}height:auto;display:block;font-family:'IBM Plex Sans',system-ui,sans-serif">` +
-    (title ? `<title>${esc(title)}</title>` : "") +
+    (title && opts.tip !== false ? `<title>${esc(title)}</title>` : "") +
     `<rect width="${w}" height="${h}" fill="${bg}"/>${body}</svg>`;
 }
 

@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { plotSvg, PLOT_POINT_R } from "../lib/views/plot/figure.ts";
-import { pointTip } from "../lib/views/plot/point-tip.ts";
+import { boxTip, pointTip } from "../lib/views/plot/point-tip.ts";
 import type { PlotData } from "../lib/plot.ts";
 
 const scatter: PlotData = {
@@ -46,4 +46,22 @@ test("a box point's tip: category and value on their own axes, colour from the p
   assert.deepEqual(pointTip(box, "S2", "0"), { id: "S2", rows: [["CANCER_TYPE", "Breast"], ["TMB", "9"], ["KRAS", "no value"]], layers: ["outliers"] });
   const flipped: PlotData = { ...box, x: box.y, y: box.x };
   assert.deepEqual(pointTip(flipped, "S1", "base")?.rows.slice(0, 2), [["TMB", "3.46"], ["CANCER_TYPE", "Breast"]]);
+});
+
+test("a box's tip: its group, quartiles, whiskers and count, on the numeric axis's own scale", () => {
+  assert.deepEqual(boxTip(box, 0), { id: "Breast", layers: [],
+    rows: [["median", "4"], ["quartiles", "2 – 6"], ["whiskers", "0 – 10"], ["n", "2"]] });
+  assert.equal(boxTip(box, 1), null);
+  assert.equal(boxTip(scatter, 0), null);
+});
+
+test("the plot has no tip of its own to compete with its points' and boxes': no <title> anywhere, an empty data-tip on the figure", () => {
+  for (const d of [scatter, box]) {
+    const svg = svgOf(d);
+    assert.doesNotMatch(svg, /<title>/, "a <title> is shown by the browser as its own tooltip");
+    const root = svg.slice(0, svg.indexOf(">"));
+    assert.match(root, / data-tip=""/);
+    assert.match(root, / aria-label="Plot — /, "the figure still has its accessible name");
+  }
+  assert.match(svgOf(box), /<rect [^>]*data-box="0"/);
 });

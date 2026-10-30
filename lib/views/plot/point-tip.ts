@@ -1,11 +1,13 @@
 // What a plot's point says on hover, as the portal's Plots tab says it: the case, its value on the
 // horizontal and the vertical axis, the categories it is coloured and ringed by, and the point
-// layers it belongs to. Read from the result the figure was drawn from, so it is never a second
-// query; the page finds which case is under the pointer (app/lab/plot-hover.tsx).
+// layers it belongs to; and what a box says: its group's quartiles and count. Read from the result
+// the figure was drawn from, so it is never a second query; the page finds what is under the
+// pointer (app/lab/plot-hover.tsx).
 import type { PlotData } from "../../plot.ts";
 import { axisTitle } from "./figure.ts";
 
 export interface PointTip {
+  /** the case, or a box's group */
   id: string;
   /** label and value, horizontal axis first */
   rows: [string, string][];
@@ -42,4 +44,13 @@ export function pointTip(d: PlotData, id: string, layer: string): PointTip | nul
   } else return null;
   const layers = ls.filter((l) => l.shown === "points" && [...(l.points || []), ...(l.shared || [])].some((p) => p.id === id)).map((l) => l.label);
   return { id, rows, layers };
+}
+
+/** the tip for the box of group `i` (its place in `d.groups`, the box's `data-box`); null when there is none */
+export function boxTip(d: PlotData, i: number): PointTip | null {
+  const g = d.groups?.[i];
+  if (d.shape !== "box" || !g) return null;
+  const a = d.x.kind === "num" ? d.x : d.y;
+  return { id: g.g, layers: [], rows: [["median", value(a, g.median)], ["quartiles", value(a, g.q1) + " – " + value(a, g.q3)],
+    ["whiskers", value(a, g.loWhisker) + " – " + value(a, g.hiWhisker)], ["n", g.n.toLocaleString("en-US")]] };
 }

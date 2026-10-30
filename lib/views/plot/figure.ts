@@ -29,10 +29,11 @@ export const PLOT_POINT_R = 2.8;
  * layer and a dot of the plotted cohort are one size, and touching dots stay apart.
  */
 const halo = (p: Pal) => `stroke="${p.bg}" stroke-width="0.6"`;
-/** a mark's case, which the page's hover (app/lab/plot-hover.tsx) reads to find the point under the pointer */
+/** a mark's case, which the page's hover (app/lab/plot-hover.tsx) reads to find the point under the pointer;
+ *  a box carries its group's place (`data-box`) the same way */
 const caseAttr = (id: string) => ` data-id="${esc(id)}"`;
 
-/** a plot's tips are its points' (app/lab/plot-hover.tsx) and its boxes': hovering anything else shows none */
+/** a plot's tips are its points' and its boxes', both shown by the page (app/lab/plot-hover.tsx): the figure has none of its own */
 const NO_FIGURE_TIP = { tip: false };
 
 /** the plot's height for a figure `w` wide */
@@ -291,8 +292,7 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
     out.push(layerGroup("base", baseMarks));
     out.push(`<line x1="${r1(cx)}" y1="${r1(ys(g.loWhisker))}" x2="${r1(cx)}" y2="${r1(ys(g.hiWhisker))}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
     out.push(`<rect x="${r1(cx - half)}" y="${r1(ys(g.q3))}" width="${r1(half * 2)}" height="${r1(Math.max(1, ys(g.q1) - ys(g.q3)))}" ` +
-      `fill="${base}" fill-opacity="${d.overlay === "none" ? 0.25 : 0.1}" stroke="${base}"><title>${esc(g.g)}: median ${fmtNum(g.median)}, ` +
-      `quartiles ${fmtNum(g.q1)}–${fmtNum(g.q3)}, n = ${fmtInt(g.n)}</title></rect>`);
+      `fill="${base}" fill-opacity="${d.overlay === "none" ? 0.25 : 0.1}" stroke="${base}" data-box="${i}"/>`);
     out.push(`<line x1="${r1(cx - half)}" y1="${r1(ys(g.median))}" x2="${r1(cx + half)}" y2="${r1(ys(g.median))}" stroke="${base}" stroke-width="2"/>`);
     // cohort layers past the budget: a narrow box of their own (side by side when several); then every
     // layer's points at the same fixed jitter the plotted cohort's points use

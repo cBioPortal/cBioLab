@@ -3,11 +3,13 @@
 // grid index over the marks the renderer tagged with `data-id`), rather than a listener or a
 // `<title>` per point, and shows that case's tip (lib/views/plot/point-tip.ts) beside it, with a
 // link to its page when the plot is over one study. The hovered point is drawn again on top of its
-// neighbours and ringed, so the reader sees which dot the tip is about. Browser state only, like any hover.
+// neighbours and ringed, so the reader sees which dot the tip is about. Away from any point, a box
+// under the pointer shows its quartiles. These are the plot's only tips: the figure shows none of
+// its own (lib/views/plot/figure.ts), so two never compete. Browser state only, like any hover.
 import { useEffect, useRef } from "react";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import type { PlotData } from "../../lib/plot.ts";
-import { pointTip, type PointTip } from "../../lib/views/plot/point-tip.ts";
+import { boxTip, pointTip, type PointTip } from "../../lib/views/plot/point-tip.ts";
 
 /** how far from a point's centre, in pixels, the pointer still picks it */
 const REACH = 6;
@@ -70,7 +72,8 @@ function highlight(svg: SVGSVGElement, m: Mark): () => void {
   return () => g.remove();
 }
 
-type Hover = { tip: PointTip; at: TipBox; svg: SVGSVGElement; mark: Mark };
+/** a point's tip sits against the point, which is drawn again and ringed; a box's, beside the pointer */
+type Hover = { tip: PointTip; svg: SVGSVGElement } & ({ kind: "point"; at: TipBox; mark: Mark } | { kind: "box"; x: number; y: number });
 
 export function PlotHover({ plot, unit, study, className, children }: {
   plot?: PlotData;
@@ -82,7 +85,7 @@ export function PlotHover({ plot, unit, study, className, children }: {
 }) {
   const index = useRef<Index | null>(null);
   const { tip: hover, move, hide, live } = useHoverTip<Hover>();
-  useEffect(() => hover ? highlight(hover.svg, hover.mark) : undefined, [hover]);
+  useEffect(() => hover?.kind === "point" ? highlight(hover.svg, hover.mark) : undefined, [hover]);
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const svg = e.currentTarget.querySelector("svg");
     if (!plot || !svg) return;
@@ -90,15 +93,26 @@ export function PlotHover({ plot, unit, study, className, children }: {
     const r = svg.getBoundingClientRect();
     const m = nearest(index.current, e.clientX - r.left, e.clientY - r.top);
     const tip = m && pointTip(plot, m.el.getAttribute("data-id") || "", m.el.closest("g[data-layer]")?.getAttribute("data-layer") || "base");
-    if (!m || !tip) { move(null, e.clientX, e.clientY); return; }
-    const b = m.el.getBoundingClientRect();
-    move({ tip, at: { left: b.left, top: b.top, right: b.right, bottom: b.bottom }, svg, mark: m }, e.clientX, e.clientY);
+    if (m && tip) {
+      const b = m.el.getBoundingClientRect();
+      move({ kind: "point", tip, at: { left: b.left, top: b.top, right: b.right, bottom: b.bottom }, svg, mark: m }, e.clientX, e.clientY);
+      return;
+    }
+    const box = e.target instanceof Element ? e.target.closest("[data-box]") : null;
+    const bt = box && boxTip(plot, Number(box.getAttribute("data-box")));
+    move(bt ? { kind: "box", tip: bt, svg, x: e.clientX, y: e.clientY } : null, e.clientX, e.clientY);
   };
   const t = hover?.tip;
   return (
     <div className={className} onPointerMove={onMove} onPointerLeave={(e) => move(null, e.clientX, e.clientY)} onPointerDown={hide}>
       {children}
-      {hover && t && (
+      {hover?.kind === "box" && (
+        <FloatingTip x={hover.x} y={hover.y} className="plot-tip">
+          <div className="lead">{hover.tip.id}</div>
+          {hover.tip.rows.map(([k, v], i) => <div key={i}>{k}: <b>{v}</b></div>)}
+        </FloatingTip>
+      )}
+      {hover?.kind === "point" && t && (
         <FloatingTip at={hover.at} live={live} className="plot-tip">
           <div className="mono">{t.id}</div>
           {t.rows.map(([k, v], i) => <div key={i}>{k}: <b>{v}</b></div>)}
