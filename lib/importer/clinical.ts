@@ -2,7 +2,6 @@
 // describe, type and rank each attribute; values the legacy importer treats as missing are not
 // stored; OS_STATUS/DFS_STATUS get their 1:/0: prefix; samples of normal tissue are not created.
 import path from "node:path";
-import { Inserter, insertAll } from "./ch-write.ts";
 import { ImportContext, skip, sampleId, tcgaPatient, isNormalBarcode, TCGA_SAMPLE_TYPES } from "./context.ts";
 import { openTable, type DataFile } from "./study.ts";
 
@@ -54,7 +53,7 @@ async function storeMeta(ctx: ImportContext, attrs: AttrMeta[], patientLevel: bo
     return { attr_id: a.id, display_name: a.display, description: a.description, datatype: a.datatype,
       patient_attribute: patientLevel ? 1 : 0, priority: a.priority, cancer_study_id: ctx.cancerStudyId };
   });
-  await insertAll(ctx.conn, "clinical_attribute_meta", rows);
+  await ctx.insertAll("clinical_attribute_meta", rows);
 }
 
 export async function importClinicalSamples(ctx: ImportContext, f: DataFile, seen: Set<string>): Promise<void> {
@@ -65,7 +64,7 @@ export async function importClinicalSamples(ctx: ImportContext, f: DataFile, see
   const iSample = col("SAMPLE_ID"), iPatient = col("PATIENT_ID"), iType = col("SAMPLE_TYPE");
   if (iSample < 0) throw new Error(path.basename(f.file) + " has no SAMPLE_ID column");
   await storeMeta(ctx, attrs, false, seen);
-  const ins = new Inserter(ctx.conn, "clinical_sample");
+  const ins = ctx.sink("clinical_sample");
   const done = new Set<string>();
   for await (const row of t.rows) {
     r.read++;
@@ -100,7 +99,7 @@ export async function importClinicalPatients(ctx: ImportContext, f: DataFile, se
   const iPatient = attrs.findIndex((a) => a.id === "PATIENT_ID");
   if (iPatient < 0) throw new Error(path.basename(f.file) + " has no PATIENT_ID column");
   await storeMeta(ctx, attrs, true, seen);
-  const ins = new Inserter(ctx.conn, "clinical_patient");
+  const ins = ctx.sink("clinical_patient");
   const done = new Set<string>();
   for await (const row of t.rows) {
     r.read++;

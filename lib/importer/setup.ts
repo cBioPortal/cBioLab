@@ -6,6 +6,7 @@ import { mkdir, readFile, writeFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { exec, execScript, insertRaw, query, type WriteConn } from "./ch-write.ts";
 import { GeneResolver } from "./genes.ts";
+import { LAB_TABLES, LEGACY_BASE_TABLES, createLabTables, createViews, derivedTypes, viewPrefix, type SchemaMode } from "./lab-schema.ts";
 import { importGenePanel } from "./panels.ts";
 
 // cBioPortal/cbioportal master on 2026-10-27; the schema, seeds and derived-table SQL are read
@@ -90,5 +91,51 @@ async function loadReferencePanels(conn: WriteConn, dataDir: string, log: Log): 
     const text = (await fetchOnce(DATAHUB_MEDIA + "reference_data/gene_panels/" + name, path.join(dataDir, "upstream", "gene_panels", name))).toString("utf8");
     const r = await importGenePanel(conn, genes, text);
     if (r.warning) log(name + ": " + r.warning);
+  }
+}
+
+const DERIVED_TABLES = ["sample_to_gene_panel_derived", "gene_panel_to_gene_derived", "sample_derived", "genomic_event_derived", "clinical_data_derived",
+  "clinical_event_derived", "clinical_event_data_derived", "genetic_alteration_derived", "generic_assay_data_derived", "mutation_derived",
+  "generic_assay_profile_entity_derived", "generic_assay_meta_derived"];
+
+/** The database's schema mode (lib/importer/lab-schema.ts); a database set up before modes existed is `legacy`. */
+export async function schemaMode(conn: WriteConn): Promise<SchemaMode> {
+  const has = await query<{ n: number }>(conn, "SELECT count() AS n FROM system.tables WHERE database = currentDatabase() AND name = 'cbiolab_schema'");
+  if (!Number(has[0]?.n)) return "legacy";
+  const r = await query<{ m: SchemaMode }>(conn, "SELECT argMax(mode, at) AS m FROM cbiolab_schema");
+  return r[0]?.m || "legacy";
+}
+
+/**
+ * Moves the database to `target`: legacy → both adds the lab_ tables and the labv_ views beside
+ * the legacy tables; legacy or both → new drops cBioPortal's study tables (their data is gone; the
+ * lab_ tables keep theirs) and puts the views in their place. Going back from `new` needs a fresh
+ * data folder, since cBioPortal's tables would have to be recreated empty.
+ */
+export async function applySchemaMode(conn: WriteConn, dataDir: string, target: SchemaMode, log: Log): Promise<void> {
+  const current = await schemaMode(conn);
+  if (current === "new" && target !== "new")
+    throw new Error("This database uses the new schema only; going back to " + target + " needs a fresh data folder (CBIOLAB_DATA).");
+  if (target === "legacy") {
+    if (current === "both") {
+      for (const name of Object.keys(LAB_TABLES)) await exec(conn, "DROP TABLE IF EXISTS " + name);
+      for (const name of [...LEGACY_BASE_TABLES, ...DERIVED_TABLES]) await exec(conn, "DROP VIEW IF EXISTS labv_" + name);
+    }
+  } else {
+    // the derived tables' column types, read before anything is replaced
+    const types = await derivedTypes(conn, "");
+    await createLabTables(conn);
+    if (target === "new" && current !== "new") {
+      log("Replacing cBioPortal's study tables with views over the lab_ tables");
+      for (const name of [...LEGACY_BASE_TABLES, ...DERIVED_TABLES]) await exec(conn, "DROP VIEW IF EXISTS labv_" + name);
+      for (const name of [...LEGACY_BASE_TABLES, ...DERIVED_TABLES]) await exec(conn, "DROP TABLE IF EXISTS " + name);
+    }
+    log("Creating the " + (viewPrefix(target) || "cBioPortal-named ") + "views over the lab_ tables");
+    await createViews(conn, target, await derivedTablesSql(dataDir), types);
+  }
+  if (current !== target) {
+    await exec(conn, "CREATE TABLE IF NOT EXISTS cbiolab_schema (mode String, at DateTime64(3) DEFAULT now64(3)) ENGINE = MergeTree ORDER BY at");
+    await exec(conn, "INSERT INTO cbiolab_schema (mode) VALUES ('" + target + "')");
+    log("Schema mode: " + target);
   }
 }

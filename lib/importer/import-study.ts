@@ -1,7 +1,9 @@
 // One study folder into the local database, in the legacy loader's order (cancer type, study,
 // clinical samples then patients, profiles, segments, timelines, the gene panel matrix, case
-// lists), followed by the computed attributes and cBioPortal's own derived-table SQL. The tables
-// the app reads are therefore built by exactly the SQL that builds them for cbioportal.org.
+// lists), followed by the computed attributes. What it writes follows the database's schema mode
+// (lib/importer/lab-schema.ts): cBioPortal's tables, then cBioPortal's own derived-table SQL, so
+// the tables the app reads are built by exactly the SQL that builds them for cbioportal.org; the
+// file-shaped lab_ tables, which views present under the same names; or both.
 import { readFile } from "node:fs/promises";
 import { exec, execScript, insertAll, query, sq, type WriteConn } from "./ch-write.ts";
 import { ImportContext, sampleId, type FileReport, type Profile, type Progress } from "./context.ts";
@@ -11,7 +13,8 @@ import { importMutations } from "./mutations.ts";
 import { importDiscreteLong, importMatrix } from "./matrix.ts";
 import { fractionGenomeAltered, importGenePanelMatrix, importSegments, importStructuralVariants, importTimeline, type SegmentTotals } from "./other.ts";
 import { importGenePanel } from "./panels.ts";
-import { derivedTablesSql } from "./setup.ts";
+import { derivedTablesSql, schemaMode } from "./setup.ts";
+import { removeLabStudy, writesLab, writesLegacy, type SchemaMode } from "./lab-schema.ts";
 import { openTable, readStudyFolder, type DataFile, type StudyFolder } from "./study.ts";
 
 export interface ImportResult {
@@ -35,10 +38,11 @@ export async function importStudy(conn: WriteConn, dataDir: string, dir: string,
   if (!studyId || !/^[A-Za-z0-9_.-]+$/.test(studyId)) throw new Error("meta_study.txt needs a cancer_study_identifier of letters, digits, _ . -");
   progress({ step: "Reading genes" });
   const genes = await GeneResolver.load(conn);
-  const ctx = new ImportContext(conn, genes, studyId, progress);
+  const mode = await schemaMode(conn);
+  const ctx = new ImportContext(conn, genes, studyId, progress, mode);
 
   progress({ step: "Removing any earlier import of " + studyId });
-  await removeStudy(conn, studyId);
+  await removeStudy(conn, studyId, mode);
   for (const p of folder.panels) {
     const r = await importGenePanel(conn, genes, await readFile(p, "utf8"));
     if (r.warning) ctx.warnings.push(r.warning);
@@ -64,13 +68,21 @@ export async function importStudy(conn: WriteConn, dataDir: string, dir: string,
   }
   progress({ step: "Writing patients, samples and case lists" });
   await writePatientsAndSamples(ctx);
-  await insertAll(conn, "sample_profile", [...ctx.sampleProfile.values()].map((x) => ({ sample_id: x.sample, genetic_profile_id: x.profile, panel_id: x.panel })));
+  await ctx.insertAll("sample_profile", [...ctx.sampleProfile.values()].map((x) => ({ sample_id: x.sample, genetic_profile_id: x.profile, panel_id: x.panel })));
   await writeCaseLists(ctx, folder);
   progress({ step: "Computing mutation counts, fraction genome altered and samples per patient" });
   await computedAttributes(ctx, segTotals, seenAttrs);
-  progress({ step: "Building the derived tables" });
-  await execScript(conn, await derivedTablesSql(dataDir), { param_optimize_backoff_secs: "0" });
-  await studyCounts(ctx);
+  const counts = studyCounts(ctx);
+  if (writesLegacy(mode)) {
+    progress({ step: "Building the derived tables" });
+    await execScript(conn, await derivedTablesSql(dataDir), { param_optimize_backoff_secs: "0" });
+    await exec(conn, "ALTER TABLE cancer_study UPDATE " + Object.entries(counts).map(([k, v]) => k + " = " + v).join(", ") +
+      " WHERE cancer_study_id = " + ctx.cancerStudyId, { mutations_sync: "2" });
+  }
+  if (ctx.lab) {
+    progress({ step: "Writing the lab_ tables" });
+    await ctx.lab.finish(counts, ctx.referenceGenome);
+  }
   if (ctx.implicitSamples.length)
     ctx.warnings.push(ctx.implicitSamples.length + " samples appear in data files but not in a clinical sample file; they were created with a patient of the same id (e.g. " + ctx.implicitSamples.slice(0, 3).join(", ") + ")");
   return {
@@ -122,9 +134,10 @@ async function createStudy(ctx: ImportContext, folder: StudyFolder): Promise<voi
   const genome = (s.reference_genome || "hg19").toLowerCase();
   const rg = await query<{ i: number }>(ctx.conn, "SELECT reference_genome_id AS i FROM reference_genome WHERE name = " + sq(genome));
   ctx.referenceGenomeId = Number(rg[0]?.i ?? 1);
-  const next = await query<{ m: number }>(ctx.conn, "SELECT max(cancer_study_id) AS m FROM cancer_study");
+  ctx.referenceGenome = genome;
+  const next = writesLegacy(ctx.mode) ? await query<{ m: number }>(ctx.conn, "SELECT max(cancer_study_id) AS m FROM cancer_study") : [];
   ctx.cancerStudyId = Number(next[0]?.m ?? 0) + 1;
-  await insertAll(ctx.conn, "cancer_study", [{
+  await ctx.insertAll("cancer_study", [{
     cancer_study_id: ctx.cancerStudyId, cancer_study_identifier: ctx.studyId, type_of_cancer_id: s.type_of_cancer || "mixed",
     name: s.name || ctx.studyId, description: s.description || "", public: 1, pmid: s.pmid || null, citation: s.citation || null,
     groups: s.groups || null, status: 0, import_date: new Date().toISOString().replace("T", " ").replace("Z", ""), reference_genome_id: ctx.referenceGenomeId
@@ -137,7 +150,7 @@ async function createProfile(ctx: ImportContext, f: DataFile): Promise<Profile> 
   const type = (m.genetic_alteration_type || "").toUpperCase() === "FUSION" ? "STRUCTURAL_VARIANT" : (m.genetic_alteration_type || "").toUpperCase();
   const datatype = (m.datatype || "").toUpperCase() === "DISCRETE_LONG" ? "DISCRETE" : (m.datatype || "").toUpperCase();
   const p: Profile = { id: ctx.id("profile"), stableId: ctx.studyId + "_" + suffix, type, datatype, showInAnalysisTab: (m.show_profile_in_analysis_tab || "true").toLowerCase() !== "false" };
-  await insertAll(ctx.conn, "genetic_profile", [{
+  await ctx.insertAll("genetic_profile", [{
     genetic_profile_id: p.id, stable_id: p.stableId, cancer_study_id: ctx.cancerStudyId, genetic_alteration_type: type,
     generic_assay_type: null, datatype, name: m.profile_name || suffix, description: m.profile_description || null,
     show_profile_in_analysis_tab: p.showInAnalysisTab ? 1 : 0,
@@ -148,8 +161,8 @@ async function createProfile(ctx: ImportContext, f: DataFile): Promise<Profile> 
 }
 
 async function writePatientsAndSamples(ctx: ImportContext): Promise<void> {
-  await insertAll(ctx.conn, "patient", [...ctx.patients].map(([stable, id]) => ({ internal_id: id, stable_id: stable, cancer_study_id: ctx.cancerStudyId })));
-  await insertAll(ctx.conn, "sample", [...ctx.samples].map(([stable, s]) => ({
+  await ctx.insertAll("patient", [...ctx.patients].map(([stable, id]) => ({ internal_id: id, stable_id: stable, cancer_study_id: ctx.cancerStudyId })));
+  await ctx.insertAll("sample", [...ctx.samples].map(([stable, s]) => ({
     internal_id: s.id, stable_id: stable, sample_type: ctx.sampleTypes.get(s.id) ?? "Primary Solid Tumor", patient_id: s.patient
   })));
 }
@@ -192,8 +205,8 @@ async function writeCaseLists(ctx: ImportContext, folder: StudyFolder): Promise<
   add("cnaseq", "Samples with mutation and copy-number data", new Set([...seq].filter((s) => cna.has(s))));
   add("sv", "Samples with structural variant data", profiledBy("STRUCTURAL_VARIANT"));
   const rows = lists.map((l) => ({ ...l, listId: ctx.id("sampleList") }));
-  await insertAll(ctx.conn, "sample_list", rows.map((l) => ({ list_id: l.listId, stable_id: l.stableId, category: l.category, cancer_study_id: ctx.cancerStudyId, name: l.name, description: l.description })));
-  await insertAll(ctx.conn, "sample_list_list", rows.flatMap((l) => l.ids.map((s) => ({ list_id: l.listId, sample_id: s }))));
+  await ctx.insertAll("sample_list", rows.map((l) => ({ list_id: l.listId, stable_id: l.stableId, category: l.category, cancer_study_id: ctx.cancerStudyId, name: l.name, description: l.description })));
+  await ctx.insertAll("sample_list_list", rows.flatMap((l) => l.ids.map((s) => ({ list_id: l.listId, sample_id: s }))));
 }
 
 /** MUTATION_COUNT, FRACTION_GENOME_ALTERED and SAMPLE_COUNT, which cBioPortal computes rather than reads. */
@@ -202,42 +215,33 @@ async function computedAttributes(ctx: ImportContext, segs: SegmentTotals, seen:
   const addMeta = (id: string, name: string, datatype: string, patient: number, priority: string) => {
     if (!seen.has(id)) meta.push({ attr_id: id, display_name: name, description: name, datatype, patient_attribute: patient, priority, cancer_study_id: ctx.cancerStudyId });
   };
-  const mutProfiles = ctx.profiles.filter((p) => p.type === "MUTATION_EXTENDED").map((p) => p.id);
-  if (mutProfiles.length) {
+  const mutProfiles = new Set(ctx.profiles.filter((p) => p.type === "MUTATION_EXTENDED").map((p) => p.id));
+  if (mutProfiles.size) {
     // one count per profiled sample, 0 when nothing was found; distinct loci, germline excluded
-    await exec(ctx.conn,
-      "INSERT INTO clinical_sample (internal_id, attr_id, attr_value)\n" +
-      "SELECT sp.sample_id, 'MUTATION_COUNT', toString(uniqExactIf((me.chr, me.start_position, me.end_position, me.reference_allele, me.tumor_seq_allele), m.sample_id != 0))\n" +
-      "FROM sample_profile sp\n" +
-      "LEFT JOIN mutation m ON m.sample_id = sp.sample_id AND m.genetic_profile_id = sp.genetic_profile_id AND upper(ifNull(m.mutation_status, '')) != 'GERMLINE'\n" +
-      "LEFT JOIN mutation_event me ON me.mutation_event_id = m.mutation_event_id\n" +
-      "WHERE sp.genetic_profile_id IN (" + mutProfiles.join(",") + ")\n" +
-      "GROUP BY sp.sample_id", { join_use_nulls: "0" });
+    const profiled = new Set([...ctx.sampleProfile.values()].filter((x) => mutProfiles.has(x.profile)).map((x) => x.sample));
+    await ctx.insertAll("clinical_sample", [...profiled].map((s) => ({ internal_id: s, attr_id: "MUTATION_COUNT", attr_value: String(ctx.mutationLoci.get(s)?.size ?? 0) })));
     addMeta("MUTATION_COUNT", "Mutation Count", "NUMBER", 0, "30");
   }
   if (segs.size) {
-    await insertAll(ctx.conn, "clinical_sample", [...segs].filter(([, [, total]]) => total > 0)
+    await ctx.insertAll("clinical_sample", [...segs].filter(([, [, total]]) => total > 0)
       .map(([sample, [alt, total]]) => ({ internal_id: sample, attr_id: "FRACTION_GENOME_ALTERED", attr_value: fractionGenomeAltered(alt, total) })));
     addMeta("FRACTION_GENOME_ALTERED", "Fraction Genome Altered", "NUMBER", 0, "20");
   }
   const perPatient = new Map<number, number>();
   for (const s of ctx.samples.values()) perPatient.set(s.patient, (perPatient.get(s.patient) ?? 0) + 1);
-  await insertAll(ctx.conn, "clinical_patient", [...perPatient].map(([p, n]) => ({ internal_id: p, attr_id: "SAMPLE_COUNT", attr_value: String(n) })));
+  await ctx.insertAll("clinical_patient", [...perPatient].map(([p, n]) => ({ internal_id: p, attr_id: "SAMPLE_COUNT", attr_value: String(n) })));
   addMeta("SAMPLE_COUNT", "Number of Samples Per Patient", "STRING", 1, "1");
-  await insertAll(ctx.conn, "clinical_attribute_meta", meta);
+  await ctx.insertAll("clinical_attribute_meta", meta);
 }
 
 /** The per-study counts the public warehouse precomputes on cancer_study (lib/datasets.ts reads them). */
-async function studyCounts(ctx: ImportContext): Promise<void> {
+function studyCounts(ctx: ImportContext): Record<string, number> {
   const by = (pred: (p: Profile) => boolean) => {
     const ids = new Set(ctx.profiles.filter(pred).map((p) => p.id));
     return new Set([...ctx.sampleProfile.values()].filter((x) => ids.has(x.profile)).map((x) => x.sample)).size;
   };
   const mrna = (p: Profile) => p.type === "MRNA_EXPRESSION";
-  const treated = await query<{ n: number }>(ctx.conn,
-    "SELECT uniqExact(ce.patient_id) AS n FROM clinical_event ce JOIN patient p ON p.internal_id = ce.patient_id " +
-    "WHERE p.cancer_study_id = " + ctx.cancerStudyId + " AND upper(ce.event_type) = 'TREATMENT'");
-  const counts: Record<string, number> = {
+  return {
     sample_count: ctx.samples.size,
     mutation_sample_count: by((p) => p.type === "MUTATION_EXTENDED"),
     cna_sample_count: by((p) => p.type === "COPY_NUMBER_ALTERATION" && p.datatype === "DISCRETE"),
@@ -247,16 +251,16 @@ async function studyCounts(ctx: ImportContext): Promise<void> {
     mrna_expression_sample_count: by(mrna),
     rppa_sample_count: by((p) => p.type === "PROTEIN_LEVEL" && !p.stableId.includes("ms_abundance")),
     mass_spectrometry_sample_count: by((p) => p.type === "PROTEIN_LEVEL" && p.stableId.includes("ms_abundance")),
-    treatment_patient_count: Number(treated[0]?.n ?? 0)
+    treatment_patient_count: ctx.treatedPatients.size
   };
-  await exec(ctx.conn, "ALTER TABLE cancer_study UPDATE " + Object.entries(counts).map(([k, v]) => k + " = " + v).join(", ") +
-    " WHERE cancer_study_id = " + ctx.cancerStudyId, { mutations_sync: "2" });
 }
 
-/** Deletes every row of a study from the base tables (the derived ones are rebuilt after). */
-export async function removeStudy(conn: WriteConn, studyId: string): Promise<boolean> {
+/** Deletes every row of a study, from the lab_ tables and from cBioPortal's base tables (the derived ones are rebuilt after). */
+export async function removeStudy(conn: WriteConn, studyId: string, mode: SchemaMode): Promise<boolean> {
+  const fromLab = writesLab(mode) ? await removeLabStudy(conn, studyId) : false;
+  if (!writesLegacy(mode)) return fromLab;
   const cs = await query<{ i: number }>(conn, "SELECT cancer_study_id AS i FROM cancer_study WHERE cancer_study_identifier = " + sq(studyId));
-  if (!cs.length) return false;
+  if (!cs.length) return fromLab;
   const id = Number(cs[0].i);
   const patients = "(SELECT internal_id FROM patient WHERE cancer_study_id = " + id + ")";
   const samples = "(SELECT internal_id FROM sample WHERE patient_id IN " + patients + ")";
@@ -292,7 +296,8 @@ export async function removeStudy(conn: WriteConn, studyId: string): Promise<boo
 
 /** Removes a study and rebuilds the derived tables without it. */
 export async function deleteStudy(conn: WriteConn, dataDir: string, studyId: string): Promise<boolean> {
-  const removed = await removeStudy(conn, studyId);
-  if (removed) await execScript(conn, await derivedTablesSql(dataDir), { param_optimize_backoff_secs: "0" });
+  const mode = await schemaMode(conn);
+  const removed = await removeStudy(conn, studyId, mode);
+  if (removed && writesLegacy(mode)) await execScript(conn, await derivedTablesSql(dataDir), { param_optimize_backoff_secs: "0" });
   return removed;
 }

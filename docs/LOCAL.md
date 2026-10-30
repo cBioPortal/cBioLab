@@ -65,6 +65,30 @@ writes to it.
 OncoKB is licensed, so the local `oncokb_annotation` store is empty: OncoKB-dependent filters
 match nothing, and driver calls come only from a study's own `cbp_driver*` columns.
 
+## Schema modes: cBioPortal's tables, the file-shaped tables, or both
+
+`npm run local -- --schema <mode>` (or `npm run import -- --schema <mode>`) sets where imports
+write; `lib/importer/lab-schema.ts` has the details.
+
+- **legacy** (the default) — cBioPortal's tables, then its derived-table SQL, as above.
+- **new** — the file-shaped `lab_` tables only: one per kind of study file, long form, keyed by the
+  files' own ids, every row carrying its `study_id`. Views with cBioPortal's table names stand in
+  for the tables the app reads, so the app's SQL runs unchanged: base views rebuild `sample`,
+  `mutation`, `genetic_profile`, … with ids computed from natural keys, and the `*_derived` views
+  are cBioPortal's own derived-table SELECTs reading them. Moving a database to `new` drops
+  cBioPortal's study tables; going back needs a fresh `CBIOLAB_DATA`.
+- **both** — both sets of tables from the same import, with the views named `labv_<name>`, for
+  comparing them: `node scripts/check-legacy-diff.ts --prefix labv_ <study>` compares the views with
+  cBioPortal's own importer exactly as it compares the legacy tables.
+
+The importer applies cBioPortal's rules once: it produces rows for cBioPortal's tables, and
+`lib/importer/lab-writer.ts` turns each into its `lab_` row. Shared reference data (genes, aliases,
+gene panels, cancer types) stays in cBioPortal's tables in every mode.
+
+Verified in `both` mode: the `labv_` views match cBioPortal's own importer row for row on
+lgg_ucsf_2014, acc_tcga, msk_impact_2017 and mpnst_mskcc, with the same single difference as the
+legacy tables (msk_impact_2017's 5 shared-event mutations, below).
+
 ## Where it differs from cBioPortal's importer, on purpose
 
 - A sample a data file names that no clinical file lists is **created** (with a patient of the

@@ -35,10 +35,15 @@ export async function query<R = Record<string, unknown>>(conn: WriteConn, sql: s
   return text.split("\n").filter(Boolean).map((l) => JSON.parse(l) as R);
 }
 
-/** A file's statements, split on `;` at line ends, run in order; `--` comment lines dropped. */
-export async function execScript(conn: WriteConn, script: string, settings: Record<string, string> = {}): Promise<void> {
-  const statements = script.split("\n").filter((l) => !/^\s*--/.test(l)).join("\n")
+/** A file's statements, split on `;` at line ends; `--` comment lines dropped. */
+export function splitStatements(script: string): string[] {
+  return script.split("\n").filter((l) => !/^\s*--/.test(l)).join("\n")
     .split(/;\s*(?:\n|$)/).map((s) => s.trim()).filter(Boolean);
+}
+
+/** A file's statements, run in order. */
+export async function execScript(conn: WriteConn, script: string, settings: Record<string, string> = {}): Promise<void> {
+  const statements = splitStatements(script);
   for (const st of statements) await exec(conn, st, settings);
 }
 

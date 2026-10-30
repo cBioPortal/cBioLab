@@ -1,7 +1,6 @@
 // MAF files (notes/legacy-java-importer.md §M). Every rule that decides whether a row is stored,
 // and what it is stored as, is a named function here so each one can be checked on its own.
 import path from "node:path";
-import { Inserter } from "./ch-write.ts";
 import { ImportContext, skip, sampleId, isNormalBarcode, type FileReport } from "./context.ts";
 import { openTable, type DataFile } from "./study.ts";
 import { mutationKeyword } from "./mutation-keyword.ts";
@@ -252,7 +251,7 @@ export async function importMutations(ctx: ImportContext, f: DataFile, profile: 
 
 async function write(ctx: ImportContext, muts: Map<string, Mut>, profile: number, panel: number | null, r: FileReport): Promise<void> {
   const events = new Map<string, number>();
-  const evIns = new Inserter(ctx.conn, "mutation_event"), mIns = new Inserter(ctx.conn, "mutation"), dIns = new Inserter(ctx.conn, "alteration_driver_annotation");
+  const evIns = ctx.sink("mutation_event"), mIns = ctx.sink("mutation"), dIns = ctx.sink("alteration_driver_annotation");
   for (const [key, m] of muts) {
     const eventKey = key.slice(0, key.lastIndexOf("|"));
     let ev = events.get(eventKey);
@@ -264,6 +263,11 @@ async function write(ctx: ImportContext, muts: Map<string, Mut>, profile: number
     const centers = [...m.centers].sort();
     const center = (centers.length > 1 ? centers.filter((c) => c !== "NA") : centers).join(";");
     await mIns.add({ mutation_event_id: ev, center, ...m.row });
+    if (String(m.row.mutation_status).toUpperCase() !== "GERMLINE") {
+      const e = m.event, loci = ctx.mutationLoci.get(m.sample) ?? new Set<string>();
+      loci.add([e.chr, e.start_position, e.end_position, e.reference_allele, e.tumor_seq_allele].join("|"));
+      ctx.mutationLoci.set(m.sample, loci);
+    }
     if (m.driver) await dIns.add({ alteration_event_id: ev, genetic_profile_id: profile, sample_id: m.sample, ...m.driver });
     ctx.profiled(m.sample, profile, panel);
     r.stored++;

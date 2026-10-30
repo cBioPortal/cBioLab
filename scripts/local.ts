@@ -9,6 +9,9 @@
 //   npm run local                          http://127.0.0.1:3120
 //   npm run local -- --port 3200 --no-open
 //   npm run local -- --import datahub:acc_tcga   import a study before the app starts
+//   npm run local -- --schema both         where imports write (lib/importer/lab-schema.ts): legacy
+//                                          (cBioPortal's tables, the default), new (the lab_ tables,
+//                                          shown to the app through views), or both
 //
 // The app runs as `next dev` with its build output in `.next-local`, so it can share a checkout
 // with a dev server that owns `.next`.
@@ -21,7 +24,8 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
-import { setupDatabase } from "../lib/importer/setup.ts";
+import { applySchemaMode, schemaMode, setupDatabase } from "../lib/importer/setup.ts";
+import { SCHEMA_MODES, type SchemaMode } from "../lib/importer/lab-schema.ts";
 import type { WriteConn } from "../lib/importer/ch-write.ts";
 
 // eslint-disable-next-line sonarjs/no-hardcoded-ip -- a ClickHouse release number, not an address
@@ -35,6 +39,8 @@ const appPort = Number(opt("--port", "3120"));
 const host = opt("--host", "127.0.0.1");
 const chHttpPort = Number(opt("--clickhouse-port", "18123"));
 const open = !args.includes("--no-open");
+const schemaArg = opt("--schema", "");
+if (schemaArg && !SCHEMA_MODES.includes(schemaArg as SchemaMode)) throw new Error("--schema is one of " + SCHEMA_MODES.join(", "));
 const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const run = promisify(execFile);
 const say = (msg: string) => console.log("[cbiolab] " + msg);
@@ -155,6 +161,7 @@ async function main(): Promise<void> {
   }
   const conn: WriteConn = { id: "a", url: "http://127.0.0.1:" + chHttpPort, user: "default", password, db: "cbioportal", label: "local" };
   await setupDatabase(conn, dataDir, say);
+  await applySchemaMode(conn, dataDir, (schemaArg || await schemaMode(conn)) as SchemaMode, say);
   await writeUsers(path.join(dataDir, "clickhouse"), password, true);
 
   const env: NodeJS.ProcessEnv = {

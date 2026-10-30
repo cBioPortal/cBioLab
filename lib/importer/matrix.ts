@@ -2,10 +2,11 @@
 // (notes/legacy-java-importer.md §T). Values are stored as written; the first row for a gene wins;
 // every sample in the header counts as profiled; discrete CNA also yields the ±2 events.
 import path from "node:path";
-import { Inserter, insertAll, query } from "./ch-write.ts";
+import { insertAll, query } from "./ch-write.ts";
 import { ImportContext, skip, sampleId, isNormalBarcode } from "./context.ts";
 import { panelOf } from "./mutations.ts";
 import type { Gene } from "./genes.ts";
+import { writesLegacy } from "./lab-schema.ts";
 import { openTable, type DataFile } from "./study.ts";
 
 // header columns that are not samples (case-insensitive)
@@ -43,6 +44,7 @@ async function phosphoGene(ctx: ImportContext, base: Gene, residue: string): Pro
 
 /** Global (entrez, alteration) → cna_event id, as cBioPortal keeps them. */
 async function cnaEvents(ctx: ImportContext): Promise<Map<string, number>> {
+  if (!writesLegacy(ctx.mode)) return new Map();
   const rows = await query<{ i: number; e: number; a: number }>(ctx.conn, "SELECT cna_event_id AS i, entrez_gene_id AS e, alteration AS a FROM cna_event");
   return new Map(rows.map((x) => [x.e + ":" + x.a, Number(x.i)]));
 }
@@ -65,11 +67,11 @@ export async function importMatrix(ctx: ImportContext, f: DataFile, profile: num
   }
   const panel = panelOf(ctx, f, r);
   for (const c of cols) ctx.profiled(c.sample, profile, panel);
-  await insertAll(ctx.conn, "genetic_profile_samples", [{ genetic_profile_id: profile, ordered_sample_list: cols.map((c) => c.sample).join(",") + "," }]);
+  await ctx.insertAll("genetic_profile_samples", [{ genetic_profile_id: profile, ordered_sample_list: cols.map((c) => c.sample).join(",") + "," }]);
 
   const events = discrete ? await cnaEvents(ctx) : null;
-  const newEvents = new Inserter(ctx.conn, "cna_event"), sce = new Inserter(ctx.conn, "sample_cna_event");
-  const ga = new Inserter(ctx.conn, "genetic_alteration");
+  const newEvents = ctx.sink("cna_event"), sce = ctx.sink("sample_cna_event");
+  const ga = ctx.sink("genetic_alteration");
   const seen = new Set<number>();
   const antibodies = new Set<string>();
   for await (const row of t.rows) {
@@ -132,7 +134,7 @@ export async function importDiscreteLong(ctx: ImportContext, f: DataFile, profil
   const samples: number[] = [], sampleIdx = new Map<number, number>();
   const genes = new Map<number, { entity: number; values: Map<number, string> }>();
   const events = await cnaEvents(ctx);
-  const newEvents = new Inserter(ctx.conn, "cna_event"), sce = new Inserter(ctx.conn, "sample_cna_event");
+  const newEvents = ctx.sink("cna_event"), sce = ctx.sink("sample_cna_event");
   for await (const row of t.rows) {
     r.read++;
     const gene = ctx.genes.forMatrix(at(row, "hugo_symbol"), at(row, "entrez_gene_id"));
@@ -157,8 +159,8 @@ export async function importDiscreteLong(ctx: ImportContext, f: DataFile, profil
   }
   const panel = panelOf(ctx, f, r);
   for (const s of samples) ctx.profiled(s, profile, panel);
-  await insertAll(ctx.conn, "genetic_profile_samples", [{ genetic_profile_id: profile, ordered_sample_list: samples.join(",") + "," }]);
-  const ga = new Inserter(ctx.conn, "genetic_alteration");
+  await ctx.insertAll("genetic_profile_samples", [{ genetic_profile_id: profile, ordered_sample_list: samples.join(",") + "," }]);
+  const ga = ctx.sink("genetic_alteration");
   for (const g of genes.values())
     await ga.add({ genetic_profile_id: profile, genetic_entity_id: g.entity, values: samples.map((s) => g.values.get(s) ?? "").join(",") + "," });
   await ga.flush(); await newEvents.flush(); await sce.flush();

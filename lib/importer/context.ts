@@ -1,7 +1,15 @@
 // What one study import shares across its steps: the connection, the gene resolver, the study's
 // internal ids, its patients and samples, the profiled-sample map and the report the page shows.
-import { query, type WriteConn } from "./ch-write.ts";
+import { Inserter, insertAll, query, type Row, type WriteConn } from "./ch-write.ts";
 import type { GeneResolver } from "./genes.ts";
+import { writesLab, writesLegacy, type SchemaMode } from "./lab-schema.ts";
+import { LabWriter } from "./lab-writer.ts";
+
+// shared reference tables: written as they are in every schema mode
+const REFERENCE = new Set(["type_of_cancer", "gene", "gene_alias", "genetic_entity", "gene_panel", "gene_panel_list"]);
+
+/** Where an importer step sends rows for one cBioPortal table; `ImportContext.sink`. */
+export interface Sink { add(row: Row): Promise<void>; flush(): Promise<void> }
 
 export interface FileReport {
   file: string;
@@ -39,8 +47,12 @@ export class ImportContext {
   readonly conn: WriteConn;
   readonly genes: GeneResolver;
   readonly studyId: string;
+  readonly mode: SchemaMode;
+  /** writes the lab_ tables, in `new` and `both` modes */
+  readonly lab: LabWriter | null;
   cancerStudyId = 0;
   referenceGenomeId = 1;
+  referenceGenome = "hg19";
   private readonly next = new Map<IdKind, number>();
   /** patient stable id → internal id */
   readonly patients = new Map<string, number>();
@@ -58,13 +70,58 @@ export class ImportContext {
   readonly progress: Progress;
   /** stable id → internal id of every gene panel in the database */
   panels = new Map<string, number>();
+  /** sample internal id → loci of its non-germline mutations, for MUTATION_COUNT */
+  readonly mutationLoci = new Map<number, Set<string>>();
+  /** patients with a TREATMENT timeline event */
+  readonly treatedPatients = new Set<number>();
 
-  constructor(conn: WriteConn, genes: GeneResolver, studyId: string, progress: Progress) {
-    this.conn = conn; this.genes = genes; this.studyId = studyId; this.progress = progress;
+  constructor(conn: WriteConn, genes: GeneResolver, studyId: string, progress: Progress, mode: SchemaMode = "legacy") {
+    this.conn = conn; this.genes = genes; this.studyId = studyId; this.progress = progress; this.mode = mode;
+    this.lab = writesLab(mode) ? new LabWriter(conn, this.labContext()) : null;
+  }
+
+  private labContext() {
+    const stable = <K>(m: () => Map<string, K>, id: (v: K) => number) => {
+      let rev: Map<number, string> | null = null;
+      return (n: number) => {
+        if (!rev || !rev.has(n)) rev = new Map([...m()].map(([k, v]) => [id(v), k]));
+        const v = rev.get(n);
+        if (v === undefined) throw new Error("lab schema: unknown internal id " + n);
+        return v;
+      };
+    };
+    const patient = stable(() => this.patients, (v) => v);
+    const sample = stable(() => this.samples, (v) => v.id);
+    const panel = stable(() => this.panels, (v) => v);
+    return {
+      studyId: this.studyId,
+      patient,
+      sample: (n: number) => ({ sample: sample(n), patient: patient(this.samples.get(sample(n))!.patient) }),
+      profile: (n: number) => { const p = this.profiles.find((x) => x.id === n); if (!p) throw new Error("lab schema: unknown profile " + n); return p.stableId; },
+      panel: (n: number) => panel(n),
+      entrez: (entity: number) => { const g = this.genes.byEntity(entity); if (!g) throw new Error("lab schema: unknown genetic entity " + entity); return g.entrez; }
+    };
+  }
+
+  /** Rows for cBioPortal table `table`: to that table, to the lab_ tables, or both, as the schema mode says. */
+  sink(table: string): Sink {
+    const legacy = writesLegacy(this.mode) || REFERENCE.has(table) ? new Inserter(this.conn, table) : null;
+    const lab = REFERENCE.has(table) ? null : this.lab;
+    return {
+      add: async (row) => { if (legacy) await legacy.add(row); if (lab) await lab.accept(table, row); },
+      flush: async () => { if (legacy) await legacy.flush(); }
+    };
+  }
+
+  async insertAll(table: string, rows: Iterable<Row>): Promise<void> {
+    if (writesLegacy(this.mode) || REFERENCE.has(table)) await insertAll(this.conn, table, rows);
+    if (this.lab && !REFERENCE.has(table)) for (const r of rows) await this.lab.accept(table, r);
   }
 
   async loadIds(): Promise<void> {
     for (const [k, src] of Object.entries(ID_SOURCES) as [IdKind, string][]) {
+      // with no legacy tables the ids live only in this import; genetic entities are shared
+      if (!writesLegacy(this.mode) && k !== "geneticEntity") { this.next.set(k, 1); continue; }
       const [col, from] = src.split(" FROM ");
       const r = await query<{ m: number }>(this.conn, "SELECT max(" + col + ") AS m FROM " + from);
       this.next.set(k, Number(r[0]?.m ?? 0) + 1);
