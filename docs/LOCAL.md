@@ -35,10 +35,10 @@ import and why, and samples a data file named that no clinical file did. Importi
 replaces it.
 
 What imports today: clinical sample and patient data, mutations (MAF), discrete copy number (wide
-and long), continuous profiles (log2/linear CNA, expression, z-scores, methylation, RPPA without
+and long), continuous profiles (log2/linear CNA, expression, z-scores, methylation, RPPA including
 phospho-antibodies), structural variants, copy-number segments, timelines, the gene panel matrix,
 gene panel definitions and case lists. Not yet: generic assay, GISTIC, MutSig, gene set scores,
-resources, phospho-protein antibodies. Files of those kinds are listed as not imported.
+resources. Files of those kinds are listed as not imported.
 
 ## How it works
 
@@ -76,16 +76,48 @@ match nothing, and driver calls come only from a study's own `cbp_driver*` colum
 - Mutation events are per study, not shared across studies (first study wins in cBioPortal).
 - A file that fails to import is reported and the rest of the study imports.
 
+## Checking against cBioPortal's own importer
+
+The reference for the importer is cBioPortal's own importer (`cBioPortal/cbioportal-core`) run on
+the same files into a second database; comparing with cbioportal.org instead mixes importer
+differences with files that changed on datahub since the warehouse was loaded.
+`scripts/check-legacy-diff.ts` compares the two row by row on every table the app reads (allocated
+integer ids aside), inside ClickHouse through `remote()`, and prints rows found on one side only.
+
+Running the legacy importer, in short:
+
+1. Build it: `mvn clean package -DskipTests` in a clone of cbioportal-core (the jar lands at the
+   clone's root, where its scripts look for it); `pip install -r requirements.txt` in a venv.
+2. Start ClickHouse **24.5** (`clickhouse/clickhouse-server:24.5` in Docker; its JDBC driver fails
+   silently against newer servers), create database `cbioportal`, and load the same `schema.sql`
+   and seed parquets that `lib/importer/setup.ts` pins.
+3. `PORTAL_HOME` names a folder holding `application.properties` (`spring.datasource.url=
+   jdbc:clickhouse://127.0.0.1:<http port>/cbioportal`, user, password). Load the datahub gene
+   panels with `org.mskcc.cbio.portal.scripts.ImportGenePanel --data <file>`, then each study with
+   `python -m importer.metaImport -s <study> -n -o --no-derive-tables` from `scripts/`.
+4. Build the derived tables with `clickhouse client … --queries-file populate_derived_tables.sql
+   --param_optimize_backoff_secs 0` (metaImport's own step needs `CLICKHOUSE_HOST`,
+   `CLICKHOUSE_NATIVE_PORT`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `CLICKHOUSE_DB` and a
+   `clickhouse` binary on `PATH`).
+5. `LEGACY_CLICKHOUSE=127.0.0.1:<native port> LEGACY_CLICKHOUSE_PASSWORD=… node
+   scripts/check-legacy-diff.ts <study> …`
+
+Result: lgg_ucsf_2014, acc_tcga (CNA, expression, methylation, RPPA with phospho-antibodies,
+segments) and mpnst_mskcc are identical in every table. msk_impact_2017 differs in 5 of 78,178
+mutations, only in `refseqMrnaId`: cBioPortal shares one mutation event across studies, so those
+five carry the transcript of the identical mutation lgg_ucsf_2014 loaded first (its output depends
+on import order); here each study keeps its own.
+
 ## Parity with cbioportal.org
 
 `node --env-file=.env.local scripts/check-import-parity.ts <study> …` compares a locally imported
 study with the same study in the public warehouse, derived table by derived table (needs the
 warehouse credentials in `.env.local`). As of this writing:
 
-- **acc_tcga** — identical except RPPA (phospho-antibodies not imported) and `sequenced` (92 vs 90:
+- **acc_tcga** — identical except `sequenced` (92 vs 90:
   the warehouse's `sample_derived.sequenced` matches sample ids across studies, a legacy bug).
 - **lgg_ucsf_2014** — identical, timelines included.
 - **msk_impact_2017** — differs by ~1,300 of 78,000 mutations whose protein change datahub has
   since re-annotated (same positions, another transcript): the warehouse was loaded from older files.
-- **mpnst_mskcc** — 4 mutations more locally, all rows whose gene resolves only through an alias;
-  the alias tables agree today, so most likely the gene table changed after the warehouse load.
+- **mpnst_mskcc** — identical since MAF rows whose `Entrez_Gene_Id` is `NA` are dropped, as the
+  legacy importer drops them.

@@ -5,6 +5,7 @@ import path from "node:path";
 import { Inserter, insertAll, query } from "./ch-write.ts";
 import { ImportContext, skip, sampleId, isNormalBarcode } from "./context.ts";
 import { panelOf } from "./mutations.ts";
+import type { Gene } from "./genes.ts";
 import { openTable, type DataFile } from "./study.ts";
 
 // header columns that are not samples (case-insensitive)
@@ -15,6 +16,29 @@ export function cnaEventValue(v: string): number | null {
   if (v === "2") return 2;
   if (v === "-2" || v === "-1.5") return -2;
   return null;
+}
+
+/** The phosphorylated residues an RPPA antibody id names ("Akt_pS473" → "pS473"), or null for a total-protein antibody. */
+export function phosphoResidue(antibody: string): string | null {
+  return /(p[STY][0-9]+(?:_[STY][0-9]+)*)/.exec(antibody)?.[1] ?? null;
+}
+
+/**
+ * The legacy importer stores a phospho antibody against a gene of its own, "<GENE>_<residue>" of
+ * type phosphoprotein, created in the shared gene tables the first time any study names it, with
+ * an Entrez id counting down below zero.
+ */
+async function phosphoGene(ctx: ImportContext, base: Gene, residue: string): Promise<Gene> {
+  const symbol = (base.hugo + "_" + residue).toUpperCase();
+  const known = ctx.genes.hugo(symbol);
+  if (known) return known;
+  const gene: Gene = { entrez: ctx.genes.lowestEntrez() - 1, hugo: symbol, type: "phosphoprotein", entityId: ctx.id("geneticEntity") };
+  const aliases = ["rppa-phospho", "phosphoprotein", "phospho" + base.hugo];
+  await insertAll(ctx.conn, "genetic_entity", [{ id: gene.entityId, entity_type: "GENE", stable_id: null }]);
+  await insertAll(ctx.conn, "gene", [{ entrez_gene_id: gene.entrez, hugo_gene_symbol: symbol, genetic_entity_id: gene.entityId, type: gene.type }]);
+  await insertAll(ctx.conn, "gene_alias", aliases.map((a) => ({ entrez_gene_id: gene.entrez, gene_alias: a })));
+  ctx.genes.add(gene, aliases);
+  return gene;
 }
 
 /** Global (entrez, alteration) → cna_event id, as cBioPortal keeps them. */
@@ -54,12 +78,16 @@ export async function importMatrix(ctx: ImportContext, f: DataFile, profile: num
     if (values.some((v) => v.includes(","))) { skip(r, "value containing a comma"); continue; }
     if (iAntibody >= 0) {
       // RPPA: "GENE1 GENE2|antibody"; the row is stored for each gene the antibody names
-      const [geneText, antibody = ""] = (row[iAntibody] ?? "").split("|");
+      const ref = row[iAntibody] ?? "";
+      if (!ref.includes("|")) { skip(r, "Composite.Element.Ref without GENE|antibody"); continue; }
+      const [geneText, antibody] = ref.split("|");
       if (antibodies.has(antibody)) { skip(r, "antibody repeated"); continue; }
       antibodies.add(antibody);
-      if (/p[STY]\d+/.test(antibody)) { skip(r, "phospho-protein antibody (not imported yet)"); continue; }
-      const genes = geneText.trim().split(/\s+/).map((g) => ctx.genes.nonAmbiguous(g)).filter((g) => g !== null);
-      if (!genes.length) { skip(r, "gene not recognised"); continue; }
+      const named = geneText.trim().split(" ").filter((g) => g.toUpperCase() !== "NA").map((g) => ctx.genes.nonAmbiguous(g)).filter((g) => g !== null);
+      if (!named.length) { skip(r, "gene not recognised"); continue; }
+      const residue = phosphoResidue(antibody);
+      const genes: Gene[] = [];
+      for (const g of named) genes.push(residue === null ? g : await phosphoGene(ctx, g, residue));
       for (const g of genes) {
         if (seen.has(g.entrez)) continue;
         seen.add(g.entrez);

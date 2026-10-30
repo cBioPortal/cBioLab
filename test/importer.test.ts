@@ -7,6 +7,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { filteredClassification, filteredStatus, mafChromosome, proteinChange, proteinPositions, tumorAllele } from "../lib/importer/mutations.ts";
+import { mutationKeyword } from "../lib/importer/mutation-keyword.ts";
 import { isMissing, survivalValue } from "../lib/importer/clinical.ts";
 import { cnaEventValue } from "../lib/importer/matrix.ts";
 import { fractionGenomeAltered } from "../lib/importer/other.ts";
@@ -54,6 +55,23 @@ test("protein change falls back from HGVSp_Short to Amino_Acid_Change to MUTATED
   assert.deepEqual(proteinPositions("12/189", "G12D"), [12, 12]);
   assert.deepEqual(proteinPositions("", "E746_A750del"), [746, 750]);
   assert.deepEqual(proteinPositions("", "MUTATED"), [-1, -1]);
+});
+
+test("protein positions read each end of Protein_position before falling back to the protein change", () => {
+  assert.deepEqual(proteinPositions("839-840/2492", "R840Kfs*9"), [839, 840]);
+  assert.deepEqual(proteinPositions("152/300", "I152Pfs*5"), [152, 152]);
+  assert.deepEqual(proteinPositions("218/500", "L218="), [218, -1]);
+  assert.deepEqual(proteinPositions("?-12/189", "G12D"), [12, 12]);
+});
+
+test("the mutation keyword groups mutations by residue, as the legacy importer did", () => {
+  assert.equal(mutationKeyword("tp53", "R175H", "Missense_Mutation"), "TP53 R175 missense");
+  assert.equal(mutationKeyword("ATRX", "R840Kfs*9", "Frame_Shift_Ins"), "ATRX truncating");
+  assert.equal(mutationKeyword("EGFR", "E746_A750del", "In_Frame_Del"), null);
+  assert.equal(mutationKeyword("EGFR", "746_750ELREA>-", "In_Frame_Del"), null);
+  assert.equal(mutationKeyword("KRAS", "G12_G13insA", "In_Frame_Ins"), null);
+  assert.equal(mutationKeyword("BRAF", "V600E", "NA"), "BRAF V600 missense");
+  assert.equal(mutationKeyword("PTEN", "L218=", "Splice_Region"), null);
 });
 
 test("the tumor allele is the one that differs from the reference", () => {
@@ -107,6 +125,7 @@ test("gene resolution differs by file type, as the legacy importer's does", () =
   assert.equal(g.forMaf("TP53", "99999999"), null);
   assert.equal(g.forMaf("p53", "0")?.hugo, "TP53");
   assert.equal(g.forMaf("Unknown", "0"), null);
+  assert.equal(g.forMaf("TP53", "NA"), null);
   // an ambiguous alias: the MAF path uses the disambiguation file, the matrix path drops the row
   assert.equal(g.forMaf("MLL2", "")?.entrez, 8085);
   assert.equal(g.forMatrix("MLL2", ""), null);

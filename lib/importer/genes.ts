@@ -41,6 +41,23 @@ export class GeneResolver {
 
   entrez(id: number): Gene | null { return this.byEntrez.get(id) ?? null; }
 
+  /** `DaoGeneOptimized.getGene(symbol)`: the gene with this Hugo symbol, ignoring case; aliases are not searched. */
+  hugo(symbol: string): Gene | null { return this.byHugo.get(symbol.toUpperCase()) ?? null; }
+
+  /** The lowest Entrez id in use: genes made by an import (phosphoproteins) count down from below it. */
+  lowestEntrez(): number { let m = 0; for (const e of this.byEntrez.keys()) if (e < m) m = e; return m; }
+
+  /** Adds a gene the import has just written to the database, with its aliases. */
+  add(gene: Gene, aliases: string[]): void {
+    this.byEntrez.set(gene.entrez, gene);
+    this.byHugo.set(gene.hugo.toUpperCase(), gene);
+    for (const a of aliases) {
+      const list = this.byAlias.get(a.toUpperCase());
+      if (!list) this.byAlias.set(a.toUpperCase(), [gene]);
+      else if (!list.includes(gene)) list.push(gene);
+    }
+  }
+
   /** Every gene a symbol names: the Hugo match alone if there is one, else every alias match. */
   candidates(symbol: string): Gene[] {
     const key = symbol.toUpperCase();
@@ -62,12 +79,13 @@ export class GeneResolver {
   }
 
   /**
-   * MAF rows: a present, non-zero Entrez id is the authority, and an unknown one drops the row
-   * (no Hugo fallback). Empty or 0 falls back to the symbol. `Unknown` with no Entrez is dropped.
+   * MAF rows: a present, non-zero Entrez id is the authority, and an unknown or non-numeric one
+   * (including `NA`) drops the row (no Hugo fallback). Empty or 0 falls back to the symbol.
+   * `Unknown` with no Entrez is dropped.
    */
   forMaf(hugo: string, entrezText: string): Gene | null {
     const e = entrezText.trim();
-    if (e && e !== "0" && e.toUpperCase() !== "NA") {
+    if (e && e !== "0") {
       if (!/^\d+$/.test(e)) return null;
       return this.entrez(Number(e));
     }

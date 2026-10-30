@@ -4,6 +4,7 @@ import path from "node:path";
 import { Inserter } from "./ch-write.ts";
 import { ImportContext, skip, sampleId, isNormalBarcode, type FileReport } from "./context.ts";
 import { openTable, type DataFile } from "./study.ts";
+import { mutationKeyword } from "./mutation-keyword.ts";
 
 const DEFAULT_FILTERED = ["silent", "intron", "3'utr", "3'flank", "5'utr", "igr"];
 const TERT = 7015;
@@ -48,13 +49,43 @@ export function proteinChange(hgvsp: string, aac: string): string {
   return pick.startsWith("p.") ? pick.slice(2) : pick;
 }
 
-/** Protein start/end from Protein_position ("12/189", "12-13/189"), else from the protein change. */
-export function proteinPositions(pos: string, change: string): [number, number] {
-  const m = /^(\d+(?:\.\d+)?)(?:-(\d+(?:\.\d+)?))?\//.exec(pos.trim());
-  if (m) { const s = Math.trunc(Number(m[1])); return [s, m[2] ? Math.trunc(Number(m[2])) : s]; }
-  const c = /^[A-Za-z*]*?(\d+)(?:_[A-Za-z*]*?(\d+))?/.exec(change);
-  if (c) { const s = Number(c[1]); return [s, c[2] ? Number(c[2]) : s]; }
+/** Java's `(int) Double.parseDouble(s)`, or -1 where that throws (`TabDelimitedFileUtil.getPartInt`). */
+function javaInt(s: string | undefined): number {
+  const t = (s ?? "").trim();
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?[dDfF]?$/.test(t)) return -1;
+  return Math.trunc(Number(t.replace(/[dDfF]$/, "")));
+}
+
+/** `ExtendedMutationUtil.annotateProteinChange`: start and end residues read from a protein change, -1 where unknown. */
+export function annotateProteinChange(change: string): [number, number] {
+  let pc = change.startsWith("p.") ? change.slice(2) : change;
+  if (pc.includes("[")) pc = pc.slice(0, pc.indexOf("["));
+  pc = pc.trim();
+  let m = /^([A-Z*]+)([0-9]+)([A-Z*?]*)$/.exec(pc);
+  if (m) {
+    const [, ref, s, v] = m, start = Number(s);
+    const single = ref === v || ref === "*" || v === "*" || start === 1 || v === "?";
+    return [start, single ? start : start + ref.length - 1];
+  }
+  m = /^[A-Z]?([0-9]+)(_[A-Z]?([0-9]+))?(delins|ins)([A-Z]+)$/.exec(pc) ?? /^[A-Z]?([0-9]+)(_[A-Z]?([0-9]+))?(_)?splice$/.exec(pc);
+  if (m) return [Number(m[1]), m[3] !== undefined ? Number(m[3]) : Number(m[1])];
+  m = /^[A-Z]?([0-9]+)_[A-Z]?([0-9]+)(.+)$/.exec(pc);
+  if (m) return [Number(m[1]), Number(m[2])];
+  m = /^([A-Z*])([0-9]+)[A-Z]?fs.*$/.exec(pc) ?? /^([A-Z]+)?([0-9]+)((ins)|(del)|(dup))$/.exec(pc);
+  if (m) return [Number(m[2]), Number(m[2])];
   return [-1, -1];
+}
+
+/**
+ * Protein start/end as the legacy importer stores them: each from the "start-end" part of
+ * Protein_position, and only where that part is missing or unreadable, from the protein change.
+ */
+export function proteinPositions(pos: string, change: string): [number, number] {
+  const parts = (pos || "NA").split("/")[0].split("-");
+  let start = javaInt(parts[0]), end = javaInt(parts[1]);
+  if (start === -1) start = annotateProteinChange(change)[0];
+  if (end === -1) end = annotateProteinChange(change)[1];
+  return [start, end];
 }
 
 const blank = (v: string) => !v || v.toUpperCase() === "NA";
@@ -76,6 +107,44 @@ const num = (v: string | undefined): number | null => {
 };
 const pos = (v: string): number => { const n = num(v); return n === null || n < 0 ? 0 : n; };
 
+/** Java's `Float.parseFloat`, or -1 where that throws (`TabDelimitedFileUtil.getPartFloat`). */
+function javaFloat(s: string): number {
+  const t = s.trim();
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?[dDfF]?$/.test(t)) return -1;
+  return Math.fround(Number(t.replace(/[dDfF]$/, "")));
+}
+/** Java's `Math.round(int * float)`. */
+const roundProduct = (depth: number, vaf: number) => Math.floor(Math.fround(depth * vaf) + 0.5);
+
+/** The columns `MafUtil` reads allele counts from, each with the alternative names it accepts. */
+export interface CountColumns { tAlt: string; tRef: string; nAlt: string; nRef: string; tTot: string; tVar: string; nTot: string; nVar: string; tDepth: string; tVaf: string; nDepth: string; nVaf: string }
+
+/**
+ * `ExtendedMutationUtil.getTumorAltCount` and its three siblings: the count column when it holds a
+ * number, else TVarCov/TTotCov (or NVarCov/NTotCov), else depth × VAF; null when none is present.
+ */
+export function alleleCounts(c: CountColumns): { tumor_alt_count: number | null; tumor_ref_count: number | null; normal_alt_count: number | null; normal_ref_count: number | null } {
+  const i = (v: string) => javaInt(v);
+  const side = (alt: string, ref: string, tot: string, vr: string, depth: string, vaf: string) => {
+    const a = i(alt), r = i(ref), t = i(tot), v = i(vr), d = i(depth), f = javaFloat(vaf);
+    const fromVaf = d !== -1 && f !== -1;
+    return [
+      a !== -1 ? a : v !== -1 ? v : fromVaf ? roundProduct(d, f) : null,
+      r !== -1 ? r : v !== -1 && t !== -1 ? t - v : fromVaf ? d - roundProduct(d, f) : null
+    ];
+  };
+  const [ta, tr] = side(c.tAlt, c.tRef, c.tTot, c.tVar, c.tDepth, c.tVaf);
+  const [na, nr] = side(c.nAlt, c.nRef, c.nTot, c.nVar, c.nDepth, c.nVaf);
+  return { tumor_alt_count: ta, tumor_ref_count: tr, normal_alt_count: na, normal_ref_count: nr };
+}
+
+// `MafUtil` matches header names case-insensitively, a few under alternative names; where several
+// columns match, the last one wins
+const COLUMN_ALIASES: Record<string, string[]> = {
+  t_ref_count: ["t_ref_count", "i_t_ref_count", "AD_Ref"], t_alt_count: ["t_alt_count", "i_t_alt_count", "AD_Alt"],
+  n_ref_count: ["n_ref_count", "Norm_AD_Ref"], n_alt_count: ["n_alt_count", "Norm_AD_Alt"]
+};
+
 interface Mut { row: Record<string, string | number | null>; event: Record<string, string | number | null>; sample: number; centers: Set<string>; driver: Record<string, string> | null; rank: number }
 
 /** Tie-break when two rows are the same mutation: validated beats germline beats anything else. */
@@ -88,9 +157,14 @@ function rank(validation: string, status: string): number {
 export async function importMutations(ctx: ImportContext, f: DataFile, profile: number): Promise<void> {
   const r = ctx.report(path.basename(f.file), "mutations");
   const t = await openTable(f.file);
-  const h = new Map(t.header.map((x, i) => [x, i]));
-  const get = (row: string[], name: string) => { const i = h.get(name); return i === undefined ? "" : (row[i] ?? "").trim(); };
-  if (!h.has("Tumor_Sample_Barcode")) throw new Error(path.basename(f.file) + " has no Tumor_Sample_Barcode column");
+  const h = new Map<string, number>();
+  t.header.forEach((x, i) => {
+    const k = x.trim().toLowerCase();
+    h.set(k, i);
+    for (const [name, names] of Object.entries(COLUMN_ALIASES)) if (names.some((n) => n.toLowerCase() === k)) h.set(name, i);
+  });
+  const get = (row: string[], name: string) => { const i = h.get(name.toLowerCase()); return i === undefined ? "" : (row[i] ?? "").trim(); };
+  if (!h.has("tumor_sample_barcode")) throw new Error(path.basename(f.file) + " has no Tumor_Sample_Barcode column");
   const custom = f.meta.variant_classification_filter
     ? new Set(f.meta.variant_classification_filter.split(",").map((s) => s.trim()).filter(Boolean)) : null;
   const panel = panelOf(ctx, f, r);
@@ -151,7 +225,7 @@ export async function importMutations(ctx: ImportContext, f: DataFile, profile: 
         protein_change: change, mutation_type: vc, ncbi_build: na(get(row, "NCBI_Build")), strand: na(get(row, "Strand")),
         variant_type: na(get(row, "Variant_Type")), db_snp_rs: na(get(row, "dbSNP_RS")), db_snp_val_status: na(get(row, "dbSNP_Val_Status")),
         refseq_mrna_id: na(get(row, "RefSeq")), codon_change: na(get(row, "Codons")), uniprot_accession: na(get(row, "SWISSPROT")),
-        protein_pos_start: pStart, protein_pos_end: pEnd, canonical_transcript: 1, keyword: null
+        protein_pos_start: pStart, protein_pos_end: pEnd, canonical_transcript: 1, keyword: mutationKeyword(gene.hugo, change, vc)
       },
       row: {
         genetic_profile_id: profile, sample_id: sample, entrez_gene_id: gene.entrez,
@@ -164,9 +238,12 @@ export async function importMutations(ctx: ImportContext, f: DataFile, profile: 
         verification_status: na(get(row, "Verification_Status")), sequencing_phase: na(get(row, "Sequencing_Phase")),
         sequence_source: na(get(row, "Sequence_Source")), validation_method: na(get(row, "Validation_Method")),
         score: na(get(row, "Score")), bam_file: na(get(row, "BAM_File")),
-        tumor_alt_count: num(get(row, "t_alt_count")), tumor_ref_count: num(get(row, "t_ref_count")),
-        normal_alt_count: num(get(row, "n_alt_count")), normal_ref_count: num(get(row, "n_ref_count")),
-        amino_acid_change: get(row, "Amino_Acid_Change") || "MUTATED", annotation_json: null
+        ...alleleCounts({
+          tAlt: get(row, "t_alt_count"), tRef: get(row, "t_ref_count"), nAlt: get(row, "n_alt_count"), nRef: get(row, "n_ref_count"),
+          tTot: get(row, "TTotCov"), tVar: get(row, "TVarCov"), nTot: get(row, "NTotCov"), nVar: get(row, "NVarCov"),
+          tDepth: get(row, "tumor_depth"), tVaf: get(row, "tumor_vaf"), nDepth: get(row, "normal_depth"), nVaf: get(row, "normal_vaf")
+        }),
+        amino_acid_change: null, annotation_json: null
       }
     });
   }
