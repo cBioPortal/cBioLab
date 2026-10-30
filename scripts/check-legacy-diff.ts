@@ -4,12 +4,12 @@
 // source drift, because both sides read identical files.
 //
 //   LEGACY_CLICKHOUSE=127.0.0.1:18301 LEGACY_CLICKHOUSE_PASSWORD=… \
-//     node scripts/check-legacy-diff.ts [--prefix lab_] [--rows 5] acc_tcga [more studies]
+//     node scripts/check-legacy-diff.ts [--prefix labv_] [--database cbioportal] [--rows 5] acc_tcga [more studies]
 //
 // The local database comes from ~/.cbiolab/local.env (`npm run local`), and reads the legacy one
 // through ClickHouse's remote() over its native port, so only differing rows leave the server.
-// --prefix compares the legacy tables with local tables or views of that prefix (lab_sample_derived
-// against sample_derived, say). docs/LOCAL.md describes running the legacy importer.
+// --prefix compares the legacy tables with local tables or views of that prefix (labv_sample_derived
+// against sample_derived, say); --database names another local database than local.env's. docs/LOCAL.md describes running the legacy importer.
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -42,6 +42,7 @@ const args = process.argv.slice(2);
 const opt = (name: string, dflt: string) => { const i = args.indexOf(name); if (i < 0) return dflt; const v = args[i + 1]; args.splice(i, 2); return v; };
 const prefix = opt("--prefix", "").replace(/[^A-Za-z0-9_]/g, "");
 const show = Number(opt("--rows", "3"));
+const database = opt("--database", "").replace(/[^A-Za-z0-9_]/g, "");
 const studies = args.filter((a) => /^[A-Za-z0-9_.-]+$/.test(a));
 const legacyHost = (process.env.LEGACY_CLICKHOUSE || "127.0.0.1:18301").replace(/[^A-Za-z0-9_.:-]/g, "");
 const legacyPassword = process.env.LEGACY_CLICKHOUSE_PASSWORD;
@@ -52,7 +53,7 @@ if (!studies.length || legacyPassword === undefined) {
 const lit = (s: string) => "'" + s.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
 const legacy = (dbTable: string) => `remote(${lit(legacyHost)}, ${dbTable}, 'default', ${lit(legacyPassword)})`;
 
-const conn = localConn();
+const conn = { ...localConn(), ...(database ? { db: database } : {}) };
 let differing = 0;
 for (const study of studies) {
   console.log("== " + study);

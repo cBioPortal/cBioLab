@@ -3,8 +3,13 @@
 // rows; this turns each into its file-shaped row, swapping internal ids for the files' own
 // identifiers, so the two schemas always hold the same data. Rows that depend on rows arriving
 // later (a mutation's driver annotation, a timeline event's values) are held until `finish`.
-import { Inserter, type Row, type WriteConn } from "./ch-write.ts";
-import { LAB_TABLES } from "./lab-schema.ts";
+//
+// Rows go to staging copies of the lab_ tables first; `finish` then merges them in
+// (`mergeStaged`): only rows that are new or changed are written, and rows the import no longer
+// has get a deletion marker, so importing an unchanged study writes nothing. An update (`scope`
+// "samples") replaces only the rows of the samples and patients it names.
+import { Inserter, exec, type Row, type WriteConn } from "./ch-write.ts";
+import { LAB_TABLES, mergeStaged, stageName } from "./lab-schema.ts";
 
 /** What the translation needs to know about the study being imported. */
 export interface LabStudyContext {
@@ -16,9 +21,23 @@ export interface LabStudyContext {
   panel(id: number): string;
   /** genetic entity id → Entrez id of the gene it is */
   entrez(entityId: number): number;
+  /** every sample and patient the import names */
+  sampleIds(): string[];
+  patientIds(): string[];
 }
 
+/** Whether an import replaces the whole study, or only the samples (and their patients) it names. */
+export type MergeScope = "study" | "samples";
+
 type Held = Record<string, unknown>;
+
+// the lab_ tables a cBioPortal table's rows (or, for a profile, its kind of data file) supply
+const SUPPLIES: Record<string, string[]> = {
+  patient: ["lab_patient"], sample: ["lab_sample"], clinical_sample: ["lab_clinical"], clinical_patient: ["lab_clinical"],
+  sample_profile: ["lab_sample_profile"], copy_number_seg_file: ["lab_segment"], clinical_event: ["lab_timeline_event"],
+  sample_list_list: ["lab_case_list_sample"]
+};
+const PROFILE_SUPPLIES: Record<string, string[]> = { MUTATION_EXTENDED: ["lab_mutation"], STRUCTURAL_VARIANT: ["lab_structural_variant"] };
 const DRIVER = ["driver_filter", "driver_filter_annotation", "driver_tiers_filter", "driver_tiers_filter_annotation"] as const;
 
 export class LabWriter {
@@ -34,12 +53,29 @@ export class LabWriter {
   private readonly drivers = new Map<string, Held>();
   private readonly timeline = new Map<number, Held & { data: Record<string, string> }>();
   private readonly lists = new Map<number, string>();
+  private readonly sampleIds = new Map<number, string[]>();
+  private matrix: Inserter | null = null;
+  private readonly tag = process.pid + "_" + Date.now();
+  private staged = false;
+  /** lab_ tables this import supplied data for: an update replaces rows only in these */
+  private readonly supplied = new Set<string>();
+  scope: MergeScope = "study";
 
   constructor(conn: WriteConn, s: LabStudyContext) { this.conn = conn; this.s = s; }
 
+  private async stage(): Promise<void> {
+    if (this.staged) return;
+    for (const t of Object.keys(LAB_TABLES)) {
+      await exec(this.conn, "DROP TABLE IF EXISTS " + stageName(t, this.tag));
+      await exec(this.conn, "CREATE TABLE " + stageName(t, this.tag) + " AS " + t);
+    }
+    this.staged = true;
+  }
+
   private async write(table: keyof typeof LAB_TABLES, row: Held): Promise<void> {
+    await this.stage();
     let ins = this.out.get(table);
-    if (!ins) { ins = new Inserter(this.conn, table); this.out.set(table, ins); }
+    if (!ins) { ins = new Inserter(this.conn, stageName(table, this.tag)); this.out.set(table, ins); }
     await ins.add({ study_id: this.s.studyId, ...row, version: this.version, is_deleted: 0 } as Row);
   }
 
@@ -47,6 +83,8 @@ export class LabWriter {
   async accept(table: string, r: Row): Promise<void> {
     const n = (k: string) => Number(r[k]);
     const s = this.s;
+    for (const t of SUPPLIES[table] ?? []) this.supplied.add(t);
+    if (table === "genetic_profile") for (const t of PROFILE_SUPPLIES[String(r.genetic_alteration_type)] ?? ["lab_profile_value"]) this.supplied.add(t);
     switch (table) {
       case "cancer_study": this.study = { ...r }; return;
       case "patient": return this.write("lab_patient", { patient_id: r.stable_id });
@@ -68,11 +106,19 @@ export class LabWriter {
         this.order.set(n("genetic_profile_id"), String(r.ordered_sample_list).split(",").filter(Boolean).map(Number));
         return;
       case "genetic_alteration": {
+        // one row per gene, expanded to one per cell on the server
         const profile = n("genetic_profile_id"), samples = this.order.get(profile) ?? [];
-        const values = String(r.values).split(",").slice(0, samples.length);
-        const pid = s.profile(profile), entrez = s.entrez(n("genetic_entity_id"));
-        for (let i = 0; i < values.length; i++)
-          await this.write("lab_profile_value", { profile_id: pid, sample_id: s.sample(samples[i]).sample, entrez_gene_id: entrez, value: values[i] });
+        let ids = this.sampleIds.get(profile);
+        if (!ids) { ids = samples.map((x) => s.sample(x).sample); this.sampleIds.set(profile, ids); }
+        await this.stage();
+        this.matrix ??= new Inserter(this.conn, "lab_profile_value", `INSERT INTO ${stageName("lab_profile_value", this.tag)}
+          (study_id, profile_id, sample_id, entrez_gene_id, value, version, is_deleted)
+          SELECT study_id, profile_id, s, entrez_gene_id, v, version, 0
+          FROM input('study_id String, profile_id String, entrez_gene_id Int64, samples Array(String), values Array(String), version UInt64')
+          ARRAY JOIN samples AS s, values AS v`);
+        this.supplied.add("lab_profile_value");
+        await this.matrix.add({ study_id: s.studyId, profile_id: s.profile(profile), entrez_gene_id: s.entrez(n("genetic_entity_id")), samples: ids,
+          values: String(r.values).split(",").slice(0, ids.length), version: this.version });
         return;
       }
       case "sample_profile":
@@ -132,5 +178,8 @@ export class LabWriter {
       pmid: st.pmid, citation: st.citation, groups: st.groups, status: st.status, import_date: st.import_date, reference_genome: referenceGenome,
       mirna_sample_count: 0, ...counts });
     for (const ins of this.out.values()) await ins.flush();
+    await this.matrix?.flush();
+    await mergeStaged(this.conn, s.studyId, this.tag, this.version,
+      this.scope === "study" ? null : { samples: s.sampleIds(), patients: s.patientIds(), tables: this.supplied });
   }
 }

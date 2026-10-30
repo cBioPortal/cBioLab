@@ -8,6 +8,20 @@ import { LabWriter } from "./lab-writer.ts";
 // shared reference tables: written as they are in every schema mode
 const REFERENCE = new Set(["type_of_cancer", "gene", "gene_alias", "genetic_entity", "gene_panel", "gene_panel_list"]);
 
+/** stable id → value holding an internal id, indexed both ways */
+export class IdMap<V> extends Map<string, V> {
+  private readonly rev = new Map<number, string>();
+  private readonly idOf: (v: V) => number;
+  constructor(idOf: (v: V) => number) { super(); this.idOf = idOf; }
+  override set(k: string, v: V): this { super.set(k, v); this.rev.set(this.idOf(v), k); return this; }
+  /** the stable id whose internal id is `n` */
+  keyOf(n: number): string {
+    const k = this.rev.get(n);
+    if (k === undefined) throw new Error("lab schema: unknown internal id " + n);
+    return k;
+  }
+}
+
 /** Where an importer step sends rows for one cBioPortal table; `ImportContext.sink`. */
 export interface Sink { add(row: Row): Promise<void>; flush(): Promise<void> }
 
@@ -55,9 +69,9 @@ export class ImportContext {
   referenceGenome = "hg19";
   private readonly next = new Map<IdKind, number>();
   /** patient stable id → internal id */
-  readonly patients = new Map<string, number>();
+  readonly patients = new IdMap<number>((v) => v);
   /** sample stable id → internal ids */
-  readonly samples = new Map<string, { id: number; patient: number }>();
+  readonly samples = new IdMap<{ id: number; patient: number }>((v) => v.id);
   /** sample internal id → sample type, as the clinical file or a TCGA barcode says */
   readonly sampleTypes = new Map<number, string>();
   /** samples created because a data file named them and no clinical file did */
@@ -69,7 +83,7 @@ export class ImportContext {
   readonly warnings: string[] = [];
   readonly progress: Progress;
   /** stable id → internal id of every gene panel in the database */
-  panels = new Map<string, number>();
+  panels = new IdMap<number>((v) => v);
   /** sample internal id → loci of its non-germline mutations, for MUTATION_COUNT */
   readonly mutationLoci = new Map<number, Set<string>>();
   /** patients with a TREATMENT timeline event */
@@ -81,25 +95,18 @@ export class ImportContext {
   }
 
   private labContext() {
-    const stable = <K>(m: () => Map<string, K>, id: (v: K) => number) => {
-      let rev: Map<number, string> | null = null;
-      return (n: number) => {
-        if (!rev || !rev.has(n)) rev = new Map([...m()].map(([k, v]) => [id(v), k]));
-        const v = rev.get(n);
-        if (v === undefined) throw new Error("lab schema: unknown internal id " + n);
-        return v;
-      };
-    };
-    const patient = stable(() => this.patients, (v) => v);
-    const sample = stable(() => this.samples, (v) => v.id);
-    const panel = stable(() => this.panels, (v) => v);
+    const patient = (n: number) => this.patients.keyOf(n);
+    const sample = (n: number) => this.samples.keyOf(n);
+    const panel = (n: number) => this.panels.keyOf(n);
     return {
       studyId: this.studyId,
       patient,
       sample: (n: number) => ({ sample: sample(n), patient: patient(this.samples.get(sample(n))!.patient) }),
       profile: (n: number) => { const p = this.profiles.find((x) => x.id === n); if (!p) throw new Error("lab schema: unknown profile " + n); return p.stableId; },
       panel: (n: number) => panel(n),
-      entrez: (entity: number) => { const g = this.genes.byEntity(entity); if (!g) throw new Error("lab schema: unknown genetic entity " + entity); return g.entrez; }
+      entrez: (entity: number) => { const g = this.genes.byEntity(entity); if (!g) throw new Error("lab schema: unknown genetic entity " + entity); return g.entrez; },
+      sampleIds: () => [...this.samples.keys()],
+      patientIds: () => [...this.patients.keys()]
     };
   }
 
@@ -131,7 +138,8 @@ export class ImportContext {
 
   async loadPanels(): Promise<void> {
     const p = await query<{ s: string; i: number }>(this.conn, "SELECT stable_id AS s, internal_id AS i FROM gene_panel");
-    this.panels = new Map(p.map((x) => [x.s, Number(x.i)]));
+    this.panels = new IdMap<number>((v) => v);
+    for (const x of p) this.panels.set(x.s, Number(x.i));
   }
 
   id(kind: IdKind): number {

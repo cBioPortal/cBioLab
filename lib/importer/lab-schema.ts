@@ -144,7 +144,7 @@ const MUTATION_COLUMNS = "center, sequencer, mutation_status, validation_status,
 const EVENT_COLUMNS = ["chr", "start_position", "end_position", "reference_allele", "tumor_seq_allele", "protein_change", "mutation_type", "ncbi_build",
   "strand", "variant_type", "db_snp_rs", "db_snp_val_status", "refseq_mrna_id", "codon_change", "uniprot_accession", "protein_pos_start",
   "protein_pos_end", "canonical_transcript", "keyword"];
-const SV_COLUMNS = LAB_TABLES.lab_structural_variant.columns.split(", ").map((c) => c.split(" ")[0])
+const SV_COLUMNS = () => columnsOf("lab_structural_variant")
   .filter((c) => !["study_id", "profile_id", "sample_id", "sv_index", "has_driver"].includes(c) && !c.startsWith("driver_"));
 
 /** cBioPortal's base tables, as views over the lab_ tables. */
@@ -201,7 +201,7 @@ export function baseViews(): Record<string, string> {
     sample_cna_event: `SELECT ${cnaEventId("v.entrez_gene_id", CNA_ALTERATION)} AS cna_event_id, ${sampleId("v.study_id", "v.sample_id")} AS sample_id,
       ${profileId("v.study_id", "v.profile_id")} AS genetic_profile_id, CAST(NULL, 'Nullable(String)') AS annotation_json ${CNA_EVENT_CELLS}`,
     structural_variant: `SELECT ${svId} AS internal_id, ${profileId("t.study_id", "t.profile_id")} AS genetic_profile_id,
-      ${sampleId("t.study_id", "t.sample_id")} AS sample_id, ${SV_COLUMNS.map((c) => "t." + c + " AS " + c).join(", ")}
+      ${sampleId("t.study_id", "t.sample_id")} AS sample_id, ${SV_COLUMNS().map((c) => "t." + c + " AS " + c).join(", ")}
       FROM ${F("lab_structural_variant", "t")}`,
     copy_number_seg: `SELECT ${labId("seg", "t.study_id", "t.sample_id", "t.chr", "toString(t.start)", "toString(t.end)")} AS seg_id,
       ${labId("study", "t.study_id")} AS cancer_study_id, ${sampleId("t.study_id", "t.sample_id")} AS sample_id, t.chr AS chr, t.start AS start,
@@ -298,6 +298,96 @@ export const LEGACY_BASE_TABLES = BASE_NAMES;
 
 export async function createLabTables(conn: WriteConn): Promise<void> {
   for (const name of Object.keys(LAB_TABLES)) await exec(conn, labTableDdl(name));
+}
+
+export const stageName = (table: string, tag: string) => `${table}_stage_${tag}`;
+
+/** A lab_ table's column names, in order. */
+export function columnsOf(table: string): string[] {
+  const out: string[] = [];
+  let depth = 0, start = 0;
+  const cols = LAB_TABLES[table].columns;
+  for (let i = 0; i <= cols.length; i++) {
+    const ch = cols[i];
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if ((ch === "," && depth === 0) || i === cols.length) { out.push(cols.slice(start, i).trim().split(" ")[0]); start = i + 1; }
+  }
+  return out;
+}
+
+/**
+ * Merges one import's staged rows into the lab_ tables at `version`: rows that are new or differ
+ * from the stored ones are written, and stored rows the import no longer has get a deletion
+ * marker. With `only`, stored rows are compared (and marked) only where they belong to the named
+ * samples or patients, in the tables the update supplied data for; study-level rows (study, profiles, attributes, case lists) are never
+ * marked deleted: an update adds to a study rather than replacing it. The staging tables are dropped.
+ */
+export async function mergeStaged(conn: WriteConn, studyId: string, tag: string, version: number,
+  only: { samples: string[]; patients: string[]; tables: Set<string> } | null): Promise<void> {
+  const lit = (v: string) => "'" + v.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+  const list = (xs: string[]) => "(" + (xs.length ? xs.map(lit).join(", ") : "''") + ")";
+  const settings = { transform_null_in: "1" };
+  try {
+    for (const table of Object.keys(LAB_TABLES)) await mergeTable(table);
+  } finally {
+    for (const table of Object.keys(LAB_TABLES)) await exec(conn, "DROP TABLE IF EXISTS " + stageName(table, tag));
+  }
+
+  async function mergeTable(table: string): Promise<void> {
+    const stage = stageName(table, tag);
+    const cols = columnsOf(table);
+    const row = "sipHash64(toString(tuple(" + cols.map((c) => "`" + c + "`").join(", ") + ")))";
+    const key = "tuple(" + LAB_TABLES[table].order + ")";
+    const scope = !only ? "1"
+      : !only.tables.has(table) ? "0"
+      : cols.includes("sample_id") && cols.includes("patient_id") ? `if(sample_id = '', patient_id IN ${list(only.patients)}, sample_id IN ${list(only.samples)})`
+        : cols.includes("sample_id") ? `sample_id IN ${list(only.samples)}`
+          : cols.includes("patient_id") ? `patient_id IN ${list(only.patients)}` : "0";
+    const study = "study_id = " + lit(studyId);
+    const stored = await query<{ n: number }>(conn, `SELECT count() AS n FROM ${table} WHERE ${study}`);
+    if (!Number(stored[0]?.n)) {
+      await exec(conn, `INSERT INTO ${table} SELECT * FROM ${stage}`);
+      return;
+    }
+    await exec(conn, `INSERT INTO ${table} (${cols.join(", ")}, version, is_deleted)
+      SELECT ${cols.join(", ")}, ${version}, 1 FROM ${table} FINAL
+      WHERE ${study} AND ${scope} AND ${key} NOT IN (SELECT ${key} FROM ${stage})`, settings);
+    await exec(conn, `INSERT INTO ${table} SELECT * FROM ${stage}
+      WHERE ${row} NOT IN (SELECT ${row} FROM ${table} FINAL WHERE ${study})`, settings);
+  }
+}
+
+/**
+ * After an update, the values that depend on the whole study rather than on the samples it named:
+ * the study's precomputed counts, and SAMPLE_COUNT of the patients it touched. Written as new
+ * versions of those rows.
+ */
+export async function refreshLabStudy(conn: WriteConn, studyId: string, patients: string[]): Promise<void> {
+  const s = "'" + studyId.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+  const version = Date.now();
+  const profiled = (cond: string) => `(SELECT uniqExact(sp.sample_id) FROM lab_sample_profile AS sp FINAL
+    JOIN lab_profile AS p FINAL ON p.study_id = sp.study_id AND p.profile_id = sp.profile_id WHERE sp.study_id = ${s} AND ${cond})`;
+  const mrna = "p.alteration_type = 'MRNA_EXPRESSION'";
+  const counts: Record<string, string> = {
+    sample_count: `(SELECT count() FROM lab_sample FINAL WHERE study_id = ${s})`,
+    mutation_sample_count: profiled("p.alteration_type = 'MUTATION_EXTENDED'"),
+    cna_sample_count: profiled("p.alteration_type = 'COPY_NUMBER_ALTERATION' AND p.datatype = 'DISCRETE'"),
+    structural_variant_sample_count: profiled("p.alteration_type = 'STRUCTURAL_VARIANT'"),
+    rna_seq_sample_count: profiled(`${mrna} AND position(p.profile_id, 'rna_seq') > 0`),
+    mrna_microarray_sample_count: profiled(`${mrna} AND position(p.profile_id, 'rna_seq') = 0 AND position(p.profile_id, 'mrna') > 0`),
+    mrna_expression_sample_count: profiled(mrna),
+    rppa_sample_count: profiled("p.alteration_type = 'PROTEIN_LEVEL' AND position(p.profile_id, 'ms_abundance') = 0"),
+    mass_spectrometry_sample_count: profiled("p.alteration_type = 'PROTEIN_LEVEL' AND position(p.profile_id, 'ms_abundance') > 0"),
+    treatment_patient_count: `(SELECT uniqExact(patient_id) FROM lab_timeline_event FINAL WHERE study_id = ${s} AND upper(event_type) = 'TREATMENT')`
+  };
+  const cols = columnsOf("lab_study");
+  await exec(conn, `INSERT INTO lab_study (${cols.join(", ")}, version, is_deleted)
+    SELECT ${cols.map((c) => counts[c] ? `toUInt32(${counts[c]}) AS ${c}` : c).join(", ")}, ${version}, 0 FROM lab_study FINAL WHERE study_id = ${s}`);
+  const list = "(" + (patients.length ? patients.map((p) => "'" + p.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'").join(", ") : "''") + ")";
+  await exec(conn, `INSERT INTO lab_clinical (study_id, patient_id, sample_id, attr_id, value, version, is_deleted)
+    SELECT study_id, patient_id, '', 'SAMPLE_COUNT', toString(count()), ${version}, 0 FROM lab_sample FINAL
+    WHERE study_id = ${s} AND patient_id IN ${list} GROUP BY study_id, patient_id`);
 }
 
 /** Removes a study from every lab_ table. */

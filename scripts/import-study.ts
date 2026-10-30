@@ -6,7 +6,9 @@
 //   node scripts/import-study.ts --schema <mode>     switches the database's schema mode (legacy,
 //                                                    new or both; lib/importer/lab-schema.ts)
 //
-// Options: --id <study_id> names a folder that has no meta_study.txt; --json prints progress and
+// Options: --id <study_id> names a folder that has no meta_study.txt; --update replaces only the
+// samples the folder holds, leaving the rest of the study as it is (new-schema databases only);
+// --json prints progress and
 // the result as JSON lines (how the import page runs it, in its own process so a large MAF never
 // shares the web server's memory). Reads CLICKHOUSE_* and CBIOLAB_DATA, which `npm run local` sets
 // for the page and writes to ~/.cbiolab/local.env for `npm run import` in another terminal.
@@ -55,7 +57,7 @@ async function main(): Promise<void> {
     fallbackId = target.slice("datahub:".length);
     dir = await fetchDatahubStudy(dataDir, fallbackId, (step) => emit({ type: "progress", step }));
   }
-  const result = await importStudy(conn, dataDir, path.resolve(dir), fallbackId, (e) => emit({ type: "progress", ...e }));
+  const result = await importStudy(conn, dataDir, path.resolve(dir), fallbackId, (e) => emit({ type: "progress", ...e }), args.includes("--update"));
   emit({ type: "result", result });
   if (!json) {
     console.log("\nImported " + result.studyId + ": " + result.patients + " patients, " + result.samples + " samples in " + result.seconds + " s");

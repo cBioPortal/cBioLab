@@ -51,7 +51,8 @@ export type Row = Record<string, string | number | boolean | null | undefined>;
 
 /**
  * Buffers rows for one table and sends them as JSONEachRow in batches, so a 500k-row MAF is a few
- * dozen requests instead of one per row or one enormous body.
+ * dozen requests instead of one per row or one enormous body. `statement`, when given, is an
+ * INSERT … SELECT … FROM input(…) that reshapes the rows on the server.
  */
 export class Inserter {
   private rows: string[] = [];
@@ -59,8 +60,9 @@ export class Inserter {
   count = 0;
   private readonly conn: WriteConn;
   private readonly table: string;
-  constructor(conn: WriteConn, table: string) { this.conn = conn; this.table = table; }
-  async add(row: Row): Promise<void> {
+  private readonly statement: string | null;
+  constructor(conn: WriteConn, table: string, statement: string | null = null) { this.conn = conn; this.table = table; this.statement = statement; }
+  async add(row: Row | Record<string, unknown>): Promise<void> {
     const line = JSON.stringify(row);
     this.rows.push(line);
     this.bytes += line.length;
@@ -72,7 +74,8 @@ export class Inserter {
     const body = this.rows.join("\n");
     this.rows = [];
     this.bytes = 0;
-    await insertRaw(this.conn, this.table, "JSONEachRow", body);
+    if (this.statement) await chWrite(this.statement + " FORMAT JSONEachRow", this.conn, body, { input_format_skip_unknown_fields: "0" });
+    else await insertRaw(this.conn, this.table, "JSONEachRow", body);
   }
 }
 
