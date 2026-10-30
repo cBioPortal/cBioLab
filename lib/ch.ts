@@ -12,6 +12,9 @@
 // take a `db` argument rather than closing over a module constant.
 import { loopbackConnId, servingAsLoopbackPeer } from "./loopback-peer.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile, rename, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { ChResult, ChRow } from "./types.ts";
 import { customExternalsFor } from "./custom-data.ts";
 import { idSetExternalsFor } from "./id-sets.ts";
@@ -268,7 +271,30 @@ async function post(sql: string, conn: ChConn, format: string): Promise<string> 
     ...[...customExternalsFor(query, conn.id), ...idSetExternalsFor(query, conn.id)]
       .map((e) => ({ name: e.name, structure: e.structure, blob: new Blob([e.data]) }))];
   if (transport) return transport({ conn, format, query, externals }, (settings) => postToDatabase(conn, query, externals, ctx, settings));
+  const runCache = process.env.CH_RUN_CACHE;
+  if (runCache) return throughRunCache(runCache, { conn, format, query, externals }, () => postToDatabase(conn, query, externals, ctx));
   return postToDatabase(conn, query, externals, ctx);
+}
+
+/**
+ * The gate's warehouse checks are separate scripts that ask the same questions of the same studies
+ * (each builds Explore for the same few studies, often in a loop), outside the Next result cache.
+ * With CH_RUN_CACHE naming a folder, an answer is kept there for the rest of that gate run, shared
+ * by every script, keyed by the whole statement (instance, format, text and every table sent with
+ * it). Only answers are kept: a failed statement throws and is asked again next time. scripts/gate.sh
+ * creates the folder for one run and deletes it after, so no answer outlives the data it came from.
+ */
+async function throughRunCache(dir: string, st: ChStatement, ask: () => Promise<string>): Promise<string> {
+  const h = createHash("sha256").update(st.conn.id + "\n" + st.format + "\n" + st.query);
+  for (const e of st.externals) h.update("\n" + e.name + "\n" + e.structure + "\n" + await e.blob.text());
+  const file = join(dir, h.digest("hex"));
+  try { return await readFile(file, "utf8"); } catch { /* not asked yet in this run */ }
+  const text = await ask();
+  // written aside and renamed, so a script reading at the same moment sees all of it or none
+  const tmp = file + "." + randomUUID();
+  await writeFile(tmp, text);
+  await rename(tmp, file);
+  return text;
 }
 
 async function postToDatabase(conn: ChConn, query: string, externals: ChStatement["externals"], ctx: ChCtx | undefined, settings?: string): Promise<string> {

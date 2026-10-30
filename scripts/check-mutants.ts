@@ -197,9 +197,13 @@ function suitesImporting(dir: string, file: string): string[] {
 function run(dir: string, guard: Guard, file?: string): { ok: boolean; failures: number; firstFailure: string } {
   const [cmd, ...args] = guard === "unit" && file ? ["node", "--test", ...suitesImporting(dir, file)] : GUARD_CMD[guard];
   // a guard run against a planted bug must never write a report; the portal's answers are kept
-  // between runs (PORTAL_CACHE in check-portal-parity.ts), since a planted bug cannot change them
-  const { RECORD, REPORT_DIR, ...rest } = process.env;
-  const env = { ...rest, PORTAL_CACHE: join(dir, ".portal-cache") };
+  // between runs (PORTAL_CACHE in check-portal-parity.ts), since a planted bug cannot change them,
+  // and so are the warehouse's (CH_RUN_CACHE in lib/ch.ts): a bug that changes a statement asks
+  // the warehouse anew, and one that changes only what is done with the answer gets the same answer.
+  // Never the unit guard's: its tests answer statements with stubs, which would be kept as the warehouse's.
+  const { RECORD, REPORT_DIR, CH_RUN_CACHE, ...rest } = process.env;
+  const env = { ...rest, PORTAL_CACHE: join(dir, ".portal-cache"),
+    ...(guard === "unit" ? {} : { CH_RUN_CACHE: CH_RUN_CACHE || join(dir, ".ch-cache") }) };
   const r = spawnSync(cmd, args, { cwd: dir, env, encoding: "utf8", maxBuffer: 64 << 20, timeout: 600_000 });
   const out = (r.stdout || "") + (r.stderr || "");
   const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -212,17 +216,19 @@ function run(dir: string, guard: Guard, file?: string): { ok: boolean; failures:
 
 const dir = mkdtempSync(join(tmpdir(), "cohort-lab-mutants-"));
 const ONLY = process.env.MUTANT_ONLY;
-try {
-  const SKIP = new Set(["node_modules", ".git", ".next", ".next-gate", ".venv"]);
+/** every planted bug run against its guard in the copy at `dir`; the exit code */
+function plantAll(): number {
+  const SKIP = new Set(["node_modules", ".git", ".next", ".next-gate", ".gate-cache", ".venv"]);
   cpSync(ROOT, dir, { recursive: true, filter: (src) => !SKIP.has(src.split("/").pop()!) });
   symlinkSync(join(ROOT, "node_modules"), join(dir, "node_modules"));
   mkdirSync(join(dir, "docs/verification"), { recursive: true });
+  mkdirSync(join(dir, ".ch-cache"));
 
   const guards = [...new Set(MUTANTS.map((m) => m.guard))];
   for (const g of guards) {
     const base = run(dir, g);
     console.log(`${base.ok ? "PASS" : "FAIL"} baseline: ${g} passes on the unmodified code`);
-    if (!base.ok) { console.log("  " + base.firstFailure); process.exit(1); }
+    if (!base.ok) { console.log("  " + base.firstFailure); return 1; }
   }
 
   const results = [];
@@ -250,7 +256,14 @@ try {
     mutants: results,
   }, null, 1) + "\n");
   console.log(`\n${caught} of ${results.length} planted bugs caught`);
-  process.exit(caught === results.length ? 0 : 1);
+  return caught === results.length ? 0 : 1;
+}
+
+// the copy is removed before exiting: process.exit() inside the try would skip the finally
+let exitCode: number;
+try {
+  exitCode = plantAll();
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
+process.exit(exitCode);

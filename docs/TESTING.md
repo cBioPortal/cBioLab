@@ -89,6 +89,15 @@ the Python suite and the e2e suite. It builds to `.next-gate` (`NEXT_DIST_DIR`),
 touches a running `next dev`'s `.next`; `GATE_PORT` picks the port of its ephemeral server
 (default 3100), so two gates on one machine don't collide.
 
+**The warehouse checks share one run's answers.** They are scripts, outside the Next result cache,
+and they ask the same questions of the same studies many times (each builds Explore for the same
+few studies, often in a loop): on 2026-10-29 one CI warehouse lane sent 5,947 statements, of which
+4,897 repeated one it had already sent — 77% of its ClickHouse time. The gate gives the lane a
+folder (`.gate-cache/run-*`, `CH_RUN_CACHE`) where `lib/ch.ts` keeps each answer, keyed by the whole
+statement, for the rest of that run, and deletes it when the lane ends; `check:mutants` does the
+same for its guard runs. A failed statement is never kept. The e2e server never gets the variable:
+it caches through Next.
+
 **CI runs the gate on every PR and push to master** (`.github/workflows/verify.yml`), as parallel
 jobs, one lane each (`local`, `warehouse`, `e2e`), plus `check:mutants` after the warehouse lane,
 with `RECORD=1` and `REPORT_DIR` (a folder that starts empty, so a stage that never ran leaves no
