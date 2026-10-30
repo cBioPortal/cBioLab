@@ -14,6 +14,8 @@ import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
 import { CHIP, FIELD } from "../_ui/toolbar.ts";
 import type { ProfileInfo } from "../../lib/profile-catalog.ts";
+import type { PlotData } from "../../lib/plot.ts";
+import { PlotHover } from "./plot-hover.tsx";
 import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_BASE, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
 
 type Update = (fn: (view: any) => any) => void;
@@ -127,12 +129,13 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
   );
 }
 
-export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohortOptions, update, children }: {
+export function PlotControls({ spec, plot, studies, attrs, catalog, loading, busy, cohortOptions, update, children }: {
   /** the view as the document holds it */
   spec: any;
   /** the last result's plot: which shape is on screen, each axis's name and kind, how many cases it shows, its layers */
-  plot?: { shape: string; n: number; x: { kind: string; label: string }; y: { kind: string; label: string }; coverage?: { total: number };
-    layers?: { label: string; color: string; n: number; shown: string; why?: string; of?: number }[]; pointSet?: { rule: string; why?: string } };
+  plot?: PlotData;
+  /** the studies the last result was drawn over: a hovered case links to its page when there is one */
+  studies?: string[];
   attrs: { attribute: string; kind: string }[];
   /** the studies' profiles as they describe them, for each axis's Data picker */
   catalog: ProfileInfo[]; loading?: boolean; busy: boolean;
@@ -252,7 +255,9 @@ export function PlotControls({ spec, plot, attrs, catalog, loading, busy, cohort
               {drawn.map((l) => chip(String(l.i), l.color, l.label + " (" + l.n.toLocaleString() + ")"))}
             </div>}
           </div>}
-          <div className="plot-figure" data-hide={hidden.length ? hidden.join(" ") : undefined}>{children}</div>
+          <div className="plot-figure" data-hide={hidden.length ? hidden.join(" ") : undefined}>
+            <PlotHover plot={plot} unit={unit} study={studies?.length === 1 ? studies[0] : undefined}>{children}</PlotHover>
+          </div>
         </div>
       </div>
     </div>

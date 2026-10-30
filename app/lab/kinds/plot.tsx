@@ -18,7 +18,7 @@ function PlotCard({ ctx, v, vi }: CardProps) {
     {v.kind === "plot" && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Plot" cohorts={ch} {...placement(ctx, vi)}
         sub={v.plot ? <>{v.plot.shape === "scatter" ? "density" : v.plot.shape === "box" ? "box" : "contingency"} · {v.plot.n.toLocaleString()} {(docView(vi).unit || "sample")}s</> : "two axes over the same cases"} />
-      <PlotControls spec={docView(vi)} plot={v.plot} attrs={catalogAttrs()} catalog={profileCatalog()} loading={attrsLoading()} busy={busy}
+      <PlotControls spec={docView(vi)} plot={v.plot} studies={v.studies} attrs={catalogAttrs()} catalog={profileCatalog()} loading={attrsLoading()} busy={busy}
         cohortOptions={cohortOptions} update={(fn) => updateView(vi, fn)}>
         <ViewFigure v={v} empty={v.plot?.note || "nothing to draw"} />
       </PlotControls>

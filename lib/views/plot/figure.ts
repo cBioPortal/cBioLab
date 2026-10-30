@@ -19,15 +19,24 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * The radius of every case drawn as a point on a plot — scatter or box, the plotted cohort or a
- * point layer, five points or five thousand — so a dot means the same thing on every figure.
+ * point layer, five points or five thousand — so a dot means the same thing on every figure. Its
+ * outline (`halo`) is drawn over the edge, leaving a coloured disc of 2.5.
  */
-export const PLOT_POINT_R = 2.5;
+export const PLOT_POINT_R = 2.8;
+
+/**
+ * Every case's dot carries the same thin outline in the figure's background colour, so a dot in a
+ * layer and a dot of the plotted cohort are one size, and touching dots stay apart.
+ */
+const halo = (p: Pal) => `stroke="${p.bg}" stroke-width="0.6"`;
+/** a mark's case, which the page's hover (app/lab/plot-hover.tsx) reads to find the point under the pointer */
+const caseAttr = (id: string) => ` data-id="${esc(id)}"`;
 
 /** the plot's height for a figure `w` wide */
 const plotHeight = (w: number) => Math.round(Math.max(240, Math.min(420, w * 0.36)));
 
 /** an axis's title: a log axis names its attribute and says it is logarithmic, rather than "log10(X + 1)" */
-function axisTitle(a: PlotData["x"]): string {
+export function axisTitle(a: PlotData["x"]): string {
   const m = /^log10\((.*) \+ 1\)$/.exec(a.label);
   return a.log && m ? m[1] + " (log scale)" : a.label;
 }
@@ -117,9 +126,9 @@ function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: Pl
   const own = d.xyPoints || [];
   out.push(layerGroup("base", [
     ...shaded.map((b) => cell(b, base, hs.length ? 0.3 + 0.7 * shade(b.n) : shade(b.n))),
-    ...own.map((pt) => `<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${base}" fill-opacity="0.7"/>`)]));
-  const dot = (pt: { x: number; y: number }, color: string) =>
-    `<circle cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`;
+    ...own.map((pt) => `<circle${caseAttr(pt.id)} cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${base}" fill-opacity="0.7" ${halo(p)}/>`)]));
+  const dot = (pt: { id: string; x: number; y: number }, color: string) =>
+    `<circle${caseAttr(pt.id)} cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${color}" fill-opacity="0.9" ${halo(p)}/>`;
   for (const h of hs) {
     const key = d.layers!.indexOf(h);
     // a cohort layer too large to draw as points is cells on the same grid, shaded by its own densest cell
@@ -220,9 +229,9 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
   const vBins = d.violinBins || 40;
   let offScale = 0, ptOffScale = 0;
   /** a value off the axis: a triangle at the frame's edge pointing the way it lies */
-  const edgeMark = (px: number, up: boolean, r: number, fill: string) => {
+  const edgeMark = (id: string, px: number, up: boolean, r: number, fill: string) => {
     const ty = up ? T + 1 : T + PLOT - 1, k = r * 1.3;
-    return `<path d="M${r1(px - k)} ${r1(up ? ty + k * 1.6 : ty - k * 1.6)} L${r1(px + k)} ${r1(up ? ty + k * 1.6 : ty - k * 1.6)} ` +
+    return `<path${caseAttr(id)} d="M${r1(px - k)} ${r1(up ? ty + k * 1.6 : ty - k * 1.6)} L${r1(px + k)} ${r1(up ? ty + k * 1.6 : ty - k * 1.6)} ` +
       `L${r1(px)} ${r1(ty)} Z" fill="${fill}" stroke="${p.bg}" stroke-width="0.5"/>`;
   };
   const inAxis = (val: number) => Math.max(vlo, Math.min(vhi, val));
@@ -268,12 +277,12 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
         const ring = pt.r != null && !isAbsent(pt.r) ? ringOf(pt.r) : null;
         if (pt.v > vhi || pt.v < vlo) {
           ptOffScale++;
-          baseMarks.push(edgeMark(cx + jitterFor(pt.id) * half * 0.9, pt.v > vhi, rBase, fill));
+          baseMarks.push(edgeMark(pt.id, cx + jitterFor(pt.id) * half * 0.9, pt.v > vhi, rBase, fill));
           continue;
         }
-        baseMarks.push(`<circle cx="${r1(cx + jitterFor(pt.id) * half * 0.9)}" cy="${r1(ys(pt.v))}" ` +
-          `r="${rBase}" fill="${fill}" fill-opacity="0.85"` +
-          (ring ? ` stroke="${ring}" stroke-width="${r1(rBase * 0.36)}"` : "") + `/>`);
+        baseMarks.push(`<circle${caseAttr(pt.id)} cx="${r1(cx + jitterFor(pt.id) * half * 0.9)}" cy="${r1(ys(pt.v))}" ` +
+          `r="${rBase}" fill="${fill}" fill-opacity="0.85" ` +
+          (ring ? `stroke="${ring}" stroke-width="${r1(rBase * 0.36)}"` : halo(p)) + `/>`);
       }
     }
     out.push(layerGroup("base", baseMarks));
@@ -303,11 +312,11 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
         const px = cx + jitterFor(pt.id) * half * 0.9;
         if (pt.v > vhi || pt.v < vlo) {
           if (counted) offScale++;
-          return [edgeMark(px, pt.v > vhi, rH, h.color)];
+          return [edgeMark(pt.id, px, pt.v > vhi, rH, h.color)];
         }
         return [categorised
-          ? `<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${r1(rH + 1.4)}" fill="none" stroke="${h.color}" stroke-width="1.4"/>`
-          : `<circle cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${rH}" fill="${h.color}" fill-opacity="0.9" stroke="${p.bg}" stroke-width="0.6"/>`];
+          ? `<circle${caseAttr(pt.id)} cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${r1(rH + 1.4)}" fill="none" stroke="${h.color}" stroke-width="1.4"/>`
+          : `<circle${caseAttr(pt.id)} cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${rH}" fill="${h.color}" fill-opacity="0.9" ${halo(p)}/>`];
       });
       const key = d.layers!.indexOf(h);
       out.push(layerGroup(key, marks(h.points!, true)));
