@@ -3,8 +3,12 @@
 // the lab_ tables read directly, with and without FINAL (what reading only each row's latest
 // version costs).
 //
-//   node scripts/bench-schema.ts load --studies acc_tcga,msk_impact_2017 [--copies 4]
+//   node scripts/bench-schema.ts load --studies acc_tcga,msk_impact_2017 [--copies 4] [--from 1]
 //       imports each datahub study, then each again under <id>_copy<n> (the same files, renamed),
+//       printing how long each import took; with --from N > 1 the study itself and copies below N
+//       are taken as loaded already (a later stage, or a resumed run). cBioPortal's derived tables
+//       are rebuilt once, after the last import (--no-derive: not at all, for a load followed by
+//       another),
 //       into the database `npm run local` runs (or the one CLICKHOUSE_* names); it must be in
 //       `both` mode (`npm run import -- --schema both`) for the three to be compared
 //   node scripts/bench-schema.ts run [--runs 5] [--gene TP53]
@@ -24,7 +28,11 @@ const dataDir = process.env.CBIOLAB_DATA || path.join(os.homedir(), ".cbiolab");
 if (!process.env.CLICKHOUSE_URL) { try { process.loadEnvFile(path.join(dataDir, "local.env")); } catch { /* not running */ } }
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const importer = path.join(repo, "scripts", "import-study.ts");
-const run = (...a: string[]) => execFileSync(process.execPath, [importer, ...a], { stdio: "inherit", env: { ...process.env, CBIOLAB_LOCAL: "1" } });
+const run = (label: string, ...a: string[]) => {
+  const t0 = performance.now();
+  execFileSync(process.execPath, [importer, ...a], { stdio: "inherit", env: { ...process.env, CBIOLAB_LOCAL: "1" } });
+  console.log(`bench: imported ${label} in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+};
 
 /** A study folder under a new id: meta files and case lists rewritten, data files linked. */
 async function copyStudy(src: string, from: string, to: string): Promise<string> {
@@ -44,13 +52,14 @@ async function copyStudy(src: string, from: string, to: string): Promise<string>
 
 async function load(): Promise<void> {
   const studies = opt("--studies", "").split(",").filter((s) => /^[A-Za-z0-9_.-]+$/.test(s));
-  const copies = Number(opt("--copies", "0"));
+  const copies = Number(opt("--copies", "0")), from = Math.max(1, Number(opt("--from", "1")));
   if (!studies.length) throw new Error("--studies a,b,c");
   for (const s of studies) {
-    run("datahub:" + s);
+    if (from === 1) run(s, "datahub:" + s, "--no-derive");
     const src = path.join(dataDir, "studies", s, s);
-    for (let i = 1; i <= copies; i++) run(await copyStudy(src, s, `${s}_copy${i}`));
+    for (let i = from; i <= copies; i++) run(`${s}_copy${i}`, await copyStudy(src, s, `${s}_copy${i}`), "--no-derive");
   }
+  if (!args.includes("--no-derive")) run("derived tables", "--derive");
 }
 
 /** name → SQL per layout: cBioPortal's tables, the labv_ views, the lab_ tables. `{gene}` is filled in. */

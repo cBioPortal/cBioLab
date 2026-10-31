@@ -36,7 +36,7 @@ const ORDER: DataFile["kind"][] = ["clinical_sample", "clinical_patient", "mutat
  * lines of the data files) and replaces just those samples, leaving the rest of the study as it
  * is. Only a database in the new schema can take one (lib/importer/lab-schema.ts).
  */
-export async function importStudy(conn: WriteConn, dataDir: string, dir: string, fallbackStudyId: string, progress: Progress, update = false): Promise<ImportResult> {
+export async function importStudy(conn: WriteConn, dataDir: string, dir: string, fallbackStudyId: string, progress: Progress, update = false, derive = true): Promise<ImportResult> {
   const t0 = Date.now();
   const folder = await readStudyFolder(dir, fallbackStudyId);
   const studyId = folder.study.cancer_study_identifier;
@@ -85,8 +85,10 @@ export async function importStudy(conn: WriteConn, dataDir: string, dir: string,
   await computedAttributes(ctx, segTotals, seenAttrs);
   const counts = studyCounts(ctx);
   if (writesLegacy(mode)) {
-    progress({ step: "Building the derived tables" });
-    await execScript(conn, await derivedTablesSql(dataDir), { param_optimize_backoff_secs: "0" });
+    if (derive) {
+      progress({ step: "Building the derived tables" });
+      await rebuildDerived(conn, dataDir);
+    }
     await exec(conn, "ALTER TABLE cancer_study UPDATE " + Object.entries(counts).map(([k, v]) => k + " = " + v).join(", ") +
       " WHERE cancer_study_id = " + ctx.cancerStudyId, { mutations_sync: "2" });
   }
@@ -306,10 +308,16 @@ export async function removeStudy(conn: WriteConn, studyId: string, mode: Schema
   return true;
 }
 
+/** Runs cBioPortal's derived-table SQL, which rebuilds the derived tables of every study (legacy and both modes). */
+export async function rebuildDerived(conn: WriteConn, dataDir: string): Promise<void> {
+  if (!writesLegacy(await schemaMode(conn))) return;
+  await execScript(conn, await derivedTablesSql(dataDir), { param_optimize_backoff_secs: "0" });
+}
+
 /** Removes a study and rebuilds the derived tables without it. */
 export async function deleteStudy(conn: WriteConn, dataDir: string, studyId: string): Promise<boolean> {
   const mode = await schemaMode(conn);
   const removed = await removeStudy(conn, studyId, mode);
-  if (removed && writesLegacy(mode)) await execScript(conn, await derivedTablesSql(dataDir), { param_optimize_backoff_secs: "0" });
+  if (removed && writesLegacy(mode)) await rebuildDerived(conn, dataDir);
   return removed;
 }
