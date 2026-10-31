@@ -108,7 +108,9 @@ export class ImportContext {
       sample: (n: number) => ({ sample: sample(n), patient: patient(this.samples.get(sample(n))!.patient) }),
       profile: (n: number) => { const p = this.profiles.find((x) => x.id === n); if (!p) throw new Error("lab schema: unknown profile " + n); return p.stableId; },
       panel: (n: number) => panel(n),
-      entrez: (entity: number) => { const g = this.genes.byEntity(entity); if (!g) throw new Error("lab schema: unknown genetic entity " + entity); return g.entrez; },
+      geneOfEntity: (entity: number) => { const g = this.genes.byEntity(entity); if (!g) throw new Error("lab schema: unknown genetic entity " + entity); return g; },
+      geneOfEntrez: (entrez: number) => this.genes.entrez(entrez),
+      referenceGenome: () => this.referenceGenome,
       sampleIds: () => [...this.samples.keys()],
       patientIds: () => [...this.patients.keys()]
     };

@@ -1,6 +1,7 @@
 // Benchmark of the schema modes (lib/importer/lab-schema.ts) at a realistic number of studies:
 // the same queries timed on cBioPortal's tables, on the labv_ views over the lab_ tables, and on
-// the lab_ tables read directly.
+// the lab_ tables read directly, with and without FINAL (what reading only each row's latest
+// version costs).
 //
 //   node scripts/bench-schema.ts load --studies acc_tcga,msk_impact_2017 [--copies 4]
 //       imports each datahub study, then each again under <id>_copy<n> (the same files, renamed),
@@ -58,10 +59,8 @@ const QUERIES: Record<string, { legacy: string; views: string; lab: string }> = 
     legacy: "SELECT cancer_study_identifier, uniqExact(sample_unique_id) FROM genomic_event_derived WHERE hugo_gene_symbol = {gene} AND variant_type IN ('mutation', 'cna') GROUP BY 1",
     views: "SELECT cancer_study_identifier, uniqExact(sample_unique_id) FROM labv_genomic_event_derived WHERE hugo_gene_symbol = {gene} AND variant_type IN ('mutation', 'cna') GROUP BY 1",
     lab: `SELECT study_id, uniqExact(sample_id) FROM (
-      SELECT m.study_id, m.sample_id FROM lab_mutation AS m FINAL JOIN gene g ON g.entrez_gene_id = m.entrez_gene_id WHERE g.hugo_gene_symbol = {gene}
-      UNION ALL SELECT v.study_id, v.sample_id FROM lab_profile_value AS v FINAL JOIN lab_profile AS p FINAL ON p.study_id = v.study_id AND p.profile_id = v.profile_id
-        JOIN gene g ON g.entrez_gene_id = v.entrez_gene_id
-        WHERE g.hugo_gene_symbol = {gene} AND p.alteration_type = 'COPY_NUMBER_ALTERATION' AND p.datatype = 'DISCRETE' AND v.value IN ('2', '-2', '-1.5'))
+      SELECT study_id, sample_id FROM lab_mutation FINAL WHERE hugo_gene_symbol = {gene}
+      UNION ALL SELECT study_id, sample_id FROM lab_cna_event FINAL WHERE hugo_gene_symbol = {gene})
       GROUP BY study_id`
   },
   "samples profiled per study for one gene": {
@@ -70,9 +69,8 @@ const QUERIES: Record<string, { legacy: string; views: string; lab: string }> = 
     views: `SELECT s.cancer_study_identifier, uniqExact(s.sample_unique_id) FROM labv_sample_to_gene_panel_derived s
       JOIN labv_gene_panel_to_gene_derived g ON g.gene_panel_id = s.gene_panel_id WHERE g.gene = {gene} AND s.alteration_type = 'MUTATION_EXTENDED' GROUP BY 1`,
     lab: `SELECT sp.study_id, uniqExact(sp.sample_id) FROM lab_sample_profile AS sp FINAL
-      JOIN lab_profile AS p FINAL ON p.study_id = sp.study_id AND p.profile_id = sp.profile_id
       LEFT JOIN gene_panel gp ON gp.stable_id = sp.panel_id
-      WHERE p.alteration_type = 'MUTATION_EXTENDED' AND (sp.panel_id = '' OR gp.internal_id IN (
+      WHERE sp.alteration_type = 'MUTATION_EXTENDED' AND (sp.panel_id = '' OR gp.internal_id IN (
         SELECT l.internal_id FROM gene_panel_list l JOIN gene g ON g.entrez_gene_id = l.gene_id WHERE g.hugo_gene_symbol = {gene}))
       GROUP BY 1`
   },
@@ -89,15 +87,12 @@ const QUERIES: Record<string, { legacy: string; views: string; lab: string }> = 
   "one gene's protein changes, every study": {
     legacy: "SELECT proteinChange, count() FROM mutation_derived WHERE entrezGeneId = (SELECT entrez_gene_id FROM gene WHERE hugo_gene_symbol = {gene}) GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
     views: "SELECT proteinChange, count() FROM labv_mutation_derived WHERE entrezGeneId = (SELECT entrez_gene_id FROM gene WHERE hugo_gene_symbol = {gene}) GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
-    lab: "SELECT protein_change, count() FROM lab_mutation FINAL WHERE entrez_gene_id = (SELECT entrez_gene_id FROM gene WHERE hugo_gene_symbol = {gene}) GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
+    lab: "SELECT protein_change, count() FROM lab_mutation FINAL WHERE hugo_gene_symbol = {gene} GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
   },
   "one gene's expression values, one study": {
     legacy: "SELECT count(), avg(toFloat64OrNull(alteration_value)) FROM genetic_alteration_derived WHERE hugo_gene_symbol = {gene} AND cancer_study_identifier = {study}",
     views: "SELECT count(), avg(toFloat64OrNull(alteration_value)) FROM labv_genetic_alteration_derived WHERE hugo_gene_symbol = {gene} AND cancer_study_identifier = {study}",
-    lab: `SELECT count(), avg(toFloat64OrNull(v.value)) FROM lab_profile_value AS v FINAL JOIN gene g ON g.entrez_gene_id = v.entrez_gene_id
-      JOIN lab_profile AS p FINAL ON p.study_id = v.study_id AND p.profile_id = v.profile_id
-      WHERE g.hugo_gene_symbol = {gene} AND v.study_id = {study} AND v.value NOT IN ('', 'NA')
-        AND p.alteration_type NOT IN ('GENERIC_ASSAY', 'MUTATION_EXTENDED', 'MUTATION_UNCALLED', 'STRUCTURAL_VARIANT')`
+    lab: "SELECT count(), avg(toFloat64OrNull(value)) FROM lab_profile_value FINAL WHERE hugo_gene_symbol = {gene} AND study_id = {study} AND value NOT IN ('', 'NA')"
   }
 };
 
@@ -110,11 +105,12 @@ async function bench(): Promise<void> {
   const gene = lit(opt("--gene", "TP53")), study = lit(opt("--study", "msk_impact_2017"));
   const studies = (await chWrite("SELECT count() FROM lab_study FINAL", conn)).trim();
   console.log(`database ${conn.db}: ${studies} studies in lab_study; median of ${runs} runs, query cache off\n`);
-  console.log("query".padEnd(54) + ["legacy", "views", "lab"].map((k) => k.padStart(24)).join(""));
+  const layouts = ["legacy", "views", "lab", "lab, no FINAL"] as const;
+  console.log("query".padEnd(54) + layouts.map((k) => k.padStart(24)).join(""));
   for (const [name, q] of Object.entries(QUERIES)) {
     const cells: string[] = [];
-    for (const layout of ["legacy", "views", "lab"] as const) {
-      const sql = q[layout].replaceAll("{gene}", gene).replaceAll("{study}", study);
+    for (const layout of layouts) {
+      const sql = (layout === "lab, no FINAL" ? q.lab.replaceAll(" FINAL", "") : q[layout]).replaceAll("{gene}", gene).replaceAll("{study}", study);
       const times: number[] = [];
       let read = { rows: 0, bytes: 0 };
       try {
