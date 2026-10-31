@@ -18,7 +18,7 @@
 import { Inserter, exec, type Row, type WriteConn } from "./ch-write.ts";
 import type { Gene } from "./genes.ts";
 import { query } from "./ch-write.ts";
-import { LAB_TABLES, mergeStaged, stageName } from "./lab-schema.ts";
+import { LAB_TABLES, NOT_IN_PROFILE_VALUES, mergeStaged, stageName } from "./lab-schema.ts";
 
 /** What the translation needs to know about the study being imported. */
 export interface LabStudyContext {
@@ -147,6 +147,9 @@ export class LabWriter {
       case "genetic_alteration": {
         // one row per gene, expanded to one per cell on the server
         const profile = n("genetic_profile_id");
+        const kind = String(this.profileKind(profile).alteration_type);
+        if (NOT_IN_PROFILE_VALUES.has(kind))
+          throw new Error(`lab schema: ${kind} profile ${s.profile(profile)} has matrix values, which lab_profile_value does not hold; this profile type is not supported in the lab schema yet`);
         let ids = this.sampleIds.get(profile);
         if (!ids) { ids = (this.order.get(profile) ?? []).map((x) => s.sample(x).sample); this.sampleIds.set(profile, ids); }
         await this.stage();

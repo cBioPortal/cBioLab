@@ -205,14 +205,22 @@ export function baseViews(): Record<string, string> {
 }
 
 /**
+ * Profile types whose values genetic_alteration_derived leaves out (cBioPortal's derived SQL);
+ * lab_profile_value never holds them (lab-writer.ts refuses them), so the view needs no filter.
+ */
+export const NOT_IN_PROFILE_VALUES = new Set(["GENERIC_ASSAY", "MUTATION_EXTENDED", "MUTATION_UNCALLED", "STRUCTURAL_VARIANT"]);
+
+/** One SELECT of a derived view: its expressions, in the derived table's column order, and the rest of the statement. */
+export type NativeSelect = { exprs: string[]; from: string };
+
+/**
  * The derived tables the app reads most, written over the denormalized lab_ tables directly
  * rather than through the base views, so each reads one table and joins nothing. Each
  * yields the derived table's columns in its order; the result is checked against cBioPortal's own
  * (scripts/check-legacy-diff.ts).
  */
-export function nativeDerived(): Record<string, string[]> {
-  // columns are named by position, so a NULL or a constant repeated in one SELECT stays distinct
-  const sel = (exprs: string[], from: string) => `SELECT ${exprs.map((e, i) => `${e} AS c${i}`).join(", ")}\n${from}`;
+export function nativeDerived(): Record<string, NativeSelect[]> {
+  const sel = (exprs: string[], from: string): NativeSelect => ({ exprs, from });
   const panel = (t: string) => `if(${t}.panel_id = '', 'WES', ${t}.panel_id)`;
   const drivers = (t: string) => ["driver_filter", "driver_filter_annotation", "driver_tiers_filter", "driver_tiers_filter_annotation"].map((c) => `${t}.${c}`);
   const sv = (site: 1 | 2, where: string) => sel([`concat(t.study_id, '_', t.sample_id)`, `t.site${site}_hugo_gene_symbol`, `t.site${site}_entrez_gene_id`,
@@ -233,9 +241,7 @@ export function nativeDerived(): Record<string, string[]> {
     genetic_alteration_derived: [
       sel(["concat(v.study_id, '_', v.sample_id)", "v.study_id", "v.hugo_gene_symbol", "replaceOne(v.profile_id, concat(v.study_id, '_'), '')",
         "if(v.value = '', NULL, v.value)"],
-      `FROM ${F("lab_profile_value", "v")}
-      WHERE v.value != '' AND v.value != 'NA' AND (v.study_id, v.profile_id) IN (SELECT study_id, profile_id FROM ${F("lab_profile")}
-        WHERE alteration_type NOT IN ('GENERIC_ASSAY', 'MUTATION_EXTENDED', 'MUTATION_UNCALLED', 'STRUCTURAL_VARIANT'))`)
+      `FROM ${F("lab_profile_value", "v")} WHERE v.value != '' AND v.value != 'NA'`)
     ],
     mutation_derived: [
       sel(["m.profile_id", "m.sample_id", sampleId("m.study_id", "m.sample_id"), "m.patient_id", "m.entrez_gene_id", "m.study_id",
@@ -291,25 +297,46 @@ const BASE_NAMES = Object.keys(baseViews());
 
 /**
  * Creates (or replaces) the compatibility views for `mode`. `derivedScript` is cBioPortal's
- * populate_derived_tables.sql. A derived view casts each column to the type the derived table has
- * in cBioPortal's schema, read from `typesFrom` (the legacy derived tables, or the views already
- * standing in for them), so a value prints the same either way.
+ * populate_derived_tables.sql. A derived view converts each column to the type the derived table
+ * has in cBioPortal's schema, read from `types` (the legacy derived tables, or the views already
+ * standing in for them), so a value prints the same either way. The native views
+ * (`nativeDerived`) name and convert their expressions in one SELECT per branch, with no
+ * conversion where none changes a value: the planner works through every expression of a view on
+ * every query, and a filter on an unconverted column can use the table's sort key.
  */
 export async function createViews(conn: WriteConn, mode: SchemaMode, derivedScript: string, types: Map<string, { name: string; type: string }[]>): Promise<void> {
   const p = viewPrefix(mode);
   for (const [name, sql] of Object.entries(baseViews())) await exec(conn, `CREATE OR REPLACE VIEW ${p}${name} AS ${sql}`);
   const selects = derivedSelects(derivedScript);
-  const native = new Set(Object.keys(nativeDerived()));
-  for (const [name, parts] of Object.entries(nativeDerived())) selects.set(name, parts);
-  for (const [derived, parts] of selects) {
+  const native = nativeDerived();
+  for (const derived of Object.keys(native)) selects.delete(derived);
+  const columnsOfDerived = (derived: string) => {
     const cols = types.get(derived);
     if (!cols) throw new Error("no column types for " + derived);
+    return cols;
+  };
+  const describe = async (derived: string, sql: string, cols: unknown[]) => {
+    const out = await query<{ name: string; type: string }>(conn, `DESCRIBE TABLE (${sql})`);
+    if (out.length !== cols.length) throw new Error(`${derived}: ${out.length} columns from the script, ${cols.length} in the table`);
+    return out;
+  };
+  for (const [derived, parts] of Object.entries(native)) {
+    const cols = columnsOfDerived(derived);
+    const branches: string[] = [];
+    for (const { exprs, from } of parts) {
+      // named by position while described, so a NULL or a constant repeated in one SELECT stays distinct
+      const out = await describe(derived, `SELECT ${exprs.map((e, i) => `${e} AS c${i}`).join(", ")} ${from}`, cols);
+      branches.push(`SELECT ${cols.map((c, i) => `${convert(exprs[i], out[i].type, c)} AS \`${c.name}\``).join(", ")}\n${from}`);
+    }
+    await exec(conn, `CREATE OR REPLACE VIEW ${p}${derived} AS ${branches.join("\nUNION ALL\n")}`);
+  }
+  for (const [derived, parts] of selects) {
+    const cols = columnsOfDerived(derived);
     const branches: string[] = [];
     for (const part of parts) {
-      const sql = native.has(derived) ? part : renameTables(part.replace(/\b(\w+_derived)_temp\b/g, "$1"), [...BASE_NAMES, ...selects.keys()], p);
-      const out = await query<{ name: string; type: string }>(conn, `DESCRIBE TABLE (${sql})`);
-      if (out.length !== cols.length) throw new Error(`${derived}: ${out.length} columns from the script, ${cols.length} in the table`);
-      branches.push(`SELECT ${cols.map((c, i) => `${castTo(out[i], c)} AS \`${c.name}\``).join(", ")} FROM (${sql})`);
+      const sql = renameTables(part.replace(/\b(\w+_derived)_temp\b/g, "$1"), [...BASE_NAMES, ...selects.keys(), ...Object.keys(native)], p);
+      const out = await describe(derived, sql, cols);
+      branches.push(`SELECT ${cols.map((c, i) => `${convert("`" + out[i].name + "`", out[i].type, c)} AS \`${c.name}\``).join(", ")} FROM (${sql})`);
     }
     await exec(conn, `CREATE OR REPLACE VIEW ${p}${derived} AS ${branches.join("\nUNION ALL\n")}`);
   }
@@ -318,15 +345,19 @@ export async function createViews(conn: WriteConn, mode: SchemaMode, derivedScri
 // integer ids the derived tables declare as Int32; the views' ids are 63-bit hashes, kept whole
 const WIDE_IDS = new Set(["internal_id", "patient_internal_id"]);
 
+// LowCardinality changes how a column is stored, never a value it holds
+const valueType = (t: string) => t.replace(/LowCardinality\((.*)\)/, "$1");
+
 /**
- * A derived-table column as the table would hold it: cast to the table's type, and NULL stored as
- * the type's default, as an INSERT into a non-Nullable column stores it.
+ * `expr`, of type `source`, as the derived table would hold it: converted to the table's type, and
+ * NULL stored as the type's default, as an INSERT into a non-Nullable column stores it.
  */
-function castTo(source: { name: string; type: string }, target: { name: string; type: string }): string {
+export function convert(expr: string, source: string, target: { name: string; type: string }): string {
   const type = WIDE_IDS.has(target.name) ? target.type.replace("Int32", "Int64") : target.type;
-  const col = "`" + source.name + "`";
-  if (source.type === type) return col;
-  return type.startsWith("Nullable(") ? `CAST(${col} AS ${type})` : `CAST(ifNull(${col}, defaultValueOfTypeName('${type}')) AS ${type})`;
+  if (valueType(source) === valueType(type)) return expr;
+  if (expr === "NULL" && valueType(type) === "String") return "''";
+  if (source === "Nullable(String)" && valueType(type) === "String") return `ifNull(${expr}, '')`;
+  return type.startsWith("Nullable(") ? `CAST(${expr} AS ${type})` : `CAST(ifNull(${expr}, defaultValueOfTypeName('${type}')) AS ${type})`;
 }
 
 /** Column names and types of every *_derived table or view in the database. */
