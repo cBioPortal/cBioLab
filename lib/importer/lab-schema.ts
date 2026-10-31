@@ -2,8 +2,11 @@
 // names, so the app's SQL runs on it unchanged.
 //
 // Every lab_ table holds one kind of study file in long form, keyed by the files' own identifiers,
-// and every row carries its study_id (the sort key's first column). Rows are versioned
-// (ReplacingMergeTree on `version`, `is_deleted`) and read through FINAL. Shared reference data —
+// and every row carries its study_id (the sort key's first column and the partition key, so each
+// study is a partition of its own). Rows are versioned (ReplacingMergeTree on `version`,
+// `is_deleted`) and read through FINAL: a change is an insert of new versions, visible at once, and
+// FINAL only has work to do in a study whose partition holds more than one part, until
+// `compactStudy` merges it. A study is removed by dropping its partitions. Shared reference data —
 // genes, aliases, gene panels, cancer types, reference genomes — stays in cBioPortal's own tables.
 //
 // The views come in two layers. Base views rebuild cBioPortal's base tables (sample, mutation,
@@ -16,7 +19,7 @@
 // A database's schema mode decides where the views live: `new` gives them cBioPortal's names (the
 // legacy tables are gone), `both` keeps the legacy tables and names the views `labv_<name>`, for
 // comparing the two on the same import.
-import { exec, query, splitStatements, type WriteConn } from "./ch-write.ts";
+import { exec, query, splitStatements, sq, type WriteConn } from "./ch-write.ts";
 
 export type SchemaMode = "legacy" | "new" | "both";
 export const SCHEMA_MODES: SchemaMode[] = ["legacy", "new", "both"];
@@ -26,7 +29,7 @@ export const writesLab = (m: SchemaMode) => m !== "legacy";
 export const viewPrefix = (m: SchemaMode) => (m === "both" ? "labv_" : "");
 
 const VERSIONED = "version UInt64, is_deleted UInt8";
-const engine = (order: string) => `ENGINE = ReplacingMergeTree(version, is_deleted) ORDER BY (${order})`;
+const engine = (order: string) => `ENGINE = ReplacingMergeTree(version, is_deleted) PARTITION BY study_id ORDER BY (${order})`;
 
 /** name → column list and sort key. study_id first in every one (test/lab-schema.test.ts). */
 export const LAB_TABLES: Record<string, { columns: string; order: string }> = {
@@ -375,19 +378,60 @@ export async function derivedTypes(conn: WriteConn, prefix: string): Promise<Map
 /** The cBioPortal tables the base views stand in for. */
 export const LEGACY_BASE_TABLES = BASE_NAMES;
 
-/** Creates the lab_ tables; refuses tables of another layout, which would need their studies imported again. */
-export async function createLabTables(conn: WriteConn): Promise<void> {
-  const rows = await query<{ t: string; c: string; k: string }>(conn, `SELECT t.name AS t, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupArray((c.position, c.name)))), ',') AS c, any(t.sorting_key) AS k
+/**
+ * Creates the lab_ tables. A table written before the tables were partitioned by study is copied
+ * into the partitioned layout, a study at a time, and swapped in; a table of any other layout is
+ * refused, since its studies would need importing again.
+ */
+export async function createLabTables(conn: WriteConn, log: (msg: string) => void = () => undefined): Promise<void> {
+  const rows = await query<{ t: string; c: string; k: string; p: string }>(conn, `SELECT t.name AS t,
+      arrayStringConcat(arrayMap(x -> x.2, arraySort(groupArray((c.position, c.name)))), ',') AS c, any(t.sorting_key) AS k, any(t.partition_key) AS p
     FROM system.tables t JOIN system.columns c ON c.database = t.database AND c.table = t.name
     WHERE t.database = currentDatabase() AND t.name IN (${Object.keys(LAB_TABLES).map((n) => `'${n}'`).join(", ")}) GROUP BY t.name`);
   // system.tables writes a one-column key in parentheses
   const key = (k: string) => k.replace(/[\s()]/g, "");
+  const unpartitioned: string[] = [];
   for (const r of rows) {
     const want = [...columnsOf(r.t), "version", "is_deleted"].join(",");
     if (r.c !== want || key(r.k) !== key(LAB_TABLES[r.t].order))
       throw new Error(`${r.t} has an older layout than this importer writes; drop the lab_ tables (or use a fresh data folder) and import the studies again`);
+    if (key(r.p) !== "study_id") unpartitioned.push(r.t);
+  }
+  for (const name of unpartitioned) {
+    log("Partitioning " + name + " by study");
+    const next = name + "_partitioned";
+    await exec(conn, "DROP TABLE IF EXISTS " + next);
+    await exec(conn, labTableDdl(name).replace(" " + name + " (", " " + next + " ("));
+    for (const { s } of await query<{ s: string }>(conn, `SELECT DISTINCT study_id AS s FROM ${name}`))
+      await exec(conn, `INSERT INTO ${next} SELECT * FROM ${name} FINAL WHERE study_id = ${sq(s)} AND is_deleted = 0`);
+    await exec(conn, `EXCHANGE TABLES ${name} AND ${next}`);
+    await exec(conn, "DROP TABLE " + next);
   }
   for (const name of Object.keys(LAB_TABLES)) await exec(conn, labTableDdl(name));
+}
+
+/** The lab_ tables holding a study's rows, with how many parts its partition has in each. */
+export async function studyParts(conn: WriteConn, studyId: string): Promise<{ table: string; parts: number; rows: number; bytes: number }[]> {
+  const rows = await query<{ table: string; parts: number; rows: number; bytes: number }>(conn, `SELECT table, count() AS parts, sum(rows) AS rows,
+      sum(bytes_on_disk) AS bytes FROM system.parts
+    WHERE active AND database = currentDatabase() AND partition = ${sq(studyId)} AND table IN (${Object.keys(LAB_TABLES).map(sq).join(", ")})
+    GROUP BY table ORDER BY table`);
+  return rows.map((r) => ({ table: r.table, parts: Number(r.parts), rows: Number(r.rows), bytes: Number(r.bytes) }));
+}
+
+/**
+ * Merges each of a study's partitions that holds more than one part into one, keeping each row's
+ * latest version: after it, FINAL has nothing to merge when it reads the study. Returns the tables
+ * it merged.
+ */
+export async function compactStudy(conn: WriteConn, studyId: string): Promise<string[]> {
+  const merged: string[] = [];
+  for (const p of await studyParts(conn, studyId))
+    if (p.parts > 1) {
+      await exec(conn, `OPTIMIZE TABLE ${p.table} PARTITION ${sq(studyId)} FINAL`);
+      merged.push(p.table);
+    }
+  return merged;
 }
 
 export const stageName = (table: string, tag: string) => `${table}_stage_${tag}`;
@@ -504,10 +548,11 @@ export async function dropStaleStages(conn: WriteConn): Promise<void> {
   }
 }
 
-/** Removes a study from every lab_ table. */
+/** Removes a study from every lab_ table, and its review records and the copy kept to undo an approval (lab-review.ts). */
 export async function removeLabStudy(conn: WriteConn, studyId: string): Promise<boolean> {
-  const lit = "'" + studyId.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
-  const n = await query<{ n: number }>(conn, `SELECT count() AS n FROM lab_study WHERE study_id = ${lit}`);
-  for (const name of Object.keys(LAB_TABLES)) await exec(conn, `DELETE FROM ${name} WHERE study_id = ${lit}`);
+  const n = await query<{ n: number }>(conn, `SELECT count() AS n FROM lab_study WHERE study_id = ${sq(studyId)}`);
+  const tables = await query<{ t: string }>(conn, `SELECT name AS t FROM system.tables WHERE database = currentDatabase()
+    AND (name IN (${Object.keys(LAB_TABLES).map(sq).join(", ")}) OR name = 'lab_review' OR name LIKE 'lab\\_%\\_previous')`);
+  for (const { t } of tables) await exec(conn, `ALTER TABLE ${t} DROP PARTITION ${sq(studyId)}`);
   return Number(n[0]?.n) > 0;
 }

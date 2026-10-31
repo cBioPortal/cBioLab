@@ -4,13 +4,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { LAB_TABLES, baseViews, columnsOf, convert, derivedSelects, labTableDdl, nativeDerived, renameTables } from "../lib/importer/lab-schema.ts";
+import { copyColumns, isReviewId, reviewId } from "../lib/importer/lab-review.ts";
+import { rng } from "../lib/importer/lab-edits.ts";
 
 test("every lab_ table has a study_id column and sorts by it first", () => {
   for (const [name, t] of Object.entries(LAB_TABLES)) {
     assert.ok(name.startsWith("lab_"), name);
     assert.match(t.columns, /^study_id String,/, name + " must begin with study_id String");
     assert.match(t.order, /^study_id\b/, name + " must sort by study_id first");
-    assert.match(labTableDdl(name), /ReplacingMergeTree\(version, is_deleted\)/, name);
+    assert.match(labTableDdl(name), /ReplacingMergeTree\(version, is_deleted\) PARTITION BY study_id /, name + " must be partitioned by study");
   }
 });
 
@@ -69,4 +71,26 @@ test("the derived-table script yields each table's SELECTs, in order", () => {
 test("column lists split at top-level commas only, so Map(String, String) stays one column", () => {
   assert.deepEqual(columnsOf("lab_timeline_event"), ["study_id", "patient_id", "event_index", "event_type", "start_date", "stop_date", "data"]);
   for (const name of Object.keys(LAB_TABLES)) assert.ok(columnsOf(name).every((c) => /^\w+$/.test(c)), name);
+});
+
+test("a review copy rewrites the study id and the ids built on it, and copying back undoes it", () => {
+  const to = Object.fromEntries(copyColumns("lab_mutation", "s1", "s1__review", 7).map((e) => [e.split(" AS ").pop(), e]));
+  assert.equal(to.study_id, "'s1__review' AS study_id");
+  assert.match(to.profile_id, /startsWith\(profile_id, 's1_'\), concat\('s1__review_', substring\(profile_id, 4\)\)/);
+  assert.equal(to.sample_id, "sample_id", "sample ids are the files' own, not the study's");
+  assert.equal(to.version, "7 AS version");
+  assert.match(copyColumns("lab_case_list", "s1", "s1__review", 1).join(), /startsWith\(list_id, 's1_'\)/);
+  const name = (from: string, t: string) => copyColumns("lab_study", from, t, 1).find((e) => e.endsWith(" AS name"));
+  assert.match(name("s1", "s1__review")!, /concat\(name, ' \(review\)'\)/);
+  assert.match(name("s1__review", "s1")!, /endsWith\(name, ' \(review\)'\)/);
+  assert.equal(copyColumns("lab_mutation", "s1", "s2", 1).length, columnsOf("lab_mutation").length + 2);
+  assert.ok(isReviewId(reviewId("s1")) && !isReviewId("s1"));
+});
+
+test("generated updates are the same for the same seed", () => {
+  const a = rng(5), b = rng(5), c = rng(6);
+  const xs = [a(), a(), a()], ys = [b(), b(), b()];
+  assert.deepEqual(xs, ys);
+  assert.notDeepEqual(xs, [c(), c(), c()]);
+  assert.ok(xs.every((x) => x >= 0 && x < 1));
 });

@@ -124,7 +124,7 @@ export async function applySchemaMode(conn: WriteConn, dataDir: string, target: 
   } else {
     // the derived tables' column types, read before anything is replaced
     const types = await derivedTypes(conn, "");
-    await createLabTables(conn);
+    await createLabTables(conn, log);
     if (target === "new" && current !== "new") {
       log("Replacing cBioPortal's study tables with views over the lab_ tables");
       for (const name of [...LEGACY_BASE_TABLES, ...DERIVED_TABLES]) await exec(conn, "DROP VIEW IF EXISTS labv_" + name);

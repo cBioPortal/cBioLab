@@ -82,7 +82,11 @@ write; `lib/importer/lab-schema.ts` has the details.
 In `new` and `both` modes an import is merged into the `lab_` tables rather than replacing
 them: rows are staged, then only rows that are new or changed are written and stored rows the
 import no longer has get a deletion marker (`ReplacingMergeTree` versions; the views read
-`FINAL`), so importing an unchanged study writes no data rows. `npm run import -- --update
+`FINAL`), so importing an unchanged study writes no data rows. Every `lab_` table is partitioned
+by `study_id`, and an import ends by merging its study's partitions into one part each: `FINAL`
+then has nothing to merge when it reads the study, a change to one study never makes another's
+queries slower, and removing a study drops its partitions. A database whose `lab_` tables predate
+the partitioning is converted, a study at a time, by `npm run import -- --schema new` (or `both`). `npm run import -- --update
 <folder>` (new mode) takes a folder holding some samples of an imported study — their clinical
 rows and their lines of the data files — and replaces just those samples, and only the kinds of
 data the folder holds (in the profiles it holds): the study's counts and the patients'
@@ -124,6 +128,39 @@ tables row for row on every compared table for lgg_ucsf_2014, acc_tcga, mpnst_ms
 msk_impact_2017 and msk_chord_2024; the legacy tables match cBioPortal's own importer with a single
 difference (msk_impact_2017's 5 shared-event mutations, below). An update of one sample's files
 leaves every `lab_` table as a fresh import of the edited study would.
+
+## Live updates and reviews
+
+`/import/updates` (new-mode databases) changes an imported study the ways a live portal does, so
+the machinery can be tried and its costs seen; `lib/importer/lab-edits.ts` and
+`lib/importer/lab-review.ts` do the work.
+
+- **Updates** are written as new row versions, visible to the next query. The page generates
+  them: new samples (copies of existing samples, with their clinical values, profiles, case lists
+  and data), a new profile with values, a new clinical attribute, mutations in existing samples,
+  values in an existing continuous profile. Each is checked first — what it would write, and what
+  of it is already there — and then applied skipping what exists or writing it again. Counts the
+  importer computes (`MUTATION_COUNT`, `SAMPLE_COUNT`, the study's) are recomputed. Until the
+  study's partitions are merged (a checkbox, or the merge button), queries on that study merge its
+  parts as they read.
+- **Reviews**: starting one copies the study, on the server, to `<study>__review` — a study of
+  its own, with the study id and the profile and case-list ids built on it rewritten. Updates
+  applied to the copy are seen only there. The page compares the copy with the live study (rows
+  added, removed and changed per table; samples, attributes and profiles added). Approving copies
+  the review back under the study's id into side tables, merged, and swaps them in partition by
+  partition (`REPLACE PARTITION`, which links files rather than copying them): readers see the
+  old study until a table's swap and the reviewed one after. Each swap is atomic for its table,
+  not across tables. The study as it was is kept in `<table>_previous`, so the last approval can
+  be undone; rejecting drops the copy. An approval (or an undo) refuses when the live study
+  changed after the review began (or after the approval), listing the changes, unless forced.
+  In local mode every study is visible to everyone; restricting a review copy to its reviewers is
+  not built.
+
+Measured on an 86-study database (on this 11 GB server): a copy of a 110,000-sample study
+(45 million copy-number values) takes about 85 s, nearly all of it the copy-number values; merging
+that study's partitions after a 1% update takes about 40 s; single-study queries on the merged,
+partitioned tables run as fast as on cBioPortal's own tables, and 1.3–3× slower on a study with
+unmerged updates.
 
 ## Where it differs from cBioPortal's importer, on purpose
 

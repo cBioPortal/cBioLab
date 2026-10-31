@@ -14,7 +14,8 @@ import { importDiscreteLong, importMatrix } from "./matrix.ts";
 import { fractionGenomeAltered, importGenePanelMatrix, importSegments, importStructuralVariants, importTimeline, type SegmentTotals } from "./other.ts";
 import { importGenePanel } from "./panels.ts";
 import { derivedTablesSql, schemaMode } from "./setup.ts";
-import { dropStaleStages, refreshLabStudy, removeLabStudy, writesLab, writesLegacy, type SchemaMode } from "./lab-schema.ts";
+import { compactStudy, dropStaleStages, refreshLabStudy, removeLabStudy, writesLab, writesLegacy, type SchemaMode } from "./lab-schema.ts";
+import { reviewId } from "./lab-review.ts";
 import { openTable, readStudyFolder, type DataFile, type StudyFolder } from "./study.ts";
 
 export interface ImportResult {
@@ -96,6 +97,8 @@ export async function importStudy(conn: WriteConn, dataDir: string, dir: string,
     progress({ step: "Writing the lab_ tables" });
     await ctx.lab.finish(counts, ctx.referenceGenome);
     if (update) await refreshLabStudy(conn, studyId, [...ctx.patients.keys()]);
+    progress({ step: "Merging the study's new rows into its partitions" });
+    await compactStudy(conn, studyId);
   }
   if (ctx.implicitSamples.length)
     ctx.warnings.push(ctx.implicitSamples.length + " samples appear in data files but not in a clinical sample file; they were created with a patient of the same id (e.g. " + ctx.implicitSamples.slice(0, 3).join(", ") + ")");
@@ -314,10 +317,11 @@ export async function rebuildDerived(conn: WriteConn, dataDir: string): Promise<
   await execScript(conn, await derivedTablesSql(dataDir), { param_optimize_backoff_secs: "0" });
 }
 
-/** Removes a study and rebuilds the derived tables without it. */
+/** Removes a study, and its review copy (lab-review.ts), and rebuilds the derived tables without it. */
 export async function deleteStudy(conn: WriteConn, dataDir: string, studyId: string): Promise<boolean> {
   const mode = await schemaMode(conn);
   const removed = await removeStudy(conn, studyId, mode);
+  if (writesLab(mode)) await removeLabStudy(conn, reviewId(studyId));
   if (removed && writesLegacy(mode)) await rebuildDerived(conn, dataDir);
   return removed;
 }

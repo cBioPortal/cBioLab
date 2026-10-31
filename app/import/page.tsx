@@ -33,6 +33,7 @@ async function ImportBody() {
               Bring a study into this cBioLab: drop a study folder (or its files) in cBioPortal&apos;s format, name a folder on this
               computer, or fetch any public study from datahub by its id. The files are read here and stored in this
               computer&apos;s own database; nothing leaves it. A study imported again replaces the earlier import.
+              To try live updates and reviews on an imported study, open <a href="/import/updates">Study updates</a>.
             </p>
           ) : (
             <p className="lede">
