@@ -36,7 +36,11 @@
     "next-env.d.ts",
     ".next-gate/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    ".next-gate/dev/types/**/*.ts"
+    ".next-gate/dev/types/**/*.ts",
+    ".next-local/types/**/*.ts",
+    ".next-local/dev/types/**/*.ts",
+    ".next-local2/types/**/*.ts",
+    ".next-local2/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

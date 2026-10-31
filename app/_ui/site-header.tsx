@@ -8,6 +8,7 @@ import { Button } from "./button";
 import { TB } from "./toolbar.ts";
 import { cn } from "../../lib/cn";
 import { useOpenSavedFromUrl, useSaved } from "../_saved/saved-context.tsx";
+import { usePublicEnv } from "../_env/public-env-context.tsx";
 
 const LINKS = [
   ["studies", "/", "studies"],
@@ -17,7 +18,7 @@ const LINKS = [
   ["verification", "/verification", "how we verify"],
   ["rationale", "/rationale", "rationale"],
 ] as const;
-export type SiteLink = typeof LINKS[number][0];
+export type SiteLink = typeof LINKS[number][0] | "import";
 
 const plainClick = (e: React.MouseEvent) => !e.metaKey && !e.ctrlKey && !e.shiftKey;
 
@@ -33,6 +34,8 @@ export function SiteHeader({ page, current, onLink, children }: {
 }) {
   const saved = useSaved();
   useOpenSavedFromUrl();
+  // a local instance (npm run local) imports its own studies
+  const local = usePublicEnv().CBIOLAB_LOCAL === "1";
   return (
     <header>
       <h1><a href="/" className="text-foreground no-underline">cbio-lab</a></h1>
@@ -41,6 +44,7 @@ export function SiteHeader({ page, current, onLink, children }: {
         <a key={key} className="toplink" href={href} aria-current={key === current ? "page" : undefined}
           onClick={(e) => { if (plainClick(e) && onLink?.(key)) e.preventDefault(); }}>{label}</a>
       ))}
+      {local && <a className="toplink" href="/import" aria-current={current === "import" ? "page" : undefined}>import data</a>}
       {children}
       <Button asChild variant="outline" size="sm" className={cn(TB, "savedbtn")} aria-current={current === "saved" ? "page" : undefined}>
         <a href="/saved" data-tip="your saved cohorts, analyses, uploads, groups and gene lists"

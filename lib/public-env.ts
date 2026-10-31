@@ -4,7 +4,7 @@
 // Anything named here is visible to every reader of the page, so a name that looks like a secret is
 // refused rather than published.
 
-export const DEFAULT_PUBLIC_ENV = ["EXAMPLES_URL", "RESULTS_MAX_STUDIES", "CROSS_STUDY_EXPRESSION"];
+export const DEFAULT_PUBLIC_ENV = ["EXAMPLES_URL", "RESULTS_MAX_STUDIES", "CROSS_STUDY_EXPRESSION", "CBIOLAB_LOCAL"];
 const NAME = /^[A-Z_][A-Z0-9_]*$/;
 const SECRET_LIKE = /PASSWORD|SECRET|KEY|TOKEN|CREDENTIAL/;
 
