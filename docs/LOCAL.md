@@ -89,6 +89,16 @@ import no longer has get a deletion marker (`ReplacingMergeTree` versions; the v
 rows and their lines of the data files — and replaces just those samples, and only the kinds of
 data the folder holds; the study's counts and the patients' SAMPLE_COUNT are then recomputed.
 
+Two scripts measure the modes against each other. `node scripts/check-schema-modes.ts <db> <db>`
+runs every gallery example whose studies both local databases hold and compares the engine's
+answers (row order and floating-point noise show up as differences too; read them).
+`node scripts/bench-schema.ts load --studies a,b --copies N` imports datahub studies plus renamed
+copies, and `bench-schema.ts run` times six cBioLab-shaped queries on cBioPortal's tables, the
+`labv_` views and the `lab_` tables directly. First result, 5 studies (~36,000 samples) on an
+11 GB machine: the views are 10–150× slower than the prebuilt tables (one gene's altered samples
+per study: 36 ms, 5.2 s through the views, 1.6 s from `lab_` directly), and 12 of 46 examples on
+msk_chord_2024 ran out of ClickHouse's ~4.5 GB there.
+
 The importer applies cBioPortal's rules once: it produces rows for cBioPortal's tables, and
 `lib/importer/lab-writer.ts` turns each into its `lab_` row. Shared reference data (genes, aliases,
 gene panels, cancer types) stays in cBioPortal's tables in every mode.
