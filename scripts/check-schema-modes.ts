@@ -8,7 +8,7 @@
 // Connection details come from ~/.cbiolab/local.env (`npm run local`); each database is run in a
 // child process of its own, because lib/ch.ts reads its connection when it loads.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,6 +31,11 @@ function firstDifference(a: unknown, b: unknown, at = ""): string | null {
       if (d) return d;
     }
   }
+  if (typeof a === "string" && typeof b === "string") {
+    let i = 0;
+    while (i < a.length && a[i] === b[i]) i++;
+    return `${at} at character ${i}: …${JSON.stringify(a.slice(Math.max(0, i - 60), i + 100))} vs …${JSON.stringify(b.slice(Math.max(0, i - 60), i + 100))}`;
+  }
   return `${at}: ${JSON.stringify(a)?.slice(0, 160)} vs ${JSON.stringify(b)?.slice(0, 160)}`;
 }
 
@@ -40,10 +45,10 @@ if (process.env.SCHEMA_MODES_CHILD) {
   const { chQuery, PRIMARY } = await import("../lib/ch.ts");
   const have = new Set((await chQuery<{ s: string }>("SELECT cancer_study_identifier AS s FROM cancer_study", PRIMARY)).data.map((r) => r.s));
   const studiesOf = (doc: unknown) => [...JSON.stringify(doc).matchAll(/"study"\s*:\s*"([^"]+)"/g)].map((m) => m[1]);
-  const wanted = EXAMPLES.filter((e) => (process.env.SCHEMA_MODES_ONLY || "").split(",").includes(e.title) ||
+  const wanted = EXAMPLES.filter((e) => (process.env.SCHEMA_MODES_ONLY || "").split("\n").includes(e.title) ||
     (!process.env.SCHEMA_MODES_ONLY && studiesOf(e.doc).length > 0 && studiesOf(e.doc).every((s) => have.has(s))));
   const runs = await runExamples(wanted);
-  process.stdout.write(JSON.stringify(runs.map((r) => ({ title: r.ex.title, error: r.error ?? null, result: strip(r.result ?? null) }))));
+  writeFileSync(process.env.SCHEMA_MODES_OUT || "", JSON.stringify(runs.map((r) => ({ title: r.ex.title, error: r.error ?? null, result: strip(r.result ?? null) }))));
   process.exit(0);
 }
 
@@ -53,13 +58,18 @@ const file = path.join(process.env.CBIOLAB_DATA || path.join(os.homedir(), ".cbi
 const env = Object.fromEntries(readFileSync(file, "utf8").split("\n").filter((l) => l.includes("=")).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
 const self = fileURLToPath(import.meta.url);
 type Run = { title: string; error: string | null; result: unknown };
-const run = (db: string, only = ""): Run[] => JSON.parse(execFileSync(process.execPath, [self], {
-  env: { ...process.env, ...env, CLICKHOUSE_DB: db, SCHEMA_MODES_CHILD: "1", SCHEMA_MODES_ONLY: only, RESULT_CACHE: "off" },
-  maxBuffer: 1 << 30, stdio: ["ignore", "pipe", "inherit"]
-}).toString()) as Run[];
+const tmp = mkdtempSync(path.join(os.tmpdir(), "schema-modes-"));
+const run = (db: string, only = ""): Run[] => {
+  const out = path.join(tmp, db + ".json");
+  execFileSync(process.execPath, [self], {
+    env: { ...process.env, ...env, CLICKHOUSE_DB: db, SCHEMA_MODES_CHILD: "1", SCHEMA_MODES_ONLY: only, SCHEMA_MODES_OUT: out, RESULT_CACHE: "off" },
+    stdio: ["ignore", "ignore", "inherit"]
+  });
+  return JSON.parse(readFileSync(out, "utf8")) as Run[];
+};
 
 const left = run(a);
-const right = new Map(run(b, left.map((r) => r.title).join(",")).map((r) => [r.title, r]));
+const right = new Map(run(b, left.map((r) => r.title).join("\n")).map((r) => [r.title, r]));
 let differ = 0;
 for (const l of left) {
   const r = right.get(l.title);

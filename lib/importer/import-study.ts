@@ -14,7 +14,7 @@ import { importDiscreteLong, importMatrix } from "./matrix.ts";
 import { fractionGenomeAltered, importGenePanelMatrix, importSegments, importStructuralVariants, importTimeline, type SegmentTotals } from "./other.ts";
 import { importGenePanel } from "./panels.ts";
 import { derivedTablesSql, schemaMode } from "./setup.ts";
-import { refreshLabStudy, removeLabStudy, writesLab, writesLegacy, type SchemaMode } from "./lab-schema.ts";
+import { dropStaleStages, refreshLabStudy, removeLabStudy, writesLab, writesLegacy, type SchemaMode } from "./lab-schema.ts";
 import { openTable, readStudyFolder, type DataFile, type StudyFolder } from "./study.ts";
 
 export interface ImportResult {
@@ -47,6 +47,7 @@ export async function importStudy(conn: WriteConn, dataDir: string, dir: string,
   const ctx = new ImportContext(conn, genes, studyId, progress, mode);
   if (update && mode !== "new") throw new Error("Updating some samples of a study needs a database in the new schema (--schema new); this one is " + mode + ".");
   if (ctx.lab && update) ctx.lab.scope = "samples";
+  if (ctx.lab) await dropStaleStages(conn);
 
   // the lab_ tables replace only what changed, when the import is merged in (lib/importer/lab-writer.ts)
   if (writesLegacy(mode)) {

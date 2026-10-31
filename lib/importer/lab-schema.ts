@@ -350,11 +350,17 @@ export async function mergeStaged(conn: WriteConn, studyId: string, tag: string,
       await exec(conn, `INSERT INTO ${table} SELECT * FROM ${stage}`);
       return;
     }
-    await exec(conn, `INSERT INTO ${table} (${cols.join(", ")}, version, is_deleted)
-      SELECT ${cols.join(", ")}, ${version}, 1 FROM ${table} FINAL
-      WHERE ${study} AND ${scope} AND ${key} NOT IN (SELECT ${key} FROM ${stage})`, settings);
-    await exec(conn, `INSERT INTO ${table} SELECT * FROM ${stage}
-      WHERE ${row} NOT IN (SELECT ${row} FROM ${table} FINAL WHERE ${study})`, settings);
+    // compared in slices of the key space, so no comparison holds more than ~2M rows' hashes
+    const n = await query<{ n: number }>(conn, `SELECT greatest((SELECT count() FROM ${stage}), (SELECT count() FROM ${table} WHERE ${study})) AS n`);
+    const slices = Math.max(1, Math.ceil(Number(n[0]?.n ?? 0) / 2_000_000));
+    for (let i = 0; i < slices; i++) {
+      const slice = slices === 1 ? "1" : `sipHash64(${key}) % ${slices} = ${i}`;
+      await exec(conn, `INSERT INTO ${table} (${cols.join(", ")}, version, is_deleted)
+        SELECT ${cols.join(", ")}, ${version}, 1 FROM ${table} FINAL
+        WHERE ${study} AND ${scope} AND ${slice} AND ${key} NOT IN (SELECT ${key} FROM ${stage} WHERE ${slice})`, settings);
+      await exec(conn, `INSERT INTO ${table} SELECT * FROM ${stage}
+        WHERE ${slice} AND ${row} NOT IN (SELECT ${row} FROM ${table} FINAL WHERE ${study} AND ${slice})`, settings);
+    }
   }
 }
 
@@ -388,6 +394,17 @@ export async function refreshLabStudy(conn: WriteConn, studyId: string, patients
   await exec(conn, `INSERT INTO lab_clinical (study_id, patient_id, sample_id, attr_id, value, version, is_deleted)
     SELECT study_id, patient_id, '', 'SAMPLE_COUNT', toString(count()), ${version}, 0 FROM lab_sample FINAL
     WHERE study_id = ${s} AND patient_id IN ${list} GROUP BY study_id, patient_id`);
+}
+
+/** Drops staging tables whose import process is no longer running (an interrupted import's). */
+export async function dropStaleStages(conn: WriteConn): Promise<void> {
+  const rows = await query<{ n: string }>(conn, "SELECT name AS n FROM system.tables WHERE database = currentDatabase() AND name LIKE 'lab\\_%\\_stage\\_%'");
+  for (const { n } of rows) {
+    const pid = Number(/_stage_(\d+)_/.exec(n)?.[1]);
+    let alive = false;
+    try { process.kill(pid, 0); alive = true; } catch { /* no such process */ }
+    if (!alive) await exec(conn, "DROP TABLE IF EXISTS " + n);
+  }
 }
 
 /** Removes a study from every lab_ table. */

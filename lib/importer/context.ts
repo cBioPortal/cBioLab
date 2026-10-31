@@ -39,19 +39,23 @@ export interface FileReport {
 
 export type Progress = (event: { step: string; file?: string; detail?: string }) => void;
 
-// Internal-id columns allocated by the importer (max + 1, as the legacy DAOs do)
+// Internal-id columns allocated by the importer (max + 1, as the legacy DAOs do). Each id is taken
+// above every column that refers to it: an interrupted import can leave rows naming ids its own
+// table never received (its patients are written last), and those must not attach to the next one.
 const ID_SOURCES = {
-  patient: "internal_id FROM patient",
-  sample: "internal_id FROM sample",
-  profile: "genetic_profile_id FROM genetic_profile",
-  mutationEvent: "mutation_event_id FROM mutation_event",
-  cnaEvent: "cna_event_id FROM cna_event",
-  seg: "seg_id FROM copy_number_seg",
-  segFile: "seg_file_id FROM copy_number_seg_file",
-  clinicalEvent: "clinical_event_id FROM clinical_event",
-  sampleList: "list_id FROM sample_list",
-  sv: "internal_id FROM structural_variant",
-  geneticEntity: "id FROM genetic_entity"
+  patient: ["internal_id FROM patient", "internal_id FROM clinical_patient", "patient_id FROM clinical_event", "patient_id FROM sample"],
+  sample: ["internal_id FROM sample", "internal_id FROM clinical_sample", "sample_id FROM mutation", "sample_id FROM sample_profile",
+    "sample_id FROM copy_number_seg", "sample_id FROM structural_variant", "sample_id FROM sample_cna_event", "sample_id FROM sample_list_list"],
+  profile: ["genetic_profile_id FROM genetic_profile", "genetic_profile_id FROM genetic_alteration", "genetic_profile_id FROM mutation",
+    "genetic_profile_id FROM sample_profile", "genetic_profile_id FROM genetic_profile_samples"],
+  mutationEvent: ["mutation_event_id FROM mutation_event", "mutation_event_id FROM mutation"],
+  cnaEvent: ["cna_event_id FROM cna_event", "cna_event_id FROM sample_cna_event"],
+  seg: ["seg_id FROM copy_number_seg"],
+  segFile: ["seg_file_id FROM copy_number_seg_file"],
+  clinicalEvent: ["clinical_event_id FROM clinical_event", "clinical_event_id FROM clinical_event_data"],
+  sampleList: ["list_id FROM sample_list", "list_id FROM sample_list_list"],
+  sv: ["internal_id FROM structural_variant"],
+  geneticEntity: ["id FROM genetic_entity"]
 } as const;
 export type IdKind = keyof typeof ID_SOURCES;
 
@@ -126,11 +130,11 @@ export class ImportContext {
   }
 
   async loadIds(): Promise<void> {
-    for (const [k, src] of Object.entries(ID_SOURCES) as [IdKind, string][]) {
+    for (const [k, sources] of Object.entries(ID_SOURCES) as [IdKind, readonly string[]][]) {
       // with no legacy tables the ids live only in this import; genetic entities are shared
       if (!writesLegacy(this.mode) && k !== "geneticEntity") { this.next.set(k, 1); continue; }
-      const [col, from] = src.split(" FROM ");
-      const r = await query<{ m: number }>(this.conn, "SELECT max(" + col + ") AS m FROM " + from);
+      const maxes = sources.map((src) => { const [col, from] = src.split(" FROM "); return "(SELECT max(" + col + ") FROM " + from + ")"; });
+      const r = await query<{ m: number }>(this.conn, "SELECT greatest(" + maxes.join(", ") + ") AS m");
       this.next.set(k, Number(r[0]?.m ?? 0) + 1);
     }
     await this.loadPanels();
