@@ -36,8 +36,7 @@
 // and the tests use the uncached engine directly.
 import { cacheLife, cacheTag } from "next/cache";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { chQuery, directConnections, loopbackOnlyConn, connById, withoutFailedQueries, type ChConn } from "./ch.ts";
-import { oncokbPin } from "./annotation.ts";
+import { chQuery, connById, withoutFailedQueries, type ChConn } from "./ch.ts";
 import { runAnalysis } from "./analysis.ts";
 import { buildContract } from "./oncoprint.ts";
 import { hasCustomData } from "./custom-data.ts";
@@ -45,7 +44,8 @@ import { hasIdSets } from "./id-sets.ts";
 import { riskFitDirect, type RiskFit, type RiskFitArgs } from "./views/riskmodel/run.ts";
 import type { AnalysisDoc, AnalysisResult, Contract } from "./types.ts";
 import type { OncoprintSpec } from "./views/oncoprint/types.ts";
-import { onSettingsChange, refreshSettings, settingsFingerprint } from "./settings.ts";
+import { refreshSettings, settingsFingerprint } from "./settings.ts";
+import { dataVersion } from "./data-version.ts";
 
 type Json = unknown;
 
@@ -67,35 +67,6 @@ export async function throughCache<T>(read: () => Promise<string>, direct: () =>
   try { return unpack<T>(packed); } catch { return direct(); }
 }
 
-let versionMemo: { at: number; value: Promise<string> } | null = null;
-/**
- * What the data looks like right now: the latest study import in every cBioPortal database on
- * every instance, plus the OncoKB release. Asked at most once a minute per instance.
- */
-export function dataVersion(): Promise<string> {
-  if (versionMemo && Date.now() - versionMemo.at < 60_000) return versionMemo.value;
-  const value = (async () => {
-    const parts: string[] = [];
-    // not the simulated peer's database, which is read only through the federation API: like a real peer's, its
-    // reloads reach this cache when entries expire
-    const peerDb = loopbackOnlyConn()?.db;
-    for (const conn of directConnections()) {
-      const dbs = await chQuery<{ name: string }>("SELECT name FROM system.databases WHERE name LIKE 'cbioportal%' ORDER BY name", conn);
-      for (const { name } of dbs.data.filter((d) => d.name !== peerDb)) {
-        const r = await chQuery<{ m: string }>("SELECT toString(max(import_date)) AS m FROM " + name + ".cancer_study", conn);
-        parts.push(conn.id + ":" + name + "@" + (r.data[0]?.m ?? ""));
-      }
-    }
-    parts.push("oncokb@" + ((await oncokbPin()) ?? ""));
-    return parts.join("|");
-  })();
-  versionMemo = { at: Date.now(), value };
-  // a failed lookup must not stick for the next minute
-  value.catch(() => { if (versionMemo?.value === value) versionMemo = null; });
-  return value;
-}
-// a cleared cache or a changed setting asks the databases again
-onSettingsChange("data-version", () => { versionMemo = null; });
 
 /** Every cached result's tag, which clearing the cache from /admin expires. */
 export const RESULT_TAG = "results";

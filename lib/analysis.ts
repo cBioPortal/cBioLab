@@ -30,8 +30,10 @@ import { viewRunner } from "./views/index.ts";
 import { Untimed, type ViewRun, type RiskFitter, type EvaluatedCohort } from "./views/run.ts";
 import { overLimit } from "./views/shared.ts";
 import { oncokbPin } from "./annotation.ts";
+import { DataMemo, keepNothing, memoVersion } from "./data-memo.ts";
 
-const _profileCache = new Map<string, StudyProfiles>(); // per-study
+// per-study, held to the result cache's rules (lib/data-memo.ts)
+const _profiles = new DataMemo<StudyProfiles>();
 export interface StudyProfiles {
   profiles: string[]; gaProfiles: string[];
   /** every profile as the study describes it (genetic_profile), for what a plot axis may read */
@@ -42,12 +44,15 @@ export interface StudyProfiles {
  * queries per study one after another. Two genetic_profile queries run once per connection over
  * every study not yet cached (30-60ms); the profile types are the catalog's profiles whose values
  * genetic_alteration_derived holds (inGeneticAlterationDerived), not a DISTINCT over that table,
- * which read 35M rows for one large study. Fills the same cache studyProfiles reads.
+ * which read 35M rows for one large study. Fills the same memo studyProfiles reads.
  */
 export async function studyProfilesMany(studies: string[]): Promise<Map<string, StudyProfiles>> {
   const { peerForStudy, remoteProfiles } = await import("./federation-remote.ts");
   const routing = await studyRouting();
-  const todo = studies.filter((s) => !_profileCache.has(s));
+  const version = keepNothing() ? null : await memoVersion();
+  const got = new Map<string, StudyProfiles>();
+  for (const s of studies) { const kept = _profiles.fresh(s, version); if (kept) got.set(s, kept); }
+  const todo = studies.filter((s) => !got.has(s));
   const peers = await Promise.all(todo.map((s) => peerForStudy(s)));
   // a peer's study: its profiles as the peer describes them (metadata only); a peer that cannot say
   // has none to offer, and a view that needs one is refused naming what is missing. Cached only once
@@ -58,7 +63,7 @@ export async function studyProfilesMany(studies: string[]): Promise<Map<string, 
     if (!peer) return;
     const out = await remoteProfiles(s, peer.url).catch(() => ({ profiles: [], gaProfiles: [], catalog: [] }));
     fromPeers.set(s, out);
-    if (out.catalog.length) _profileCache.set(s, out);
+    if (out.catalog.length) { got.set(s, out); _profiles.put(s, version, out); }
   });
   const groups = new Map<string, { conn: ChConn; studies: string[] }>();
   todo.forEach((s, i) => {
@@ -88,10 +93,10 @@ export async function studyProfilesMany(studies: string[]): Promise<Map<string, 
     for (const r of cat.data) out.get(String(r.s))?.catalog.push({
       profile: String(r.profile), type: String(r.type), datatype: String(r.datatype), name: String(r.name), study: String(r.s),
       ...(r.assay ? { assayType: String(r.assay) } : {}), ...(Number(r.pl) === 1 ? { patientLevel: true } : {}), order: Number(r.ord) || 0 });
-    for (const [s, p] of out) _profileCache.set(s, p);
+    for (const [s, p] of out) { got.set(s, p); _profiles.put(s, version, p); }
   }));
   await Promise.all(peerAsks);
-  return new Map(studies.map((s) => [s, _profileCache.get(s) || fromPeers.get(s)!]));
+  return new Map(studies.map((s) => [s, got.get(s) || fromPeers.get(s)!]));
 }
 
 export async function studyProfiles(study: string): Promise<StudyProfiles> {

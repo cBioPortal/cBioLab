@@ -7,22 +7,18 @@ import { sq } from "./compiler.ts";
 import { BUILD_INFO } from "./build-info.ts";
 import { studyRouting, type Resolver } from "./federation.ts";
 import { setting } from "./settings.ts";
+import { DataMemo } from "./data-memo.ts";
 import type { AnalysisSource, PeerSource } from "./types.ts";
 
-const IMPORTED_TTL = 5 * 60_000;
-const imported = new Map<string, { at: number; value: Promise<string | null> }>();
+// held to the result cache's rules (lib/data-memo.ts): a new import is a new data version
+const imported = new DataMemo<string | null>();
 
 /** When `study`'s data was last imported into the database `conn` reaches, or null if it can't tell. */
 export function studyImported(study: string, conn: ChConn): Promise<string | null> {
-  const key = conn.id + "|" + conn.db + "|" + study;
-  const hit = imported.get(key);
-  if (hit && Date.now() - hit.at < IMPORTED_TTL) return hit.value;
-  const value = chQuery<{ d: string }>("SELECT toString(max(import_date)) AS d FROM " + conn.db + ".cancer_study WHERE cancer_study_identifier = " + sq(study), conn)
-    .then((r) => (r.data[0]?.d || "").replace(/\.0+$/, "") || null)
-    .catch((e) => { if (isAbortError(e)) throw e; return null; });
-  imported.set(key, { at: Date.now(), value });
-  value.catch(() => { if (imported.get(key)?.value === value) imported.delete(key); });
-  return value;
+  return imported.get(conn.id + "|" + conn.db + "|" + study, () =>
+    chQuery<{ d: string }>("SELECT toString(max(import_date)) AS d FROM " + conn.db + ".cancer_study WHERE cancer_study_identifier = " + sq(study), conn)
+      .then((r) => (r.data[0]?.d || "").replace(/\.0+$/, "") || null)
+      .catch((e) => { if (isAbortError(e)) throw e; return null; }));
 }
 
 /** What this instance reports about itself when it answers as a peer, for `study` if one is named. */

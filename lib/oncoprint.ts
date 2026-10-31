@@ -35,6 +35,7 @@ import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, 
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
 import { clinicalTable, assertCustomDataPresent } from "./custom-data.ts";
 import { finiteSql } from "./sql-number.ts";
+import { DataMemo } from "./data-memo.ts";
 import { ENTITY_RE, isCategoricalAssay } from "./generic-assay.ts";
 import type { OncoprintSpec, HeatmapSpec } from "./views/oncoprint/types.ts";
 export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
@@ -201,43 +202,38 @@ export function clinicalSql(attrs: string[], study: string = STUDY, db: string =
     "GROUP BY pid, k";
 }
 
-// per-study molecular-profile inventory (validation for heatmap tracks)
-const _profCache = new Map<string, Set<string>>();
-async function studyProfileTypes(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Set<string>> {
-  const key = conn.id + "." + db + "." + study;
-  if (_profCache.has(key)) return _profCache.get(key)!;
+// per-study molecular-profile inventory (validation for heatmap tracks); this and the two memos
+// below are held to the result cache's rules (lib/data-memo.ts)
+const _profTypes = new DataMemo<Set<string>>();
+function studyProfileTypes(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Set<string>> {
+  return _profTypes.get(conn.id + "." + db + "." + study, async () => {
   const r = await chQuery("SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt, gp.genetic_alteration_type AS type\n" +
     "FROM " + db + ".genetic_profile gp JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study), conn);
-  const set = new Set((r.data as ChRow[]).filter((x) => inGeneticAlterationDerived(String(x.type))).map((x) => String(x.pt)));
-  _profCache.set(key, set);
-  return set;
+  return new Set((r.data as ChRow[]).filter((x) => inGeneticAlterationDerived(String(x.type))).map((x) => String(x.pt)));
+  });
 }
 
 // per-study generic-assay profiles, by profile type: their datatype and whether a value is a patient's
-const _assayCache = new Map<string, Map<string, { datatype: string; patientLevel: boolean }>>();
-async function studyAssayProfiles(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Map<string, { datatype: string; patientLevel: boolean }>> {
-  const key = conn.id + "." + db + "." + study;
-  if (_assayCache.has(key)) return _assayCache.get(key)!;
+const _assayProfiles = new DataMemo<Map<string, { datatype: string; patientLevel: boolean }>>();
+function studyAssayProfiles(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Map<string, { datatype: string; patientLevel: boolean }>> {
+  return _assayProfiles.get(conn.id + "." + db + "." + study, async () => {
   const r = await chQuery("SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt, gp.datatype AS datatype, toInt32OrZero(ifNull(toString(gp.patient_level), '')) AS pl\n" +
     "FROM " + db + ".genetic_profile gp JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'GENERIC_ASSAY'", conn);
-  const m = new Map((r.data as ChRow[]).map((x) => [String(x.pt), { datatype: String(x.datatype), patientLevel: Number(x.pl) === 1 }] as const));
-  _assayCache.set(key, m);
-  return m;
+  return new Map((r.data as ChRow[]).map((x) => [String(x.pt), { datatype: String(x.datatype), patientLevel: Number(x.pl) === 1 }] as const));
+  });
 }
 
 // synthetic "VAF" heatmap profile: variant allele fraction from mutation allele
 // counts (the portal's "Variant Allele Frequency in Selected Mutations Profile").
 // Patient-level value = max across the patient's mutations in the gene.
-const _vafCache = new Map<string, boolean>();
-async function vafAvailable(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<boolean> {
-  const key = conn.id + "." + db + "." + study;
-  if (_vafCache.has(key)) return _vafCache.get(key)!;
+const _vaf = new DataMemo<boolean>();
+function vafAvailable(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<boolean> {
+  return _vaf.get(conn.id + "." + db + "." + study, async () => {
   const r = await chQuery("SELECT 1 FROM " + db + ".mutation_derived WHERE " + mutationStudySql(study) + " AND tumorAltCount > 0 LIMIT 1", conn);
-  const ok = r.data.length > 0;
-  _vafCache.set(key, ok);
-  return ok;
+  return r.data.length > 0;
+  });
 }
 export function vafSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
   return "SELECT " + (unit === "sample" ? "sampleId" : "patientId") + " AS pid, `GENE.hugoGeneSymbol` AS gene,\n" +

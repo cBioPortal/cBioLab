@@ -2,7 +2,7 @@ import { parseBody, LockRequest } from "../../../lib/api-schemas.ts";
 import { requirePrincipal, AccessError } from "../../../lib/auth.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { lockCohorts } from "../../../lib/cohort-lock-server.ts";
-import { dataVersion } from "../../../lib/next-cache.ts";
+import { dataVersion } from "../../../lib/data-version.ts";
 
 export const maxDuration = 60;
 
