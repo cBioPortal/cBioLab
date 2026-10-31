@@ -95,10 +95,13 @@ answers (row order and floating-point noise show up as differences too; read the
 `node scripts/bench-schema.ts load --studies a,b --copies N` imports datahub studies plus renamed
 copies, and `bench-schema.ts run` times six cBioLab-shaped queries on cBioPortal's tables, the
 `labv_` views and the `lab_` tables directly, with and without `FINAL`. With 5 studies (~36,000
-samples) on an 11 GB machine, the views take 1.2–2.4× the prebuilt tables' time (one gene's
-altered samples per study: 22 ms on the tables, 51 ms through the views, 14 ms from `lab_`
-directly; `FINAL` adds 0–4 ms). Of 46 gallery examples, 26 answer identically through the views,
-19 differ only in row order or floating-point digits, and one ran out of ClickHouse's ~4.8 GB
+samples) on an 11 GB machine, a query through the views reads about the rows the prebuilt tables
+read and takes 1.1–2× their time (one gene's altered samples per study, server-side: 20 ms on the
+tables, 35 ms through the views; one gene's expression in one study: 5 ms and 10 ms; `FINAL`
+adds 0–4 ms). Most of the difference is ClickHouse planning the view's SQL, a cost per query
+rather than per row, which is why the views convert a column only where the conversion changes a
+value. Of 46 gallery examples, 27 answer identically through the views,
+18 differ only in row order or floating-point digits, and one ran out of ClickHouse's ~4.8 GB
 there. Importing into `new` takes about as long as before denormalizing (msk_chord_2024: 212 s
 against 218 s; acc_tcga: 30–34 s either way).
 
