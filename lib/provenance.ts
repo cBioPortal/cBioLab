@@ -2,7 +2,7 @@
 // its own name, the commit it runs, and when the study it answered for was last imported there);
 // the coordinator keeps the first such report per study (lib/federation-remote.ts) and lists every
 // source of a run, local or remote, in the result's `sources` (lib/analysis.ts).
-import { chQuery, isAbortError, type ChConn } from "./ch.ts";
+import { chQuery, isAbortError, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { BUILD_INFO } from "./build-info.ts";
 import { studyRouting, type Resolver } from "./federation.ts";
@@ -16,7 +16,7 @@ const imported = new Map<string, { at: number; value: Promise<string | null> }>(
 export function studyImported(study: string, conn: ChConn): Promise<string | null> {
   const key = conn.id + "|" + conn.db + "|" + study;
   const hit = imported.get(key);
-  if (hit && Date.now() - hit.at < IMPORTED_TTL) return hit.value;
+  if (hit && Date.now() - hit.at < IMPORTED_TTL && !studiesChangeWhileRunning()) return hit.value;
   const value = chQuery<{ d: string }>("SELECT toString(max(import_date)) AS d FROM " + conn.db + ".cancer_study WHERE cancer_study_identifier = " + sq(study), conn)
     .then((r) => (r.data[0]?.d || "").replace(/\.0+$/, "") || null)
     .catch((e) => { if (isAbortError(e)) throw e; return null; });

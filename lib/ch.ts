@@ -388,3 +388,10 @@ export async function chQuery<R = ChRow>(sql: string, conn: ChConn = PRIMARY): P
   j._ms = Date.now() - t0;
   return j;
 }
+
+/**
+ * Whether the studies this process reads can change while it runs: a local instance (npm run
+ * local) imports and updates studies, so facts kept per study (its profiles, its routing) are read
+ * again there rather than kept for the life of the process.
+ */
+export const studiesChangeWhileRunning = (): boolean => process.env.CBIOLAB_LOCAL === "1";

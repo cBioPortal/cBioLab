@@ -4,7 +4,7 @@
 //   conventions: {lineGap} }
 // Contract: sorted columns, typed cells (bitmask for gene tracks, NOT_PROFILED = -1),
 //   panel-aware track frequencies, group ranges. The renderer does zero data logic.
-import { chQuery, chQueryRows, DB, STUDY, PRIMARY, ensureChContext, registerChExternal, type ChConn } from "./ch.ts";
+import { chQuery, chQueryRows, DB, STUDY, PRIMARY, ensureChContext, registerChExternal, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { compileCohort, mutationStudySql, sq } from "./compiler.ts";
 import type { CohortDef, Contract, ChRow } from "./types.ts";
 
@@ -205,7 +205,7 @@ export function clinicalSql(attrs: string[], study: string = STUDY, db: string =
 const _profCache = new Map<string, Set<string>>();
 async function studyProfileTypes(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Set<string>> {
   const key = conn.id + "." + db + "." + study;
-  if (_profCache.has(key)) return _profCache.get(key)!;
+  if (_profCache.has(key) && !studiesChangeWhileRunning()) return _profCache.get(key)!;
   const r = await chQuery("SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt, gp.genetic_alteration_type AS type\n" +
     "FROM " + db + ".genetic_profile gp JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study), conn);
@@ -218,7 +218,7 @@ async function studyProfileTypes(study: string, db: string = DB, conn: ChConn = 
 const _assayCache = new Map<string, Map<string, { datatype: string; patientLevel: boolean }>>();
 async function studyAssayProfiles(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Map<string, { datatype: string; patientLevel: boolean }>> {
   const key = conn.id + "." + db + "." + study;
-  if (_assayCache.has(key)) return _assayCache.get(key)!;
+  if (_assayCache.has(key) && !studiesChangeWhileRunning()) return _assayCache.get(key)!;
   const r = await chQuery("SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt, gp.datatype AS datatype, toInt32OrZero(ifNull(toString(gp.patient_level), '')) AS pl\n" +
     "FROM " + db + ".genetic_profile gp JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'GENERIC_ASSAY'", conn);
@@ -233,7 +233,7 @@ async function studyAssayProfiles(study: string, db: string = DB, conn: ChConn =
 const _vafCache = new Map<string, boolean>();
 async function vafAvailable(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<boolean> {
   const key = conn.id + "." + db + "." + study;
-  if (_vafCache.has(key)) return _vafCache.get(key)!;
+  if (_vafCache.has(key) && !studiesChangeWhileRunning()) return _vafCache.get(key)!;
   const r = await chQuery("SELECT 1 FROM " + db + ".mutation_derived WHERE " + mutationStudySql(study) + " AND tumorAltCount > 0 LIMIT 1", conn);
   const ok = r.data.length > 0;
   _vafCache.set(key, ok);

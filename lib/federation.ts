@@ -20,7 +20,7 @@
 // (data-level federation) or a federation API client to a remote cbio-lab
 // (document-level federation) behind the same interface.
 import { survivalCountsSql, anchoredSurvivalSql, coxRowsSql, survivalEndpointsSql } from "./survival-queries.ts";
-import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, registerChExternal, hasChExternal, inChContext, type ChConn } from "./ch.ts";
+import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, registerChExternal, hasChExternal, inChContext, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { createHash } from "node:crypto";
 import { mutationStudySql, sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
@@ -196,13 +196,12 @@ export const restrictedStudies = new Set<string>();
 // the routing reads the settings (which studies are withheld, which connection is a simulated peer)
 onSettingsChange("study-routing", () => { _routing = null; _routingEpoch++; routingCollisions.length = 0; restrictedStudies.clear(); });
 let _routingEpoch = 0;
-// a local instance (npm run local) imports and changes studies while it runs, so it reads them again
-// after a few seconds rather than keeping the first answer for the life of the process
+// where studies change while the process runs (studiesChangeWhileRunning), read again after a few seconds
 const LOCAL_ROUTING_MS = 5_000;
 let _routingAt = 0;
 export async function studyRouting(): Promise<Map<string, ChConn>> {
   await refreshSettings();
-  if (_routing && process.env.CBIOLAB_LOCAL === "1" && Date.now() - _routingAt > LOCAL_ROUTING_MS) _routing = null;
+  if (_routing && studiesChangeWhileRunning() && Date.now() - _routingAt > LOCAL_ROUTING_MS) _routing = null;
   if (_routing) return _routing;
   // One build at a time, shared by every caller that arrives while it runs: a cold request asks
   // for hundreds of studies' routes at once, and each starting its own build sent hundreds of
@@ -242,7 +241,8 @@ async function buildRouting(): Promise<Map<string, ChConn>> {
   // produced it, and a transient failure would look permanent.
   // nor is one built under settings that have since changed
   if (epoch !== _routingEpoch) complete = false;
-  if (complete) { _routing = map; _routingAt = Date.now(); }
+  if (complete) _routing = map;
+  _routingAt = Date.now();
   return map;
 }
 

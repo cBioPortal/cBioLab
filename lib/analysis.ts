@@ -7,7 +7,7 @@
 // re-derives its columns inside the owning database.
 // Deliberately deferred: cross-study patient dedup and attribute harmonization.
 import { applyLocks, lockDate } from "./cohort-lock.ts";
-import { chQuery, STUDY, PRIMARY, ensureChContext, type ChConn } from "./ch.ts";
+import { chQuery, STUDY, PRIMARY, ensureChContext, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 import { inGeneticAlterationDerived, type ProfileInfo } from "./profile-catalog.ts";
 import { describeCohortDef } from "./cohort2.ts";
@@ -47,7 +47,7 @@ export interface StudyProfiles {
 export async function studyProfilesMany(studies: string[]): Promise<Map<string, StudyProfiles>> {
   const { peerForStudy, remoteProfiles } = await import("./federation-remote.ts");
   const routing = await studyRouting();
-  const todo = studies.filter((s) => !_profileCache.has(s));
+  const todo = studies.filter((s) => !_profileCache.has(s) || studiesChangeWhileRunning());
   const peers = await Promise.all(todo.map((s) => peerForStudy(s)));
   // a peer's study: its profiles as the peer describes them (metadata only); a peer that cannot say
   // has none to offer, and a view that needs one is refused naming what is missing. Cached only once
