@@ -73,9 +73,7 @@ write; `lib/importer/lab-schema.ts` has the details.
 - **legacy** (the default) — cBioPortal's tables, then its derived-table SQL, as above.
 - **new** — the file-shaped `lab_` tables only: one per kind of study file, long form, keyed by the
   files' own ids, every row carrying its `study_id`. Views with cBioPortal's table names stand in
-  for the tables the app reads, so the app's SQL runs unchanged: base views rebuild `sample`,
-  `mutation`, `genetic_profile`, … with ids computed from natural keys, and the `*_derived` views
-  are cBioPortal's own derived-table SELECTs reading them. Moving a database to `new` drops
+  for the tables the app reads, so the app's SQL runs unchanged. Moving a database to `new` drops
   cBioPortal's study tables; going back needs a fresh `CBIOLAB_DATA`.
 - **both** — both sets of tables from the same import, with the views named `labv_<name>`, for
   comparing them: `node scripts/check-legacy-diff.ts --prefix labv_ <study>` compares the views with
@@ -87,25 +85,42 @@ import no longer has get a deletion marker (`ReplacingMergeTree` versions; the v
 `FINAL`), so importing an unchanged study writes no data rows. `npm run import -- --update
 <folder>` (new mode) takes a folder holding some samples of an imported study — their clinical
 rows and their lines of the data files — and replaces just those samples, and only the kinds of
-data the folder holds; the study's counts and the patients' SAMPLE_COUNT are then recomputed.
+data the folder holds (in the profiles it holds): the study's counts and the patients'
+SAMPLE_COUNT are then recomputed. Study-level rows — profiles, attributes, case lists — are only
+added by an update, never changed or removed, and nor are case-list members.
 
 Two scripts measure the modes against each other. `node scripts/check-schema-modes.ts <db> <db>`
 runs every gallery example whose studies both local databases hold and compares the engine's
 answers (row order and floating-point noise show up as differences too; read them).
 `node scripts/bench-schema.ts load --studies a,b --copies N` imports datahub studies plus renamed
 copies, and `bench-schema.ts run` times six cBioLab-shaped queries on cBioPortal's tables, the
-`labv_` views and the `lab_` tables directly. First result, 5 studies (~36,000 samples) on an
-11 GB machine: the views are 10–150× slower than the prebuilt tables (one gene's altered samples
-per study: 36 ms, 5.2 s through the views, 1.6 s from `lab_` directly), and 12 of 46 examples on
-msk_chord_2024 ran out of ClickHouse's ~4.5 GB there.
+`labv_` views and the `lab_` tables directly, with and without `FINAL`. With 5 studies (~36,000
+samples) on an 11 GB machine, the views take 1.2–2.4× the prebuilt tables' time (one gene's
+altered samples per study: 22 ms on the tables, 51 ms through the views, 14 ms from `lab_`
+directly; `FINAL` adds 0–4 ms). Of 46 gallery examples, 26 answer identically through the views,
+19 differ only in row order or floating-point digits, and one ran out of ClickHouse's ~4.8 GB
+there. Importing into `new` takes about as long as before denormalizing (msk_chord_2024: 212 s
+against 218 s; acc_tcga: 30–34 s either way).
 
 The importer applies cBioPortal's rules once: it produces rows for cBioPortal's tables, and
-`lib/importer/lab-writer.ts` turns each into its `lab_` row. Shared reference data (genes, aliases,
+`lib/importer/lab-writer.ts` turns each into its `lab_` row. Rows are written denormalized — each
+carries what a query would otherwise join for: the gene's symbol, the sample's patient and panel,
+whether the gene is on that panel, the cytoband; clinical rows form the full grid of samples (or
+patients) by attributes, with `''` where the file has no value; copy-number events are kept in
+`lab_cna_event`, apart from the matrix values, as cBioPortal keeps `sample_cna_event`. The six
+derived views the app reads most (`genomic_event_derived`, `mutation_derived`,
+`clinical_data_derived`, `sample_derived`, `sample_to_gene_panel_derived`,
+`genetic_alteration_derived`) each read one `lab_` table and join nothing (a test holds them to
+that); the other derived views are cBioPortal's own derived-table SELECTs over base views that
+rebuild `sample`, `mutation`, `genetic_profile`, … with ids computed from natural keys. Gene-keyed
+tables sort by `study_id` then gene symbol, so a gene's rows in a study are read without a scan. Shared reference data (genes, aliases,
 gene panels, cancer types) stays in cBioPortal's tables in every mode.
 
-Verified in `both` mode: the `labv_` views match cBioPortal's own importer row for row on
-lgg_ucsf_2014, acc_tcga, msk_impact_2017 and mpnst_mskcc, with the same single difference as the
-legacy tables (msk_impact_2017's 5 shared-event mutations, below).
+Verified: the `labv_` views (in `both` mode) and the views of a `new`-mode database match the legacy
+tables row for row on every compared table for lgg_ucsf_2014, acc_tcga, mpnst_mskcc,
+msk_impact_2017 and msk_chord_2024; the legacy tables match cBioPortal's own importer with a single
+difference (msk_impact_2017's 5 shared-event mutations, below). An update of one sample's files
+leaves every `lab_` table as a fresh import of the edited study would.
 
 ## Where it differs from cBioPortal's importer, on purpose
 

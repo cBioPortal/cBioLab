@@ -3,7 +3,7 @@
 // built from cBioPortal's own derived-table SQL by renaming tables, never by editing it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LAB_TABLES, baseViews, columnsOf, derivedSelects, labTableDdl, renameTables } from "../lib/importer/lab-schema.ts";
+import { LAB_TABLES, baseViews, columnsOf, derivedSelects, labTableDdl, nativeDerived, renameTables } from "../lib/importer/lab-schema.ts";
 
 test("every lab_ table has a study_id column and sorts by it first", () => {
   for (const [name, t] of Object.entries(LAB_TABLES)) {
@@ -19,6 +19,15 @@ test("every base view reads only lab_ tables and the shared reference tables", (
   for (const [name, sql] of Object.entries(baseViews())) {
     for (const m of sql.matchAll(/\b(?:FROM|JOIN)\s+(\w+)\b(?!\s*\()/g))
       assert.ok(m[1].startsWith("lab_") || reference.has(m[1]), `${name} reads ${m[1]}`);
+  }
+});
+
+test("the derived views the app reads most join nothing: what they need is on the lab_ rows", () => {
+  for (const [name, parts] of Object.entries(nativeDerived())) {
+    for (const sql of parts) {
+      assert.doesNotMatch(sql, /\bJOIN\b/, name);
+      for (const m of sql.matchAll(/\bFROM\s+(\w+)\b/g)) assert.ok(m[1].startsWith("lab_"), `${name} reads ${m[1]}`);
+    }
   }
 });
 

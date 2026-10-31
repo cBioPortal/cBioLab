@@ -42,7 +42,7 @@ export const LAB_TABLES: Record<string, { columns: string; order: string }> = {
   lab_sample: { columns: "study_id String, sample_id String, patient_id String, sample_type String", order: "study_id, sample_id" },
   lab_clinical: {
     columns: "study_id String, patient_id String, sample_id String, attr_id String, value String",
-    order: "study_id, patient_id, sample_id, attr_id"
+    order: "study_id, attr_id, patient_id, sample_id"
   },
   lab_clinical_attribute: {
     columns: "study_id String, attr_id String, display_name String, description String, datatype String, patient_attribute Int32, priority String",
@@ -54,15 +54,23 @@ export const LAB_TABLES: Record<string, { columns: string; order: string }> = {
     order: "study_id, profile_id"
   },
   lab_sample_profile: {
-    columns: "study_id String, sample_id String, profile_id String, panel_id String",
+    columns: "study_id String, sample_id String, profile_id String, alteration_type String, panel_id String",
     order: "study_id, sample_id, profile_id"
   },
   lab_profile_value: {
-    columns: "study_id String, profile_id String, sample_id String, entrez_gene_id Int64, value String",
-    order: "study_id, profile_id, entrez_gene_id, sample_id"
+    columns: "study_id String, profile_id String, sample_id String, entrez_gene_id Int64, hugo_gene_symbol String, value String",
+    order: "study_id, hugo_gene_symbol, profile_id, entrez_gene_id, sample_id"
+  },
+  // the cells of a discrete copy-number file that are events (amplifications, deep deletions), as
+  // cBioPortal's importer writes them to sample_cna_event
+  lab_cna_event: {
+    columns: "study_id String, profile_id String, sample_id String, patient_id String, panel_id String, profiled UInt8, entrez_gene_id Int64, " +
+      "hugo_gene_symbol String, cytoband Nullable(String), alteration Int8, off_panel UInt8",
+    order: "study_id, hugo_gene_symbol, profile_id, sample_id, entrez_gene_id"
   },
   lab_mutation: {
-    columns: "study_id String, profile_id String, sample_id String, entrez_gene_id Int64, chr Nullable(String), start_position Nullable(Int64), " +
+    columns: "study_id String, profile_id String, sample_id String, patient_id String, panel_id String, profiled UInt8, entrez_gene_id Int64, " +
+      "hugo_gene_symbol String, gene_type Nullable(String), off_panel UInt8, chr Nullable(String), start_position Nullable(Int64), " +
       "end_position Nullable(Int64), reference_allele Nullable(String), tumor_seq_allele Nullable(String), protein_change Nullable(String), " +
       "mutation_type Nullable(String), ncbi_build Nullable(String), strand Nullable(String), variant_type Nullable(String), db_snp_rs Nullable(String), " +
       "db_snp_val_status Nullable(String), refseq_mrna_id Nullable(String), codon_change Nullable(String), uniprot_accession Nullable(String), " +
@@ -76,11 +84,12 @@ export const LAB_TABLES: Record<string, { columns: string; order: string }> = {
       "normal_alt_count Nullable(Int64), normal_ref_count Nullable(Int64), amino_acid_change Nullable(String), annotation_json Nullable(String), " +
       "has_driver UInt8, driver_filter Nullable(String), driver_filter_annotation Nullable(String), driver_tiers_filter Nullable(String), " +
       "driver_tiers_filter_annotation Nullable(String)",
-    order: "study_id, profile_id, sample_id, entrez_gene_id, assumeNotNull(chr), assumeNotNull(start_position), assumeNotNull(end_position), " +
+    order: "study_id, hugo_gene_symbol, profile_id, sample_id, entrez_gene_id, assumeNotNull(chr), assumeNotNull(start_position), assumeNotNull(end_position), " +
       "assumeNotNull(protein_change), assumeNotNull(tumor_seq_allele), assumeNotNull(mutation_type)"
   },
   lab_structural_variant: {
-    columns: "study_id String, profile_id String, sample_id String, sv_index UInt32, site1_entrez_gene_id Nullable(Int64), " +
+    columns: "study_id String, profile_id String, sample_id String, patient_id String, sv_index UInt32, site1_entrez_gene_id Nullable(Int64), " +
+      "site1_hugo_gene_symbol String, site2_hugo_gene_symbol String, panel_id String, profiled UInt8, site1_off_panel UInt8, site2_off_panel UInt8, " +
       "site1_ensembl_transcript_id Nullable(String), site1_chromosome Nullable(String), site1_region Nullable(String), site1_region_number Nullable(Int64), " +
       "site1_contig Nullable(String), site1_position Nullable(Int64), site1_description Nullable(String), site2_entrez_gene_id Nullable(Int64), " +
       "site2_ensembl_transcript_id Nullable(String), site2_chromosome Nullable(String), site2_region Nullable(String), site2_region_number Nullable(Int64), " +
@@ -129,13 +138,6 @@ const cnaEventId = (entrez: string, alt: string) => labId("cna", `toString(${ent
 const listId = (s = "study_id", l = "list_id") => labId("list", s, l);
 const eventId = labId("event", "t.study_id", "t.patient_id", "toString(t.event_index)");
 
-// discrete copy-number cells that are events, and the alteration each stands for
-const CNA_ALTERATION = "multiIf(v.value = '2', 2, v.value IN ('-2', '-1.5'), -2, NULL)";
-const CNA_EVENT_CELLS = `FROM ${F("lab_profile_value", "v")}
-  JOIN ${F("lab_profile", "p")} ON p.study_id = v.study_id AND p.profile_id = v.profile_id
-  JOIN gene g ON g.entrez_gene_id = v.entrez_gene_id
-  WHERE p.alteration_type = 'COPY_NUMBER_ALTERATION' AND p.datatype = 'DISCRETE' AND p.show_in_analysis_tab = 1
-    AND v.value IN ('2', '-2', '-1.5') AND ifNull(g.type, '') != 'miRNA'`;
 
 const MUTATION_COLUMNS = "center, sequencer, mutation_status, validation_status, tumor_seq_allele1, tumor_seq_allele2, matched_norm_sample_barcode, " +
   "match_norm_seq_allele1, match_norm_seq_allele2, tumor_validation_allele1, tumor_validation_allele2, match_norm_validation_allele1, " +
@@ -145,7 +147,9 @@ const EVENT_COLUMNS = ["chr", "start_position", "end_position", "reference_allel
   "strand", "variant_type", "db_snp_rs", "db_snp_val_status", "refseq_mrna_id", "codon_change", "uniprot_accession", "protein_pos_start",
   "protein_pos_end", "canonical_transcript", "keyword"];
 const SV_COLUMNS = () => columnsOf("lab_structural_variant")
-  .filter((c) => !["study_id", "profile_id", "sample_id", "sv_index", "has_driver"].includes(c) && !c.startsWith("driver_"));
+  .filter((c) => !["study_id", "profile_id", "sample_id", "patient_id", "sv_index", "has_driver", "site1_hugo_gene_symbol", "site2_hugo_gene_symbol",
+    "panel_id", "profiled", "site1_off_panel", "site2_off_panel"].includes(c)
+    && !c.startsWith("driver_"));
 
 /** cBioPortal's base tables, as views over the lab_ tables. */
 export function baseViews(): Record<string, string> {
@@ -162,23 +166,14 @@ export function baseViews(): Record<string, string> {
     genetic_profile: `SELECT ${profileId()} AS genetic_profile_id, profile_id AS stable_id, ${studyId} AS cancer_study_id,
       alteration_type AS genetic_alteration_type, generic_assay_type, datatype, name, description, show_in_analysis_tab AS show_profile_in_analysis_tab,
       pivot_threshold, sort_order, patient_level FROM ${F("lab_profile")}`,
-    // cBioPortal's derived-table script adds samples of a _sequenced list missing from sample_profile
-    // as profiled for <study>_mutations; that is part of what sample_profile means here
     sample_profile: `SELECT ${sampleId("sp.study_id", "sp.sample_id")} AS sample_id, ${profileId("sp.study_id", "sp.profile_id")} AS genetic_profile_id,
         if(sp.panel_id = '', NULL, gpn.internal_id) AS panel_id
-      FROM ${F("lab_sample_profile", "sp")} LEFT JOIN gene_panel gpn ON gpn.stable_id = sp.panel_id
-      UNION ALL
-      SELECT ${sampleId("l.study_id", "l.sample_id")}, ${profileId("p.study_id", "p.profile_id")}, NULL
-      FROM ${F("lab_case_list_sample", "l")}
-      JOIN ${F("lab_profile", "p")} ON p.study_id = l.study_id AND p.profile_id = concat(l.study_id, '_mutations')
-      WHERE l.list_id LIKE '%\\_sequenced' AND (l.study_id, l.sample_id) NOT IN (
-        SELECT s.study_id, s.sample_id FROM ${F("lab_sample_profile", "s")}
-        JOIN ${F("lab_profile", "q")} ON q.study_id = s.study_id AND q.profile_id = s.profile_id WHERE q.alteration_type = 'MUTATION_EXTENDED')`,
+      FROM ${F("lab_sample_profile", "sp")} LEFT JOIN gene_panel gpn ON gpn.stable_id = sp.panel_id`,
     sample_list: `SELECT ${listId("t.study_id", "t.list_id")} AS list_id, t.list_id AS stable_id, t.category AS category, ${studyId} AS cancer_study_id,
       t.name AS name, t.description AS description FROM ${F("lab_case_list", "t")}`,
     sample_list_list: `SELECT ${listId("t.study_id", "t.list_id")} AS list_id, ${sampleId("t.study_id", "t.sample_id")} AS sample_id FROM ${F("lab_case_list_sample", "t")}`,
-    clinical_patient: `SELECT ${patientId()} AS internal_id, attr_id, value AS attr_value FROM ${F("lab_clinical")} WHERE sample_id = ''`,
-    clinical_sample: `SELECT ${sampleId()} AS internal_id, attr_id, value AS attr_value FROM ${F("lab_clinical")} WHERE sample_id != ''`,
+    clinical_patient: `SELECT ${patientId()} AS internal_id, attr_id, value AS attr_value FROM ${F("lab_clinical")} WHERE sample_id = '' AND value != ''`,
+    clinical_sample: `SELECT ${sampleId()} AS internal_id, attr_id, value AS attr_value FROM ${F("lab_clinical")} WHERE sample_id != '' AND value != ''`,
     clinical_attribute_meta: `SELECT attr_id, display_name, description, datatype, patient_attribute, priority, ${studyId} AS cancer_study_id
       FROM ${F("lab_clinical_attribute")}`,
     clinical_event: `SELECT ${eventId} AS clinical_event_id, ${patientId("t.study_id", "t.patient_id")} AS patient_id, t.start_date AS start_date,
@@ -196,10 +191,10 @@ export function baseViews(): Record<string, string> {
       SELECT ${svId}, ${profileId("t.study_id", "t.profile_id")}, ${sampleId("t.study_id", "t.sample_id")}, t.driver_filter, t.driver_filter_annotation,
         t.driver_tiers_filter, t.driver_tiers_filter_annotation
       FROM ${F("lab_structural_variant", "t")} WHERE t.has_driver`,
-    cna_event: `SELECT DISTINCT ${cnaEventId("v.entrez_gene_id", CNA_ALTERATION)} AS cna_event_id, v.entrez_gene_id AS entrez_gene_id,
-      toInt32(${CNA_ALTERATION}) AS alteration ${CNA_EVENT_CELLS}`,
-    sample_cna_event: `SELECT ${cnaEventId("v.entrez_gene_id", CNA_ALTERATION)} AS cna_event_id, ${sampleId("v.study_id", "v.sample_id")} AS sample_id,
-      ${profileId("v.study_id", "v.profile_id")} AS genetic_profile_id, CAST(NULL, 'Nullable(String)') AS annotation_json ${CNA_EVENT_CELLS}`,
+    cna_event: `SELECT DISTINCT ${cnaEventId("v.entrez_gene_id", "v.alteration")} AS cna_event_id, v.entrez_gene_id AS entrez_gene_id,
+      toInt32(v.alteration) AS alteration FROM ${F("lab_cna_event", "v")}`,
+    sample_cna_event: `SELECT ${cnaEventId("v.entrez_gene_id", "v.alteration")} AS cna_event_id, ${sampleId("v.study_id", "v.sample_id")} AS sample_id,
+      ${profileId("v.study_id", "v.profile_id")} AS genetic_profile_id, CAST(NULL, 'Nullable(String)') AS annotation_json FROM ${F("lab_cna_event", "v")}`,
     structural_variant: `SELECT ${svId} AS internal_id, ${profileId("t.study_id", "t.profile_id")} AS genetic_profile_id,
       ${sampleId("t.study_id", "t.sample_id")} AS sample_id, ${SV_COLUMNS().map((c) => "t." + c + " AS " + c).join(", ")}
       FROM ${F("lab_structural_variant", "t")}`,
@@ -209,15 +204,66 @@ export function baseViews(): Record<string, string> {
   };
 }
 
-/** genetic_alteration_derived, read straight from the long-form matrix values. */
-const geneticAlterationDerived = () => `SELECT concat(v.study_id, '_', v.sample_id) AS sample_unique_id, v.study_id AS cancer_study_identifier,
-    g.hugo_gene_symbol AS hugo_gene_symbol, replaceOne(v.profile_id, concat(v.study_id, '_'), '') AS profile_type,
-    if(v.value = '', NULL, v.value) AS alteration_value
-  FROM ${F("lab_profile_value", "v")}
-  JOIN ${F("lab_profile", "p")} ON p.study_id = v.study_id AND p.profile_id = v.profile_id
-  JOIN gene g ON g.entrez_gene_id = v.entrez_gene_id
-  WHERE p.alteration_type NOT IN ('GENERIC_ASSAY', 'MUTATION_EXTENDED', 'MUTATION_UNCALLED', 'STRUCTURAL_VARIANT')
-    AND v.value != '' AND v.value != 'NA'`;
+/**
+ * The derived tables the app reads most, written over the denormalized lab_ tables directly
+ * rather than through the base views, so each reads one table and joins nothing. Each
+ * yields the derived table's columns in its order; the result is checked against cBioPortal's own
+ * (scripts/check-legacy-diff.ts).
+ */
+export function nativeDerived(): Record<string, string[]> {
+  // columns are named by position, so a NULL or a constant repeated in one SELECT stays distinct
+  const sel = (exprs: string[], from: string) => `SELECT ${exprs.map((e, i) => `${e} AS c${i}`).join(", ")}\n${from}`;
+  const panel = (t: string) => `if(${t}.panel_id = '', 'WES', ${t}.panel_id)`;
+  const drivers = (t: string) => ["driver_filter", "driver_filter_annotation", "driver_tiers_filter", "driver_tiers_filter_annotation"].map((c) => `${t}.${c}`);
+  const sv = (site: 1 | 2, where: string) => sel([`concat(t.study_id, '_', t.sample_id)`, `t.site${site}_hugo_gene_symbol`, `t.site${site}_entrez_gene_id`,
+    panel("t"), "t.study_id", "t.profile_id", "'structural_variant'", "'NA'", "'NA'", "t.sv_status", ...drivers("t"), "NULL", "''", "t.event_info",
+    "concat(t.study_id, '_', t.patient_id)", `t.site${site}_off_panel`],
+  `FROM ${F("lab_structural_variant", "t")} WHERE t.profiled AND ${where}`);
+  return {
+    genomic_event_derived: [
+      sel(["concat(m.study_id, '_', m.sample_id)", "m.hugo_gene_symbol", "m.entrez_gene_id", panel("m"), "m.study_id", "m.profile_id", "'mutation'",
+        "m.protein_change", "m.mutation_type", "m.mutation_status", ...drivers("m"), "NULL", "''", "''", "concat(m.study_id, '_', m.patient_id)", "m.off_panel"],
+      `FROM ${F("lab_mutation", "m")} WHERE m.profiled`),
+      sel(["concat(v.study_id, '_', v.sample_id)", "v.hugo_gene_symbol", "v.entrez_gene_id", panel("v"), "v.study_id", "v.profile_id", "'cna'",
+        "'NA'", "'NA'", "'NA'", "NULL", "NULL", "NULL", "NULL", "v.alteration", "v.cytoband", "''", "concat(v.study_id, '_', v.patient_id)", "v.off_panel"],
+      `FROM ${F("lab_cna_event", "v")} WHERE v.profiled AND v.cytoband IS NOT NULL`),
+      sv(1, "t.site1_entrez_gene_id IS NOT NULL AND t.site1_hugo_gene_symbol != ''"),
+      sv(2, "t.site2_entrez_gene_id IS NOT NULL AND t.site2_hugo_gene_symbol != '' AND (t.site2_entrez_gene_id != t.site1_entrez_gene_id OR t.site1_entrez_gene_id IS NULL)")
+    ],
+    genetic_alteration_derived: [
+      sel(["concat(v.study_id, '_', v.sample_id)", "v.study_id", "v.hugo_gene_symbol", "replaceOne(v.profile_id, concat(v.study_id, '_'), '')",
+        "if(v.value = '', NULL, v.value)"],
+      `FROM ${F("lab_profile_value", "v")}
+      WHERE v.value != '' AND v.value != 'NA' AND (v.study_id, v.profile_id) IN (SELECT study_id, profile_id FROM ${F("lab_profile")}
+        WHERE alteration_type NOT IN ('GENERIC_ASSAY', 'MUTATION_EXTENDED', 'MUTATION_UNCALLED', 'STRUCTURAL_VARIANT'))`)
+    ],
+    mutation_derived: [
+      sel(["m.profile_id", "m.sample_id", sampleId("m.study_id", "m.sample_id"), "m.patient_id", "m.entrez_gene_id", "m.study_id",
+        ...["center", "mutation_status", "validation_status", "tumor_alt_count", "tumor_ref_count", "normal_alt_count", "normal_ref_count",
+          "amino_acid_change", "chr", "start_position", "end_position", "reference_allele", "tumor_seq_allele", "protein_change", "mutation_type",
+          "ncbi_build", "variant_type", "refseq_mrna_id", "protein_pos_start", "protein_pos_end", "keyword", "annotation_json"].map((c) => "m." + c),
+        ...drivers("m"), "m.entrez_gene_id", "m.hugo_gene_symbol", "m.gene_type", ...Array(8).fill("NULL")],
+      `FROM ${F("lab_mutation", "m")}`)
+    ],
+    sample_derived: [
+      sel(["concat(s.study_id, '_', s.sample_id)", "base64Encode(s.sample_id)", "s.sample_id", "concat(s.study_id, '_', s.patient_id)",
+        "base64Encode(s.patient_id)", "s.patient_id", "s.study_id", sampleId("s.study_id", "s.sample_id"), patientId("s.study_id", "s.patient_id"),
+        "s.sample_type",
+        `if((s.study_id, s.sample_id) IN (SELECT study_id, sample_id FROM ${F("lab_case_list_sample")} WHERE list_id = concat(study_id, '_sequenced')), 1, 0)`,
+        `if((s.study_id, s.sample_id) IN (SELECT study_id, sample_id FROM ${F("lab_segment")}), 1, 0)`],
+      `FROM ${F("lab_sample", "s")}`)
+    ],
+    sample_to_gene_panel_derived: [
+      sel(["concat(sp.study_id, '_', sp.sample_id)", "sp.alteration_type", panel("sp"), "sp.study_id", "sp.profile_id"], `FROM ${F("lab_sample_profile", "sp")}`)
+    ],
+    clinical_data_derived: [
+      sel([`if(c.sample_id = '', ${patientId("c.study_id", "c.patient_id")}, ${sampleId("c.study_id", "c.sample_id")})`,
+        "if(c.sample_id = '', '', concat(c.study_id, '_', c.sample_id))", "concat(c.study_id, '_', c.patient_id)", "c.attr_id", "c.value", "c.study_id",
+        "if(c.sample_id = '', 'patient', 'sample')"],
+      `FROM ${F("lab_clinical", "c")}`)
+    ]
+  };
+}
 
 /** Replaces whole-word table names outside string literals. */
 export function renameTables(sql: string, names: string[], prefix: string): string {
@@ -253,16 +299,17 @@ export async function createViews(conn: WriteConn, mode: SchemaMode, derivedScri
   const p = viewPrefix(mode);
   for (const [name, sql] of Object.entries(baseViews())) await exec(conn, `CREATE OR REPLACE VIEW ${p}${name} AS ${sql}`);
   const selects = derivedSelects(derivedScript);
-  selects.set("genetic_alteration_derived", [geneticAlterationDerived()]);
+  const native = new Set(Object.keys(nativeDerived()));
+  for (const [name, parts] of Object.entries(nativeDerived())) selects.set(name, parts);
   for (const [derived, parts] of selects) {
     const cols = types.get(derived);
     if (!cols) throw new Error("no column types for " + derived);
     const branches: string[] = [];
     for (const part of parts) {
-      const sql = renameTables(part.replace(/\b(\w+_derived)_temp\b/g, "$1"), [...BASE_NAMES, ...selects.keys()], p);
-      const out = await query<{ name: string }>(conn, `DESCRIBE TABLE (${sql})`);
+      const sql = native.has(derived) ? part : renameTables(part.replace(/\b(\w+_derived)_temp\b/g, "$1"), [...BASE_NAMES, ...selects.keys()], p);
+      const out = await query<{ name: string; type: string }>(conn, `DESCRIBE TABLE (${sql})`);
       if (out.length !== cols.length) throw new Error(`${derived}: ${out.length} columns from the script, ${cols.length} in the table`);
-      branches.push(`SELECT ${cols.map((c, i) => `${castTo(out[i].name, c)} AS \`${c.name}\``).join(", ")} FROM (${sql})`);
+      branches.push(`SELECT ${cols.map((c, i) => `${castTo(out[i], c)} AS \`${c.name}\``).join(", ")} FROM (${sql})`);
     }
     await exec(conn, `CREATE OR REPLACE VIEW ${p}${derived} AS ${branches.join("\nUNION ALL\n")}`);
   }
@@ -275,9 +322,10 @@ const WIDE_IDS = new Set(["internal_id", "patient_internal_id"]);
  * A derived-table column as the table would hold it: cast to the table's type, and NULL stored as
  * the type's default, as an INSERT into a non-Nullable column stores it.
  */
-function castTo(source: string, target: { name: string; type: string }): string {
+function castTo(source: { name: string; type: string }, target: { name: string; type: string }): string {
   const type = WIDE_IDS.has(target.name) ? target.type.replace("Int32", "Int64") : target.type;
-  const col = "`" + source + "`";
+  const col = "`" + source.name + "`";
+  if (source.type === type) return col;
   return type.startsWith("Nullable(") ? `CAST(${col} AS ${type})` : `CAST(ifNull(${col}, defaultValueOfTypeName('${type}')) AS ${type})`;
 }
 
@@ -296,7 +344,18 @@ export async function derivedTypes(conn: WriteConn, prefix: string): Promise<Map
 /** The cBioPortal tables the base views stand in for. */
 export const LEGACY_BASE_TABLES = BASE_NAMES;
 
+/** Creates the lab_ tables; refuses tables of another layout, which would need their studies imported again. */
 export async function createLabTables(conn: WriteConn): Promise<void> {
+  const rows = await query<{ t: string; c: string; k: string }>(conn, `SELECT t.name AS t, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupArray((c.position, c.name)))), ',') AS c, any(t.sorting_key) AS k
+    FROM system.tables t JOIN system.columns c ON c.database = t.database AND c.table = t.name
+    WHERE t.database = currentDatabase() AND t.name IN (${Object.keys(LAB_TABLES).map((n) => `'${n}'`).join(", ")}) GROUP BY t.name`);
+  // system.tables writes a one-column key in parentheses
+  const key = (k: string) => k.replace(/[\s()]/g, "");
+  for (const r of rows) {
+    const want = [...columnsOf(r.t), "version", "is_deleted"].join(",");
+    if (r.c !== want || key(r.k) !== key(LAB_TABLES[r.t].order))
+      throw new Error(`${r.t} has an older layout than this importer writes; drop the lab_ tables (or use a fresh data folder) and import the studies again`);
+  }
   for (const name of Object.keys(LAB_TABLES)) await exec(conn, labTableDdl(name));
 }
 
@@ -320,11 +379,12 @@ export function columnsOf(table: string): string[] {
  * Merges one import's staged rows into the lab_ tables at `version`: rows that are new or differ
  * from the stored ones are written, and stored rows the import no longer has get a deletion
  * marker. With `only`, stored rows are compared (and marked) only where they belong to the named
- * samples or patients, in the tables the update supplied data for; study-level rows (study, profiles, attributes, case lists) are never
- * marked deleted: an update adds to a study rather than replacing it. The staging tables are dropped.
+ * samples or patients, in the tables and profiles the update supplied data for; study-level rows
+ * (study, profiles, attributes, case lists) are only added where the study has none of that key,
+ * and those and case-list members are never marked deleted: an update adds to a study rather than replacing it. The staging tables are dropped.
  */
 export async function mergeStaged(conn: WriteConn, studyId: string, tag: string, version: number,
-  only: { samples: string[]; patients: string[]; tables: Set<string> } | null): Promise<void> {
+  only: { samples: string[]; patients: string[]; profiles: string[]; tables: Set<string> } | null): Promise<void> {
   const lit = (v: string) => "'" + v.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
   const list = (xs: string[]) => "(" + (xs.length ? xs.map(lit).join(", ") : "''") + ")";
   const settings = { transform_null_in: "1" };
@@ -339,12 +399,18 @@ export async function mergeStaged(conn: WriteConn, studyId: string, tag: string,
     const cols = columnsOf(table);
     const row = "sipHash64(toString(tuple(" + cols.map((c) => "`" + c + "`").join(", ") + ")))";
     const key = "tuple(" + LAB_TABLES[table].order + ")";
-    const scope = !only ? "1"
+    const rows = !only ? "1"
       : !only.tables.has(table) ? "0"
       : cols.includes("sample_id") && cols.includes("patient_id") ? `if(sample_id = '', patient_id IN ${list(only.patients)}, sample_id IN ${list(only.samples)})`
         : cols.includes("sample_id") ? `sample_id IN ${list(only.samples)}`
           : cols.includes("patient_id") ? `patient_id IN ${list(only.patients)}` : "0";
+    // an update replaces a sample's data only in the profiles it supplied
+    const scope = only && cols.includes("profile_id") ? `${rows} AND profile_id IN ${list(only.profiles)}` : rows;
     const study = "study_id = " + lit(studyId);
+    if (only && !cols.includes("sample_id") && !cols.includes("patient_id")) {
+      await exec(conn, `INSERT INTO ${table} SELECT * FROM ${stage} WHERE ${key} NOT IN (SELECT ${key} FROM ${table} FINAL WHERE ${study})`, settings);
+      return;
+    }
     const stored = await query<{ n: number }>(conn, `SELECT count() AS n FROM ${table} WHERE ${study}`);
     if (!Number(stored[0]?.n)) {
       await exec(conn, `INSERT INTO ${table} SELECT * FROM ${stage}`);
