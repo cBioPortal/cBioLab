@@ -499,18 +499,32 @@ export async function studyParts(conn: WriteConn, studyId: string): Promise<{ ta
   return rows.map((r) => ({ table: r.table, parts: Number(r.parts), rows: Number(r.rows), bytes: Number(r.bytes) }));
 }
 
+const COMPACT_TIMEOUT_MS = 60 * 60_000;
+
 /**
  * Merges each of a study's partitions that holds more than one part into one, keeping each row's
  * latest version: after it, FINAL has nothing to merge when it reads the study. Returns the tables
- * it merged.
+ * it merged. The merges are started without holding a request open for each (a large study's merge
+ * outlasts ClickHouse Cloud's wait for it) and then watched until every partition is one part; a
+ * merge ClickHouse Cloud will not start yet, while merges it began itself on the partition are
+ * running, is asked for again on the next look.
  */
 export async function compactStudy(conn: WriteConn, studyId: string): Promise<string[]> {
-  const merged: string[] = [];
-  for (const p of await studyParts(conn, studyId))
-    if (p.parts > 1) {
-      await exec(conn, `OPTIMIZE TABLE ${p.table} PARTITION ${sq(studyId)} FINAL`);
-      merged.push(p.table);
+  const merged = (await studyParts(conn, studyId)).filter((p) => p.parts > 1).map((p) => p.table);
+  const until = Date.now() + COMPACT_TIMEOUT_MS;
+  for (let left = merged; left.length;) {
+    for (const t of left) {
+      try {
+        await exec(conn, `OPTIMIZE TABLE ${t} PARTITION ${sq(studyId)} FINAL`, { alter_sync: "0" });
+      } catch (e) {
+        if (!/no-future-parts discovery/.test(String(e))) throw e;
+      }
     }
+    await new Promise((r) => setTimeout(r, 2000));
+    left = (await studyParts(conn, studyId)).filter((p) => p.parts > 1).map((p) => p.table);
+    if (left.length && Date.now() > until)
+      throw new Error(`${studyId}: still unmerged after ${COMPACT_TIMEOUT_MS / 60_000} minutes: ` + left.join(", "));
+  }
   return merged;
 }
 
