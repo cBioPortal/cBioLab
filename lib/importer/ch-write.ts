@@ -18,9 +18,14 @@ export function assertLocal(): void {
   if (!importEnabled()) throw new Error("Importing is only available in local mode (npm run local)");
 }
 
-/** Runs one statement. */
+/**
+ * Runs one statement and returns once its effect is in place: OPTIMIZE, ALTER and DELETE wait for
+ * their merge or mutation on every replica (ClickHouse Cloud defaults to returning before them).
+ */
+const WAIT = { alter_sync: "2", mutations_sync: "2", lightweight_deletes_sync: "2" };
+
 export async function exec(conn: WriteConn, sql: string, settings: Record<string, string> = {}): Promise<void> {
-  await chWrite(sql, conn, undefined, settings);
+  await chWrite(sql, conn, undefined, { ...WAIT, ...settings });
 }
 
 /** Sends `body` (rows in `format`) to `INSERT INTO table`. */
