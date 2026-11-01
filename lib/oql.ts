@@ -137,6 +137,9 @@ export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db 
   const caseCol = unit === "sample" ? "sample_unique_id" : "patient_unique_id";
   const parsed = parseOql(q);
   const parts: string[] = [];
+  // the plain event conditions of every gene, read in one pass over genomic_event_derived: one
+  // subquery per gene had ClickHouse plan the view again for each
+  const plain: { gene: string; cond: string }[] = [];
   for (const { gene, specs } of parsed) {
     for (const spec of specs) {
       if (spec.driver && !oncokbPin) throw new Error("OQL DRIVER requires the OncoKB annotation store");
@@ -153,6 +156,7 @@ export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db 
           "    AND ga.profile_type = " + sq(prof) + " AND " + finiteSql("ga.alteration_value") + " " + spec.op + " " + spec.z);
         continue;
       }
+      if (!spec.range && !spec.driver) { plain.push({ gene, cond: specCond(spec) }); continue; }
       parts.push(
         "SELECT DISTINCT replaceOne(g." + caseCol + ", " + sq(study + "_") + ", '') AS pid\n" +
         "  FROM " + (spec.range ? mutationsWithPositions(db, study, gene) : db + ".genomic_event_derived g\n") +
@@ -163,5 +167,12 @@ export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db 
       );
     }
   }
+  if (plain.length)
+    parts.unshift(
+      "SELECT DISTINCT replaceOne(g." + caseCol + ", " + sq(study + "_") + ", '') AS pid\n" +
+      "  FROM " + db + ".genomic_event_derived g\n" +
+      "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
+      "    AND g.hugo_gene_symbol IN (" + [...new Set(plain.map((x) => x.gene))].map(sq).join(", ") + ")\n" +
+      "    AND (" + plain.map((x) => "(g.hugo_gene_symbol = " + sq(x.gene) + " AND " + x.cond + ")").join("\n      OR ") + ")");
   return parts.map(p => "(" + p + ")").join("\nUNION DISTINCT\n");
 }

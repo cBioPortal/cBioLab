@@ -5,8 +5,8 @@
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
-    AND g.hugo_gene_symbol = 'APC'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))
+    AND g.hugo_gene_symbol IN ('APC')
+    AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
@@ -27,8 +27,8 @@ INTERSECT DISTINCT
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
-    AND g.hugo_gene_symbol = 'APC'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))
+    AND g.hugo_gene_symbol IN ('APC')
+    AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
@@ -48,8 +48,8 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', ''
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
-    AND g.hugo_gene_symbol = 'APC'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))
+    AND g.hugo_gene_symbol IN ('APC')
+    AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
@@ -84,8 +84,8 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', ''
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
-    AND g.hugo_gene_symbol = 'APC'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))
+    AND g.hugo_gene_symbol IN ('APC')
+    AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
@@ -120,8 +120,8 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', ''
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
-    AND g.hugo_gene_symbol = 'APC'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))
+    AND g.hugo_gene_symbol IN ('APC')
+    AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
@@ -153,8 +153,8 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', ''
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
-    AND g.hugo_gene_symbol = 'APC'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))
+    AND g.hugo_gene_symbol IN ('APC')
+    AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
