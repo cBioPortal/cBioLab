@@ -433,12 +433,16 @@ async function runAnalysisIn(template: AnalysisDoc | TemplateDoc, opts: RunOpts 
       const rowsOf = opts.count;
       // provenance is the definition, read before resolveCohort makes the queries read its rows
       const sql = res.cohortSql(def);
-      const { patients, samples } = local && rowsOf
+      // resolved first wherever it can be: every view statement then reads its rows rather than
+      // evaluating the definition again; the counts (cached on the web routes) are for a cohort
+      // that stays a definition
+      const resolved = res instanceof PatientLevelResolver ? await res.resolveCohort(def) : null;
+      const { patients, samples } = resolved ?? (local && rowsOf
         ? await (async () => {
           const [patients, samples] = await Promise.all([rowsOf(res.instance.conn, "SELECT DISTINCT pid FROM (" + sql + ")"), rowsOf(res.instance.conn, sql)]);
           return { patients, samples };
         })()
-        : (res instanceof PatientLevelResolver && await res.resolveCohort(def)) || await res.sizes(def);
+        : await res.sizes(def));
       return { s, res, sql, count: patients, samples };
     }));
     for (const { s, res, sql, count, samples } of evals) {
