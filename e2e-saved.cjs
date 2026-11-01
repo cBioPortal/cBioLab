@@ -89,7 +89,8 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       const steps = {};
       try {
         const rowOf = (n) => page.locator(".listrow").filter({ has: page.locator("strong", { hasText: n }) });
-        const menu = async (n) => { await rowOf(n).locator("button.savedcohortgear").click(); return page.locator("[data-slot=popover-content]"); };
+        // the open one: a menu just closed stays mounted, data-state=closed, until its fade-out ends
+        const menu = async (n) => { await rowOf(n).locator("button.savedcohortgear").click(); return page.locator("[data-slot=popover-content][data-state=open]"); };
         const first = (await page.locator(".listrow label.pick strong").first().innerText()).trim();
         const copy = "e2e copy " + Date.now();
         await (await menu(first)).getByRole("button", { name: "duplicate" }).click();

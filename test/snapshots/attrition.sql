@@ -17,8 +17,8 @@ INTERSECT DISTINCT
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol = 'KRAS'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND g.mutation_variant = 'G12C')))
+    AND g.hugo_gene_symbol IN ('KRAS')
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND g.mutation_variant = 'G12C')))))
 INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
@@ -75,8 +75,8 @@ EXCEPT DISTINCT
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol = 'KRAS'
-    AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
+    AND g.hugo_gene_symbol IN ('KRAS')
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 
 -- view 0 attrition: attrition:LUAD KRAS G12C, immunotherapy:step 0 · msk_chord_2024
 SELECT count() AS n FROM (SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
@@ -113,8 +113,8 @@ INTERSECT DISTINCT
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol = 'KRAS'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND g.mutation_variant = 'G12C'))))
+    AND g.hugo_gene_symbol IN ('KRAS')
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND g.mutation_variant = 'G12C'))))))
 
 -- view 0 attrition: attrition:LUAD KRAS G12C, immunotherapy:step 3 · msk_chord_2024
 SELECT count() AS n FROM ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
@@ -134,8 +134,8 @@ INTERSECT DISTINCT
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol = 'KRAS'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND g.mutation_variant = 'G12C')))
+    AND g.hugo_gene_symbol IN ('KRAS')
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND g.mutation_variant = 'G12C')))))
 INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
@@ -176,8 +176,8 @@ INTERSECT DISTINCT
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol = 'KRAS'
-    AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND g.mutation_variant = 'G12C')))
+    AND g.hugo_gene_symbol IN ('KRAS')
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND g.mutation_variant = 'G12C')))))
 INTERSECT DISTINCT
 (SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
@@ -250,5 +250,5 @@ EXCEPT DISTINCT
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE g.cancer_study_identifier = 'msk_chord_2024'
-    AND g.hugo_gene_symbol = 'KRAS'
-    AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2))))))
+    AND g.hugo_gene_symbol IN ('KRAS')
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2))))))))
