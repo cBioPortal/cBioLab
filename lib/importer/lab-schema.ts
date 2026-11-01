@@ -112,7 +112,8 @@ export const LAB_TABLES: Record<string, { columns: string; order: string }> = {
   },
   lab_timeline_event: {
     columns: "study_id String, patient_id String, event_index UInt32, event_type String, start_date Int64, stop_date Nullable(Int64), data Map(String, String)",
-    order: "study_id, patient_id, event_index"
+    // by type first: most timeline queries ask for one kind of event, and its rows are then one range
+    order: "study_id, lowerUTF8(trimBoth(event_type)), patient_id, event_index"
   },
   lab_case_list: {
     columns: "study_id String, list_id String, category String, name String, description Nullable(String)",
@@ -308,6 +309,9 @@ export function nativeDerived(): Record<string, NativeSelect[]> {
     sample_to_gene_panel_derived: [
       sel(["concat(sp.study_id, '_', sp.sample_id)", "sp.alteration_type", panel("sp"), "sp.study_id", "sp.profile_id"], `FROM ${F("lab_sample_profile", "sp")}`)
     ],
+    clinical_event_derived: [
+      sel([eventId, patientId("t.study_id"), "t.patient_id", "t.start_date", "t.stop_date", "t.event_type", "t.study_id"], `FROM ${F("lab_timeline_event", "t")}`)
+    ],
     clinical_data_derived: [
       sel([`if(c.sample_id = '', ${patientId("c.study_id")}, ${sampleId("c.study_id")})`,
         "if(c.sample_id = '', '', concat(c.study_id, '_', c.sample_id))", "concat(c.study_id, '_', c.patient_id)", "c.attr_id", "c.value", "c.study_id",
@@ -422,9 +426,10 @@ export async function derivedTypes(conn: WriteConn, prefix: string): Promise<Map
 export const LEGACY_BASE_TABLES = BASE_NAMES;
 
 /**
- * Creates the lab_ tables. A table written before the tables were partitioned by study is copied
- * into the partitioned layout, a study at a time, and swapped in; a table of any other layout is
- * refused, since its studies would need importing again.
+ * Creates the lab_ tables. A table with the right columns but another partitioning or sort key (one
+ * written before the tables were partitioned by study, or before its key changed) is copied into
+ * the current layout, a study at a time, and swapped in, as is its `<table>_previous`; a table with
+ * other columns is refused, since its studies would need importing again.
  */
 export async function createLabTables(conn: WriteConn, log: (msg: string) => void = () => undefined): Promise<void> {
   const rows = await query<{ t: string; c: string; k: string; p: string }>(conn, `SELECT t.name AS t,
@@ -434,22 +439,27 @@ export async function createLabTables(conn: WriteConn, log: (msg: string) => voi
     GROUP BY t.name`);
   // system.tables writes a one-column key in parentheses
   const key = (k: string) => k.replace(/[\s()]/g, "");
-  const unpartitioned: string[] = [];
+  const relayout: string[] = [];
   for (const r of rows) {
     const want = [...columnsOf(r.t), "version", "is_deleted"].join(",");
-    if (r.c !== want || key(r.k) !== key(LAB_TABLES[r.t].order))
+    if (r.c !== want)
       throw new Error(`${r.t} has an older layout than this importer writes; drop the lab_ tables (or use a fresh data folder) and import the studies again`);
-    if (key(r.p) !== "study_id") unpartitioned.push(r.t);
+    if (key(r.p) !== "study_id" || key(r.k) !== key(LAB_TABLES[r.t].order)) relayout.push(r.t);
   }
-  for (const name of unpartitioned) {
-    log("Partitioning " + name + " by study");
-    const next = name + "_partitioned";
-    await exec(conn, "DROP TABLE IF EXISTS " + next);
-    await exec(conn, labTableDdl(name).replace(" " + name + " (", " " + next + " ("));
-    for (const { s } of await query<{ s: string }>(conn, `SELECT DISTINCT study_id AS s FROM ${name}`))
-      await exec(conn, `INSERT INTO ${next} SELECT * FROM ${name} FINAL WHERE study_id = ${sq(s)} AND is_deleted = 0`);
-    await exec(conn, `EXCHANGE TABLES ${name} AND ${next}`);
-    await exec(conn, "DROP TABLE " + next);
+  const tables = new Set((await query<{ t: string }>(conn, "SELECT name AS t FROM system.tables WHERE database = currentDatabase()")).map((r) => r.t));
+  for (const name of relayout) {
+    for (const table of [name, ...(tables.has(name + "_previous") ? [name + "_previous"] : [])]) {
+      log("Copying " + table + " into its current layout (partitioned by study, sorted by " + LAB_TABLES[name].order + ")");
+      const next = table + "_relayout";
+      await exec(conn, "DROP TABLE IF EXISTS " + next);
+      await exec(conn, labTableDdl(name).replace(" " + name + " (", " " + next + " ("));
+      for (const { s } of await query<{ s: string }>(conn, `SELECT DISTINCT study_id AS s FROM ${table}`)) {
+        await exec(conn, `INSERT INTO ${next} SELECT * FROM ${table} FINAL WHERE study_id = ${sq(s)} AND is_deleted = 0`);
+        await exec(conn, `OPTIMIZE TABLE ${next} PARTITION ${sq(s)} FINAL`);
+      }
+      await exec(conn, `EXCHANGE TABLES ${table} AND ${next}`);
+      await exec(conn, "DROP TABLE " + next);
+    }
   }
   for (const name of Object.keys(LAB_TABLES)) await exec(conn, labTableDdl(name));
   await addStoredIds(conn, log);
