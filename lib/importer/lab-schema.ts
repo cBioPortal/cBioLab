@@ -10,7 +10,7 @@
 // genes, aliases, gene panels, cancer types, reference genomes — stays in cBioPortal's own tables.
 //
 // The views come in two layers. Base views rebuild cBioPortal's base tables (sample, mutation,
-// genetic_profile, …), with each integer id computed from the natural key (`labId`) so the joins
+// genetic_profile, …), with each integer id computed from the natural key (`labId`, stored on the rows) so the joins
 // between them line up. Derived views are cBioPortal's own populate_derived_tables.sql SELECTs
 // reading those base views, so the *_derived names hold what that SQL would have built; only
 // genetic_alteration_derived is written natively, because the base table it would read stores a
@@ -121,26 +121,69 @@ export const LAB_TABLES: Record<string, { columns: string; order: string }> = {
   lab_case_list_sample: { columns: "study_id String, list_id String, sample_id String", order: "study_id, list_id, sample_id" }
 };
 
-export const labTableDdl = (name: string) =>
-  `CREATE TABLE IF NOT EXISTS ${name} (${LAB_TABLES[name].columns}, ${VERSIONED}) ${engine(LAB_TABLES[name].order)}`;
-
 /** A stable Int64 id computed from a natural key; the same key gives the same id in every view. */
 export const labId = (kind: string, ...parts: string[]) =>
   `toInt64(bitAnd(sipHash64('${kind}', ${parts.join(", ")}), 9223372036854775807))`;
 
-const F = (t: string, alias = "") => `${t}${alias ? " AS " + alias : ""} FINAL`;
-const studyId = labId("study", "study_id");
-const patientId = (s = "study_id", p = "patient_id") => labId("patient", s, p);
-const sampleId = (s = "study_id", x = "sample_id") => labId("sample", s, x);
-const profileId = (s = "study_id", p = "profile_id") => labId("profile", s, p);
-const mutationEventId = (t: string) =>
-  labId("mutation", `${t}.study_id`, `toString(${t}.entrez_gene_id)`, `lower(ifNull(${t}.chr, ''))`, `toString(${t}.start_position)`,
-    `toString(${t}.end_position)`, `lower(ifNull(${t}.protein_change, ''))`, `lower(ifNull(${t}.tumor_seq_allele, ''))`, `lower(ifNull(${t}.mutation_type, ''))`);
-const svId = labId("sv", "t.study_id", "t.profile_id", "toString(t.sv_index)");
-const cnaEventId = (entrez: string, alt: string) => labId("cna", `toString(${entrez})`, `toString(${alt})`);
-const listId = (s = "study_id", l = "list_id") => labId("list", s, l);
-const eventId = labId("event", "t.study_id", "t.patient_id", "toString(t.event_index)");
+/**
+ * The integer ids the views give cBioPortal's tables, each computed from a row's natural key. They
+ * are stored, computed once as a row is written (MATERIALIZED), rather than computed by the views:
+ * the app joins and filters on them (`clinical_event.patient_id IN (…)`), and an id computed in a
+ * view is computed for every row of every study before it can be compared. The mutation event's
+ * is Nullable, as its parts are.
+ */
+const IDS: Record<string, string> = {
+  study_int: labId("study", "study_id"),
+  patient_int: labId("patient", "study_id", "patient_id"),
+  sample_int: labId("sample", "study_id", "sample_id"),
+  profile_int: labId("profile", "study_id", "profile_id"),
+  list_int: labId("list", "study_id", "list_id"),
+  event_int: labId("event", "study_id", "patient_id", "toString(event_index)"),
+  sv_int: labId("sv", "study_id", "profile_id", "toString(sv_index)"),
+  cna_event_int: labId("cna", "toString(entrez_gene_id)", "toString(alteration)"),
+  seg_int: labId("seg", "study_id", "sample_id", "chr", "toString(start)", "toString(end)"),
+  mutation_event_int: labId("mutation", "study_id", "toString(entrez_gene_id)", "lower(ifNull(chr, ''))", "toString(start_position)",
+    "toString(end_position)", "lower(ifNull(protein_change, ''))", "lower(ifNull(tumor_seq_allele, ''))", "lower(ifNull(mutation_type, ''))")
+};
 
+/** Each lab_ table's stored ids, and the ids filtered with IN (…) that get a bloom-filter index. */
+export const TABLE_IDS: Record<string, { ids: string[]; indexed?: string[] }> = {
+  lab_study: { ids: ["study_int"] },
+  lab_patient: { ids: ["study_int", "patient_int"], indexed: ["patient_int"] },
+  lab_sample: { ids: ["study_int", "sample_int", "patient_int"], indexed: ["sample_int", "patient_int"] },
+  lab_clinical: { ids: ["study_int", "patient_int", "sample_int"], indexed: ["patient_int", "sample_int"] },
+  lab_clinical_attribute: { ids: ["study_int"] },
+  lab_profile: { ids: ["study_int", "profile_int"] },
+  lab_sample_profile: { ids: ["sample_int", "profile_int"], indexed: ["sample_int"] },
+  lab_profile_value: { ids: [] },
+  lab_cna_event: { ids: ["sample_int", "profile_int", "cna_event_int"], indexed: ["sample_int"] },
+  lab_mutation: { ids: ["sample_int", "profile_int", "mutation_event_int"], indexed: ["sample_int"] },
+  lab_structural_variant: { ids: ["sample_int", "profile_int", "sv_int"], indexed: ["sample_int"] },
+  lab_segment: { ids: ["study_int", "sample_int", "seg_int"], indexed: ["sample_int"] },
+  lab_timeline_event: { ids: ["patient_int", "event_int"], indexed: ["patient_int", "event_int"] },
+  lab_case_list: { ids: ["study_int", "list_int"] },
+  lab_case_list_sample: { ids: ["list_int", "sample_int"], indexed: ["sample_int"] }
+};
+const idColumn = (c: string) => `${c} ${c === "mutation_event_int" ? "Nullable(Int64)" : "Int64"} MATERIALIZED ${IDS[c]}`;
+const idIndex = (c: string) => `INDEX ${c}_idx ${c} TYPE bloom_filter GRANULARITY 1`;
+
+export const labTableDdl = (name: string) => {
+  const t = TABLE_IDS[name];
+  return `CREATE TABLE IF NOT EXISTS ${name} (${[LAB_TABLES[name].columns, VERSIONED, ...t.ids.map(idColumn), ...(t.indexed ?? []).map(idIndex)].join(", ")}) ${engine(LAB_TABLES[name].order)}`;
+};
+
+const F = (t: string, alias = "") => `${t}${alias ? " AS " + alias : ""} FINAL`;
+// the stored ids, read through the alias the first argument carries (`t.study_id` -> `t.patient_int`)
+const col = (ref: string, name: string) => (ref.includes(".") ? ref.slice(0, ref.indexOf(".") + 1) : "") + name;
+const studyId = "study_int";
+const patientId = (s = "study_id") => col(s, "patient_int");
+const sampleId = (s = "study_id") => col(s, "sample_int");
+const profileId = (s = "study_id") => col(s, "profile_int");
+const mutationEventId = (t: string) => `${t}.mutation_event_int`;
+const svId = "t.sv_int";
+const cnaEventId = (ref: string) => col(ref, "cna_event_int");
+const listId = (s = "study_id") => col(s, "list_int");
+const eventId = "t.event_int";
 
 const MUTATION_COLUMNS = "center, sequencer, mutation_status, validation_status, tumor_seq_allele1, tumor_seq_allele2, matched_norm_sample_barcode, " +
   "match_norm_seq_allele1, match_norm_seq_allele2, tumor_validation_allele1, tumor_validation_allele2, match_norm_validation_allele1, " +
@@ -164,45 +207,45 @@ export function baseViews(): Record<string, string> {
       CAST(map(), 'Map(String, UInt32)') AS resource_sample_counts
       FROM ${F("lab_study")}`,
     patient: `SELECT ${patientId()} AS internal_id, patient_id AS stable_id, ${studyId} AS cancer_study_id FROM ${F("lab_patient")}`,
-    sample: `SELECT ${sampleId("t.study_id", "t.sample_id")} AS internal_id, t.sample_id AS stable_id, t.sample_type AS sample_type,
-      ${patientId("t.study_id", "t.patient_id")} AS patient_id FROM ${F("lab_sample", "t")}`,
+    sample: `SELECT ${sampleId("t.study_id")} AS internal_id, t.sample_id AS stable_id, t.sample_type AS sample_type,
+      ${patientId("t.study_id")} AS patient_id FROM ${F("lab_sample", "t")}`,
     genetic_profile: `SELECT ${profileId()} AS genetic_profile_id, profile_id AS stable_id, ${studyId} AS cancer_study_id,
       alteration_type AS genetic_alteration_type, generic_assay_type, datatype, name, description, show_in_analysis_tab AS show_profile_in_analysis_tab,
       pivot_threshold, sort_order, patient_level FROM ${F("lab_profile")}`,
-    sample_profile: `SELECT ${sampleId("sp.study_id", "sp.sample_id")} AS sample_id, ${profileId("sp.study_id", "sp.profile_id")} AS genetic_profile_id,
+    sample_profile: `SELECT ${sampleId("sp.study_id")} AS sample_id, ${profileId("sp.study_id")} AS genetic_profile_id,
         if(sp.panel_id = '', NULL, gpn.internal_id) AS panel_id
       FROM ${F("lab_sample_profile", "sp")} LEFT JOIN gene_panel gpn ON gpn.stable_id = sp.panel_id`,
-    sample_list: `SELECT ${listId("t.study_id", "t.list_id")} AS list_id, t.list_id AS stable_id, t.category AS category, ${studyId} AS cancer_study_id,
+    sample_list: `SELECT ${listId("t.study_id")} AS list_id, t.list_id AS stable_id, t.category AS category, ${studyId} AS cancer_study_id,
       t.name AS name, t.description AS description FROM ${F("lab_case_list", "t")}`,
-    sample_list_list: `SELECT ${listId("t.study_id", "t.list_id")} AS list_id, ${sampleId("t.study_id", "t.sample_id")} AS sample_id FROM ${F("lab_case_list_sample", "t")}`,
+    sample_list_list: `SELECT ${listId("t.study_id")} AS list_id, ${sampleId("t.study_id")} AS sample_id FROM ${F("lab_case_list_sample", "t")}`,
     clinical_patient: `SELECT ${patientId()} AS internal_id, attr_id, value AS attr_value FROM ${F("lab_clinical")} WHERE sample_id = '' AND value != ''`,
     clinical_sample: `SELECT ${sampleId()} AS internal_id, attr_id, value AS attr_value FROM ${F("lab_clinical")} WHERE sample_id != '' AND value != ''`,
     clinical_attribute_meta: `SELECT attr_id, display_name, description, datatype, patient_attribute, priority, ${studyId} AS cancer_study_id
       FROM ${F("lab_clinical_attribute")}`,
-    clinical_event: `SELECT ${eventId} AS clinical_event_id, ${patientId("t.study_id", "t.patient_id")} AS patient_id, t.start_date AS start_date,
+    clinical_event: `SELECT ${eventId} AS clinical_event_id, ${patientId("t.study_id")} AS patient_id, t.start_date AS start_date,
       t.stop_date AS stop_date, t.event_type AS event_type FROM ${F("lab_timeline_event", "t")}`,
     clinical_event_data: `SELECT ${eventId} AS clinical_event_id, kv.1 AS key, kv.2 AS value FROM ${F("lab_timeline_event", "t")} ARRAY JOIN CAST(t.data, 'Array(Tuple(String, String))') AS kv`,
     mutation_event: `SELECT ${mutationEventId("m")} AS mutation_event_id, any(m.entrez_gene_id) AS entrez_gene_id,
       ${EVENT_COLUMNS.map((c) => `any(m.${c}) AS ${c}`).join(", ")}
       FROM ${F("lab_mutation", "m")} GROUP BY mutation_event_id`,
-    mutation: `SELECT ${mutationEventId("m")} AS mutation_event_id, ${profileId("m.study_id", "m.profile_id")} AS genetic_profile_id,
-      ${sampleId("m.study_id", "m.sample_id")} AS sample_id, m.entrez_gene_id, ${MUTATION_COLUMNS} FROM ${F("lab_mutation", "m")}`,
-    alteration_driver_annotation: `SELECT ${mutationEventId("m")} AS alteration_event_id, ${profileId("m.study_id", "m.profile_id")} AS genetic_profile_id,
-        ${sampleId("m.study_id", "m.sample_id")} AS sample_id, driver_filter, driver_filter_annotation, driver_tiers_filter, driver_tiers_filter_annotation
+    mutation: `SELECT ${mutationEventId("m")} AS mutation_event_id, ${profileId("m.study_id")} AS genetic_profile_id,
+      ${sampleId("m.study_id")} AS sample_id, m.entrez_gene_id, ${MUTATION_COLUMNS} FROM ${F("lab_mutation", "m")}`,
+    alteration_driver_annotation: `SELECT ${mutationEventId("m")} AS alteration_event_id, ${profileId("m.study_id")} AS genetic_profile_id,
+        ${sampleId("m.study_id")} AS sample_id, driver_filter, driver_filter_annotation, driver_tiers_filter, driver_tiers_filter_annotation
       FROM ${F("lab_mutation", "m")} WHERE has_driver
       UNION ALL
-      SELECT ${svId}, ${profileId("t.study_id", "t.profile_id")}, ${sampleId("t.study_id", "t.sample_id")}, t.driver_filter, t.driver_filter_annotation,
+      SELECT ${svId}, ${profileId("t.study_id")}, ${sampleId("t.study_id")}, t.driver_filter, t.driver_filter_annotation,
         t.driver_tiers_filter, t.driver_tiers_filter_annotation
       FROM ${F("lab_structural_variant", "t")} WHERE t.has_driver`,
-    cna_event: `SELECT DISTINCT ${cnaEventId("v.entrez_gene_id", "v.alteration")} AS cna_event_id, v.entrez_gene_id AS entrez_gene_id,
+    cna_event: `SELECT DISTINCT ${cnaEventId("v.entrez_gene_id")} AS cna_event_id, v.entrez_gene_id AS entrez_gene_id,
       toInt32(v.alteration) AS alteration FROM ${F("lab_cna_event", "v")}`,
-    sample_cna_event: `SELECT ${cnaEventId("v.entrez_gene_id", "v.alteration")} AS cna_event_id, ${sampleId("v.study_id", "v.sample_id")} AS sample_id,
-      ${profileId("v.study_id", "v.profile_id")} AS genetic_profile_id, CAST(NULL, 'Nullable(String)') AS annotation_json FROM ${F("lab_cna_event", "v")}`,
-    structural_variant: `SELECT ${svId} AS internal_id, ${profileId("t.study_id", "t.profile_id")} AS genetic_profile_id,
-      ${sampleId("t.study_id", "t.sample_id")} AS sample_id, ${SV_COLUMNS().map((c) => "t." + c + " AS " + c).join(", ")}
+    sample_cna_event: `SELECT ${cnaEventId("v.entrez_gene_id")} AS cna_event_id, ${sampleId("v.study_id")} AS sample_id,
+      ${profileId("v.study_id")} AS genetic_profile_id, CAST(NULL, 'Nullable(String)') AS annotation_json FROM ${F("lab_cna_event", "v")}`,
+    structural_variant: `SELECT ${svId} AS internal_id, ${profileId("t.study_id")} AS genetic_profile_id,
+      ${sampleId("t.study_id")} AS sample_id, ${SV_COLUMNS().map((c) => "t." + c + " AS " + c).join(", ")}
       FROM ${F("lab_structural_variant", "t")}`,
-    copy_number_seg: `SELECT ${labId("seg", "t.study_id", "t.sample_id", "t.chr", "toString(t.start)", "toString(t.end)")} AS seg_id,
-      ${labId("study", "t.study_id")} AS cancer_study_id, ${sampleId("t.study_id", "t.sample_id")} AS sample_id, t.chr AS chr, t.start AS start,
+    copy_number_seg: `SELECT t.seg_int AS seg_id,
+      t.study_int AS cancer_study_id, ${sampleId("t.study_id")} AS sample_id, t.chr AS chr, t.start AS start,
       t.end AS end, t.num_probes AS num_probes, t.segment_mean AS segment_mean FROM ${F("lab_segment", "t")}`
   };
 }
@@ -247,7 +290,7 @@ export function nativeDerived(): Record<string, NativeSelect[]> {
       `FROM ${F("lab_profile_value", "v")} WHERE v.value != '' AND v.value != 'NA'`)
     ],
     mutation_derived: [
-      sel(["m.profile_id", "m.sample_id", sampleId("m.study_id", "m.sample_id"), "m.patient_id", "m.entrez_gene_id", "m.study_id",
+      sel(["m.profile_id", "m.sample_id", sampleId("m.study_id"), "m.patient_id", "m.entrez_gene_id", "m.study_id",
         ...["center", "mutation_status", "validation_status", "tumor_alt_count", "tumor_ref_count", "normal_alt_count", "normal_ref_count",
           "amino_acid_change", "chr", "start_position", "end_position", "reference_allele", "tumor_seq_allele", "protein_change", "mutation_type",
           "ncbi_build", "variant_type", "refseq_mrna_id", "protein_pos_start", "protein_pos_end", "keyword", "annotation_json"].map((c) => "m." + c),
@@ -256,7 +299,7 @@ export function nativeDerived(): Record<string, NativeSelect[]> {
     ],
     sample_derived: [
       sel(["concat(s.study_id, '_', s.sample_id)", "base64Encode(s.sample_id)", "s.sample_id", "concat(s.study_id, '_', s.patient_id)",
-        "base64Encode(s.patient_id)", "s.patient_id", "s.study_id", sampleId("s.study_id", "s.sample_id"), patientId("s.study_id", "s.patient_id"),
+        "base64Encode(s.patient_id)", "s.patient_id", "s.study_id", sampleId("s.study_id"), patientId("s.study_id"),
         "s.sample_type",
         `if((s.study_id, s.sample_id) IN (SELECT study_id, sample_id FROM ${F("lab_case_list_sample")} WHERE list_id = concat(study_id, '_sequenced')), 1, 0)`,
         `if((s.study_id, s.sample_id) IN (SELECT study_id, sample_id FROM ${F("lab_segment")}), 1, 0)`],
@@ -266,7 +309,7 @@ export function nativeDerived(): Record<string, NativeSelect[]> {
       sel(["concat(sp.study_id, '_', sp.sample_id)", "sp.alteration_type", panel("sp"), "sp.study_id", "sp.profile_id"], `FROM ${F("lab_sample_profile", "sp")}`)
     ],
     clinical_data_derived: [
-      sel([`if(c.sample_id = '', ${patientId("c.study_id", "c.patient_id")}, ${sampleId("c.study_id", "c.sample_id")})`,
+      sel([`if(c.sample_id = '', ${patientId("c.study_id")}, ${sampleId("c.study_id")})`,
         "if(c.sample_id = '', '', concat(c.study_id, '_', c.sample_id))", "concat(c.study_id, '_', c.patient_id)", "c.attr_id", "c.value", "c.study_id",
         "if(c.sample_id = '', 'patient', 'sample')"],
       `FROM ${F("lab_clinical", "c")}`)
@@ -387,7 +430,8 @@ export async function createLabTables(conn: WriteConn, log: (msg: string) => voi
   const rows = await query<{ t: string; c: string; k: string; p: string }>(conn, `SELECT t.name AS t,
       arrayStringConcat(arrayMap(x -> x.2, arraySort(groupArray((c.position, c.name)))), ',') AS c, any(t.sorting_key) AS k, any(t.partition_key) AS p
     FROM system.tables t JOIN system.columns c ON c.database = t.database AND c.table = t.name
-    WHERE t.database = currentDatabase() AND t.name IN (${Object.keys(LAB_TABLES).map((n) => `'${n}'`).join(", ")}) GROUP BY t.name`);
+    WHERE t.database = currentDatabase() AND t.name IN (${Object.keys(LAB_TABLES).map((n) => `'${n}'`).join(", ")}) AND c.default_kind != 'MATERIALIZED'
+    GROUP BY t.name`);
   // system.tables writes a one-column key in parentheses
   const key = (k: string) => k.replace(/[\s()]/g, "");
   const unpartitioned: string[] = [];
@@ -408,6 +452,32 @@ export async function createLabTables(conn: WriteConn, log: (msg: string) => voi
     await exec(conn, "DROP TABLE " + next);
   }
   for (const name of Object.keys(LAB_TABLES)) await exec(conn, labTableDdl(name));
+  await addStoredIds(conn, log);
+}
+
+/**
+ * Adds the stored ids and their indexes (TABLE_IDS) a table written before them lacks, and fills
+ * them for its rows; also to the copies kept to undo an approval (`<table>_previous`, lab-review.ts),
+ * whose partitions are swapped with the table's and so must have its structure.
+ */
+async function addStoredIds(conn: WriteConn, log: (msg: string) => void): Promise<void> {
+  const have = new Set((await query<{ x: string }>(conn, `SELECT concat(table, '.', name) AS x FROM system.columns WHERE database = currentDatabase()
+    UNION ALL SELECT concat(table, '.', name) AS x FROM system.data_skipping_indices WHERE database = currentDatabase()`)).map((r) => r.x));
+  const tables = new Set((await query<{ t: string }>(conn, "SELECT name AS t FROM system.tables WHERE database = currentDatabase()")).map((r) => r.t));
+  const sync = { mutations_sync: "2" };
+  for (const [name, t] of Object.entries(TABLE_IDS).flatMap(([n, ids]) => [[n, ids], ...(tables.has(n + "_previous") ? [[n + "_previous", ids]] : [])] as [string, typeof ids][])) {
+    const ids = t.ids.filter((c) => !have.has(`${name}.${c}`)), indexes = (t.indexed ?? []).filter((c) => !have.has(`${name}.${c}_idx`));
+    if (!ids.length && !indexes.length) continue;
+    log("Storing the ids of " + name);
+    for (const c of ids) {
+      await exec(conn, `ALTER TABLE ${name} ADD COLUMN IF NOT EXISTS ${idColumn(c)}`);
+      await exec(conn, `ALTER TABLE ${name} MATERIALIZE COLUMN ${c}`, sync);
+    }
+    for (const c of indexes) {
+      await exec(conn, `ALTER TABLE ${name} ADD ${idIndex(c).replace("INDEX ", "INDEX IF NOT EXISTS ")}`);
+      await exec(conn, `ALTER TABLE ${name} MATERIALIZE INDEX ${c}_idx`, sync);
+    }
+  }
 }
 
 /** The lab_ tables holding a study's rows, with how many parts its partition has in each. */

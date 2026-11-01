@@ -119,7 +119,9 @@ derived views the app reads most (`genomic_event_derived`, `mutation_derived`,
 `clinical_data_derived`, `sample_derived`, `sample_to_gene_panel_derived`,
 `genetic_alteration_derived`) each read one `lab_` table and join nothing (a test holds them to
 that); the other derived views are cBioPortal's own derived-table SELECTs over base views that
-rebuild `sample`, `mutation`, `genetic_profile`, … with ids computed from natural keys. Gene-keyed
+rebuild `sample`, `mutation`, `genetic_profile`, … with ids computed from natural keys — computed
+once, as a row is written, and stored on it (`TABLE_IDS`), because the app joins and filters on
+them and an id a view computes is computed for every row of every study before it is compared. Gene-keyed
 tables sort by `study_id` then gene symbol, so a gene's rows in a study are read without a scan. Shared reference data (genes, aliases,
 gene panels, cancer types) stays in cBioPortal's tables in every mode.
 
