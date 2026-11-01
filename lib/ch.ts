@@ -28,6 +28,28 @@ export interface ChConn {
   /** database (schema) name on THIS instance — may differ between instances */
   db: string;
   label: string;
+  /** the one study every statement on this connection is about (a resolver's): see studyScope */
+  study?: string;
+}
+
+/** The tables of the file-shaped schema (lib/importer/lab-schema.ts LAB_TABLES), each partitioned by study_id. */
+export const LAB_STUDY_TABLES = ["lab_study", "lab_patient", "lab_sample", "lab_clinical", "lab_clinical_attribute", "lab_profile",
+  "lab_sample_profile", "lab_profile_value", "lab_cna_event", "lab_mutation", "lab_structural_variant", "lab_segment",
+  "lab_timeline_event", "lab_case_list", "lab_case_list_sample"];
+
+/**
+ * The URL setting that holds a statement to its connection's study on a database in the
+ * file-shaped schema: ClickHouse adds `study_id = <study>` to every read of a lab_ table, inside
+ * the views too, so it reads that study's partitions alone. The app's SQL names a study through
+ * joins (cancer_study, then patient), which ClickHouse cannot prune partitions by: without this a
+ * one-study timeline query reads every study's events. A database without lab_ tables (cBioPortal's
+ * own) ignores it.
+ */
+export function studyScope(conn: ChConn): string {
+  if (!conn.study) return "";
+  const lit = (s: string) => "'" + s.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+  const filter = lit("study_id = " + lit(conn.study));
+  return "additional_table_filters=" + encodeURIComponent("{" + LAB_STUDY_TABLES.map((t) => lit(conn.db + "." + t) + ": " + filter).join(", ") + "}");
 }
 
 const clean = (s: string | undefined) => (s || "").replace(/[^A-Za-z0-9_]/g, "");
@@ -303,7 +325,8 @@ async function postToDatabase(conn: ChConn, query: string, externals: ChStatemen
   // Tell ClickHouse to stop a query whose client has gone away. Without it an abandoned
   // request keeps its share of the database until it finishes, which is most of what an
   // abandoned request costs.
-  const url = conn.url.replace(/\/+$/, "") + "/?cancel_http_readonly_queries_on_client_close=1" + (settings ? "&" + settings : "");
+  const scope = studyScope(conn);
+  const url = conn.url.replace(/\/+$/, "") + "/?cancel_http_readonly_queries_on_client_close=1" + (settings ? "&" + settings : "") + (scope ? "&" + scope : "");
   const send = async (): Promise<string> => {
     const auth = "Basic " + Buffer.from(conn.user + ":" + conn.password).toString("base64");
     let init: RequestInit;
@@ -347,6 +370,29 @@ async function postToDatabase(conn: ChConn, query: string, externals: ChStatemen
 }
 
 /**
+ * A statement that writes, for local mode's importer (lib/importer/) and nothing else: the app's
+ * reads go through `post`. Sent with `body` as its data (an INSERT's rows) when there is one, to
+ * the connection's database, and through the same loopback check as every read. Not queued with
+ * the reads, and never retried: a write sent twice is not the same as a write sent once.
+ */
+export async function chWrite(sql: string, conn: ChConn, body?: BodyInit, settings: Record<string, string> = {}): Promise<string> {
+  assertNotLoopbackDirect(sql, conn);
+  if (!conn.url || !conn.user || !conn.password || !conn.db)
+    throw new Error("ClickHouse instance '" + conn.id + "' is missing configuration (url/password/db)");
+  const params = new URLSearchParams({ database: conn.db, ...settings });
+  if (body !== undefined) params.set("query", sql);
+  const res = await fetch(conn.url.replace(/\/+$/, "") + "/?" + params.toString(), {
+    method: "POST",
+    headers: { Authorization: "Basic " + Buffer.from(conn.user + ":" + conn.password).toString("base64") },
+    body: body === undefined ? sql : body,
+    cache: "no-store"
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error("ClickHouse error [" + conn.id + "]: " + chException(text).slice(0, 800));
+  return text;
+}
+
+/**
  * Columnar result: `FORMAT JSONCompact` gives rows as arrays, which is ~45% fewer bytes and
  * ~35% less time than the object form on a million-row fetch, and leaves the caller free to
  * read by index instead of allocating an object per row. Used by the oncoprint's hot queries.
@@ -365,3 +411,10 @@ export async function chQuery<R = ChRow>(sql: string, conn: ChConn = PRIMARY): P
   j._ms = Date.now() - t0;
   return j;
 }
+
+/**
+ * Whether the studies this process reads can change while it runs: a local instance (npm run
+ * local) imports and updates studies, so facts kept per study (its profiles, its routing) are read
+ * again there rather than kept for the life of the process.
+ */
+export const studiesChangeWhileRunning = (): boolean => process.env.CBIOLAB_LOCAL === "1";

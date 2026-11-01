@@ -38,3 +38,6 @@ quality-report/
 
 # next dev's local database (lib/db.ts) when no DATABASE_URL is set
 .data/
+
+# npm run local: build output of the local-mode app (scripts/local.ts)
+.next-local

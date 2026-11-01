@@ -20,7 +20,7 @@
 // (data-level federation) or a federation API client to a remote cbio-lab
 // (document-level federation) behind the same interface.
 import { survivalCountsSql, anchoredSurvivalSql, coxRowsSql, survivalEndpointsSql } from "./survival-queries.ts";
-import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, registerChExternal, hasChExternal, inChContext, type ChConn } from "./ch.ts";
+import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, registerChExternal, hasChExternal, inChContext, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { createHash } from "node:crypto";
 import { mutationStudySql, sq } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
@@ -196,8 +196,12 @@ export const restrictedStudies = new Set<string>();
 // the routing reads the settings (which studies are withheld, which connection is a simulated peer)
 onSettingsChange("study-routing", () => { _routing = null; _routingEpoch++; routingCollisions.length = 0; restrictedStudies.clear(); });
 let _routingEpoch = 0;
+// where studies change while the process runs (studiesChangeWhileRunning), read again after a few seconds
+const LOCAL_ROUTING_MS = 5_000;
+let _routingAt = 0;
 export async function studyRouting(): Promise<Map<string, ChConn>> {
   await refreshSettings();
+  if (_routing && studiesChangeWhileRunning() && Date.now() - _routingAt > LOCAL_ROUTING_MS) _routing = null;
   if (_routing) return _routing;
   // One build at a time, shared by every caller that arrives while it runs: a cold request asks
   // for hundreds of studies' routes at once, and each starting its own build sent hundreds of
@@ -238,6 +242,7 @@ async function buildRouting(): Promise<Map<string, ChConn>> {
   // nor is one built under settings that have since changed
   if (epoch !== _routingEpoch) complete = false;
   if (complete) _routing = map;
+  _routingAt = Date.now();
   return map;
 }
 
@@ -1956,7 +1961,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   }
   constructor(study: string, ctx: Partial<CompileCtx>, instance: Instance) {
     super(study, ctx);
-    this.instance = { ...instance, mode: "patient-level" };
+    this.instance = { ...instance, conn: { ...instance.conn, study }, mode: "patient-level" };
   }
   /** the cohort as its queries read it: its rows, once resolveCohort has published them for this request; else its definition */
   cohortSql(def: CohortDef | null | undefined): CohortSql {
@@ -2255,7 +2260,7 @@ export class AggregateResolver extends BaseResolver {
   readonly instance: Instance;
   constructor(study: string, ctx: Partial<CompileCtx>, instance: Instance) {
     super(study, ctx);
-    this.instance = instance;
+    this.instance = { ...instance, conn: { ...instance.conn, study } };
   }
   /** compiled SQL for an aggregate-only instance may never embed identifiers */
   cohortSql(def: CohortDef | null | undefined): CohortSql {
