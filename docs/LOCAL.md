@@ -122,7 +122,11 @@ that); the other derived views are cBioPortal's own derived-table SELECTs over b
 rebuild `sample`, `mutation`, `genetic_profile`, … with ids computed from natural keys — computed
 once, as a row is written, and stored on it (`TABLE_IDS`), because the app joins and filters on
 them and an id a view computes is computed for every row of every study before it is compared. Gene-keyed
-tables sort by `study_id` then gene symbol, so a gene's rows in a study are read without a scan. Shared reference data (genes, aliases,
+tables sort by `study_id` then gene symbol, so a gene's rows in a study are read without a scan.
+`genomic_event_derived` and `sample_derived` are stored per study (`lab_genomic_event`,
+`lab_sample_summary`, from views that compute them for one study) and rewritten whenever the study
+changes: the app's cohort queries name them once per gene and condition, and a view is planned
+again at every mention. Shared reference data (genes, aliases,
 gene panels, cancer types) stays in cBioPortal's tables in every mode.
 
 Verified: the `labv_` views (in `both` mode) and the views of a `new`-mode database match the legacy

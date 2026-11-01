@@ -17,7 +17,7 @@
 // last, a query reading two tables can see the new rows of one beside the old rows of the other.
 import { randomUUID } from "node:crypto";
 import { exec, query, sq, type WriteConn } from "./ch-write.ts";
-import { LAB_TABLES, columnsOf, compactStudy } from "./lab-schema.ts";
+import { LAB_TABLES, columnsOf, compactStudy, refreshStoredDerived } from "./lab-schema.ts";
 
 export const reviewId = (studyId: string) => studyId + "__review";
 export const isReviewId = (id: string) => id.endsWith("__review");
@@ -80,6 +80,7 @@ export async function copyStudy(conn: WriteConn, from: string, to: string): Prom
     await exec(conn, `INSERT INTO ${t} (${columnsOf(t).join(", ")}, version, is_deleted)
       SELECT ${copyColumns(t, from, to, version).join(", ")} FROM ${current(t, from)}`);
   await compactStudy(conn, to);
+  await refreshStoredDerived(conn, to);
 }
 
 /** The study's latest review record, if it has one. */
@@ -204,6 +205,8 @@ export async function approveReview(conn: WriteConn, studyId: string, force = fa
     for (const t of tables()) await exec(conn, `DROP TABLE IF EXISTS ${side(t)}`);
   }
   for (const t of tables()) await exec(conn, `ALTER TABLE ${t} DROP PARTITION ${sq(rv.reviewId)}`);
+  await refreshStoredDerived(conn, studyId);
+  await refreshStoredDerived(conn, rv.reviewId);
   const seconds = (Date.now() - t0) / 1000;
   await record(conn, { ...rv, state: "approved", approvedVersion: version }, seconds);
   return { approved: true, seconds };
@@ -214,6 +217,7 @@ export async function rejectReview(conn: WriteConn, studyId: string): Promise<vo
   const rv = await latestReview(conn, studyId);
   if (rv?.state !== "open") throw new Error(studyId + " has no open review");
   for (const t of tables()) await exec(conn, `ALTER TABLE ${t} DROP PARTITION ${sq(rv.reviewId)}`);
+  await refreshStoredDerived(conn, rv.reviewId);
   await record(conn, { ...rv, state: "rejected" }, 0);
 }
 
@@ -229,6 +233,7 @@ export async function undoApproval(conn: WriteConn, studyId: string, force = fal
   // the approved rows carry the approval's version; anything later was written since
   if (!force && (await latestVersion(conn, studyId)) > rv.approvedVersion) return { undone: false, changes: await changedSince(conn, studyId, rv.approvedVersion) };
   for (const t of tables()) await swapPartition(conn, t, `${t}_previous`, studyId);
+  await refreshStoredDerived(conn, studyId);
   await record(conn, { ...rv, state: "undone" }, 0);
   return { undone: true };
 }

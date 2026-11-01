@@ -10,7 +10,7 @@
 // already exists, and applying either skips what exists or writes it again as a new version.
 // Generated values are a function of the seed, so the same edit twice meets its own rows.
 import { exec, insertAll, query, sq, type Row, type WriteConn } from "./ch-write.ts";
-import { LAB_TABLES, columnsOf, compactStudy, refreshLabStudy } from "./lab-schema.ts";
+import { LAB_TABLES, columnsOf, compactStudy, refreshLabStudy, refreshStoredDerived } from "./lab-schema.ts";
 
 export type EditKind = "samples" | "profile" | "clinical" | "mutations" | "expression";
 
@@ -247,6 +247,7 @@ export async function applyEdit(conn: WriteConn, study: string, p: EditParams, o
       break;
     }
   }
+  await refreshStoredDerived(conn, study);
   const merged = merge ? await compactStudy(conn, study) : [];
   return { rows, seconds: (Date.now() - t0) / 1000, merged };
 }

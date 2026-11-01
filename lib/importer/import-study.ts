@@ -14,7 +14,7 @@ import { importDiscreteLong, importMatrix } from "./matrix.ts";
 import { fractionGenomeAltered, importGenePanelMatrix, importSegments, importStructuralVariants, importTimeline, type SegmentTotals } from "./other.ts";
 import { importGenePanel } from "./panels.ts";
 import { derivedTablesSql, schemaMode } from "./setup.ts";
-import { compactStudy, dropStaleStages, refreshLabStudy, removeLabStudy, writesLab, writesLegacy, type SchemaMode } from "./lab-schema.ts";
+import { compactStudy, dropStaleStages, refreshLabStudy, refreshStoredDerived, removeLabStudy, writesLab, writesLegacy, type SchemaMode } from "./lab-schema.ts";
 import { reviewId } from "./lab-review.ts";
 import { openTable, readStudyFolder, type DataFile, type StudyFolder } from "./study.ts";
 
@@ -99,6 +99,7 @@ export async function importStudy(conn: WriteConn, dataDir: string, dir: string,
     if (update) await refreshLabStudy(conn, studyId, [...ctx.patients.keys()]);
     progress({ step: "Merging the study's new rows into its partitions" });
     await compactStudy(conn, studyId);
+    await refreshStoredDerived(conn, studyId);
   }
   if (ctx.implicitSamples.length)
     ctx.warnings.push(ctx.implicitSamples.length + " samples appear in data files but not in a clinical sample file; they were created with a patient of the same id (e.g. " + ctx.implicitSamples.slice(0, 3).join(", ") + ")");
