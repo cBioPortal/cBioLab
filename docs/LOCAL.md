@@ -85,7 +85,12 @@ import no longer has get a deletion marker (`ReplacingMergeTree` versions; the v
 `FINAL`), so importing an unchanged study writes no data rows. Every `lab_` table is partitioned
 by `study_id`, and an import ends by merging its study's partitions into one part each: `FINAL`
 then has nothing to merge when it reads the study, a change to one study never makes another's
-queries slower, and removing a study drops its partitions. A database whose `lab_` tables predate
+queries slower, and removing a study drops its partitions. The app's SQL names its study through
+joins (`cancer_study`, then `patient`), which ClickHouse cannot skip partitions by, so each
+resolver's connection carries its study and sends `additional_table_filters` with every statement:
+ClickHouse adds `study_id = <study>` to each read of a `lab_` table, views included, and reads that
+study's partitions alone (`studyScope` in `lib/ch.ts`; cBioPortal's own tables have no `lab_`
+tables and ignore it). A database whose `lab_` tables predate
 the partitioning is converted, a study at a time, by `npm run import -- --schema new` (or `both`). `npm run import -- --update
 <folder>` (new mode) takes a folder holding some samples of an imported study — their clinical
 rows and their lines of the data files — and replaces just those samples, and only the kinds of

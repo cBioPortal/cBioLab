@@ -28,6 +28,28 @@ export interface ChConn {
   /** database (schema) name on THIS instance — may differ between instances */
   db: string;
   label: string;
+  /** the one study every statement on this connection is about (a resolver's): see studyScope */
+  study?: string;
+}
+
+/** The tables of the file-shaped schema (lib/importer/lab-schema.ts LAB_TABLES), each partitioned by study_id. */
+export const LAB_STUDY_TABLES = ["lab_study", "lab_patient", "lab_sample", "lab_clinical", "lab_clinical_attribute", "lab_profile",
+  "lab_sample_profile", "lab_profile_value", "lab_cna_event", "lab_mutation", "lab_structural_variant", "lab_segment",
+  "lab_timeline_event", "lab_case_list", "lab_case_list_sample"];
+
+/**
+ * The URL setting that holds a statement to its connection's study on a database in the
+ * file-shaped schema: ClickHouse adds `study_id = <study>` to every read of a lab_ table, inside
+ * the views too, so it reads that study's partitions alone. The app's SQL names a study through
+ * joins (cancer_study, then patient), which ClickHouse cannot prune partitions by: without this a
+ * one-study timeline query reads every study's events. A database without lab_ tables (cBioPortal's
+ * own) ignores it.
+ */
+export function studyScope(conn: ChConn): string {
+  if (!conn.study) return "";
+  const lit = (s: string) => "'" + s.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
+  const filter = lit("study_id = " + lit(conn.study));
+  return "additional_table_filters=" + encodeURIComponent("{" + LAB_STUDY_TABLES.map((t) => lit(conn.db + "." + t) + ": " + filter).join(", ") + "}");
 }
 
 const clean = (s: string | undefined) => (s || "").replace(/[^A-Za-z0-9_]/g, "");
@@ -303,7 +325,8 @@ async function postToDatabase(conn: ChConn, query: string, externals: ChStatemen
   // Tell ClickHouse to stop a query whose client has gone away. Without it an abandoned
   // request keeps its share of the database until it finishes, which is most of what an
   // abandoned request costs.
-  const url = conn.url.replace(/\/+$/, "") + "/?cancel_http_readonly_queries_on_client_close=1" + (settings ? "&" + settings : "");
+  const scope = studyScope(conn);
+  const url = conn.url.replace(/\/+$/, "") + "/?cancel_http_readonly_queries_on_client_close=1" + (settings ? "&" + settings : "") + (scope ? "&" + scope : "");
   const send = async (): Promise<string> => {
     const auth = "Basic " + Buffer.from(conn.user + ":" + conn.password).toString("base64");
     let init: RequestInit;

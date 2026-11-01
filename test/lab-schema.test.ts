@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { LAB_TABLES, baseViews, columnsOf, convert, derivedSelects, labTableDdl, nativeDerived, renameTables } from "../lib/importer/lab-schema.ts";
 import { copyColumns, isReviewId, reviewId } from "../lib/importer/lab-review.ts";
 import { rng } from "../lib/importer/lab-edits.ts";
+import { LAB_STUDY_TABLES, studyScope } from "../lib/ch.ts";
 
 test("every lab_ table has a study_id column and sorts by it first", () => {
   for (const [name, t] of Object.entries(LAB_TABLES)) {
@@ -93,4 +94,13 @@ test("generated updates are the same for the same seed", () => {
   assert.deepEqual(xs, ys);
   assert.notDeepEqual(xs, [c(), c(), c()]);
   assert.ok(xs.every((x) => x >= 0 && x < 1));
+});
+
+test("a resolver's statements are held to its study in every lab_ table, its id quoted", () => {
+  assert.deepEqual([...LAB_STUDY_TABLES].sort(), Object.keys(LAB_TABLES).sort());
+  const conn = { id: "t", url: "", user: "", password: "", db: "cbio", label: "" };
+  assert.equal(studyScope(conn), "");
+  const filters = decodeURIComponent(studyScope({ ...conn, study: "o'brien" }).replace(/^additional_table_filters=/, ""));
+  assert.equal((filters.match(/study_id = /g) || []).length, LAB_STUDY_TABLES.length);
+  assert.ok(filters.startsWith("{'cbio.lab_study': 'study_id = \\'o\\\\\\'brien\\''"), filters.slice(0, 80));
 });

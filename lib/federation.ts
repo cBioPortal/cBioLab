@@ -1961,7 +1961,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   }
   constructor(study: string, ctx: Partial<CompileCtx>, instance: Instance) {
     super(study, ctx);
-    this.instance = { ...instance, mode: "patient-level" };
+    this.instance = { ...instance, conn: { ...instance.conn, study }, mode: "patient-level" };
   }
   /** the cohort as its queries read it: its rows, once resolveCohort has published them for this request; else its definition */
   cohortSql(def: CohortDef | null | undefined): CohortSql {
@@ -2260,7 +2260,7 @@ export class AggregateResolver extends BaseResolver {
   readonly instance: Instance;
   constructor(study: string, ctx: Partial<CompileCtx>, instance: Instance) {
     super(study, ctx);
-    this.instance = instance;
+    this.instance = { ...instance, conn: { ...instance.conn, study } };
   }
   /** compiled SQL for an aggregate-only instance may never embed identifiers */
   cohortSql(def: CohortDef | null | undefined): CohortSql {
