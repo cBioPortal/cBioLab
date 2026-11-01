@@ -263,26 +263,24 @@ export type NativeSelect = { exprs: string[]; from: string };
  * The derived tables the app reads most, written over the denormalized lab_ tables directly
  * rather than through the base views, so each reads one table and joins nothing. Each
  * yields the derived table's columns in its order; the result is checked against cBioPortal's own
- * (scripts/check-legacy-diff.ts). With `forStudy`, the ones stored per study (STORED_DERIVED) read
- * only the study a `{study:String}` query parameter names, subqueries included.
+ * (scripts/check-legacy-diff.ts).
  */
-export function nativeDerived(forStudy = false): Record<string, NativeSelect[]> {
+export function nativeDerived(): Record<string, NativeSelect[]> {
   const sel = (exprs: string[], from: string): NativeSelect => ({ exprs, from });
-  const only = (t: string) => (forStudy ? ` AND ${t}.study_id = {study:String}` : "");
   const panel = (t: string) => `if(${t}.panel_id = '', 'WES', ${t}.panel_id)`;
   const drivers = (t: string) => ["driver_filter", "driver_filter_annotation", "driver_tiers_filter", "driver_tiers_filter_annotation"].map((c) => `${t}.${c}`);
   const sv = (site: 1 | 2, where: string) => sel([`concat(t.study_id, '_', t.sample_id)`, `t.site${site}_hugo_gene_symbol`, `t.site${site}_entrez_gene_id`,
     panel("t"), "t.study_id", "t.profile_id", "'structural_variant'", "'NA'", "'NA'", "t.sv_status", ...drivers("t"), "NULL", "''", "t.event_info",
     "concat(t.study_id, '_', t.patient_id)", `t.site${site}_off_panel`],
-  `FROM ${F("lab_structural_variant", "t")} WHERE t.profiled AND ${where}${only("t")}`);
+  `FROM ${F("lab_structural_variant", "t")} WHERE t.profiled AND ${where}`);
   return {
     genomic_event_derived: [
       sel(["concat(m.study_id, '_', m.sample_id)", "m.hugo_gene_symbol", "m.entrez_gene_id", panel("m"), "m.study_id", "m.profile_id", "'mutation'",
         "m.protein_change", "m.mutation_type", "m.mutation_status", ...drivers("m"), "NULL", "''", "''", "concat(m.study_id, '_', m.patient_id)", "m.off_panel"],
-      `FROM ${F("lab_mutation", "m")} WHERE m.profiled${only("m")}`),
+      `FROM ${F("lab_mutation", "m")} WHERE m.profiled`),
       sel(["concat(v.study_id, '_', v.sample_id)", "v.hugo_gene_symbol", "v.entrez_gene_id", panel("v"), "v.study_id", "v.profile_id", "'cna'",
         "'NA'", "'NA'", "'NA'", "NULL", "NULL", "NULL", "NULL", "v.alteration", "v.cytoband", "''", "concat(v.study_id, '_', v.patient_id)", "v.off_panel"],
-      `FROM ${F("lab_cna_event", "v")} WHERE v.profiled AND v.cytoband IS NOT NULL${only("v")}`),
+      `FROM ${F("lab_cna_event", "v")} WHERE v.profiled AND v.cytoband IS NOT NULL`),
       sv(1, "t.site1_entrez_gene_id IS NOT NULL AND t.site1_hugo_gene_symbol != ''"),
       sv(2, "t.site2_entrez_gene_id IS NOT NULL AND t.site2_hugo_gene_symbol != '' AND (t.site2_entrez_gene_id != t.site1_entrez_gene_id OR t.site1_entrez_gene_id IS NULL)")
     ],
@@ -303,9 +301,9 @@ export function nativeDerived(forStudy = false): Record<string, NativeSelect[]> 
       sel(["concat(s.study_id, '_', s.sample_id)", "base64Encode(s.sample_id)", "s.sample_id", "concat(s.study_id, '_', s.patient_id)",
         "base64Encode(s.patient_id)", "s.patient_id", "s.study_id", sampleId("s.study_id"), patientId("s.study_id"),
         "s.sample_type",
-        `if((s.study_id, s.sample_id) IN (SELECT study_id, sample_id FROM ${F("lab_case_list_sample")} WHERE list_id = concat(study_id, '_sequenced')${forStudy ? " AND study_id = {study:String}" : ""}), 1, 0)`,
-        `if((s.study_id, s.sample_id) IN (SELECT study_id, sample_id FROM ${F("lab_segment")}${forStudy ? " WHERE study_id = {study:String}" : ""}), 1, 0)`],
-      `FROM ${F("lab_sample", "s")}${forStudy ? " WHERE s.study_id = {study:String}" : ""}`)
+        `if((s.study_id, s.sample_id) IN (SELECT study_id, sample_id FROM ${F("lab_case_list_sample")} WHERE list_id = concat(study_id, '_sequenced')), 1, 0)`,
+        `if((s.study_id, s.sample_id) IN (SELECT study_id, sample_id FROM ${F("lab_segment")}), 1, 0)`],
+      `FROM ${F("lab_sample", "s")}`)
     ],
     sample_to_gene_panel_derived: [
       sel(["concat(sp.study_id, '_', sp.sample_id)", "sp.alteration_type", panel("sp"), "sp.study_id", "sp.profile_id"], `FROM ${F("lab_sample_profile", "sp")}`)
@@ -368,25 +366,15 @@ export async function createViews(conn: WriteConn, mode: SchemaMode, derivedScri
     if (out.length !== cols.length) throw new Error(`${derived}: ${out.length} columns from the script, ${cols.length} in the table`);
     return out;
   };
-  const perStudy = nativeDerived(true);
   for (const [derived, parts] of Object.entries(native)) {
     const cols = columnsOfDerived(derived);
-    const stored = STORED_DERIVED[derived];
     const branches: string[] = [];
-    for (const { exprs, from } of stored ? perStudy[derived] : parts) {
-      // named by position while described, so a NULL or a constant repeated in one SELECT stays distinct;
-      // a study parameter is described as any study
-      const out = await describe(derived, `SELECT ${exprs.map((e, i) => `${e} AS c${i}`).join(", ")} ${from}`.replaceAll("{study:String}", "''"), cols);
+    for (const { exprs, from } of parts) {
+      // named by position while described, so a NULL or a constant repeated in one SELECT stays distinct
+      const out = await describe(derived, `SELECT ${exprs.map((e, i) => `${e} AS c${i}`).join(", ")} ${from}`, cols);
       branches.push(`SELECT ${cols.map((c, i) => `${convert(exprs[i], out[i].type, c)} AS \`${c.name}\``).join(", ")}\n${from}`);
     }
-    if (!stored) {
-      await exec(conn, `CREATE OR REPLACE VIEW ${p}${derived} AS ${branches.join("\nUNION ALL\n")}`);
-      continue;
-    }
-    await exec(conn, `CREATE OR REPLACE VIEW ${stored.table}_source AS ${branches.join("\nUNION ALL\n")}`);
-    const fresh = await createStoredTable(conn, stored);
-    await exec(conn, `CREATE OR REPLACE VIEW ${p}${derived} AS SELECT * FROM ${stored.table}`);
-    if (fresh) for (const { s } of await query<{ s: string }>(conn, "SELECT DISTINCT study_id AS s FROM lab_study")) await refreshStudyTable(conn, stored.table, s);
+    await exec(conn, `CREATE OR REPLACE VIEW ${p}${derived} AS ${branches.join("\nUNION ALL\n")}`);
   }
   for (const [derived, parts] of selects) {
     const cols = columnsOfDerived(derived);
@@ -398,56 +386,6 @@ export async function createViews(conn: WriteConn, mode: SchemaMode, derivedScri
     }
     await exec(conn, `CREATE OR REPLACE VIEW ${p}${derived} AS ${branches.join("\nUNION ALL\n")}`);
   }
-}
-
-/**
- * Derived tables stored per study rather than computed by a view on every read: a view is planned
- * again each time a query names it, and the app's cohort queries name these once per gene and per
- * condition (genomic_event_derived is four UNION branches over three tables; sample_derived has two
- * subqueries), so planning them cost several times reading what they select. Each is written from
- * `<table>_source`, the view that computes it for one study, whenever that study's lab_ rows change
- * (`refreshStoredDerived`); its view then reads the table.
- */
-export const STORED_DERIVED: Record<string, { table: string; order: string }> = {
-  genomic_event_derived: { table: "lab_genomic_event", order: "cancer_study_identifier, hugo_gene_symbol, variant_type, sample_unique_id" },
-  sample_derived: { table: "lab_sample_summary", order: "cancer_study_identifier, sample_unique_id" }
-};
-
-/** Creates a stored derived table from its source view's columns, replacing one of other columns; true when it is new. */
-async function createStoredTable(conn: WriteConn, t: { table: string; order: string }): Promise<boolean> {
-  const cols = async (name: string) => (await query<{ x: string }>(conn, `SELECT concat(name, ' ', type) AS x FROM system.columns
-    WHERE database = currentDatabase() AND table = ${sq(name)} ORDER BY position`)).map((r) => r.x).join(", ");
-  const existing = await cols(t.table);
-  if (existing && existing === await cols(t.table + "_source")) return false;
-  if (existing) await exec(conn, `DROP TABLE ${t.table}`);
-  await exec(conn, `CREATE TABLE ${t.table} ENGINE = MergeTree PARTITION BY cancer_study_identifier ORDER BY (${t.order})
-    EMPTY AS SELECT * FROM ${t.table}_source(study = '')`);
-  return true;
-}
-
-/** Rewrites one study's partition of a stored derived table from its source view (none, when the study has no rows). */
-async function refreshStudyTable(conn: WriteConn, table: string, studyId: string): Promise<void> {
-  const side = `${table}_refresh_${process.pid}_${Date.now()}`;
-  try {
-    await exec(conn, `CREATE TABLE ${side} AS ${table}`);
-    await exec(conn, `INSERT INTO ${side} SELECT * FROM ${table}_source(study = ${sq(studyId)})`);
-    const n = await query<{ n: number }>(conn, `SELECT count() AS n FROM ${side}`);
-    if (Number(n[0]?.n)) await exec(conn, `ALTER TABLE ${table} REPLACE PARTITION ${sq(studyId)} FROM ${side}`);
-    else await exec(conn, `ALTER TABLE ${table} DROP PARTITION ${sq(studyId)}`);
-  } finally {
-    await exec(conn, `DROP TABLE IF EXISTS ${side}`);
-  }
-}
-
-/**
- * Brings a study's stored derived tables (STORED_DERIVED) up to date with its lab_ rows: called
- * after every write to a study (an import or update, an edit, a review's copy, approval, undo or
- * rejection, a removal). A database without them (legacy mode) has nothing to refresh.
- */
-export async function refreshStoredDerived(conn: WriteConn, studyId: string): Promise<void> {
-  const have = new Set((await query<{ t: string }>(conn, `SELECT name AS t FROM system.tables WHERE database = currentDatabase()
-    AND name IN (${Object.values(STORED_DERIVED).map((t) => sq(t.table)).join(", ")})`)).map((r) => r.t));
-  for (const { table } of Object.values(STORED_DERIVED)) if (have.has(table)) await refreshStudyTable(conn, table, studyId);
 }
 
 // integer ids the derived tables declare as Int32; the views' ids are 63-bit hashes, kept whole
@@ -680,12 +618,11 @@ export async function dropStaleStages(conn: WriteConn): Promise<void> {
   }
 }
 
-/** Removes a study from every lab_ table and stored derived table, and its review records and the copy kept to undo an approval (lab-review.ts). */
+/** Removes a study from every lab_ table, and its review records and the copy kept to undo an approval (lab-review.ts). */
 export async function removeLabStudy(conn: WriteConn, studyId: string): Promise<boolean> {
   const n = await query<{ n: number }>(conn, `SELECT count() AS n FROM lab_study WHERE study_id = ${sq(studyId)}`);
   const tables = await query<{ t: string }>(conn, `SELECT name AS t FROM system.tables WHERE database = currentDatabase()
-    AND (name IN (${[...Object.keys(LAB_TABLES), ...Object.values(STORED_DERIVED).map((t) => t.table)].map(sq).join(", ")}) OR name = 'lab_review'
-      OR name LIKE 'lab\\_%\\_previous')`);
+    AND (name IN (${Object.keys(LAB_TABLES).map(sq).join(", ")}) OR name = 'lab_review' OR name LIKE 'lab\\_%\\_previous')`);
   for (const { t } of tables) await exec(conn, `ALTER TABLE ${t} DROP PARTITION ${sq(studyId)}`);
   return Number(n[0]?.n) > 0;
 }
