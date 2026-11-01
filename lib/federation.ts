@@ -64,6 +64,7 @@ import { driverAnnotationJoin } from "./oql.ts";
 import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type CohortSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
+import { keepNothing, memoVersion } from "./data-memo.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -185,7 +186,10 @@ export function isRestrictedStudy(id: string, name = ""): boolean {
 
 /**
  * study -> owning connection, discovered by asking each configured instance
- * which studies it holds. Cached per process. First instance wins a collision,
+ * which studies it holds. Kept per process under the result cache's rules
+ * (lib/data-memo.ts): rebuilt when the data or the settings change, at least
+ * daily, and with RESULT_CACHE=off at least every few seconds (rebuilding it on
+ * every lookup would ask every instance once per study). First instance wins a collision,
  * and the collision is reported rather than silently resolved. Restricted
  * studies are never routed, so they are unreachable rather than merely hidden.
  */
@@ -196,8 +200,17 @@ export const restrictedStudies = new Set<string>();
 // the routing reads the settings (which studies are withheld, which connection is a simulated peer)
 onSettingsChange("study-routing", () => { _routing = null; _routingEpoch++; routingCollisions.length = 0; restrictedStudies.clear(); });
 let _routingEpoch = 0;
+let _routingVersion: string | null = null, _routingAt = 0;
+const ROUTING_UNCACHED_MS = 5_000, ROUTING_MAX_AGE_MS = 24 * 3600_000;
+/** Whether the kept routing map was built under the data and settings in force now. */
+async function routingCurrent(): Promise<boolean> {
+  const age = Date.now() - _routingAt;
+  if (keepNothing()) return age < ROUTING_UNCACHED_MS;
+  return age < ROUTING_MAX_AGE_MS && _routingVersion !== null && (await memoVersion()) === _routingVersion;
+}
 export async function studyRouting(): Promise<Map<string, ChConn>> {
   await refreshSettings();
+  if (_routing && !(await routingCurrent())) _routing = null;
   if (_routing) return _routing;
   // One build at a time, shared by every caller that arrives while it runs: a cold request asks
   // for hundreds of studies' routes at once, and each starting its own build sent hundreds of
@@ -209,6 +222,7 @@ let _routingBuild: Promise<Map<string, ChConn>> | null = null;
 
 async function buildRouting(): Promise<Map<string, ChConn>> {
   const epoch = _routingEpoch;
+  const version = keepNothing() ? null : await memoVersion();
   const map = new Map<string, ChConn>();
   let complete = true;
   for (const conn of connections()) {
@@ -238,6 +252,8 @@ async function buildRouting(): Promise<Map<string, ChConn>> {
   // nor is one built under settings that have since changed
   if (epoch !== _routingEpoch) complete = false;
   if (complete) _routing = map;
+  _routingVersion = version;
+  _routingAt = Date.now();
   return map;
 }
 

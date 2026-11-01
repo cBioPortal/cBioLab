@@ -88,7 +88,9 @@ this project is "fast"), [`ENVIRONMENT.md`](docs/ENVIRONMENT.md) (settings),
 11. **Results are cached** (`lib/next-cache.ts`). Only a returned value is stored: a refusal, a
    partial answer or an abandoned query must THROW, or it is served to everyone for a day. Read
    through `throughCache`, and make everything that changes the answer an argument of the cached
-   function. Details: ARCHITECTURE.md, "The result cache".
+   function. Facts kept in a process (a study's profiles, the study routing) go through
+   `lib/data-memo.ts`, which holds them to the same rules — never a module-level `Map` that lives
+   as long as the process. Details: ARCHITECTURE.md, "The result cache".
 12. **Every view states how its numbers were computed, and that statement is checked.** A result
    carries a method record (`lib/method.ts`) with a Python script that recomputes its numbers; **a
    change to how a view computes updates its method builder in the same commit**, and

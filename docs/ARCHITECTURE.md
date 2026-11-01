@@ -447,6 +447,13 @@ and commit both.
     cache handler configured (anywhere but Vercel), the cache is the Node process's own LRU
     (`cacheMaxMemorySize`, 50 MB unless `RESULT_CACHE_MB` says otherwise): lost on restart, and not
     shared between replicas.
+  - **Facts kept in a process obey the same rules** (`lib/data-memo.ts`): a study's profiles, its
+    oncoprint profile types and VAF availability, its import date and the study routing are kept
+    only while `dataVersion()` and the settings' fingerprint are what they were when read, for at
+    most a day, and not at all with `RESULT_CACHE=off` (the routing then for a few seconds, since
+    rebuilding it per lookup would ask every instance once per study). Never keep data-derived
+    state in a module-level `Map` of your own: one kept for the life of the process hid every
+    study and profile imported after the server started until it restarted.
   - **Arguments are the key.** A cached function takes only serializable arguments and computes
     everything else itself; a function passed in cannot be called. Anything that changes the
     answer must be an argument.
