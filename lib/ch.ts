@@ -12,6 +12,7 @@
 // take a `db` argument rather than closing over a module constant.
 import { loopbackConnId, servingAsLoopbackPeer } from "./loopback-peer.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { Agent } from "undici";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -370,6 +371,12 @@ async function postToDatabase(conn: ChConn, query: string, externals: ChStatemen
 }
 
 /**
+ * Writes wait for as long as the statement runs: ClickHouse sends an INSERT … SELECT's response
+ * only when it has finished, and fetch otherwise gives up after 300 s without one.
+ */
+const WRITES = new Agent({ headersTimeout: 0, bodyTimeout: 0 });
+
+/**
  * A statement that writes, for local mode's importer (lib/importer/) and nothing else: the app's
  * reads go through `post`. Sent with `body` as its data (an INSERT's rows) when there is one, to
  * the connection's database, and through the same loopback check as every read. Not queued with
@@ -385,8 +392,9 @@ export async function chWrite(sql: string, conn: ChConn, body?: BodyInit, settin
     method: "POST",
     headers: { Authorization: "Basic " + Buffer.from(conn.user + ":" + conn.password).toString("base64") },
     body: body === undefined ? sql : body,
-    cache: "no-store"
-  });
+    cache: "no-store",
+    dispatcher: WRITES
+  } as RequestInit);
   const text = await res.text();
   if (!res.ok) throw new Error("ClickHouse error [" + conn.id + "]: " + chException(text).slice(0, 800));
   return text;
