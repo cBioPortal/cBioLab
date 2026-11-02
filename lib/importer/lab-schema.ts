@@ -530,18 +530,22 @@ export async function compactStudy(conn: WriteConn, studyId: string): Promise<st
 
 export const stageName = (table: string, tag: string) => `${table}_stage_${tag}`;
 
-/** A lab_ table's column names, in order. */
-export function columnsOf(table: string): string[] {
+/** A comma-separated list's items, leaving commas inside parentheses alone. */
+function splitTopLevel(list: string): string[] {
   const out: string[] = [];
   let depth = 0, start = 0;
-  const cols = LAB_TABLES[table].columns;
-  for (let i = 0; i <= cols.length; i++) {
-    const ch = cols[i];
+  for (let i = 0; i <= list.length; i++) {
+    const ch = list[i];
     if (ch === "(") depth++;
     else if (ch === ")") depth--;
-    else if ((ch === "," && depth === 0) || i === cols.length) { out.push(cols.slice(start, i).trim().split(" ")[0]); start = i + 1; }
+    else if ((ch === "," && depth === 0) || i === list.length) { out.push(list.slice(start, i).trim()); start = i + 1; }
   }
   return out;
+}
+
+/** A lab_ table's column names, in order. */
+export function columnsOf(table: string): string[] {
+  return splitTopLevel(LAB_TABLES[table].columns).map((c) => c.split(" ")[0]);
 }
 
 /**
@@ -585,11 +589,29 @@ export async function mergeStaged(conn: WriteConn, studyId: string, tag: string,
       await exec(conn, `INSERT INTO ${table} SELECT * FROM ${stage}`);
       return;
     }
-    // compared in slices of the key space, so no comparison holds more than ~2M rows' hashes
-    const n = await query<{ n: number }>(conn, `SELECT greatest((SELECT count() FROM ${stage}), (SELECT count() FROM ${table} WHERE ${study})) AS n`);
-    const slices = Math.max(1, Math.ceil(Number(n[0]?.n ?? 0) / 2_000_000));
-    for (let i = 0; i < slices; i++) {
-      const slice = slices === 1 ? "1" : `sipHash64(${key}) % ${slices} = ${i}`;
+    if (!only) {
+      // the same row count and sum of row hashes on both sides: nothing to write
+      const sums = (from: string) => query<{ n: string; h: string }>(conn,
+        `SELECT toString(count()) AS n, toString(sum(${row})) AS h FROM ${from}`).then((r) => r[0].n + ":" + r[0].h);
+      if (await sums(stage) === await sums(`${table} FINAL WHERE ${study}`)) return;
+    }
+    // compared in ranges of the sort key's second column, each ~2M rows: a range reads only its
+    // own granules, so the whole comparison is about one pass over the study
+    const lead = splitTopLevel(LAB_TABLES[table].order)[1];
+    const starts: string[] = [];
+    if (lead) {
+      const keys = await query<{ k: string; n: number }>(conn, `SELECT k, sum(n) AS n FROM (
+        SELECT ${lead} AS k, count() AS n FROM ${stage} GROUP BY k
+        UNION ALL SELECT ${lead} AS k, count() AS n FROM ${table} WHERE ${study} GROUP BY k) GROUP BY k ORDER BY k`);
+      let size = 0;
+      for (const { k, n } of keys) {
+        if (size >= 2_000_000) { starts.push(k); size = 0; }
+        size += Number(n);
+      }
+    }
+    for (let i = 0; i <= starts.length; i++) {
+      const slice = [i > 0 ? `${lead} >= ${lit(starts[i - 1])}` : "", i < starts.length ? `${lead} < ${lit(starts[i])}` : ""]
+        .filter(Boolean).join(" AND ") || "1";
       await exec(conn, `INSERT INTO ${table} (${cols.join(", ")}, version, is_deleted)
         SELECT ${cols.join(", ")}, ${version}, 1 FROM ${table} FINAL
         WHERE ${study} AND ${scope} AND ${slice} AND ${key} NOT IN (SELECT ${key} FROM ${stage} WHERE ${slice})`, settings);
