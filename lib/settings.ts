@@ -119,7 +119,7 @@ export const SETTINGS: readonly SettingSpec[] = [
 const SPEC = new Map(SETTINGS.map((s) => [s.name, s]));
 export const settingSpec = (name: string): SettingSpec | undefined => SPEC.get(name);
 
-/** When an administrator last cleared the result cache: a row of app_setting, never a variable. */
+/** When the result cache was last cleared (/admin or the header): a row of app_setting, never a variable. */
 export const CACHE_CLEARED = "result_cache_cleared_at";
 
 const REFRESH_MS = 5_000;
@@ -242,7 +242,7 @@ export async function settingsReport(): Promise<SettingsReport> {
   return { databases, rows, unavailable: state.unavailable, cacheCleared: cleared ? { at: cleared.value, by } : null, log };
 }
 
-async function write(name: string, value: string | null, by: string): Promise<void> {
+async function write(name: string, value: string | null, by: string | null): Promise<void> {
   await refreshSettings(true);
   if (state.unavailable) throw new Error("settings cannot be changed here: " + state.unavailable);
   const [old] = await dbQuery<{ value: string }>("select value from app_setting where name = $1", [name]);
@@ -270,6 +270,6 @@ export async function setSetting(name: string, value: string | null, by: string)
 }
 
 /** Mark the result cache cleared now: every cached entry's key changes, in every process. */
-export async function markResultCacheCleared(by: string): Promise<void> {
+export async function markResultCacheCleared(by: string | null): Promise<void> {
   await write(CACHE_CLEARED, new Date().toISOString(), by);
 }
