@@ -19,6 +19,7 @@ import CohortPills from "../../lab/pills.tsx";
 import { usePublicEnv } from "../../_env/public-env-context.tsx";
 import { fmtInt } from "../../../lib/chart/format.ts";
 import { api } from "../../lab/api.ts";
+import { usePortalTools } from "../agent-tools.ts";
 import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
 import { SiteHeader } from "../../_ui/site-header.tsx";
 import { QueryGenesDialog, RESULTS_MAX_GENES, readResultsTarget, studiesProblem } from "../query-editor.tsx";
@@ -52,6 +53,8 @@ export default function ResultsPage() {
       : { expr: null, cna: null, clinical: [], numeric: [], expressionAcross: across, held: basics.held, partial: true })
     : null, [basics, known, studies, filters, check, genes, queryError, across]);
   const page = usePageDoc(fresh);
+  usePortalTools({ page: "query results", subject: { studies, genes, query: target.query, filters },
+    doc: page.doc, layout: page.layout, open: page.open, openTab: page.openTab, note: page.note });
   // the header's "altered in N of the queried": its own request, beside the tabs', so no tab waits for it
   const [altered, setAltered] = useState<{ altered: number; queried: number } | null>(null);
   const groups = fresh?.doc.cohorts;

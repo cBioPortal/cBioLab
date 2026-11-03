@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AnalysisDoc, View } from "../../../lib/types";
 import { PortalTabs } from "../PortalTabs";
+import { usePortalTools } from "../agent-tools.ts";
 import { useStudyKnown, expressionProfile, assayComparisonProfiles, type StudyKnown } from "../study-known";
 import { arrange, decodeDoc, decodeParam, encodeParam, syncUrl, usePageDoc, type PageLayout } from "../page-doc";
 import { COMPARISON_MAX_ACTIVE, COMPARISON_MAX_GROUPS, exclusiveCohorts } from "../../../lib/partition-arms.ts";
@@ -61,6 +62,8 @@ export default function ComparisonPage() {
     [linked, compared, basics, known, study, sizeOk]);
   const input = useMemo(() => linked && { dsl: linked.dsl, study: linked.study, cohorts: linked.cohorts }, [linked]);
   const page = usePageDoc(fresh, input);
+  usePortalTools({ page: "group comparison", subject: { study, compared: Object.keys(compared.cohorts), takenOut: off, overlapExcluded: exclude },
+    doc: page.doc, layout: page.layout, open: page.open, openTab: page.openTab, note: page.note });
   // sizes as the tabs report them, for the groups as they are compared now
   const comparedKey = JSON.stringify(compared.cohorts);
   const [sized, setSized] = useState<{ key: string; c: Record<string, number> } | null>(null);
