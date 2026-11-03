@@ -20,7 +20,7 @@ import { describeSources, sourceIndex } from "./provenance.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
-import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey, chooseArmValues, armLabel, quantilePoints, rangeArms, SPLIT_BY_DEFAULT_MIN_COUNT } from "./partition-arms.ts";
+import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey, chooseArmValues, armLabel, quantilePoints, rangeArms, SPLIT_BY_DEFAULT_MIN_COUNT, ANALYSIS_MAX_COHORTS } from "./partition-arms.ts";
 import { ENTITY_RE, isCategoricalAssay, assayCohortMedianSql, assayCohortValuesSql, assayCohortCutsSql } from "./generic-assay.ts";
 import { entityShortName } from "./profile-names.ts";
 import { upgradeDocument } from "./doc-version.ts";
@@ -401,7 +401,7 @@ async function runAnalysisIn(template: AnalysisDoc | TemplateDoc, opts: RunOpts 
   // named cohorts, and 6 forced one such analysis into four separate documents. Views stay
   // at 6 — each one issues its own set of queries per cohort, so raising cohorts already
   // multiplies real query cost without also multiplying the view count.
-  { const e = overLimit("an analysis document", 16, authoredNames.length); if (e) throw new Error(e.replace("at most 16", "at most 16 cohorts")); }
+  { const e = overLimit("an analysis document", ANALYSIS_MAX_COHORTS, authoredNames.length); if (e) throw new Error(e.replace("at most " + ANALYSIS_MAX_COHORTS, "at most " + ANALYSIS_MAX_COHORTS + " cohorts")); }
   // Partition children are counted separately: one split of a 16-cohort document can add a
   // dozen children, and each costs one count per study, not a view's worth of queries.
   { const e = overLimit("an analysis document", 48, names.length); if (e) throw new Error(e.replace("at most 48", "at most 48 cohorts including partition children")); }
