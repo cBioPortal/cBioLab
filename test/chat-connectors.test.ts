@@ -112,12 +112,20 @@ describe("the browser's connector state", () => {
     assert.deepEqual(canSwitchOn(withToken(empty, "cbioportal", { token: "t", expiresAt: 5 }), cb, 10), { ok: false, why: "the sign-in has expired: connect again" });
     assert.equal(signedIn(withToken(empty, "cbioportal", { token: "t" }), "cbioportal", 1e15), true, "no expiry given, none assumed");
   });
-  test("signing out switches the connector off, and a request names only what is on, with a good token", () => {
-    const base = withToken(withOn(withOn({ on: [], tokens: {} }, "cbioportal", true), "openevidence", true), "cbioportal", { token: "tok", expiresAt: 100 });
-    assert.deepEqual(requestEntries(base, DEFAULT_CONNECTORS, 10), [{ id: "openevidence" }, { id: "cbioportal", token: "tok" }]);
-    assert.deepEqual(requestEntries(base, DEFAULT_CONNECTORS, 200), [{ id: "openevidence" }, { id: "cbioportal" }], "an expired token is not sent");
-    const out = withToken(base, "cbioportal", null);
-    assert.deepEqual(out.on, ["openevidence"]);
+  test("signing out switches the connector off", () => {
+    const st = withToken(withOn(withOn({ on: [], tokens: {} }, "cbioportal", true), "openevidence", true), "cbioportal", { token: "tok", expiresAt: 100 });
+    assert.deepEqual(withToken(st, "cbioportal", null).on, ["openevidence"]);
+  });
+  test("a request names what is on and may be, each with its token", () => {
+    const st = withToken(withToken(withOn(withOn({ on: [], tokens: {} }, "cbioportal", true), "openevidence", true), "openevidence", { token: "k" }), "cbioportal", { token: "tok", expiresAt: 100 });
+    assert.deepEqual(requestEntries(st, DEFAULT_CONNECTORS, 10), [{ id: "openevidence", token: "k" }, { id: "cbioportal", token: "tok" }]);
+    assert.deepEqual(requestEntries(st, DEFAULT_CONNECTORS, 200), [{ id: "openevidence", token: "k" }], "a sign-in that has run out is not named");
     assert.deepEqual(requestEntries(withOn({ on: [], tokens: {} }, "x", true), DEFAULT_CONNECTORS, 1), [], "an id the deployment does not have is not named");
+  });
+  test("one stored as on that has no credential is not named, as the panel shows it off (it was: 'no API token' on every message)", () => {
+    const st = withOn({ on: [], tokens: {} }, "openevidence", true);
+    assert.deepEqual(st.on, ["openevidence"]);
+    assert.deepEqual(requestEntries(st, DEFAULT_CONNECTORS, 10), []);
+    assert.deepEqual(requestEntries(withToken(st, "openevidence", { token: "k" }), DEFAULT_CONNECTORS, 10), [{ id: "openevidence", token: "k" }], "and is named once it has one");
   });
 });

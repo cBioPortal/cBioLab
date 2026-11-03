@@ -95,7 +95,12 @@ function ChatPanel({ info }: { info: ChatInfo }) {
   infoRef.current = info;
   const statusSink = useRef<(s: ConnectorStatus[]) => void>(() => {});
   statusSink.current = (list) => setConnStatus(Object.fromEntries(list.map((s) => [s.id, s])));
-  const saveConn = (next: ConnectorState) => { setConn(next); setConnSaveFailed(!saveState(local(), next)); };
+  // a connector's last-turn status describes the settings it had then: any change to it clears the status
+  const saveConn = (next: ConnectorState, changed: string) => {
+    setConn(next);
+    setConnSaveFailed(!saveState(local(), next));
+    setConnStatus((s) => Object.fromEntries(Object.entries(s).filter(([id]) => id !== changed)));
+  };
 
   const transport = useMemo(() => new DefaultChatTransport({
     api: "/api/chat",
@@ -227,9 +232,9 @@ function ChatPanel({ info }: { info: ChatInfo }) {
         onClear={() => { setHistory([]); setHistoryNote({ dropped: 0, failed: !saveHistory(local(), []) }); }} />}
       {showConnectors && <ConnectorsPanel connectors={info.connectors} error={info.connectorsError} state={conn} status={connStatus} note={connNote} saveFailed={connSaveFailed}
         onDismissNote={() => setConnNote(null)}
-        onSwitch={(id, on) => saveConn(withOn(conn, id, on))}
-        onDisconnect={(id) => saveConn(withToken(conn, id, null))}
-        onSaveToken={(id, token) => saveConn(withToken(conn, id, { token }))}
+        onSwitch={(id, on) => saveConn(withOn(conn, id, on), id)}
+        onDisconnect={(id) => saveConn(withToken(conn, id, null), id)}
+        onSaveToken={(id, token) => saveConn(withToken(conn, id, { token }), id)}
         onConnect={(id) => { location.assign(connectUrl(id, location.pathname + location.search)); }} />}
       <Conversation className={showHistory || showConnectors ? "hidden" : undefined}>
         <ConversationContent>
