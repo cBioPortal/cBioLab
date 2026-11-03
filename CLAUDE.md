@@ -40,7 +40,9 @@ for the area you are changing first. The parts most changes touch:
 - **Agents** — WebMCP tools `lib/webmcp.ts` / `app/lab/agent-tools.ts`; MCP server `mcp/tools.ts`.
   **Federation is not MCP**: peers talk through `lib/federation-api.ts` at `/api/federation/v1/<op>`;
   never register a federation op as an MCP tool. **The chat sidebar is the app's only model call and
-  is just another WebMCP client** — never give it a private way in. **The campaign engine never
+  is just another WebMCP client** — never give it a private way in. (The one exception is a
+  *connector*: an external MCP server the reader switches on, every call approved first, that reaches
+  only what the model puts in the call — [`ARCHITECTURE.md`](docs/ARCHITECTURE.md).) **The campaign engine never
   calls a model**, and a locked campaign is immutable at the database level.
 
 Other docs: [`DOMAIN.md`](docs/DOMAIN.md) (what the domain's words mean),
