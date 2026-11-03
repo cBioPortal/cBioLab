@@ -136,6 +136,25 @@ msk_impact_2017 and msk_chord_2024; the legacy tables match cBioPortal's own imp
 difference (msk_impact_2017's 5 shared-event mutations, below). An update of one sample's files
 leaves every `lab_` table as a fresh import of the edited study would.
 
+### From an existing cBioPortal database
+
+`scripts/convert-legacy.ts` (`lib/importer/from-legacy.ts`) builds a `new`-mode database from a
+database in cBioPortal's own schema on the same ClickHouse server, by SQL alone, with no study
+files: the destination is `CLICKHOUSE_DB`, the source `--from <db>`.
+
+```
+node scripts/convert-legacy.ts --from cbioportal --setup            # reference tables, lab_ tables, views
+node scripts/convert-legacy.ts --from cbioportal msk_chord_2024     # named studies
+node scripts/convert-legacy.ts --from cbioportal --changed          # studies new or re-imported since the last run
+```
+
+A study is converted into staging tables and merged in as an import is, so converting it again
+writes only what changed; `--changed` compares each study's `import_date` and removes studies the
+source no longer has. Generic assay profiles are left out and named, as the `lab_` tables do not
+hold them yet. Timeline values are stored with their keys sorted (cBioPortal's tables keep no
+order for them). Verified: converting `both`-mode lgg_ucsf_2014, acc_tcga and msk_chord_2024
+gives `lab_` tables identical, row for row and column for column, to the ones their import wrote.
+
 ## Live updates and reviews
 
 `/import/updates` (new-mode databases) changes an imported study the ways a live portal does, so
