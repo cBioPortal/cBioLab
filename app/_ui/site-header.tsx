@@ -1,8 +1,9 @@
 "use client";
 // THE app's header, the same on every page: the name (home), which page this is, the same links in
-// the same order, a page's own tools (its assistant menu), "Saved work" and the sign-in. "Saved work"
+// the same order, a page's own tools (its assistant menu), "Saved work", "Clear cache" and the sign-in. "Saved work"
 // opens the saved-work manager over the page (app/_saved); its link is the same manager as a page.
-import { Bookmark } from "lucide-react";
+import { useState } from "react";
+import { Bookmark, Loader2, RotateCcw } from "lucide-react";
 import LoginButton from "../lab/login-button.tsx";
 import { Button } from "./button";
 import { TB } from "./toolbar.ts";
@@ -21,6 +22,31 @@ const LINKS = [
 export type SiteLink = typeof LINKS[number][0] | "import";
 
 const plainClick = (e: React.MouseEvent) => !e.metaKey && !e.ctrlKey && !e.shiftKey;
+
+/** Clears the result cache for the whole deployment (POST /api/cache), for anyone, then reloads the page. */
+function ClearCacheButton() {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const clear = async () => {
+    if (!confirm("Clear the result cache for the whole deployment? Every analysis, Explore page and study list is computed again on its next request.")) return;
+    setBusy(true); setFailed(null);
+    try {
+      const r = await fetch("/api/cache", { method: "POST" });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(body.error || "HTTP " + r.status);
+      location.reload();
+    } catch (e) {
+      setFailed(String((e as Error)?.message || e));
+      setBusy(false);
+    }
+  };
+  return (
+    <Button variant="outline" size="sm" className={TB} onClick={() => void clear()} disabled={busy}
+      data-tip={failed ? "the cache was not cleared: " + failed : "clear every cached result, on every server, and reload this page"}>
+      {busy ? <Loader2 className="animate-spin" /> : <RotateCcw />}{failed ? "Clear cache — failed" : "Clear cache"}
+    </Button>
+  );
+}
 
 export function SiteHeader({ page, current, onLink, children }: {
   /** which page this is, beside the name */
@@ -50,6 +76,7 @@ export function SiteHeader({ page, current, onLink, children }: {
         <a href="/saved" data-tip="your saved cohorts, analyses, uploads, groups and gene lists"
           onClick={(e) => { if (plainClick(e) && current !== "saved") { e.preventDefault(); saved.open("cohorts"); } }}><Bookmark />Saved work</a>
       </Button>
+      <ClearCacheButton />
       <LoginButton />
     </header>
   );
