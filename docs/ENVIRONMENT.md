@@ -136,6 +136,8 @@ see the security notes below.
 | `CHAT_MODEL` | Claude Sonnet 5.5 under the provider's id | the model |
 | `CHAT_EFFORT` | `medium` | `low`, `medium`, `high`, `xhigh` or `max` |
 | `CHAT_ON_DEPLOYMENT` | — | `1`: also on a built deployment (never on Vercel), for signed-in users only |
+| `CHAT_CONNECTORS` | OpenEvidence and cBioPortal MCP | a JSON array of the external MCP servers the sidebar may offer, each `{id, name, url (https), auth: "none"\|"oauth"\|"token", tokenHeader (with "token"), what, sendsFreeText, tools?}`; `[]` offers none. A malformed entry is an error, never skipped |
+| `CHAT_APPROVAL_SECRET` | `AUTH_SESSION_SECRET`, else one per process | signs the approval requests for connector calls, so a browser cannot forge one. Set it where several instances serve the chat, or an approval that lands on another instance is refused and the call is asked for again |
 
 The sidebar keeps a history of conversations in the browser's `localStorage` (key
 `cohortlab.chat.history`; `lib/chat-history.ts`), opened from the clock button in its header. It keeps
@@ -143,6 +145,13 @@ the latest 30 conversations, up to 100 messages each, as **text only**: the read
 assistant's replies, never what the tools returned. The live conversation stays in `sessionStorage`
 with its tool results, which the resume-after-reload path needs. The history menu says when the
 oldest conversation was dropped, and when the browser's storage is full or blocked.
+
+**Connectors** (issue #128) are external MCP servers the reader switches on in the sidebar's plug menu; all are
+off until then. OpenEvidence takes an API token the reader pastes (sent in `x-api-token`); cBioPortal MCP takes an
+OAuth sign-in (`/api/chat/connectors/oauth/…`, standard MCP OAuth with dynamic client registration, so the
+server must accept this app's `/api/chat/connectors/oauth/callback` as a redirect). Tokens stay in the reader's
+browser. Every connector call waits for the reader's approval. See `ARCHITECTURE.md` for the rule and
+`DATA-BOUNDARY.md` for what it sends.
 
 Where the assistant is on, the patient page also shows a **Summarize** button that puts a fixed prompt
 (`lib/summarize-prompt.ts`) to it in a new conversation; it has no setting of its own, so turning the

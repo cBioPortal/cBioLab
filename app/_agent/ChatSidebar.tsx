@@ -11,12 +11,17 @@
 // conversation and whether the panel is open live in sessionStorage; a conversation whose last
 // step was a tool call carries on once the new page's tools are up.
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai";
-import { ArrowLeftIcon, ArrowUpIcon, CheckIcon, HistoryIcon, MessageSquareIcon, PencilIcon, RotateCcwIcon, SquareIcon, SquarePenIcon, Trash2Icon, XIcon } from "lucide-react";
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses, lastAssistantMessageIsCompleteWithToolCalls, type UIMessage } from "ai";
+import { ArrowLeftIcon, ArrowUpIcon, CheckIcon, HistoryIcon, MessageSquareIcon, PencilIcon, PlugIcon, RotateCcwIcon, ShieldAlertIcon, SquareIcon, SquarePenIcon, Trash2Icon, XIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/app/_ui/button";
 import { Textarea } from "@/app/_ui/textarea";
 import { Input } from "@/app/_ui/input";
+import { Checkbox } from "@/app/_ui/checkbox";
+import { fromToolName, type ConnectorStatus, type PublicConnector } from "../../lib/chat-connectors.ts";
+import {
+  CONNECTOR_NOTE_KEY, canSwitchOn, connectUrl, loadState, requestEntries, saveState, signedIn, withOn, withToken, type ConnectorState
+} from "../../lib/chat-connector-state.ts";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/app/_ui/ai/conversation";
 import { Message, MessageContent, MessageResponse } from "@/app/_ui/ai/message";
 import { Reasoning } from "@/app/_ui/ai/reasoning";
@@ -49,6 +54,10 @@ function store(key: string, v: unknown) {
 const local = (): Storage | null => { try { return window.localStorage; } catch { return null; } };
 const newId = () => (globalThis.crypto?.randomUUID?.() ?? String(Date.now()) + Math.random().toString(36).slice(2));
 type Meta = { tools?: string[]; earlier?: string } | undefined;
+/** a message the connector sign-in left for this page (sessionStorage), shown once */
+function takeNote(): string | null {
+  try { const n = sessionStorage.getItem(CONNECTOR_NOTE_KEY); if (n) sessionStorage.removeItem(CONNECTOR_NOTE_KEY); return n; } catch { return null; }
+}
 
 /** The page's tools, waiting briefly for a page that registers them after it mounts. */
 async function waitForPage(ms = 10000): Promise<PageApi | null> {
@@ -76,21 +85,41 @@ function ChatPanel({ info }: { info: ChatInfo }) {
   const [historyNote, setHistoryNote] = useState<{ dropped: number; failed: boolean }>({ dropped: 0, failed: false });
   const [showHistory, setShowHistory] = useState(false);
   const initial = useMemo(() => stored<UIMessage[]>(STORE, []), []);
+  // connectors (issue #128): the reader's switches and sign-ins, kept in this browser; off until switched on
+  const [conn, setConn] = useState<ConnectorState>(() => loadState(local()));
+  const [connSaveFailed, setConnSaveFailed] = useState(false);
+  const [connStatus, setConnStatus] = useState<Record<string, ConnectorStatus>>({});
+  const [connNote, setConnNote] = useState<string | null>(() => takeNote());
+  const [showConnectors, setShowConnectors] = useState<boolean>(() => !!connNote);
+  const infoRef = useRef(info);
+  infoRef.current = info;
+  const statusSink = useRef<(s: ConnectorStatus[]) => void>(() => {});
+  statusSink.current = (list) => setConnStatus(Object.fromEntries(list.map((s) => [s.id, s])));
+  const saveConn = (next: ConnectorState) => { setConn(next); setConnSaveFailed(!saveState(local(), next)); };
 
   const transport = useMemo(() => new DefaultChatTransport({
     api: "/api/chat",
+    // what is on is read when the request is made, so a switch applies to the very next message
     prepareSendMessagesRequest: ({ messages }) => {
       const p = pageApi();
-      return { body: { messages, page: p?.page ?? location.pathname, tools: p?.tools ?? [] } };
+      const connectors = requestEntries(loadState(local()), infoRef.current.connectors, Date.now());
+      return { body: { messages, page: p?.page ?? location.pathname, tools: p?.tools ?? [], connectors } };
+    },
+    // what became of each connector this turn comes back in a header
+    fetch: async (input, init) => {
+      const r = await fetch(input, init);
+      try { const h = r.headers.get("x-chat-connectors"); if (h) statusSink.current(JSON.parse(decodeURIComponent(h)) as ConnectorStatus[]); } catch { /* a status is a convenience */ }
+      return r;
     }
   }), []);
 
-  const { messages, sendMessage, addToolOutput, status, error, stop, setMessages, regenerate, clearError } = useChat({
+  const { messages, sendMessage, addToolOutput, addToolApprovalResponse, status, error, stop, setMessages, regenerate, clearError } = useChat({
     id: "sidebar",
     messages: initial,
     transport,
     throttle: 50,
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    // a page tool the browser has run, or a connector call the reader has approved or denied
+    sendAutomaticallyWhen: (o) => lastAssistantMessageIsCompleteWithToolCalls(o) || lastAssistantMessageIsCompleteWithApprovalResponses(o),
     onToolCall: async ({ toolCall }) => {
       const { toolName, toolCallId, input: args } = toolCall;
       try {
@@ -185,7 +214,9 @@ function ChatPanel({ info }: { info: ChatInfo }) {
         <span className="text-md font-medium">Assistant</span>
         <span className="truncate text-xs text-muted-foreground" data-tip="The model behind this assistant">{info.model}</span>
         <span className="flex-1" />
-        <Button variant="ghost" size="icon-sm" onClick={() => setShowHistory((v) => !v)} data-tip={showHistory ? "Back to the conversation" : "Earlier conversations"} aria-label={showHistory ? "Back to the conversation" : "Earlier conversations"} aria-pressed={showHistory}>{showHistory ? <ArrowLeftIcon /> : <HistoryIcon />}</Button>
+        <Button variant="ghost" size="icon-sm" onClick={() => { setShowConnectors((v) => !v); setShowHistory(false); }} aria-pressed={showConnectors}
+          data-tip={"Connectors: external servers the assistant can ask (" + (info.connectors.filter((c) => conn.on.includes(c.id)).length || "none") + " on)"} aria-label="Connectors"><PlugIcon /></Button>
+        <Button variant="ghost" size="icon-sm" onClick={() => { setShowHistory((v) => !v); setShowConnectors(false); }} data-tip={showHistory ? "Back to the conversation" : "Earlier conversations"} aria-label={showHistory ? "Back to the conversation" : "Earlier conversations"} aria-pressed={showHistory}>{showHistory ? <ArrowLeftIcon /> : <HistoryIcon />}</Button>
         <Button variant="ghost" size="icon-sm" onClick={newChat} data-tip="New conversation" aria-label="New conversation"><SquarePenIcon /></Button>
         <Button variant="ghost" size="icon-sm" onClick={() => setOpen(false)} data-tip="Close" aria-label="Close the assistant"><XIcon /></Button>
       </div>
@@ -194,7 +225,13 @@ function ChatPanel({ info }: { info: ChatInfo }) {
         onRename={(id, t) => { const h = renamed(history, id, t); setHistory(h); setHistoryNote((n) => ({ ...n, failed: !saveHistory(local(), h) })); }}
         onRemove={(id) => { const h = removed(history, id); setHistory(h); setHistoryNote((n) => ({ ...n, failed: !saveHistory(local(), h) })); if (id === convId) newChat(); }}
         onClear={() => { setHistory([]); setHistoryNote({ dropped: 0, failed: !saveHistory(local(), []) }); }} />}
-      <Conversation className={showHistory ? "hidden" : undefined}>
+      {showConnectors && <ConnectorsPanel connectors={info.connectors} error={info.connectorsError} state={conn} status={connStatus} note={connNote} saveFailed={connSaveFailed}
+        onDismissNote={() => setConnNote(null)}
+        onSwitch={(id, on) => saveConn(withOn(conn, id, on))}
+        onDisconnect={(id) => saveConn(withToken(conn, id, null))}
+        onSaveToken={(id, token) => saveConn(withToken(conn, id, { token }))}
+        onConnect={(id) => { location.assign(connectUrl(id, location.pathname + location.search)); }} />}
+      <Conversation className={showHistory || showConnectors ? "hidden" : undefined}>
         <ConversationContent>
           {reopened && (
             <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground" role="note">
@@ -221,6 +258,9 @@ function ChatPanel({ info }: { info: ChatInfo }) {
                   if (part.type === "dynamic-tool" || part.type.startsWith("tool-")) {
                     const t = part as ToolPart;
                     const name = t.type === "dynamic-tool" ? t.toolName : t.type.slice(5);
+                    if (t.state === "approval-requested" && t.approval)
+                      return <ApprovalCard key={j} name={name} input={t.input} connectors={info.connectors}
+                        onRespond={(approved) => void addToolApprovalResponse({ id: t.approval!.id, approved })} />;
                     return (
                       <Tool key={j}>
                         <ToolHeader name={name} state={t.state} />
@@ -249,6 +289,11 @@ function ChatPanel({ info }: { info: ChatInfo }) {
         <ConversationScrollButton />
       </Conversation>
 
+      {info.connectors.some((c) => conn.on.includes(c.id)) && (
+        <p className="shrink-0 border-t px-2.5 pt-2 text-xs text-muted-foreground" role="note">
+          Connectors on: {info.connectors.filter((c) => conn.on.includes(c.id)).map((c) => c.name).join(", ")}. The assistant can ask {info.connectors.filter((c) => conn.on.includes(c.id)).length === 1 ? "it" : "them"}, and you approve each call first.
+        </p>
+      )}
       <form className="shrink-0 border-t p-2.5" onSubmit={(e) => { e.preventDefault(); submit(); }}>
         {info.signInRequired
           ? <p className="text-sm text-muted-foreground">Sign in to use the assistant.</p>
@@ -313,6 +358,105 @@ function TitleField({ initial, onDone }: { initial: string; onDone: (title: stri
       <Input autoFocus value={draft} maxLength={120} aria-label="Conversation title" onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); onDone(null); } }} />
       <Button type="submit" variant="ghost" size="icon-xs" aria-label="Save the title"><CheckIcon /></Button>
+    </form>
+  );
+}
+
+/** A connector call waiting for the reader: where it goes, what it sends, and the two answers. */
+function ApprovalCard({ name, input, connectors, onRespond }: {
+  name: string; input: unknown; connectors: PublicConnector[]; onRespond: (approved: boolean) => void;
+}) {
+  const of = fromToolName(name);
+  const c = of && connectors.find((x) => x.id === of.id);
+  return (
+    <div className="space-y-2 rounded-md border border-mark bg-card p-2.5 text-sm" role="group" aria-label="This call needs your approval">
+      <div className="flex items-start gap-1.5">
+        <ShieldAlertIcon className="mt-0.5 size-4 shrink-0 text-mark" />
+        <p>
+          The assistant wants to call <span className="font-mono text-xs">{of?.tool ?? name}</span> on <span className="font-medium">{c?.name ?? of?.id ?? "an external server"}</span>
+          {c && <> (<span className="font-mono text-xs">{c.host}</span>)</>}, a server outside this app. This is exactly what it would send:
+        </p>
+      </div>
+      <pre className="max-h-48 overflow-auto rounded-sm bg-muted p-1.5 font-mono text-xs whitespace-pre-wrap break-words">{JSON.stringify(input, null, 2)}</pre>
+      <p className="text-xs text-muted-foreground">Deny it if it names a patient or sample, or anything that could identify one person.</p>
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => onRespond(true)}>Approve</Button>
+        <Button size="sm" variant="outline" onClick={() => onRespond(false)}>Deny</Button>
+      </div>
+    </div>
+  );
+}
+
+/** The connectors: off until switched on, each with its sign-in when it needs one, and what became of it last turn. */
+function ConnectorsPanel({ connectors, error, state, status, note, saveFailed, onDismissNote, onSwitch, onDisconnect, onConnect, onSaveToken }: {
+  connectors: PublicConnector[]; error: string | null; state: ConnectorState; status: Record<string, ConnectorStatus>; note: string | null; saveFailed: boolean;
+  onDismissNote: () => void; onSwitch: (id: string, on: boolean) => void; onDisconnect: (id: string) => void; onConnect: (id: string) => void; onSaveToken: (id: string, token: string) => void;
+}) {
+  const now = Date.now();
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-auto p-2.5 text-sm" aria-label="Connectors">
+      <p className="mb-2 text-xs text-muted-foreground">
+        Connectors are external servers the assistant can ask. They are off until you switch them on. What the assistant writes in a call goes to that server, a third party, and this app cannot check it,
+        so you approve every call before it runs, and the assistant is told never to put a patient or sample identifier in one. Switches and sign-ins are kept in this browser only.
+      </p>
+      {error && <p className="mb-2 rounded-md bg-destructive-soft p-2 text-xs text-destructive" role="alert">The deployment&apos;s connectors could not be read: {error}</p>}
+      {note && <p className="mb-2 flex items-start justify-between gap-2 rounded-md bg-muted p-2 text-xs" role="status"><span>{note}</span><button type="button" className="shrink-0 cursor-pointer underline" onClick={onDismissNote}>dismiss</button></p>}
+      {saveFailed && <p className="mb-2 rounded-md bg-destructive-soft p-2 text-xs text-destructive" role="alert">This browser would not keep the setting (its storage is full or blocked), so connectors stay off.</p>}
+      {!error && connectors.length === 0 && <p className="py-6 text-muted-foreground">This deployment has no connectors.</p>}
+      <ul className="space-y-2">
+        {connectors.map((c) => {
+          const can = canSwitchOn(state, c, now);
+          const on = state.on.includes(c.id) && can.ok;
+          const s = status[c.id];
+          return (
+            <li key={c.id} className="space-y-1.5 rounded-md border p-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-medium">{c.name} <span className="font-mono text-xs font-normal text-muted-foreground">{c.host}</span></div>
+                  <div className="text-xs text-muted-foreground">{c.what}</div>
+                </div>
+                <label className="flex shrink-0 items-center gap-1.5 text-xs">
+                  <Checkbox checked={on} disabled={!can.ok && !on} onCheckedChange={(v) => onSwitch(c.id, v === true)} aria-label={"Switch on " + c.name} />
+                  On
+                </label>
+              </div>
+              {c.sendsFreeText && <p className="text-xs text-muted-foreground">It takes free text, so anything the assistant writes in a question leaves this app.</p>}
+              {c.auth === "oauth" && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {signedIn(state, c.id, now)
+                    ? <><span className="text-ok">Signed in</span><Button size="xs" variant="outline" onClick={() => onDisconnect(c.id)}>Disconnect</Button></>
+                    : <><span className="text-muted-foreground">{state.tokens[c.id] ? "Sign-in expired." : "Not signed in."}</span><Button size="xs" onClick={() => onConnect(c.id)}>Connect</Button></>}
+                </div>
+              )}
+              {c.auth === "token" && (
+                signedIn(state, c.id, now)
+                  ? <div className="flex flex-wrap items-center gap-2 text-xs"><span className="text-ok">API token saved in this browser</span><Button size="xs" variant="outline" onClick={() => onDisconnect(c.id)}>Remove token</Button></div>
+                  : <TokenField name={c.name} onSave={(t) => onSaveToken(c.id, t)} />
+              )}
+              {!can.ok && <p className="text-xs text-muted-foreground">Cannot be switched on: {can.why}.</p>}
+              {on && s && !s.ok && (
+                <p className="text-xs text-destructive" role="alert">
+                  Not available at the last message: {s.reason}.
+                  {s.signIn && c.auth === "oauth" && <> <button type="button" className="cursor-pointer underline" onClick={() => onConnect(c.id)}>Connect again</button></>}
+                  {s.signIn && c.auth === "token" && <> Remove the token and add a good one.</>}
+                </p>
+              )}
+              {on && s?.ok && <p className="text-xs text-muted-foreground">Reached at the last message ({s.tools} {s.tools === 1 ? "tool" : "tools"}).</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** An API token being typed: the draft stays in this field; it is sent only to the connector's own server, in the header it names. */
+function TokenField({ name, onSave }: { name: string; onSave: (token: string) => void }) {
+  const [draft, setDraft] = useState("");
+  return (
+    <form className="flex items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { onSave(draft.trim()); setDraft(""); } }}>
+      <Input type="password" autoComplete="off" value={draft} placeholder="Paste your API token" aria-label={"API token for " + name} className="h-7 text-xs" onChange={(e) => setDraft(e.target.value)} />
+      <Button type="submit" size="xs" disabled={!draft.trim()}>Save</Button>
     </form>
   );
 }

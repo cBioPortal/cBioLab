@@ -399,9 +399,21 @@ and commit both.
   assistant (Claude in Chrome, Claude Desktop) does: each request sends the tools the page exposes
   (`window.cohortLab.tools`), the route declares them **without implementations**, and every call
   runs in the browser through `window.cohortLab.call`. **Never give it a private way in** — no
-  tools in the route, no reading page state or calling the engine or an API directly. A capability
+  page tools in the route, no reading page state or calling the engine or an API directly. A capability
   it lacks is a new WebMCP tool, which every assistant then gets. Opening a page reloads it, so the conversation lives in
   `sessionStorage` and resumes on the new page's tools. No other route calls a model.
+  **The one exception is a connector** (`lib/chat-connectors.ts`, `lib/chat-connector-tools.ts`, issue
+  #128): an external MCP server the reader switches on — off by default — that the route itself calls.
+  It reaches only what the model puts in a call the reader approves, never the app's data, the engine or
+  the page; page tools still run in the browser through `window.cohortLab`. The rules that keep it that way:
+  a request names a connector by **id** and the address always comes from the deployment's registry
+  (`CHAT_CONNECTORS`, else the defaults), so a request cannot point the route anywhere; every connector tool
+  is namespaced `<id>__<tool>`, **waits for the reader's approval** (the sidebar shows the server and the exact
+  arguments; approval requests are signed, so a browser cannot forge one) and has no "always allow"; the
+  reader's token (an OAuth sign-in, `lib/chat-connector-oauth.ts`, or a pasted API token) lives in their browser
+  (`localStorage`) and is sent per request, never stored, logged, cached or returned by the server; a connector that
+  cannot be reached is reported in the `x-chat-connectors` header and left out of that turn. The data-boundary
+  side is in [`DATA-BOUNDARY.md`](DATA-BOUNDARY.md) (Known limits).
 - **`mcp/tools.ts`** — MCP registry, for agents: `describe_dsl`, `run_analysis`, `render_oncoprint` (+v1
   event tools). MCP returns oncoprints as a static image rendered from the server SVG; the
   interactive figure is the web app's, not a third renderer. It serves no federation: that is
