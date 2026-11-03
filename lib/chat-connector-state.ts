@@ -50,7 +50,11 @@ export function withToken(s: ConnectorState, id: string, t: ConnectorToken | nul
   if (t) tokens[id] = t; else delete tokens[id];
   return { on: t ? s.on : s.on.filter((x) => x !== id), tokens };
 }
-/** What a chat request names: each connector that is on, with its token when it has a good one. */
+/**
+ * What a chat request names: each connector that is on AND may be (an OAuth or token one has a good
+ * credential), with its token. One stored as on that has lost its credential is left out, as the panel
+ * shows it off, so the model is not told about a connector that cannot answer.
+ */
 export function requestEntries(s: ConnectorState, known: Pick<Connector, "id" | "auth">[], now: number): { id: string; token?: string }[] {
-  return known.filter((c) => s.on.includes(c.id)).map((c) => ({ id: c.id, ...(signedIn(s, c.id, now) ? { token: s.tokens[c.id].token } : {}) }));
+  return known.filter((c) => s.on.includes(c.id) && canSwitchOn(s, c, now).ok).map((c) => ({ id: c.id, ...(signedIn(s, c.id, now) ? { token: s.tokens[c.id].token } : {}) }));
 }
