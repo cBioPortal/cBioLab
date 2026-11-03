@@ -137,6 +137,10 @@ see the security notes below.
 | `CHAT_EFFORT` | `medium` | `low`, `medium`, `high`, `xhigh` or `max` |
 | `CHAT_ON_DEPLOYMENT` | — | `1`: also on a built deployment (never on Vercel), for signed-in users only |
 
+Where the assistant is on, the patient page also shows a **Summarize** button that puts a fixed prompt
+(`lib/summarize-prompt.ts`) to it in a new conversation; it has no setting of its own, so turning the
+assistant off removes it. What it sends is described in `DATA-BOUNDARY.md`, "Known limits".
+
 Bedrock reads AWS credentials through the standard chain, re-read on every request, so a
 refreshed credentials file needs no restart. The internal instance
 (cbiolab.cbioportal.aws.mskcc.org) relies on that: it uses Bedrock with the credentials file the

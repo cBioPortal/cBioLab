@@ -19,12 +19,12 @@ import { Textarea } from "@/app/_ui/textarea";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/app/_ui/ai/conversation";
 import { Message, MessageContent, MessageResponse } from "@/app/_ui/ai/message";
 import { Reasoning } from "@/app/_ui/ai/reasoning";
+import { ASK_EVENT, chatInfo, type AskDetail, type ChatInfo } from "./ask.ts";
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolPart } from "@/app/_ui/ai/tool";
 
 const STORE = "cohortlab.chat";
 const OPEN = "cohortlab.chat.open";
 
-interface ChatInfo { enabled: boolean; signInRequired: boolean; model: string | null }
 interface PageApi { page: string; tools: { name: string; description: string; input: object }[]; call: (name: string, args: object) => Promise<unknown> }
 
 const pageApi = (): PageApi | null => (window as unknown as { cohortLab?: PageApi }).cohortLab ?? null;
@@ -50,7 +50,7 @@ async function waitForPage(ms = 10000): Promise<PageApi | null> {
 export function ChatSidebar() {
   const [info, setInfo] = useState<ChatInfo | null>(null);
   useEffect(() => {
-    fetch("/api/chat").then((r) => r.ok ? r.json() : null).then(setInfo, () => setInfo(null));
+    void chatInfo().then(setInfo);
   }, []);
   if (!info?.enabled) return null;
   return <ChatPanel info={info} />;
@@ -114,6 +114,22 @@ function ChatPanel({ info }: { info: ChatInfo }) {
     setInput("");
   };
   const newChat = () => { void stop(); setMessages([]); clearError(); store(STORE, null); };
+
+  // A page's question (app/_agent/ask.ts, the patient page's Summarize): handled as typed text is,
+  // after the reader agrees to drop a conversation that has something in it.
+  const ask = useRef<(d: AskDetail) => void>(() => {});
+  ask.current = ({ text, newChat: fresh = true }) => {
+    if (info.signInRequired || !text.trim()) return;
+    if (fresh && messages.length && !window.confirm("Start a new conversation? This replaces the current one.")) return;
+    if (fresh) newChat();
+    setOpen(true);
+    void sendMessage({ text });
+  };
+  useEffect(() => {
+    const on = (e: Event) => ask.current((e as CustomEvent<AskDetail>).detail);
+    window.addEventListener(ASK_EVENT, on);
+    return () => window.removeEventListener(ASK_EVENT, on);
+  }, []);
 
   if (!open)
     return (
