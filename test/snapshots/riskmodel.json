@@ -997,6 +997,118 @@
         "aggregateOnly": []
       },
       "caveat": "Association, not cause: a gene's weight is its link to OS with the other candidates held fixed, in this cohort. Without strata, a gene that marks a cancer type carries that type's prognosis; on a cohort of several cancer types, stratify by CANCER_TYPE. Each patient is scored only by models that did not train on them. The group cuts are equal quantiles of the score, chosen without the outcome. Genes outside the panels every patient was sequenced on are not candidates, so a patient is never counted as wild-type for a gene they were not tested for. Table 1 describes the patients the curves draw; its rows marked “in the model” (the model's genes and covariates) and “outcome” differ between the groups by construction, so they get no q-value and are left out of the correction. The C-index ignores delayed entry. Seeded (seed 1): the same document gives the same model.",
+      "findings": {
+        "version": 1,
+        "kind": "riskmodel",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "table1:attribute:STAGE_HIGHEST_RECORDED:p",
+            "value": 1.1468149488184953e-11,
+            "checked": "table1:attribute:STAGE_HIGHEST_RECORDED:p"
+          },
+          {
+            "name": "table1:attribute:STAGE_HIGHEST_RECORDED:q",
+            "value": 1.9113582480308254e-11,
+            "checked": "table1:attribute:STAGE_HIGHEST_RECORDED:q"
+          },
+          {
+            "name": "table1:attribute:GENDER:p",
+            "value": 3.678865795731468e-33,
+            "checked": "table1:attribute:GENDER:p"
+          },
+          {
+            "name": "table1:attribute:GENDER:q",
+            "value": 9.197164489328671e-33,
+            "checked": "table1:attribute:GENDER:q"
+          },
+          {
+            "name": "table1:attribute:SMOKING_PREDICTIONS_3_CLASSES:p",
+            "value": 6.868370703147977e-100,
+            "checked": "table1:attribute:SMOKING_PREDICTIONS_3_CLASSES:p"
+          },
+          {
+            "name": "table1:attribute:SMOKING_PREDICTIONS_3_CLASSES:q",
+            "value": 3.4341853515739883e-99,
+            "checked": "table1:attribute:SMOKING_PREDICTIONS_3_CLASSES:q"
+          },
+          {
+            "name": "table1:attribute:CURRENT_AGE_DEID:p",
+            "value": 1.1491177580358153e-7,
+            "checked": "table1:attribute:CURRENT_AGE_DEID:p"
+          },
+          {
+            "name": "table1:attribute:CURRENT_AGE_DEID:q",
+            "value": 1.1491177580358153e-7,
+            "checked": "table1:attribute:CURRENT_AGE_DEID:q"
+          },
+          {
+            "name": "table1:gene:KEAP1:p",
+            "value": 0,
+            "checked": "table1:gene:KEAP1:p"
+          },
+          {
+            "name": "table1:gene:TP53:p",
+            "value": 0,
+            "checked": "table1:gene:TP53:p"
+          },
+          {
+            "name": "table1:gene:ZFHX3:p",
+            "value": 4.156318193331212e-10,
+            "checked": "table1:gene:ZFHX3:p"
+          },
+          {
+            "name": "table1:gene:ZFHX3:q",
+            "value": 5.195397741664015e-10,
+            "checked": "table1:gene:ZFHX3:q"
+          },
+          {
+            "name": "table1:attribute:CURRENT_AGE_DEID:Low risk:median",
+            "value": 72,
+            "checked": "table1:attribute:CURRENT_AGE_DEID:Low risk:median"
+          },
+          {
+            "name": "table1:attribute:CURRENT_AGE_DEID:Low risk:q1",
+            "value": 64,
+            "checked": "table1:attribute:CURRENT_AGE_DEID:Low risk:q1"
+          },
+          {
+            "name": "table1:attribute:CURRENT_AGE_DEID:Low risk:q3",
+            "value": 79,
+            "checked": "table1:attribute:CURRENT_AGE_DEID:Low risk:q3"
+          },
+          {
+            "name": "table1:attribute:CURRENT_AGE_DEID:Intermediate risk:median",
+            "value": 71,
+            "checked": "table1:attribute:CURRENT_AGE_DEID:Intermediate risk:median"
+          },
+          {
+            "name": "table1:attribute:CURRENT_AGE_DEID:Intermediate risk:q1",
+            "value": 63,
+            "checked": "table1:attribute:CURRENT_AGE_DEID:Intermediate risk:q1"
+          },
+          {
+            "name": "table1:attribute:CURRENT_AGE_DEID:Intermediate risk:q3",
+            "value": 77,
+            "checked": "table1:attribute:CURRENT_AGE_DEID:Intermediate risk:q3"
+          },
+          {
+            "name": "table1:attribute:CURRENT_AGE_DEID:High risk:median",
+            "value": 70,
+            "checked": "table1:attribute:CURRENT_AGE_DEID:High risk:median"
+          },
+          {
+            "name": "table1:attribute:CURRENT_AGE_DEID:High risk:q1",
+            "value": 63,
+            "checked": "table1:attribute:CURRENT_AGE_DEID:High risk:q1"
+          },
+          {
+            "…": "1 more",
+            "sha256": "7b70a442d3dcab1f"
+          }
+        ],
+        "caveat": "Association, not cause: a gene's weight is its link to OS with the other candidates held fixed, in this cohort. Without strata, a gene that marks a cancer type carries that type's prognosis; on a cohort of several cancer types, stratify by CANCER_TYPE. Each patient is scored only by models that did not train on them. The group cuts are equal quantiles of the score, chosen without the outcome. Genes outside the panels every patient was sequenced on are not candidates, so a patient is never counted as wild-type for a gene they were not tested for. Table 1 describes the patients the curves draw; its rows marked “in the model” (the model's genes and covariates) and “outcome” differ between the groups by construction, so they get no q-value and are left out of the correction. The C-index ignores delayed entry. Seeded (seed 1): the same document gives the same model."
+      },
       "method": {
         "steps": [
           {

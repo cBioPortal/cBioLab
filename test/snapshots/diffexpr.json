@@ -2695,6 +2695,118 @@
         "aggregateOnly": []
       },
       "caveat": "Welch's t-test per gene on rna_seq_v2_mrna_median_all_sample_Zscores as stored, Basal-like minus Luminal A, each sample in the cohort one observation, as the portal's group comparison tests expression; computed from three running totals per gene and cohort, so it is exact across sites. 20,006 genes tested, 14 left out (fewer than 3 samples with a value in a cohort, or no variance); q is Benjamini–Hochberg across every gene tested. The 1500 most significant genes are drawn as points, the rest as density. Z-scores are standardised within each study, so a difference is in study-specific units. A t-test on thousands of samples finds tiny differences significant — read the effect, not only the q. Enrichment is preranked GSEA on the unrounded t (Subramanian et al. 2005, weight 1), significance from 1000 random sets of the same size drawn from the same ranking, seeded by the set's name so a shared link reproduces it; p = (b+1)/(m+1) over the same-sign nulls, q is Benjamini–Hochberg across the sets tested (not GSEA's own NES-based FDR). Gene-set permutation ignores gene–gene correlation, so it is anti-conservative next to phenotype permutation, which needs patient-level values. ",
+      "findings": {
+        "version": 1,
+        "kind": "diffexpr",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "diffexpr:tested",
+            "value": 20006,
+            "checked": "diffexpr:tested"
+          },
+          {
+            "name": "diffexpr:TTC36:p",
+            "value": 8.091447449982316e-220,
+            "checked": "diffexpr:TTC36:p"
+          },
+          {
+            "name": "diffexpr:TTC36:q",
+            "value": 1.618774976843462e-215,
+            "checked": "diffexpr:TTC36:q"
+          },
+          {
+            "name": "diffexpr:FSIP1:p",
+            "value": 2.3035779855211427e-204,
+            "checked": "diffexpr:FSIP1:p"
+          },
+          {
+            "name": "diffexpr:FSIP1:q",
+            "value": 2.304269058916799e-200,
+            "checked": "diffexpr:FSIP1:q"
+          },
+          {
+            "name": "diffexpr:SRARP:p",
+            "value": 2.5912634422014837e-200,
+            "checked": "diffexpr:SRARP:p"
+          },
+          {
+            "name": "diffexpr:SRARP:q",
+            "value": 1.728027214156096e-196,
+            "checked": "diffexpr:SRARP:q"
+          },
+          {
+            "name": "diffexpr:DRAIC:p",
+            "value": 5.510248672861103e-190,
+            "checked": "diffexpr:DRAIC:p"
+          },
+          {
+            "name": "diffexpr:DRAIC:q",
+            "value": 2.7559508737314804e-186,
+            "checked": "diffexpr:DRAIC:q"
+          },
+          {
+            "name": "diffexpr:NAT1:p",
+            "value": 2.7043279892965445e-182,
+            "checked": "diffexpr:NAT1:p"
+          },
+          {
+            "name": "diffexpr:NAT1:q",
+            "value": 1.0820557150773334e-178,
+            "checked": "diffexpr:NAT1:q"
+          },
+          {
+            "name": "diffexpr:MAPT-IT1:p",
+            "value": 2.012953202068773e-175,
+            "checked": "diffexpr:MAPT-IT1:p"
+          },
+          {
+            "name": "diffexpr:MAPT-IT1:q",
+            "value": 6.711856960097978e-172,
+            "checked": "diffexpr:MAPT-IT1:q"
+          },
+          {
+            "name": "diffexpr:CT62:p",
+            "value": 6.399560110513753e-157,
+            "checked": "diffexpr:CT62:p"
+          },
+          {
+            "name": "diffexpr:CT62:q",
+            "value": 1.8289942795848305e-153,
+            "checked": "diffexpr:CT62:q"
+          },
+          {
+            "name": "diffexpr:SLC7A13:p",
+            "value": 3.892473730009011e-156,
+            "checked": "diffexpr:SLC7A13:p"
+          },
+          {
+            "name": "diffexpr:SLC7A13:q",
+            "value": 9.734103680320035e-153,
+            "checked": "diffexpr:SLC7A13:q"
+          },
+          {
+            "name": "diffexpr:CYP2B7P:p",
+            "value": 6.350257193661754e-150,
+            "checked": "diffexpr:CYP2B7P:p"
+          },
+          {
+            "name": "diffexpr:CYP2B7P:q",
+            "value": 1.411591615737745e-146,
+            "checked": "diffexpr:CYP2B7P:q"
+          },
+          {
+            "name": "diffexpr:TFF1:p",
+            "value": 5.06156284235556e-149,
+            "checked": "diffexpr:TFF1:p"
+          },
+          {
+            "…": "3131 more",
+            "sha256": "e71b30d6b215ecb9"
+          }
+        ],
+        "caveat": "Welch's t-test per gene on rna_seq_v2_mrna_median_all_sample_Zscores as stored, Basal-like minus Luminal A, each sample in the cohort one observation, as the portal's group comparison tests expression; computed from three running totals per gene and cohort, so it is exact across sites. 20,006 genes tested, 14 left out (fewer than 3 samples with a value in a cohort, or no variance); q is Benjamini–Hochberg across every gene tested. The 1500 most significant genes are drawn as points, the rest as density. Z-scores are standardised within each study, so a difference is in study-specific units. A t-test on thousands of samples finds tiny differences significant — read the effect, not only the q. Enrichment is preranked GSEA on the unrounded t (Subramanian et al. 2005, weight 1), significance from 1000 random sets of the same size drawn from the same ranking, seeded by the set's name so a shared link reproduces it; p = (b+1)/(m+1) over the same-sign nulls, q is Benjamini–Hochberg across the sets tested (not GSEA's own NES-based FDR). Gene-set permutation ignores gene–gene correlation, so it is anti-conservative next to phenotype permutation, which needs patient-level values. "
+      },
       "method": {
         "steps": [
           {

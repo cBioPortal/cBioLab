@@ -318,6 +318,171 @@
         "msk_met_2021"
       ],
       "note": "cross-study comparison (msk_chord_2024, msk_met_2021): denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic",
+      "findings": {
+        "version": 1,
+        "kind": "compare",
+        "source": "kind",
+        "findings": [
+          {
+            "name": "profiled",
+            "value": 25574,
+            "gene": "APC",
+            "cohort": "TP53 mut",
+            "unit": "samples",
+            "checked": "compare:APC:TP53 mut:profiled"
+          },
+          {
+            "name": "altered",
+            "value": 6077,
+            "gene": "APC",
+            "cohort": "TP53 mut",
+            "unit": "samples",
+            "checked": "compare:APC:TP53 mut:altered"
+          },
+          {
+            "name": "driver_altered",
+            "value": 5516,
+            "gene": "APC",
+            "cohort": "TP53 mut",
+            "unit": "samples",
+            "checked": "compare:APC:TP53 mut:driver"
+          },
+          {
+            "name": "pct_altered",
+            "value": 23.76241495268632,
+            "gene": "APC",
+            "cohort": "TP53 mut",
+            "unit": "percent"
+          },
+          {
+            "name": "pct_driver_altered",
+            "value": 21.568780792992882,
+            "gene": "APC",
+            "cohort": "TP53 mut",
+            "unit": "percent"
+          },
+          {
+            "name": "profiled",
+            "value": 24697,
+            "gene": "APC",
+            "cohort": "TP53 wt",
+            "unit": "samples",
+            "checked": "compare:APC:TP53 wt:profiled"
+          },
+          {
+            "name": "altered",
+            "value": 2489,
+            "gene": "APC",
+            "cohort": "TP53 wt",
+            "unit": "samples",
+            "checked": "compare:APC:TP53 wt:altered"
+          },
+          {
+            "name": "driver_altered",
+            "value": 2049,
+            "gene": "APC",
+            "cohort": "TP53 wt",
+            "unit": "samples",
+            "checked": "compare:APC:TP53 wt:driver"
+          },
+          {
+            "name": "pct_altered",
+            "value": 10.078147143377738,
+            "gene": "APC",
+            "cohort": "TP53 wt",
+            "unit": "percent"
+          },
+          {
+            "name": "pct_driver_altered",
+            "value": 8.296554237356764,
+            "gene": "APC",
+            "cohort": "TP53 wt",
+            "unit": "percent"
+          },
+          {
+            "name": "p_altered",
+            "value": 0,
+            "gene": "APC",
+            "unit": "p",
+            "test": "Fisher's exact",
+            "checked": "compare:APC:p_any"
+          },
+          {
+            "name": "p_driver_altered",
+            "value": 0,
+            "gene": "APC",
+            "unit": "p",
+            "test": "Fisher's exact",
+            "checked": "compare:APC:p_driver"
+          },
+          {
+            "name": "q_altered",
+            "value": 0,
+            "gene": "APC",
+            "unit": "q",
+            "test": "Benjamini–Hochberg over this view's genes",
+            "checked": "compare:APC:q_any"
+          },
+          {
+            "name": "q_driver_altered",
+            "value": 0,
+            "gene": "APC",
+            "unit": "q",
+            "test": "Benjamini–Hochberg over this view's genes",
+            "checked": "compare:APC:q_driver"
+          },
+          {
+            "name": "profiled",
+            "value": 25574,
+            "gene": "KRAS",
+            "cohort": "TP53 mut",
+            "unit": "samples",
+            "checked": "compare:KRAS:TP53 mut:profiled"
+          },
+          {
+            "name": "altered",
+            "value": 7672,
+            "gene": "KRAS",
+            "cohort": "TP53 mut",
+            "unit": "samples",
+            "checked": "compare:KRAS:TP53 mut:altered"
+          },
+          {
+            "name": "driver_altered",
+            "value": 7616,
+            "gene": "KRAS",
+            "cohort": "TP53 mut",
+            "unit": "samples",
+            "checked": "compare:KRAS:TP53 mut:driver"
+          },
+          {
+            "name": "pct_altered",
+            "value": 29.999217955736295,
+            "gene": "KRAS",
+            "cohort": "TP53 mut",
+            "unit": "percent"
+          },
+          {
+            "name": "pct_driver_altered",
+            "value": 29.780245561898802,
+            "gene": "KRAS",
+            "cohort": "TP53 mut",
+            "unit": "percent"
+          },
+          {
+            "name": "profiled",
+            "value": 24697,
+            "gene": "KRAS",
+            "cohort": "TP53 wt",
+            "unit": "samples",
+            "checked": "compare:KRAS:TP53 wt:profiled"
+          },
+          {
+            "…": "50 more",
+            "sha256": "5b1aa6c1b9f0e537"
+          }
+        ]
+      },
       "method": {
         "steps": [
           {
@@ -883,6 +1048,88 @@
         "strata": 1
       },
       "caveat": "Left out of the survival analysis (OS_MONTHS / OS_STATUS), as on cBioPortal — a patient enters only with both a status and a time of at least 0, so a missing status is never read as censored: “TP53 mut”: 57 patients with a status but no usable time; “TP53 wt”: 57 patients with a status but no usable time. OS from each study's own baseline (left truncation applies; baselines are NOT harmonized across studies) Status '0:...' treated as censored. The log-rank test is STRATIFIED by study (2 strata contributed events): each study is compared only against itself, so a difference in case mix between studies cannot masquerade as a difference between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer. Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary.",
+      "findings": {
+        "version": 1,
+        "kind": "survival",
+        "source": "kind",
+        "findings": [
+          {
+            "name": "patients",
+            "value": 25498,
+            "cohort": "TP53 mut",
+            "unit": "patients",
+            "checked": "km:TP53 mut:n"
+          },
+          {
+            "name": "events",
+            "value": 12607,
+            "cohort": "TP53 mut",
+            "unit": "events",
+            "checked": "km:TP53 mut:events"
+          },
+          {
+            "name": "median_months",
+            "value": 30.64106231,
+            "cohort": "TP53 mut",
+            "unit": "months",
+            "checked": "km:TP53 mut:median"
+          },
+          {
+            "name": "missing_outcome",
+            "value": 57,
+            "cohort": "TP53 mut",
+            "unit": "patients"
+          },
+          {
+            "name": "patients",
+            "value": 24618,
+            "cohort": "TP53 wt",
+            "unit": "patients",
+            "checked": "km:TP53 wt:n"
+          },
+          {
+            "name": "events",
+            "value": 8609,
+            "cohort": "TP53 wt",
+            "unit": "events",
+            "checked": "km:TP53 wt:events"
+          },
+          {
+            "name": "median_months",
+            "value": 68.3834867,
+            "cohort": "TP53 wt",
+            "unit": "months",
+            "checked": "km:TP53 wt:median"
+          },
+          {
+            "name": "missing_outcome",
+            "value": 57,
+            "cohort": "TP53 wt",
+            "unit": "patients"
+          },
+          {
+            "name": "logrank_chi2",
+            "value": 1596.4994,
+            "unit": "chi2",
+            "test": "log-rank, stratified by study",
+            "checked": "logrank:chi2"
+          },
+          {
+            "name": "logrank_df",
+            "value": 1,
+            "unit": "df",
+            "test": "log-rank, stratified by study"
+          },
+          {
+            "name": "logrank_p",
+            "value": 0,
+            "unit": "p",
+            "test": "log-rank, stratified by study",
+            "checked": "logrank:p"
+          }
+        ],
+        "caveat": "Left out of the survival analysis (OS_MONTHS / OS_STATUS), as on cBioPortal — a patient enters only with both a status and a time of at least 0, so a missing status is never read as censored: “TP53 mut”: 57 patients with a status but no usable time; “TP53 wt”: 57 patients with a status but no usable time. OS from each study's own baseline (left truncation applies; baselines are NOT harmonized across studies) Status '0:...' treated as censored. The log-rank test is STRATIFIED by study (2 strata contributed events): each study is compared only against itself, so a difference in case mix between studies cannot masquerade as a difference between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer. Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary."
+      },
       "method": {
         "steps": [
           {
@@ -1141,6 +1388,33 @@
         "aggregateOnly": []
       },
       "note": "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary; numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across the 2 tested attributes. Counts are pooled across 2 studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged.",
+      "findings": {
+        "version": 1,
+        "kind": "clinical",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "clinical:TMB_NONSYNONYMOUS:p",
+            "value": 2.4704440628041033e-40,
+            "checked": "clinical:TMB_NONSYNONYMOUS:p"
+          },
+          {
+            "name": "clinical:TMB_NONSYNONYMOUS:q",
+            "value": 2.4704440628041033e-40,
+            "checked": "clinical:TMB_NONSYNONYMOUS:q"
+          },
+          {
+            "name": "clinical:FRACTION_GENOME_ALTERED:p",
+            "value": 0,
+            "checked": "clinical:FRACTION_GENOME_ALTERED:p"
+          },
+          {
+            "name": "clinical:FRACTION_GENOME_ALTERED:q",
+            "value": 0,
+            "checked": "clinical:FRACTION_GENOME_ALTERED:q"
+          }
+        ]
+      },
       "method": {
         "steps": [
           {
@@ -1359,6 +1633,103 @@
         "aggregateOnly": []
       },
       "note": "Pairwise co-occurrence within “TP53 mut” (the first cohort in this view; co-occurrence describes one cohort, not a contrast). Denominators are the patients profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on patients whose panel could not have detected it. With 2 studies the reported test is STRATIFIED by study (Cochran–Mantel–Haenszel): each study contributes a 2×2 and the coordinator combines them, so a pair cannot be manufactured by differing case mix between sites. The pooled Fisher p is shown alongside. q-values are Benjamini–Hochberg across the 6 assessable pairs. Every site returns four counts per pair and nothing else.",
+      "findings": {
+        "version": 1,
+        "kind": "cooccurrence",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "cooccurrence:KRAS/APC:p",
+            "value": 6.829714732997381e-40,
+            "checked": "cooccurrence:KRAS/APC:p"
+          },
+          {
+            "name": "cooccurrence:KRAS/APC:q",
+            "value": 5.653690143319935e-35,
+            "checked": "cooccurrence:KRAS/APC:q"
+          },
+          {
+            "name": "cooccurrence:KRAS/APC:p_cmh",
+            "value": 9.422816905533226e-36,
+            "checked": "cooccurrence:KRAS/APC:p_cmh"
+          },
+          {
+            "name": "cooccurrence:KRAS/PIK3CA:p",
+            "value": 1.8442687564601873e-33,
+            "checked": "cooccurrence:KRAS/PIK3CA:p"
+          },
+          {
+            "name": "cooccurrence:KRAS/PIK3CA:q",
+            "value": 3.948167936521602e-31,
+            "checked": "cooccurrence:KRAS/PIK3CA:q"
+          },
+          {
+            "name": "cooccurrence:KRAS/PIK3CA:p_cmh",
+            "value": 1.316055978840534e-31,
+            "checked": "cooccurrence:KRAS/PIK3CA:p_cmh"
+          },
+          {
+            "name": "cooccurrence:PIK3CA/APC:p",
+            "value": 1.3792171134489835e-8,
+            "checked": "cooccurrence:PIK3CA/APC:p"
+          },
+          {
+            "name": "cooccurrence:PIK3CA/APC:q",
+            "value": 1.1447334025928812e-8,
+            "checked": "cooccurrence:PIK3CA/APC:q"
+          },
+          {
+            "name": "cooccurrence:PIK3CA/APC:p_cmh",
+            "value": 5.723667012964406e-9,
+            "checked": "cooccurrence:PIK3CA/APC:p_cmh"
+          },
+          {
+            "name": "cooccurrence:TP53/KRAS:p",
+            "value": 1,
+            "checked": "cooccurrence:TP53/KRAS:p"
+          },
+          {
+            "name": "cooccurrence:TP53/KRAS:q",
+            "value": 1,
+            "checked": "cooccurrence:TP53/KRAS:q"
+          },
+          {
+            "name": "cooccurrence:TP53/KRAS:p_cmh",
+            "value": 1,
+            "checked": "cooccurrence:TP53/KRAS:p_cmh"
+          },
+          {
+            "name": "cooccurrence:TP53/PIK3CA:p",
+            "value": 0.9999999999708962,
+            "checked": "cooccurrence:TP53/PIK3CA:p"
+          },
+          {
+            "name": "cooccurrence:TP53/PIK3CA:q",
+            "value": 1,
+            "checked": "cooccurrence:TP53/PIK3CA:q"
+          },
+          {
+            "name": "cooccurrence:TP53/PIK3CA:p_cmh",
+            "value": 1,
+            "checked": "cooccurrence:TP53/PIK3CA:p_cmh"
+          },
+          {
+            "name": "cooccurrence:TP53/APC:p",
+            "value": 1,
+            "checked": "cooccurrence:TP53/APC:p"
+          },
+          {
+            "name": "cooccurrence:TP53/APC:q",
+            "value": 1,
+            "checked": "cooccurrence:TP53/APC:q"
+          },
+          {
+            "name": "cooccurrence:TP53/APC:p_cmh",
+            "value": 1,
+            "checked": "cooccurrence:TP53/APC:p_cmh"
+          }
+        ]
+      },
       "method": {
         "steps": [
           {

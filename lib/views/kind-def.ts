@@ -1,11 +1,12 @@
 // What a view kind is to every page and agent, apart from how it runs (run.ts, server-only): its
-// figure, its title, its part of the results text, its help, what federation needs of it, and its
-// marks. Each kind's lib/views/<kind>/kind.ts is one of these; lib/views/kinds.ts lists them.
+// figure, its title, its part of the results text, its findings, its help, what federation needs of
+// it, and its marks. Each kind's lib/views/<kind>/kind.ts is one of these; lib/views/kinds.ts lists them.
 // Browser-safe.
 import type { ViewKind, ViewResult, ViewResultOf, DrawnResultOf } from "../types.ts";
 import type { SvgOpts } from "../svg-kit.ts";
 import type { ViewHelp } from "../view-help.ts";
 import type { Need } from "../view-coverage.ts";
+import type { Finding } from "../findings.ts";
 
 /** What a kind's text has to hand (lib/result-text.ts builds one per analysis). */
 export interface TextContext {
@@ -30,6 +31,8 @@ export interface ViewKindDef<K extends ViewKind> {
   title?: (v: ViewResultOf<K>) => string;
   /** its paragraph of the results text; false when it has none for this result (lib/result-text.ts) */
   text?: (v: DrawnResultOf<K>, t: TextContext) => void | false;
+  /** its headline numbers, named and typed (lib/findings.ts); the method record's checks without one */
+  findings?: (v: DrawnResultOf<K>) => Finding[];
   /** the plain-language "What is this?" in its header */
   help: ViewHelp;
   /** what it needs of every study it draws (lib/view-coverage.ts); counts only without one */

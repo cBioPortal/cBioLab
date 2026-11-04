@@ -517,6 +517,118 @@
         "aggregateOnly": []
       },
       "caveat": "FACETS allele-specific copy number: each OncoKB driver (v7.5) mutation call — one mutation in one sample — is clonal, subclonal or indeterminate as FACETS called it from its cancer-cell fraction; uncalled calls have an estimate but no call. LOH at the locus is a minor copy number of 0 where one was estimated. Only samples whose FACETS_QC is Pass are used (Colorectal: 4,809 pass, 436 fail; Breast: 6,115 pass, 662 fail); qc: false uses every sample. Whole-genome doubling, purity and ploidy are FACETS's own per-sample calls. Clonality is only as good as the purity estimate behind it: a low-purity sample's clonal mutation can be called subclonal, and a panel's handful of mutations per sample makes each estimate coarse. Two cohorts: Fisher on clonal against subclonal calls per gene (BH across genes) and on WGD.",
+      "findings": {
+        "version": 1,
+        "kind": "clonality",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "clonality:Colorectal:TP53:clonal",
+            "value": 3118,
+            "checked": "clonality:Colorectal:TP53:clonal"
+          },
+          {
+            "name": "clonality:Colorectal:TP53:subclonal",
+            "value": 411,
+            "checked": "clonality:Colorectal:TP53:subclonal"
+          },
+          {
+            "name": "clonality:Colorectal:KRAS:clonal",
+            "value": 1493,
+            "checked": "clonality:Colorectal:KRAS:clonal"
+          },
+          {
+            "name": "clonality:Colorectal:KRAS:subclonal",
+            "value": 285,
+            "checked": "clonality:Colorectal:KRAS:subclonal"
+          },
+          {
+            "name": "clonality:Colorectal:APC:clonal",
+            "value": 3878,
+            "checked": "clonality:Colorectal:APC:clonal"
+          },
+          {
+            "name": "clonality:Colorectal:APC:subclonal",
+            "value": 897,
+            "checked": "clonality:Colorectal:APC:subclonal"
+          },
+          {
+            "name": "clonality:Colorectal:PIK3CA:clonal",
+            "value": 628,
+            "checked": "clonality:Colorectal:PIK3CA:clonal"
+          },
+          {
+            "name": "clonality:Colorectal:PIK3CA:subclonal",
+            "value": 300,
+            "checked": "clonality:Colorectal:PIK3CA:subclonal"
+          },
+          {
+            "name": "clonality:Colorectal:SMAD4:clonal",
+            "value": 489,
+            "checked": "clonality:Colorectal:SMAD4:clonal"
+          },
+          {
+            "name": "clonality:Colorectal:SMAD4:subclonal",
+            "value": 164,
+            "checked": "clonality:Colorectal:SMAD4:subclonal"
+          },
+          {
+            "name": "clonality:Colorectal:CDH1:clonal",
+            "value": 40,
+            "checked": "clonality:Colorectal:CDH1:clonal"
+          },
+          {
+            "name": "clonality:Colorectal:CDH1:subclonal",
+            "value": 17,
+            "checked": "clonality:Colorectal:CDH1:subclonal"
+          },
+          {
+            "name": "clonality:Colorectal:GATA3:clonal",
+            "value": 28,
+            "checked": "clonality:Colorectal:GATA3:clonal"
+          },
+          {
+            "name": "clonality:Colorectal:GATA3:subclonal",
+            "value": 12,
+            "checked": "clonality:Colorectal:GATA3:subclonal"
+          },
+          {
+            "name": "clonality:Breast:TP53:clonal",
+            "value": 2144,
+            "checked": "clonality:Breast:TP53:clonal"
+          },
+          {
+            "name": "clonality:Breast:TP53:subclonal",
+            "value": 277,
+            "checked": "clonality:Breast:TP53:subclonal"
+          },
+          {
+            "name": "clonality:Breast:KRAS:clonal",
+            "value": 38,
+            "checked": "clonality:Breast:KRAS:clonal"
+          },
+          {
+            "name": "clonality:Breast:KRAS:subclonal",
+            "value": 10,
+            "checked": "clonality:Breast:KRAS:subclonal"
+          },
+          {
+            "name": "clonality:Breast:APC:clonal",
+            "value": 19,
+            "checked": "clonality:Breast:APC:clonal"
+          },
+          {
+            "name": "clonality:Breast:APC:subclonal",
+            "value": 7,
+            "checked": "clonality:Breast:APC:subclonal"
+          },
+          {
+            "…": "23 more",
+            "sha256": "7d22b19fdeab740f"
+          }
+        ],
+        "caveat": "FACETS allele-specific copy number: each OncoKB driver (v7.5) mutation call — one mutation in one sample — is clonal, subclonal or indeterminate as FACETS called it from its cancer-cell fraction; uncalled calls have an estimate but no call. LOH at the locus is a minor copy number of 0 where one was estimated. Only samples whose FACETS_QC is Pass are used (Colorectal: 4,809 pass, 436 fail; Breast: 6,115 pass, 662 fail); qc: false uses every sample. Whole-genome doubling, purity and ploidy are FACETS's own per-sample calls. Clonality is only as good as the purity estimate behind it: a low-purity sample's clonal mutation can be called subclonal, and a panel's handful of mutations per sample makes each estimate coarse. Two cohorts: Fisher on clonal against subclonal calls per gene (BH across genes) and on WGD."
+      },
       "method": {
         "steps": [
           {

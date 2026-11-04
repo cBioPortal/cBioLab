@@ -27,6 +27,7 @@ import { upgradeDocument } from "./doc-version.ts";
 import { resolveCohortPercentiles } from "./cohort-percentile.ts";
 import { ATTR_NAME_RE, assertCustomDataPresent } from "./custom-data.ts";
 import { viewRunner } from "./views/index.ts";
+import { viewFindings } from "./view-findings.ts";
 import { Untimed, type ViewRun, type RiskFitter, type EvaluatedCohort } from "./views/run.ts";
 import { overLimit } from "./views/shared.ts";
 import { oncokbPin } from "./annotation.ts";
@@ -648,6 +649,7 @@ async function runAnalysisIn(template: AnalysisDoc | TemplateDoc, opts: RunOpts 
   // Same reason: splitBy's resolved arms are cheaper to attach by position, once, than to
   // thread through every view runner.
   for (const [i, info] of Object.entries(splitByForView)) if (views[+i]) views[+i].splitBy = info;
+  for (const v of views) { const f = viewFindings(v); if (f) v.findings = f; }
 
   return {
     study: docStudy, involvedStudies: involved, oncokbPin: pin,

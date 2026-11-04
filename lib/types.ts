@@ -706,6 +706,8 @@ export interface ViewResultCommon {
   };
   /** what a reader must know to read the numbers right */
   caveat?: string;
+  /** its headline numbers, named and typed for a program to read (lib/findings.ts) */
+  findings?: import("./findings.ts").ViewFindings;
 }
 /**
  * Each view kind's own result fields, beside the common ones. A result of one kind has only its

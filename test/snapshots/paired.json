@@ -143,6 +143,94 @@
         "aggregateOnly": []
       },
       "caveat": "Within patients with samples on both sides, Primary and Metastasis (SAMPLE_TYPE = Primary vs Metastasis; all patients: 2,278 patients), per gene, among those profiled for it on BOTH sides by each side's own panels: an OncoKB driver (v7.5) on both sides, on the Primary side only, or the Metastasis side only; a patient with several samples on a side counts as altered there if any is. Both sides are the cohort's own samples, so a cohort that selects one kind of sample has no pairs. Concordance is both ÷ altered anywhere. The exact McNemar test asks whether discordance runs one way; q is Benjamini–Hochberg across the genes of each cohort. A sample's SAMPLE_TYPE records where the tissue came from, not when it was taken, so Metastasis-only is not the same as \"acquired later\"; and patients sampled twice are a selected group, typically with longer or harder disease courses.",
+      "findings": {
+        "version": 1,
+        "kind": "paired",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "paired:all patients:TP53:p",
+            "value": 0.0014752559593677614,
+            "checked": "paired:all patients:TP53:p"
+          },
+          {
+            "name": "paired:all patients:TP53:q",
+            "value": 0.002360409534988418,
+            "checked": "paired:all patients:TP53:q"
+          },
+          {
+            "name": "paired:all patients:KRAS:p",
+            "value": 0.16508338915579682,
+            "checked": "paired:all patients:KRAS:p"
+          },
+          {
+            "name": "paired:all patients:KRAS:q",
+            "value": 0.18866673046376778,
+            "checked": "paired:all patients:KRAS:q"
+          },
+          {
+            "name": "paired:all patients:PIK3CA:p",
+            "value": 0.07304915944162735,
+            "checked": "paired:all patients:PIK3CA:p"
+          },
+          {
+            "name": "paired:all patients:PIK3CA:q",
+            "value": 0.09739887925550313,
+            "checked": "paired:all patients:PIK3CA:q"
+          },
+          {
+            "name": "paired:all patients:ESR1:p",
+            "value": 7.455210310203303e-9,
+            "checked": "paired:all patients:ESR1:p"
+          },
+          {
+            "name": "paired:all patients:ESR1:q",
+            "value": 2.982084124081321e-8,
+            "checked": "paired:all patients:ESR1:q"
+          },
+          {
+            "name": "paired:all patients:AR:p",
+            "value": 3.091670257478201e-20,
+            "checked": "paired:all patients:AR:p"
+          },
+          {
+            "name": "paired:all patients:AR:q",
+            "value": 2.473336205982561e-19,
+            "checked": "paired:all patients:AR:q"
+          },
+          {
+            "name": "paired:all patients:CDKN2A:p",
+            "value": 0.0012575668195445922,
+            "checked": "paired:all patients:CDKN2A:p"
+          },
+          {
+            "name": "paired:all patients:CDKN2A:q",
+            "value": 0.002360409534988418,
+            "checked": "paired:all patients:CDKN2A:q"
+          },
+          {
+            "name": "paired:all patients:MYC:p",
+            "value": 1.876911518039637e-7,
+            "checked": "paired:all patients:MYC:p"
+          },
+          {
+            "name": "paired:all patients:MYC:q",
+            "value": 5.005097381439033e-7,
+            "checked": "paired:all patients:MYC:q"
+          },
+          {
+            "name": "paired:all patients:TERT:p",
+            "value": 0.8690499708342935,
+            "checked": "paired:all patients:TERT:p"
+          },
+          {
+            "name": "paired:all patients:TERT:q",
+            "value": 0.8690499708342935,
+            "checked": "paired:all patients:TERT:q"
+          }
+        ],
+        "caveat": "Within patients with samples on both sides, Primary and Metastasis (SAMPLE_TYPE = Primary vs Metastasis; all patients: 2,278 patients), per gene, among those profiled for it on BOTH sides by each side's own panels: an OncoKB driver (v7.5) on both sides, on the Primary side only, or the Metastasis side only; a patient with several samples on a side counts as altered there if any is. Both sides are the cohort's own samples, so a cohort that selects one kind of sample has no pairs. Concordance is both ÷ altered anywhere. The exact McNemar test asks whether discordance runs one way; q is Benjamini–Hochberg across the genes of each cohort. A sample's SAMPLE_TYPE records where the tissue came from, not when it was taken, so Metastasis-only is not the same as \"acquired later\"; and patients sampled twice are a selected group, typically with longer or harder disease courses."
+      },
       "method": {
         "steps": [
           {

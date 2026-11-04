@@ -7,6 +7,7 @@ import type { SvgOpts } from "../svg-kit.ts";
 import type { ViewHelp } from "../view-help.ts";
 import type { Need } from "../view-coverage.ts";
 import type { TextContext, ViewKindDef } from "./kind-def.ts";
+import type { Finding } from "../findings.ts";
 import { acquiredKind } from "./acquired/kind.ts";
 import { actionabilityKind } from "./actionability/kind.ts";
 import { adjustedKind } from "./adjusted/kind.ts";
@@ -114,6 +115,7 @@ export interface AnyKindDef {
   figure?: (v: ViewResult, o: SvgOpts) => string | null;
   title?: (v: ViewResult) => string;
   text?: (v: ViewResult, t: TextContext) => void | false;
+  findings?: (v: ViewResult) => Finding[];
   help: ViewHelp; need?: Need; preview?: string; isNew?: boolean;
 }
 

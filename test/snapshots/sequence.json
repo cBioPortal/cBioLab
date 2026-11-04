@@ -654,6 +654,118 @@
         "aggregateOnly": []
       },
       "caveat": "Therapies are grouped into LINES before being sequenced, by the definition every line count here shares: systemic-therapy treatment records (class, from SUBTYPE or else TREATMENT_TYPE, on the systemic list: chemotherapy, immunotherapy, targeted, hormone, biologic, investigational and their spellings; radiation, surgery, bone and ancillary treatment are not lines). A record starting more than 90 days after every earlier one has stopped begins a new line; anything closer is the same line, and a line is labelled by its whole combination (sorted, so 'A + B' and 'B + A' are one regimen). That grouping is the point — a patient here has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision, not several lines. Lines are labelled by SUBTYPE. ENDING A PATH IS SPLIT IN TWO, because the difference matters more than anything else here: 'no further line' means the study kept watching for at least 90 days (one line gap, the same rule that defines a line) and saw no further therapy; 'record ends here' means it did not, so nothing can be concluded about that patient. 55.5% of paths end censored — reading those as patients who finished treatment would be a claim about the record-keeping dressed up as one about the patient. Neither terminal is an outcome measure. 51 less common regimens folded into 'other', which is 23.3% of first-line patients in the first panel — combination regimens have a genuinely long tail, so 'other' is real diversity rather than a rounding bucket. Raise topN to split it further. Both panels share one scale and one colour per regimen, so their heights are directly comparable. TP53 mut: 11,564 with a first line; TP53 wt: 9,689 with a first line.",
+      "findings": {
+        "version": 1,
+        "kind": "sequence",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "sequence:TP53 mut:started",
+            "value": 11564,
+            "checked": "sequence:TP53 mut:started"
+          },
+          {
+            "name": "sequence:TP53 mut:censored",
+            "value": 6417,
+            "checked": "sequence:TP53 mut:censored"
+          },
+          {
+            "name": "sequence:TP53 mut:1:regimen:Chemo:n",
+            "value": 5239,
+            "checked": "sequence:TP53 mut:1:regimen:Chemo:n"
+          },
+          {
+            "name": "sequence:TP53 mut:1:regimen:other:n",
+            "value": 2689,
+            "checked": "sequence:TP53 mut:1:regimen:other:n"
+          },
+          {
+            "name": "sequence:TP53 mut:1:regimen:Biologic + Chemo:n",
+            "value": 995,
+            "checked": "sequence:TP53 mut:1:regimen:Biologic + Chemo:n"
+          },
+          {
+            "name": "sequence:TP53 mut:1:regimen:Hormone:n",
+            "value": 672,
+            "checked": "sequence:TP53 mut:1:regimen:Hormone:n"
+          },
+          {
+            "name": "sequence:TP53 mut:1:regimen:Chemo + Hormone:n",
+            "value": 644,
+            "checked": "sequence:TP53 mut:1:regimen:Chemo + Hormone:n"
+          },
+          {
+            "name": "sequence:TP53 mut:1:regimen:Chemo + Immuno:n",
+            "value": 639,
+            "checked": "sequence:TP53 mut:1:regimen:Chemo + Immuno:n"
+          },
+          {
+            "name": "sequence:TP53 mut:1:regimen:Targeted:n",
+            "value": 273,
+            "checked": "sequence:TP53 mut:1:regimen:Targeted:n"
+          },
+          {
+            "name": "sequence:TP53 mut:1:regimen:Investigational:n",
+            "value": 254,
+            "checked": "sequence:TP53 mut:1:regimen:Investigational:n"
+          },
+          {
+            "name": "sequence:TP53 mut:1:regimen:Chemo + Hormone + Targeted:n",
+            "value": 159,
+            "checked": "sequence:TP53 mut:1:regimen:Chemo + Hormone + Targeted:n"
+          },
+          {
+            "name": "sequence:TP53 mut:2:censored::n",
+            "value": 4206,
+            "checked": "sequence:TP53 mut:2:censored::n"
+          },
+          {
+            "name": "sequence:TP53 mut:2:stopped::n",
+            "value": 3285,
+            "checked": "sequence:TP53 mut:2:stopped::n"
+          },
+          {
+            "name": "sequence:TP53 mut:2:regimen:Chemo:n",
+            "value": 1400,
+            "checked": "sequence:TP53 mut:2:regimen:Chemo:n"
+          },
+          {
+            "name": "sequence:TP53 mut:2:regimen:other:n",
+            "value": 1038,
+            "checked": "sequence:TP53 mut:2:regimen:other:n"
+          },
+          {
+            "name": "sequence:TP53 mut:2:regimen:Biologic + Chemo:n",
+            "value": 538,
+            "checked": "sequence:TP53 mut:2:regimen:Biologic + Chemo:n"
+          },
+          {
+            "name": "sequence:TP53 mut:2:regimen:Hormone:n",
+            "value": 489,
+            "checked": "sequence:TP53 mut:2:regimen:Hormone:n"
+          },
+          {
+            "name": "sequence:TP53 mut:2:regimen:Targeted:n",
+            "value": 174,
+            "checked": "sequence:TP53 mut:2:regimen:Targeted:n"
+          },
+          {
+            "name": "sequence:TP53 mut:2:regimen:Investigational:n",
+            "value": 140,
+            "checked": "sequence:TP53 mut:2:regimen:Investigational:n"
+          },
+          {
+            "name": "sequence:TP53 mut:2:regimen:Chemo + Immuno:n",
+            "value": 133,
+            "checked": "sequence:TP53 mut:2:regimen:Chemo + Immuno:n"
+          },
+          {
+            "…": "68 more",
+            "sha256": "e1938678b41c3748"
+          }
+        ],
+        "caveat": "Therapies are grouped into LINES before being sequenced, by the definition every line count here shares: systemic-therapy treatment records (class, from SUBTYPE or else TREATMENT_TYPE, on the systemic list: chemotherapy, immunotherapy, targeted, hormone, biologic, investigational and their spellings; radiation, surgery, bone and ancillary treatment are not lines). A record starting more than 90 days after every earlier one has stopped begins a new line; anything closer is the same line, and a line is labelled by its whole combination (sorted, so 'A + B' and 'B + A' are one regimen). That grouping is the point — a patient here has a median of 6 treatment records and 4 distinct agents, and combination therapy is several records describing ONE decision, not several lines. Lines are labelled by SUBTYPE. ENDING A PATH IS SPLIT IN TWO, because the difference matters more than anything else here: 'no further line' means the study kept watching for at least 90 days (one line gap, the same rule that defines a line) and saw no further therapy; 'record ends here' means it did not, so nothing can be concluded about that patient. 55.5% of paths end censored — reading those as patients who finished treatment would be a claim about the record-keeping dressed up as one about the patient. Neither terminal is an outcome measure. 51 less common regimens folded into 'other', which is 23.3% of first-line patients in the first panel — combination regimens have a genuinely long tail, so 'other' is real diversity rather than a rounding bucket. Raise topN to split it further. Both panels share one scale and one colour per regimen, so their heights are directly comparable. TP53 mut: 11,564 with a first line; TP53 wt: 9,689 with a first line."
+      },
       "method": {
         "steps": [
           {

@@ -609,6 +609,118 @@
         "aggregateOnly": []
       },
       "caveat": "Every gene's mutation frequency in each cohort, counted in SAMPLES over the samples profiled for that gene (a panel that lists it, or whole-exome; an off-panel call is left out), uncalled mutations excluded as the portal excludes them. 493 genes tested with a two-sided Fisher's exact test; q is Benjamini–Hochberg across all of them. 7 altered genes were not tested: fewer than 5 altered samples across the cohorts, or not profiled in one of them. The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. ",
+      "findings": {
+        "version": 1,
+        "kind": "enrichment",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "enrichment:tested",
+            "value": 493,
+            "checked": "enrichment:tested"
+          },
+          {
+            "name": "enrichment:APC:p",
+            "value": 0,
+            "checked": "enrichment:APC:p"
+          },
+          {
+            "name": "enrichment:APC:q",
+            "value": 0,
+            "checked": "enrichment:APC:q"
+          },
+          {
+            "name": "enrichment:KRAS:p",
+            "value": 3.3890878095288153e-251,
+            "checked": "enrichment:KRAS:p"
+          },
+          {
+            "name": "enrichment:KRAS:q",
+            "value": 8.35410145048853e-249,
+            "checked": "enrichment:KRAS:q"
+          },
+          {
+            "name": "enrichment:CDKN2A:p",
+            "value": 3.284288823108772e-213,
+            "checked": "enrichment:CDKN2A:p"
+          },
+          {
+            "name": "enrichment:CDKN2A:q",
+            "value": 5.397181299308749e-211,
+            "checked": "enrichment:CDKN2A:q"
+          },
+          {
+            "name": "enrichment:PIK3CA:p",
+            "value": 5.573498114286534e-121,
+            "checked": "enrichment:PIK3CA:p"
+          },
+          {
+            "name": "enrichment:PIK3CA:q",
+            "value": 6.869336425858153e-119,
+            "checked": "enrichment:PIK3CA:q"
+          },
+          {
+            "name": "enrichment:TCF7L2:p",
+            "value": 1.9957721923475326e-119,
+            "checked": "enrichment:TCF7L2:p"
+          },
+          {
+            "name": "enrichment:TCF7L2:q",
+            "value": 1.9678313816546674e-117,
+            "checked": "enrichment:TCF7L2:q"
+          },
+          {
+            "name": "enrichment:FBXW7:p",
+            "value": 2.6807419470934915e-99,
+            "checked": "enrichment:FBXW7:p"
+          },
+          {
+            "name": "enrichment:FBXW7:q",
+            "value": 2.202676299861819e-97,
+            "checked": "enrichment:FBXW7:q"
+          },
+          {
+            "name": "enrichment:SOX9:p",
+            "value": 7.392002898686707e-73,
+            "checked": "enrichment:SOX9:p"
+          },
+          {
+            "name": "enrichment:SOX9:q",
+            "value": 5.206082041503639e-71,
+            "checked": "enrichment:SOX9:q"
+          },
+          {
+            "name": "enrichment:BRAF:p",
+            "value": 3.455118066593093e-41,
+            "checked": "enrichment:BRAF:p"
+          },
+          {
+            "name": "enrichment:BRAF:q",
+            "value": 2.1292165085379933e-39,
+            "checked": "enrichment:BRAF:q"
+          },
+          {
+            "name": "enrichment:AMER1:p",
+            "value": 3.991429699491581e-35,
+            "checked": "enrichment:AMER1:p"
+          },
+          {
+            "name": "enrichment:AMER1:q",
+            "value": 2.1864164909437213e-33,
+            "checked": "enrichment:AMER1:q"
+          },
+          {
+            "name": "enrichment:SMAD2:p",
+            "value": 7.772332731975096e-34,
+            "checked": "enrichment:SMAD2:p"
+          },
+          {
+            "…": "61 more",
+            "sha256": "16fd3fbc29a55adc"
+          }
+        ],
+        "caveat": "Every gene's mutation frequency in each cohort, counted in SAMPLES over the samples profiled for that gene (a panel that lists it, or whole-exome; an off-panel call is left out), uncalled mutations excluded as the portal excludes them. 493 genes tested with a two-sided Fisher's exact test; q is Benjamini–Hochberg across all of them. 7 altered genes were not tested: fewer than 5 altered samples across the cohorts, or not profiled in one of them. The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. "
+      },
       "method": {
         "steps": [
           {

@@ -635,6 +635,118 @@
         "aggregateOnly": []
       },
       "caveat": "Aligned on first Treatment — time 0 is that event, so every patient is lined up on the same clinical landmark. Patients with no such event are absent from every bin. THE DENOMINATOR IS NOT THE WHOLE COHORT: each bin is over the patients still under observation in it, from their first recorded event to their last contact (the later of their last recorded event and their OS follow-up where the study declares one). Without that, a curve would fall simply because follow-up ran out. Follow-up ending at the last recorded event biases the tail upward — by construction a patient has an event on their last observed day. Bins are half-open [t, t+3mo). The figure stops each line where fewer than 10 patients remain observable; the numbers past that point are in the result but not drawn. Event types carrying real durations are drawn as a state the patient is IN during the bin; the rest as an event that HAPPENED in it. That is read off the data, not the event's name.",
+      "findings": {
+        "version": 1,
+        "kind": "course",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "course:TP53 mut:Treatment:-4:pct",
+            "value": 0,
+            "checked": "course:TP53 mut:Treatment:-4:pct"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:-4:at_risk",
+            "value": 2411,
+            "checked": "course:TP53 mut:Treatment:-4:at_risk"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:-3:pct",
+            "value": 0,
+            "checked": "course:TP53 mut:Treatment:-3:pct"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:-3:at_risk",
+            "value": 2757,
+            "checked": "course:TP53 mut:Treatment:-3:at_risk"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:-2:pct",
+            "value": 0,
+            "checked": "course:TP53 mut:Treatment:-2:pct"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:-2:at_risk",
+            "value": 3527,
+            "checked": "course:TP53 mut:Treatment:-2:at_risk"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:-1:pct",
+            "value": 0,
+            "checked": "course:TP53 mut:Treatment:-1:pct"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:-1:at_risk",
+            "value": 12392,
+            "checked": "course:TP53 mut:Treatment:-1:at_risk"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:0:pct",
+            "value": 100,
+            "checked": "course:TP53 mut:Treatment:0:pct"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:0:at_risk",
+            "value": 12738,
+            "checked": "course:TP53 mut:Treatment:0:at_risk"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:1:pct",
+            "value": 76.6,
+            "checked": "course:TP53 mut:Treatment:1:pct"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:1:at_risk",
+            "value": 12222,
+            "checked": "course:TP53 mut:Treatment:1:at_risk"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:2:pct",
+            "value": 61.4,
+            "checked": "course:TP53 mut:Treatment:2:pct"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:2:at_risk",
+            "value": 11605,
+            "checked": "course:TP53 mut:Treatment:2:at_risk"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:3:pct",
+            "value": 53.1,
+            "checked": "course:TP53 mut:Treatment:3:pct"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:3:at_risk",
+            "value": 10910,
+            "checked": "course:TP53 mut:Treatment:3:at_risk"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:4:pct",
+            "value": 51,
+            "checked": "course:TP53 mut:Treatment:4:pct"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:4:at_risk",
+            "value": 10100,
+            "checked": "course:TP53 mut:Treatment:4:at_risk"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:5:pct",
+            "value": 49,
+            "checked": "course:TP53 mut:Treatment:5:pct"
+          },
+          {
+            "name": "course:TP53 mut:Treatment:5:at_risk",
+            "value": 9355,
+            "checked": "course:TP53 mut:Treatment:5:at_risk"
+          },
+          {
+            "…": "180 more",
+            "sha256": "9b6fea3a723b4c13"
+          }
+        ],
+        "caveat": "Aligned on first Treatment — time 0 is that event, so every patient is lined up on the same clinical landmark. Patients with no such event are absent from every bin. THE DENOMINATOR IS NOT THE WHOLE COHORT: each bin is over the patients still under observation in it, from their first recorded event to their last contact (the later of their last recorded event and their OS follow-up where the study declares one). Without that, a curve would fall simply because follow-up ran out. Follow-up ending at the last recorded event biases the tail upward — by construction a patient has an event on their last observed day. Bins are half-open [t, t+3mo). The figure stops each line where fewer than 10 patients remain observable; the numbers past that point are in the result but not drawn. Event types carrying real durations are drawn as a state the patient is IN during the bin; the rest as an event that HAPPENED in it. That is read off the data, not the event's name."
+      },
       "method": {
         "steps": [
           {

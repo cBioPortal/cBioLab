@@ -273,6 +273,118 @@
         "brca_dldccc_2022"
       ],
       "caveat": "Within patients with samples on both sides, before and after (egc_msk_2017: IMPACT_PRE_POST PRE-TX vs POST-TX; breast_alpelisib_2020: SAMPLE_COLLECTION_TIMEPOINT pre-treatment vs post-treatment; egc_trap_ccr_msk_2023: PRE_OR_POST_TREATMENT Pre vs Post; blca_cornell_2016: SPECIMEN_COLLECTION_PRE_OR_POST_CHEMO pre-chemotherapy vs post-chemotherapy; brca_dldccc_2022: TREATMENT_STATUS Pre-Treatment vs Post-Treatment; before and after treatment: 111 patients), per gene, among those profiled for it on BOTH sides by each side's own panels: an OncoKB driver (v7.5) on both sides, on the before side only, or the after side only; a patient with several samples on a side counts as altered there if any is. Both sides are the cohort's own samples, so a cohort that selects one kind of sample has no pairs. Concordance is both ÷ altered anywhere. The exact McNemar test asks whether discordance runs one way; q is Benjamini–Hochberg across the genes of each cohort. Genes were not chosen in advance: every gene with a driver in some paired patient was tested (before and after treatment: 278 genes with a discordant patient), q is taken across all of them, and the 12 most one-sided are drawn — at these sizes, read the counts, not only the q. Sides are as each study labels its samples; after-only means seen on that side and not the other, which is not proof it arose or vanished in between — a subclone one biopsy missed, or a lower-purity sample (common after treatment) under-calling its side, reads the same; and patients sampled twice are a selected group, typically with longer or harder disease courses. Counts are summed across 5 studies.",
+      "findings": {
+        "version": 1,
+        "kind": "paired",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "paired:before and after treatment:CCND1:p",
+            "value": 0.011718749999999981,
+            "checked": "paired:before and after treatment:CCND1:p"
+          },
+          {
+            "name": "paired:before and after treatment:CCND1:q",
+            "value": 1,
+            "checked": "paired:before and after treatment:CCND1:q"
+          },
+          {
+            "name": "paired:before and after treatment:MYC:p",
+            "value": 0.03857421875000008,
+            "checked": "paired:before and after treatment:MYC:p"
+          },
+          {
+            "name": "paired:before and after treatment:MYC:q",
+            "value": 1,
+            "checked": "paired:before and after treatment:MYC:q"
+          },
+          {
+            "name": "paired:before and after treatment:ERBB3:p",
+            "value": 0.0625,
+            "checked": "paired:before and after treatment:ERBB3:p"
+          },
+          {
+            "name": "paired:before and after treatment:ERBB3:q",
+            "value": 1,
+            "checked": "paired:before and after treatment:ERBB3:q"
+          },
+          {
+            "name": "paired:before and after treatment:MTAP:p",
+            "value": 0.0625,
+            "checked": "paired:before and after treatment:MTAP:p"
+          },
+          {
+            "name": "paired:before and after treatment:MTAP:q",
+            "value": 1,
+            "checked": "paired:before and after treatment:MTAP:q"
+          },
+          {
+            "name": "paired:before and after treatment:TP53:p",
+            "value": 0.09228515625000008,
+            "checked": "paired:before and after treatment:TP53:p"
+          },
+          {
+            "name": "paired:before and after treatment:TP53:q",
+            "value": 1,
+            "checked": "paired:before and after treatment:TP53:q"
+          },
+          {
+            "name": "paired:before and after treatment:CDH1:p",
+            "value": 0.125,
+            "checked": "paired:before and after treatment:CDH1:p"
+          },
+          {
+            "name": "paired:before and after treatment:CDH1:q",
+            "value": 1,
+            "checked": "paired:before and after treatment:CDH1:q"
+          },
+          {
+            "name": "paired:before and after treatment:FOXP1:p",
+            "value": 0.125,
+            "checked": "paired:before and after treatment:FOXP1:p"
+          },
+          {
+            "name": "paired:before and after treatment:FOXP1:q",
+            "value": 1,
+            "checked": "paired:before and after treatment:FOXP1:q"
+          },
+          {
+            "name": "paired:before and after treatment:FGFR1:p",
+            "value": 0.12500000000000006,
+            "checked": "paired:before and after treatment:FGFR1:p"
+          },
+          {
+            "name": "paired:before and after treatment:FGFR1:q",
+            "value": 1,
+            "checked": "paired:before and after treatment:FGFR1:q"
+          },
+          {
+            "name": "paired:before and after treatment:RSPO2:p",
+            "value": 0.12500000000000006,
+            "checked": "paired:before and after treatment:RSPO2:p"
+          },
+          {
+            "name": "paired:before and after treatment:RSPO2:q",
+            "value": 1,
+            "checked": "paired:before and after treatment:RSPO2:q"
+          },
+          {
+            "name": "paired:before and after treatment:LMNA:p",
+            "value": 0.21875000000000017,
+            "checked": "paired:before and after treatment:LMNA:p"
+          },
+          {
+            "name": "paired:before and after treatment:LMNA:q",
+            "value": 1,
+            "checked": "paired:before and after treatment:LMNA:q"
+          },
+          {
+            "…": "4 more",
+            "sha256": "ca6a31195f5ecddf"
+          }
+        ],
+        "caveat": "Within patients with samples on both sides, before and after (egc_msk_2017: IMPACT_PRE_POST PRE-TX vs POST-TX; breast_alpelisib_2020: SAMPLE_COLLECTION_TIMEPOINT pre-treatment vs post-treatment; egc_trap_ccr_msk_2023: PRE_OR_POST_TREATMENT Pre vs Post; blca_cornell_2016: SPECIMEN_COLLECTION_PRE_OR_POST_CHEMO pre-chemotherapy vs post-chemotherapy; brca_dldccc_2022: TREATMENT_STATUS Pre-Treatment vs Post-Treatment; before and after treatment: 111 patients), per gene, among those profiled for it on BOTH sides by each side's own panels: an OncoKB driver (v7.5) on both sides, on the before side only, or the after side only; a patient with several samples on a side counts as altered there if any is. Both sides are the cohort's own samples, so a cohort that selects one kind of sample has no pairs. Concordance is both ÷ altered anywhere. The exact McNemar test asks whether discordance runs one way; q is Benjamini–Hochberg across the genes of each cohort. Genes were not chosen in advance: every gene with a driver in some paired patient was tested (before and after treatment: 278 genes with a discordant patient), q is taken across all of them, and the 12 most one-sided are drawn — at these sizes, read the counts, not only the q. Sides are as each study labels its samples; after-only means seen on that side and not the other, which is not proof it arose or vanished in between — a subclone one biopsy missed, or a lower-purity sample (common after treatment) under-calling its side, reads the same; and patients sampled twice are a selected group, typically with longer or harder disease courses. Counts are summed across 5 studies."
+      },
       "method": {
         "steps": [
           {

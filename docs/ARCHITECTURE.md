@@ -109,7 +109,7 @@ and commit both.
   (the kind's spec and result fields: it adds its entry to `ViewSpecs`, `ViewResultFields` and
   `ViewResultMain` in `lib/types.ts` by `declare module`), `run.ts` (the runner), `sql.ts` (its
   queries; `test/boundary.test.ts` sweeps every kind's), `method.ts` (its method record, invariant
-  12), `figure.ts` (its SVG), `kind.ts` (its descriptor: figure, title, results text, help,
+  12), `figure.ts` (its SVG), `kind.ts` (its descriptor: figure, title, results text, findings, help,
   federation need, marks — `ViewKindDef` in `lib/views/kind-def.ts`) and `doc.ts` (its part of the DSL
   reference: its row of the Views table, its agent-grammar entry, its phrase in MCP `run_analysis`'s
   description and its own gallery examples, one marked as its view snapshot case —
@@ -230,6 +230,11 @@ and commit both.
   say what changed; one for a NEWER version is refused, because an older engine would silently ignore
   what it does not know. A change to the document's shape, or to what an unchanged document means,
   bumps DOC_VERSION and adds an upgrade step there; never re-interpret an old shape anywhere else.
+- **Findings** — **`lib/findings.ts`**, `lib/view-findings.ts`: each result's headline numbers as
+  named, typed values (`findings` on every result; MCP `run_analysis`'s `structuredContent`), from
+  the kind's descriptor (`findings` in its `kind.ts`; `survival` and `compare` so far) or, without
+  one, its method record's checks under the script's own names. A finding the script recomputes
+  names that check (`checked`). Renaming or changing a finding bumps `FINDINGS_VERSION`.
 - **`lib/explore.ts`** — faceted study exploration, single + federated (`buildExploreFederated`).
 - **Cell Explorer links** (`lib/cell-explorer.ts` browser-safe, `lib/cell-explorer-server.ts`,
   `POST /api/cell-explorer`) — a cohort's patients opened as a donor filter on a study's

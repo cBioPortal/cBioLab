@@ -542,6 +542,118 @@
         "aggregateOnly": []
       },
       "caveat": "Every entity of “Mutational Signature Contribution Scores (COSMIC v2)” (mutational_signatures_contribution_v2) compared across the cohorts, one value per sample as the study recorded it, from each cohort's own samples. Values that are not numbers (a limit such as \">8\", or NA) are left out (0 of them). Each entity is tested with Welch's t-test from each cohort's n, mean and variance; with thousands of samples a tiny difference is significant, so read the means too. 30 entities tested; q is Benjamini–Hochberg across all of them. 0 were not tested: fewer than 3 samples with a value in some cohort, or no spread. ",
+      "findings": {
+        "version": 1,
+        "kind": "assays",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "assays:tested",
+            "value": 30,
+            "checked": "assays:tested"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature4:p",
+            "value": 0,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature4:p"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature4:q",
+            "value": 0,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature4:q"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature7:p",
+            "value": 0,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature7:p"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature7:q",
+            "value": 0,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature7:q"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature24:p",
+            "value": 3.4141851060194217e-184,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature24:p"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature24:q",
+            "value": 3.4141851060194217e-183,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature24:q"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature13:p",
+            "value": 8.13066007698531e-168,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature13:p"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature13:q",
+            "value": 6.097995057738982e-167,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature13:q"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature18:p",
+            "value": 8.800637811894144e-70,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature18:p"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature18:q",
+            "value": 5.280382687136486e-69,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature18:q"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature29:p",
+            "value": 3.206965556454754e-63,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature29:p"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature29:q",
+            "value": 1.603482778227377e-62,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature29:q"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature2:p",
+            "value": 9.389121052651763e-56,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature2:p"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature2:q",
+            "value": 4.023909022565042e-55,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature2:q"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature20:p",
+            "value": 6.049120802895663e-23,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature20:p"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature20:q",
+            "value": 2.2684203010858736e-22,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature20:q"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature16:p",
+            "value": 5.978316095432489e-15,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature16:p"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature16:q",
+            "value": 1.9927720318108296e-14,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature16:q"
+          },
+          {
+            "name": "assays:mutational_signatures_contribution_v2_Signature8:p",
+            "value": 1.7229075154526388e-13,
+            "checked": "assays:mutational_signatures_contribution_v2_Signature8:p"
+          },
+          {
+            "…": "41 more",
+            "sha256": "5b1f7d657a951b92"
+          }
+        ],
+        "caveat": "Every entity of “Mutational Signature Contribution Scores (COSMIC v2)” (mutational_signatures_contribution_v2) compared across the cohorts, one value per sample as the study recorded it, from each cohort's own samples. Values that are not numbers (a limit such as \">8\", or NA) are left out (0 of them). Each entity is tested with Welch's t-test from each cohort's n, mean and variance; with thousands of samples a tiny difference is significant, so read the means too. 30 entities tested; q is Benjamini–Hochberg across all of them. 0 were not tested: fewer than 3 samples with a value in some cohort, or no spread. "
+      },
       "method": {
         "steps": [
           {

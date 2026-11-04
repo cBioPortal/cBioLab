@@ -774,6 +774,118 @@
         "aggregateOnly": []
       },
       "caveat": "Each patient's 10 parts (clinical attributes), divided by their sum so every bar is a whole; cases ordered by CD8 T CXCL13, highest first. Each cohort is compared with the view's other cohorts pooled, part by part: log2 of the ratio of means (each + 0.001), Welch's t from the cohorts' n, mean and variance, Benjamini–Hochberg across the 30 comparisons. Parts of a whole are not independent — one part's rise is the others' fall — and a case in two cohorts counts in both. Entropy is Shannon's (natural log) over each case's shares. ",
+      "findings": {
+        "version": 1,
+        "kind": "composition",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "composition:tested",
+            "value": 30,
+            "checked": "composition:tested"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13:mean",
+            "value": 0.041764604649869704,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13:mean"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13:log2",
+            "value": 0.46672649022575663,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13:log2"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13:p",
+            "value": 0.1746038985447137,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13:p"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13:q",
+            "value": 0.3269279431247544,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_CXCL13:q"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_naive:mean",
+            "value": 0.15190356463785532,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_naive:mean"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_naive:log2",
+            "value": -0.39043349341761374,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_naive:log2"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_naive:p",
+            "value": 0.039443948769039554,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_naive:p"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_naive:q",
+            "value": 0.2036386575363233,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_naive:q"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_reg:mean",
+            "value": 0.11608881987570877,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_reg:mean"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_reg:log2",
+            "value": -0.008487341666750163,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_reg:log2"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_reg:p",
+            "value": 0.9671721726016329,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_reg:p"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_reg:q",
+            "value": 0.9878261597675358,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD4_T_reg:q"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13:mean",
+            "value": 0.06966859761265197,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13:mean"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13:log2",
+            "value": 0.6126131061782081,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13:log2"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13:p",
+            "value": 0.021817016905044912,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13:p"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13:q",
+            "value": 0.2036386575363233,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_CXCL13:q"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_ISG:mean",
+            "value": 0.09179150282027985,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_ISG:mean"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_ISG:log2",
+            "value": 0.4069229426617545,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_ISG:log2"
+          },
+          {
+            "name": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_ISG:p",
+            "value": 0.030829201866788468,
+            "checked": "composition:HRD-Dup|custom:spectrum-sc-tnk/TNK_CD8_T_ISG:p"
+          },
+          {
+            "…": "101 more",
+            "sha256": "ca36878c6fb40bb6"
+          }
+        ],
+        "caveat": "Each patient's 10 parts (clinical attributes), divided by their sum so every bar is a whole; cases ordered by CD8 T CXCL13, highest first. Each cohort is compared with the view's other cohorts pooled, part by part: log2 of the ratio of means (each + 0.001), Welch's t from the cohorts' n, mean and variance, Benjamini–Hochberg across the 30 comparisons. Parts of a whole are not independent — one part's rise is the others' fall — and a case in two cohorts counts in both. Entropy is Shannon's (natural log) over each case's shares. "
+      },
       "method": {
         "steps": [
           {
@@ -1792,6 +1904,118 @@
         "aggregateOnly": []
       },
       "caveat": "Each sample's 10 parts (entities of “Cell Type Relative Fractions”), divided by their sum so every bar is a whole; cases ordered by T_cell, highest first. Each cohort is compared with the view's other cohorts pooled, part by part: log2 of the ratio of means (each + 0.001), Welch's t from the cohorts' n, mean and variance, Benjamini–Hochberg across the 30 comparisons. Parts of a whole are not independent — one part's rise is the others' fall — and a case in two cohorts counts in both. Entropy is Shannon's (natural log) over each case's shares. ",
+      "findings": {
+        "version": 1,
+        "kind": "composition",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "composition:tested",
+            "value": 30,
+            "checked": "composition:tested"
+          },
+          {
+            "name": "composition:HRD-Dup|B_cell:mean",
+            "value": 0.025429784846068906,
+            "checked": "composition:HRD-Dup|B_cell:mean"
+          },
+          {
+            "name": "composition:HRD-Dup|B_cell:log2",
+            "value": 0.552089045579386,
+            "checked": "composition:HRD-Dup|B_cell:log2"
+          },
+          {
+            "name": "composition:HRD-Dup|B_cell:p",
+            "value": 0.4653273526789026,
+            "checked": "composition:HRD-Dup|B_cell:p"
+          },
+          {
+            "name": "composition:HRD-Dup|B_cell:q",
+            "value": 0.7304459576478041,
+            "checked": "composition:HRD-Dup|B_cell:q"
+          },
+          {
+            "name": "composition:HRD-Dup|Dendritic_cell:mean",
+            "value": 0.0033227942634539835,
+            "checked": "composition:HRD-Dup|Dendritic_cell:mean"
+          },
+          {
+            "name": "composition:HRD-Dup|Dendritic_cell:log2",
+            "value": -0.4041004900557177,
+            "checked": "composition:HRD-Dup|Dendritic_cell:log2"
+          },
+          {
+            "name": "composition:HRD-Dup|Dendritic_cell:p",
+            "value": 0.3325952043539977,
+            "checked": "composition:HRD-Dup|Dendritic_cell:p"
+          },
+          {
+            "name": "composition:HRD-Dup|Dendritic_cell:q",
+            "value": 0.5869327135658783,
+            "checked": "composition:HRD-Dup|Dendritic_cell:q"
+          },
+          {
+            "name": "composition:HRD-Dup|Endothelial_cell:mean",
+            "value": 0.02264195111891671,
+            "checked": "composition:HRD-Dup|Endothelial_cell:mean"
+          },
+          {
+            "name": "composition:HRD-Dup|Endothelial_cell:log2",
+            "value": 0.3237036404485407,
+            "checked": "composition:HRD-Dup|Endothelial_cell:log2"
+          },
+          {
+            "name": "composition:HRD-Dup|Endothelial_cell:p",
+            "value": 0.4732090127512971,
+            "checked": "composition:HRD-Dup|Endothelial_cell:p"
+          },
+          {
+            "name": "composition:HRD-Dup|Endothelial_cell:q",
+            "value": 0.7304459576478041,
+            "checked": "composition:HRD-Dup|Endothelial_cell:q"
+          },
+          {
+            "name": "composition:HRD-Dup|Fibroblast:mean",
+            "value": 0.18217998044196398,
+            "checked": "composition:HRD-Dup|Fibroblast:mean"
+          },
+          {
+            "name": "composition:HRD-Dup|Fibroblast:log2",
+            "value": 0.6432653766744568,
+            "checked": "composition:HRD-Dup|Fibroblast:log2"
+          },
+          {
+            "name": "composition:HRD-Dup|Fibroblast:p",
+            "value": 0.16053870710566653,
+            "checked": "composition:HRD-Dup|Fibroblast:p"
+          },
+          {
+            "name": "composition:HRD-Dup|Fibroblast:q",
+            "value": 0.5869327135658783,
+            "checked": "composition:HRD-Dup|Fibroblast:q"
+          },
+          {
+            "name": "composition:HRD-Dup|Mast_cell:mean",
+            "value": 0.0008646280530261326,
+            "checked": "composition:HRD-Dup|Mast_cell:mean"
+          },
+          {
+            "name": "composition:HRD-Dup|Mast_cell:log2",
+            "value": -0.5932869405889261,
+            "checked": "composition:HRD-Dup|Mast_cell:log2"
+          },
+          {
+            "name": "composition:HRD-Dup|Mast_cell:p",
+            "value": 0.10013306419957604,
+            "checked": "composition:HRD-Dup|Mast_cell:p"
+          },
+          {
+            "…": "101 more",
+            "sha256": "bdedebec7cbe5560"
+          }
+        ],
+        "caveat": "Each sample's 10 parts (entities of “Cell Type Relative Fractions”), divided by their sum so every bar is a whole; cases ordered by T_cell, highest first. Each cohort is compared with the view's other cohorts pooled, part by part: log2 of the ratio of means (each + 0.001), Welch's t from the cohorts' n, mean and variance, Benjamini–Hochberg across the 30 comparisons. Parts of a whole are not independent — one part's rise is the others' fall — and a case in two cohorts counts in both. Entropy is Shannon's (natural log) over each case's shares. "
+      },
       "method": {
         "steps": [
           {

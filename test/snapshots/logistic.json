@@ -52,6 +52,29 @@
         "aggregateOnly": []
       },
       "caveat": "Logistic regression on 470 patients, 27 with MSI_TYPE = Instable (1 term). Every other observed value of MSI_TYPE (Do not report, Indeterminate, Stable) was treated as “not event.” 1 patient from patient-level participants lacked the outcome or a covariate and were excluded. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers.",
+      "findings": {
+        "version": 1,
+        "kind": "logistic",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "logistic:APC mutation status: Mutated:beta",
+            "value": -1.264274030987992,
+            "checked": "logistic:APC mutation status: Mutated:beta"
+          },
+          {
+            "name": "logistic:APC mutation status: Mutated:se",
+            "value": 0.4053957847207888,
+            "checked": "logistic:APC mutation status: Mutated:se"
+          },
+          {
+            "name": "logistic:APC mutation status: Mutated:p",
+            "value": 0.001817022203426293,
+            "checked": "logistic:APC mutation status: Mutated:p"
+          }
+        ],
+        "caveat": "Logistic regression on 470 patients, 27 with MSI_TYPE = Instable (1 term). Every other observed value of MSI_TYPE (Do not report, Indeterminate, Stable) was treated as “not event.” 1 patient from patient-level participants lacked the outcome or a covariate and were excluded. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers."
+      },
       "method": {
         "steps": [
           {

@@ -627,6 +627,118 @@
         "aggregateOnly": []
       },
       "caveat": "Cumulative incidence of the first brain metastasis after the study's day 0, with death (OS_STATUS) as a competing risk: Aalen–Johansen, 95% intervals from its delta-method standard error. It is not 1 − Kaplan–Meier: that treats the dead as still at risk of the event and overstates incidence whenever death is common — the table sets the two side by side. Excluded rather than counted as event-free: 2101 who already had it by day 0, 0 without follow-up. Gray's test (weight 1) by permutation of cohort labels, 2000 shuffles, seeded; exact under the null that the cohorts share one distribution, entry times included. An event recorded from notes or registries is only as complete as the recording.",
+      "findings": {
+        "version": 1,
+        "kind": "incidence",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "incidence:NSCLC:12:f1",
+            "value": 0.13109119321243984,
+            "checked": "incidence:NSCLC:12:f1"
+          },
+          {
+            "name": "incidence:NSCLC:12:lo",
+            "value": 0.12275472329176881,
+            "checked": "incidence:NSCLC:12:lo"
+          },
+          {
+            "name": "incidence:NSCLC:12:hi",
+            "value": 0.13942766313311086,
+            "checked": "incidence:NSCLC:12:hi"
+          },
+          {
+            "name": "incidence:Breast:12:f1",
+            "value": 0.09076442001016774,
+            "checked": "incidence:Breast:12:f1"
+          },
+          {
+            "name": "incidence:Breast:12:lo",
+            "value": 0.08245310725479074,
+            "checked": "incidence:Breast:12:lo"
+          },
+          {
+            "name": "incidence:Breast:12:hi",
+            "value": 0.09907573276554474,
+            "checked": "incidence:Breast:12:hi"
+          },
+          {
+            "name": "incidence:Colorectal:12:f1",
+            "value": 0.0314726097593687,
+            "checked": "incidence:Colorectal:12:f1"
+          },
+          {
+            "name": "incidence:Colorectal:12:lo",
+            "value": 0.026729157383594535,
+            "checked": "incidence:Colorectal:12:lo"
+          },
+          {
+            "name": "incidence:Colorectal:12:hi",
+            "value": 0.03621606213514286,
+            "checked": "incidence:Colorectal:12:hi"
+          },
+          {
+            "name": "incidence:NSCLC:24:f1",
+            "value": 0.18355912082668832,
+            "checked": "incidence:NSCLC:24:f1"
+          },
+          {
+            "name": "incidence:NSCLC:24:lo",
+            "value": 0.17377663726429607,
+            "checked": "incidence:NSCLC:24:lo"
+          },
+          {
+            "name": "incidence:NSCLC:24:hi",
+            "value": 0.19334160438908057,
+            "checked": "incidence:NSCLC:24:hi"
+          },
+          {
+            "name": "incidence:Breast:24:f1",
+            "value": 0.13557168300700778,
+            "checked": "incidence:Breast:24:f1"
+          },
+          {
+            "name": "incidence:Breast:24:lo",
+            "value": 0.12552839318649045,
+            "checked": "incidence:Breast:24:lo"
+          },
+          {
+            "name": "incidence:Breast:24:hi",
+            "value": 0.1456149728275251,
+            "checked": "incidence:Breast:24:hi"
+          },
+          {
+            "name": "incidence:Colorectal:24:f1",
+            "value": 0.057539779761021585,
+            "checked": "incidence:Colorectal:24:f1"
+          },
+          {
+            "name": "incidence:Colorectal:24:lo",
+            "value": 0.05093075326178087,
+            "checked": "incidence:Colorectal:24:lo"
+          },
+          {
+            "name": "incidence:Colorectal:24:hi",
+            "value": 0.0641488062602623,
+            "checked": "incidence:Colorectal:24:hi"
+          },
+          {
+            "name": "incidence:NSCLC:60:f1",
+            "value": 0.24663153687867914,
+            "checked": "incidence:NSCLC:60:f1"
+          },
+          {
+            "name": "incidence:NSCLC:60:lo",
+            "value": 0.23480543347943614,
+            "checked": "incidence:NSCLC:60:lo"
+          },
+          {
+            "…": "9 more",
+            "sha256": "64d25e2947d9a749"
+          }
+        ],
+        "caveat": "Cumulative incidence of the first brain metastasis after the study's day 0, with death (OS_STATUS) as a competing risk: Aalen–Johansen, 95% intervals from its delta-method standard error. It is not 1 − Kaplan–Meier: that treats the dead as still at risk of the event and overstates incidence whenever death is common — the table sets the two side by side. Excluded rather than counted as event-free: 2101 who already had it by day 0, 0 without follow-up. Gray's test (weight 1) by permutation of cohort labels, 2000 shuffles, seeded; exact under the null that the cohorts share one distribution, entry times included. An event recorded from notes or registries is only as complete as the recording."
+      },
       "method": {
         "steps": [
           {
