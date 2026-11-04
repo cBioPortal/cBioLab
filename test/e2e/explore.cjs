@@ -263,6 +263,32 @@ async function explore({ ok, BASE, page }) {
   ok("a second Analyze resets the analysis instead of accumulating", replaced && seeded.length === 1,
     replaced ? "replaced \u201c" + seeded[0] + "\u201d with \u201c" + after[0] + "\u201d"
              : "seeded: " + (seeded.join(", ") || "?") + " -> document holds: " + (after.join(", ") || "?"));
+
+  // A chart menu's "Analyze groups" opens the chart's values as cohorts of a fresh analysis, on
+  // this page (Compare groups is the one that opens a new tab): one cohort per value, each
+  // drawn on that value of the chart's attribute, and no views yet.
+  await page.getByRole("tab", { name: "Explore", exact: true }).click();
+  const pie = page.locator("[data-attr][data-shape=pie]").filter({ has: page.locator(".chartgear") }).first();
+  let groups = "no pie chart with a menu";
+  let groupsOk = false;
+  try {
+    await pie.waitFor({ timeout: 240000 });
+    const attr = (await pie.getAttribute("data-attr")).split("|")[1];
+    const pagesBefore = page.context().pages().length;
+    await pie.locator(".chartgear").click();
+    await page.getByRole("menuitem", { name: /^Analyze (top \d+ )?groups$/ }).click();
+    await page.waitForFunction((a) => {
+      try {
+        const cs = Object.values(JSON.parse(document.querySelector("#docjson")?.value || "{}").cohorts || {});
+        return cs.length >= 2 && cs.every((c) => (c.all || []).some((cl) => cl.attribute === a));
+      } catch { return false; }
+    }, attr, { timeout: 120000 });
+    const d = JSON.parse(await page.locator("#docjson").inputValue());
+    const names = Object.keys(d.cohorts);
+    groupsOk = (d.views || []).length === 0 && page.context().pages().length === pagesBefore;
+    groups = attr + " → " + names.join(", ") + " · " + (d.views || []).length + " views";
+  } catch (e) { groups = String(e.message).split("\n")[0]; }
+  ok("a chart's Analyze groups opens its values as the cohorts of a fresh analysis", groupsOk, groups);
 }
 
 module.exports = { explore };

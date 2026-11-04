@@ -88,19 +88,23 @@ export function rangeArms(label: string, cuts: number[], where: (range: { gt?: n
 export const COMPARISON_MAX_ACTIVE = 6;
 /** the most groups it holds: those past COMPARISON_MAX_ACTIVE open taken out, and are swapped in by hand */
 export const COMPARISON_MAX_GROUPS = 20;
+/** the most cohorts an analysis document names itself (lib/analysis.ts refuses more) */
+export const ANALYSIS_MAX_COHORTS = 16;
 /** the most clauses a cohort takes (lib/cohort2.ts) */
 const COHORT_MAX_CLAUSES = 8;
 
 /**
- * Groups for the comparison page from one chart: each arm is its own cohort, the selection's other
+ * Groups for the comparison page (or, `into` "analysis", a fresh analysis document) from one chart: each arm is its own cohort, the selection's other
  * clauses (`base`) and the arm's own, evaluated where the selection is (`scope`: its study or
  * studies). Unlike a split's children these are not first-match-wins: a patient in two arms (two
  * genes' mutations) is in both groups, as on cBioPortal, and the page's Overlap tab shows it.
  */
-export function comparisonCohorts(scope: Pick<CohortDef, "study" | "studies">, base: Clause[], arms: PartitionArm[]): Record<string, CohortDef> {
+export function comparisonCohorts(scope: Pick<CohortDef, "study" | "studies">, base: Clause[], arms: PartitionArm[],
+  into: "comparison" | "analysis" = "comparison"): Record<string, CohortDef> {
+  const [max, holder] = into === "analysis" ? [ANALYSIS_MAX_COHORTS, "an analysis document"] : [COMPARISON_MAX_GROUPS, "the comparison page"];
   if (arms.length < 2) throw new Error("a comparison needs at least 2 groups, and this chart gives " + arms.length);
-  if (arms.length > COMPARISON_MAX_GROUPS)
-    throw new Error("the comparison page holds at most " + COMPARISON_MAX_GROUPS + " groups, and this chart gives " + arms.length);
+  if (arms.length > max)
+    throw new Error(holder + " holds at most " + max + " groups, and this chart gives " + arms.length);
   if (base.length + 1 > COHORT_MAX_CLAUSES)
     throw new Error("each group would need " + (base.length + 1) + " conditions (the selection's " + base.length + " and its own), and a cohort takes at most " + COHORT_MAX_CLAUSES + " — remove a filter first");
   const out: Record<string, CohortDef> = {};

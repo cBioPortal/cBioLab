@@ -6,7 +6,7 @@ import { useState } from "react";
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import CohortPills from "./pills";
 import { ChartMenu, type ChartAction } from "./partitions.tsx";
-import { armLabel, COMPARISON_MAX_ACTIVE, COMPARISON_MAX_GROUPS, type ChartKey } from "../../lib/partition-arms.ts";
+import { ANALYSIS_MAX_COHORTS, armLabel, COMPARISON_MAX_ACTIVE, COMPARISON_MAX_GROUPS, type ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
 import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
@@ -15,7 +15,7 @@ import { textWidth } from "../../lib/chart/text.ts";
 import { fmtInt, fmtNum, fmtPct } from "../../lib/chart/format.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
-import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState } from "./use-explore-state.ts";
+import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState, type GroupsTarget } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { Dna, Save, Tag, Users, X } from "lucide-react";
 import { Button } from "../_ui/button";
@@ -598,39 +598,54 @@ function Histogram({ ticks, na, children }: { ticks: string[]; na: string | null
 }
 
 /**
- * A chart menu's "Compare groups", as the portal's study view opens group comparison from a chart:
- * the rows the reader checked, each a group, or — with none checked — the chart's values, the most
- * frequent first, up to the most groups the comparison page takes (the item says when it leaves
- * values out). `checked` is null for a chart without checkboxes.
+ * How a chart menu's group actions read for each place the groups can open: cBioPortal's group
+ * comparison (a new tab), or a fresh analysis on this page with each group a cohort.
  */
-function compareAction(values: (PartitionArm & { n: number })[], checked: PartitionArm[] | null, what: string, onCompare: (arms: PartitionArm[]) => void): ChartAction {
+const GROUPS: Record<GroupsTarget, { verb: string; doing: string; opens: string; holds: string; max: number; past: (n: number) => string }> = {
+  comparison: { verb: "Compare", doing: "compare", opens: "open group comparison with", holds: "the comparison page holds", max: COMPARISON_MAX_GROUPS, past: (n) => past(n) },
+  analysis: { verb: "Analyze", doing: "analyze", opens: "start a fresh analysis (replacing the current one) with", holds: "an analysis document holds", max: ANALYSIS_MAX_COHORTS, past: () => "" }
+};
+/** a chart's group action for both targets — compare, then analyze — leaving out what one target has nothing to add to */
+const forBoth = (make: (t: GroupsTarget) => ChartAction | null): ChartAction[] =>
+  (["comparison", "analysis"] as const).map(make).filter((a): a is ChartAction => !!a);
+
+/**
+ * A chart menu's "Compare groups" (or "Analyze groups"), as the portal's study view opens group
+ * comparison from a chart: the rows the reader checked, each a group, or — with none checked — the
+ * chart's values, the most frequent first, up to the most groups the target takes (20 for the comparison
+ * page, 16 for an analysis document; the item says when it leaves values out). `checked` is null for a chart without checkboxes. With one
+ * row checked only the comparison's "check another" hint is given, so the menu says it once.
+ */
+function compareAction(values: (PartitionArm & { n: number })[], checked: PartitionArm[] | null, what: string, onCompare: (arms: PartitionArm[]) => void, target: GroupsTarget = "comparison"): ChartAction | null {
+  const g = GROUPS[target];
   if (checked && checked.length === 1)
-    return { label: "Check another row to compare", disabled: true, title: "a comparison needs at least 2 groups — check another " + what };
-  if (checked && checked.length > COMPARISON_MAX_GROUPS)
-    return { label: "Compare checked groups (" + checked.length + ")", disabled: true, title: "the comparison page holds at most " + COMPARISON_MAX_GROUPS + " groups — uncheck " + (checked.length - COMPARISON_MAX_GROUPS) };
+    return target === "comparison" ? { label: "Check another row to compare or analyze", disabled: true, title: "groups need at least 2 rows — check another " + what } : null;
+  if (checked && checked.length > g.max)
+    return { label: g.verb + " checked groups (" + checked.length + ")", disabled: true, title: g.holds + " at most " + g.max + " groups — uncheck " + (checked.length - g.max) };
   if (checked && checked.length)
-    return { label: "Compare checked groups (" + checked.length + ")", onClick: () => onCompare(checked),
-      title: "open group comparison with each checked " + what + " as a group (the rest of your selection, without this chart's own filter)" + past(checked.length) };
-  const top = [...values].filter((v) => v.n > 0).sort((x, y) => y.n - x.n).slice(0, COMPARISON_MAX_GROUPS);
+    return { label: g.verb + " checked groups (" + checked.length + ")", onClick: () => onCompare(checked),
+      title: g.opens + " each checked " + what + " as a group (the rest of your selection, without this chart's own filter)" + g.past(checked.length) };
+  const top = [...values].filter((v) => v.n > 0).sort((x, y) => y.n - x.n).slice(0, g.max);
   const more = values.filter((v) => v.n > 0).length - top.length;
-  if (top.length < 2) return { label: "Compare groups", disabled: true, title: "a comparison needs at least 2 groups, and this chart has " + top.length + " " + what };
-  return { label: more ? "Compare top " + top.length + " groups" : "Compare groups", onClick: () => onCompare(top),
-    title: "open group comparison with each " + what + " as a group" + (more ? " — the " + top.length + " most frequent; " + more + " more are left out (check rows to choose)" : "") +
-      ", over the rest of your selection" + past(top.length) };
+  if (top.length < 2) return { label: g.verb + " groups", disabled: true, title: g.doing + " needs at least 2 groups, and this chart has " + top.length + " " + what };
+  return { label: more ? g.verb + " top " + top.length + " groups" : g.verb + " groups", onClick: () => onCompare(top),
+    title: g.opens + " each " + what + " as a group" + (more ? " — the " + top.length + " most frequent; " + more + " more are left out (check rows to choose)" : "") +
+      ", over the rest of your selection" + g.past(top.length) };
 }
 
 /** what a tooltip adds when the page will open with some groups taken out */
 const past = (n: number) => n > COMPARISON_MAX_ACTIVE ? "; the page compares " + COMPARISON_MAX_ACTIVE + " at a time, so it opens with the first " + COMPARISON_MAX_ACTIVE + " and you swap the others in" : "";
 
-/** a numeric chart's "Compare groups ▸ Quartiles / Median / Current bins", as on cBioPortal */
-function compareNumeric(label: string, singleStudy: boolean, working: boolean, quantiles: (n: number) => void, bins: PartitionArm[], onBins: () => void): ChartAction {
-  const multi = "cut points are computed within one study; select a single study to compare its quartiles or median";
-  return { label: "Compare groups", working, disabled: working, title: "open group comparison with " + label + " divided into groups", sub: [
+/** a numeric chart's "Compare groups ▸ Quartiles / Median / Current bins", as on cBioPortal (or "Analyze groups ▸ …") */
+function compareNumeric(label: string, singleStudy: boolean, working: boolean, quantiles: (n: number) => void, bins: PartitionArm[], onBins: () => void, target: GroupsTarget = "comparison"): ChartAction {
+  const g = GROUPS[target];
+  const multi = "cut points are computed within one study; select a single study to " + g.doing + " its quartiles or median";
+  return { label: g.verb + " groups", working, disabled: working, title: g.opens + " " + label + " divided into groups", sub: [
     { label: "Quartiles", disabled: !singleStudy, onClick: () => quantiles(4), title: singleStudy ? "four groups of (near) equal size, cut at " + label + "'s quartiles within your selection" : multi },
     { label: "Median", disabled: !singleStudy, onClick: () => quantiles(2), title: singleStudy ? "two groups, at or below / above " + label + "'s median within your selection" : multi },
-    { label: "Current bins", disabled: bins.length < 2 || bins.length > COMPARISON_MAX_GROUPS, onClick: onBins,
-      title: bins.length < 2 ? "the chart has fewer than 2 bins with cases" : bins.length > COMPARISON_MAX_GROUPS
-        ? "the chart has " + bins.length + " bins with cases, and the comparison page holds at most " + COMPARISON_MAX_GROUPS : "one group per bar of the chart (" + bins.length + ")" + past(bins.length) }
+    { label: "Current bins", disabled: bins.length < 2 || bins.length > g.max, onClick: onBins,
+      title: bins.length < 2 ? "the chart has fewer than 2 bins with cases" : bins.length > g.max
+        ? "the chart has " + bins.length + " bins with cases, and " + g.holds + " at most " + g.max : "one group per bar of the chart (" + bins.length + ")" + g.past(bins.length) }
   ] };
 }
 
@@ -691,15 +706,15 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                 const checked = c.kind === "cat" ? c.values.filter((v: any) => picks.has(String(v.v)))
                   .sort((x: any, y: any) => picks.picked.indexOf(String(x.v)) - picks.picked.indexOf(String(y.v))) : [];
                 const valueArm = (v: any) => ({ name: armLabel(String(v.v)), where: { kind: "clinical", attribute: c.attribute, values: [v.v] } as Leaf, n: v.n });
-                const selected = n > 1 ? [{ label: "Compare selected (" + (n > 8 ? "8+" : n) + ")",
-                  title: "open group comparison with each selected " + (c.kind === "num" ? "range" : "value") + " of " + label + " as a group, over the rest of your selection",
-                  onClick: () => compareSelection(chart) }] : [];
+                const selected = n > 1 ? forBoth((t) => ({ label: GROUPS[t].verb + " selected (" + (n > 8 ? "8+" : n) + ")",
+                  title: GROUPS[t].opens + " each selected " + (c.kind === "num" ? "range" : "value") + " of " + label + " as a group, over the rest of your selection",
+                  onClick: () => compareSelection(chart, t) })) : [];
                 if (c.kind === "cat") return <ChartMenu label={label} actions={addMode ? [] : [
-                  compareAction(c.values.map(valueArm), PIE_ATTRIBUTES.has(c.attribute) ? null : checked.map(valueArm), "value of " + label, (arms) => compareItems(chart, arms)),
+                  ...forBoth((t) => compareAction(c.values.map(valueArm), PIE_ATTRIBUTES.has(c.attribute) ? null : checked.map(valueArm), "value of " + label, (arms) => compareItems(chart, arms, t), t)),
                   ...selected]} />;
                 const bins = (c.bins || []).filter((b: any) => b.count > 0).map((b: any) => ({ name: armLabel(c.attribute + " " + binLabel(b)), where: binClause(c.attribute, b) as Leaf }));
                 return <ChartMenu label={label} actions={addMode ? [] : [
-                  compareNumeric(label, exStudies.length === 1, splittingBy === label, (q) => compareQuantiles({ attribute: c.attribute }, q, label), bins, () => compareItems(chart, bins)),
+                  ...forBoth((t) => compareNumeric(label, exStudies.length === 1, splittingBy === label, (q) => compareQuantiles({ attribute: c.attribute }, q, label, t), bins, () => compareItems(chart, bins, t), t)),
                   ...selected]} />;
               })()}
             </div>
@@ -863,10 +878,10 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
     <div data-assayfacet={f.profileType + "|" + f.entity} className="card">
       <div className="facettitle flex items-center gap-1">
         <span className="min-w-0 flex-1 truncate" data-tip={f.entity}>{title}</span>
-        <ChartMenu label={title} actions={addMode || exStudies.length > 1 ? [] : f.kind === "cat" ? [
-          compareAction((f.values || []).map((v) => ({ ...valueArm(v.v), n: v.n })), checked.map(valueArm), "value of " + title, (arms) => compareItems(chart, arms))] : [
-          compareNumeric(title, true, splittingBy === title, (q) => compareQuantiles({ assay: { profileType: f.profileType, entity: f.entity } }, q, title),
-            binArms, () => compareItems(chart, binArms))]} />
+        <ChartMenu label={title} actions={addMode || exStudies.length > 1 ? [] : f.kind === "cat"
+          ? forBoth((t) => compareAction((f.values || []).map((v) => ({ ...valueArm(v.v), n: v.n })), checked.map(valueArm), "value of " + title, (arms) => compareItems(chart, arms, t), t))
+          : forBoth((t) => compareNumeric(title, true, splittingBy === title, (q) => compareQuantiles({ assay: { profileType: f.profileType, entity: f.entity } }, q, title, t),
+            binArms, () => compareItems(chart, binArms, t), t))} />
         <Button variant="ghost" size="icon-xs" data-tip="stop charting this" aria-label={"stop charting " + f.entity}
           onClick={() => unchartAssay(f.profileType, f.entity)}><X /></Button>
       </div>
@@ -1054,10 +1069,9 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
         {(() => {
           const chart: ChartKey = { kind: "genes", specs: kind === "mutated" ? [": MUT"] : kind === "cna" ? [": AMP", ": HOMDEL"] : [": FUSION"] };
           const checked = picks.picked.map((k) => byKey.get(k)).filter(Boolean);
-          return <ChartMenu label={meta.title} actions={addMode ? [] : [
-            checked.length < 2
-              ? { label: "Check genes to compare", disabled: true, title: "check at least 2 genes: each becomes a group of the cases altered in it (a case altered in both is in both)" }
-              : compareAction([], checked.map((g: any) => ({ name: armLabel(meta.oql(g)), where: { kind: "oql", q: meta.oql(g) } as Leaf })), "gene", (arms) => compareItems(chart, arms))]} />;
+          return <ChartMenu label={meta.title} actions={addMode ? [] : checked.length < 2
+            ? [{ label: "Check genes to compare or analyze", disabled: true, title: "check at least 2 genes: each becomes a group of the cases altered in it (a case altered in both is in both)" }]
+            : forBoth((t) => compareAction([], checked.map((g: any) => ({ name: armLabel(meta.oql(g)), where: { kind: "oql", q: meta.oql(g) } as Leaf })), "gene", (arms) => compareItems(chart, arms, t), t))} />;
         })()}
       </div>
       {/* the portal's columns: the gene, its event count (mutations, SVs) or cytoband and call

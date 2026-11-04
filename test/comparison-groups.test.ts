@@ -1,7 +1,7 @@
 // Explore's "Compare groups": a chart's items or a numeric attribute's cuts as the comparison page's cohorts.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { comparisonCohorts, exclusiveCohorts, quantilePoints, rangeArms, COMPARISON_MAX_GROUPS } from "../lib/partition-arms.ts";
+import { comparisonCohorts, exclusiveCohorts, quantilePoints, rangeArms, ANALYSIS_MAX_COHORTS, COMPARISON_MAX_GROUPS } from "../lib/partition-arms.ts";
 import type { Clause, Leaf, PartitionArm } from "../lib/types.ts";
 
 const age = (range: { gt?: number; lte?: number }): Clause => ({ kind: "clinical", attribute: "AGE", range });
@@ -58,6 +58,13 @@ describe("comparisonCohorts", () => {
     const many = Array.from({ length: COMPARISON_MAX_GROUPS + 1 }, (_, i) => ({ name: "g" + i, where: arms[0].where }));
     assert.throws(() => comparisonCohorts({}, [], many), new RegExp("holds at most " + COMPARISON_MAX_GROUPS + " groups"));
     assert.throws(() => comparisonCohorts({}, Array(8).fill(base[0]), arms), /at most 8/);
+  });
+  test("an analysis takes the groups up to the document's cohort limit, not the comparison page's", () => {
+    const groups = (n: number) => Array.from({ length: n }, (_, i) => ({ name: "g" + i, where: arms[0].where }));
+    assert.equal(Object.keys(comparisonCohorts({}, [], groups(ANALYSIS_MAX_COHORTS), "analysis")).length, ANALYSIS_MAX_COHORTS);
+    assert.throws(() => comparisonCohorts({}, [], groups(ANALYSIS_MAX_COHORTS + 1), "analysis"),
+      new RegExp("an analysis document holds at most " + ANALYSIS_MAX_COHORTS + " groups"));
+    assert.ok(ANALYSIS_MAX_COHORTS < COMPARISON_MAX_GROUPS, "otherwise one limit covers both and the target argument proves nothing");
   });
 });
 

@@ -25,6 +25,9 @@ import { SPEC_URL_MAX } from "../../lib/lab-links.ts";
  *  (studyview_clinical_attribute_chart_count) */
 export const DEFAULT_CLINICAL_CHARTS = 20;
 
+/** where a chart's groups open: the comparison page (a new tab), or a fresh analysis here */
+export type GroupsTarget = "comparison" | "analysis";
+
 /** a saved cohort open in Explore to change its filters */
 export type EditingCohort = { id: string; name: string; def: CohortDef };
 
@@ -196,24 +199,32 @@ export function useExploreState(page: ExplorePage) {
     // and is invisible here, so inheriting it made the analysis arrive under a
     // name with no on-screen explanation.
     const name = barDefaultName();
+    startAnalysis({ [name]: d });
+  };
+  /** replace the document with a fresh analysis of `cohorts` (no views yet) and show it; Back restores the old one */
+  const startAnalysis = (cohorts: Record<string, CohortDef>) => {
     const nextStudy = exSel.current[0] || study;
-    const nd: AnalysisDoc = { dsl: DOC_VERSION, study: nextStudy, cohorts: { [name]: d }, views: [] };
     setStudy(nextStudy);
-    docs.replace(nd);
+    docs.replace({ dsl: DOC_VERSION, study: nextStudy, cohorts, views: [] });
     setError(null);     // never leave the previous run's numbers on screen
     goTab("analysis");
   };
   /**
-   * Open cBioPortal's group comparison on `arms` of the selection, as the portal's study view does
-   * from a chart: each arm a group of its own (the selection's `base` clauses and the arm's), in a
-   * new tab so the selection stays here. The tab is opened before anything is awaited (a window
-   * opened later is a blocked pop-up) and sent on once the groups are known; a refusal closes it
-   * and is said here. A link too long for the address bar has its id lists stored first.
+   * Open `arms` of the selection as groups, as the portal's study view does from a chart: each arm
+   * a group of its own (the selection's `base` clauses and the arm's). `target` says where:
+   * - "comparison": cBioPortal's group comparison, in a new tab so the selection stays here. The
+   *   tab is opened before anything is awaited (a window opened later is a blocked pop-up) and sent
+   *   on once the groups are known; a refusal closes it and is said here. A link too long for the
+   *   address bar has its id lists stored first.
+   * - "analysis": a fresh analysis document with each group a cohort, on the Analysis tab — as
+   *   Analyze does for the whole selection (it replaces the document; Back restores it).
    */
-  const openComparison = async (w: Window | null, groups: () => Promise<Record<string, CohortDef>>) => {
+  const openGroups = async (target: GroupsTarget, w: Window | null, groups: () => Promise<Record<string, CohortDef>>) => {
     setExMsg(null);
     try {
-      let nd: AnalysisDoc = { dsl: DOC_VERSION, study: exSel.current[0] || study, cohorts: await groups(), views: [] };
+      const cohorts = await groups();
+      if (target === "analysis") { startAnalysis(cohorts); return; }
+      let nd: AnalysisDoc = { dsl: DOC_VERSION, study: exSel.current[0] || study, cohorts, views: [] };
       if (encodeParam(nd).length > SPEC_URL_MAX) nd = await storeDocLists(nd);
       const n = encodeParam(nd).length;
       if (n > SPEC_URL_MAX)
@@ -222,7 +233,7 @@ export function useExploreState(page: ExplorePage) {
       if (w && !w.closed) w.location.href = url; else window.location.assign(url);
     } catch (e) {
       w?.close();
-      setExMsg("Could not compare: " + String((e as Error)?.message || e));
+      setExMsg((target === "analysis" ? "Could not analyze: " : "Could not compare: ") + String((e as Error)?.message || e));
     }
   };
   /** a new tab saying it is waiting for its groups, or null when the browser blocks it */
@@ -238,16 +249,16 @@ export function useExploreState(page: ExplorePage) {
    * halves either side of its median (2) — cut by the server over the selection's own values, each
    * cut written into its group.
    */
-  const compareQuantiles = (spec: SplitSpec, quantiles: number, label: string) => {
+  const compareQuantiles = (spec: SplitSpec, quantiles: number, label: string, target: GroupsTarget = "comparison") => {
     const d = barDef();
     if (!d) { setExMsg("select at least one study first"); return; }
-    const w = comparisonTab();
+    const w = target === "comparison" ? comparisonTab() : null;
     setSplittingBy(label);
     const name = barDefaultName();
     const base: AnalysisDoc = { dsl: DOC_VERSION, study: exSel.current[0] || study, cohorts: { [name]: d }, views: [] };
-    void openComparison(w, async () => {
+    void openGroups(target, w, async () => {
       const { def } = await proposePartition({ doc: base, cohort: name, quantiles, ...spec });
-      return comparisonCohorts(d, d.all as Clause[], def.arms);
+      return comparisonCohorts(d, d.all as Clause[], def.arms, target);
     }).finally(() => setSplittingBy(null));
   };
   /** How many items one chart has selected (each its own group when compared); 9 for more than 8. */
@@ -256,25 +267,25 @@ export function useExploreState(page: ExplorePage) {
     if (!d) return 0;
     try { return armsFromSelection(d, chart)?.arms.length ?? 0; } catch { return 9; }
   };
-  /** Compare a chart's selected items, each its own group, over the rest of the selection. */
-  const compareSelection = (chart: ChartKey) => {
+  /** Compare (or analyze) a chart's selected items, each its own group, over the rest of the selection. */
+  const compareSelection = (chart: ChartKey, target: GroupsTarget = "comparison") => {
     const d = parseDraft();
     if (!d) return;
-    void openComparison(comparisonTab(), async () => {
+    void openGroups(target, target === "comparison" ? comparisonTab() : null, async () => {
       const r = armsFromSelection(d, chart);
       if (!r) throw new Error("nothing is selected in this chart");
-      return comparisonCohorts(d, r.base.all, r.arms);
+      return comparisonCohorts(d, r.base.all, r.arms, target);
     });
   };
   /**
-   * Compare the given items of one chart — its checked rows, its values or its bins — each a group,
+   * Compare (or analyze) the given items of one chart — its checked rows, its values or its bins — each a group,
    * over the selection without that chart's own clauses, so a value the chart already filters to
    * does not empty the others.
    */
-  const compareItems = (chart: ChartKey, arms: PartitionArm[]) => {
+  const compareItems = (chart: ChartKey, arms: PartitionArm[], target: GroupsTarget = "comparison") => {
     if (!exSel.current.length) { setExMsg("select at least one study first"); return; }
     const d = parseDraft() || { all: [] };
-    void openComparison(comparisonTab(), async () => comparisonCohorts(selectionScope(), withoutChart(d, chart), arms));
+    void openGroups(target, target === "comparison" ? comparisonTab() : null, async () => comparisonCohorts(selectionScope(), withoutChart(d, chart), arms, target));
   };
   /**
    * Saving asks for a name when you ask to save, rather than keeping a field in
