@@ -1,0 +1,586 @@
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "All samples": {
+      "count": 1084,
+      "samples": 1084,
+      "text": "all samples in the study",
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "mutexpr",
+      "cohorts": [
+        "All samples"
+      ],
+      "mutexpr": {
+        "gene": "TP53",
+        "expressionGene": "TP53",
+        "profileType": "rna_seq_v2_mrna",
+        "scale": "log2",
+        "resolution": "protein",
+        "stratify": [],
+        "minCount": 3,
+        "valueLabel": "TP53 expression — log2(v + 1) of rna_seq_v2_mrna",
+        "range": [
+          7.7888096705817595,
+          12.338836643610199
+        ],
+        "bins": 60,
+        "strata": [
+          {
+            "key": "",
+            "label": "All samples",
+            "n": 1082,
+            "groups": [
+              {
+                "label": "All mutated",
+                "role": "allMutated",
+                "n": 347,
+                "mean": 10.372798585933674,
+                "sd": 1.1925184387730905,
+                "p5": 8.277937570182317,
+                "q1": 9.29600610539743,
+                "median": 10.687728370821848,
+                "q3": 11.292675138826766,
+                "p95": 12.030193147273103,
+                "diff": -0.2045734322466135,
+                "t": -2.9931476985450356,
+                "p": 0.0029147645642023283,
+                "q": 0.008744293692606984
+              },
+              {
+                "label": "R175H",
+                "role": "variant",
+                "n": 20,
+                "mean": 11.328172509857872,
+                "sd": 0.5836250450739108,
+                "p5": 10.139656939979787,
+                "q1": 10.935911660259762,
+                "median": 11.277163683236896,
+                "q3": 11.61841570621403,
+                "p95": 12.300919752168294,
+                "diff": 0.7508004916775839,
+                "t": 5.658730968901985,
+                "p": 0.00001460048048445962,
+                "q": 0.00022526303335413604
+              },
+              {
+                "label": "R273H",
+                "role": "variant",
+                "n": 12,
+                "mean": 10.93479112284985,
+                "sd": 0.4085655247927356,
+                "p5": 10.412658558361493,
+                "q1": 10.632576528724535,
+                "median": 10.860077877375955,
+                "q3": 11.125496117469282,
+                "p95": 11.83833367657707,
+                "diff": 0.35741910466956206,
+                "t": 2.9698883865755623,
+                "p": 0.011774955122885606,
+                "q": 0.028646647756603527
+              },
+              {
+                "label": "R196*",
+                "role": "variant",
+                "n": 8,
+                "mean": 8.795754930256583,
+                "sd": 0.42272308306932727,
+                "p5": 8.046644532386704,
+                "q1": 8.395479933652219,
+                "median": 8.850482630955062,
+                "q3": 8.926316413838869,
+                "p95": 9.35098559798819,
+                "diff": -1.7816170879237045,
+                "t": -11.770706252095815,
+                "p": 0.0000048654541374418075,
+                "q": 0.00016055998653557966
+              },
+              {
+                "label": "R213*",
+                "role": "variant",
+                "n": 7,
+                "mean": 8.945858398346102,
+                "sd": 0.735507939486783,
+                "p5": 8.11868662612632,
+                "q1": 8.224853922163652,
+                "median": 9.115900871048387,
+                "q3": 9.476111339746472,
+                "p95": 9.96144755020284,
+                "diff": -1.6315136198341857,
+                "t": -5.847201531955439,
+                "p": 0.0010474522376060858,
+                "q": 0.006288087277416123
+              },
+              {
+                "label": "R342*",
+                "role": "variant",
+                "n": 7,
+                "mean": 9.75907376130946,
+                "sd": 0.6125571930479927,
+                "p5": 8.72535688919678,
+                "q1": 9.589862014072184,
+                "median": 9.722571134118846,
+                "q3": 10.006947819933124,
+                "p95": 10.79561916192472,
+                "diff": -0.8182982568708272,
+                "t": -3.5156433468453407,
+                "p": 0.012153123290680284,
+                "q": 0.028646647756603527
+              },
+              {
+                "label": "Y220C",
+                "role": "variant",
+                "n": 7,
+                "mean": 11.505935997749848,
+                "sd": 0.4482093172659617,
+                "p5": 10.924536592827192,
+                "q1": 11.030703888864522,
+                "median": 11.61841570621403,
+                "q3": 11.969146952051638,
+                "p95": 12.022230600070303,
+                "diff": 0.9285639795695602,
+                "t": 5.427334183350312,
+                "p": 0.0014270560672987851,
+                "q": 0.006727550031551416
+              },
+              {
+                "label": "H179R",
+                "role": "variant",
+                "n": 6,
+                "mean": 11.069267699225804,
+                "sd": 0.7674662531336448,
+                "p5": 9.859071943309699,
+                "q1": 10.632576528724535,
+                "median": 10.973828551701667,
+                "q3": 11.409872803283559,
+                "p95": 12.164418942977441,
+                "diff": 0.4918956810455164,
+                "t": 1.5654001936158433,
+                "p": 0.1775930805600541,
+                "q": 0.2093061306600638
+              },
+              {
+                "label": "H193R",
+                "role": "variant",
+                "n": 6,
+                "mean": 11.228555472286338,
+                "sd": 0.6387575198671299,
+                "p5": 10.238240857728735,
+                "q1": 10.860077877375955,
+                "median": 11.20132990035309,
+                "q3": 11.466748140446414,
+                "p95": 12.24025272586125,
+                "diff": 0.6511834541060502,
+                "t": 2.4866842699647003,
+                "p": 0.054576429952565675,
+                "q": 0.07980167983368779
+              },
+              {
+                "label": "I195T",
+                "role": "variant",
+                "n": 5,
+                "mean": 11.342644585821088,
+                "sd": 0.25275600234035,
+                "p5": 11.068620780306427,
+                "q1": 11.210809123213565,
+                "median": 11.258205237515945,
+                "q3": 11.334039020399752,
+                "p95": 11.789041717702595,
+                "diff": 0.7652725676407997,
+                "t": 6.623268139603416,
+                "p": 0.0019655464454396586,
+                "q": 0.008107879087438591
+              },
+              {
+                "label": "R273C",
+                "role": "variant",
+                "n": 5,
+                "mean": 10.958859852422208,
+                "sd": 0.32554117604781696,
+                "p5": 10.537784300119775,
+                "q1": 10.765285648771197,
+                "median": 10.935911660259762,
+                "q3": 11.182371454632136,
+                "p95": 11.409872803283559,
+                "diff": 0.3814878342419199,
+                "t": 2.585631125179792,
+                "p": 0.05784342397355155,
+                "q": 0.07980167983368779
+              },
+              {
+                "label": "X225_splice",
+                "role": "variant",
+                "n": 5,
+                "mean": 8.771184062534065,
+                "sd": 0.6161875981667849,
+                "p5": 7.807768116302712,
+                "q1": 8.869441076676013,
+                "median": 9.021108642443629,
+                "q3": 9.068504756746009,
+                "p95": 9.210693099653147,
+                "diff": -1.806187955646223,
+                "t": -6.529837921918169,
+                "p": 0.002695800230375297,
+                "q": 0.008744293692606984
+              },
+              {
+                "label": "C176F",
+                "role": "variant",
+                "n": 4,
+                "mean": 11.486350119151462,
+                "sd": 0.3965282556312273,
+                "p5": 10.98899530827843,
+                "q1": 11.049662334585474,
+                "median": 11.352997466120703,
+                "q3": 11.808000163423547,
+                "p95": 11.868667189730594,
+                "diff": 0.9089781009711739,
+                "t": 4.551623909430977,
+                "p": 0.018662158455931686,
+                "q": 0.0384907018153591
+              },
+              {
+                "label": "E285K",
+                "role": "variant",
+                "n": 4,
+                "mean": 11.057387713676851,
+                "sd": 0.7984483771615267,
+                "p5": 10.38232504520797,
+                "q1": 10.442992071515016,
+                "median": 10.59465963728263,
+                "q3": 11.20132990035309,
+                "p95": 12.172002321265822,
+                "diff": 0.4800156954965633,
+                "t": 1.2002154259883104,
+                "p": 0.3156347531990301,
+                "q": 0.3471982285189331
+              },
+              {
+                "label": "L194R",
+                "role": "variant",
+                "n": 4,
+                "mean": 11.30795767656933,
+                "sd": 0.42113184505930096,
+                "p5": 10.837327742510814,
+                "q1": 10.89799476881786,
+                "median": 11.125496117469282,
+                "q3": 11.580498814772126,
+                "p95": 11.792833406846785,
+                "diff": 0.7305856583890424,
+                "t": 3.4474214205649925,
+                "p": 0.039418644990449885,
+                "q": 0.06476522472918529
+              },
+              {
+                "label": "R209Kfs*6",
+                "role": "variant",
+                "n": 4,
+                "mean": 8.382411721781608,
+                "sd": 0.14810409219458381,
+                "p5": 8.183145341577557,
+                "q1": 8.243812367884603,
+                "median": 8.31964615076841,
+                "q3": 8.471313716536025,
+                "p95": 8.607814525726878,
+                "diff": -2.19496029639868,
+                "t": -28.203676149546084,
+                "p": 0.00002047845757764873,
+                "q": 0.00022526303335413604
+              },
+              {
+                "label": "R248W",
+                "role": "variant",
+                "n": 4,
+                "mean": 11.107585327578894,
+                "sd": 0.29739512408747965,
+                "p5": 10.837327742510814,
+                "q1": 10.89799476881786,
+                "median": 10.973828551701667,
+                "q3": 11.20132990035309,
+                "p95": 11.565332058195363,
+                "diff": 0.5302133093986061,
+                "t": 3.5203870526868966,
+                "p": 0.03586428983594147,
+                "q": 0.062290608662424654
+              },
+              {
+                "label": "R282W",
+                "role": "variant",
+                "n": 4,
+                "mean": 11.673598985240305,
+                "sd": 0.45252664108389345,
+                "p5": 11.064829091162236,
+                "q1": 11.125496117469282,
+                "median": 11.656332597655933,
+                "q3": 11.883833946307355,
+                "p95": 12.172002321265822,
+                "diff": 1.0962269670600175,
+                "t": 4.818025468351264,
+                "p": 0.01618160147898883,
+                "q": 0.03559952325377543
+              },
+              {
+                "label": "X125_splice",
+                "role": "variant",
+                "n": 4,
+                "mean": 9.05269444466725,
+                "sd": 0.4246184994891036,
+                "p5": 8.782232226359636,
+                "q1": 8.812565739513158,
+                "median": 8.850482630955062,
+                "q3": 8.926316413838869,
+                "p95": 9.66948748610018,
+                "diff": -1.5246775735130385,
+                "t": -7.136179071822687,
+                "p": 0.005207167134615503,
+                "q": 0.014319709620192633
+              },
+              {
+                "label": "X126_splice",
+                "role": "variant",
+                "n": 4,
+                "mean": 11.028323337700831,
+                "sd": 0.22615852365540415,
+                "p5": 10.761493959627007,
+                "q1": 10.822160985934053,
+                "median": 10.89799476881786,
+                "q3": 11.20132990035309,
+                "p95": 11.261996926660135,
+                "diff": 0.45095131952054324,
+                "t": 3.901454164011911,
+                "p": 0.025478811920716233,
+                "q": 0.04945887019903739
+              },
+              {
+                "…": "15 more",
+                "sha256": "3f23929c9d707fc2"
+              }
+            ]
+          }
+        ],
+        "withheldStrata": 0,
+        "samples": {
+          "cohort": 1084,
+          "withValue": 1082,
+          "negativeDropped": 0
+        },
+        "tested": 33
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Each sample of “All samples” with a rna_seq_v2_mrna value for TP53 is one observation (1,082 of its 1,084 samples). A sample's group is its one protein change of TP53; a sample with more than one is “Several”. “Not mutated” is a sample whose panel covers TP53 for mutations and has no call; “Not profiled” is one whose panel does not — never counted as wild type. A mutation is a call on the panel (not off-panel). minCount 3: a protein change with fewer samples is pooled into “Other”, beyond the 30 largest too; any group or stratum still under 3 is withheld — its size is shown as “< 3” and no statistic is reported. This is a display rule, not formal disclosure control: a withheld count can sometimes be recovered from the totals. Means and SDs are exact; the box's quartiles and its 5th–95th percentile whiskers are read off 60 bins spanning the cohort's middle 99% of values (values beyond it count in the end bins): each lies within one bin (0.0758) of the smallest value with that share of the group at or below it, which in a small group can differ from an averaged median. Each group is compared with “Not mutated” in its stratum by Welch's t-test from per-group sums, exact across sites; q is Benjamini–Hochberg across the 33 comparisons. “All mutated” overlaps the groups below it. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the samples with a value, and the range of the values",
+            "detail": "The mutexpr:range query above: TP53 on “rna_seq_v2_mrna” as log2(v + 1) (a negative stored value has no log and is left out, not clamped), one value per sample (the mean of its rows). Returns the cohort's samples, those with a value, those left out for a negative value, and the values' 0.5th and 99.5th percentiles.",
+            "scope": "All samples · brca_tcga_pan_can_atlas_2018",
+            "rowsIn": 1084,
+            "rowsOut": 1082
+          },
+          {
+            "kind": "transform",
+            "title": "Set the bins every site shares",
+            "detail": "From the lowest 0.5th to the highest 99.5th percentile across the sites, cut into 60 equal bins; a value beyond either end is counted in the end bin, so every sample is counted.",
+            "params": [
+              [
+                "from",
+                "7.7888096705817595"
+              ],
+              [
+                "to",
+                "12.338836643610199"
+              ],
+              [
+                "bins",
+                "60"
+              ],
+              [
+                "bin width",
+                "0.07583378288380732"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count and sum the values per stratum, group and bin",
+            "detail": "The mutexpr:groups query above. A sample's group is its one protein change of TP53, “Several” for more than one, “Not mutated” when its panel covers TP53 for mutations and it has no call (whole exome included), “Not profiled” when its panel does not. A mutation is a call on the panel. Per (stratum, group, bin): n, Σv and Σv² — no individual value.",
+            "scope": "All samples · brca_tcga_pan_can_atlas_2018",
+            "rowsIn": 1082
+          },
+          {
+            "kind": "transform",
+            "title": "Form the groups drawn, and withhold the small ones",
+            "detail": "Per stratum: “All mutated” (every protein change and “Several” together), each protein change with at least 3 samples (the 30 largest; ties by name), “Several”, “Other” (every protein change not drawn on its own, pooled), “Not mutated” and “Not profiled”. A group or a whole stratum with fewer than 3 samples is withheld: no statistic of it is reported, and it is not in the table below.",
+            "params": [
+              [
+                "minCount",
+                "3"
+              ],
+              [
+                "groups drawn",
+                "35"
+              ],
+              [
+                "groups withheld",
+                "0"
+              ],
+              [
+                "strata withheld",
+                "0"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Summarise each group",
+            "detail": "Mean Σv/n and SD √((Σv² − (Σv)²/n)/(n − 1)), exact. The 5th, 25th, 50th, 75th and 95th percentiles from the bin counts: for probability p, the first bin whose running count reaches p·n, the values in it taken as spread evenly across it — within one bin's width of the smallest value with at least that share of the group at or below it (in a small group this can differ from an averaged median)."
+          },
+          {
+            "kind": "statistic",
+            "title": "Welch's t-test against “Not mutated”",
+            "detail": "Each group other than “Not mutated” and “Not profiled” against “Not mutated” in the same stratum, where both are drawn: difference of means, unequal-variance t, Welch–Satterthwaite df, two-sided. A pair with no variance (Var + Var ≤ 1e-9 · (1 + mean² + mean²)) is not tested.",
+            "params": [
+              [
+                "comparisons",
+                "33"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Benjamini–Hochberg across the comparisons",
+            "detail": "q-values over all 33 comparisons in the view."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "runMutexpr",
+            "binQuantile",
+            "welchT",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/views/mutexpr/run.ts",
+          "commit": null
+        },
+        "verification": "Welch's t from moments matches scipy 1.18.1 ttest_ind(equal_var=False) and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts); binQuantile is held to numpy's percentiles of the binned values in test/mutexpr.test.ts.",
+        "check": {
+          "mutexpr:tested": {
+            "v": 33,
+            "abs": 0
+          },
+          "mutexpr:All samples:All mutated:mean": {
+            "v": 10.372798585933674,
+            "rel": 1e-9
+          },
+          "mutexpr:All samples:All mutated:median": {
+            "v": 10.687728370821848,
+            "rel": 1e-9,
+            "abs": 1e-9
+          },
+          "mutexpr:All samples:All mutated:p": {
+            "v": 0.0029147645642023283,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "mutexpr:All samples:All mutated:q": {
+            "v": 0.008744293692606984,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "mutexpr:All samples:R175H:mean": {
+            "v": 11.328172509857872,
+            "rel": 1e-9
+          },
+          "mutexpr:All samples:R175H:median": {
+            "v": 11.277163683236896,
+            "rel": 1e-9,
+            "abs": 1e-9
+          },
+          "mutexpr:All samples:R175H:p": {
+            "v": 0.00001460048048445962,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "mutexpr:All samples:R175H:q": {
+            "v": 0.00022526303335413604,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "mutexpr:All samples:R273H:mean": {
+            "v": 10.93479112284985,
+            "rel": 1e-9
+          },
+          "mutexpr:All samples:R273H:median": {
+            "v": 10.860077877375955,
+            "rel": 1e-9,
+            "abs": 1e-9
+          },
+          "mutexpr:All samples:R273H:p": {
+            "v": 0.011774955122885606,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "mutexpr:All samples:R273H:q": {
+            "v": 0.028646647756603527,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "mutexpr:All samples:R196*:mean": {
+            "v": 8.795754930256583,
+            "rel": 1e-9
+          },
+          "mutexpr:All samples:R196*:median": {
+            "v": 8.850482630955062,
+            "rel": 1e-9,
+            "abs": 1e-9
+          },
+          "mutexpr:All samples:R196*:p": {
+            "v": 0.0000048654541374418075,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "mutexpr:All samples:R196*:q": {
+            "v": 0.00016055998653557966,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "mutexpr:All samples:R213*:mean": {
+            "v": 8.945858398346102,
+            "rel": 1e-9
+          },
+          "mutexpr:All samples:R213*:median": {
+            "v": 9.115900871048387,
+            "rel": 1e-9,
+            "abs": 1e-9
+          },
+          "mutexpr:All samples:R213*:p": {
+            "v": 0.0010474522376060858,
+            "rel": 0.000001,
+            "abs": 1e-300
+          },
+          "…": {
+            "more": 117,
+            "sha256": "cd64113af4665a9d"
+          }
+        }
+      }
+    }
+  ]
+}

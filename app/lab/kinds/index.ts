@@ -23,6 +23,7 @@ import { coxUi } from "./cox.tsx";
 import { ctdnaUi } from "./ctdna.tsx";
 import { cutpointUi } from "./cutpoint.tsx";
 import { diffexprUi } from "./diffexpr.tsx";
+import { mutexprUi } from "./mutexpr.tsx";
 import { drivernegativeUi } from "./drivernegative.tsx";
 import { enrichmentUi } from "./enrichment.tsx";
 import { exclusivityUi } from "./exclusivity.tsx";
@@ -102,6 +103,7 @@ export const KIND_UI: { [K in ViewKind]: KindUi<K> } = {
   adjusted: adjustedUi,
   forest: forestUi,
   diffexpr: diffexprUi,
+  mutexpr: mutexprUi,
 };
 
 /** a kind's page-side description, whatever kind it is */

@@ -329,6 +329,7 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | `drivernegative` | `drivers?:["<symbol>" ×≤40] (default EGFR, KRAS, ALK, ROS1, BRAF, MET, RET, ERBB2, NTRK1, NTRK2, NTRK3), alteration?:"mutation"|"sv"|"cna", measure?:"any"|"driver", minAltered?:5, label?:12, cohorts:[1 name]` | **driver-negative analysis within one cohort**: each patient sequenced for mutations is driver-positive with an OncoKB driver (oncogenic or likely oncogenic, at the pin: a called mutation, a high-level copy-number call or a structural variant) in one of `drivers`; else driver-negative when a mutation panel of theirs covers every listed gene (or whole-exome); else "not fully profiled" — counted, in neither group, never driver-negative. Then every other gene's `alteration` (default mutation; `sv` counts either fusion partner) frequency is compared between the two groups in PATIENTS over the patients profiled for that gene (panel-aware as `enrichment` counts, an off-panel call left out): two-sided Fisher, Benjamini–Hochberg q, log2 of the driver-negative share over the driver-positive one. Drawn as the group split and a volcano, with the genes most enriched in the driver-negative group. Counts only. |
 | `organotropism` | `source?:"auto"|"flags"|"timeline"|"sample", flagPrefix?:"DMETS_DX_", timeline?:{eventType?:"Diagnosis", key?:"TUMOR_SITE"}, siteAttribute?:"METASTATIC_SITE", sites?:[labels], genes?:[≤20] | top?:12, alteration?:"mutation"|"cna"|"amp"|"homdel"|"sv", measure?:"driver"|"any", stratifyBy?:"CANCER_TYPE"|null, minPatients?:5, incidence?:{site?, gene?}|null, cohorts:[1 name]` | **metastatic organotropism**: which genes' alterations go with metastasis to which organ (MSK-MET, Nguyen et al. Cell 2022). Sites come from per-organ Yes/No flags (`flagPrefix`<site>), from the timeline (event type and key naming a site, at any date) or from the biopsy site of metastasis samples (free text mapped to organs by the view's disclosed rules, the rest as a listed "Other"); `auto` takes the first the cohort has and the view refuses, naming what exists, when none is. Per site and gene, the patients evaluable for the site and profiled for the gene (panel-aware: an unprofiled patient is in neither group) form a 2×2 per stratum of `stratifyBy` (per patient); Cochran–Mantel–Haenszel test and Mantel–Haenszel odds ratio, Benjamini–Hochberg over the grid; a cell needs `minPatients` altered, with and without the site. Genes: a list, or the `top` most altered. Drawn as a gene × site heatmap of log2 OR (outlined at q < 0.05) and the strongest cells. With the timeline source, also the cumulative incidence of the first event at one site after day 0 by one gene's status (default the grid's most significant cell), death competing (Aalen–Johansen, Gray's permutation test); patients with the site by day 0 are excluded, and the panel is withheld when more than 5% of records have the site after their last follow-up. A site is only what imaging, biopsy or abstraction recorded. Counts only. |
 | `molsubtype` | `classifier?:"endometrial", msi?:{attribute?, high?:[values], stable?:[values]} | {attribute, threshold, stableBelow?} (default MSI_TYPE Instable / Stable, else MSI_SCORE or MSI_SENSOR_SCORE ≥ 10 / < 3), p53?:"driver"|"nonsynonymous", by?:"<patient attribute>", top?:8, survival?:true, cohorts:[≤6 names]` | **a published molecular classifier as derived subtypes**, so far the endometrial carcinoma classification (TCGA 2013 / ProMisE / WHO 2020): per patient over all their samples, first match wins — POLE-ultramutated (a somatic POLE exonuclease-domain hotspot: P286R, S297F, F367S/V, V411L, L424I/V, P436R, M444K, A456P, S459F, M295R, D368Y; León-Castillo et al. 2020), else MMR-deficient (MSI-high by the `msi` rule), else p53-abnormal (an OncoKB-driver TP53 mutation, or with `p53:"nonsynonymous"` any protein-changing one), else NSMP. A patient missing an input the hierarchy needs before reaching their subtype — not sequenced, not profiled for POLE or TP53 (panel-aware), no MSI-high or stable call — is "not classifiable", counted and kept out of shares, tests and curves; never guessed. Per cohort: subtype shares (a stacked bar; chi-squared between cohorts), with `by` one bar per group (the `top` largest, the rest pooled into a named Other; chi-squared), and overall survival by subtype (Kaplan–Meier, k-group log-rank) for the first three cohorts. Another `classifier` is refused, naming those that exist. Counts only. |
+| `mutexpr` | `gene, expressionGene?, profileType, scale?:"linear"|"log2"|"zscore", resolution?:"protein"|"codon", stratify?:["cancerType","fusion"], fusionGene?, minCount?:5, cohorts:[1 name]` | **expression of `expressionGene` (default: `gene` itself) against `gene`'s mutations**, one group per protein change (`resolution:"protein"`, the default) or codon (`"codon"`: reference residue and first position as written, so R175H and R175C are R175). Each sample of the cohort with a value is one observation. A sample with two changes is "Several"; **"Not mutated" (its panel covers the gene for mutations, whole exome included, and it has no call) and "Not profiled" (its panel does not) are separate groups** — a sample never profiled is never wild type. `scale`: `"zscore"` reads a z-score profile as stored (and is the only scale for one), `"log2"` is log2(v+1) of a continuous profile (TPM, RSEM, FPKM; the default for one; a negative value is left out and counted), `"linear"` the profile as stored; anything else is refused. `stratify` splits the samples first by CANCER_TYPE (folded; none recorded is its own stratum) and/or by a structural variant of `fusionGene` (default `gene`; present / absent / not profiled), crossed, at most 24 strata. **`minCount` (default 5)**: changes with fewer samples are pooled into "Other", as are those past the 30 largest; any group or stratum still smaller is withheld — its size shown as "< minCount", no statistic reported. Per group: n, exact mean and SD, and quartiles and 5th–95th percentiles read off 60 bins over the cohort's middle 99% (each within one bin of the smallest value with that share at or below it); each group, "All mutated" included, against "Not mutated" in its stratum by Welch's t from per-group sums (exact across sites), BH q across the view. A method record re-computes every number. A remote peer cannot answer yet and is named |
 | `germline` | `genes?:[≤60] (default every gene with ≥ minCarriers carriers), minCarriers?:3, survival?:{gene}, cohorts:[≤4 names]` | **germline carriers and their somatic second hits**, per patient: carriers are patients with a mutation the study marks GERMLINE in the gene, among the patients sequenced for it (a tumour mutation panel listing it, or whole-exome; a carrier whose panel omits the gene is counted apart — a gene not on a patient's panel never makes them a non-carrier). The carrier share is of patients sequenced, not germline-tested, since the warehouse cannot tell a negative germline test from none. Among carriers, a somatic second hit in the same gene: another called mutation not marked germline, or a deep deletion (−2, among patients profiled for copy number); loss of heterozygosity is not assessed (no allele-specific copy number is read; the result says when the study has FACETS), so the rate is a floor. Compared with the same somatic rate in non-carriers: Fisher per gene, Benjamini–Hochberg over the cohort's genes. With `survival`, overall survival of that gene's carriers against non-carriers (Kaplan–Meier, log-rank). Counts only. |
 | `assays` | `profileType:"<generic-assay profile>", minN?:3, label?:12, cohorts:[2–6 names]` | **every entity of one generic-assay profile compared between cohorts**, cBioPortal's group-comparison tabs for generic assays (mutational signatures, arm-level copy number, treatment response, …): one value per sample (every sample of each cohort's patients) or per patient for a patient-level profile. A numeric profile: each entity's n, Σv and Σv² per cohort — values that are not numbers, such as a limit `">8"` or NA, are counted and left out — then Welch's t for two cohorts (drawn as a volcano of the difference in means) or Welch's ANOVA for more. A categorical one: each entity's count per value per cohort — NA and blank are not called and are counted apart — then a chi-squared test on cohort × value. q is Benjamini–Hochberg across every entity tested; an entity with fewer than `minN` values in a cohort, or with no spread, is counted as not tested. Per-probe methylation is refused (hundreds of thousands of probes), as is any profile past 20,000 entities. Counts and moments only |
 | `composition` | `profileType:"<generic-assay profile>", entities?:[ids] | attributes:["<numeric attribute>", …2–16], unit?:"patient"|"sample", normalize?:true, sort?:"<part>", cohorts:[1–8 names]` | **what each case is made of, as parts of a whole, compared between cohorts** — the stacked-bar panels of single-cell studies (cell types, cell states) and of signature studies. The parts are a generic-assay profile's entities (per sample, or per patient for a patient-level profile; at most 16 — choose them with `entities`) or 2–16 numeric clinical attributes, `custom:` uploads included (per patient unless `unit:"sample"`). A case with every part, none below zero and a sum above zero is kept, its parts divided by their sum unless `normalize:false`; the rest are counted as left out. Inside the database, per cohort: n, Σp and Σp² per part and Σ, Σ² of each case's Shannon entropy. Each cohort against the view's other cohorts pooled, part by part: log2 of the ratio of means (each + 0.001) and Welch's t, Benjamini–Hochberg across the comparisons (with two cohorts, once per part). The figure draws each cohort's cases as stacked bars ordered by `sort` (default the first part), beside the cohort's mean, and a cohort × part matrix; the bars come only from participants that may show cases, and past 2,000 cases a cohort is drawn as its mean alone, saying so. Sums only, apart from those bars, which carry no ids |
@@ -5294,7 +5295,68 @@ Microsatellite-stable colorectal against pancreatic cancer in MSK-CHORD. APC, TC
 }
 ```
 
-### Example 85: Mutational signatures: what UV light and tobacco leave behind
+### Example 85: TP53 expression by TP53 protein change in breast cancer
+
+TCGA PanCancer Atlas breast cancer, RSEM as log2(v + 1). Truncating TP53 changes (R196*, R213*, R342*) lower TP53's own mRNA, by nonsense-mediated decay, while hotspot missense changes such as R175H and R273H do not — the reason a missense and a truncating TP53 tumour should not be pooled when expression is the readout.
+
+```json
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "All samples": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "mutexpr",
+      "cohorts": [
+        "All samples"
+      ],
+      "gene": "TP53",
+      "profileType": "rna_seq_v2_mrna",
+      "minCount": 3
+    }
+  ]
+}
+```
+
+### Example 86: DUSP6 expression by KRAS codon, within cancer type
+
+TCGA PanCancer Atlas pancreatic, colorectal and lung adenocarcinoma, on mRNA z-scores relative to all samples. KRAS G12 tumours carry higher DUSP6 than KRAS-unmutated tumours of the same cancer type; the codon groups seen in fewer than five samples of a cancer type are pooled or withheld rather than drawn from a handful of points.
+
+```json
+{
+  "study": "paad_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "PAAD + COADREAD + LUAD": {
+      "studies": [
+        "paad_tcga_pan_can_atlas_2018",
+        "coadread_tcga_pan_can_atlas_2018",
+        "luad_tcga_pan_can_atlas_2018"
+      ],
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "mutexpr",
+      "cohorts": [
+        "PAAD + COADREAD + LUAD"
+      ],
+      "gene": "KRAS",
+      "expressionGene": "DUSP6",
+      "profileType": "rna_seq_v2_mrna_median_all_sample_Zscores",
+      "resolution": "codon",
+      "stratify": [
+        "cancerType"
+      ]
+    }
+  ]
+}
+```
+
+### Example 87: Mutational signatures: what UV light and tobacco leave behind
 
 Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.
 
@@ -5338,7 +5400,7 @@ Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature 
 }
 ```
 
-### Example 86: Composition: T and NK cell states by mutational signature (MSK SPECTRUM)
+### Example 88: Composition: T and NK cell states by mutational signature (MSK SPECTRUM)
 
 The 36 SPECTRUM patients with a consensus signature other than Undetermined, split as the paper splits them. Dysfunctional CXCL13+ CD8 T cells are a mean 7.0% of T/NK cells in the 16 HRD-Dup patients against 4.9% in HRD-Del and 4.4% in FBI, and naive CD4 cells the reverse (15.2% against 19.6% and 20.1%) — the direction of the paper's Fig. 4b. The clearest single difference is cycling T/NK cells, higher in HRD-Dup (8.6% against 5.7%; Welch p = 0.003, q = 0.08 across the 30 comparisons); none reaches q < 0.05 at this size, which the matrix shows as no outlined dot. Per sample, from the study's cell-type fractions, T cells are 24% of HRD-Dup samples' cells against 32% of FBI's. The paper fits a binomial model on cell counts with site and sort as covariates; this view compares shares between groups and says so.
 
@@ -5418,7 +5480,7 @@ Runs on custom data: `spectrum-sc-composition` (SPECTRUM scRNA: cell-type compos
 }
 ```
 
-### Example 87: Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)
+### Example 89: Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)
 
 crc_hta11_htan_2021 is 52 patients with colorectal polyps (Chen et al., Cell 2021). The summary covers 55 of its 61 samples; its counts equal the study's own absolute_counts profile for all 670 sample and cell-type pairs it reports. Per sample, adenoma-specific cells (ASC) are 32.1% of the epithelium in the 30 conventional adenomas against 4.1% in the 20 serrated polyps (q = 2e-5), and serrated-specific cells (SSC) 1.5% against 19.7% (q = 0.003): the two paths to malignancy the paper describes. Stem cells (STM) differ little here (3.1% against 2.5%). The study's own fractions, over every cell type, give the same picture (ASC 29.9% against 3.7%). Cohorts are patients, so a patient with polyps of both types counts in both; 5 of the 52 have both.
 
@@ -5485,7 +5547,7 @@ Runs on custom data: `hta11-sc-p` (HTAN Vanderbilt colorectal polyp scRNA-seq (C
 }
 ```
 
-### Example 88: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
+### Example 90: KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first
 
 MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at an allele frequency of 0.2 or more, highest first.
 
@@ -5537,7 +5599,7 @@ MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at 
 }
 ```
 
-### Example 89: Clinical data: every pancreatic cancer sample, oldest patients first
+### Example 91: Clinical data: every pancreatic cancer sample, oldest patients first
 
 Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 
@@ -5573,7 +5635,7 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 }
 ```
 
-### Example 90: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
+### Example 92: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
 
 MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.
 
@@ -5625,7 +5687,7 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
 }
 ```
 
-### Example 91: A patient's mutations, copy-number alterations and structural variants
+### Example 93: A patient's mutations, copy-number alterations and structural variants
 
 MSK-CHORD prostate cancer patients, those with the most structural variants first; P-0024249's tables, mutations kept to OncoKB-oncogenic calls.
 
@@ -5672,7 +5734,7 @@ MSK-CHORD prostate cancer patients, those with the most structural variants firs
 }
 ```
 
-### Example 92: Co-expression: the genes that rise and fall with ESR1
+### Example 94: Co-expression: the genes that rise and fall with ESR1
 
 TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.
 

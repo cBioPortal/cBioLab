@@ -50,6 +50,7 @@ import { runDrivernegative } from "./drivernegative/run.ts";
 import { runOrganotropism } from "./organotropism/run.ts";
 import { runMolsubtype } from "./molsubtype/run.ts";
 import { runGermline } from "./germline/run.ts";
+import { runMutexpr } from "./mutexpr/run.ts";
 
 /**
  * A runner that lets a throw stand for its error: an error is reported as the view's, with its
@@ -136,6 +137,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   organotropism: reportsLeftOut(drawn(runOrganotropism), () => OS, drew("incidence")),
   molsubtype: reportsLeftOut(drawn(runMolsubtype), () => OS, drew("survival")),
   germline: reportsLeftOut(drawn(runGermline), () => OS, drew("survival")),
+  mutexpr: drawn(runMutexpr),
 };
 
 /** the runner for a view kind, or undefined for a kind runAnalysis does not know */

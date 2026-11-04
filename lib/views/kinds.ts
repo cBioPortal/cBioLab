@@ -40,6 +40,7 @@ import { labsKind } from "./labs/kind.ts";
 import { logisticKind } from "./logistic/kind.ts";
 import { molsubtypeKind } from "./molsubtype/kind.ts";
 import { multistateKind } from "./multistate/kind.ts";
+import { mutexprKind } from "./mutexpr/kind.ts";
 import { mutationsKind } from "./mutations/kind.ts";
 import { oncoprintKind } from "./oncoprint/kind.ts";
 import { organotropismKind } from "./organotropism/kind.ts";
@@ -91,6 +92,7 @@ export const KINDS: { [K in ViewKind]: ViewKindDef<K> } = {
   logistic: logisticKind,
   molsubtype: molsubtypeKind,
   multistate: multistateKind,
+  mutexpr: mutexprKind,
   mutations: mutationsKind,
   oncoprint: oncoprintKind,
   organotropism: organotropismKind,

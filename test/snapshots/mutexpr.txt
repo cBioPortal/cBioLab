@@ -1,0 +1,60 @@
+Analysis over brca_tcga_pan_can_atlas_2018 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- All samples: 1,084 patients — all samples in the study
+
+Expression by mutation: TP53 expression — log2(v + 1) of rna_seq_v2_mrna, grouped by TP53 protein change (minCount 3; 1,082 of 1,084 samples have a value):
+    All mutated: n=347, mean 10.4, median 10.7 (IQR 9.30–11.3), vs not mutated -0.205 p=0.0029 q=0.0087
+    R175H: n=20, mean 11.3, median 11.3 (IQR 10.9–11.6), vs not mutated +0.751 p=1.5e-5 q=0.0002
+    R273H: n=12, mean 10.9, median 10.9 (IQR 10.6–11.1), vs not mutated +0.357 p=0.0118 q=0.0286
+    R196*: n=8, mean 8.80, median 8.85 (IQR 8.40–8.93), vs not mutated -1.78 p=4.9e-6 q=0.0002
+    R213*: n=7, mean 8.95, median 9.12 (IQR 8.22–9.48), vs not mutated -1.63 p=0.0010 q=0.0063
+    R342*: n=7, mean 9.76, median 9.72 (IQR 9.59–10.0), vs not mutated -0.818 p=0.0122 q=0.0286
+    Y220C: n=7, mean 11.5, median 11.6 (IQR 11.0–12.0), vs not mutated +0.929 p=0.0014 q=0.0067
+    H179R: n=6, mean 11.1, median 11.0 (IQR 10.6–11.4), vs not mutated +0.492 p=0.1776 q=0.2093
+    H193R: n=6, mean 11.2, median 11.2 (IQR 10.9–11.5), vs not mutated +0.651 p=0.0546 q=0.0798
+    I195T: n=5, mean 11.3, median 11.3 (IQR 11.2–11.3), vs not mutated +0.765 p=0.0020 q=0.0081
+    R273C: n=5, mean 11.0, median 10.9 (IQR 10.8–11.2), vs not mutated +0.381 p=0.0578 q=0.0798
+    X225_splice: n=5, mean 8.77, median 9.02 (IQR 8.87–9.07), vs not mutated -1.81 p=0.0027 q=0.0087
+    C176F: n=4, mean 11.5, median 11.4 (IQR 11.0–11.8), vs not mutated +0.909 p=0.0187 q=0.0385
+    E285K: n=4, mean 11.1, median 10.6 (IQR 10.4–11.2), vs not mutated +0.480 p=0.3156 q=0.3472
+    L194R: n=4, mean 11.3, median 11.1 (IQR 10.9–11.6), vs not mutated +0.731 p=0.0394 q=0.0648
+    R209Kfs*6: n=4, mean 8.38, median 8.32 (IQR 8.24–8.47), vs not mutated -2.19 p=2.0e-5 q=0.0002
+    R248W: n=4, mean 11.1, median 11.0 (IQR 10.9–11.2), vs not mutated +0.530 p=0.0359 q=0.0623
+    R282W: n=4, mean 11.7, median 11.7 (IQR 11.1–11.9), vs not mutated +1.10 p=0.0162 q=0.0356
+    X125_splice: n=4, mean 9.05, median 8.85 (IQR 8.81–8.93), vs not mutated -1.52 p=0.0052 q=0.0143
+    X126_splice: n=4, mean 11.0, median 10.9 (IQR 10.8–11.2), vs not mutated +0.451 p=0.0255 q=0.0495
+    C141Y: n=3, mean 11.3, median 11.5 (IQR 10.7–11.7), vs not mutated +0.714 p=0.1425 q=0.1741
+    C242Afs*5: n=3, mean 8.96, median 8.91 (IQR 8.88–9.10), vs not mutated -1.61 p=0.0011 q=0.0063
+    G245D: n=3, mean 10.4, median 10.4 (IQR 10.1–10.7), vs not mutated -0.165 p=0.4527 q=0.4668
+    Q331*: n=3, mean 9.22, median 9.19 (IQR 9.13–9.40), vs not mutated -1.35 p=0.0028 q=0.0087
+    R248Q: n=3, mean 11.5, median 11.5 (IQR 11.1–12.0), vs not mutated +0.970 p=0.0580 q=0.0798
+    R273L: n=3, mean 11.0, median 11.1 (IQR 10.7–11.1), vs not mutated +0.408 p=0.1113 q=0.1413
+    V216M: n=3, mean 11.0, median 10.9 (IQR 10.4–11.8), vs not mutated +0.446 p=0.3748 q=0.3989
+    V272M: n=3, mean 11.1, median 10.6 (IQR 10.3–12.3), vs not mutated +0.511 p=0.5240 q=0.5240
+    X187_splice: n=3, mean 9.29, median 9.19 (IQR 8.68–10.1), vs not mutated -1.28 p=0.0924 q=0.1219
+    X331_splice: n=3, mean 8.48, median 8.59 (IQR 7.85–9.02), vs not mutated -2.10 p=0.0292 q=0.0535
+    Y163C: n=3, mean 11.1, median 11.2 (IQR 10.6–11.7), vs not mutated +0.564 p=0.2183 q=0.2484
+    Several protein changes: n=6, mean 11.5, median 11.5 (IQR 10.8–12.0), vs not mutated +0.928 p=0.0412 q=0.0648
+    Other protein changes (163): n=188, mean 10.2, median 10.4 (IQR 9.13–11.2), vs not mutated -0.360 p=9.0e-5 q=0.0007
+    Not mutated: n=717, mean 10.6, median 10.6 (IQR 10.2–11.0)
+    Not profiled: n=18, mean 10.7, median 10.8 (IQR 10.6–11.0)
+  CAVEAT (tell the user): Each sample of “All samples” with a rna_seq_v2_mrna value for TP53 is one observation (1,082 of its 1,084 samples). A sample's group is its one protein change of TP53; a sample with more than one is “Several”. “Not mutated” is a sample whose panel covers TP53 for mutations and has no call; “Not profiled” is one whose panel does not — never counted as wild type. A mutation is a call on the panel (not off-panel). minCount 3: a protein change with fewer samples is pooled into “Other”, beyond the 30 largest too; any group or stratum still under 3 is withheld — its size is shown as “< 3” and no statistic is reported. This is a display rule, not formal disclosure control: a withheld count can sometimes be recovered from the totals. Means and SDs are exact; the box's quartiles and its 5th–95th percentile whiskers are read off 60 bins spanning the cohort's middle 99% of values (values beyond it count in the end bins): each lies within one bin (0.0758) of the smallest value with that share of the group at or below it, which in a small group can differ from an averaged median. Each group is compared with “Not mutated” in its stratum by Welch's t-test from per-group sums, exact across sites; q is Benjamini–Hochberg across the 33 comparisons. “All mutated” overlaps the groups below it. 
+  METHOD:
+    - Count the samples with a value, and the range of the values [All samples · brca_tcga_pan_can_atlas_2018] (1,084 → 1,082 rows): The mutexpr:range query above: TP53 on “rna_seq_v2_mrna” as log2(v + 1) (a negative stored value has no log and is left out, not clamped), one value per sample (the mean of its rows). Returns the cohort's samples, those with a value, those left out for a negative value, and the values' 0.5th and 99.5th percentiles.
+    - Set the bins every site shares: From the lowest 0.5th to the highest 99.5th percentile across the sites, cut into 60 equal bins; a value beyond either end is counted in the end bin, so every sample is counted.
+        from: 7.7888096705817595
+        to: 12.338836643610199
+        bins: 60
+        bin width: 0.07583378288380732
+    - Count and sum the values per stratum, group and bin [All samples · brca_tcga_pan_can_atlas_2018]: The mutexpr:groups query above. A sample's group is its one protein change of TP53, “Several” for more than one, “Not mutated” when its panel covers TP53 for mutations and it has no call (whole exome included), “Not profiled” when its panel does not. A mutation is a call on the panel. Per (stratum, group, bin): n, Σv and Σv² — no individual value.
+    - Form the groups drawn, and withhold the small ones: Per stratum: “All mutated” (every protein change and “Several” together), each protein change with at least 3 samples (the 30 largest; ties by name), “Several”, “Other” (every protein change not drawn on its own, pooled), “Not mutated” and “Not profiled”. A group or a whole stratum with fewer than 3 samples is withheld: no statistic of it is reported, and it is not in the table below.
+        minCount: 3
+        groups drawn: 35
+        groups withheld: 0
+        strata withheld: 0
+    - Summarise each group: Mean Σv/n and SD √((Σv² − (Σv)²/n)/(n − 1)), exact. The 5th, 25th, 50th, 75th and 95th percentiles from the bin counts: for probability p, the first bin whose running count reaches p·n, the values in it taken as spread evenly across it — within one bin's width of the smallest value with at least that share of the group at or below it (in a small group this can differ from an averaged median).
+    - Welch's t-test against “Not mutated”: Each group other than “Not mutated” and “Not profiled” against “Not mutated” in the same stratum, where both are drawn: difference of means, unequal-variance t, Welch–Satterthwaite df, two-sided. A pair with no variance (Var + Var ≤ 1e-9 · (1 + mean² + mean²)) is not tested.
+        comparisons: 33
+    - Benjamini–Hochberg across the comparisons: q-values over all 33 comparisons in the view.
+    Welch's t from moments matches scipy 1.18.1 ttest_ind(equal_var=False) and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts); binQuantile is held to numpy's percentiles of the binned values in test/mutexpr.test.ts.

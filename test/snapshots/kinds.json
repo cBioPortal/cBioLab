@@ -35,7 +35,8 @@
     "actionability",
     "adjusted",
     "forest",
-    "diffexpr"
+    "diffexpr",
+    "mutexpr"
   ],
   "kinds": {
     "acquired": {
@@ -2493,6 +2494,77 @@
       "sub": "TP53 · every mutation call",
       "title": "Mutation table (one gene)"
     },
+    "mutexpr": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "gene": "TP53",
+        "kind": "mutexpr",
+        "profileType": "rna_seq_v2_mrna"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "gene": "TP53",
+        "kind": "mutexpr",
+        "profileType": ""
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "gene": "TP53",
+        "kind": "mutexpr",
+        "profileType": "rna_seq_v2_mrna"
+      },
+      "card": {
+        "defaults": {
+          "gene": "TP53",
+          "kind": "mutexpr",
+          "profileType": "rna_seq_v2_mrna"
+        },
+        "defaultsBareStudy": {
+          "gene": "TP53",
+          "kind": "mutexpr",
+          "profileType": ""
+        },
+        "label": "Expression by mutation (protein change or codon)",
+        "maxCohorts": 1,
+        "title": "Expression by mutation",
+        "why": null,
+        "whyBareStudy": "this study has no expression profile"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Expression by mutation — A vs B",
+      "headTitle": "Expression by mutation",
+      "help": {
+        "text": "Shows how active one gene is in tumours that carry each particular change in a gene — for example, how much MDM2 is switched on in tumours with TP53 R175H, R273H and so on, compared with tumours whose TP53 was tested and found unchanged. Tumours whose test did not cover the gene are shown separately rather than counted as unchanged. Groups too small to describe reliably are withheld, and the samples can first be split by cancer type or by whether the tumour carries a gene fusion.",
+        "title": "What is this?"
+      },
+      "isNew": true,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Expression by mutation (protein change or codon)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study has no expression profile"
+      },
+      "need": "local",
+      "preview": null,
+      "sub": "TP53 expression · by TP53 protein change · min 5",
+      "title": "Expression by mutation (protein change or codon)"
+    },
     "oncoprint": {
       "added": {
         "cohorts": [
@@ -3556,6 +3628,7 @@
     "actionability",
     "adjusted",
     "forest",
-    "diffexpr"
+    "diffexpr",
+    "mutexpr"
   ]
 }

@@ -388,6 +388,10 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // diffexpr: `vals` is per (patient, gene); only per-gene totals leave
     "profileMomentsAllSql": () => aggregates.profileMomentsAllSql(cohortSql, "x", "db", "rna_seq_v2_mrna_median_Zscores", false),
     "profileMomentsAllSql:log2": () => aggregates.profileMomentsAllSql(cohortSql, "x", "db", "rna_seq_v2_mrna", true),
+    // mutexpr: `raw`/`mut`/`lab` hold samples; the outer SELECTs return two percentiles and counts, or per (stratum, group, bin) totals
+    "mutexprRangeSql": () => aggregates.mutexprRangeSql(cohortSql, "x", "db", { expressionGene: "MDM2", profileType: "rna_seq_v2_mrna", log2: true }),
+    "mutexprGroupsSql": () => aggregates.mutexprGroupsSql(cohortSql, "x", "db", { expressionGene: "MDM2", profileType: "rna_seq_v2_mrna", log2: false,
+      gene: "TP53", resolution: "codon", stratify: ["cancerType", "fusion"], fusionGene: "ERG", range: [0, 12], bins: 60 }),
     // gene-set membership is reference data, not patient data — no cohort at all
     "genesetMembersSql": () => aggregates.genesetMembersSql(["HALLMARK_E2F_TARGETS"], null, "db"),
     "genesetMembersSql:prefix": () => aggregates.genesetMembersSql([], "HALLMARK_", "db"),

@@ -43,6 +43,7 @@ import { actionabilityDoc } from "./actionability/doc.ts";
 import { drivernegativeDoc } from "./drivernegative/doc.ts";
 import { organotropismDoc } from "./organotropism/doc.ts";
 import { molsubtypeDoc } from "./molsubtype/doc.ts";
+import { mutexprDoc } from "./mutexpr/doc.ts";
 import { germlineDoc } from "./germline/doc.ts";
 import { assaysDoc } from "./assays/doc.ts";
 import { compositionDoc } from "./composition/doc.ts";
@@ -93,6 +94,7 @@ export const KIND_DOCS: Record<ViewKind, KindDoc> = {
   drivernegative: drivernegativeDoc,
   organotropism: organotropismDoc,
   molsubtype: molsubtypeDoc,
+  mutexpr: mutexprDoc,
   germline: germlineDoc,
   assays: assaysDoc,
   composition: compositionDoc,
