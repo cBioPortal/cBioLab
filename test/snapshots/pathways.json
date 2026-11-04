@@ -1439,6 +1439,118 @@
         "aggregateOnly": []
       },
       "caveat": "Share of samples with an OncoKB driver (v7.5) in at least one member gene — drivers only, as Sanchez-Vega et al. counted curated oncogenic events. A pathway's denominator is the samples profiled for at least one of its genes, so a panel that covers few members makes a pathway look rarer than a genome-wide assay would; each member gene's own % is over the samples profiled for THAT gene. 211 member-gene slots were on no participating panel and are listed as not profiled rather than counted as unaltered. Pathway membership is the paper's Table S3; a gene's pathway role (oncogene / tumour suppressor) is not used in the count. Two-sided Fisher tests; q is Benjamini–Hochberg across the pathways drawn, and separately across every member gene tested.",
+      "findings": {
+        "version": 1,
+        "kind": "pathways",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "pathways:pathway:RTK-RAS:p",
+            "value": 1.462670758898686e-62,
+            "checked": "pathways:pathway:RTK-RAS:p"
+          },
+          {
+            "name": "pathways:pathway:RTK-RAS:q",
+            "value": 2.925341517797372e-62,
+            "checked": "pathways:pathway:RTK-RAS:q"
+          },
+          {
+            "name": "pathways:pathway:PI3K:p",
+            "value": 3.964100494394015e-128,
+            "checked": "pathways:pathway:PI3K:p"
+          },
+          {
+            "name": "pathways:pathway:PI3K:q",
+            "value": 9.910251235985037e-128,
+            "checked": "pathways:pathway:PI3K:q"
+          },
+          {
+            "name": "pathways:pathway:TP53:p",
+            "value": 3.815369089388766e-17,
+            "checked": "pathways:pathway:TP53:p"
+          },
+          {
+            "name": "pathways:pathway:TP53:q",
+            "value": 5.4505272705553805e-17,
+            "checked": "pathways:pathway:TP53:q"
+          },
+          {
+            "name": "pathways:pathway:Cell cycle:p",
+            "value": 7.759506001650455e-250,
+            "checked": "pathways:pathway:Cell cycle:p"
+          },
+          {
+            "name": "pathways:pathway:Cell cycle:q",
+            "value": 3.879753000825227e-249,
+            "checked": "pathways:pathway:Cell cycle:q"
+          },
+          {
+            "name": "pathways:pathway:MYC:p",
+            "value": 3.156317345880685e-8,
+            "checked": "pathways:pathway:MYC:p"
+          },
+          {
+            "name": "pathways:pathway:MYC:q",
+            "value": 3.9453966823508565e-8,
+            "checked": "pathways:pathway:MYC:q"
+          },
+          {
+            "name": "pathways:pathway:WNT:p",
+            "value": 0,
+            "checked": "pathways:pathway:WNT:p"
+          },
+          {
+            "name": "pathways:pathway:WNT:q",
+            "value": 0,
+            "checked": "pathways:pathway:WNT:q"
+          },
+          {
+            "name": "pathways:pathway:NOTCH:p",
+            "value": 2.923893179688554e-141,
+            "checked": "pathways:pathway:NOTCH:p"
+          },
+          {
+            "name": "pathways:pathway:NOTCH:q",
+            "value": 9.746310598961845e-141,
+            "checked": "pathways:pathway:NOTCH:q"
+          },
+          {
+            "name": "pathways:pathway:Hippo:p",
+            "value": 1.4140291667150588e-18,
+            "checked": "pathways:pathway:Hippo:p"
+          },
+          {
+            "name": "pathways:pathway:Hippo:q",
+            "value": 2.3567152778584313e-18,
+            "checked": "pathways:pathway:Hippo:q"
+          },
+          {
+            "name": "pathways:pathway:TGF-β:p",
+            "value": 0.03797934967787995,
+            "checked": "pathways:pathway:TGF-β:p"
+          },
+          {
+            "name": "pathways:pathway:TGF-β:q",
+            "value": 0.04219927741986661,
+            "checked": "pathways:pathway:TGF-β:q"
+          },
+          {
+            "name": "pathways:pathway:NRF2:p",
+            "value": 0.22174729663395792,
+            "checked": "pathways:pathway:NRF2:p"
+          },
+          {
+            "name": "pathways:pathway:NRF2:q",
+            "value": 0.22174729663395792,
+            "checked": "pathways:pathway:NRF2:q"
+          },
+          {
+            "…": "53 more",
+            "sha256": "9b859655176a4afe"
+          }
+        ],
+        "caveat": "Share of samples with an OncoKB driver (v7.5) in at least one member gene — drivers only, as Sanchez-Vega et al. counted curated oncogenic events. A pathway's denominator is the samples profiled for at least one of its genes, so a panel that covers few members makes a pathway look rarer than a genome-wide assay would; each member gene's own % is over the samples profiled for THAT gene. 211 member-gene slots were on no participating panel and are listed as not profiled rather than counted as unaltered. Pathway membership is the paper's Table S3; a gene's pathway role (oncogene / tumour suppressor) is not used in the count. Two-sided Fisher tests; q is Benjamini–Hochberg across the pathways drawn, and separately across every member gene tested."
+      },
       "method": {
         "steps": [
           {

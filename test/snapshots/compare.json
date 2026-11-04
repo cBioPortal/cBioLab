@@ -86,6 +86,89 @@
         "aggregateOnly": []
       },
       "note": "no copy-number data exists for sarcoma_msk_2022 — altered% reflects only mutation/structural-variant status, not a real negative for the missing type(s)",
+      "findings": {
+        "version": 1,
+        "kind": "compare",
+        "source": "kind",
+        "findings": [
+          {
+            "name": "profiled",
+            "value": 444,
+            "gene": "MDM2",
+            "cohort": "Well-diff liposarcoma",
+            "unit": "samples",
+            "checked": "compare:MDM2:Well-diff liposarcoma:profiled"
+          },
+          {
+            "name": "altered",
+            "value": 0,
+            "gene": "MDM2",
+            "cohort": "Well-diff liposarcoma",
+            "unit": "samples",
+            "checked": "compare:MDM2:Well-diff liposarcoma:altered"
+          },
+          {
+            "name": "driver_altered",
+            "value": 0,
+            "gene": "MDM2",
+            "cohort": "Well-diff liposarcoma",
+            "unit": "samples",
+            "checked": "compare:MDM2:Well-diff liposarcoma:driver"
+          },
+          {
+            "name": "pct_altered",
+            "value": 0,
+            "gene": "MDM2",
+            "cohort": "Well-diff liposarcoma",
+            "unit": "percent"
+          },
+          {
+            "name": "pct_driver_altered",
+            "value": 0,
+            "gene": "MDM2",
+            "cohort": "Well-diff liposarcoma",
+            "unit": "percent"
+          },
+          {
+            "name": "profiled",
+            "value": 444,
+            "gene": "TP53",
+            "cohort": "Well-diff liposarcoma",
+            "unit": "samples",
+            "checked": "compare:TP53:Well-diff liposarcoma:profiled"
+          },
+          {
+            "name": "altered",
+            "value": 17,
+            "gene": "TP53",
+            "cohort": "Well-diff liposarcoma",
+            "unit": "samples",
+            "checked": "compare:TP53:Well-diff liposarcoma:altered"
+          },
+          {
+            "name": "driver_altered",
+            "value": 7,
+            "gene": "TP53",
+            "cohort": "Well-diff liposarcoma",
+            "unit": "samples",
+            "checked": "compare:TP53:Well-diff liposarcoma:driver"
+          },
+          {
+            "name": "pct_altered",
+            "value": 3.828828828828829,
+            "gene": "TP53",
+            "cohort": "Well-diff liposarcoma",
+            "unit": "percent"
+          },
+          {
+            "name": "pct_driver_altered",
+            "value": 1.5765765765765767,
+            "gene": "TP53",
+            "cohort": "Well-diff liposarcoma",
+            "unit": "percent"
+          }
+        ]
+      },
       "method": {
         "steps": [
           {

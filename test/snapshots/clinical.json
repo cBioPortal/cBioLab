@@ -119,6 +119,103 @@
         "aggregateOnly": []
       },
       "note": "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary; numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across the 2 tested attributes. Numeric attributes also show median/IQR and a rank-based test alongside the moment-based one — a Mann-Whitney U for 2 cohorts, Kruskal-Wallis for 3+ (neither itself part of the q-value correction) — computed from the attribute's complete value distribution, which is only exact and only requested because this view is confined to a single study.",
+      "findings": {
+        "version": 1,
+        "kind": "clinical",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "clinical:MSI_SCORE:p",
+            "value": 0.03358254545161534,
+            "checked": "clinical:MSI_SCORE:p"
+          },
+          {
+            "name": "clinical:MSI_SCORE:q",
+            "value": 0.06716509090323068,
+            "checked": "clinical:MSI_SCORE:q"
+          },
+          {
+            "name": "clinical:MSI_SCORE:rank_p",
+            "value": 0.5029628540374218,
+            "checked": "clinical:MSI_SCORE:rank_p"
+          },
+          {
+            "name": "clinical:AGE_AT_MET:p",
+            "value": 0.7656913780960357,
+            "checked": "clinical:AGE_AT_MET:p"
+          },
+          {
+            "name": "clinical:AGE_AT_MET:q",
+            "value": 0.7656913780960357,
+            "checked": "clinical:AGE_AT_MET:q"
+          },
+          {
+            "name": "clinical:AGE_AT_MET:rank_p",
+            "value": 0.9907597366429025,
+            "checked": "clinical:AGE_AT_MET:rank_p"
+          },
+          {
+            "name": "clinical:MSI_SCORE:liver mets:median",
+            "value": 0.6,
+            "checked": "clinical:MSI_SCORE:liver mets:median"
+          },
+          {
+            "name": "clinical:MSI_SCORE:liver mets:q1",
+            "value": 0.26,
+            "checked": "clinical:MSI_SCORE:liver mets:q1"
+          },
+          {
+            "name": "clinical:MSI_SCORE:liver mets:q3",
+            "value": 1.29,
+            "checked": "clinical:MSI_SCORE:liver mets:q3"
+          },
+          {
+            "name": "clinical:MSI_SCORE:no liver mets:median",
+            "value": 0.595,
+            "checked": "clinical:MSI_SCORE:no liver mets:median"
+          },
+          {
+            "name": "clinical:MSI_SCORE:no liver mets:q1",
+            "value": 0.205,
+            "checked": "clinical:MSI_SCORE:no liver mets:q1"
+          },
+          {
+            "name": "clinical:MSI_SCORE:no liver mets:q3",
+            "value": 1.248,
+            "checked": "clinical:MSI_SCORE:no liver mets:q3"
+          },
+          {
+            "name": "clinical:AGE_AT_MET:liver mets:median",
+            "value": 59,
+            "checked": "clinical:AGE_AT_MET:liver mets:median"
+          },
+          {
+            "name": "clinical:AGE_AT_MET:liver mets:q1",
+            "value": 51,
+            "checked": "clinical:AGE_AT_MET:liver mets:q1"
+          },
+          {
+            "name": "clinical:AGE_AT_MET:liver mets:q3",
+            "value": 68,
+            "checked": "clinical:AGE_AT_MET:liver mets:q3"
+          },
+          {
+            "name": "clinical:AGE_AT_MET:no liver mets:median",
+            "value": 58.5,
+            "checked": "clinical:AGE_AT_MET:no liver mets:median"
+          },
+          {
+            "name": "clinical:AGE_AT_MET:no liver mets:q1",
+            "value": 50.25,
+            "checked": "clinical:AGE_AT_MET:no liver mets:q1"
+          },
+          {
+            "name": "clinical:AGE_AT_MET:no liver mets:q3",
+            "value": 68.75,
+            "checked": "clinical:AGE_AT_MET:no liver mets:q3"
+          }
+        ]
+      },
       "method": {
         "steps": [
           {

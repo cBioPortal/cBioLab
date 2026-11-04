@@ -538,6 +538,118 @@
         "aggregateOnly": []
       },
       "caveat": "ESR1 on “rna_seq_v2_mrna” against every gene on “rna_seq_v2_mrna”, over the samples in “all patients” with both values, paired per sample as the portal's co-expression tab pairs them. Ranked by Spearman's ρ, as the portal ranks, with Pearson's r beside it; q is Benjamini–Hochberg over ρ's p across all 20,057 genes tested. A correlation is not a regulatory link: genes that rise together across a cohort often both track a third thing — a subtype, the tumour's purity, proliferation. 280 genes were not tested: fewer than 10 samples with both values, or no spread.",
+      "findings": {
+        "version": 1,
+        "kind": "correlates",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "correlates:tested",
+            "value": 20057,
+            "checked": "correlates:tested"
+          },
+          {
+            "name": "correlates:CCDC170:rho",
+            "value": 0.7917,
+            "checked": "correlates:CCDC170:rho"
+          },
+          {
+            "name": "correlates:CCDC170:rho_p",
+            "value": 2.2249983400385912e-233,
+            "checked": "correlates:CCDC170:rho_p"
+          },
+          {
+            "name": "correlates:CCDC170:q",
+            "value": 4.4626791706154024e-229,
+            "checked": "correlates:CCDC170:q"
+          },
+          {
+            "name": "correlates:CCDC170:r",
+            "value": 0.6675,
+            "checked": "correlates:CCDC170:r"
+          },
+          {
+            "name": "correlates:CCDC170:p",
+            "value": 1.86618036574955e-140,
+            "checked": "correlates:CCDC170:p"
+          },
+          {
+            "name": "correlates:DCPH1:rho",
+            "value": 0.7841,
+            "checked": "correlates:DCPH1:rho"
+          },
+          {
+            "name": "correlates:DCPH1:rho_p",
+            "value": 5.089149809464745e-226,
+            "checked": "correlates:DCPH1:rho_p"
+          },
+          {
+            "name": "correlates:DCPH1:q",
+            "value": 5.103653886421719e-222,
+            "checked": "correlates:DCPH1:q"
+          },
+          {
+            "name": "correlates:DCPH1:r",
+            "value": 0.5652,
+            "checked": "correlates:DCPH1:r"
+          },
+          {
+            "name": "correlates:DCPH1:p",
+            "value": 2.3489389556771624e-92,
+            "checked": "correlates:DCPH1:p"
+          },
+          {
+            "name": "correlates:THSD4:rho",
+            "value": 0.7776,
+            "checked": "correlates:THSD4:rho"
+          },
+          {
+            "name": "correlates:THSD4:rho_p",
+            "value": 6.808597091162043e-220,
+            "checked": "correlates:THSD4:rho_p"
+          },
+          {
+            "name": "correlates:THSD4:q",
+            "value": 4.55200106191457e-216,
+            "checked": "correlates:THSD4:q"
+          },
+          {
+            "name": "correlates:THSD4:r",
+            "value": 0.6439,
+            "checked": "correlates:THSD4:r"
+          },
+          {
+            "name": "correlates:THSD4:p",
+            "value": 1.0524911370004154e-127,
+            "checked": "correlates:THSD4:p"
+          },
+          {
+            "name": "correlates:FOXA1:rho",
+            "value": 0.7478,
+            "checked": "correlates:FOXA1:rho"
+          },
+          {
+            "name": "correlates:FOXA1:rho_p",
+            "value": 2.5074740593460398e-194,
+            "checked": "correlates:FOXA1:rho_p"
+          },
+          {
+            "name": "correlates:FOXA1:q",
+            "value": 1.257310180207588e-190,
+            "checked": "correlates:FOXA1:q"
+          },
+          {
+            "name": "correlates:FOXA1:r",
+            "value": 0.686,
+            "checked": "correlates:FOXA1:r"
+          },
+          {
+            "…": "381 more",
+            "sha256": "c7a6b7c173e60e06"
+          }
+        ],
+        "caveat": "ESR1 on “rna_seq_v2_mrna” against every gene on “rna_seq_v2_mrna”, over the samples in “all patients” with both values, paired per sample as the portal's co-expression tab pairs them. Ranked by Spearman's ρ, as the portal ranks, with Pearson's r beside it; q is Benjamini–Hochberg over ρ's p across all 20,057 genes tested. A correlation is not a regulatory link: genes that rise together across a cohort often both track a third thing — a subtype, the tumour's purity, proliferation. 280 genes were not tested: fewer than 10 samples with both values, or no spread."
+      },
       "method": {
         "steps": [
           {

@@ -412,6 +412,118 @@
         "aggregateOnly": []
       },
       "caveat": "PSA as % change from each patient's baseline — the mean of their readings on the last day with any, in the 90 days up to and including the first Treatment [SUBTYPE=Hormone] — over -12 to 52 weeks around it, in 4-week bins; a patient tested several times in a bin counts once, at their mean, and no reading from the baseline day is drawn. Median and interquartile band are read from 2-point histograms, so they are exact to within a point, and the figure draws only bins with at least 5 patients; values above +300% share the top bin. Best response is each patient's lowest value after the anchor within the window; a responder fell by at least 50% (PCWG3's PSA50), counted exactly. Denominators: Prostate, TP53 mutant — 782 anchored, 641 with a baseline (18 of them left out: a baseline of 0 or below has no % change), 579 with a value after; Prostate, TP53 wild-type — 1,899 anchored, 1,576 with a baseline (25 of them left out: a baseline of 0 or below has no % change), 1,456 with a value after. Patients tested more often are over-represented in any bin they appear in, and testing itself is more frequent when a value is moving; the course is of those measured, not of everyone. Response rates compared with a two-sided Fisher test. ",
+      "findings": {
+        "version": 1,
+        "kind": "labs",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "labs:Prostate, TP53 mutant:-12:q1",
+            "value": -36.5,
+            "checked": "labs:Prostate, TP53 mutant:-12:q1"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:-12:median",
+            "value": -13,
+            "checked": "labs:Prostate, TP53 mutant:-12:median"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:-12:q3",
+            "value": 32,
+            "checked": "labs:Prostate, TP53 mutant:-12:q3"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:-8:q1",
+            "value": -32,
+            "checked": "labs:Prostate, TP53 mutant:-8:q1"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:-8:median",
+            "value": -12,
+            "checked": "labs:Prostate, TP53 mutant:-8:median"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:-8:q3",
+            "value": 5,
+            "checked": "labs:Prostate, TP53 mutant:-8:q3"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:-4:q1",
+            "value": -18,
+            "checked": "labs:Prostate, TP53 mutant:-4:q1"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:-4:median",
+            "value": -6,
+            "checked": "labs:Prostate, TP53 mutant:-4:median"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:-4:q3",
+            "value": 6.5,
+            "checked": "labs:Prostate, TP53 mutant:-4:q3"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:0:q1",
+            "value": -84,
+            "checked": "labs:Prostate, TP53 mutant:0:q1"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:0:median",
+            "value": -56,
+            "checked": "labs:Prostate, TP53 mutant:0:median"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:0:q3",
+            "value": -6.5,
+            "checked": "labs:Prostate, TP53 mutant:0:q3"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:4:q1",
+            "value": -96,
+            "checked": "labs:Prostate, TP53 mutant:4:q1"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:4:median",
+            "value": -86,
+            "checked": "labs:Prostate, TP53 mutant:4:median"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:4:q3",
+            "value": -48,
+            "checked": "labs:Prostate, TP53 mutant:4:q3"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:8:q1",
+            "value": -98,
+            "checked": "labs:Prostate, TP53 mutant:8:q1"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:8:median",
+            "value": -94,
+            "checked": "labs:Prostate, TP53 mutant:8:median"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:8:q3",
+            "value": -66,
+            "checked": "labs:Prostate, TP53 mutant:8:q3"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:12:q1",
+            "value": -100,
+            "checked": "labs:Prostate, TP53 mutant:12:q1"
+          },
+          {
+            "name": "labs:Prostate, TP53 mutant:12:median",
+            "value": -96,
+            "checked": "labs:Prostate, TP53 mutant:12:median"
+          },
+          {
+            "…": "83 more",
+            "sha256": "4e07638c2b8c1d5e"
+          }
+        ],
+        "caveat": "PSA as % change from each patient's baseline — the mean of their readings on the last day with any, in the 90 days up to and including the first Treatment [SUBTYPE=Hormone] — over -12 to 52 weeks around it, in 4-week bins; a patient tested several times in a bin counts once, at their mean, and no reading from the baseline day is drawn. Median and interquartile band are read from 2-point histograms, so they are exact to within a point, and the figure draws only bins with at least 5 patients; values above +300% share the top bin. Best response is each patient's lowest value after the anchor within the window; a responder fell by at least 50% (PCWG3's PSA50), counted exactly. Denominators: Prostate, TP53 mutant — 782 anchored, 641 with a baseline (18 of them left out: a baseline of 0 or below has no % change), 579 with a value after; Prostate, TP53 wild-type — 1,899 anchored, 1,576 with a baseline (25 of them left out: a baseline of 0 or below has no % change), 1,456 with a value after. Patients tested more often are over-represented in any bin they appear in, and testing itself is more frequent when a value is moving; the course is of those measured, not of everyone. Response rates compared with a two-sided Fisher test. "
+      },
       "method": {
         "steps": [
           {

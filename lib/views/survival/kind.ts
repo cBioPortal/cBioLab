@@ -1,6 +1,7 @@
 // The survival view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { survivalSvg } from "./figure.ts";
+import { verifiedBy, type Finding } from "../../findings.ts";
 
 export const survivalKind: ViewKindDef<"survival"> = {
   kind: "survival",
@@ -12,6 +13,24 @@ export const survivalKind: ViewKindDef<"survival"> = {
       (v.logrank ? `\n  log-rank p=${pFmt(v.logrank.p)}${v.logrank.strata > 1 ? " (stratified by study)" : ""}`
         : v.logrankK ? `\n  k-group log-rank p=${pFmt(v.logrankK.p)}` : "") +
       "\nCAVEAT (tell the user): " + v.caveat);
+  },
+  findings: (v) => {
+    const out: Finding[] = [];
+    for (const c of v.curves) {
+      const at = "km:" + c.cohort + ":";
+      out.push({ name: "patients", value: c.n, cohort: c.cohort, unit: "patients", ...verifiedBy(v, at + "n") },
+        { name: "events", value: c.events, cohort: c.cohort, unit: "events", ...verifiedBy(v, at + "events") },
+        { name: "median_months", value: c.median, cohort: c.cohort, unit: "months", ...verifiedBy(v, at + "median") });
+      if (c.missing) out.push({ name: "missing_outcome", value: c.missing, cohort: c.cohort, unit: "patients" });
+    }
+    const t = v.logrank || v.logrankK;
+    if (t) {
+      const test = (v.logrankK ? "k-group log-rank" : "log-rank") + (t.strata > 1 ? ", stratified by study" : "");
+      out.push({ name: "logrank_chi2", value: t.chi2, unit: "chi2", test, ...verifiedBy(v, "logrank:chi2") },
+        { name: "logrank_df", value: t.df, unit: "df", test },
+        { name: "logrank_p", value: t.p, unit: "p", test, ...verifiedBy(v, "logrank:p") });
+    }
+    return out;
   },
   help: {
     title: "What is this?",

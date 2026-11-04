@@ -114,6 +114,117 @@
         "aggregateOnly": []
       },
       "note": "Pearson correlation on “rna_seq_v2_mrna_median_Zscores” within “BRCA”, over the patients with BOTH values (values averaged per patient, matching the heatmap convention). Each site reports six sums — n, Σx, Σy, Σxy, Σx², Σy² — and nothing else; those sums are additive, so the pooled correlation is EXACT rather than an approximation of a centralized one. q-values are Benjamini–Hochberg across the 10 pairs with a defined correlation.",
+      "findings": {
+        "version": 1,
+        "kind": "coexpression",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "coexpression:ERBB2/GRB7:r",
+            "value": 0.8713,
+            "checked": "coexpression:ERBB2/GRB7:r"
+          },
+          {
+            "name": "coexpression:ERBB2/GRB7:p",
+            "value": 0,
+            "checked": "coexpression:ERBB2/GRB7:p"
+          },
+          {
+            "name": "coexpression:ERBB2/GRB7:q",
+            "value": 0,
+            "checked": "coexpression:ERBB2/GRB7:q"
+          },
+          {
+            "name": "coexpression:ESR1/MKI67:r",
+            "value": -0.2334,
+            "checked": "coexpression:ESR1/MKI67:r"
+          },
+          {
+            "name": "coexpression:ESR1/MKI67:p",
+            "value": 1.2418853229945448e-14,
+            "checked": "coexpression:ESR1/MKI67:p"
+          },
+          {
+            "name": "coexpression:ESR1/MKI67:q",
+            "value": 6.209426614972723e-14,
+            "checked": "coexpression:ESR1/MKI67:q"
+          },
+          {
+            "name": "coexpression:ESR1/PGR:r",
+            "value": 0.2263,
+            "checked": "coexpression:ESR1/PGR:r"
+          },
+          {
+            "name": "coexpression:ESR1/PGR:p",
+            "value": 8.025146361683289e-14,
+            "checked": "coexpression:ESR1/PGR:p"
+          },
+          {
+            "name": "coexpression:ESR1/PGR:q",
+            "value": 2.675048787227763e-13,
+            "checked": "coexpression:ESR1/PGR:q"
+          },
+          {
+            "name": "coexpression:PGR/MKI67:r",
+            "value": -0.1839,
+            "checked": "coexpression:PGR/MKI67:r"
+          },
+          {
+            "name": "coexpression:PGR/MKI67:p",
+            "value": 1.5183862366308729e-9,
+            "checked": "coexpression:PGR/MKI67:p"
+          },
+          {
+            "name": "coexpression:PGR/MKI67:q",
+            "value": 3.7959655915771825e-9,
+            "checked": "coexpression:PGR/MKI67:q"
+          },
+          {
+            "name": "coexpression:GRB7/ESR1:r",
+            "value": -0.1723,
+            "checked": "coexpression:GRB7/ESR1:r"
+          },
+          {
+            "name": "coexpression:GRB7/ESR1:p",
+            "value": 1.5601015483908943e-8,
+            "checked": "coexpression:GRB7/ESR1:p"
+          },
+          {
+            "name": "coexpression:GRB7/ESR1:q",
+            "value": 3.120203096781789e-8,
+            "checked": "coexpression:GRB7/ESR1:q"
+          },
+          {
+            "name": "coexpression:ERBB2/ESR1:r",
+            "value": -0.1651,
+            "checked": "coexpression:ERBB2/ESR1:r"
+          },
+          {
+            "name": "coexpression:ERBB2/ESR1:p",
+            "value": 6.030449902721193e-8,
+            "checked": "coexpression:ERBB2/ESR1:p"
+          },
+          {
+            "name": "coexpression:ERBB2/ESR1:q",
+            "value": 1.0050749837868655e-7,
+            "checked": "coexpression:ERBB2/ESR1:q"
+          },
+          {
+            "name": "coexpression:ERBB2/PGR:r",
+            "value": -0.127,
+            "checked": "coexpression:ERBB2/PGR:r"
+          },
+          {
+            "name": "coexpression:ERBB2/PGR:p",
+            "value": 0.00003249163546036962,
+            "checked": "coexpression:ERBB2/PGR:p"
+          },
+          {
+            "…": "10 more",
+            "sha256": "acb75b037889e4f8"
+          }
+        ]
+      },
       "method": {
         "steps": [
           {

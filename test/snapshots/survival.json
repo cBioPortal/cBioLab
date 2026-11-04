@@ -294,6 +294,76 @@
         "strata": 1
       },
       "caveat": "PFS_1L from each study's own baseline (left truncation applies) Status '0:...' treated as censored. Log-rank on a single study, so no stratification applies.",
+      "findings": {
+        "version": 1,
+        "kind": "survival",
+        "source": "kind",
+        "findings": [
+          {
+            "name": "patients",
+            "value": 28,
+            "cohort": "MSI-H",
+            "unit": "patients",
+            "checked": "km:MSI-H:n"
+          },
+          {
+            "name": "events",
+            "value": 23,
+            "cohort": "MSI-H",
+            "unit": "events",
+            "checked": "km:MSI-H:events"
+          },
+          {
+            "name": "median_months",
+            "value": 18.37,
+            "cohort": "MSI-H",
+            "unit": "months",
+            "checked": "km:MSI-H:median"
+          },
+          {
+            "name": "patients",
+            "value": 148,
+            "cohort": "MSS",
+            "unit": "patients",
+            "checked": "km:MSS:n"
+          },
+          {
+            "name": "events",
+            "value": 142,
+            "cohort": "MSS",
+            "unit": "events",
+            "checked": "km:MSS:events"
+          },
+          {
+            "name": "median_months",
+            "value": 15.3,
+            "cohort": "MSS",
+            "unit": "months",
+            "checked": "km:MSS:median"
+          },
+          {
+            "name": "logrank_chi2",
+            "value": 0.3942,
+            "unit": "chi2",
+            "test": "log-rank",
+            "checked": "logrank:chi2"
+          },
+          {
+            "name": "logrank_df",
+            "value": 1,
+            "unit": "df",
+            "test": "log-rank"
+          },
+          {
+            "name": "logrank_p",
+            "value": 0.5301191634922409,
+            "unit": "p",
+            "test": "log-rank",
+            "checked": "logrank:p"
+          }
+        ],
+        "caveat": "PFS_1L from each study's own baseline (left truncation applies) Status '0:...' treated as censored. Log-rank on a single study, so no stratification applies."
+      },
       "method": {
         "steps": [
           {

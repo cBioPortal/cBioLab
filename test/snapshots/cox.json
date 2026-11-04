@@ -48,6 +48,29 @@
         "aggregateOnly": []
       },
       "caveat": "Cox proportional-hazards regression (Efron ties) on 471 patients, 311 events, 1 term. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank.",
+      "findings": {
+        "version": 1,
+        "kind": "cox",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "cox::TP53/KRAS/PIK3CA (any) mutation status: Mutated:beta",
+            "value": -0.3285283537241268,
+            "checked": "cox::TP53/KRAS/PIK3CA (any) mutation status: Mutated:beta"
+          },
+          {
+            "name": "cox::TP53/KRAS/PIK3CA (any) mutation status: Mutated:se",
+            "value": 0.21751119615856146,
+            "checked": "cox::TP53/KRAS/PIK3CA (any) mutation status: Mutated:se"
+          },
+          {
+            "name": "cox::TP53/KRAS/PIK3CA (any) mutation status: Mutated:p",
+            "value": 0.1309420416160914,
+            "checked": "cox::TP53/KRAS/PIK3CA (any) mutation status: Mutated:p"
+          }
+        ],
+        "caveat": "Cox proportional-hazards regression (Efron ties) on 471 patients, 311 events, 1 term. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers, unlike KM/log-rank."
+      },
       "method": {
         "steps": [
           {

@@ -65,6 +65,16 @@ function cohortCaveats(args: any): string[] {
 
 function text(t: string) { return { content: [{ type: "text", text: t }] }; }
 
+/** run_analysis's machine-readable result: each cohort's counts and each view's findings (lib/findings.ts). */
+function structuredAnalysis(r: AnalysisResult, editor: string) {
+  return {
+    editor,
+    cohorts: Object.fromEntries(Object.entries(r.cohorts).map(([n, c]) => [n, { patients: c.count, samples: c.samples, studies: c.studies }])),
+    views: r.views.map((v, i) => ({ index: i, kind: v.kind, title: viewTitle(v),
+      ...(v.error ? { error: v.error } : {}), ...(v.findings ? { findings: v.findings } : {}) })),
+  };
+}
+
 /**
  * The engine the tools run on. The Next route passes the cached one (lib/next-cache.ts); the
  * stdio server has no Next runtime, so it runs the engine directly.
@@ -87,7 +97,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
   server.tool(
     "run_analysis",
     "Execute a full Analysis document — the v2 DSL: named cohorts built from OQL genomic status, clinical attributes, timeline events, case lists, and continuous genomic data (optionally federated across studies), plus views: " + viewsSummary() +
-      ". Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor.",
+      ". Every view's figure is returned as an image. Call describe_dsl first for the grammar and runnable examples. Returns per-cohort counts with plain-language readbacks, view results, caveats you MUST surface to the user, and a link that opens this exact document in the interactive editor. The structured result carries each view's findings: its headline numbers, named and typed (cohort, gene, unit, test), each marked with the method check that independently recomputes it.",
     {
       document: z.object({}).passthrough()
         .describe("The Analysis document: {dsl?, study, cohorts: {name: def (may carry splits), ...}, views: [...]}. Grammar and examples: describe_dsl.")
@@ -130,7 +140,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       out.push(`Interactive editor (share with the user — opens this exact document, live): ${base}/lab?doc=${docB64}` +
         `\nThat page also shows the generated SQL for every cohort (full provenance).`);
       content.push({ type: "text", text: out.join("\n\n") });
-      return { content };
+      return { content, structuredContent: structuredAnalysis(r, base + "/lab?doc=" + docB64) };
     });
 
   server.tool(

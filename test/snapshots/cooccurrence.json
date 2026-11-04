@@ -229,6 +229,117 @@
         "aggregateOnly": []
       },
       "note": "Pairwise co-occurrence within “NSCLC”. Denominators are the patients profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on patients whose panel could not have detected it. Two-sided Fisher exact test. q-values are Benjamini–Hochberg across the 15 assessable pairs. Every site returns four counts per pair and nothing else.",
+      "findings": {
+        "version": 1,
+        "kind": "cooccurrence",
+        "source": "method-check",
+        "findings": [
+          {
+            "name": "cooccurrence:STK11/KEAP1:p",
+            "value": 1.1515322331420719e-248,
+            "checked": "cooccurrence:STK11/KEAP1:p"
+          },
+          {
+            "name": "cooccurrence:STK11/KEAP1:q",
+            "value": 1.7272983497131078e-247,
+            "checked": "cooccurrence:STK11/KEAP1:q"
+          },
+          {
+            "name": "cooccurrence:EGFR/KRAS:p",
+            "value": 1.7475932682687458e-240,
+            "checked": "cooccurrence:EGFR/KRAS:p"
+          },
+          {
+            "name": "cooccurrence:EGFR/KRAS:q",
+            "value": 1.3106949512015594e-239,
+            "checked": "cooccurrence:EGFR/KRAS:q"
+          },
+          {
+            "name": "cooccurrence:EGFR/STK11:p",
+            "value": 2.5872309776966024e-88,
+            "checked": "cooccurrence:EGFR/STK11:p"
+          },
+          {
+            "name": "cooccurrence:EGFR/STK11:q",
+            "value": 1.2936154888483012e-87,
+            "checked": "cooccurrence:EGFR/STK11:q"
+          },
+          {
+            "name": "cooccurrence:KRAS/STK11:p",
+            "value": 5.750549146153232e-79,
+            "checked": "cooccurrence:KRAS/STK11:p"
+          },
+          {
+            "name": "cooccurrence:KRAS/STK11:q",
+            "value": 2.156455929807462e-78,
+            "checked": "cooccurrence:KRAS/STK11:q"
+          },
+          {
+            "name": "cooccurrence:EGFR/KEAP1:p",
+            "value": 8.785826313148364e-73,
+            "checked": "cooccurrence:EGFR/KEAP1:p"
+          },
+          {
+            "name": "cooccurrence:EGFR/KEAP1:q",
+            "value": 2.6357478939445094e-72,
+            "checked": "cooccurrence:EGFR/KEAP1:q"
+          },
+          {
+            "name": "cooccurrence:KRAS/TP53:p",
+            "value": 7.7934784462294424e-59,
+            "checked": "cooccurrence:KRAS/TP53:p"
+          },
+          {
+            "name": "cooccurrence:KRAS/TP53:q",
+            "value": 1.9483696115573604e-58,
+            "checked": "cooccurrence:KRAS/TP53:q"
+          },
+          {
+            "name": "cooccurrence:EGFR/ALK:p",
+            "value": 3.2367056081627897e-25,
+            "checked": "cooccurrence:EGFR/ALK:p"
+          },
+          {
+            "name": "cooccurrence:EGFR/ALK:q",
+            "value": 6.9357977317774065e-25,
+            "checked": "cooccurrence:EGFR/ALK:q"
+          },
+          {
+            "name": "cooccurrence:KRAS/KEAP1:p",
+            "value": 8.969073797936211e-23,
+            "checked": "cooccurrence:KRAS/KEAP1:p"
+          },
+          {
+            "name": "cooccurrence:KRAS/KEAP1:q",
+            "value": 1.6817013371130396e-22,
+            "checked": "cooccurrence:KRAS/KEAP1:q"
+          },
+          {
+            "name": "cooccurrence:TP53/STK11:p",
+            "value": 4.339673873642473e-17,
+            "checked": "cooccurrence:TP53/STK11:p"
+          },
+          {
+            "name": "cooccurrence:TP53/STK11:q",
+            "value": 7.232789789404122e-17,
+            "checked": "cooccurrence:TP53/STK11:q"
+          },
+          {
+            "name": "cooccurrence:EGFR/TP53:p",
+            "value": 2.194819061759366e-9,
+            "checked": "cooccurrence:EGFR/TP53:p"
+          },
+          {
+            "name": "cooccurrence:EGFR/TP53:q",
+            "value": 3.2922285926390486e-9,
+            "checked": "cooccurrence:EGFR/TP53:q"
+          },
+          {
+            "…": "10 more",
+            "sha256": "2a2bf4ee020dfc8d"
+          }
+        ]
+      },
       "method": {
         "steps": [
           {
