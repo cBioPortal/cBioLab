@@ -1,7 +1,7 @@
 // The lollipop figure: the plot alone, one panel per gene, and its caption's words for what the app
 // shows beside it as controls. Imports only the drawing kit and lib/lollipop.ts, so the app draws
 // it in the browser (app/_lollipop/HotspotsBody.tsx) from the same code the server uses for MCP.
-import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, type AlterationCell } from "./lollipop.ts";
+import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, type AlterationCell, type CodonSelection } from "./lollipop.ts";
 
 import {
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, legend, label, textWidth, textOn,
@@ -14,7 +14,7 @@ import type { HotspotGene } from "./views/hotspots/types.ts";
  * counts by alteration class — in words, plus what the selection hides, for a figure that travels
  * without the app (an MCP client's image, an export). The app draws those as controls instead.
  */
-export function lollipopSummaryText(genes: HotspotGene[], hide: readonly string[]): string {
+export function lollipopSummaryText(genes: HotspotGene[], hide: readonly string[], codons?: CodonSelection): string {
   const parts = genes.map((g) => {
     const freq = g.cohortSamples ? fmtShare(g.somaticSamples / g.cohortSamples) : "–";
     const cells = IMPACT_TYPES.filter((k) => g.tally[k].driver || g.tally[k].vus)
@@ -24,7 +24,13 @@ export function lollipopSummaryText(genes: HotspotGene[], hide: readonly string[
       (hide.length ? "; drawn: " + fmtInt(f.shown) + " of " + fmtInt(f.total) + " mutations" +
         (f.unclassed ? " (" + fmtInt(f.unclassed) + " from a site that reports no alteration class, drawn regardless)" : "") : "") + ".";
   });
-  return (hide.length ? "Hidden: " + hide.map((c) => cellLabel(c as AlterationCell)).join(", ") + ". " : "") + parts.join(" ");
+  const picked = genes.filter((g) => codons?.[g.gene]?.length).map((g) => {
+    const ps = codons![g.gene], drawn = filterHotspotGene(g, hide).gene.positions;
+    const n = drawn.filter((q) => ps.includes(q.pos)).reduce((a, q) => a + q.n, 0);
+    return g.gene + " " + ps.join(", ") + " (" + fmtInt(n) + " mutation" + (n === 1 ? "" : "s") + " drawn there)";
+  });
+  return (hide.length ? "Hidden: " + hide.map((c) => cellLabel(c as AlterationCell)).join(", ") + ". " : "") + parts.join(" ") +
+    (picked.length ? " Selected codons, drawn with a larger head: " + picked.join("; ") + "." : "");
 }
 
 /**
@@ -36,7 +42,7 @@ export function lollipopSummaryText(genes: HotspotGene[], hide: readonly string[
  * one panel per gene, with a caption: the app draws its own controls beside them, and
  * lib/view-svg.ts's hotspotsSvg wraps them for a figure that stands alone.
  */
-export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText: string): string {
+export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText: string, codons?: CodonSelection): string {
   const p = palette(o.theme), W = Math.max(400, o.width || 720);
   const R = 16, STEM = 150, LABEL_ROOM = 18, BACKBONE = 14, DOMAIN = 24, STICK = "#BABDB6";
   const out: string[] = [];
@@ -76,15 +82,18 @@ export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText:
     xs.ticks = [...xs.ticks.filter((t) => t < len && xs(t) + textWidth(fmtInt(t), FS.small) / 2 + 8 < x(len) - endW), len];
     out.push(axisBottom(xs, axY, p, { minX: L - 20, maxX: W - 2, fmt: (t) => t === len ? endText : fmtInt(t) }));
 
-    // stems, heads, tooltips
-    for (const q of g.positions) {
+    // stems, heads, tooltips; a selected codon's head drawn larger and last, over its neighbours, as
+    // the portal draws it (radius 5 for 2.8). Each stem names its gene and codon, for the app's click.
+    const sel = new Set(codons?.[g.gene] || []);
+    for (const q of [...g.positions.filter((q) => !sel.has(q.pos)), ...g.positions.filter((q) => sel.has(q.pos))]) {
       const cx = x(q.pos), cy = ys(Math.min(ys.domain[1], q.n));
       const tip = "codon " + q.pos + ": " + fmtInt(q.n) + " mutation" + (q.n === 1 ? "" : "s") + "\n" +
         q.changes.slice(0, 12).map((c) => c.change + " " + fmtInt(c.n)).join("\n") +
         (q.changes.length > 12 ? "\n…and " + (q.changes.length - 12) + " more" : "");
-      out.push(`<g><title>${esc(tip)}</title>` +
+      const on = sel.has(q.pos);
+      out.push(`<g data-gene="${esc(g.gene)}" data-codon="${q.pos}"${on ? ' data-selected="1"' : ""}><title>${esc(tip)}</title>` +
         `<line x1="${r1(cx)}" y1="${yBase}" x2="${r1(cx)}" y2="${r1(cy)}" stroke="${STICK}" stroke-width="${SW.line}"/>` +
-        `<circle class="lollipop-head" cx="${r1(cx)}" cy="${r1(cy)}" r="2.8" fill="${q.color}"/></g>`);
+        `<circle class="lollipop-head" cx="${r1(cx)}" cy="${r1(cy)}" r="${on ? 5 : 2.8}" fill="${q.color}"${on ? ` stroke="${p.ink}" stroke-width="1"` : ""}/></g>`);
     }
     if (g.label) {
       const lq = g.positions.find((q) => q.pos === g.label!.pos);

@@ -9,6 +9,7 @@ import type { SvgOpts } from "../../svg-kit.ts";
 export function hotspotsSvg(v: DrawnResultOf<"hotspots">, o: SvgOpts): string {
   const hide = (v.hide || []) as string[];
   const all = (v.hotspots || []) as HotspotGene[];
+  const codons = v.codons as Record<string, number[]> | undefined;
   return lollipopPanelsSvg(all.map((g) => filterHotspotGene(g, hide).gene), o,
-    [v.note || "", lollipopSummaryText(all, hide)].filter(Boolean).join(" "));
+    [v.note || "", lollipopSummaryText(all, hide, codons)].filter(Boolean).join(" "), codons);
 }

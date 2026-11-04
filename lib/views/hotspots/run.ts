@@ -1,6 +1,6 @@
 // Hotspots view: a lollipop of mutation counts per protein position for each gene.
 import { geneSymbols } from "../../gene-tracks.ts";
-import { buildLollipopGene, fetchProteinInfo, checkHide } from "../../lollipop.ts";
+import { buildLollipopGene, fetchProteinInfo, checkHide, checkCodons, pruneCodons } from "../../lollipop.ts";
 import type { ViewResult } from "../../types.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { overLimit } from "../shared.ts";
@@ -15,6 +15,8 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const minCount = Math.max(1, Math.min(1000, Math.floor(Number(hv.minCount) || 1)));
   { const e = checkHide(hv.hide); if (e) return untimed({ kind: "hotspots", error: e }); }
   const hide = [...new Set(hv.hide || [])];
+  { const e = checkCodons(hv.codons, uniq); if (e) return untimed({ kind: "hotspots", error: e }); }
+  const codons = pruneCodons(hv.codons && Object.fromEntries(Object.entries(hv.codons).map(([g, ps]) => [g, [...new Set(ps)].sort((a, b) => a - b)])), uniq);
   const cn = vNames[0];
   const studies = cohorts[cn].studies;
   // the sites' counts and the proteins (length, Pfam domains) are independent, so both at once
@@ -31,7 +33,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const annotated = reports.every((r) => r.annotated);
   // the figure and the text apply the selection (lib/view-svg.ts lollipopSummaryText says what it hides);
   // `hotspots` stays whole, so the app re-filters it without a re-run
-  const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(hide.length ? { hide } : {}),
+  const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}),
     participation: participationFor(studies, false),
     note: (vNames.length > 1 ? "A lollipop draws one cohort: this shows “" + cn + "” only; " +
         vNames.slice(1).map((n) => "“" + n + "”").join(", ") + (vNames.length === 2 ? " is" : " are") + " not drawn. " : "") +

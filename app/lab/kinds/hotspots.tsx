@@ -17,6 +17,8 @@ function HotspotsCard({ ctx, v, vi }: CardProps) {
           alteration grid beside it as controls; the grid's selection re-runs nothing */}
       <HotspotsBody v={v} hide={docView(vi).hide} onHide={(h) => updateViewLocal(vi, (vv: any) => {
         const nx = { ...vv }; if (h) nx.hide = h; else delete nx.hide; return nx;
+      })} codons={docView(vi).codons} onCodons={(c) => updateViewLocal(vi, (vv: any) => {
+        const nx = { ...vv }; if (c) nx.codons = c; else delete nx.codons; return nx;
       })} />
     </>}
   </>;

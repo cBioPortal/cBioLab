@@ -3,7 +3,8 @@
 // expression tabs follow cBioPortal's cross-study rule.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resultsGroups, resultsLayout } from "../app/portal/results-layout.ts";
+import { resultsGroups, resultsLayout, linkMutations } from "../app/portal/results-layout.ts";
+import type { View } from "../lib/types.ts";
 
 const ALL3 = { every: ["MUTATION", "CNA", "SV"] as const, some: [] as never[] };
 const q = (studies: string[], entries: string[], filters: any[] = []) => ({ studies, filters, entries, genes: [...new Set(entries.map((e) => e.split(":")[0].trim()))] });
@@ -89,4 +90,21 @@ test("before the profiles are known, the page lays out the tabs that need nothin
   // every view laid out first is the same view, under the same name, once the page is whole
   first.names.forEach((n, i) => assert.deepEqual(full.doc.views![full.names.indexOf(n)], first.doc.views![i], n));
   assert.deepEqual(first.doc.cohorts, full.doc.cohorts);
+});
+
+test("the Mutations tab: stems selected on the lollipop filter the table to those protein positions, and back", () => {
+  const lp = { kind: "hotspots", genes: ["KRAS"], cohorts: ["Queried"] } as unknown as View;
+  const tb = { kind: "mutations", gene: "KRAS", cohorts: ["Queried"] } as unknown as View;
+  const f = (vs: View[]) => (vs[1] as unknown as { filters?: Record<string, unknown> }).filters;
+  const c = (vs: View[]) => (vs[0] as unknown as { codons?: Record<string, number[]> }).codons;
+  const picked = linkMutations([{ ...lp, codons: { KRAS: [12, 13] } } as View, tb], 0);
+  assert.deepEqual(f(picked), { proteinPos: { values: ["12", "13"] } });
+  assert.equal(f(linkMutations([lp, picked[1]], 0)), undefined, "clearing the selection clears the table's filter");
+  const both = linkMutations([{ ...lp, codons: { KRAS: [12] }, hide: ["missense.vus"] } as View, tb], 0);
+  assert.deepEqual(Object.keys(f(both)!).sort(), ["alteration", "proteinPos"], "the grid and the stems each filter their own column");
+  // from the table: a value filter on Protein Position selects those stems; removing it clears them
+  assert.deepEqual(c(linkMutations([lp, { ...tb, filters: { proteinPos: { values: ["61", "12"] } } } as View], 1)), { KRAS: [12, 61] });
+  assert.equal(c(linkMutations([{ ...lp, codons: { KRAS: [12] } } as View, tb], 1)), undefined);
+  // a range on the column is not a set of codons: the plot keeps its selection
+  assert.deepEqual(c(linkMutations([{ ...lp, codons: { KRAS: [12] } } as View, { ...tb, filters: { proteinPos: { min: 10, max: 20 } } } as View], 1)), { KRAS: [12] });
 });

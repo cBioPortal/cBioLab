@@ -15,6 +15,9 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
   { id: "sample", name: "Sample ID", numeric: false },
   { id: "cancerType", name: "Cancer Type Detailed", numeric: false },
   { id: "proteinChange", name: "Protein Change", numeric: false },
+  // the stored protein start position: the codon the lollipop draws the mutation at. Filtered as a
+  // set of values (the stems selected there), so a text column that sorts by number
+  { id: "proteinPos", name: "Protein Position", numeric: false },
   { id: "annotation", name: "Annotation (OncoKB)", numeric: false },
   { id: "mutationType", name: "Mutation Type", numeric: false },
   { id: "alteration", name: "Alteration", numeric: false },
@@ -59,6 +62,7 @@ function queryColumn(c: MutationColumn, pin: string | null): QueryColumn {
     case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: "drv" };
     case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };
     case "alteration": return { ...c, text: alterationSql(pin) };
+    case "proteinPos": return { ...c, text: str("pos"), order: "pos" };
     case "vaf": return { ...c, text: str("round(vaf, 2)"), num: num("vaf") };
     default: return c.numeric ? { ...c, text: str(c.id), num: num(c.id) } : { ...c, text: str(c.id) };
   }
