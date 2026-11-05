@@ -17,4 +17,5 @@ export const attritionKind: ViewKindDef<"attrition"> = {
     text: "Shows how each group of patients was narrowed down, one criterion at a time: how many patients the study started with, how many were left after each rule in the group's definition, and how many each rule removed. It lets a reader see who was left out before trusting any result drawn from the patients who remain."
   },
   isNew: true,
+  e2ePending: "provisional: its design may still change",
 };

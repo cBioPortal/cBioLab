@@ -1,5 +1,5 @@
 # Jobs run side by side: lint (ESLint, knip, ruff; no secrets), the gate as three lanes, the
-# planted-bug check, and the report-only duplication, coverage and security reports.
+# planted-bug check, the coverage rules, and the report-only duplication and security reports.
 #
 # The whole gate, on every pull request and every push to master, is scripts/gate.sh, split into the
 # lanes it names: `local` (unit tests, the stores' Postgres tests, the planted sharing bugs, the
@@ -232,9 +232,46 @@ jobs:
           pattern: verification-report-*
           delete-merged: true
 
-  # Report-only: copy-paste (jscpd), unit-test coverage (node's, summarised on the job's page) and
-  # security patterns (Semgrep's registry rule packs). None fails the run; the findings are kept as
-  # the quality-report artifact, Semgrep's as SARIF.
+  # Unit-test coverage (node's, summarised on the job's page), then its rules (scripts/check-coverage.ts):
+  # a pull request's changed lines in lib/ and mcp/ covered, no new file there that no unit test loads,
+  # and each area's coverage at or above its floor. It needs the base branch's history for the diff.
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit-test coverage
+        run: npm run report:coverage
+
+      - name: Coverage rules
+        env:
+          COVERAGE_BASE: origin/${{ github.base_ref || 'master' }}
+        run: npm run check:coverage
+
+      - name: Keep the coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            quality-report/coverage.lcov
+            quality-report/coverage.md
+          if-no-files-found: warn
+
+  # Report-only: copy-paste (jscpd) and security patterns (Semgrep's registry rule packs). Neither
+  # fails the run; the findings are kept as the quality-report artifact, Semgrep's as SARIF.
   reports:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -254,9 +291,6 @@ jobs:
 
       - name: Duplication
         run: npm run report:dupes
-
-      - name: Unit-test coverage
-        run: npm run report:coverage
 
       - name: Security patterns
         run: npm run report:security

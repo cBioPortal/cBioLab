@@ -26,4 +26,5 @@ export const sequenceKind: ViewKindDef<"sequence"> = {
     text: "Shows the order in which patients moved from one treatment to the next, drawn as flows between them. It answers a simple but useful question: after this treatment, what did doctors try next, and how often?"
   },
   isNew: true,
+  e2ePending: "provisional: its design may still change",
 };

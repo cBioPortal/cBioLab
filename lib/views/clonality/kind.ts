@@ -22,4 +22,5 @@ export const clonalityKind: ViewKindDef<"clonality"> = {
   },
   need: "local",
   isNew: true,
+  e2ePending: "provisional: its design may still change",
 };

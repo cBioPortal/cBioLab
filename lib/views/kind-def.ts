@@ -36,6 +36,9 @@ export interface ViewKindDef<K extends ViewKind> {
   need?: Need;
   /** what a preview kind still lacks before it is held to the full checks (lib/preview-kinds.ts) */
   preview?: string;
+  /** why this kind has no browser check yet: a provisional kind's design may still change. A kind with neither
+   * this nor `preview` must be drawn by an e2e area that lists it in `covers` (test/e2e-coverage.test.ts) */
+  e2ePending?: string;
   /** cBioPortal has no counterpart for it (lib/new-in-lab.ts) */
   isNew?: boolean;
 }

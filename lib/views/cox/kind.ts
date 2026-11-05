@@ -29,4 +29,5 @@ export const coxKind: ViewKindDef<"cox"> = {
   },
   need: "patients",
   isNew: true,
+  e2ePending: "provisional: its design may still change",
 };

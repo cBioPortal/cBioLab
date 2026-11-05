@@ -19,4 +19,5 @@ export const logisticKind: ViewKindDef<"logistic"> = {
   },
   need: "patients",
   isNew: true,
+  e2ePending: "provisional: its design may still change",
 };

@@ -100,6 +100,12 @@ this project is "fast"), [`ENVIRONMENT.md`](docs/ENVIRONMENT.md) (settings),
 13. **`/verification` reports what the checks found; it never restates a claim by hand.** A new
    statistic gets a row in `lib/verification.ts`; new cohort or count logic should get a planted bug
    that proves a check would notice it breaking ([`TESTING.md`](docs/TESTING.md)).
+14. **New code is tested, and every settled view is drawn by a browser check.** CI's `coverage` job
+   fails a PR whose changed lines in `lib/` and `mcp/` the unit tests leave under 80% run, that adds
+   a file there no unit test loads, or that drops an area below its floor (`npm run report:coverage
+   && npm run check:coverage`). Every view kind is in some e2e area's `covers` unless it is `preview`
+   or provisional (`e2ePending` in its `kind.ts`); `test/e2e-coverage.test.ts` holds this, and
+   promoting a kind adds its browser check in the same change ([`TESTING.md`](docs/TESTING.md)).
 
 ## UI conventions
 

@@ -149,4 +149,7 @@ async function riskmodel({ decodeUrlJson, browser, ok, BASE }) {
   }
 }
 
-module.exports = { riskmodel };
+/** the view kinds this area draws (test/e2e-coverage.test.ts) */
+const covers = ["riskmodel"];
+
+module.exports = { riskmodel, covers };

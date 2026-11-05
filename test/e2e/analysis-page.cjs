@@ -187,4 +187,7 @@ async function analysisPage({ ok, BASE, page, scheme }) {
                   : "control did not drive a re-run");
 }
 
-module.exports = { analysisPage };
+/** the view kinds this area draws (test/e2e-coverage.test.ts) */
+const covers = ["oncoprint"];
+
+module.exports = { analysisPage, covers };
