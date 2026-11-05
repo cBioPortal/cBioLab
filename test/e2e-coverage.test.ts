@@ -35,9 +35,9 @@ test("every kind an area covers exists, and is covered by one area", () => {
   assert.deepEqual([...coveredBy].filter(([, fs]) => fs.length > 1).map(([k, fs]) => k + ": " + fs.join(", ")), []);
 });
 
-test("every kind the view-kinds area draws has a snapshot example it can open without uploads", () => {
+test("every kind the view-kinds area draws has a snapshot example it can open without custom data", () => {
   const { covers } = require(join(dir, "view-kinds.cjs")) as { covers: string[] };
-  const bad = covers.filter((k) => { const ex = EXAMPLES.find((e) => e.snapshot === k); return !ex || ex.uploads; });
+  const bad = covers.filter((k) => { const ex = EXAMPLES.find((e) => e.snapshot === k); return !ex || ex.customData?.length; });
   assert.deepEqual(bad, []);
 });
 

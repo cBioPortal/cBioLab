@@ -16,8 +16,8 @@ const AT_ONCE = 3;
 
 async function drawKind({ ctx, ok, BASE, encodeUrlJson, EXAMPLES }, kind) {
   const ex = EXAMPLES.find((e) => e.snapshot === kind);
-  if (!ex || ex.uploads) {
-    ok("view kinds: " + kind + " has a snapshot example without uploads to draw", false, ex ? "its example needs uploads" : "no example marked snapshot: \"" + kind + "\"");
+  if (!ex || ex.customData?.length) {
+    ok("view kinds: " + kind + " has a snapshot example without custom data to draw", false, ex ? "its example needs custom data" : "no example marked snapshot: \"" + kind + "\"");
     return;
   }
   const page = await ctx.newPage();
