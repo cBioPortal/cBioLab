@@ -1,0 +1,97 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  body { margin: 0; background: #fff; font: 14px/1.35 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: #1f2328; }
+  .wrap { width: 1180px; padding: 28px 32px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .lede { color: #59636e; margin: 0 0 20px; }
+  .lane { border-radius: 12px; padding: 14px 16px 16px; position: relative; }
+  .lane h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 10px; }
+  .lane h2 span { text-transform: none; letter-spacing: 0; font-weight: 400; color: #59636e; margin-left: 8px; }
+  .k { background: #e9f8ee; border: 1px solid #9fd8b0; } .k h2 { color: #1a7f37; }
+  .r { background: #eef4ff; border: 1px solid #c4d7f5; } .r h2 { color: #2a5bb5; }
+  .u { background: #f3f0ff; border: 1px solid #d5cdf5; } .u h2 { color: #5b3fc4; }
+  .c { background: #fff4e5; border: 1px solid #f0c98a; } .c h2 { color: #9a5b00; }
+  .grid { display: grid; gap: 8px; }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .g5 { grid-template-columns: repeat(5, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .box { background: #fff; border: 1px solid #d8dee4; border-radius: 9px; padding: 9px 11px; }
+  .box.opt { border-style: dashed; }
+  .box .t { font-weight: 650; margin-bottom: 3px; }
+  .box .d { color: #3d444d; font-size: 13px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 10px; padding: 0 7px; margin-left: 4px; vertical-align: 1px; }
+  .every { background: #dafbe1; color: #1a7f37; } .some { background: #f6f8fa; color: #59636e; border: 1px solid #d8dee4; }
+  code { font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background: #f6f8fa; border-radius: 4px; padding: 1px 4px; }
+  .arrow { text-align: center; color: #59636e; font-size: 12.5px; margin: 6px 0; }
+  .arrow b { font-size: 18px; display: block; line-height: 1; color: #8c959f; }
+  .note { font-size: 13px; color: #3d444d; margin-top: 10px; }
+  table { border-collapse: collapse; width: 100%; background: #fff; border-radius: 9px; overflow: hidden; font-size: 13px; }
+  td, th { text-align: left; vertical-align: top; padding: 6px 10px; border-bottom: 1px solid #eaeef2; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #59636e; background: #f6f8fa; }
+  tr:last-child td { border-bottom: 0; }
+</style></head><body><div class="wrap">
+<h1>What a view kind is made of</h1>
+<p class="lede">Adding a kind means writing one folder and one page file, then adding a line to each of four registries. Shared code reads only the registries, and checks fail when a piece is missing. <code>test/diagrams.test.ts</code> holds this page to the code: its file list, its registries and every path and name in it.</p>
+
+<div class="lane k"><h2>Written for the kind<span><code>lib/views/&lt;kind&gt;/</code> + <code>app/lab/kinds/&lt;kind&gt;.tsx</code></span></h2>
+  <div class="grid g4">
+    <div class="box" data-kind-file="types.ts" data-every><div class="t"><code>types.ts</code><span class="tag every">every kind</span></div>
+      <div class="d">the spec and result fields, added to <code>ViewSpecs</code>, <code>ViewResultFields</code> and <code>ViewResultMain</code> in <code>lib/types.ts</code> by <code>declare module</code></div></div>
+    <div class="box" data-kind-file="run.ts" data-every><div class="t"><code>run.ts</code><span class="tag every">every kind</span></div>
+      <div class="d">the runner: validates, refuses loudly, asks each site (<code>askEachSite</code>, <code>answering</code> in <code>lib/views/shared.ts</code>), combines, computes</div></div>
+    <div class="box" data-kind-file="kind.ts" data-every><div class="t"><code>kind.ts</code><span class="tag every">every kind</span></div>
+      <div class="d">the descriptor (<code>ViewKindDef</code>, <code>lib/views/kind-def.ts</code>): figure, title, results text, help, federation <code>need</code>, <code>preview</code>, <code>isNew</code></div></div>
+    <div class="box" data-kind-file="doc.ts" data-every><div class="t"><code>doc.ts</code><span class="tag every">every kind</span></div>
+      <div class="d">its part of the DSL reference (<code>KindDoc</code>, <code>lib/views/kind-doc.ts</code>): Views row, agent grammar, gallery examples, one marked <code>snapshot</code></div></div>
+    <div class="box opt" data-kind-file="sql.ts"><div class="t"><code>sql.ts</code><span class="tag some">when it has its own queries</span></div>
+      <div class="d">aggregate-only builders returning <code>AggregateSql</code>; otherwise shared builders in <code>lib/federation-views.ts</code> or resolver methods</div></div>
+    <div class="box opt" data-kind-file="method.ts"><div class="t"><code>method.ts</code><span class="tag some">most kinds</span></div>
+      <div class="d">the method record and its Python script (<code>lib/method.ts</code>); a kind in <code>lib/preview-kinds.ts</code> may lack one</div></div>
+    <div class="box opt" data-kind-file="figure.ts"><div class="t"><code>figure.ts</code><span class="tag some">most kinds</span></div>
+      <div class="d">result JSON to an SVG string, laid out with <code>lib/chart/</code>; table-only kinds have none</div></div>
+    <div class="box opt" data-kind-file="README.md"><div class="t"><code>README.md</code><span class="tag some">a few</span></div>
+      <div class="d">a kind with more to explain than <code>docs/ARCHITECTURE.md</code>'s paragraph; read it before changing the kind</div></div>
+  </div>
+  <div class="box" style="margin-top:8px"><div class="t"><code>app/lab/kinds/&lt;kind&gt;.tsx</code> <span class="tag every">every kind</span></div>
+    <div class="d">its <code>KindUi</code> (<code>app/lab/kinds/kind-ui.ts</code>): add-view dialog entry and category, why it is disabled, the spec a new view starts from, the card's subtitle and Controls. The only JSX a kind writes.</div></div>
+  <div class="note">Kinds never import each other: a kind's files import one another and the shared modules only. <code>local/kind-boundary</code> in <code>eslint.config.mjs</code> enforces it.</div>
+</div>
+<div class="arrow"><b>↓</b>one line each</div>
+
+<div class="lane r"><h2>Registries<span>each keyed by <code>ViewKind</code>, so a kind missing from one does not compile</span></h2>
+  <div class="grid g5">
+    <div class="box"><div class="t"><code>lib/types.ts</code></div><div class="d"><code>ViewSpecs</code> makes the <code>ViewKind</code> union the others are typed by</div></div>
+    <div class="box" data-registry="RUNNERS" data-file="lib/views/index.ts"><div class="t"><code>RUNNERS</code></div><div class="d"><code>lib/views/index.ts</code>, read through <code>viewRunner(kind)</code>; <code>drawn()</code> wraps a runner</div></div>
+    <div class="box" data-registry="KINDS" data-file="lib/views/kinds.ts"><div class="t"><code>KINDS</code></div><div class="d"><code>lib/views/kinds.ts</code>: the descriptors</div></div>
+    <div class="box" data-registry="KIND_DOCS" data-file="lib/views/docs.ts"><div class="t"><code>KIND_DOCS</code></div><div class="d"><code>lib/views/docs.ts</code>: the DSL reference</div></div>
+    <div class="box" data-registry="KIND_UI" data-file="app/lab/kinds/index.ts"><div class="t"><code>KIND_UI</code></div><div class="d"><code>app/lab/kinds/index.ts</code>: the page files, read through <code>kindUi(kind)</code></div></div>
+  </div>
+</div>
+<div class="arrow"><b>↓</b>read by</div>
+
+<div class="lane u"><h2>Shared code that reads them<span>no kind is named here</span></h2>
+  <div class="grid g3">
+    <div class="box"><div class="t">The run</div><div class="d"><code>runAnalysis</code> (<code>lib/analysis.ts</code>) builds each view's <code>ViewRun</code> (<code>lib/views/run.ts</code>) and calls its runner; the runner's queries go through <code>viewAggregate</code> (<code>lib/federation.ts</code>), which runs them per cohort and study and logs them</div></div>
+    <div class="box"><div class="t">Figures and text</div><div class="d"><code>viewToSvg</code> (<code>lib/view-svg.ts</code>) and <code>lib/result-text.ts</code>: the page's figure, MCP's image, the assistant's text</div></div>
+    <div class="box"><div class="t">Rules and badges</div><div class="d"><code>lib/view-coverage.ts</code> (which peers can answer), <code>lib/preview-kinds.ts</code>, <code>lib/new-in-lab.ts</code>, <code>lib/view-help.ts</code></div></div>
+    <div class="box"><div class="t">The DSL reference</div><div class="d"><code>lib/dsl-reference.ts</code> → <code>docs/dsl.md</code> (<code>npm run docs:gen</code>), MCP <code>describe_dsl</code>, the Examples tab, the agent grammar</div></div>
+    <div class="box"><div class="t">The page</div><div class="d"><code>app/lab/add-view-dialog.tsx</code>, <code>app/lab/view-cards.tsx</code> and the shared card <code>app/lab/kind-cards.tsx</code></div></div>
+    <div class="box"><div class="t">Provenance</div><div class="d">the method record, compiled SQL and notebook shown with each result</div></div>
+  </div>
+</div>
+<div class="arrow"><b>↓</b>held by</div>
+
+<div class="lane c"><h2>Checks that fail when a piece is missing or wrong</h2>
+  <table>
+    <tr><th style="width:300px">Check</th><th>What it requires of a kind</th></tr>
+    <tr><td><code>tsc</code></td><td>an entry in each of the four registries; a drawn result fills its kind's main field</td></tr>
+    <tr><td><code>local/kind-boundary</code> (eslint)</td><td>no import of another kind</td></tr>
+    <tr><td><code>test/boundary.test.ts</code></td><td>finds every <code>lib/views/*/sql.ts</code>; each exported builder needs a case in its <code>BUILDERS</code> list</td></tr>
+    <tr><td><code>test/view-snapshots.test.ts</code></td><td>a gallery example marked <code>snapshot</code>, with answers recorded under <code>test/snapshots/answers/</code></td></tr>
+    <tr><td><code>test/view-kinds.test.ts</code></td><td>its menu entry, default spec and card text pinned in <code>test/snapshots/kinds.json</code> (<code>UPDATE_SNAPSHOTS=1</code> after a change)</td></tr>
+    <tr><td><code>test/example-features.test.ts</code></td><td>no gallery tag is a view kind's name</td></tr>
+    <tr><td><code>npm run docs:check</code></td><td><code>docs/dsl.md</code> regenerated; each example runs, with its counts pinned in <code>test/fixtures/example-counts.json</code> (<code>npm run docs:counts</code>)</td></tr>
+    <tr><td><code>npm run check:methods</code></td><td>each method record's script reproduces the view's numbers (<code>scripts/check-method-scripts.ts</code>)</td></tr>
+  </table>
+</div>
+</div></body></html>
