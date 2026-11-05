@@ -1,11 +1,12 @@
 // Differential expression view: a volcano of every gene, and preranked GSEA of the same ranking
 import type { ViewResult, ViewResultOf } from "../../types.ts";
-import { benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea } from "../../stats.ts";
+import { benjaminiHochberg, varianceFromMoments, welchT } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, answering, refuse, niceCeil, askEachSite } from "../shared.ts";
 import type { DiffexprView, DiffexprGene } from "./types.ts";
 import { profileMomentsAllSql, genesetMembersSql } from "./sql.ts";
 import { diffexprMethod } from "./method.ts";
+import { compute } from "../../compute-pool.ts";
 
 const DE_MIN_N = 3, DE_POINT_CAP = 1500, DE_PERMUTATIONS = 1000;
 const SET_NAME = /^[A-Z0-9_]{3,120}$/;
@@ -123,7 +124,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
     if (absent.length) return refuse("diffexpr", ctx, "no MSigDB set named " + absent.slice(0, 3).join(", ") + " in this warehouse" +
       " (it holds the collections as named in MSigDB, e.g. HALLMARK_E2F_TARGETS, KEGG_…, REACTOME_…)");
     const ranked = [...tested].sort((x, y) => y.t - x.t).map((g) => ({ gene: g.gene, score: g.t }));
-    const res = preRankedGsea(ranked, found, { permutations: DE_PERMUTATIONS });
+    const res = await compute("preRankedGsea", ranked, found, { permutations: DE_PERMUTATIONS });
     const qs = benjaminiHochberg(res.map((r) => r.p));
     // many sets reach the permutation floor together, so p alone cannot order them: q, then |NES|
     const sets = res.map((r, i) => ({ ...r, q: qs[i] })).sort((x, y) => x.q - y.q || Math.abs(y.nes) - Math.abs(x.nes));

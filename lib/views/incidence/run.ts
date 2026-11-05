@@ -7,6 +7,7 @@ import { overLimit, answering, refuse } from "../shared.ts";
 import type { IncidenceView } from "./types.ts";
 import { incidenceMethod } from "./method.ts";
 import type { IncidenceTrace } from "./method.ts";
+import { compute } from "../../compute-pool.ts";
 
 const INCIDENCE_COHORT_LIMIT = 6;
 
@@ -36,6 +37,7 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
   const { ok, excluded } = answering(ctx);
   if (!Object.keys(ok).length) return refuse("incidence", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   const recsBy: Record<string, CrRecord[]> = {};
+  const cifBy: Record<string, ReturnType<typeof aalenJohansen>> = {};
   const curves: IncidenceCurve[] = [];
   const countRows: IncidenceTrace["counts"] = [];
   for (const n of vNames) {
@@ -64,6 +66,7 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
     recs.sort((x, y) => x.t - y.t || x.cause - y.cause || (entryKey(x) < entryKey(y) ? -1 : entryKey(x) > entryKey(y) ? 1 : 0));
     recsBy[n] = recs;
     const c = aalenJohansen(recs);
+    cifBy[n] = c;
     curves.push({ cohort: n, n: c.n, events: c.events, competing: c.competing, censored: c.censored,
       points: c.points.map((pt) => ({ t: pt.t, f1: Math.round(pt.f1 * 1e5) / 1e5, f2: Math.round(pt.f2 * 1e5) / 1e5,
         se1: Math.round(pt.se1 * 1e5) / 1e5, atRisk: pt.atRisk })), excluded: ex, late });
@@ -76,7 +79,7 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
   // incidence at each horizon, beside the naive 1 − KM that censors the dead
   const hz = horizons.map((months) => ({ months, cells: curves.map((c) => {
     const recs = recsBy[c.cohort];
-    const cif = aalenJohansen(recs), at = cifAt(cif, months);
+    const at = cifAt(cifBy[c.cohort], months);
     const km = kaplanMeier(recs.map((r) => ({ t: r.t, event: r.cause === 1 ? 1 : 0, ...(r.entry != null ? { entry: r.entry } : {}) })));
     let s = 1;
     for (const pt of km.points) { if (pt.t > months) break; s = pt.s; }
@@ -87,7 +90,7 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
   const live = curves.filter((c) => c.n);
   const nAll = live.reduce((a, c) => a + c.n, 0);
   const perms = nAll > 50000 ? 500 : 2000;
-  if (live.length >= 2) gray = grayPermutationTest(live.map((c) => recsBy[c.cohort]), perms, 1);
+  if (live.length >= 2) gray = await compute("grayPermutationTest", live.map((c) => recsBy[c.cohort]), perms, 1);
   const multi = ctx.vStudies.length > 1;
   const exTotal = (k: keyof IncidenceCurve["excluded"]) => curves.reduce((a, c) => a + c.excluded[k], 0);
   return {

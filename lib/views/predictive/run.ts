@@ -5,34 +5,17 @@
 import type { ViewResult, CoxCovariate } from "../../types.ts";
 import { hasViewAggregates, isPatientLevel } from "../../federation.ts";
 import { riskmodelRowsSql, riskmodelPanelGenesSql } from "../../federation-views.ts";
-import { coxRegression, benjaminiHochberg, type CoxRow, type CoxFit } from "../../stats.ts";
+import { benjaminiHochberg } from "../../stats.ts";
 import type { AxisKind } from "../../plot.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, refuse, plural, ATTR_NAME } from "../shared.ts";
 import { buildCoxColumns } from "../covariates.ts";
-import type { PredictiveView, PredictiveGene, PredictiveEffect } from "./types.ts";
+import type { PredictiveView, PredictiveGene } from "./types.ts";
+import { compute } from "../../compute-pool.ts";
 
 const PRED_MAX_GENES = 20, PRED_MAX_COVARIATES = 6;
 
 interface PredRow { t: number; ev: number; exposed: boolean; genes: Set<string>; panels: string[]; cov: string[]; stratum: string; study: string }
-
-/** effect k of a fit, as a hazard ratio with its interval and p */
-const effect = (f: CoxFit, k: number): PredictiveEffect => ({ hr: f.hr[k], ciLow: f.ciLow[k], ciHigh: f.ciHigh[k], p: f.p[k] });
-
-/**
- * One gene's fits over the rows profiled for it. The model is gene + exposed + gene×exposed (+
- * covariates); it is fitted twice, coded two ways — the interaction as gene×exposed, then as
- * gene×unexposed — so the gene's own coefficient is first its effect among the unexposed, then
- * among the exposed. The two codings are the same model (same likelihood), so both contrasts and
- * the interaction come from one fit's estimates and standard errors.
- */
-export function fitPredictiveGene(rows: { t: number; ev: number; exposed: boolean; mutated: boolean; x: number[]; stratum?: string }[]) {
-  const coded = (inter: (r: typeof rows[number]) => number): CoxRow[] => rows.map((r) => ({ t: r.t, event: r.ev,
-    x: [r.mutated ? 1 : 0, r.exposed ? 1 : 0, (r.mutated ? 1 : 0) * inter(r), ...r.x], ...(r.stratum ? { stratum: r.stratum } : {}) }));
-  const u = coxRegression(coded((r) => r.exposed ? 1 : 0));
-  const e = coxRegression(coded((r) => r.exposed ? 0 : 1));
-  return { inUnexposed: effect(u, 0), inExposed: effect(e, 0), interaction: effect(u, 2), n: u.n, events: u.events, converged: u.iterations > 0 && e.iterations > 0 };
-}
 
 export async function runPredictive(view: PredictiveView, ctx: ViewRun): Promise<ViewResult> {
   const { doc, cohorts, vNames } = ctx;
@@ -102,7 +85,7 @@ export async function runPredictive(view: PredictiveView, ctx: ViewRun): Promise
   const stratified = new Set(rows.map((r) => r.stratum)).size > 1;
   const covered = (r: PredRow, g: string) => r.panels.some((p) => p === "WES" || panelGenes.get(r.study)?.get(p)?.has(g));
 
-  const out: PredictiveGene[] = genes.map((gene) => {
+  const out: PredictiveGene[] = await Promise.all(genes.map(async (gene): Promise<PredictiveGene> => {
     const idx = rows.map((r, i) => covered(r, gene) ? i : -1).filter((i) => i >= 0);
     const sub = idx.map((i) => ({ t: rows[i].t, ev: rows[i].ev, exposed: rows[i].exposed, mutated: rows[i].genes.has(gene), x: xOf(i), ...(stratified ? { stratum: rows[i].stratum } : {}) }));
     const base = { gene, exposed: sub.filter((r) => r.exposed).length, unexposed: sub.filter((r) => !r.exposed).length,
@@ -113,12 +96,12 @@ export async function runPredictive(view: PredictiveView, ctx: ViewRun): Promise
       return { ...base, skipped: "mutated in " + base.mutatedExposed + " exposed and " + base.mutatedUnexposed + " unexposed patients; fitted only with at least " + minMutated + " in each" };
     if (base.mutatedExposed === base.exposed || base.mutatedUnexposed === base.unexposed) return { ...base, skipped: "every profiled patient of a group is mutated, so there is no wild-type to compare against" };
     try {
-      const f = fitPredictiveGene(sub);
+      const f = await compute("fitPredictiveGene", sub);
       if (![f.inExposed, f.inUnexposed, f.interaction].every((e) => Number.isFinite(e.hr) && Number.isFinite(e.ciHigh) && e.ciHigh < 1e6))
         return { ...base, skipped: "the fit did not converge (an estimate ran to infinity: the gene's patients may all have the same outcome)" };
       return { ...base, inExposed: f.inExposed, inUnexposed: f.inUnexposed, interaction: f.interaction };
     } catch (e) { return { ...base, skipped: "the fit failed: " + (e as Error).message }; }
-  });
+  }));
   const fitted = out.filter((g) => g.interaction);
   const qs = benjaminiHochberg(fitted.map((g) => g.interaction!.p));
   fitted.forEach((g, i) => { g.q = qs[i]; });

@@ -3,12 +3,13 @@
 // from dated timeline sites, the cumulative incidence of one site by one gene's status.
 import type { ViewResult, IncidenceCurve } from "../../types.ts";
 import { type EnrichAlteration } from "../../federation-views.ts";
-import { cochranMantelHaenszel, benjaminiHochberg, aalenJohansen, cifAt, grayPermutationTest, Z_975, type CrRecord } from "../../stats.ts";
+import { cochranMantelHaenszel, benjaminiHochberg, aalenJohansen, cifAt, Z_975, type CrRecord } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, answering, refuse, plural, ATTR_NAME } from "../shared.ts";
 import type { OrganotropismView, OrganotropismCell, OrganotropismSite, OrganotropismIncidence } from "./types.ts";
 import { orgSourcesSql, orgSitesSql, orgOtherValuesSql, orgTopGenesSql, orgCountsSql, orgIncidenceSql } from "./sql.ts";
 import type { OrgSource, OrgSourceKind } from "./sql.ts";
+import { compute } from "../../compute-pool.ts";
 
 const ORG_MAX_GENES = 20, ORG_MAX_SITES = 30;
 const ORG_DEFAULTS = { prefix: "DMETS_DX_", eventType: "Diagnosis", key: "TUMOR_SITE", attribute: "METASTATIC_SITE" };
@@ -193,7 +194,7 @@ export async function runOrganotropism(view: OrganotropismView, ctx: ViewRun): P
         noIncidence = "fewer than " + MIN_ARM + " patients in a group (" + curves.map((c) => c.cohort + " " + c.n).join(", ") + ") for the incidence of " + site.label;
       else {
         const perms = records > 50000 ? 500 : 2000;
-        incidence = { site: site.label, gene, curves, late, records, gray: grayPermutationTest(recs, perms, 1),
+        incidence = { site: site.label, gene, curves, late, records, gray: await compute("grayPermutationTest", recs, perms, 1),
           horizons: HORIZONS.map((months) => ({ months, cells: curves.map((c, i) => {
             const at = cifAt(aalenJohansen(recs[i]), months);
             return { cohort: c.cohort, f1: at.f1, lo: Math.max(0, at.f1 - Z_975 * at.se1), hi: Math.min(1, at.f1 + Z_975 * at.se1),

@@ -472,6 +472,13 @@ no longer match the kind folders and the maps keyed by `ViewKind`.
     has handed typed arrays back corrupted.
   - `next/cache` exists only under Next, so the stdio MCP server, CLI and tests run the engine
     uncached; `registerTools` takes the engine to use.
+- **The compute pool** (`lib/compute-pool.ts`) — statistics that take seconds of CPU (the risk
+  model's ensemble and group fits, Gray's permutation test, GSEA, the adjusted and predictive
+  fits) run on worker threads, never on the thread serving requests, where a 10 s fit would stall
+  every request sharing the process. A kernel is listed by name in `lib/compute-kernels.ts`, must
+  be pure, and takes and returns only what structured clone carries (no class instances, no
+  functions); a view calls it as `await compute("name", ...args)`. The workers are a Turbopack
+  `[worker thread]` chunk in a build. `COMPUTE_WORKERS=0` runs kernels on the calling thread.
 - **Method records** (`lib/method.ts`) — CLAUDE.md invariant 12. A view's result carries each step
   from its queries' rows to its numbers, built from the values that computation used, plus a Python
   script that recomputes the numbers with standard libraries; `check:methods` re-runs them
