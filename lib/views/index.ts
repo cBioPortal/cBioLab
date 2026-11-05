@@ -106,7 +106,11 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   diffexpr: drawn(runDiffexpr),
   paired: drawn(runPaired),
   clonality: drawn(runClonality),
-  incidence: reportsLeftOut(drawn(runIncidence), () => OS),
+  // a timeline event's follow-up is OS; a recorded time and status are their own endpoint
+  incidence: reportsLeftOut(drawn(runIncidence), (v) => {
+    const w = v as { monthsAttribute?: unknown; statusAttribute?: unknown };
+    return w.monthsAttribute != null || w.statusAttribute != null ? viewEndpoint(v) : OS;
+  }),
   labs: drawn(runLabs),
   riskmodel: reportsLeftOut(drawn(runRiskmodel), viewEndpoint),
   cancertypes: drawn(runCancertypes),

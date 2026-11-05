@@ -427,6 +427,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // incidence: `per`/`cls` are per patient; the outer SELECT groups them into (kind, entry, t, cause) tallies
     "incidenceCountsSql": () => federation.incidenceCountsSql(cohortSql, "x", "db", { eventType: "Diagnosis", attrs: [{ key: "TUMOR_SITE", value: "CNS/Brain" }] }, null),
     "incidenceCountsSql:anchored": () => federation.incidenceCountsSql(cohortSql, "x", "db", { eventType: "Status" }, { eventType: "Treatment", key: "SUBTYPE", value: "Chemo", occurrence: "FIRST" }),
+    "incidenceColumnsCountsSql": () => federation.incidenceColumnsCountsSql(cohortSql, "x", "db", "custom:bm/ICPFS_TIME", "custom:bm/ICPFS_EVENTCR"),
     // txendpoints: `per`/`cls` are per patient; the outer SELECT groups them into (kind, entry, t, ev) tallies
     "txEndpointCountsSql:ttnt": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "ttnt", anchor: { eventType: "Treatment", key: "SUBTYPE", value: "Immuno" }, lines: { gap: 90 } }),
     "txEndpointCountsSql:tot": () => federation.txEndpointCountsSql(cohortSql, "x", "db", { endpoint: "tot", anchor: { eventType: "Treatment", key: "AGENT", value: "PEMBROLIZUMAB", occurrence: "LAST" }, lines: { gap: 60, classes: "all" }, ongoingDays: 30 }),

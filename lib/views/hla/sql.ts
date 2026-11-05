@@ -1,6 +1,6 @@
 // The hla view's SQL: what its runner (run.ts) asks each participant's database for.
 // hla: HLA class I genotype and HLA LOH per patient
-import { survivalMonthsSql, survivalEventSql } from "../../survival-sql.ts";
+import { survivalMonthsSql, survivalEventSql, endpointRowsSql, endpointValueSql } from "../../survival-sql.ts";
 import { pidOf } from "../../federation-views.ts";
 import { sq } from "../../compiler.ts";
 import { clinicalTable } from "../../custom-data.ts";
@@ -75,10 +75,10 @@ export function hlaRowsSql(cohortSql: string, study: string, db: string, o: HlaR
     "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name = " + sq(o.months) + ")", "anyIf(attribute_value, attribute_name = " + sq(o.status) + ")") + " AS months,\n" +
-    "         anyIf(attribute_value, attribute_name = " + sq(o.status) + ") AS status\n" +
+    "         " + survivalMonthsSql(endpointValueSql(o.months, " = "), endpointValueSql(o.status, " = ")) + " AS months,\n" +
+    "         " + endpointValueSql(o.status, " = ") + " AS status\n" +
     "  FROM " + clinicalTable(db, [o.months, o.status]) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient' AND attribute_name IN (" + sq(o.months) + ", " + sq(o.status) + ")\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + endpointRowsSql(o.months, o.status, "type = 'patient'") + " AND attribute_name IN (" + sq(o.months) + ", " + sq(o.status) + ")\n" +
     "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
     ")" +

@@ -3,7 +3,7 @@
 // lib/federation.ts, which re-exports these so test/boundary.test.ts sweeps them with the rest:
 // the outer SELECT returns counts, sums and grouping keys — never an identifier — so any
 // participant, aggregate-only included, can answer.
-import { survivalMonthsSql, survivalEventSql } from "./survival-sql.ts";
+import { survivalMonthsSql, survivalEventSql, endpointRowsSql, endpointValueSql } from "./survival-sql.ts";
 import { osCte } from "./survival-queries.ts";
 import { sq } from "./compiler.ts";
 import { ALTERED_COND, driverJoin, inCohortClinical } from "./federation.ts";
@@ -211,6 +211,41 @@ export function incidenceCountsSql(cohortSql: string, study: string, db: string,
   ));
 }
 
+/** the status codes a competing-risks column may hold: 0 censored, 1 the event of interest, 2 a competing event */
+export const COMPETING_CODES = [0, 1, 2] as const;
+
+/**
+ * Cumulative-incidence counts from a recorded time and a competing-risks status, e.g. an uploaded
+ * ICPFS_TIME / ICPFS_EVENTCR: the status's code (the part before any ":", as the survival rule reads
+ * it) is 0 censored, 1 the event of interest, 2 a competing event. The same rows as
+ * incidenceCountsSql, all of kind 'record' with entry 0: the time is already measured from the
+ * patient's own start. A patient enters with both values and a time ≥ 0 (lib/survival-sql.ts); a code
+ * other than 0, 1 or 2 fails the query, since reading it as censored would understate incidence.
+ */
+export function incidenceColumnsCountsSql(cohortSql: string, study: string, db: string, months: string, status: string): AggregateSql {
+  const pid = pidOf("patient_unique_id", study);
+  const refusal = status + " holds a status code other than " + COMPETING_CODES.join(", ") +
+    " (censored, the event, a competing event): an incidence view reads it as a competing-risks status";
+  return aggregateSql((
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "os AS (\n" +
+    "  SELECT " + pid + " AS pid,\n" +
+    "         " + survivalMonthsSql(endpointValueSql(months), endpointValueSql(status)) + " AS months,\n" +
+    "         " + finiteSql("trimBoth(splitByChar(':', ifNull(" + endpointValueSql(status) + ", ''))[1])") + " AS code\n" +
+    "  FROM " + clinicalTable(db, [months, status]) + "\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + endpointRowsSql(months, status, "type = 'patient'") + "\n" +
+    "    AND attribute_name IN (" + sq(months) + ", " + sq(status) + ")\n" +
+    "    AND " + inCohortPatients(pid) + "\n" +
+    "  GROUP BY pid\n" +
+    ")\n" +
+    "SELECT 'record' AS kind, 0 AS entry, round(months, 4) AS t, toInt8(code) AS cause, 0 AS late, count() AS n\n" +
+    "FROM os\n" +
+    "WHERE throwIf(months IS NOT NULL AND ifNull(code, -1) NOT IN (" + COMPETING_CODES.join(", ") + "), " + sq(refusal) + ") = 0\n" +
+    "  AND months IS NOT NULL\n" +
+    "GROUP BY kind, entry, t, cause, late ORDER BY t"
+  ));
+}
+
 /** The tests a lab event type holds, with how many patients and results each has. */
 export function labTestsSql(cohortSql: string, study: string, db: string, eventType: string, testKey: string): AggregateSql {
   return aggregateSql((
@@ -317,11 +352,11 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")", "anyIf(attribute_value, attribute_name=" + sq(status) + ")") + " AS months,\n" +
-    "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status,\n" +
+    "         " + survivalMonthsSql(endpointValueSql(months), endpointValueSql(status)) + " AS months,\n" +
+    "         " + endpointValueSql(status) + " AS status,\n" +
     "         " + splitBucketSql(pid, study) + " AS half\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + endpointRowsSql(months, status, "type='patient'") + "\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
     "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
