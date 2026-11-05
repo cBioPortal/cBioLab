@@ -1063,7 +1063,7 @@ function viewsGrammar(): string {
   return '  "views": [ ' + entries.join("\n").slice(VIEWS_INDENT.length) + (notes.length ? "\n\n" + notes.join("\n\n") : "");
 }
 
-const exampleBlock = (ex: { title: string; note: string; doc: unknown; customData?: CustomDataset[] }, i: number) =>
+export const exampleBlock = (ex: { title: string; note: string; doc: unknown; customData?: CustomDataset[] }, i: number) =>
   `### Example ${i + 1}: ${ex.title}\n\n${ex.note}\n\n` +
   (ex.customData?.length ? "Runs on custom data: " + ex.customData.map((d) => "`" + d.id + "` (" + d.name + ", " + d.rows.length +
     " " + d.level + "s, columns " + d.columns.map((c) => c.name).join(", ") + ")").join("; ") +

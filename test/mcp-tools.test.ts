@@ -18,7 +18,8 @@ const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.j
 const { registerTools } = await import("../mcp/tools.ts");
 const { setChTransport } = await import("../lib/ch.ts");
 const { LINE_TYPE } = await import("../lib/compiler.ts");
-const { renderDslMarkdown } = await import("../lib/dsl-reference.ts");
+const { renderDslMarkdown, AGENT_GRAMMAR, EXAMPLES } = await import("../lib/dsl-reference.ts");
+const { matchesSearch } = await import("../lib/example-features.ts");
 const { decodeUrlJson } = await import("../lib/url-json.ts");
 const { assembleContract } = await import("../lib/oncoprint-assemble.ts");
 const { localInput, parseTsv } = await import("../lib/oncoprint-local.ts");
@@ -107,14 +108,61 @@ describe("the tool list a client sees", () => {
 // ---------- describe_dsl ----------
 
 describe("describe_dsl", () => {
-  test("returns the generated DSL reference, the same one the docs are made from", async () => {
+  test("by default returns the compact agent grammar and the numbered example index, not the full reference", async () => {
     const c = await connect();
     try {
       const r = await c.call("describe_dsl");
       assert.notEqual(r.isError, true);
-      assert.equal(textOf(r), renderDslMarkdown());
-      assert.match(textOf(r), /OncoprintSpec/);
-      assert.match(textOf(r), /federat/i);
+      const t = textOf(r);
+      assert.ok(t.startsWith(AGENT_GRAMMAR), "the grammar the in-app assistant reads comes first");
+      assert.match(t, new RegExp(`Worked examples \\(${EXAMPLES.length}\\):`));
+      assert.match(t, new RegExp("\\n1\\. " + EXAMPLES[0].title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " \\[views: "));
+      assert.match(t, new RegExp(`\\n${EXAMPLES.length}\\. `));
+      assert.match(t, /`example: N`/);
+      assert.ok(t.length < renderDslMarkdown().length / 4, `default is ${t.length} characters`);
+    } finally { await c.close(); }
+  });
+
+  test("`full: true` returns the generated reference the docs are made from", async () => {
+    const c = await connect();
+    try {
+      const t = textOf(await c.call("describe_dsl", { full: true }));
+      assert.equal(t, renderDslMarkdown());
+      assert.match(t, /OncoprintSpec/);
+      assert.match(t, /federat/i);
+    } finally { await c.close(); }
+  });
+
+  test("`example: N` returns that example's document as numbered in docs/dsl.md", async () => {
+    const c = await connect();
+    try {
+      const t = textOf(await c.call("describe_dsl", { example: 4 }));
+      assert.ok(t.startsWith(`### Example 4: ${EXAMPLES[3].title}`));
+      assert.ok(t.includes(JSON.stringify(EXAMPLES[3].doc, null, 2)));
+      assert.ok(renderDslMarkdown().includes(t.slice(0, t.indexOf("```json"))), "the same numbering and text as the reference");
+      assert.match(t, /run_analysis/);
+    } finally { await c.close(); }
+  });
+
+  test("an example number out of range is refused, naming the range", async () => {
+    const c = await connect();
+    try {
+      const r = await c.call("describe_dsl", { example: EXAMPLES.length + 1 });
+      assert.equal(r.isError, true);
+      assert.match(textOf(r), new RegExp(`no example ${EXAMPLES.length + 1}; examples are numbered 1-${EXAMPLES.length}`));
+    } finally { await c.close(); }
+  });
+
+  test("`search` filters the index to the examples whose every word matches, keeping their numbers", async () => {
+    const c = await connect();
+    try {
+      const t = textOf(await c.call("describe_dsl", { search: "lollipop" }));
+      const hits = EXAMPLES.map((e, i) => ({ e, n: i + 1 })).filter(({ e }) => matchesSearch(e, "lollipop"));
+      assert.ok(hits.length > 0 && hits.length < EXAMPLES.length);
+      assert.match(t, new RegExp(`matching "lollipop" \\(${hits.length} of ${EXAMPLES.length}\\)`));
+      for (const { n } of hits) assert.match(t, new RegExp(`\\n${n}\\. `));
+      assert.doesNotMatch(t, /Document shape:/, "a search returns the index alone");
+      assert.match(textOf(await c.call("describe_dsl", { search: "zzzz-no-such-example" })), /\(none —/);
     } finally { await c.close(); }
   });
 });
@@ -248,6 +296,27 @@ describe("describe_study", () => {
       assert.match(t, /CARBOPLATIN\+PEMETREXED, PEMBROLIZUMAB/);
       assert.match(t, /Caveats: .*Prior medications/);
       assert.ok(statements.every((s) => !/\btestdb\b/.test(s) || /test_study/.test(s)), "every statement is scoped to the study");
+    } finally { await c.close(); }
+  });
+
+  test("`study` describes another study the warehouse holds, every statement scoped to it", async () => {
+    routes = [[/FROM testdb\.cancer_study WHERE cancer_study_identifier = 'other_study'/, [{ n: 1 }]]];
+    const c = await connect();
+    try {
+      const r = await c.call("describe_study", { study: "other_study" });
+      assert.notEqual(r.isError, true, textOf(r));
+      assert.match(textOf(r), /Study: other_study/);
+      assert.ok(statements.every((s) => !/\btestdb\b/.test(s) || /other_study/.test(s)), "every statement is scoped to the requested study");
+      assert.ok(statements.every((s) => !/test_study/.test(s)));
+    } finally { await c.close(); }
+  });
+
+  test("a requested study the warehouse does not hold is refused by that name", async () => {
+    const c = await connect();
+    try {
+      const r = await c.call("describe_study", { study: "no_such_study" });
+      assert.equal(r.isError, true, textOf(r));
+      assert.match(textOf(r), /unknown study 'no_such_study'/);
     } finally { await c.close(); }
   });
 
@@ -468,6 +537,17 @@ describe("render_oncoprint", () => {
       assert.deepEqual(specs[0].genes, ["TP53", "KRAS", "EGFR"]);
       assert.equal(specs[0].cohort, null, "no cohort means all patients");
       assert.equal(specs[0].layout, null);
+    } finally { await c.close(); }
+  });
+
+  test("`study` reaches the spec; without it the spec names no study and the engine's default applies", async () => {
+    const { specs, engine } = capture();
+    const c = await connect(engine);
+    try {
+      await c.call("render_oncoprint", { genes: ["TP53"], study: "msk_met_2021" });
+      await c.call("render_oncoprint", { genes: ["TP53"] });
+      assert.equal(specs[0].study, "msk_met_2021");
+      assert.equal("study" in specs[1], false);
     } finally { await c.close(); }
   });
 
