@@ -2005,7 +2005,7 @@
         "maxCohorts": 6,
         "title": "Cumulative incidence",
         "why": null,
-        "whyBareStudy": "this study records no timeline events to estimate the incidence of"
+        "whyBareStudy": "this study records no timeline events to estimate the incidence of, and no upload holds a <X>_TIME with a <X>_EVENTCR status"
       },
       "drawsOwnHead": {
         "error": true,
@@ -2031,7 +2031,7 @@
       },
       "menuBareStudy": {
         "loading": false,
-        "why": "this study records no timeline events to estimate the incidence of"
+        "why": "this study records no timeline events to estimate the incidence of, and no upload holds a <X>_TIME with a <X>_EVENTCR status"
       },
       "need": "local",
       "preview": null,

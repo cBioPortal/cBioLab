@@ -1,5 +1,6 @@
 // Incidence figure: cumulative incidence curves, with death as a competing risk, and the
 // estimates at each horizon set beside what 1 − KM would claim.
+import { attributeLabel } from "../../custom-data-names.ts";
 import {
   palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, legend, label, textWidth,
   seriesStyle, fmtInt, fmtNum, fmtPct, fmtCI, fmtP, pDigits, FS, SW, type SvgOpts
@@ -52,7 +53,7 @@ export function incidenceSvg(v: DrawnResultOf<"incidence">, o: SvgOpts): string 
   const yTitle = "Cumulative incidence";
   const L = 8 + leftAxisWidth(ys, yTitle, yFmt);
   const xs = timeScale(0, tMax, L, W - R);
-  const xTitle = timeTitle("Months", r.anchoredTo || "the study's day 0");
+  const xTitle = r.columns ? "Months (" + attributeLabel(r.columns.months, "short") + ")" : timeTitle("Months", r.anchoredTo || "the study's day 0");
   const y = (f: number) => ys(Math.min(1, Math.max(0, f)) * 100);
   const out: string[] = [];
   out.push(axisLeft(ys, L, p, { title: yTitle, gridTo: W - R, fmt: yFmt }));
@@ -111,7 +112,11 @@ export function incidenceSvg(v: DrawnResultOf<"incidence">, o: SvgOpts): string 
   curves.forEach((c, i) => {
     const st = seriesStyle(i);
     const x = c.excluded;
-    const text = c.cohort + " — n = " + fmtInt(c.n) + ": " + fmtInt(c.events) + " events, " + fmtInt(c.competing) + " died first, " +
+    const text = r.columns
+      ? c.cohort + " — n = " + fmtInt(c.n) + ": " + fmtInt(c.events) + " events, " + fmtInt(c.competing) + " competing first, " +
+        fmtInt(c.censored) + " censored" + (x.noFollowup ? " · " + fmtInt(x.noFollowup) + " without a time and status" : "") +
+        (drawn(c) ? "" : " — not drawn: no patient could be at risk")
+      : c.cohort + " — n = " + fmtInt(c.n) + ": " + fmtInt(c.events) + " events, " + fmtInt(c.competing) + " died first, " +
       fmtInt(c.censored) + " censored · not at risk: " + fmtInt(x.prior) + " already had it" +
       (x.unobserved ? ", " + fmtInt(x.unobserved) + " before observation" : "") +
       (x.noAnchor ? ", " + fmtInt(x.noAnchor) + " no anchor event" : "") + (x.noFollowup ? ", " + fmtInt(x.noFollowup) + " no follow-up" : "") +

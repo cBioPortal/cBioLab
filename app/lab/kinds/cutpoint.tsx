@@ -1,5 +1,6 @@
 "use client";
 // The cutpoint view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
+import { endpointText } from "../outcome-pairs.ts";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
 import { EntityField, searchEntities } from "../entity-field.tsx";
@@ -64,7 +65,7 @@ export const cutpointUi: KindUi<"cutpoint"> = {
     const num = known.attrs.find((a) => a.attribute === "TMB_NONSYNONYMOUS") || known.attrs.find((a) => a.kind === "num");
     return { kind: "cutpoint", attribute: num ? num.attribute : "TMB_NONSYNONYMOUS" };
   },
-  sub: (spec) => (spec.assay ? spec.assay.entity : spec.attribute || "TMB_NONSYNONYMOUS") + " on " + (spec.endpoint || "OS") + " · best log-rank cut, " + (spec.permutations ?? 1000) + " permutations" +
+  sub: (spec) => (spec.assay ? spec.assay.entity : spec.attribute || "TMB_NONSYNONYMOUS") + " on " + endpointText(spec) + " · best log-rank cut, " + (spec.permutations ?? 1000) + " permutations" +
     (spec.stratifyBy ? " · per " + spec.stratifyBy : ""),
   Controls,
 };

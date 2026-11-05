@@ -2,6 +2,7 @@
 // The survival view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
 import type { CardProps } from "../view-cards.tsx";
 import { Choice } from "../../_ui/choice.tsx";
+import { EndpointChoice } from "../outcome-choice.tsx";
 import { Input } from "../../_ui/input";
 import type { KindUi } from "./kind-ui.ts";
 import { ViewFigure } from "../figure.tsx";
@@ -10,15 +11,15 @@ import { Waiting } from "../../_oncoprint/OncoprintCard.tsx";
 import { placement } from "./parts.tsx";
 
 function SurvivalCard({ ctx, v, vi }: CardProps) {
-  const { busy, cat, catLoading, cohortChoice, doc, docView, menuOpenRef, patchView } = ctx;
+  const { busy, cat, catLoading, catalogAttrs, cohortChoice, doc, docView, menuOpenRef, patchView } = ctx;
   return <>
-    {v.kind === "survival" && v.curves && <>
-      <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} {...placement(ctx, vi)}
+    {v.kind === "survival" && (v.curves || v.error) && <>
+      {v.curves && <ViewHead menuStore={menuOpenRef.current} v={v} title="Survival" cohorts={cohortChoice(vi, docView(vi))} {...placement(ctx, vi)}
         sub={<>Kaplan–Meier, {v.endpoint && v.endpoint !== "OS" ? v.endpoint : "overall survival"}{v.anchoredTo && <> — from {v.anchoredTo}</>}</>}
         chips={v.truncated ? <span className="trunc" data-tip={
           "Delayed entry is applied: a patient joins the risk set when the study could first observe them, not at the anchor." +
           (v.entryMonths ? "\n\nMedian " + v.entryMonths.median + " months from anchor to entry; 90th percentile "
-            + v.entryMonths.p90 + "; longest " + v.entryMonths.max + "." : "")}>left-truncated</span> : null} />
+            + v.entryMonths.p90 + "; longest " + v.entryMonths.max + "." : "")}>left-truncated</span> : null} />}
       {(() => {
         // The basis of a survival analysis — which endpoint, and what
         // the clock starts from — is the thing people most want to
@@ -33,8 +34,8 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
         return (
           <div className="basis">
             <span className="meta">endpoint</span>
-            <Choice size="ctl" value={sv.endpoint || "OS"} disabled={busy} onChange={v => patchView(vi, { endpoint: v })}
-              options={(eps.length ? eps : [sv.endpoint || "OS"]).map(x => [x, x] as const)} pending={!cat ? "loading…" : undefined} />
+            <EndpointChoice spec={sv} endpoints={eps} attrs={catalogAttrs()} busy={busy} pending={!cat ? "loading…" : undefined}
+              onPatch={(p) => patchView(vi, p)} />
             {catLoading && !cat && <Waiting what="endpoints" />}
             <span className="meta">measured from</span>
             <Choice size="ctl" value={a ? a.eventType : ""} disabled={busy}
@@ -71,7 +72,7 @@ function SurvivalCard({ ctx, v, vi }: CardProps) {
           </div>
         );
       })()}
-      <ViewFigure v={v} error={v.error} />
+      {v.curves && <ViewFigure v={v} error={v.error} />}
     </>}
   </>;
 }

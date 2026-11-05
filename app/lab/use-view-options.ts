@@ -4,6 +4,7 @@
 // attributes, events and molecular profiles a picker lists, which view kinds can be added
 // (VIEW_KINDS, each with why it cannot when it cannot, and whether that is still being
 // fetched), and which kinds draw their own header. Read-only: it edits nothing.
+import { uploadedOutcomePairs, SURVIVAL_STATUS } from "./outcome-pairs.ts";
 import { KIND_UI, kindUi, type AnyKindUi } from "./kinds/index.ts";
 import type { Known, MenuPage, ViewCategory } from "./kinds/kind-ui.ts";
 import type { AnalysisDoc, AnalysisResult } from "../../lib/types.ts";
@@ -129,7 +130,8 @@ export function useViewOptions(page: ViewOptionsPage) {
       Array.isArray(c?.studies) && c.studies.length ? c.studies : [c?.study || doc.study]));
     if (studies.size !== 1 || !cat || cat.study !== [...studies][0]) return null;
     if (!Array.isArray(cat.survivalEndpoints) || cat.survivalEndpoints.length) return null;
-    return cat.study + " has no survival data (no <X>_MONTHS/<X>_STATUS pair), so there is no endpoint to fit";
+    if (uploadedOutcomePairs(catalogAttrs(), SURVIVAL_STATUS).length) return null;
+    return cat.study + " has no survival data (no <X>_MONTHS/<X>_STATUS pair, and no upload with a <X>_TIME and <X>_EVENT), so there is no endpoint to fit";
   };
   /** what the page knows about the study, for an add button's `why` */
   const known = (): Known => ({ genes: [], attrs: catalogAttrs(), profiles: profileOptions(), assays: assayOptions(), events: viewEvents(), cohorts: Object.keys(doc.cohorts || {}) });
