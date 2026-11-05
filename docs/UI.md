@@ -18,6 +18,12 @@ still holds, against a running server.
   re-run key). Code the browser draws with must not import server modules — `node:async_hooks`
   in a client bundle fails the whole page — which is why what the plot figure needs from
   `lib/plot.ts` lives in `lib/plot-draw.ts`.
+- **Light and dark come from one set of colour tokens.** Each colour in `:root` (`app/globals.css`)
+  is `light-dark(<light>, <dark>)`, resolved by `color-scheme`: the system's, unless the reader has
+  chosen with the header's switch (`app/_ui/theme-toggle.tsx`), which sets `data-theme` on `<html>`
+  and keeps the choice in this browser only. A new colour is a token written that way, never a
+  `@media (prefers-color-scheme: dark)` block, which the switch cannot reach; Tailwind's `dark:`
+  variant follows the same choice.
 - **One scale, in `app/globals.css`.** Seven type steps (`--t-xs` … `--t-2xl`), seven spacing
   steps (`--s0` … `--s6`), four radii, one control height (`--ctl-h`). Nothing declares a font
   size or a border radius outside it — the app once had 36 distinct font sizes, five of them

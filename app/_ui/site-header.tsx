@@ -1,6 +1,7 @@
 "use client";
 // THE app's header, the same on every page: the name (home), which page this is, the same links in
-// the same order, a page's own tools (its assistant menu), "Saved work", "Clear cache" and the sign-in. "Saved work"
+// the same order, a page's own tools (its assistant menu), "Saved work", "Clear cache", the light/dark
+// switch and the sign-in. "Saved work"
 // opens the saved-work manager over the page (app/_saved); its link is the same manager as a page.
 import { useState } from "react";
 import { Bookmark, Loader2, RotateCcw } from "lucide-react";
@@ -10,6 +11,7 @@ import { TB } from "./toolbar.ts";
 import { cn } from "../../lib/cn";
 import { useOpenSavedFromUrl, useSaved } from "../_saved/saved-context.tsx";
 import { usePublicEnv } from "../_env/public-env-context.tsx";
+import { ThemeToggle } from "./theme-toggle.tsx";
 
 const LINKS = [
   ["studies", "/", "studies"],
@@ -77,6 +79,7 @@ export function SiteHeader({ page, current, onLink, children }: {
           onClick={(e) => { if (plainClick(e) && current !== "saved") { e.preventDefault(); saved.open("cohorts"); } }}><Bookmark />Saved work</a>
       </Button>
       <ClearCacheButton />
+      <ThemeToggle />
       <LoginButton />
     </header>
   );
