@@ -52,7 +52,7 @@ function Controls({ c }: { c: KindCardCtx }) {
           </OptionSelect>
         </label>
         <label className="tbfield" data-tip="count every alteration, or only OncoKB drivers">
-          count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : undefined })}>
+          count <OptionSelect value={spec.measure === "driver" ? "driver" : "any"} disabled={busy} onValueChange={(v) => patch({ measure: v === "driver" ? "driver" : "any" })}>
             <option value="any">any</option><option value="driver">drivers</option>
           </OptionSelect>
         </label>

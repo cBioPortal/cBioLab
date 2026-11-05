@@ -18,6 +18,8 @@ export interface StudyBasics {
   names: Record<string, string>;
   /** the genomic data types every queried study holds, and those only some do */
   held: { every: ProfileType[]; some: ProfileType[] };
+  /** the queried studies with no OncoKB driver calls on this deployment (none: every study has them) */
+  noDrivers: string[];
 }
 
 export interface StudyKnown extends StudyBasics {
@@ -49,7 +51,7 @@ export function useQueryKnown(studies: string[], filters: Clause[] = []): { basi
     const scope = studies.length === 1 ? { study: studies[0] } : { studies };
     const fail = (e: string) => { if (live) setError(e); };
     const listed = api.studies().then((r) => r.json()).catch(() => ({ studies: [] })).then((st): StudyBasics | null => {
-      const catalog = (st.studies || []) as { id: string; name: string; caps?: Record<string, boolean> }[];
+      const catalog = (st.studies || []) as { id: string; name: string; caps?: Record<string, boolean>; oncokb?: boolean }[];
       const rows = studies.map((id) => catalog.find((x) => x.id === id));
       const missing = studies.filter((_, i) => !rows[i]);
       if (missing.length) { fail("no study named " + missing.join(", ") + " on this deployment"); return null; }
@@ -61,6 +63,7 @@ export function useQueryKnown(studies: string[], filters: Clause[] = []): { basi
           every: CAPS.filter(([, c]) => holding(c) === studies.length).map(([t]) => t),
           some: CAPS.filter(([, c]) => holding(c) > 0 && holding(c) < studies.length).map(([t]) => t),
         },
+        noDrivers: rows.filter((r) => !r!.oncokb).map((r) => r!.id),
       };
       if (live) setBasics(b);
       return b;

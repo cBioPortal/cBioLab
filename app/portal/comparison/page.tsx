@@ -4,7 +4,9 @@
 // any the link carries unless they are this page's own (a link made on this page). A setting
 // changed here travels as ?changes= beside the cohorts (page-doc.ts). As on the portal, a group can
 // be taken out of every tab and put back (?off=), and the groups compared with or without the
-// samples they share (?overlap=exclude, lib/partition-arms.ts's exclusiveCohorts).
+// samples they share (?overlap=exclude, lib/partition-arms.ts's exclusiveCohorts). The Genomic
+// Alterations tab counts every alteration, or only OncoKB drivers (?drivers=1), a setting of the
+// page's own that each of its views carries as `measure`.
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { AnalysisDoc, View } from "../../../lib/types";
@@ -20,20 +22,21 @@ import { fmtInt } from "../../../lib/chart/format.ts";
 const CLINICAL_SHOWN = 8;
 
 /** the page's tabs; before the study's profiles and attributes are known (`known` null), those that need neither */
-function comparisonLayout(linked: AnalysisDoc, study: string, known: StudyKnown | null): PageLayout {
+function comparisonLayout(linked: AnalysisDoc, study: string, known: StudyKnown | null, drivers: boolean): PageLayout {
   const names = Object.keys(linked.cohorts || {});
   const expr = known && expressionProfile(known.profileCatalog);
   const assays = known ? assayComparisonProfiles(known.profileCatalog) : [];
   const clinical = known?.clinical || [];
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
+  const measure = drivers ? "driver" : "any";
   const left = !known ? [] : [!clinical.length && "Clinical (no attributes)", !(expr && names.length === 2) && "mRNA (" + (expr ? "compares exactly two cohorts" : "no mRNA profile") + ")",
     !assays.length && "Generic Assays (no generic-assay profile)"].filter(Boolean) as string[];
   return arrange({ study, cohorts: linked.cohorts }, [
     { title: "Overlap", views: [v("Overlap", { kind: "overlap" })] },
     { title: "Survival", views: [v("Survival", { kind: "survival" })] },
     ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", attributes: clinical.slice(0, CLINICAL_SHOWN) })] }] : []),
-    { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation" }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna" }),
-      v("Structural variants", { kind: "enrichment", alteration: "sv" })] },
+    { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", measure }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna", measure }),
+      v("Structural variants", { kind: "enrichment", alteration: "sv", measure })] },
     ...(expr && names.length === 2 ? [{ title: "mRNA", views: [v("mRNA", { kind: "diffexpr", profileType: expr })] }] : []),
     ...assays.map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile })] })),
     { title: "Clinical Data", views: [v("Clinical data", { kind: "table" })] }
@@ -50,6 +53,10 @@ export default function ComparisonPage() {
   const [off, setOff] = useState<string[]>(() => (decodeParam<string[]>(q.get("off")) || names.slice(COMPARISON_MAX_ACTIVE)).filter((n) => names.includes(n)));
   const sizeOk = names.length >= 2 && names.length <= COMPARISON_MAX_GROUPS && names.length - off.length <= COMPARISON_MAX_ACTIVE;
   const [exclude, setExclude] = useState(() => q.get("overlap") === "exclude");
+  const [driversAsked, setDriversAsked] = useState(() => q.get("drivers") === "1");
+  // drivers only where every compared study has OncoKB calls here; otherwise said so, never applied
+  const noDrivers = basics?.noDrivers || [];
+  const drivers = driversAsked && !noDrivers.length;
   // the groups every tab compares: those not taken out, without their shared samples when asked
   const compared = useMemo(() => {
     const on = Object.fromEntries(Object.entries(linked?.cohorts || {}).filter(([n]) => !off.includes(n)));
@@ -57,8 +64,8 @@ export default function ComparisonPage() {
     try { return { cohorts: exclusiveCohorts(on), refused: null }; }
     catch (e) { return { cohorts: on, refused: (e as Error).message }; }
   }, [linked, off, exclude]);
-  const fresh = useMemo(() => linked && basics && sizeOk ? comparisonLayout({ ...linked, cohorts: compared.cohorts }, study, known) : null,
-    [linked, compared, basics, known, study, sizeOk]);
+  const fresh = useMemo(() => linked && basics && sizeOk ? comparisonLayout({ ...linked, cohorts: compared.cohorts }, study, known, drivers) : null,
+    [linked, compared, basics, known, study, sizeOk, drivers]);
   const input = useMemo(() => linked && { dsl: linked.dsl, study: linked.study, cohorts: linked.cohorts }, [linked]);
   const page = usePageDoc(fresh, input);
   // sizes as the tabs report them, for the groups as they are compared now
@@ -72,6 +79,7 @@ export default function ComparisonPage() {
     syncUrl({ off: next.length === usual.length && next.every((x) => usual.includes(x)) ? null : encodeParam(next) });
   };
   const overlap = (v: string) => { setExclude(v === "exclude"); syncUrl({ overlap: v === "exclude" ? "exclude" : null }); };
+  const alterations = (v: string) => { setDriversAsked(v === "drivers"); syncUrl({ drivers: v === "drivers" ? "1" : null }); };
   const shell = (body: React.ReactNode) => <><SiteHeader page="group comparison" /><main className="analysis-main">{body}</main></>;
   if (!linked || !study) return shell(<p className="note">This page compares the cohorts of an analysis document passed as <code>?doc=</code> (the lab&apos;s own link encoding); none was given.</p>);
   if (!sizeOk) return shell(<p className="note">a comparison page holds 2 to {COMPARISON_MAX_GROUPS} cohorts and compares at most {COMPARISON_MAX_ACTIVE} at once; this link has {names.length}{off.length ? ", " + (names.length - off.length) + " of them compared" : ""}</p>);
@@ -81,10 +89,16 @@ export default function ComparisonPage() {
     <PortalSummary eyebrow="Group comparison" title={basics ? basics.name : study} study={study}
       detail={known && <span className="tabular-nums">{fmtInt(known.samples)} samples · {fmtInt(known.patients)} patients</span>}
       groups={names} counts={counts} left={fresh?.left || []} off={off} onToggleGroup={toggle} maxOn={COMPARISON_MAX_ACTIVE}
-      action={<Choice value={exclude ? "exclude" : "include"} onChange={overlap} title="samples in more than one group" className="overlapchoice"
-        options={[["include", "Overlapping samples: include"], ["exclude", "Overlapping samples: exclude"]]} />} />
+      action={<span className="flex flex-wrap items-center gap-2">
+        <Choice value={drivers ? "drivers" : "all"} onChange={alterations} disabled={!basics || noDrivers.length > 0} className="driverchoice"
+          title={noDrivers.length ? "drivers only needs OncoKB driver calls, which " + noDrivers.join(", ") + " does not have on this deployment" : "count every alteration, or only those OncoKB calls drivers, in the Genomic Alterations tab"}
+          options={[["all", "Alterations: all"], ["drivers", "Alterations: OncoKB drivers only"]]} />
+        <Choice value={exclude ? "exclude" : "include"} onChange={overlap} title="samples in more than one group" className="overlapchoice"
+          options={[["include", "Overlapping samples: include"], ["exclude", "Overlapping samples: exclude"]]} />
+      </span>} />
     {page.note && <p className="note">{page.note}</p>}
     {compared.refused && <p className="note">Overlapping samples are still included: {compared.refused}.</p>}
+    {driversAsked && noDrivers.length > 0 && <p className="note">This link asks for OncoKB drivers only, but {noDrivers.join(", ")} has no OncoKB driver calls on this deployment, so every alteration is counted.</p>}
     {!ready
       ? <PortalLoading />
       : <PortalTabs doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
