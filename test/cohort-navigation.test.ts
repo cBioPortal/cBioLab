@@ -2,7 +2,7 @@
 // carries, and the document that lists the cohort's patients.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { listDoc, navigationParams, patientHref, readNavigation, NAV_COHORT } from "../app/portal/cohort-navigation.ts";
+import { listDoc, navigationParams, patientHref, readNavigation, sampleHref, NAV_COHORT } from "../app/portal/cohort-navigation.ts";
 import type { CohortDef } from "../lib/types.ts";
 
 const def: CohortDef = { studies: ["a", "b"], all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }] } as CohortDef;
@@ -21,6 +21,11 @@ describe("a Patient page's cohort navigation", () => {
     assert.deepEqual(Object.keys(navigationParams({ def, order: {} })), ["cohort"]);
     assert.deepEqual(Object.keys(navigationParams({ def, order: { columns: ["patient"], filters: {} } })), ["cohort"]);
     assert.deepEqual(navigationParams(null), {});
+  });
+  test("a sample's link (the mutation table's sample ids) opens its sample view, with no cohort to step through", () => {
+    const q = new URL("http://h" + sampleHref("coadread_tcga_pub", "TCGA-AA-3867-01")).searchParams;
+    assert.deepEqual([...q.entries()], [["study", "coadread_tcga_pub"], ["sample", "TCGA-AA-3867-01"]]);
+    assert.deepEqual(readNavigation(q), { nav: null, error: null });
   });
   test("a link without a cohort is not a navigation; one whose cohort does not decode says so", () => {
     assert.deepEqual(readNavigation(new URLSearchParams("study=a&patient=P")), { nav: null, error: null });

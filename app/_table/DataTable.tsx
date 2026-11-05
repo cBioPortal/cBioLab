@@ -329,8 +329,8 @@ export interface DataTableProps<V> {
   unit: string;
   /** the view's search, filters, sort and columns changed: write them to its spec (re-runs the view) */
   onQuery: (q: TableQuery) => void;
-  /** a cell drawn other than as its text (a badge, a link) */
-  cell?: (column: string, value: V) => React.ReactNode;
+  /** a cell drawn other than as its text (a badge, a link); the row says whose it is (study, sample) */
+  cell?: (column: string, value: V, row: TableRows<V>["rows"][number]) => React.ReactNode;
   /** how a number shows (default: grouped) */
   num?: (column: string, value: number) => string;
   title?: React.ReactNode;
@@ -386,8 +386,8 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   const filters = Object.entries(q.filters || {});
   const filtered = t.total < t.all || filters.length > 0 || !!(q.search || "").trim();
   const waiting = updating ? "updating…" : p.loading ? "loading page " + (p.page + 1).toLocaleString() + "…" : null;
-  const show = (c: { id: string; numeric: boolean }, x: V) => {
-    if (cell) { const r = cell(c.id, x); if (r !== undefined) return r; }
+  const show = (c: { id: string; numeric: boolean }, x: V, row: TableRows<V>["rows"][number]) => {
+    if (cell) { const r = cell(c.id, x, row); if (r !== undefined) return r; }
     if (x == null || x === "") return "";
     return typeof x === "number" ? (num ? num(c.id, x) : x.toLocaleString()) : String(x);
   };
@@ -476,7 +476,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                   {multi && <td className="meta">{r.cohort}</td>}
                   {multi && <td className="meta">{r.study}</td>}
                   {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>
-                    {g?.cont && t.columns[i].id === groupBy ? null : show(t.columns[i], r.values[i])}</td>)}
+                    {g?.cont && t.columns[i].id === groupBy ? null : show(t.columns[i], r.values[i], r)}</td>)}
                 </tr>);
               })}
               {!p.rows.length && !waiting && <tr><td className="meta" colSpan={shownIdx.length + (multi ? 2 : 0)}>{filtered ? "no rows match — loosen the search or a filter" : "no rows"}</td></tr>}

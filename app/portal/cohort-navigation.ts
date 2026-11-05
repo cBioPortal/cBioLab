@@ -33,6 +33,11 @@ export function patientHref(to: PatientKey, nav: CohortNavigation | null, tab?: 
   return "/portal/patient?" + new URLSearchParams({ study: to.study, patient: to.id, ...(tab ? { tab } : {}), ...navigationParams(nav) }).toString();
 }
 
+/** A sample's own page (the Patient page's sample view), as the portal's tables link a sample id: no cohort to step through. */
+export function sampleHref(study: string, sample: string): string {
+  return "/portal/patient?" + new URLSearchParams({ study, sample }).toString();
+}
+
 const studyOf = (def: CohortDef): string => def.study || def.studies?.[0] || "";
 
 /** The one-view document that lists the cohort's patients in the navigation's order. */
