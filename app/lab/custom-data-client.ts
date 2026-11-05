@@ -301,7 +301,7 @@ export function parseUpload(text: string): ParsedUpload {
     delimitersToGuess: ["\t", ",", ";", "|"], comments: "#", skipEmptyLines: "greedy"
   });
   const bad = parsed.errors.find((e) => e.type === "Quotes");
-  if (bad) throw new Error("row " + (bad.row + 1) + ": " + bad.message.toLowerCase() + " (a value holding a separator or line break must be wrapped in double quotes, with any quote inside it doubled)");
+  if (bad) throw new Error((bad.row === undefined ? "" : "row " + (bad.row + 1) + ": ") + bad.message.toLowerCase() + " (a value holding a separator or line break must be wrapped in double quotes, with any quote inside it doubled)");
   const records = parsed.data.map((r) => r.map((c) => c.trim())).filter((r) => r.some((c) => c !== ""));
   if (records.length < 2) throw new Error("paste a header row and at least one row of data");
   const header = records[0];
