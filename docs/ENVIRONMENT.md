@@ -91,7 +91,9 @@ export PORT=<port> LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alte
 These go in the serve script, **not** `.env.local`: `scripts/gate.sh` builds and serves from the
 same folder on its own port, reading `.env.local`, and a `PORT`/`LOOPBACK_PEER` there would send
 its loopback calls to the dev server. The gate runs its own federation stage
-(`scripts/e2e-federation.cjs`) with the simulated peer whenever `CLICKHOUSE2_*` is set.
+(`scripts/e2e-federation.cjs`) with the simulated peer, against a second database of its own: the
+committed fixture study, which it starts with `scripts/peer-db.ts` and whose `CLICKHOUSE2_*` override
+`.env.local`'s for the gate's run ([`TESTING.md`](TESTING.md)).
 
 ### A separate peer
 

@@ -43,7 +43,9 @@ resources. Files of those kinds are listed as not imported.
 ## How it works
 
 Everything lives in `~/.cbiolab` (`CBIOLAB_DATA` overrides): the ClickHouse binary and its data,
-the app's own Postgres (PGlite), downloaded datahub studies, uploads. ClickHouse listens on
+the app's own Postgres (PGlite), downloaded datahub studies, uploads. (`npm run peer-db`, the tests'
+second database, shares the binary and cBioPortal's reference files with it and keeps its own data
+apart: [`TESTING.md`](TESTING.md).) ClickHouse listens on
 127.0.0.1 only, with a generated password (`~/.cbiolab/clickhouse/password`).
 
 The database is **cBioPortal's own ClickHouse schema**, created from `schema.sql` and the seed

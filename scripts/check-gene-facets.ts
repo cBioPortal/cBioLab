@@ -8,16 +8,20 @@
  * while being built:
  *
  *   - "Mutated" was counted over all altered patients and clamped to the
- *     profiled total. 7 EGFR-mutant patients in genie_public are on no panel
+ *     profiled total. 7 EGFR-mutant patients in genie_public were on no panel
  *     covering EGFR, so they landed in both the mutated and the not-profiled
  *     slice. The states still summed to the cohort, and were still wrong.
  *   - "Diploid" was computed as profiled minus amplified minus deleted. One
- *     patient is amplified in one sample and deleted in another, so subtracting
+ *     patient was amplified in one sample and deleted in another, so subtracting
  *     both removed them twice: the facet said 152,241 where the click selected
  *     152,242.
  *
  * Neither is visible in the output's shape. Only comparing the two paths finds
- * them, which is what this does.
+ * them, which is what this does. Connection b's case is the committed fixture
+ * study (test/fixtures/peer-study, served by scripts/peer-db.ts), built to hold
+ * both shapes: FX-P33, FX-P35 and FX-P37 are EGFR-mutant on PEERFIX_NO_EGFR, a
+ * panel without EGFR, and FX-P02 is FAT1-amplified in one sample and FAT1-deleted
+ * in the other.
  *
  * Run: node --env-file=.env.local scripts/check-gene-facets.ts
  */
@@ -33,7 +37,7 @@ import { studyProfiles } from "../lib/analysis.ts";
  * 400 on every drafted request. An undrafted-only check passed it.
  */
 const CASES = [
-  { conn: "b", study: "genie_public", genes: ["EGFR", "TP53", "FAT1"] },
+  { conn: "b", study: "cbiolab_peer_fixture", genes: ["EGFR", "TP53", "FAT1"] },
   { conn: "a", study: "nsclc_ctdx_msk_2022", genes: ["EGFR", "KRAS"] }
 ] as const;
 /** applied as the second pass over every case */

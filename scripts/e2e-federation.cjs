@@ -4,15 +4,18 @@
 // are not shared under these rules), every other view keeps the peer aggregate-only, and nothing
 // patient-level answers an outside caller of the federation API.
 //
-// Run by scripts/gate.sh when a second database is configured; on its own against a server started
-// with the simulated peer on:
+// The peer's study is the committed fixture (test/fixtures/peer-study), which scripts/gate.sh serves
+// as the second database (scripts/peer-db.ts): its KRAS-mutant patients join msk_chord_2024's in the
+// cohort, FX-P10 (mid-list, a dozen mutations with allele counts, timeline events) is the patient
+// opened, and test/fixtures/peer-oncokb.tsv annotates its variants. On its own, against a server
+// started with the simulated peer on and CLICKHOUSE2_* from `npm run peer-db`:
 //   PORT=3110 LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations+oncoprint' \
 //     FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations+oncoprint' npx next start -p 3110
 //   E2E_PORT=3110 node scripts/e2e-federation.cjs
 const { launch } = require("../e2e-browser.cjs");
 
 const BASE = "http://127.0.0.1:" + (process.env.E2E_PORT || 3100);
-const LOCAL = "msk_chord_2024", PEER = "nsclc_public_genie_bpc", PEER_PATIENT = "GENIE-DFCI-109626";
+const LOCAL = "msk_chord_2024", PEER = "cbiolab_peer_fixture", PEER_PATIENT = "FX-P10";
 const COHORTS = { "KRAS mut": { studies: [LOCAL, PEER], all: [{ kind: "oql", q: "KRAS: MUT" }] }, "peer's patients": { study: PEER, all: [] }, "peer first": { studies: [PEER, LOCAL], all: [] } };
 const doc = (views) => ({ dsl: "2.5", study: LOCAL, cohorts: COHORTS, views });
 
@@ -50,7 +53,7 @@ async function main() {
       { kind: "timeline", rows: 5, cohorts: ["KRAS mut"], filters: { source: { op: "contains", value: "simulated peer" } }, sort: { column: "events", desc: true } },
       { kind: "alterations", rows: 5, cohorts: ["KRAS mut"], filters: { patient: { op: "equals", value: PEER_PATIENT } } },
       altSpec,
-      { kind: "alterations", rows: 5, cohorts: ["KRAS mut"], patient: { study: PEER, id: "GENIE-NOT-A-PATIENT" } },
+      { kind: "alterations", rows: 5, cohorts: ["KRAS mut"], patient: { study: PEER, id: "FX-NOT-A-PATIENT" } },
       { kind: "table", rows: 5, cohorts: ["KRAS mut"] },
       { kind: "compare", cohorts: ["KRAS mut"], genes: ["TP53"] },
     ]));

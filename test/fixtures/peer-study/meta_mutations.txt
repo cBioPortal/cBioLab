@@ -1,0 +1,8 @@
+cancer_study_identifier: cbiolab_peer_fixture
+genetic_alteration_type: MUTATION_EXTENDED
+datatype: MAF
+stable_id: mutations
+show_profile_in_analysis_tab: true
+profile_name: Mutations
+profile_description: Mutation data (synthetic).
+data_filename: data_mutations.txt
