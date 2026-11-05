@@ -15,6 +15,7 @@
 //                           none stays on the shared result cache. A name the document pins
 //                           (`uploads`, see bindUploads) resolves to that version; a body that
 //                           carries a spec rather than the document is given the pins with it.
+import Papa from "papaparse";
 import type { Sharing } from "../../lib/access.ts";
 import { CUSTOM_PREFIX, CUSTOM_REF_RE, LIMITS, type CustomColumn, type CustomDataset, type CustomLevel } from "../../lib/custom-data-names.ts";
 import type { DatasetMeta } from "../../lib/custom-store.ts";
@@ -290,17 +291,21 @@ const NUMBER_RE = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
 
 /**
- * A pasted or uploaded table: a header row, then one row per case. Tab-separated, or
- * comma-separated when the header has no tab. The id column is the first one named like
- * PATIENT_ID / SAMPLE_ID (else the first column), and its name decides the level.
+ * A pasted or uploaded table: a header row, then one row per case. Tab-, comma-, semicolon- or
+ * pipe-separated (whichever splits the rows consistently), quoted per RFC 4180; lines starting
+ * with # are comments. The id column is the first one named like PATIENT_ID / SAMPLE_ID (else the
+ * first column), and its name decides the level.
  */
 export function parseUpload(text: string): ParsedUpload {
-  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim() && !l.startsWith("#"));
-  if (lines.length < 2) throw new Error("paste a header row and at least one row of data");
-  const sep = lines[0].includes("\t") ? "\t" : ",";
-  const split = (l: string) => l.split(sep).map((c) => c.trim().replace(/^"(.*)"$/, "$1"));
-  const header = split(lines[0]);
-  if (header.length < 2) throw new Error("the header needs an id column and at least one value column (tab- or comma-separated)");
+  const parsed = Papa.parse<string[]>(text.replace(/^\uFEFF/, ""), {
+    delimitersToGuess: ["\t", ",", ";", "|"], comments: "#", skipEmptyLines: "greedy"
+  });
+  const bad = parsed.errors.find((e) => e.type === "Quotes");
+  if (bad) throw new Error((bad.row === undefined ? "" : "row " + (bad.row + 1) + ": ") + bad.message.toLowerCase() + " (a value holding a separator or line break must be wrapped in double quotes, with any quote inside it doubled)");
+  const records = parsed.data.map((r) => r.map((c) => c.trim())).filter((r) => r.some((c) => c !== ""));
+  if (records.length < 2) throw new Error("paste a header row and at least one row of data");
+  const header = records[0];
+  if (header.length < 2) throw new Error("the header needs an id column and at least one value column (tab-, comma-, semicolon- or pipe-separated)");
   let idIdx = header.findIndex((h) => /^(patient|sample|case)([ _]?id)?$/i.test(h));
   if (idIdx < 0) idIdx = 0;
   const level: CustomLevel = /sample/i.test(header[idIdx]) ? "sample" : "patient";
@@ -316,7 +321,11 @@ export function parseUpload(text: string): ParsedUpload {
     if (n !== header[i]) warnings.push("column “" + header[i] + "” is named " + n);
     return n;
   });
-  const rows = lines.slice(1).map((l) => { const c = split(l); return [c[idIdx] ?? "", ...valueIdx.map((i) => c[i] ?? "")]; });
+  const rows = records.slice(1).map((c, k) => {
+    if (c.slice(header.length).some((v) => v !== ""))
+      throw new Error("data row " + (k + 1) + " has " + c.length + " fields but the header has " + header.length + ": is a value holding a separator missing its quotes?");
+    return [c[idIdx] ?? "", ...valueIdx.map((i) => c[i] ?? "")];
+  });
   const columns = valueIdx.map((_, k) => {
     const vals = rows.map((r) => r[k + 1]).filter((v) => v !== "" && !/^(NA|N\/A|NAN|NULL)$/i.test(v));
     const numeric = vals.length > 0 && vals.every((v) => NUMBER_RE.test(v));

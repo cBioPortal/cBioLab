@@ -208,7 +208,7 @@ export function AddCustomData({ studies, onAdded }: { studies: string[]; onAdded
             </div>}
         <details className="cd-format">
           <summary>File format</summary>
-          A header row, then one row per case, tab- or comma-separated. The first column is the case id: name it{" "}
+          A header row, then one row per case, tab-, comma- or semicolon-separated. A value holding the separator or a line break is wrapped in double quotes, as spreadsheet exports do. The first column is the case id: name it{" "}
           <code>PATIENT_ID</code> or <code>SAMPLE_ID</code>{studies.length > 1 && <>; prefix one as <code>study:id</code> to pin it to one of the studies</>}.
           Every other column becomes an attribute. Rows whose id matches no {studies.length === 1 ? "patient or sample of the study" : "patient or sample of these studies"} are dropped, and the check below says which.
         </details>
