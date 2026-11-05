@@ -10,8 +10,16 @@ import type { IncidenceCurve } from "../../types.ts";
 export interface IncidenceView {
   note?: string;
   kind: "incidence"; cohorts?: string[];
-  /** the event of interest: its first occurrence after the anchor */
-  event: { eventType: string; attrs?: { key: string; value: string }[]; label?: string };
+  /** the event of interest: its first occurrence after the anchor. Or, instead, monthsAttribute/statusAttribute. */
+  event?: { eventType: string; attrs?: { key: string; value: string }[]; label?: string };
+  /**
+   * Instead of a timeline event, a recorded time and competing-risks status (e.g. an upload's
+   * ICPFS_TIME / ICPFS_EVENTCR): status 0 censored, 1 the event, 2 a competing event. Both together,
+   * never with `event` or `anchor`.
+   */
+  monthsAttribute?: string; statusAttribute?: string;
+  /** the event's name in the figure and text when it comes from monthsAttribute/statusAttribute */
+  label?: string;
   /** the clock's start (default: the study's day 0), as in the survival view */
   anchor?: { eventType: string; key?: string; value?: string; occurrence?: "FIRST" | "LAST" };
   /** months at which incidence is read off and compared (default [12, 24, 60]) */
@@ -19,6 +27,8 @@ export interface IncidenceView {
 }
 export interface IncidenceResult {
   eventLabel: string; anchoredTo?: string;
+  /** the time and status columns, when the outcome was read from them rather than the timeline */
+  columns?: { months: string; status: string };
   curves: IncidenceCurve[];
   horizons: { months: number; cells: { cohort: string; f1: number; lo: number; hi: number; naive: number; atRisk: number }[] }[];
   gray?: import("../../stats.ts").GrayTest;

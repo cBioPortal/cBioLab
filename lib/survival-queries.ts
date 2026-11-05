@@ -9,7 +9,7 @@ import { clinicalTable, clinicalMetaTable } from "./custom-data.ts";
 import { inCohortPatients } from "./cohort2.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
-import { survivalMonthsSql, survivalEventSql, survivalPresentSql, survivalTimeUsableSql } from "./survival-sql.ts";
+import { survivalMonthsSql, survivalEventSql, survivalPresentSql, survivalTimeUsableSql, endpointRowsSql, endpointValueSql } from "./survival-sql.ts";
 import type { EndpointColumns } from "./federation.ts";
 
 /** Endpoint prefix -> the (<X>_MONTHS, <X>_STATUS) attribute pair cBioPortal stores. */
@@ -33,10 +33,10 @@ export function survivalCountsSql(cohortSql: string, study: string, db: string =
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         anyIf(attribute_value, attribute_name=" + sq(months) + ") AS months,\n" +
-    "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
+    "         " + endpointValueSql(months) + " AS months,\n" +
+    "         " + endpointValueSql(status) + " AS status\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + endpointRowsSql(months, status, "type='patient'") + "\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
     "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
@@ -58,10 +58,10 @@ export function survivalLeftOutSql(cohortSql: string, study: string, db: string,
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         anyIf(attribute_value, attribute_name = " + sq(months) + ") AS months,\n" +
-    "         anyIf(attribute_value, attribute_name = " + sq(status) + ") AS status\n" +
+    "         " + endpointValueSql(months, " = ") + " AS months,\n" +
+    "         " + endpointValueSql(status, " = ") + " AS status\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'patient'\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + endpointRowsSql(months, status, "type = 'patient'") + "\n" +
     "    AND attribute_name IN (" + sq(months) + ", " + sq(status) + ")\n" +
     "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
@@ -103,10 +103,10 @@ export function anchoredSurvivalSql(
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")", "anyIf(attribute_value, attribute_name=" + sq(status) + ")") + " AS months,\n" +
-    "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
+    "         " + survivalMonthsSql(endpointValueSql(months), endpointValueSql(status)) + " AS months,\n" +
+    "         " + endpointValueSql(status) + " AS status\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + endpointRowsSql(months, status, "type='patient'") + "\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
     "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +
@@ -155,10 +155,10 @@ export function coxRowsSql(
     "WITH cohort AS (" + cohortSql + "),\n" +
     "os AS (\n" +
     "  SELECT " + pid + " AS pid,\n" +
-    "         " + survivalMonthsSql("anyIf(attribute_value, attribute_name=" + sq(months) + ")", "anyIf(attribute_value, attribute_name=" + sq(status) + ")") + " AS months,\n" +
-    "         anyIf(attribute_value, attribute_name=" + sq(status) + ") AS status\n" +
+    "         " + survivalMonthsSql(endpointValueSql(months), endpointValueSql(status)) + " AS months,\n" +
+    "         " + endpointValueSql(status) + " AS status\n" +
     "  FROM " + clinicalTable(db, [months, status]) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND type='patient'\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + endpointRowsSql(months, status, "type='patient'") + "\n" +
     "    AND attribute_name IN (" + sq(months) + "," + sq(status) + ")\n" +
     "    AND " + inCohortPatients(pid) + "\n" +
     "  GROUP BY pid\n" +

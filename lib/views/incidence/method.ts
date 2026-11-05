@@ -9,6 +9,8 @@ export const GRAY_NULL_PY = "import math\n\n\ndef mulberry32(seed):\n    a = see
 export interface IncidenceTrace {
   eventLabel: string;
   anchor?: string;
+  /** the time and competing-risks status columns, when the outcome was read from them */
+  columns?: { months: string; status: string };
   horizons: number[];
   perSite: { cohort: string; study: string; cohortPatients: number }[];
   cohorts: { name: string; n: number; events: number; competing: number; censored: number; late: number;
@@ -24,24 +26,30 @@ export function incidenceMethod(t: IncidenceTrace): MethodRecord {
   const hasEntry = t.counts.some((r) => r.entry > 0);
   const steps: MethodStep[] = t.perSite.map((s) => ({
     kind: "fetch" as const, title: "Classify and count each patient's outcome",
-    detail: "The incidence query above. Per patient, months from " + (t.anchor ? "the " + t.anchor : "the study's day 0") +
+    detail: t.columns
+      ? "The incidence query above. Per patient, " + t.columns.months + " as the time in months (rounded to 4 decimals) and the code of " + t.columns.status +
+        " (the part before any \":\"): 1 the event (cause 1), 2 a competing event (cause 2), 0 censored; any other code is refused. A patient enters with both values and a time ≥ 0, read per patient from an upload keyed by sample, whose samples must agree. Counted by (months, cause). Counts only."
+      : "The incidence query above. Per patient, months from " + (t.anchor ? "the " + t.anchor : "the study's day 0") +
       " (days ÷ 30.4375, rounded to 4 decimals) to the first " + t.eventLabel + " after it (cause 1), death without it (cause 2, from OS_STATUS), or last follow-up (censored, OS_MONTHS)" +
       (t.anchor ? ", and the delay from the anchor to day 0 as a delayed entry when the anchor comes first" : "") +
       "; then counted by (entry, months, cause). Counts only.",
     scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
   }));
-  steps.push({ kind: "transform", title: "Set aside patients who cannot enter the risk set",
+  if (t.columns) steps.push({ kind: "transform", title: "Set aside patients who cannot enter the risk set",
+    detail: "Named and counted rather than treated as event-free: patients of the cohort without both " + t.columns.months + " and " + t.columns.status + ".",
+    params: t.cohorts.map((c) => [c.name, c.excluded.noFollowup + " without both values"] as [string, string]) });
+  else steps.push({ kind: "transform", title: "Set aside patients who cannot enter the risk set",
     detail: "Named and counted rather than treated as event-free. A patient whose first event was recorded after their last follow-up is kept, as censored or dead at follow-up.",
     params: t.cohorts.map((c) => [c.name, c.excluded.prior + " already had it " + (t.anchor ? "at or before the anchor" : "by day 0") +
       (c.excluded.unobserved ? " · " + c.excluded.unobserved + " had it before observation began" : "") +
       " · " + c.excluded.noFollowup + " without follow-up" + (t.anchor ? " · " + c.excluded.noAnchor + " with no anchor event" : "") +
       (c.late ? " · " + c.late + " recorded late, kept" : "")] as [string, string]) });
   steps.push({ kind: "statistic", title: "Estimate cumulative incidence by Aalen–Johansen",
-    detail: "Death is a competing risk: at each time F1 rises by S(t−)·d1/R, with S the all-cause Kaplan–Meier survival and R those at risk" +
+    detail: (t.columns ? "A competing event (code 2) is a competing risk" : "Death is a competing risk") + ": at each time F1 rises by S(t−)·d1/R, with S the all-cause Kaplan–Meier survival and R those at risk" +
       (hasEntry ? " (entered strictly before t: delayed entry honoured)" : "") +
-      ". Standard error by the delta method (Aalen 1978); 95% interval F1 ± 1.959964·SE, clamped to [0, 1]. At each horizon the curve's value there, beside 1 − Kaplan–Meier of the event alone, which counts the dead as still at risk and overstates incidence.",
+      ". Standard error by the delta method (Aalen 1978); 95% interval F1 ± 1.959964·SE, clamped to [0, 1]. At each horizon the curve's value there, beside 1 − Kaplan–Meier of the event alone, which counts " + (t.columns ? "those with a competing event" : "the dead") + " as still at risk and overstates incidence.",
     params: [["horizons (months)", t.horizons.join(", ")],
-      ...t.cohorts.map((c) => [c.name, c.n.toLocaleString() + " at risk · " + c.events + " events · " + c.competing + " deaths first · " + c.censored + " censored"] as [string, string])] });
+      ...t.cohorts.map((c) => [c.name, c.n.toLocaleString() + " at risk · " + c.events + " events · " + c.competing + (t.columns ? " competing events first · " : " deaths first · ") + c.censored + " censored"] as [string, string])] });
   if (t.gray) steps.push({ kind: "statistic", title: "Gray-type test by permutation",
     detail: "Per cohort, observed cause-1 events minus those expected from the pooled subdistribution hazard, the subdistribution risk set being Y·(1 − F1)/S (Gray 1988, weight 1), summed as Σ (O − E)²/E over cohorts. This is not Gray's variance-standardised χ², so its p does not come from a χ² table: the cohort labels are shuffled across the pooled records " +
       t.gray.permutations.toLocaleString() + " times by a generator seeded with 1, and p = (b + 1)/(m + 1). Exact under the null that every cohort's records, entry times included, come from one distribution.",
@@ -54,7 +62,7 @@ export function incidenceMethod(t: IncidenceTrace): MethodRecord {
     "import pandas as pd",
     ...(hasEntry ? [] : ["from statsmodels.duration.survfunc import CumIncidenceRight"]),
     "",
-    ...pyTable("counts", "What the incidence queries returned for the patients who enter the risk set: n per (entry, months, cause); cause 1 the event, 2 death first, 0 censored",
+    ...pyTable("counts", "What the incidence queries returned for the patients who enter the risk set: n per (entry, months, cause); cause 1 the event, 2 " + (t.columns ? "a competing event" : "death") + " first, 0 censored",
       ["cohort", "study", "entry", "t", "cause", "n"], t.counts.map((r) => [r.cohort, r.study, r.entry, r.t, r.cause, r.n]), "incidence_counts.csv"),
     "df = counts.loc[counts.index.repeat(counts[\"n\"])].reset_index(drop=True)  # one row per patient",
     "horizons = " + JSON.stringify(t.horizons),

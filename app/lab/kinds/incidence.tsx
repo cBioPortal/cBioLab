@@ -7,6 +7,14 @@ import { OptionSelect } from "../../_ui/choice.tsx";
 /** the incidence view's settings row */
 function Controls({ c }: { c: KindCardCtx }) {
   const { spec, busy, patch } = c;
+  if (spec.monthsAttribute || spec.statusAttribute) return (
+    <div className="viewtb">
+      <div className="tbz"><span className="tbl">outcome</span>
+        <span className="meta" data-tip="set in the document: a recorded time, and a status coded 0 censored, 1 the event, 2 a competing event">
+          {spec.statusAttribute} over {spec.monthsAttribute} (months) · 0 censored, 1 event, 2 competing</span>
+      </div>
+    </div>
+  );
   const e = spec.event || { eventType: "" }, a0 = (e.attrs || [])[0] || { key: "", value: "" };
   const an = spec.anchor || null;
   const setEvent = (next: any) => patch({ event: next });
@@ -55,6 +63,8 @@ export const incidenceUi: KindUi<"incidence"> = {
     return { kind: "incidence", event: { eventType: ev ? ev.label : "" } };
   },
   sub: (spec) => {
+    if (spec.monthsAttribute || spec.statusAttribute)
+      return (spec.label || spec.statusAttribute || "") + " over " + (spec.monthsAttribute || "") + ", code 2 competing";
     const e = spec.event || {};
     const an = spec.anchor;
     return (e.label || e.eventType || "no event chosen") +

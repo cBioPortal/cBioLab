@@ -76,7 +76,7 @@ export function incidenceSvg(v: DrawnResultOf<"incidence">, o: SvgOpts): string 
   let yy = T + PLOT + bottomAxisHeight(xTitle) + 8;
   const key = legend([
     { label: r.eventLabel, color: p.ink, kind: "line" },
-    { label: "death without it (competing)", color: p.ink, kind: "line", dash: COMPETING_DASH },
+    { label: r.columns ? "competing event first (code 2)" : "death without it (competing)", color: p.ink, kind: "line", dash: COMPETING_DASH },
     { label: "95% interval", color: p.ink, opacity: 0.18 }
   ], 8, yy, W - 16, p, { size: FS.small });
   out.push(key.svg);

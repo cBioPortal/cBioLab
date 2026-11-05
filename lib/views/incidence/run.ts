@@ -1,9 +1,9 @@
 // Incidence view: cumulative incidence with death as a competing risk
 import type { ViewResult, IncidenceCurve } from "../../types.ts";
-import { incidenceCountsSql } from "../../federation-views.ts";
+import { incidenceCountsSql, incidenceColumnsCountsSql } from "../../federation-views.ts";
 import { Z_975, aalenJohansen, cifAt, grayPermutationTest, kaplanMeier, type CrRecord } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
-import { overLimit, answering, refuse } from "../shared.ts";
+import { overLimit, answering, refuse, ATTR_NAME } from "../shared.ts";
 import type { IncidenceView } from "./types.ts";
 import { incidenceMethod } from "./method.ts";
 import type { IncidenceTrace } from "./method.ts";
@@ -13,22 +13,36 @@ const INCIDENCE_COHORT_LIMIT = 6;
 export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<ViewResult> {
   const { doc, cohorts, vNames } = ctx;
   { const e = overLimit("an incidence view", INCIDENCE_COHORT_LIMIT, vNames.length); if (e) return refuse("incidence", ctx, e.replace("at most " + INCIDENCE_COHORT_LIMIT, "at most " + INCIDENCE_COHORT_LIMIT + " cohorts")); }
-  const ev = view.event;
-  if (!ev || typeof ev.eventType !== "string" || !ev.eventType.trim())
-    return refuse("incidence", ctx, "an incidence view needs event: {eventType, attrs?}, the timeline event whose incidence to estimate");
-  const attrs = Array.isArray(ev.attrs) ? ev.attrs : [];
-  if (attrs.length > 3) return refuse("incidence", ctx, "event takes at most 3 attrs; this asks for " + attrs.length);
-  if (attrs.some((a) => !a || !a.key || a.value == null || a.value === ""))
-    return refuse("incidence", ctx, "every event attr needs both a key and a value");
-  const event = { eventType: ev.eventType.trim().slice(0, 120), attrs: attrs.map((a) => ({ key: String(a.key).slice(0, 120), value: String(a.value).slice(0, 200) })) };
-  const eventLabel = (ev.label && String(ev.label).trim().slice(0, 80)) ||
-    event.eventType + (event.attrs.length ? " [" + event.attrs.map((a) => a.key + "=" + a.value).join(", ") + "]" : "");
-  const rawAnchor = view.anchor;
-  const anchor = rawAnchor && rawAnchor.eventType
-    ? { eventType: String(rawAnchor.eventType).slice(0, 120),
-        ...(rawAnchor.key ? { key: String(rawAnchor.key).slice(0, 120), value: String(rawAnchor.value ?? "") } : {}),
-        occurrence: rawAnchor.occurrence === "LAST" ? "LAST" as const : "FIRST" as const }
-    : null;
+  const columns = view.monthsAttribute != null || view.statusAttribute != null
+    ? { months: String(view.monthsAttribute || "").trim(), status: String(view.statusAttribute || "").trim() } : null;
+  let event: { eventType: string; attrs: { key: string; value: string }[] } | null = null;
+  let eventLabel: string;
+  let anchor: { eventType: string; key?: string; value?: string; occurrence: "FIRST" | "LAST" } | null = null;
+  if (columns) {
+    if (!ATTR_NAME.test(columns.months) || !ATTR_NAME.test(columns.status))
+      return refuse("incidence", ctx, "monthsAttribute and statusAttribute must both be given as valid attribute names (a study attribute, or an uploaded column as custom:<dataset>/<COLUMN>): got '" +
+        columns.months.slice(0, 60) + "'/'" + columns.status.slice(0, 60) + "'");
+    if (view.event) return refuse("incidence", ctx, "give either event (a timeline event) or monthsAttribute/statusAttribute (a recorded time and status), not both");
+    if (view.anchor) return refuse("incidence", ctx, "anchor applies to a timeline event; monthsAttribute is already measured from each patient's own start");
+    eventLabel = (view.label && String(view.label).trim().slice(0, 80)) || columns.status;
+  } else {
+    const ev = view.event;
+    if (!ev || typeof ev.eventType !== "string" || !ev.eventType.trim())
+      return refuse("incidence", ctx, "an incidence view needs event: {eventType, attrs?}, the timeline event whose incidence to estimate, or monthsAttribute/statusAttribute, a recorded time and a status coded 0 censored, 1 the event, 2 a competing event");
+    const attrs = Array.isArray(ev.attrs) ? ev.attrs : [];
+    if (attrs.length > 3) return refuse("incidence", ctx, "event takes at most 3 attrs; this asks for " + attrs.length);
+    if (attrs.some((a) => !a || !a.key || a.value == null || a.value === ""))
+      return refuse("incidence", ctx, "every event attr needs both a key and a value");
+    event = { eventType: ev.eventType.trim().slice(0, 120), attrs: attrs.map((a) => ({ key: String(a.key).slice(0, 120), value: String(a.value).slice(0, 200) })) };
+    eventLabel = (ev.label && String(ev.label).trim().slice(0, 80)) ||
+      event.eventType + (event.attrs.length ? " [" + event.attrs.map((a) => a.key + "=" + a.value).join(", ") + "]" : "");
+    const rawAnchor = view.anchor;
+    anchor = rawAnchor && rawAnchor.eventType
+      ? { eventType: String(rawAnchor.eventType).slice(0, 120),
+          ...(rawAnchor.key ? { key: String(rawAnchor.key).slice(0, 120), value: String(rawAnchor.value ?? "") } : {}),
+          occurrence: rawAnchor.occurrence === "LAST" ? "LAST" as const : "FIRST" as const }
+      : null;
+  }
   const horizons = (view.horizons == null ? [12, 24, 60] : view.horizons).map(Number);
   if (!horizons.length || horizons.length > 6 || horizons.some((h) => !(h > 0 && h <= 600)))
     return refuse("incidence", ctx, "horizons are 1 to 6 month values between 0 and 600");
@@ -44,7 +58,8 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
     let late = 0, seen = 0, cohortN = 0;
     await Promise.all(cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
       cohortN += cohorts[n].perStudy[st]?.count || 0;
-      const rows = await ok[st].viewAggregate("incidence:" + n, doc.cohorts[n], (c, s, d) => incidenceCountsSql(c, s, d, event, anchor));
+      const rows = await ok[st].viewAggregate("incidence:" + n, doc.cohorts[n], (c, s, d) =>
+        columns ? incidenceColumnsCountsSql(c, s, d, columns.months, columns.status) : incidenceCountsSql(c, s, d, event!, anchor));
       for (const r of rows) {
         const k = String(r.kind), cnt = Number(r.n);
         seen += cnt;
@@ -57,7 +72,8 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
         countRows.push({ cohort: n, study: st, entry, t, cause, n: cnt });
       }
     }));
-    ex.noAnchor = Math.max(0, cohortN - seen);
+    if (columns) ex.noFollowup = Math.max(0, cohortN - seen);
+    else ex.noAnchor = Math.max(0, cohortN - seen);
     // a canonical order, independent of which study answered first or how the database ordered
     // tied rows: the permutation test shuffles labels by position, so its seeded p depends on it
     const entryKey = (r: CrRecord) => r.entry ?? -Infinity;
@@ -69,9 +85,11 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
         se1: Math.round(pt.se1 * 1e5) / 1e5, atRisk: pt.atRisk })), excluded: ex, late });
   }
   if (!curves.some((c) => c.n))
-    return refuse("incidence", ctx, "no patient could enter the risk set: " + curves.map((c) => c.cohort + " — " +
+    return refuse("incidence", ctx, "no patient could enter the risk set: " + (columns
+      ? curves.map((c) => c.cohort + " — " + c.excluded.noFollowup + " without both " + columns.months + " and " + columns.status).join("; ")
+      : curves.map((c) => c.cohort + " — " +
       c.excluded.prior + " already had " + eventLabel + (anchor ? " at or before the anchor" : " by day 0") + ", " + c.excluded.noFollowup + " without follow-up" +
-      (anchor ? ", " + c.excluded.noAnchor + " without a " + anchor.eventType + " event" : "") + (c.excluded.unobserved ? ", " + c.excluded.unobserved + " before observation began" : "")).join("; "));
+      (anchor ? ", " + c.excluded.noAnchor + " without a " + anchor.eventType + " event" : "") + (c.excluded.unobserved ? ", " + c.excluded.unobserved + " before observation began" : "")).join("; ")));
 
   // incidence at each horizon, beside the naive 1 − KM that censors the dead
   const hz = horizons.map((months) => ({ months, cells: curves.map((c) => {
@@ -93,7 +111,7 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
   return {
     kind: "incidence", cohorts: vNames,
     method: incidenceMethod({
-      eventLabel, horizons,
+      eventLabel, horizons, ...(columns ? { columns } : {}),
       ...(anchor ? { anchor: (anchor.occurrence === "LAST" ? "last " : "first ") + anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") } : {}),
       perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
         .map((st) => ({ cohort: n, study: st, cohortPatients: cohorts[n].perStudy[st]?.count || 0 }))),
@@ -104,11 +122,19 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
       horizonResults: hz.flatMap((h) => h.cells.filter((c) => curves.find((x) => x.cohort === c.cohort)!.n > 0)
         .map((c) => ({ cohort: c.cohort, months: h.months, f1: c.f1, lo: c.lo, hi: c.hi }))),
     }),
-    incidence: { eventLabel, ...(anchor ? { anchoredTo: anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") } : {}),
+    incidence: { eventLabel, ...(columns ? { columns } : {}), ...(anchor ? { anchoredTo: anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") } : {}),
       curves, horizons: hz, ...(gray ? { gray } : {}), ...(excluded.length ? { excludedStudies: excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
-    caveat: "Cumulative incidence of the first " + eventLabel + " after " + (anchor ? (anchor.occurrence === "LAST" ? "the last " : "the first ") + anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") : "the study's day 0") +
+    caveat: columns
+      ? "Cumulative incidence of " + eventLabel + " from " + columns.months + " (months) and " + columns.status + ", whose status code 0 is censored, 1 the event and 2 a competing event: " +
+        "Aalen–Johansen, 95% intervals from its delta-method standard error. It is not 1 − Kaplan–Meier, which treats a competing event as still at risk of this one and overstates its incidence — the table sets the two side by side. " +
+        "A patient enters with both values; " + exTotal("noFollowup") + " without them are left out, not counted as event-free. " +
+        (gray ? "Gray's test (weight 1) by permutation of cohort labels, " + gray.permutations + " shuffles, seeded; exact under the null that the cohorts share one distribution. " : "") +
+        "The times and codes are the source's own, as recorded." +
+        (multi ? " Records are pooled across " + ctx.vStudies.length + " studies." : "") +
+        (excluded.length ? " Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
+      : "Cumulative incidence of the first " + eventLabel + " after " + (anchor ? (anchor.occurrence === "LAST" ? "the last " : "the first ") + anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : "") : "the study's day 0") +
       ", with death (OS_STATUS) as a competing risk: Aalen–Johansen, 95% intervals from its delta-method standard error. " +
       "It is not 1 − Kaplan–Meier: that treats the dead as still at risk of the event and overstates incidence whenever death is common — the table sets the two side by side. " +
       (anchor ? "Left truncation as in the survival view: a patient anchored before day 0 enters the risk set at day 0, not at the anchor. " : "") +
