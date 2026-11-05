@@ -6,7 +6,8 @@
 //    executable ones and PATCH_BRANCHES% of the branches on them must run under `npm test`. A patch
 //    with fewer than MIN_COUNTED of either is too small to hold to a percentage.
 // 2. A new file in lib/ or mcp/ that no unit test loads. Node leaves such a file out of its totals
-//    altogether, so it would never show up in rule 1.
+//    altogether, so it would never show up in rule 1. A file that holds only types never runs, and
+//    is left out.
 // 3. An area's branch or function coverage below its floor in test/fixtures/coverage-floor.json, by
 //    more than FLOOR_SLACK points. UPDATE_COVERAGE_FLOOR=1 rewrites the floors from this run, which
 //    the change then shows: raise them when coverage rises; lowering one is a decision for review.
@@ -16,6 +17,7 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { isTypeOnly } from "./type-only.ts";
 
 const root = join(import.meta.dirname, "..");
 const lcovPath = join(root, "quality-report", "coverage.lcov");
@@ -76,7 +78,7 @@ if (mergeBase) {
   const rows: string[] = [], unloadedNew: string[] = [], unloadedOld: string[] = [];
   for (const [f, set] of [...changed].sort()) {
     const c = cov.get(f);
-    if (!c) { (added.has(f) ? unloadedNew : unloadedOld).push(f); continue; }
+    if (!c) { if (!isTypeOnly(join(root, f))) (added.has(f) ? unloadedNew : unloadedOld).push(f); continue; }
     let flh = 0, fln = 0, fbh = 0, fbn = 0;
     const missed: number[] = [];
     for (const n of set) {

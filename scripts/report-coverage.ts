@@ -10,6 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { isTypeOnly } from "./type-only.ts";
 
 const root = join(import.meta.dirname, "..");
 const outDir = join(root, "quality-report");
@@ -50,14 +51,14 @@ const neverLoaded: string[] = [];
 for (const area of [...AREAS, "lib/views", "lib/figures"]) {
   const all = walk(area);
   const loaded = all.filter((f) => files.has(f));
-  if (AREAS.includes(area)) neverLoaded.push(...all.filter((f) => !files.has(f)));
+  if (AREAS.includes(area)) neverLoaded.push(...all.filter((f) => !files.has(f) && !isTypeOnly(join(root, f))));
   md.push(row(area, sum(loaded.map((f) => files.get(f)!)), " " + loaded.length + " of " + all.length + " |"));
 }
 const libFiles = [...files].filter(([f, c]) => f.startsWith("lib/") && c.BRF + c.FNF > 0);
 const weakest = libFiles.sort(([, a], [, b]) => a.BRH / Math.max(1, a.BRF) - b.BRH / Math.max(1, b.BRF)).slice(0, 20);
 md.push("", "### Least-covered lib modules, by branches", "", "| module | lines | branches | functions |", "|---|---|---|---|",
   ...weakest.map(([f, c]) => row(f, c)));
-md.push("", "### Never loaded by a unit test (" + neverLoaded.filter((f) => f.startsWith("lib/")).length + " in lib/)", "",
+md.push("", "### Never loaded by a unit test (" + neverLoaded.filter((f) => f.startsWith("lib/")).length + " in lib/; files of types only left out)", "",
   ...neverLoaded.filter((f) => f.startsWith("lib/")).map((f) => "- " + f),
   "", neverLoaded.filter((f) => !f.startsWith("lib/")).length + " more in app/ and mcp/ (the pages, covered by the e2e suites).");
 

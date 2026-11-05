@@ -34,7 +34,7 @@ CI's `coverage` job runs `npm run report:coverage` (node's coverage of `npm test
   10 of either is not held to a percentage. Lines is the stricter column here: V8 reports no branches
   inside a function that never ran, so the branch figure only speaks for code that did.
 - **A new file in `lib/` or `mcp/` that no unit test loads.** Node leaves such a file out of its
-  totals altogether.
+  totals altogether. A file of types only never runs and is left out.
 - **An area below its floor.** `test/fixtures/coverage-floor.json` holds each area's branch and
   function coverage; falling more than a quarter point below fails. When coverage rises, raise the
   floors with `UPDATE_COVERAGE_FLOOR=1 npm run check:coverage` and commit the file; lowering one is a
