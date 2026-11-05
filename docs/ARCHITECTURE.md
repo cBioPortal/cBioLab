@@ -91,8 +91,26 @@ the contract from `/api/oncoprint` as binary and draws it on a canvas.
 
 ![How an oncoprint is drawn on the analysis page](diagrams/oncoprint-request.png)
 
-Both are drawn from HTML in `docs/diagrams/`: edit the HTML, run `node scripts/render-diagrams.cjs`,
-and commit both.
+## What a view kind is made of
+
+The files a kind is written as, the four registries that list it, the shared code that reads them,
+and the checks that fail when a piece is missing. The "View kinds" entry under The parts says the
+same in prose.
+
+![What a view kind is made of](diagrams/view-kind.png)
+
+Adding a kind, beyond its folder and page file: a line in each registry; a case in
+`test/boundary.test.ts`'s `BUILDERS` for each builder in its `sql.ts`; a gallery example marked
+`snapshot` with its answers recorded (`RECORD_SNAPSHOTS=1`); `test/snapshots/kinds.json` updated
+(`UPDATE_SNAPSHOTS=1 node --test test/view-kinds.test.ts`); `npm run docs:gen`, then
+`npm run docs:counts` for its examples; and, when its method script reads a file, that file rebuilt
+in `lib/method-data.ts`. No gallery tag may be a kind's name. `lib/views/diffexpr/` has every piece,
+so it is a good kind to read first.
+
+The diagrams are drawn from HTML in `docs/diagrams/`: edit the HTML, run
+`node scripts/render-diagrams.cjs`, and commit both. `test/diagrams.test.ts` fails when a diagram
+names a path or a name the code no longer has, and when the view-kind diagram's files or registries
+no longer match the kind folders and the maps keyed by `ViewKind`.
 
 ## The parts
 
