@@ -576,7 +576,7 @@ edge-case rows, **low** = cosmetic or rare.
 ### P4. Python import order matters (cross-ref)
 - **What**: The matrix is imported after all profiles, and MUTATION_COUNT is recomputed then. Case
   lists and `_all` come last.
-- **Where**: `scripts/importer/cbioportalImporter.py:400-471` (Python, read for context only)
+- **Where**: `cbioportal-core/scripts/importer/cbioportalImporter.py:400-471` (Python, read for context only)
 - Severity: **med**
 
 ### P5. Gene panel definition import
@@ -607,7 +607,7 @@ edge-case rows, **low** = cosmetic or rare.
   samples created implicitly (C5, R1). An existing `_all` is kept. `_sequenced`, `_cna` and `_cnaseq`
   are **not** generated in Java: only validated in Python, so they must come from files.
 - **Where**: `scripts/AddCaseList.java:32-92`;
-  `scripts/importer/cbioportalImporter.py:470-471`
+  `cbioportal-core/scripts/importer/cbioportalImporter.py:470-471`
 - Severity: **med**
 
 ---
