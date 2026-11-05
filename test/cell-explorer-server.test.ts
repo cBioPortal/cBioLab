@@ -21,7 +21,7 @@ const { cohortCellsLink, cohortFromCells } = await import("../lib/cell-explorer-
 const { CELL_EXPLORER_BASE, CELL_EXPLORER_MAX_DONORS, cellExplorerFor } = await import("../lib/cell-explorer.ts");
 
 const SPECTRUM = "msk_spectrum_tme_2022", HTAN = "crc_hta8_htan_2024", HTAN_B = "crc_hta11_htan_2021";
-const spectrum = cellExplorerFor(SPECTRUM)!, htan = cellExplorerFor(HTAN)!;
+const spectrum = cellExplorerFor(SPECTRUM)!;
 
 /** each study's instance and patients: their SEX and, for SPECTRUM, their donor id */
 type Patient = { sex: string; donor?: string };

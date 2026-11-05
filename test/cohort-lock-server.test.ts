@@ -32,7 +32,7 @@ const WAREHOUSE: Record<string, { conn: string; patients: Record<string, { sex: 
 };
 
 let sent: { conn: string; query: string }[] = [];
-let oncokbVersion: string | null = "v-from-warehouse";
+const oncokbVersion: string | null = "v-from-warehouse";
 const json = (data: unknown[]) => JSON.stringify({ data, meta: [], rows: data.length });
 setChTransport(async (st) => {
   const q = st.query;
