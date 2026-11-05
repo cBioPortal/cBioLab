@@ -1,0 +1,8 @@
+cancer_study_identifier: cbiolab_peer_fixture
+genetic_alteration_type: COPY_NUMBER_ALTERATION
+datatype: DISCRETE
+stable_id: cna
+show_profile_in_analysis_tab: true
+profile_name: Putative copy-number alterations
+profile_description: Discrete copy number (synthetic): -2 deep deletion, -1 shallow deletion, 0 diploid, 1 gain, 2 amplification.
+data_filename: data_cna.txt

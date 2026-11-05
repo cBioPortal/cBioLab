@@ -1,11 +1,12 @@
 // What several e2e areas do the same way: pick Explore's studies or a facet, add a view, measure a
 // toolbar's alignment, save a cohort to the library.
 
-// Explore starts with no studies selected; the checks that browse facets pick the two studies they
-// were written against, through the page's own tool (what a reader's ticking does).
+// Explore starts with no studies selected; the checks that browse facets pick two studies in two
+// databases, through the page's own tool (what a reader's ticking does): msk_chord_2024 on the
+// warehouse and the fixture study the gate serves as the second database (scripts/peer-db.ts).
 async function pickExploreStudies(p) {
   await p.waitForFunction(() => window.cohortLab && window.cohortLab.selectStudies, null, { timeout: 120000 });
-  await p.evaluate(() => window.cohortLab.selectStudies(["msk_chord_2024", "genie_public"]));
+  await p.evaluate(() => window.cohortLab.selectStudies(["msk_chord_2024", "cbiolab_peer_fixture"]));
 }
 
 /** filter Explore by the `nth` facet value: a pie slice filters on click, a list row once checked and applied */

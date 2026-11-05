@@ -25,7 +25,8 @@ const CASES = [
   { conn: "a", study: "breast_msk_2025", attr: "GENDER", spellings: ["Female", "FEMALE"] },
   { conn: "a", study: "breast_msk_2025", attr: "RACE", spellings: ["White", "WHITE"] },
   { conn: "a", study: "msk_chord_2024", attr: "METASTATIC_SITE", spellings: ["Lymph Node", "Lymph node"] },
-  { conn: "b", study: "genie_public", attr: "DEAD", spellings: ["False", "FALSE"] }
+  // the fixture study connection b holds (test/fixtures/peer-study) spells DEAD both ways on purpose
+  { conn: "b", study: "cbiolab_peer_fixture", attr: "DEAD", spellings: ["False", "FALSE"] }
 ] as const;
 
 let failures = 0;
