@@ -21,4 +21,5 @@ export const labsKind: ViewKindDef<"labs"> = {
   },
   need: "local",
   isNew: true,
+  e2ePending: "provisional: its design may still change",
 };

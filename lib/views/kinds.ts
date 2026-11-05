@@ -114,7 +114,7 @@ export interface AnyKindDef {
   figure?: (v: ViewResult, o: SvgOpts) => string | null;
   title?: (v: ViewResult) => string;
   text?: (v: ViewResult, t: TextContext) => void | false;
-  help: ViewHelp; need?: Need; preview?: string; isNew?: boolean;
+  help: ViewHelp; need?: Need; preview?: string; e2ePending?: string; isNew?: boolean;
 }
 
 /** the descriptor for a view kind, or undefined for a kind the document language does not have */

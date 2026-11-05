@@ -21,4 +21,5 @@ export const incidenceKind: ViewKindDef<"incidence"> = {
   },
   need: "local",
   isNew: true,
+  e2ePending: "provisional: its design may still change",
 };

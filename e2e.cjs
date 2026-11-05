@@ -2,6 +2,8 @@
 // E2E_LOGIN_EMAIL to sign in). The checks live by area in test/e2e/; this file runs them in order —
 // the light and dark passes over one page first, then each area in a context of its own — and
 // prints PASS/FAIL per check. A new check goes in its area's file, or a new area's file listed here.
+// E2E_ONLY=view-kinds,riskmodel runs only the areas named (by file name in test/e2e/, plus lab-races
+// and saved), for iterating on them; the gate runs them all.
 const { launch } = require("./e2e-browser.cjs");
 const { accounts } = require("./test/e2e/accounts.cjs");
 const { site } = require("./test/e2e/site.cjs");
@@ -18,6 +20,7 @@ const { homepage } = require("./test/e2e/homepage.cjs");
 const { portal } = require("./test/e2e/portal.cjs");
 const { savedCohorts } = require("./test/e2e/saved-cohorts.cjs");
 const { studyPicker } = require("./test/e2e/study-picker.cjs");
+const { viewKinds } = require("./test/e2e/view-kinds.cjs");
 
 const BASE = "http://localhost:" + (process.env.E2E_PORT || 3100);
 
@@ -34,9 +37,13 @@ async function main() {
   const signIn = (ctx, email = LOGIN) => ctx.request.post(BASE + "/api/auth/dev", { data: { email } });
   /** what every area's checks are given; the light pass adds its context, page, errors and scheme */
   const t = { browser, ok, BASE, LOGIN, signIn, decodeUrlJson };
-  await accounts(t);
+  const only = new Set((process.env.E2E_ONLY || "").split(",").map((s) => s.trim()).filter(Boolean));
+  const want = (area) => only.size === 0 || only.has(area);
+  const LIGHT_AREAS = ["site", "explore", "analysis-controls", "analysis-page", "examples"];
+  if (want("accounts")) await accounts(t);
 
   for (const scheme of ["light", "dark"]) {
+    if (only.size && (scheme === "dark" || !LIGHT_AREAS.some(want))) continue;
     const ctx = await browser.newContext({ colorScheme: scheme, viewport: { width: 1360, height: 900 } });
     if (LOGIN) {
       const r = await signIn(ctx);
@@ -67,31 +74,33 @@ async function main() {
     ok(scheme + ": app shell loads", (await page.getByRole("tab").count()) >= 2);
 
     if (scheme === "light") {
-      await site({ ...t, ctx, page, errors, scheme });
-      await explore({ ...t, ctx, page, errors, scheme });
-      await analysisControls({ ...t, ctx, page, errors, scheme });
-      await analysisPage({ ...t, ctx, page, errors, scheme });
-      await examples({ ...t, ctx, page, errors, scheme });
+      if (want("site")) await site({ ...t, ctx, page, errors, scheme });
+      if (want("explore")) await explore({ ...t, ctx, page, errors, scheme });
+      if (want("analysis-controls")) await analysisControls({ ...t, ctx, page, errors, scheme });
+      if (want("analysis-page")) await analysisPage({ ...t, ctx, page, errors, scheme });
+      if (want("examples")) await examples({ ...t, ctx, page, errors, scheme });
     } else {
       await page.screenshot({ path: "shot-next-dark.png", fullPage: false });
     }
     ok(scheme + ": no JS errors", errors.length === 0, errors.slice(0, 4).join(" | "));
     await ctx.close();
   }
-  await tables(t);
-  await assays(t);
-  await riskmodel(t);
-  await patientViews(t);
-  await lollipop(t);
-  await homepage(t);
-  await portal(t);
-  await savedCohorts(t);
-  await studyPicker(t);
+  if (want("tables")) await tables(t);
+  if (want("assays")) await assays(t);
+  if (want("riskmodel")) await riskmodel(t);
+  if (want("view-kinds")) await viewKinds(t);
+  if (want("patient-views")) await patientViews(t);
+  if (want("lollipop")) await lollipop(t);
+  if (want("homepage")) await homepage(t);
+  if (want("portal")) await portal(t);
+  if (want("saved-cohorts")) await savedCohorts(t);
+  if (want("study-picker")) await studyPicker(t);
 
   // the analysis page's requests finishing out of order (e2e-lab-races.cjs)
-  await require("./e2e-lab-races.cjs").labRaces(browser, ok, BASE);
+  if (want("lab-races")) await require("./e2e-lab-races.cjs").labRaces(browser, ok, BASE);
   // the Saved tab's lists: loading, failed and empty said apart; a re-save updates (e2e-saved.cjs)
-  if (LOGIN) await require("./e2e-saved.cjs").savedLists(browser, ok, BASE, LOGIN);
+  if (LOGIN && want("saved")) await require("./e2e-saved.cjs").savedLists(browser, ok, BASE, LOGIN);
+  if (results.length === 0) results.push("FAIL E2E_ONLY named no area that ran  [" + [...only].join(",") + "]");
 
   await browser.close();
 

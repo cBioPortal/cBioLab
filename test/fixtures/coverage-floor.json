@@ -1,0 +1,14 @@
+{
+  "lib": {
+    "branches": 76.81,
+    "functions": 86.77
+  },
+  "app": {
+    "branches": 70.25,
+    "functions": 45.25
+  },
+  "mcp": {
+    "branches": 100,
+    "functions": 5.26
+  }
+}

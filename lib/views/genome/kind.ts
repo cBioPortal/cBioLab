@@ -32,4 +32,5 @@ export const genomeKind: ViewKindDef<"genome"> = {
   },
   need: "local",
   isNew: true,
+  e2ePending: "provisional: its design may still change",
 };

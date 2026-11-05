@@ -39,7 +39,8 @@
     "check:mutants": "node --env-file=.env.local scripts/check-mutants.ts",
     "verify": "npm test && npm run check:methods && RECORD=1 npm run check:portal && RECORD=1 npm run check:cohorts && RECORD=1 npm run check:mutants",
     "visual": "node scripts/visual.ts",
-    "check:figures": "node --env-file=.env.local scripts/check-figures.ts"
+    "check:figures": "node --env-file=.env.local scripts/check-figures.ts",
+    "check:coverage": "node scripts/check-coverage.ts"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^5.0.115",

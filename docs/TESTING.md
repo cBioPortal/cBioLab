@@ -18,7 +18,43 @@ What each suite checks, how to run it, and how the gate and CI put them together
   `lib/db.ts`'s own fallback.
 - **`npm run test:python`** — the Python port's suite (below).
 - **`npx eslint <files you touched>`** — the full `npm run lint` takes ~2 min.
-- `npm run report:coverage` — the unit suites' coverage (CI shows it on the reports job).
+- `npm run report:coverage && npm run check:coverage` — the unit suites' coverage and its rules (below).
+- **`E2E_PORT=<your next dev port> E2E_ONLY=<areas> node e2e.cjs`** — only the e2e areas you are
+  working on (file names in `test/e2e/`, e.g. `view-kinds,riskmodel`), against your running `next dev`.
+  The whole suite runs in the gate.
+
+## Coverage rules — new code is tested
+
+CI's `coverage` job runs `npm run report:coverage` (node's coverage of `npm test`) and then
+`npm run check:coverage` (`scripts/check-coverage.ts`), which fails on any of:
+
+- **Changed lines poorly covered.** Of a PR's changed lines in `lib/` and `mcp/` (against
+  `COVERAGE_BASE`, default `origin/master`; a kind's `doc.ts` is left out), at least 80% of the
+  executable ones and 70% of the branches on them must run under `npm test`. A patch with fewer than
+  10 of either is not held to a percentage. Lines is the stricter column here: V8 reports no branches
+  inside a function that never ran, so the branch figure only speaks for code that did.
+- **A new file in `lib/` or `mcp/` that no unit test loads.** Node leaves such a file out of its
+  totals altogether.
+- **An area below its floor.** `test/fixtures/coverage-floor.json` holds each area's branch and
+  function coverage; falling more than a quarter point below fails. When coverage rises, raise the
+  floors with `UPDATE_COVERAGE_FLOOR=1 npm run check:coverage` and commit the file; lowering one is a
+  decision a reviewer sees in the diff.
+
+Code a unit test cannot reach (a ClickHouse write, a network call) is better given a seam a test
+can drive than an exemption. Where it truly cannot, mark it with node's own comments,
+`/* node:coverage ignore next <n> */` or a `/* node:coverage disable */` … `/* node:coverage enable */`
+pair, so the exemption is in the code a reviewer reads.
+
+## Every settled view kind is drawn by a browser check
+
+A view kind is in some e2e area's `covers` export (`test/e2e/*.cjs`) unless it says why not: a
+`preview` kind, or a provisional one whose `kind.ts` gives an `e2ePending` reason (the new kinds
+whose design may still change). `test/e2e-coverage.test.ts` (in `npm test`) fails on a kind that is
+neither covered nor exempt, and on one that is both. `test/e2e/view-kinds.cjs` draws each kind it
+covers from its gallery snapshot example and requires every card drawn, with no error and no JS
+error; an area that checks a kind more closely (`riskmodel.cjs`, the oncoprint in
+`analysis-page.cjs`) covers it instead. Promoting a kind removes its exemption and adds it to a
+`covers` list in the same change.
 
 ## View snapshots — every view kind's output is pinned
 

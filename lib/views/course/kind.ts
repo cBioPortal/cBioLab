@@ -22,4 +22,5 @@ export const courseKind: ViewKindDef<"course"> = {
     text: "Shows what share of patients were in each stage of their care — on treatment, in follow-up, and so on — at each point in time after diagnosis or another starting event. It's a picture of the typical patient's journey through care, not any one individual's."
   },
   isNew: true,
+  e2ePending: "provisional: its design may still change",
 };
