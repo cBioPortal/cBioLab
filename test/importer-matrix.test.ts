@@ -1,5 +1,5 @@
 // The gene × sample matrix importers (lib/importer/matrix.ts) against the legacy importer's rules
-// for tab-delimited profiles (notes/legacy-java-importer.md §G3, §G4, §T1–T9, §P1). Each test
+// for tab-delimited profiles (docs/importer/legacy-java-importer.md §G3, §G4, §T1–T9, §P1). Each test
 // writes a small file, imports it into a fake ClickHouse and checks what was stored, what was
 // skipped and which samples count as profiled. Expected values come from the notes, not the code.
 import { afterEach, beforeEach, describe, test } from "node:test";

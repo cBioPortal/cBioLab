@@ -1,5 +1,5 @@
 // The importer's clinical, segment, timeline, gene panel and case list rules, written from the
-// legacy-importer notes (import session: notes/README.md and legacy-java-importer.md §C, §S, §P,
+// legacy-importer notes (docs/importer/README.md and legacy-java-importer.md §C, §S, §P,
 // §L, §X3, §X5) rather than from the code. Each test names the rule it pins; a test marked `todo`
 // records a place where the importer and the notes disagree.
 import { test } from "node:test";

@@ -1,5 +1,5 @@
 // The MAF and structural-variant importers checked against the legacy importer's rules as the
-// import notes state them (legacy-java-importer.md §G1, G2, G5, M1–M13, V1–V4 and the
+// import notes state them (docs/importer/legacy-java-importer.md §G1, G2, G5, M1–M13, V1–V4 and the
 // reference-genome summary; README §A/§B). Expected values come from those notes, not from the
 // code: a case the importer gets wrong is kept as a `todo` naming the rule it breaks.
 import { test } from "node:test";
