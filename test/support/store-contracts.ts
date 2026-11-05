@@ -7,7 +7,9 @@ import { listArtifacts, getArtifact, createArtifact, updateArtifact, deleteArtif
 import { createGroup, addMember, getGroup, listGroups, removeMember, setRole, deleteGroup } from "../../lib/groups.ts";
 import { userForEmail, signIn, claimLegacy, searchUsers } from "../../lib/users.ts";
 import { dbQuery } from "../../lib/db.ts";
-import { saveIdSet, listIdSets, getIdSet, readIdSet, deleteIdSet, shareIdSet, loadIdSetForRequest } from "../../lib/id-set-store.ts";
+import { saveIdSet, listIdSets, getIdSet, readIdSet, withdrawIdSet, restoreIdSet, idSetUsage, shareIdSet, loadIdSetForRequest, WithdrawnIdSetError } from "../../lib/id-set-store.ts";
+import { saveLink, readLink, linkId, linksNaming } from "../../lib/link-store.ts";
+import { encodeUrlJson } from "../../lib/url-json.ts";
 
 const ds = (id: string, value = "Brain") => ({
   id, name: id + " (test)", level: "patient", columns: [{ name: "MET_SITE", datatype: "STRING" }],
@@ -107,7 +109,7 @@ export function customStoreContract(backend: string): void {
   });
 }
 
-/** Stored id sets (lib/id-set-store.ts): read back exactly, never changed, owner-scoped, a deleted one says so. */
+/** Stored id sets (lib/id-set-store.ts): read back exactly, never changed, read by id by anyone, managed by its owner, a withdrawn one says why. */
 export function idSetContract(backend: string): void {
   describe("id set store (" + backend + ")", () => {
     before(users);
@@ -133,28 +135,83 @@ export function idSetContract(backend: string): void {
       await assert.rejects(saveIdSet(P, input("  ")), /needs a name/);
     });
 
-    test("another principal can read nothing it was not granted, until it is shared", async () => {
-      const meta = await saveIdSet(P, input("private"));
-      assert.ok(!(await listIdSets(OTHER)).some((x) => x.id === meta.id));
-      await assert.rejects(readIdSet(OTHER, meta.id), /no stored id set .* that you may read/);
-      await assert.rejects(loadIdSetForRequest(OTHER, meta.id), /no stored id set .* that you may read/);
-      await assert.rejects(shareIdSet(OTHER, meta.id, { visibility: "public" }), /no stored id set/);
-      await shareIdSet(P, meta.id, { visibility: "public" });
+    test("anyone with its id reads it, signed in or not; only its owner's saved work lists it until it is shared", async () => {
+      const meta = await saveIdSet(P, input("by id"));
       assert.deepEqual((await readIdSet(OTHER, meta.id)).perStudy.s2, ["T-1"]);
-      await assert.rejects(deleteIdSet(OTHER, meta.id), /only its owner can delete/);
-      await loadIdSetForRequest(OTHER, meta.id);
-      await shareIdSet(P, meta.id, { visibility: "private" });
-      await assert.rejects(loadIdSetForRequest(OTHER, meta.id), /no stored id set/, "unsharing takes effect at once, not after the access check's minute");
+      assert.deepEqual((await readIdSet(null, meta.id)).perStudy.s2, ["T-1"], "a reader who is not signed in");
+      assert.equal((await loadIdSetForRequest(null, meta.id)).count, 3);
+      assert.deepEqual((await getIdSet(null, meta.id)).rights, { edit: false, share: false });
+      assert.ok(!(await listIdSets(OTHER)).some((x) => x.id === meta.id), "reading by id does not put it in someone else's list");
+      await shareIdSet(P, meta.id, { visibility: "public" });
+      assert.ok((await listIdSets(OTHER)).some((x) => x.id === meta.id));
+      await assert.rejects(readIdSet(OTHER, "00000000-0000-4000-8000-000000000000"), /no stored id set/);
     });
 
-    test("a deleted set disappears from the list, and reading it says when it went", async () => {
-      const meta = await saveIdSet(P, input("gone"));
-      await loadIdSetForRequest(P, meta.id);   // read once, so it is remembered
-      await deleteIdSet(P, meta.id);
-      await assert.rejects(loadIdSetForRequest(P, meta.id), /was deleted on/, "a set read just before its deletion is not served after it");
-      assert.ok(!(await listIdSets(P)).some((x) => x.id === meta.id));
-      assert.ok((await getIdSet(P, meta.id)).deletedAt);
-      await assert.rejects(readIdSet(P, meta.id), /was deleted on \d{4}-\d{2}-\d{2}/);
+    test("only its owner shares, withdraws, restores or counts what uses it", async () => {
+      const meta = await saveIdSet(P, input("owned"));
+      await assert.rejects(shareIdSet(OTHER, meta.id, { visibility: "public" }), /only its owner can change who sees/);
+      await assert.rejects(withdrawIdSet(OTHER, meta.id), /only its owner can withdraw/);
+      await assert.rejects(restoreIdSet(OTHER, meta.id), /only its owner can restore/);
+      await assert.rejects(idSetUsage(OTHER, meta.id), /only its owner can see what uses/);
+      assert.equal((await readIdSet(OTHER, meta.id)).meta.count, 3, "refusals change nothing");
+    });
+
+    test("a withdrawn set is refused with who, when, why and its replacement — even just after it was read", async () => {
+      const meta = await saveIdSet(P, input("withdrawn"));
+      const next = await saveIdSet(P, input("withdrawn v2"));
+      await loadIdSetForRequest(OTHER, meta.id);   // read once, so it is remembered
+      const w = await withdrawIdSet(P, meta.id, { note: "  wrong cohort: patients from the pilot were included.  ", replacedBy: next.id });
+      assert.equal(w.withdrawal?.note, "wrong cohort: patients from the pilot were included.");
+      assert.deepEqual(w.withdrawal?.replacedBy, { id: next.id, name: "withdrawn v2" });
+      for (const read of [() => loadIdSetForRequest(OTHER, meta.id), () => readIdSet(null, meta.id)]) {
+        await assert.rejects(read, (e: unknown) => {
+          assert.ok(e instanceof WithdrawnIdSetError);
+          assert.equal(e.status, 410);
+          assert.match(e.message, /“withdrawn” was withdrawn by its owner \(owner@contract\.test\) on \d{4}-\d{2}-\d{2}: wrong cohort: patients from the pilot were included\. Its owner points to “withdrawn v2”/);
+          assert.equal(e.withdrawal.replacedBy?.id, next.id);
+          return true;
+        });
+      }
+      assert.ok((await getIdSet(OTHER, meta.id)).withdrawal, "its description still reads, with the withdrawal");
+      assert.ok(!(await listIdSets(P)).some((x) => x.id === meta.id), "it leaves its owner's list");
+      assert.ok((await listIdSets(P, { withdrawn: true })).some((x) => x.id === meta.id && x.withdrawal), "unless they ask for withdrawn ones");
+      await assert.rejects(shareIdSet(P, meta.id, { visibility: "public" }), /is withdrawn: restore it first/);
+    });
+
+    test("withdrawing one set leaves another holding the same ids readable", async () => {
+      const a = await saveIdSet(P, input("twin"));
+      const b = await saveIdSet(OTHER, input("twin"));
+      assert.equal(a.sha256, b.sha256, "the same ids");
+      assert.notEqual(a.id, b.id, "but two sets");
+      await withdrawIdSet(P, a.id);
+      await assert.rejects(readIdSet(OTHER, a.id), /was withdrawn/);
+      assert.deepEqual((await readIdSet(P, b.id)).perStudy, (await readIdSet(OTHER, b.id)).perStudy);
+    });
+
+    test("a replacement must be another set in use; restoring clears the withdrawal", async () => {
+      const a = await saveIdSet(P, input("restorable"));
+      const gone = await saveIdSet(P, input("already gone"));
+      await withdrawIdSet(P, gone.id);
+      await assert.rejects(withdrawIdSet(P, a.id, { replacedBy: a.id }), /cannot replace itself/);
+      await assert.rejects(withdrawIdSet(P, a.id, { replacedBy: gone.id }), /is withdrawn too/);
+      await assert.rejects(withdrawIdSet(P, a.id, { replacedBy: "00000000-0000-4000-8000-000000000000" }), /no stored id set .* to point readers to/);
+      await assert.rejects(withdrawIdSet(P, a.id, { note: "x".repeat(1001) }), /at most 1000 characters/);
+      const w = await withdrawIdSet(P, a.id, { note: "pending review" });
+      const at = w.withdrawal!.at;
+      assert.equal((await withdrawIdSet(P, a.id, { note: "reviewed: keep it withdrawn" })).withdrawal!.at, at, "a second withdrawal changes the note, not the date");
+      const r = await restoreIdSet(P, a.id);
+      assert.equal(r.withdrawal, null);
+      assert.equal(r.deletedAt, null);
+      assert.equal((await loadIdSetForRequest(OTHER, a.id)).count, 3);
+    });
+
+    test("its owner sees how many saved items and stored links name it — counted, not listed", async () => {
+      const meta = await saveIdSet(P, input("used"));
+      const clause = { kind: "sampleList", set: meta.id };
+      await createArtifact(OTHER, "cohort", "someone else's cohort", { all: [clause] });
+      await createArtifact(P, "workspace", "an analysis", { study: "s1", cohorts: { a: { all: [clause] } }, views: [] });
+      await saveLink(null, { doc: encodeUrlJson({ study: "s1", cohorts: { a: { all: [clause] } }, views: [] }) });
+      assert.deepEqual(await idSetUsage(P, meta.id), { cohorts: 1, analyses: 1, links: 1 });
     });
 
     test("a lock is one row: its patients, and its samples and arms as parts, read back exactly", async () => {
@@ -170,7 +227,7 @@ export function idSetContract(backend: string): void {
       await assert.rejects(dbQuery("update id_set set parts = '{}'::jsonb where id = $1", [meta.id]), /members are immutable/);
     });
 
-    test("its members cannot be changed or the row deleted, though its sharing can", async () => {
+    test("its members cannot be changed or the row deleted, though its name and sharing can", async () => {
       const meta = await saveIdSet(P, input("frozen"));
       await assert.rejects(dbQuery("update id_set set id_count = 99 where id = $1", [meta.id]), /members are immutable/);
       await assert.rejects(dbQuery("update id_set set ids_gz = ''::bytea where id = $1", [meta.id]), /members are immutable/);
@@ -420,6 +477,48 @@ export function sharingContract(backend: string): void {
       await deleteGroup(O, g);
       assert.deepEqual((await getArtifact(O, a.id))!.sharing, { visibility: "private", groupId: null, groupCanEdit: false, groupName: null });
       assert.deepEqual((await getArtifact(O, b.id))!.sharing, { visibility: "public", groupId: null, groupCanEdit: false, groupName: null });
+    });
+  });
+}
+
+/** Stored links (lib/link-store.ts): stored by anyone, keyed by what they hold, never changed. */
+export function linkContract(backend: string): void {
+  describe("stored links (" + backend + ")", () => {
+    const tag = Math.random().toString(36).slice(2, 8);
+    test("a stored link reads back exactly, for anyone, under the id its parameters hash to", async () => {
+      const params = { doc: "1." + "A".repeat(300) + tag, changes: "x" };
+      const { id } = await saveLink(null, params);
+      assert.equal(id, linkId(params));
+      assert.deepEqual(await readLink(id), params);
+    });
+    test("the same parameters, in any order and by anyone, are one link", async () => {
+      await users();
+      const a = await saveLink(P, { a: "1" + tag, b: "2" });
+      const b = await saveLink(null, { b: "2", a: "1" + tag });
+      assert.equal(a.id, b.id);
+      const [{ n }] = await dbQuery<{ n: number | string }>("select count(*) as n from stored_link where id = $1", [a.id]);
+      assert.equal(Number(n), 1);
+    });
+    test("a stored link cannot be changed or deleted", async () => {
+      const { id } = await saveLink(null, { doc: "frozen " + tag });
+      await assert.rejects(dbQuery("update stored_link set params = '{}'::jsonb where id = $1", [id]), /never changes|permission denied/);
+      await assert.rejects(dbQuery("delete from stored_link where id = $1", [id]), /never changes|permission denied/);
+    });
+    test("what is not a page's parameters is refused before it is stored, and a missing id says so", async () => {
+      await assert.rejects(saveLink(null, null), /must be an object/);
+      await assert.rejects(saveLink(null, {}), /at least one parameter/);
+      await assert.rejects(saveLink(null, { s: "abc" }), /cannot hold another stored link/);
+      await assert.rejects(saveLink(null, { doc: 1 }), /must be text/);
+      await assert.rejects(readLink("A".repeat(22)), /no stored link .* on this deployment/);
+      await assert.rejects(readLink("../../etc"), /no stored link/);
+    });
+    test("a link naming a stored id set is counted for that set", async () => {
+      await users();
+      const set = await saveIdSet(P, { name: "linked " + tag, level: "sample", perStudy: { s1: ["S-1"] }, source: { idsIn: 1, unmatched: 0, duplicates: 0, multiStudy: 0 } });
+      const before = await linksNaming(set.id);
+      await saveLink(null, { doc: encodeUrlJson({ cohorts: { a: { kind: "sampleList", set: set.id } } }), tab: "analysis" });
+      await saveLink(null, { cohort: encodeUrlJson({ all: [{ kind: "patientList", set: set.id }] }) });
+      assert.equal(await linksNaming(set.id), before + 2);
     });
   });
 }

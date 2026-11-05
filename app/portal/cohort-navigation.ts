@@ -1,6 +1,7 @@
 // What a Patient page stepping through a cohort carries in its link, and the one-view document that
 // lists the cohort's patients (app/portal/cohort-nav.tsx draws the pager). The link holds the
-// cohort's definition (?cohort=) and the list's order (?order=), never its patients. Pure.
+// cohort's definition (?cohort=, or a stored link holding it: ?s=, app/_links) and the list's order
+// (?order=), never its patients. Pure.
 import type { AnalysisDoc, CohortDef, View } from "../../lib/types.ts";
 import type { TableQuery } from "../../lib/table-query.ts";
 import { decodeParam, encodeParam } from "./page-doc.ts";
@@ -8,16 +9,25 @@ import { decodeParam, encodeParam } from "./page-doc.ts";
 export const NAV_COHORT = "Patients";
 export type PatientKey = { study: string; id: string };
 
-/** The cohort a Patient page steps through, and the order it steps in, as its link carries them. */
-export interface CohortNavigation { def: CohortDef; order: TableQuery }
+/**
+ * The cohort a Patient page steps through, and the order it steps in, as its link carries them.
+ * `link` is a stored link holding exactly the cohort, which the page's own links carry (?s=)
+ * instead of a ?cohort= too long for the address bar.
+ */
+export interface CohortNavigation { def: CohortDef; order: TableQuery; link?: string }
 
-export function readNavigation(q: URLSearchParams): { nav: CohortNavigation | null; error: string | null } {
+/**
+ * The navigation a page's parameters carry (`q`, a stored link's put back). `link` is the stored
+ * link the address bar names, if any: kept when it holds this cohort and nothing else.
+ */
+export function readNavigation(q: URLSearchParams, link?: { id: string; params: Record<string, string> } | null): { nav: CohortNavigation | null; error: string | null } {
   const raw = q.get("cohort");
   if (!raw) return { nav: null, error: null };
   const def = decodeParam<CohortDef>(raw);
   if (!def || typeof def !== "object" || Array.isArray(def)) return { nav: null, error: "this link's cohort cannot be read" };
   const order = decodeParam<TableQuery>(q.get("order")) || {};
-  return { nav: { def, order: typeof order === "object" ? order : {} }, error: null };
+  const holdsCohort = !!link && link.params.cohort === raw && Object.keys(link.params).every((k) => k === "cohort");
+  return { nav: { def, order: typeof order === "object" ? order : {}, ...(holdsCohort ? { link: link!.id } : {}) }, error: null };
 }
 
 /** The URL parameters that carry a navigation: what every link the page makes keeps. */
@@ -25,7 +35,7 @@ export function navigationParams(nav: CohortNavigation | null): Record<string, s
   if (!nav) return {};
   const order = { search: nav.order.search, filters: nav.order.filters, sort: nav.order.sort };
   const hasOrder = !!(order.search || order.filters && Object.keys(order.filters).length || order.sort);
-  return { cohort: encodeParam(nav.def), ...(hasOrder ? { order: encodeParam(order) } : {}) };
+  return { ...(nav.link ? { s: nav.link } : { cohort: encodeParam(nav.def) }), ...(hasOrder ? { order: encodeParam(order) } : {}) };
 }
 
 /** The Patient page's link for a patient of the cohort. */

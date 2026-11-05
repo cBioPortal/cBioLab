@@ -7,11 +7,14 @@ export const maxDuration = 60;
 
 const fail = (e: unknown) => Response.json({ error: String((e as Error)?.message || e) }, { status: e instanceof AccessError ? e.status : 400 });
 
-/** The stored id sets this reader may use, without their ids. */
+/** The stored id sets in this reader's saved work, without their ids; `?withdrawn=1` adds their own withdrawn ones. */
 export async function GET(req: Request) {
   // rendered per request: without it the build prerenders whatever the login check answers then
   await connection();
-  try { return Response.json({ sets: await listIdSets(requirePrincipal(req, "use stored id sets")) }); }
+  try {
+    const withdrawn = new URL(req.url).searchParams.get("withdrawn") === "1";
+    return Response.json({ sets: await listIdSets(requirePrincipal(req, "use stored id sets"), { withdrawn }) });
+  }
   catch (e) { return fail(e); }
 }
 

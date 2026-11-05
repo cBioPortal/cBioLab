@@ -27,6 +27,17 @@ describe("a Patient page's cohort navigation", () => {
     assert.deepEqual([...q.entries()], [["study", "coadread_tcga_pub"], ["sample", "TCGA-AA-3867-01"]]);
     assert.deepEqual(readNavigation(q), { nav: null, error: null });
   });
+  test("a stored link holding exactly the cohort is carried as ?s= instead of the cohort, and reads back the same", () => {
+    const cohort = navigationParams({ def, order: {} }).cohort;
+    const link = { id: "abcdefghijklmnopqrstuv", params: { cohort } };
+    const q = new URLSearchParams({ cohort, study: "a" });
+    const nav = readNavigation(q, link).nav!;
+    assert.equal(nav.link, link.id);
+    assert.deepEqual(new URL("http://h" + patientHref({ study: "a", id: "P-1" }, nav, null)).searchParams.get("s"), link.id);
+    assert.equal(new URL("http://h" + patientHref({ study: "a", id: "P-1" }, nav, null)).searchParams.get("cohort"), null);
+    assert.equal(readNavigation(q, { ...link, params: { cohort, doc: "x" } }).nav!.link, undefined, "a link holding more than the cohort is not carried");
+    assert.equal(readNavigation(q, { ...link, params: { cohort: cohort + "x" } }).nav!.link, undefined, "nor one holding another cohort");
+  });
   test("a link without a cohort is not a navigation; one whose cohort does not decode says so", () => {
     assert.deepEqual(readNavigation(new URLSearchParams("study=a&patient=P")), { nav: null, error: null });
     assert.match(readNavigation(new URLSearchParams("cohort=%%%")).error || "", /cannot be read/);

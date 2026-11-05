@@ -323,20 +323,23 @@ suite fail. A test that cannot fail is decoration.
 - **Stored id sets are patient-level too, and follow the same rules.** A long
   `sampleList`/`patientList` is saved on the server (`lib/id-set-store.ts`,
   `db/migrations/0006`) and named by a document as `"set": "<id>"`, so the ids
-  are in neither the document, its `?doc=` link nor the request. A route reads
-  the sets its body names as the request's signed-in principal
-  (`withRequestIdSets` in `lib/id-sets-server.ts`, reached through
+  are in neither the document, its `?doc=` link nor the request. **A set is read
+  by its id**: whoever holds a link or document naming it may read its members,
+  signed in or not, as they may read the link (a decision of 2026-11-05: ids
+  reached through a link are not a protected audience; [LINKS.md](LINKS.md)).
+  Only its owner shares, withdraws or restores it. A route reads the sets its
+  body names (`withRequestIdSets` in `lib/id-sets-server.ts`, reached through
   `withRequestCustomData`), and each study's ids go only to the connection of
   the patient-level instance holding that study: `lib/ch.ts` uploads a set's
   table (`idSetExternalsFor` in `lib/id-sets.ts`) only with a statement that
   names it, and refuses any other connection. `carriesPatientIds()` counts a
   `set` as identifiers, so such a cohort is refused for an aggregate-only or
-  remote participant before any request is made. Sets are owned and shared by
-  `lib/access.ts`, their members are immutable (a trigger), deletion is a soft
-  delete that a document naming the set reports, every read and write is logged
-  (`id_set_access_log`), and answers that read one are never written to the
-  shared result cache (`hasIdSets()`). Without a signed-in request (an MCP client, a script,
-  a signed-out link) a set is not read at all, and the clause is refused by name.
+  remote participant before any request is made — who may READ a set never
+  widens where its ids may GO. Their members are immutable (a trigger), a
+  withdrawn set refuses every document naming it with its owner's note, every
+  read and write is logged (`id_set_access_log`, "anonymous" when no one is
+  signed in), and answers that read one are never written to the shared result
+  cache (`hasIdSets()`).
   Covered by `test/id-sets.test.ts` and `idSetContract` in
   `test/support/store-contracts.ts`.
 

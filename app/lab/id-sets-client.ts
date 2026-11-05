@@ -2,8 +2,8 @@
 // reader is signed in: a cohort picked on an oncoprint, donors from Cell Explorer, and every list
 // still inline when a cohort or an analysis is saved. The document then names the set
 // (`{"kind":"sampleList","set":"<id>"}`), so it, its ?doc= link and every request stay small
-// however long the list is. Inline lists remain valid DSL for MCP clients, scripts and signed-out
-// readers, who cannot read a set.
+// however long the list is. Anyone with the document may read a set it names (docs/LINKS.md);
+// a reader who is not signed in cannot store one, so their lists stay inline, which is valid DSL.
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
 import { api } from "./api.ts";
 

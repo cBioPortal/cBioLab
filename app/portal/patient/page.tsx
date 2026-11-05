@@ -10,7 +10,8 @@
 // (Explore's "View patients") it steps through that cohort's patients (cohort-nav.tsx); with a
 // cohort and no patient it opens the cohort's first.
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useAddressLink, useLinkParams } from "../../_links/use-link.ts";
 import { PortalTabs } from "../PortalTabs";
 import { useStudyKnown } from "../study-known";
 import { usePageDoc } from "../page-doc";
@@ -49,12 +50,13 @@ function useSamplePatient(study: string, sample: string): { patient: string | nu
 }
 
 export default function PatientPage() {
-  const q = useSearchParams();
+  const q = useLinkParams();
   const study = (q.get("study") || q.get("studyId") || "").replace(ID, "");
   const sample = (q.get("sample") || q.get("sampleId") || "").replace(ID, "");
   // as on the portal, a sample in the link makes it the sample view, whatever patient is named too
   const patient = sample ? "" : (q.get("patient") || q.get("caseId") || "").replace(ID, "");
-  const { nav, error } = useMemo(() => readNavigation(q), [q]);
+  const link = useAddressLink();
+  const { nav, error } = useMemo(() => readNavigation(q, link), [q, link]);
   if (error) return <><SiteHeader page="patient" /><main className="analysis-main"><div className="error">{error}</div></main></>;
   if (nav && !patient && !sample) return <CohortStart nav={nav} tab={q.get("tab")} />;
   return <PatientView key={study + "|" + patient + "|" + sample} study={study} patient={patient} sample={sample} nav={nav} tab={q.get("tab")} />;

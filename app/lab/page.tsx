@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { linkParams } from "../_links/link-state.ts";
+import { useLinkParams } from "../_links/use-link.ts";
 import { ExploreCharts } from "./explore-charts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
@@ -160,13 +161,14 @@ function useOverBar(onCancel: () => void) {
 }
 
 export default function AnalysisPage() {
-  // Read through useSearchParams, never `use(searchParams)`: every syncUrl() is a
+  // Read through useLinkParams (useSearchParams, with a stored link's parameters put back:
+  // app/_links), never `use(searchParams)`: every syncUrl() is a
   // history.replaceState, which hands the page a NEW searchParams promise, and
   // `use()` of an unresolved promise suspends the whole page — the layout's
   // Suspense then shows its empty fallback for React's minimum 300 ms, a white
   // flash on every click. The params only seed first-render state (the tab, a
   // ?doc= link's loading skeleton), so nothing here needs them to be reactive.
-  const params = useSearchParams();
+  const params = useLinkParams();
   const sp: SearchParams = Object.fromEntries(params.entries());
   // the ?doc= link as the page was opened with it: by the time the mount effect reads it, the
   // document store may already have written the URL
@@ -318,11 +320,11 @@ export default function AnalysisPage() {
         if (tabRef.current === "explore") fetchExplore();
       } else {
         // ?study=a,b opens Explore scoped to those studies (the data sets page links here)
-        const only = (new URLSearchParams(window.location.search).get("study") || "")
+        const only = (linkParams().get("study") || "")
           .split(",").map((x) => x.trim().replace(/[^A-Za-z0-9._-]/g, "")).filter(Boolean);
         if (only.length) { setStudy(only[0]); setExStudies(only); exSel.current = only; }
         // &custom=add opens Custom data → Add data on them (the homepage's "add custom data to" icon)
-        if (only.length && new URLSearchParams(window.location.search).get("custom") === "add") exploreState.setCustomTab("add");
+        if (only.length && linkParams().get("custom") === "add") exploreState.setCustomTab("add");
         if (tabRef.current === "explore") fetchExplore();
       }
     } catch (e) { setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
@@ -341,7 +343,7 @@ export default function AnalysisPage() {
   // change they did not make, rewrites the current one.
   const syncUrl = (nextTab?: string, d?: AnalysisDoc | null, push = false) => {
     try {
-      const q = new URLSearchParams(window.location.search);
+      const q = linkParams();
       q.set("tab", nextTab || tabRef.current);
       if (d) q.set("doc", docParam(d));
       docHistory.record("?" + q.toString(), push);
@@ -389,7 +391,7 @@ export default function AnalysisPage() {
       return (typeof sp.study === "string" ? sp.study : "").split(",").map((x) => x.trim().replace(/[^A-Za-z0-9._-]/g, "")).filter(Boolean);
     } catch { return []; }
   });
-  const exploreState = useExploreState({ linkedStudies, addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
+  const exploreState = useExploreState({ linkedStudies, addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, loggedIn, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
   const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, drivers, setDrivers, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
   // The saved-work manager, opened over this page, opens what is chosen in it here, in place
   const savedWork = useSaved();

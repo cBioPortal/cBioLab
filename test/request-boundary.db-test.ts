@@ -23,8 +23,8 @@ const { startPostgres } = await import("./support/postgres.ts");
 const { setChTransport } = await import("../lib/ch.ts");
 const { userForEmail } = await import("../lib/users.ts");
 const { sessionCookie, AccessError } = await import("../lib/auth.ts");
-const { saveIdSet, readIdSet, ID_SET_MAX } = await import("../lib/id-set-store.ts");
-const { idSetExternalsFor, idSetTableName } = await import("../lib/id-sets.ts");
+const { saveIdSet, readIdSet, withdrawIdSet, ID_SET_MAX } = await import("../lib/id-set-store.ts");
+const { idSetExternalsFor, idSetTableName, loadedIdSet } = await import("../lib/id-sets.ts");
 const { withRequestIdSets, MAX_SETS_PER_REQUEST } = await import("../lib/id-sets-server.ts");
 const { createIdSet } = await import("../lib/id-set-import.ts");
 const { lockCohorts } = await import("../lib/cohort-lock-server.ts");
@@ -82,7 +82,7 @@ beforeEach(() => { sent = []; });
 const source = { idsIn: 0, unmatched: 0, duplicates: 0, multiStudy: 0 };
 const setCount = async () => Number((await db.query<{ n: number }>("select count(*)::int as n from id_set")).rows[0].n);
 
-describe("withRequestIdSets: the sets a request names, read as its reader", () => {
+describe("withRequestIdSets: the sets a request names, read by their ids", () => {
   test("a request naming no set runs as it is, signed in or not", async () => {
     assert.equal(await withRequestIdSets({ cohorts: { A: { all: [] } } }, request(null), async () => "ran"), "ran");
   });
@@ -93,17 +93,19 @@ describe("withRequestIdSets: the sets a request names, read as its reader", () =
     await assert.rejects(withRequestIdSets(body, request(null), async () => "ran"), new RegExp("at most " + MAX_SETS_PER_REQUEST + " stored id sets"));
   });
 
-  test("a set is not read without a signed-in reader", async () => {
-    const s = await saveIdSet(alice.id, { name: "mine", level: "patient", perStudy: { s_a: ["P1"] }, source });
+  test("a set is read by its id for anyone: signed in, someone else, or nobody", async () => {
+    const s = await saveIdSet(alice.id, { name: "alice's", level: "patient", perStudy: { s_a: ["P1"] }, source });
     const body = { cohorts: { A: { all: [{ kind: "patientList", set: s.id }] } } };
-    await assert.rejects(withRequestIdSets(body, request(null), async () => "ran"), AccessError);
+    for (const who of [alice, bob, null])
+      assert.equal(await withRequestIdSets(body, request(who), async () => loadedIdSet(s.id).count), 1, "read for " + (who ? "a signed-in reader" : "a reader who is not signed in"));
   });
 
-  test("nor by someone it is not shared with, whose request then never runs", async () => {
-    const s = await saveIdSet(alice.id, { name: "alice only", level: "patient", perStudy: { s_a: ["P1"] }, source });
+  test("a withdrawn set is refused, and the request never runs", async () => {
+    const s = await saveIdSet(alice.id, { name: "withdrawn", level: "patient", perStudy: { s_a: ["P1"] }, source });
+    await withdrawIdSet(alice.id, s.id, { note: "superseded" });
     let ran = false;
-    await assert.rejects(withRequestIdSets({ cohorts: { A: { all: [{ kind: "patientList", set: s.id }] } } }, request(bob),
-      async () => { ran = true; }));
+    await assert.rejects(withRequestIdSets({ cohorts: { A: { all: [{ kind: "patientList", set: s.id }] } } }, request(null),
+      async () => { ran = true; }), (e: unknown) => e instanceof AccessError && e.status === 410 && /withdrawn by its owner .*: superseded\./.test(e.message));
     assert.equal(ran, false);
   });
 
