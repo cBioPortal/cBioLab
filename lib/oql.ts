@@ -109,10 +109,28 @@ const mutationsWithPositions = (db: string, study: string, gene: string): string
  */
 export const annotationMatchSql = (ann: string, g: string): string =>
   ann + ".hugo_gene_symbol = " + g + ".hugo_gene_symbol\n" +
-  "   AND " + ann + ".alteration_type = multiIf(" + g + ".variant_type = 'mutation', 'MUTATION', " + g + ".variant_type = 'cna', 'CNA', " +
-  g + ".variant_type = 'structural_variant', 'SV', '')\n" +
-  "   AND " + ann + ".alteration = multiIf(" + g + ".variant_type = 'mutation', " + g + ".mutation_variant, " + g + ".variant_type = 'cna', " +
-  "if(" + g + ".cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')\n";
+  "   AND " + ann + ".alteration_type = " + storeAlterationType(g + ".") + "\n" +
+  "   AND " + ann + ".alteration = " + storeAlteration(g + ".") + "\n";
+
+/** an event's alteration type and alteration as the OncoKB store keys them; `g` prefixes the event's columns */
+const storeAlterationType = (g: string): string =>
+  "multiIf(" + g + "variant_type = 'mutation', 'MUTATION', " + g + "variant_type = 'cna', 'CNA', " + g + "variant_type = 'structural_variant', 'SV', '')";
+const storeAlteration = (g: string): string =>
+  "multiIf(" + g + "variant_type = 'mutation', " + g + "mutation_variant, " + g + "variant_type = 'cna', " +
+  "if(" + g + "cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')";
+
+/**
+ * "This genomic_event_derived row is an OncoKB driver at the pin", as a condition on the row's own
+ * columns (`g` names its table, or "" for unqualified columns): the same match as the driver join,
+ * as a set lookup, so it narrows a query that aggregates the rows without joining them, and never
+ * repeats a row the store happens to list twice.
+ */
+export const driverEventSql = (pin: string, g = ""): string => {
+  const c = g ? g + "." : "";
+  return "(" + c + "hugo_gene_symbol, " + storeAlterationType(c) + ", " + storeAlteration(c) + ") IN (\n" +
+    "    SELECT hugo_gene_symbol, alteration_type, alteration FROM oncokb_annotation.variant_annotation\n" +
+    "    WHERE oncokb_version = " + sq(pin) + " AND is_driver)";
+};
 
 /** The store's driver rows at the pin, joined to each event `g` (`kind`: INNER or LEFT). */
 export const driverAnnotationJoin = (pin: string, kind: "INNER" | "LEFT"): string =>

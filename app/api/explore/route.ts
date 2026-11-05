@@ -7,7 +7,7 @@ import { mergeExplore } from "../../../lib/explore.ts";
 import { PRIMARY, withChContext, ensureChContext, withoutFailedQueries } from "../../../lib/ch.ts";
 import { pack, throughCache, cacheVersion, resultEntry } from "../../../lib/next-cache.ts";
 import { studyProfilesMany, resolveStudy } from "../../../lib/analysis.ts";
-import { oncokbPin } from "../../../lib/annotation.ts";
+import { oncokbPin, studiesWithoutDrivers } from "../../../lib/annotation.ts";
 import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { assertCustomDataPresent } from "../../../lib/custom-data.ts";
@@ -97,6 +97,16 @@ async function exploreFor(body: any) {
     .map((x: DerivedRequest) => ({ metric: x.metric, ...(x.eventType ? { eventType: String(x.eventType).slice(0, 200) } : {}),
       ...(x.lineGap != null ? { lineGap: Number(x.lineGap) } : {}) }))
     : undefined;
+  // Drivers only is answered here or not at all: a study the OncoKB store has not annotated, or one
+  // a peer holds (its federation API counts every alteration), would read as having no drivers.
+  const drivers = body.drivers === true;
+  if (drivers) {
+    if (!pin) throw new Error("drivers only needs the OncoKB annotation store, which this deployment does not have; count every alteration instead");
+    if (remote.length) throw new Error("drivers only is not available for studies held by a remote peer (" + remote.join(", ") + "); deselect them or count every alteration");
+    const missing = await studiesWithoutDrivers(local);
+    if (missing.length) throw new Error("drivers only needs OncoKB driver calls, which " + missing.join(", ") + (missing.length === 1 ? " does" : " do") +
+      " not have on this deployment; deselect " + (missing.length === 1 ? "it" : "them") + " or count every alteration");
+  }
   const remoteParts = await Promise.all(remote.map((s) => {
     const peer = peers.get(s)!;
     return remoteFacets(s, peer.url, draft, peer.label, geneSearch);
@@ -108,9 +118,9 @@ async function exploreFor(body: any) {
   }
   const { catalog: _c, ...oneProfiles } = profilesByStudy.get(local[0]) || {};
   const localResult = local.length === 1
-    ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts, derived,
+    ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts, derived, drivers,
         ...oneProfiles, conn: connByStudy.get(local[0]) })
-    : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived });
+    : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived, drivers });
   const assayFacets = body.assayCharts && body.assayCharts.length
     ? await buildAssayFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy,
         charts: body.assayCharts.filter((c: { profileType: string; entity: string }) => ENTITY_RE.test(c.entity)) })
