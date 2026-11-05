@@ -1,5 +1,6 @@
 "use client";
 // The predictive view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
+import { endpointText } from "../outcome-pairs.ts";
 import { DraftInput } from "./parts.tsx";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
@@ -45,7 +46,7 @@ export const predictiveUi: KindUi<"predictive"> = {
   },
   sub: (spec) => {
     const ex = spec.exposure || {};
-    return "gene × " + (ex.eventType || "?") + (ex.key ? " [" + ex.key + "=" + ex.value + "]" : "") + " on " + (spec.endpoint || "OS") +
+    return "gene × " + (ex.eventType || "?") + (ex.key ? " [" + ex.key + "=" + ex.value + "]" : "") + " on " + endpointText(spec) +
       (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") + " · Cox per gene";
   },
   Controls,

@@ -3,24 +3,28 @@
 import { DraftInput } from "./parts.tsx";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
+import { IncidenceOutcomeChoice } from "../outcome-choice.tsx";
+import { uploadedOutcomePairs, COMPETING_STATUS, endpointText } from "../outcome-pairs.ts";
+import { attributeLabel } from "../../../lib/custom-data-names.ts";
 
 /** the incidence view's settings row */
 function Controls({ c }: { c: KindCardCtx }) {
   const { spec, busy, patch } = c;
+  const types = c.events.map((x) => x.label);
+  const outcome = <IncidenceOutcomeChoice spec={spec} attrs={c.attrs} events={types} busy={busy} onPatch={patch} />;
   if (spec.monthsAttribute || spec.statusAttribute) return (
     <div className="viewtb">
-      <div className="tbz"><span className="tbl">outcome</span>
-        <span className="meta" data-tip="set in the document: a recorded time, and a status coded 0 censored, 1 the event, 2 a competing event">
-          {spec.statusAttribute} over {spec.monthsAttribute} (months) · 0 censored, 1 event, 2 competing</span>
+      <div className="tbz"><span className="tbl">outcome</span>{outcome}
+        <span className="meta" data-tip="the status column's codes">0 censored · 1 event · 2 competing</span>
       </div>
     </div>
   );
   const e = spec.event || { eventType: "" }, a0 = (e.attrs || [])[0] || { key: "", value: "" };
   const an = spec.anchor || null;
   const setEvent = (next: any) => patch({ event: next });
-  const types = c.events.map((x) => x.label);
   return (
     <div className="viewtb">
+      <div className="tbz"><span className="tbl">outcome</span>{outcome}</div>
       <div className="tbz"><span className="tbl">event</span>
         <label className="tbfield" data-tip="the timeline event whose first occurrence after the anchor is counted">
           type <OptionSelect value={e.eventType || ""} disabled={busy} onValueChange={(v) => setEvent({ ...e, eventType: v })}>
@@ -57,14 +61,17 @@ export const incidenceUi: KindUi<"incidence"> = {
   category: "outcomes",
   title: "Cumulative incidence",
   maxCohorts: 6,
-  why: (k) => k.events.length ? null : "this study records no timeline events to estimate the incidence of",
+  why: (k) => k.events.length || uploadedOutcomePairs(k.attrs, COMPETING_STATUS).length ? null
+    : "this study records no timeline events to estimate the incidence of, and no upload holds a <X>_TIME with a <X>_EVENTCR status",
   defaults: (known) => {
     const ev = known.events.find((e) => /diagnos|progress|status/i.test(e.canonical)) || known.events[0];
+    const pair = uploadedOutcomePairs(known.attrs, COMPETING_STATUS)[0];
+    if (!ev && pair) return { kind: "incidence", monthsAttribute: pair.months, statusAttribute: pair.status };
     return { kind: "incidence", event: { eventType: ev ? ev.label : "" } };
   },
   sub: (spec) => {
     if (spec.monthsAttribute || spec.statusAttribute)
-      return (spec.label || spec.statusAttribute || "") + " over " + (spec.monthsAttribute || "") + ", code 2 competing";
+      return endpointText(spec) + " over " + attributeLabel(String(spec.monthsAttribute || ""), "short") + ", code 2 competing";
     const e = spec.event || {};
     const an = spec.anchor;
     return (e.label || e.eventType || "no event chosen") +

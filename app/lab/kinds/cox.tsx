@@ -2,7 +2,7 @@
 // The cox view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
 import type { CardProps } from "../view-cards.tsx";
 import { Checkbox } from "../../_ui/checkbox";
-import { Choice } from "../../_ui/choice.tsx";
+import { EndpointChoice } from "../outcome-choice.tsx";
 import { CovariateList, placement } from "./parts.tsx";
 import { Input } from "../../_ui/input";
 import type { KindUi } from "./kind-ui.ts";
@@ -44,8 +44,8 @@ function CoxCard({ ctx, v, vi }: CardProps) {
         return (
           <div className="basis wraps">
             <span className="meta">endpoint</span>
-            <Choice size="ctl" value={sv.endpoint || "OS"} disabled={busy} onChange={v => patchView(vi, { endpoint: v })}
-              options={(eps.length ? eps : [sv.endpoint || "OS"]).map(x => [x, x] as const)} pending={!cat ? "loading…" : undefined} />
+            <EndpointChoice spec={sv} endpoints={eps} attrs={catalogAttrs()} busy={busy} pending={!cat ? "loading…" : undefined}
+              onPatch={(p) => patchView(vi, p)} />
             {catLoading && !cat && <Waiting what="endpoints" />}
             <span className="meta">cutoff</span>
             <Input type="number" min={1} placeholder="none" disabled={busy} className="h-ctl w-20 bg-card text-md md:text-md"

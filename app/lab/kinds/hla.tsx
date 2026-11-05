@@ -1,5 +1,6 @@
 "use client";
 // The hla view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
+import { endpointText } from "../outcome-pairs.ts";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
 
@@ -39,7 +40,7 @@ export const hlaUi: KindUi<"hla"> = {
     const tmb = known.attrs.find((a) => a.attribute === "TMB_NONSYNONYMOUS" || a.attribute === "TMB_SCORE");
     return tmb ? { kind: "hla", covariates: [tmb.attribute] } : { kind: "hla" };
   },
-  sub: (spec) => "alleles at " + (spec.resolution === 1 ? "1 field" : spec.resolution === "full" ? "full resolution" : "2 fields") + " · " + (spec.endpoint || "OS") +
+  sub: (spec) => "alleles at " + (spec.resolution === 1 ? "1 field" : spec.resolution === "full" ? "full resolution" : "2 fields") + " · " + endpointText(spec) +
     " by homozygosity and by HLA LOH" + (spec.covariates && spec.covariates.length ? " · adjusted for " + spec.covariates.join(", ") : ""),
   Controls,
 };

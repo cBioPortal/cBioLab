@@ -1,5 +1,6 @@
 "use client";
 // The riskmodel view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
+import { endpointText } from "../outcome-pairs.ts";
 import { Checkbox } from "../../_ui/checkbox";
 import { Choice, OptionSelect } from "../../_ui/choice.tsx";
 import { DraftInput } from "./parts.tsx";
@@ -120,7 +121,7 @@ export const riskmodelUi: KindUi<"riskmodel"> = {
   category: "outcomes",
   title: "Risk model",
   maxCohorts: 1,
-  sub: (spec) => (spec.endpoint || "OS") + (spec.anchor?.eventType ? " from first " + spec.anchor.eventType + (spec.anchor.key ? " [" + spec.anchor.key + "=" + spec.anchor.value + "]" : "") : "") +
+  sub: (spec) => endpointText(spec) + (spec.anchor?.eventType ? " from first " + spec.anchor.eventType + (spec.anchor.key ? " [" + spec.anchor.key + "=" + spec.anchor.value + "]" : "") : "") +
     " on " + (spec.measure === "driver" ? "driver mutations" : "mutated genes") +
     (spec.covariates?.length ? " + " + spec.covariates.length + " covariate" + (spec.covariates.length === 1 ? "" : "s") : "") +
     (spec.strata ? ", stratified by " + spec.strata : "") + " · " + (spec.runs ?? 10) + " held-out splits" + (spec.validate ? ", validated on the held-out half" : "") +

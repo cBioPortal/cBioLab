@@ -53,7 +53,7 @@ test("cumulative incidence from the columns: counts, label, the columns in the r
   const cv = r.incidence.curves[0];
   assert.deepEqual([cv.n, cv.events, cv.competing, cv.censored], [10, 6, 2, 2]);
   assert.equal(cv.excluded.noFollowup, 2, "the 2 of 12 patients without both values are counted, not dropped");
-  assert.equal(r.incidence.eventLabel, S);
+  assert.equal(r.incidence.eventLabel, "ICPFS_EVENTCR", "the column, without its dataset");
   assert.deepEqual(r.incidence.columns, { months: M, status: S });
   // F1 at 5 months: 3 events of 10 at t=2 → 0.3
   assert.equal(r.incidence.horizons[0].cells[0].f1, 0.3);

@@ -1,4 +1,5 @@
 // Incidence view: cumulative incidence with death as a competing risk
+import { attributeLabel } from "../../custom-data-names.ts";
 import type { ViewResult, IncidenceCurve } from "../../types.ts";
 import { incidenceCountsSql, incidenceColumnsCountsSql } from "../../federation-views.ts";
 import { Z_975, aalenJohansen, cifAt, grayPermutationTest, kaplanMeier, type CrRecord } from "../../stats.ts";
@@ -24,7 +25,7 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
         columns.months.slice(0, 60) + "'/'" + columns.status.slice(0, 60) + "'");
     if (view.event) return refuse("incidence", ctx, "give either event (a timeline event) or monthsAttribute/statusAttribute (a recorded time and status), not both");
     if (view.anchor) return refuse("incidence", ctx, "anchor applies to a timeline event; monthsAttribute is already measured from each patient's own start");
-    eventLabel = (view.label && String(view.label).trim().slice(0, 80)) || columns.status;
+    eventLabel = (view.label && String(view.label).trim().slice(0, 80)) || attributeLabel(columns.status, "short");
   } else {
     const ev = view.event;
     if (!ev || typeof ev.eventType !== "string" || !ev.eventType.trim())
@@ -129,7 +130,7 @@ export async function runIncidence(view: IncidenceView, ctx: ViewRun): Promise<V
     caveat: columns
       ? "Cumulative incidence of " + eventLabel + " from " + columns.months + " (months) and " + columns.status + ", whose status code 0 is censored, 1 the event and 2 a competing event: " +
         "Aalen–Johansen, 95% intervals from its delta-method standard error. It is not 1 − Kaplan–Meier, which treats a competing event as still at risk of this one and overstates its incidence — the table sets the two side by side. " +
-        "A patient enters with both values; " + exTotal("noFollowup") + " without them are left out, not counted as event-free. " +
+        "A patient enters with both values; " + exTotal("noFollowup").toLocaleString("en-US") + " without them are left out, not counted as event-free. " +
         (gray ? "Gray's test (weight 1) by permutation of cohort labels, " + gray.permutations + " shuffles, seeded; exact under the null that the cohorts share one distribution. " : "") +
         "The times and codes are the source's own, as recorded." +
         (multi ? " Records are pooled across " + ctx.vStudies.length + " studies." : "") +
