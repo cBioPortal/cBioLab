@@ -1,38 +1,54 @@
 // The page's side of stored links (docs/LINKS.md; the rules are lib/links.ts, the store
 // lib/link-store.ts). Every page that keeps state in its URL reads and writes it through here:
 //
-//   linkParams()         the page's parameters as they mean, a stored link's put back
+//   linkParams()         the page's parameters as they mean, a stored link's or held ones put back
 //   useLinkParams()      the same, for a component (use-link.ts, with the other hooks)
-//   writeSearch(s, push) write the URL; past linkUrlMax() its long parameters are stored, once the
-//                        page has written nothing for LINK_IDLE_MS, and the address bar becomes
-//                        ?s=<id> plus the short ones
-//   flushLink()          store a waiting long link now (before copying or sharing the address)
+//   writeSearch(s, push) write the URL; past linkUrlMax() its long parameters are held in the
+//                        history entry and the address says `long=<mark>` instead of carrying them
+//   copyLink()           a short link to the page as it is: its long parameters stored, `?s=<id>`
 //   openLink(id)         read a stored link (LinkGate does, before the page renders)
 //
-// A link's parameters are remembered in this tab (`known`) and in the history entry that names it
-// (history.state), so Back, Forward and a reload never wait for the server once a link was read.
-// The server is reached only through /api/links (POST to store, GET /api/links/<id> to read), one
-// place a browser test can intercept or hold. No React here: test/link-state.test.ts drives it with
-// a stand-in history, location and fetch.
-import { LINK_PARAM, LINK_ID, LINK_IDLE_MS, effectiveParams, linkUrlMax, planLink, resolveWrite, shortSearch, type LinkParams } from "../../lib/links.ts";
+// Nothing is stored while a page is worked on: a link is stored only when someone asks for one
+// (copyLink, or linkTo for a page opening another). A link's parameters are remembered in this tab
+// (`known`) and in the history entry that names it (history.state), so Back, Forward and a reload
+// never wait for the server once a link was read; held parameters live only in history.state, which
+// a reload keeps. The server is reached only through /api/links (POST to store, GET /api/links/<id>
+// to read), one place a browser test can intercept or hold. No React here: test/link-state.test.ts
+// drives it with a stand-in history, location and fetch.
+import { LINK_PARAM, LINK_ID, HELD_PARAM, canonicalLinkJson, effectiveParams, heldMark, heldSearch, linkUrlMax, planLink, resolveWrite,
+  shortSearch, type LinkParams } from "../../lib/links.ts";
 
 const STATE_KEY = "cbioLink";
 const known = new Map<string, LinkParams>();
+
+type Entry = { id?: string; params?: LinkParams; mark?: string; held?: LinkParams };
+const entry = (): Entry | undefined => {
+  try { return (history.state as Record<string, unknown> | null)?.[STATE_KEY] as Entry | undefined; }
+  catch { return undefined; }   // no history: nothing remembered
+};
 
 /** A stored link's parameters if this tab has read or written it. */
 export function knownLink(id: string): LinkParams | undefined {
   const hit = known.get(id);
   if (hit) return hit;
-  try {
-    const s = (history.state as Record<string, unknown> | null)?.[STATE_KEY] as { id?: string; params?: LinkParams } | undefined;
-    if (s?.id === id && s.params) { known.set(id, s.params); return s.params; }
-  } catch { /* no history: nothing remembered */ }
+  const s = entry();
+  if (s?.id === id && s.params) { known.set(id, s.params); return s.params; }
   return undefined;
 }
 
-/** The page's parameters as they mean: `search` (the address bar's by default) with a known stored link put back. */
+/** The long parameters this history entry holds, when `search` says it holds them (its `long=` mark matches). */
+export function heldParams(search: string = typeof location === "undefined" ? "" : location.search): LinkParams | undefined {
+  const mark = new URLSearchParams(search).get(HELD_PARAM);
+  const s = entry();
+  return mark && s?.held && s.mark === mark ? s.held : undefined;
+}
+
+/** The address says its long parameters are held, but this tab does not hold them: it was copied from another browser. */
+export const heldElsewhere = (search: string): boolean => new URLSearchParams(search).has(HELD_PARAM) && !heldParams(search);
+
+/** The page's parameters as they mean: `search` (the address bar's by default) with a known stored link, or held parameters, put back. */
 export function linkParams(search: string = typeof location === "undefined" ? "" : location.search): URLSearchParams {
-  return effectiveParams(search, knownLink);
+  return effectiveParams(search, knownLink, heldParams(search));
 }
 
 /** The stored link the address bar names, if any. */
@@ -52,8 +68,18 @@ export async function openLink(id: string): Promise<LinkParams> {
   return j.params;
 }
 
-/** Store parameters; their id. */
+/** The id these parameters are already stored under, if this tab knows it. */
+function knownIdOf(params: LinkParams): string | undefined {
+  const want = canonicalLinkJson(params);
+  for (const [id, p] of known) if (canonicalLinkJson(p) === want) return id;
+  const s = entry();
+  return s?.id && s.params && canonicalLinkJson(s.params) === want ? s.id : undefined;
+}
+
+/** Store parameters; their id. Parameters this tab already stored or read are not sent again. */
 export async function storeLink(params: LinkParams): Promise<string> {
+  const had = knownIdOf(params);
+  if (had) return had;
   const res = await fetch("/api/links", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ params }) });
   const j = await res.json().catch(() => ({ error: res.status + " " + res.statusText }));
   if (!res.ok || j.error) throw new Error(j.error || res.statusText);
@@ -62,34 +88,37 @@ export async function storeLink(params: LinkParams): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The threshold, and what the page is told when a link could not be stored
+// The threshold, and what the page is told while its address holds less than the page
 // ---------------------------------------------------------------------------------------------
 
 let configured: string | undefined;
 /** The deployment's LINK_URL_MAX (LinkGate passes it from the public environment). */
 export function configureLinks(urlMax: string | undefined): void { configured = urlMax; }
-/** The query string length past which a page stores its link; a browser test may set `window.__cbioLinkUrlMax`. */
+/** The query string length past which a page holds its long parameters; a browser test may set `window.__cbioLinkUrlMax`. */
 export function currentLinkUrlMax(): number {
   const test = typeof window === "undefined" ? undefined : (window as { __cbioLinkUrlMax?: number }).__cbioLinkUrlMax;
   return linkUrlMax(test ?? configured);
 }
-/** How long a page waits before storing a long link; a test may set `window.__cbioLinkIdleMs`. */
-export function currentLinkIdleMs(): number {
-  const test = typeof window === "undefined" ? undefined : (window as { __cbioLinkIdleMs?: number }).__cbioLinkIdleMs;
-  return typeof test === "number" && test >= 0 ? test : LINK_IDLE_MS;
+
+/** The page's address holds less than the page: how long the full one would be. Null while it holds everything. */
+export type Held = { length: number } | null;
+const listeners = new Set<(h: Held) => void>();
+/** Hear when the page starts or stops holding its long parameters out of its address. */
+export function onHeld(fn: (h: Held) => void): () => void { listeners.add(fn); return () => { listeners.delete(fn); }; }
+const tell = (h: Held) => { for (const fn of listeners) fn(h); };
+
+/** Whether the address bar holds less than the page now, and how long the full address would be. */
+export function currentHeld(): Held {
+  if (typeof location === "undefined") return null;
+  const held = heldParams();
+  return held ? { length: ("?" + linkParams().toString()).length } : null;
 }
 
-export type LinkProblem = { length: number; error: string } | null;
-const listeners = new Set<(p: LinkProblem) => void>();
-/** Hear when the address bar is too long and could not be stored (and when that is over). */
-export function onLinkProblem(fn: (p: LinkProblem) => void): () => void { listeners.add(fn); return () => { listeners.delete(fn); }; }
-const tell = (p: LinkProblem) => { for (const fn of listeners) fn(p); };
-
 // ---------------------------------------------------------------------------------------------
-// Writing the URL
+// Writing the URL, and making a link
 // ---------------------------------------------------------------------------------------------
 
-/** history.state without a stored link's entry, for a URL that no longer names it. */
+/** history.state without a stored link's or held parameters' entry, for a URL that no longer names them. */
 const stateWithout = (): Record<string, unknown> => {
   const s = { ...((history.state as Record<string, unknown> | null) || {}) };
   delete s[STATE_KEY];
@@ -98,53 +127,52 @@ const stateWithout = (): Record<string, unknown> => {
 
 /**
  * Write the page's URL (`search` is "?…"): a new history entry when `push`, else over the current
- * one. A known stored link the URL still names is folded back in first, so nothing it held is lost;
- * past linkUrlMax() the long parameters are then stored — once the page has written nothing for
- * currentLinkIdleMs() — and the entry rewritten to the short form, once the server has them, and
- * only if the page has not written another URL meanwhile. `state` is merged into the entry's
- * history.state.
+ * one. A stored link or held parameters the URL still names are folded back in first, so nothing is
+ * lost. Up to linkUrlMax() the address carries everything. Past it, the long parameters are held in
+ * the entry's history.state and the address carries the short ones and `long=<mark>` — unless they
+ * are a link this tab already stored or read, when the address is that `?s=<id>`. `state` is merged
+ * into the entry's history.state.
  */
 export function writeSearch(search: string, opts: { push?: boolean; state?: Record<string, unknown> } = {}): void {
   try {
-    const full = resolveWrite(search, knownLink);
-    const url = location.pathname + full + location.hash;
-    const state = { ...stateWithout(), ...(opts.state || {}) };
+    const full = resolveWrite(search, knownLink, heldParams());
+    const base = { ...stateWithout(), ...(opts.state || {}) };
+    let next = full, link: Entry | undefined;
+    // long parameters this tab already has a link for stay that link, whatever the length
+    const all = planLink(full, 0);
+    const id = all ? knownIdOf(all.stored) : undefined;
+    if (all && id) { next = shortSearch(id, all.kept); link = { id, params: all.stored }; }
+    else {
+      const plan = planLink(full, currentLinkUrlMax());
+      if (plan) { const mark = heldMark(plan.stored); next = heldSearch(mark, plan.kept); link = { mark, held: plan.stored }; }
+    }
+    const state = link ? { ...base, [STATE_KEY]: link } : base;
+    const url = location.pathname + next + location.hash;
     if (opts.push) history.pushState(state, "", url); else history.replaceState(state, "", url);
-    schedule(full);
+    tell(link?.held ? { length: full.length } : null);
   } catch { /* URL state is a convenience, never a failure */ }
 }
 
-/** the long URL waiting to be stored, and its timer */
-let waiting: { full: string; timer: ReturnType<typeof setTimeout> } | null = null;
-
-function schedule(full: string): void {
-  if (waiting) { clearTimeout(waiting.timer); waiting = null; }
-  if (!planLink(full, currentLinkUrlMax())) { tell(null); return; }
-  const w = { full, timer: setTimeout(() => { if (waiting === w) waiting = null; void shorten(full); }, currentLinkIdleMs()) };
-  waiting = w;
-}
-
-/** Store the long URL waiting to be stored now, rather than when the page is idle; done when the address bar is as short as it will get. */
-export async function flushLink(): Promise<void> {
-  const w = waiting;
-  if (!w) return;
-  clearTimeout(w.timer);
-  waiting = null;
-  await shorten(w.full);
-}
-
-async function shorten(full: string): Promise<void> {
-  const plan = planLink(full, currentLinkUrlMax());
-  if (!plan) { tell(null); return; }
-  let id: string;
-  try { id = await storeLink(plan.stored); }
-  catch (e) { if (location.search === full) tell({ length: full.length, error: String((e as Error)?.message || e) }); return; }
-  if (location.search !== full) return;   // the page has written again; that write stores its own
-  try {
-    history.replaceState({ ...((history.state as Record<string, unknown> | null) || {}), [STATE_KEY]: { id, params: plan.stored } }, "",
-      location.pathname + shortSearch(id, plan.kept) + location.hash);
-    tell(null);
-  } catch { /* as above */ }
+/**
+ * A link to the page as it is now, short however much it holds: its long parameters (any longer
+ * than LONG_PARAM, whatever the address's length) are stored and the link is `?s=<id>` plus the
+ * short ones; a page with none is linked as it is. The address bar becomes that link too, so what
+ * it shows is what was copied. Throws the store's refusal.
+ */
+export async function copyLink(): Promise<string> {
+  const search = "?" + linkParams().toString();
+  const plan = planLink(search, 0);
+  if (!plan) return location.origin + location.pathname + (search === "?" ? "" : search);
+  const id = await storeLink(plan.stored);
+  const short = shortSearch(id, plan.kept);
+  // the page may have moved on while the link was stored; only an address still meaning the same is rewritten
+  if ("?" + linkParams().toString() === search) {
+    try {
+      history.replaceState({ ...stateWithout(), [STATE_KEY]: { id, params: plan.stored } }, "", location.pathname + short + location.hash);
+      tell(null);
+    } catch { /* as above */ }
+  }
+  return location.origin + location.pathname + short;
 }
 
 /**

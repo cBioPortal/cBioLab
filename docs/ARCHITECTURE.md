@@ -315,9 +315,11 @@ no longer match the kind folders and the maps keyed by `ViewKind`.
   which give the open document the same sets so a re-save stores nothing new). A signed-in
   reader's sets are their own; a reader who is not signed in stores unowned ones, one row per list
   (`db/migrations/0013`). Inline lists stay valid DSL for MCP and scripts.
-- **Stored links** ([LINKS.md](LINKS.md)) — a page's URL past `LINK_URL_MAX` keeps its long
-  parameters on the server (`lib/link-store.ts`, `db/migrations/0012`) under the hash of what they
-  hold, and becomes `?s=<id>` plus its short ones. Pages read their parameters through
+- **Stored links** ([LINKS.md](LINKS.md)) — **Copy link** (in the header of every page that keeps
+  its state in its URL) keeps the page's long parameters on the server (`lib/link-store.ts`,
+  `db/migrations/0012`) under the hash of what they hold, and the link is `?s=<id>` plus its short
+  ones. Nothing is stored while a page is worked on: past `LINK_URL_MAX` its address stops carrying
+  the state (held in `history.state`, the address says `long=`) and a bar says so. Pages read their parameters through
   `linkParams()`/`useLinkParams()` and write through `writeSearch()` (`app/_links/`), never
   `location.search` or `history.*State` directly; `LinkGate` (in the lab and portal layouts) reads a
   stored link before the page renders. `lib/links.ts` holds the rules, pure.

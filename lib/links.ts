@@ -3,10 +3,14 @@
 // session service plays for its `session_id`. docs/LINKS.md is the design; this module is its pure
 // part (no I/O, browser-safe), so every rule here is unit-tested without a server or a browser.
 //
-// A page's URL is `?<params>`. When its query string grows past `linkUrlMax()`, the page stores
-// its LONG parameters (each longer than LONG_PARAM, e.g. ?doc=, ?changes=, ?cohort=) and its URL
-// becomes `?s=<id>` plus the short ones (?tab=, ?study=, ...), which stay readable and editable in
-// the address bar. Reading a page's parameters (`effectiveParams`) puts the stored ones back.
+// A page's URL is `?<params>`. A link is stored only when someone asks for one (Copy link, or a
+// page opening another): its LONG parameters (each longer than LONG_PARAM, e.g. ?doc=, ?changes=,
+// ?cohort=) are stored and the link is `?s=<id>` plus the short ones (?tab=, ?study=, ...).
+//
+// While a page is worked on, its address carries everything up to `linkUrlMax()`. Past that, the
+// long parameters are HELD in the browser's history entry instead, and the address carries the
+// short ones and `long=<mark>`: the page says so, and offers Copy link. Reading a page's
+// parameters (`effectiveParams`) puts stored or held ones back.
 //
 // - The id is a hash of the stored parameters (lib/link-store.ts), so the same parameters always
 //   get the same id, and an id always means the same parameters: a stored link never changes.
@@ -24,18 +28,14 @@ export const LINK_ID = /^[A-Za-z0-9_-]{22}$/;
 export const LONG_PARAM = 256;
 
 /**
- * The query string length (encoded characters, "?" included) past which a page stores its link.
- * Node refuses a request line past 16 KB, and mail clients and chat tools cut links well before
- * that; ?doc= links up to this length stay self-contained, as they always were.
+ * The query string length (encoded characters, "?" included) past which a page stops writing its
+ * long parameters into its address and holds them in its history entry. Node refuses a request
+ * line past 16 KB, and an address that long is no use to read or copy anyway.
  */
 export const LINK_URL_MAX = 8000;
 
-/**
- * How long a page waits after its last URL write before storing a long link (milliseconds). A run
- * of edits to a long document is then one stored link, not one per edit; the long URL works
- * meanwhile, as it does while a store is on its way.
- */
-export const LINK_IDLE_MS = 1500;
+/** The URL parameter saying the page's long parameters are held in this history entry, not in the address. */
+export const HELD_PARAM = "long";
 
 /** The most one stored link holds, in characters of parameter names and values. */
 export const LINK_STORE_MAX = 2_000_000;
@@ -83,23 +83,42 @@ const toSearch = (q: URLSearchParams): string => { const s = q.toString(); retur
  * names one whose parameters are `known` (absent ones are left out: the page waits for them).
  * `s` itself is dropped once it is known.
  */
-export function effectiveParams(search: string | URLSearchParams, known: (id: string) => LinkParams | undefined): URLSearchParams {
+export function effectiveParams(search: string | URLSearchParams, known: (id: string) => LinkParams | undefined,
+  /** the long parameters this history entry holds, when the address says it holds them (`long=`) */
+  held?: LinkParams): URLSearchParams {
   const q = toParams(search);
   const id = q.get(LINK_PARAM);
-  const stored = id ? known(id) : undefined;
-  if (!stored) return q;
+  let base = id ? known(id) : undefined;
+  let drop = LINK_PARAM;
+  if (!base && q.has(HELD_PARAM) && held) { base = held; drop = HELD_PARAM; }
+  if (!base) return q;
   const out = new URLSearchParams();
-  for (const [k, v] of Object.entries(stored)) if (!q.has(k)) out.set(k, v);
-  for (const [k, v] of q) if (k !== LINK_PARAM) out.append(k, v);
+  for (const [k, v] of Object.entries(base)) if (!q.has(k)) out.set(k, v);
+  for (const [k, v] of q) if (k !== drop) out.append(k, v);
   return out;
 }
 
-/** What a page should write: `search` with a known stored link it still names folded back in, so nothing it held is lost. */
-export function resolveWrite(search: string, known: (id: string) => LinkParams | undefined): string {
+/** What a page should write: `search` with a known stored link, or the held parameters, it still names folded back in, so nothing is lost. */
+export function resolveWrite(search: string, known: (id: string) => LinkParams | undefined, held?: LinkParams): string {
   const q = toParams(search);
   const id = q.get(LINK_PARAM);
-  if (!id || !known(id)) return toSearch(q);
-  return toSearch(effectiveParams(q, known));
+  if ((id && known(id)) || (q.has(HELD_PARAM) && held)) return toSearch(effectiveParams(q, known, held));
+  return toSearch(q);
+}
+
+/** A short mark for held parameters (FNV-1a of their canonical JSON), so the address changes when they do. */
+export function heldMark(p: LinkParams): string {
+  let h = 0x811c9dc5;
+  const s = canonicalLinkJson(p);
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(36);
+}
+
+/** The address of a page whose long parameters are held: what stayed, then `long=<mark>`. */
+export function heldSearch(mark: string, kept: [string, string][]): string {
+  const q = new URLSearchParams(kept.filter(([k]) => k !== LINK_PARAM && k !== HELD_PARAM));
+  q.set(HELD_PARAM, mark);
+  return "?" + q.toString();
 }
 
 /**
@@ -111,6 +130,7 @@ export function planLink(search: string, max: number): { stored: LinkParams; kep
   const q = toParams(search);
   const stored: LinkParams = {}, kept: [string, string][] = [];
   for (const [k, v] of q) {
+    if (k === HELD_PARAM) continue;
     if (k !== LINK_PARAM && v.length > LONG_PARAM && !(k in stored)) stored[k] = v;
     else kept.push([k, v]);
   }
@@ -119,6 +139,6 @@ export function planLink(search: string, max: number): { stored: LinkParams; kep
 
 /** The short URL: `?s=<id>` first, then the parameters that stayed. */
 export function shortSearch(id: string, kept: [string, string][]): string {
-  const q = new URLSearchParams([[LINK_PARAM, id], ...kept.filter(([k]) => k !== LINK_PARAM)]);
+  const q = new URLSearchParams([[LINK_PARAM, id], ...kept.filter(([k]) => k !== LINK_PARAM && k !== HELD_PARAM)]);
   return "?" + q.toString();
 }

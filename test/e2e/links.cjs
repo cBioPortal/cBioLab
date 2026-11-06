@@ -1,16 +1,17 @@
-// Stored links and stored id lists in the browser (docs/LINKS.md): a long URL becomes ?s=<id> and
-// opens again — after a reload, in a fresh browser, signed out; a missing or slow link is said; a
-// failed store is said; a withdrawn list is refused with its owner's note; the Id lists tab
-// withdraws and restores.
+// Stored links and stored id lists in the browser (docs/LINKS.md): past the limit a page's address
+// stops carrying its state and a bar says so; Copy link makes a short ?s=<id> link, which opens
+// again — after a reload, in a fresh browser, signed out; an address copied from a page past the
+// limit is said; a missing or slow link is said; a failed store is said; a withdrawn list is
+// refused with its owner's note; the Id lists tab withdraws and restores.
 //
 // Everything here can be steered from a test without touching the server:
-//   linkMax(ctx, n)    shorten past n characters instead of LINK_URL_MAX (window.__cbioLinkUrlMax)
+//   linkMax(ctx, n)    hold the state out of the address past n characters (window.__cbioLinkUrlMax)
 //   holdLinks(page)    hold GET /api/links/<id> until the returned release() is called
 //   failStore(page)    answer POST /api/links with a 500
 // The server side is real: the e2e server runs lib/db.ts's in-memory Postgres, so a link stored by
 // one test is there for the next and gone when the server stops.
 
-/** shorten past `n` characters in every page of `ctx` */
+/** hold the page's state out of its address past `n` characters, in every page of `ctx` */
 const linkMax = (ctx, n) => ctx.addInitScript((max) => { window.__cbioLinkUrlMax = max; }, n);
 
 /** hold every read of a stored link until release() */
@@ -27,6 +28,15 @@ const failStore = (page) => page.route(/\/api\/links$/, (route) => route.request
   : route.continue());
 
 const SHORT = /[?&]s=[A-Za-z0-9_-]{22}(&|$)/;
+const HELD = /[?&]long=[0-9a-z]+$/;
+/** Copy link (in the bar, or the header's), then the link it made, read from the field that shows it:
+ *  the bar's is shown in the bar that replaces it, the header's beside the button */
+async function copyLinkFrom(page, scope) {
+  await scope.getByRole("button", { name: /copy link/i }).first().click();
+  const shown = page.locator("[data-link-copied] [data-copied-link], header [data-copied-link]").first();
+  await shown.waitFor({ timeout: 60000 });
+  return shown.getAttribute("data-copied-link");
+}
 /** text deflate cannot shrink, so the link it is in really is long */
 const noise = (n) => require("node:crypto").randomBytes(n).toString("base64url").slice(0, n);
 
@@ -39,8 +49,9 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
   const longUrl = BASE + "/lab?tab=analysis&doc=" + encodeUrlJson(longDoc);
   let shortUrl = null;
 
-  // A long ?doc= link becomes ?s=<id> once the page has stored it, and the short link opens the same
-  // document again: after a reload, and in a fresh browser that has never seen it.
+  // Past the limit the address stops carrying the document: it says long=, a bar says why, and a
+  // reload keeps the page. Copy link in the bar makes ?s=<id>, which the address becomes and which
+  // opens the same document in a fresh, signed-out browser. The held address, opened there, is said.
   {
     const steps = {};
     const ctx = await browser.newContext();
@@ -48,24 +59,117 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
     const p = await ctx.newPage();
     try {
       await p.goto(longUrl, { waitUntil: "domcontentloaded" });
-      await p.waitForFunction((re) => new RegExp(re).test(location.search), SHORT.source, { timeout: 60000 });
-      shortUrl = p.url();
-      steps.short = shortUrl.length < 200 && !shortUrl.includes("doc=");
+      const bar = p.locator("[data-link-held]");
+      await bar.waitFor({ timeout: 60000 });
+      const heldUrl = p.url();
+      steps.held = HELD.test(heldUrl) && !heldUrl.includes("doc=") && /too long to keep in its address/.test(await bar.innerText());
       // the document editor fills as the page loads the document; wait for it rather than read it early
       await p.waitForFunction((n) => (document.querySelector("#docjson")?.value || "").includes(n), notes, { timeout: 60000 });
       steps.same = (await docOf(p)).cohorts["Long notes"]?.notes === notes;
       await p.reload({ waitUntil: "domcontentloaded" });
       await p.waitForFunction((n) => (document.querySelector("#docjson")?.value || "").includes(n), notes, { timeout: 60000 });
-      steps.reloaded = (await docOf(p)).cohorts["Long notes"]?.notes === notes;
+      steps.reloaded = (await docOf(p)).cohorts["Long notes"]?.notes === notes && (await bar.count()) === 1;
+      shortUrl = await copyLinkFrom(p, bar);
+      steps.short = SHORT.test(shortUrl) && !shortUrl.includes("doc=");
+      await p.waitForFunction((u) => location.href === u, shortUrl, { timeout: 10000 });
+      steps.addressIsLink = (await p.locator("[data-link-held]").count()) === 0 && (await p.locator("[data-link-copied]").count()) === 1;
       const fresh = await browser.newContext();
       const q = await fresh.newPage();
       await q.goto(shortUrl, { waitUntil: "domcontentloaded" });
       await q.waitForFunction((n) => (document.querySelector("#docjson")?.value || "").includes(n), notes, { timeout: 60000 });
       steps.elsewhere = (await docOf(q)).cohorts["Long notes"]?.notes === notes;
+      await q.goto(heldUrl, { waitUntil: "domcontentloaded" });
+      const told = q.locator("[data-link-elsewhere]");
+      await told.waitFor({ timeout: 30000 });
+      steps.heldElsewhere = /copied from a page whose state was too long/.test(await told.innerText());
       await fresh.close();
     } catch (e) { steps.error = String(e.message || e).split("\n")[0].slice(0, 160); }
-    ok("a long link becomes ?s=<id>, and opens the same document after a reload and in a fresh, signed-out browser",
-      steps.short && steps.same && steps.reloaded && steps.elsewhere, JSON.stringify(steps));
+    ok("past the limit the address says so with a bar; Copy link makes ?s=<id>, which opens the same document after a reload and in a fresh, signed-out browser",
+      steps.held && steps.same && steps.reloaded && steps.short && steps.addressIsLink && steps.elsewhere && steps.heldElsewhere, JSON.stringify(steps));
+    await ctx.close();
+  }
+
+  // Working on a page past the limit: each edit changes the address's mark (the bar stays, nothing is
+  // stored), Back and Forward step through the held edits, and once a link is copied the next edit
+  // holds the page again.
+  {
+    const steps = {};
+    const ctx = await browser.newContext();
+    await linkMax(ctx, 400);
+    const p = await ctx.newPage();
+    let posts = 0;
+    p.on("request", (r) => { if (r.method() === "POST" && /\/api\/links$/.test(r.url())) posts++; });
+    try {
+      await p.goto(longUrl, { waitUntil: "domcontentloaded" });
+      await p.locator("[data-link-held]").waitFor({ timeout: 60000 });
+      await p.waitForFunction(() => window.cohortLab && window.cohortLab.call, null, { timeout: 120000 });
+      const before = p.url();
+      await p.evaluate(() => window.cohortLab.call("analysis_set_details", { title: "held edit (e2e)" }));
+      await p.waitForFunction((u) => location.href !== u, before, { timeout: 30000 });
+      const edited = p.url();
+      steps.marked = HELD.test(edited) && (await p.locator("[data-link-held]").count()) === 1 && posts === 0;
+      const titled = async () => (await docOf(p)).title === "held edit (e2e)";
+      await p.waitForFunction(() => /held edit \(e2e\)/.test(document.querySelector("#docjson")?.value || ""), null, { timeout: 30000 });
+      await p.goBack();
+      await p.waitForFunction(() => !/held edit \(e2e\)/.test(document.querySelector("#docjson")?.value || ""), null, { timeout: 30000 });
+      steps.back = p.url() === before && (await docOf(p)).cohorts["Long notes"]?.notes === notes;
+      await p.goForward();
+      await p.waitForFunction(() => /held edit \(e2e\)/.test(document.querySelector("#docjson")?.value || ""), null, { timeout: 30000 });
+      steps.forward = p.url() === edited && await titled();
+      await copyLinkFrom(p, p.locator("[data-link-held]"));
+      steps.copiedOnce = posts === 1;
+      await p.evaluate(() => window.cohortLab.call("analysis_set_details", { title: "after the copy (e2e)" }));
+      await p.locator("[data-link-held]").waitFor({ timeout: 30000 });
+      steps.heldAgain = HELD.test(p.url()) && (await p.locator("[data-link-copied]").count()) === 0 && posts === 1;
+    } catch (e) { steps.error = String(e.message || e).split("\n")[0].slice(0, 160); }
+    ok("a page past the limit is edited with nothing stored, Back and Forward step through its held edits, and an edit after Copy link holds it again",
+      steps.marked && steps.back && steps.forward && steps.copiedOnce && steps.heldAgain, JSON.stringify(steps));
+    await ctx.close();
+  }
+
+  // A portal page past the limit is held and says so like the lab, and still draws from what it holds.
+  {
+    const steps = {};
+    const ctx = await browser.newContext();
+    await linkMax(ctx, 400);
+    const p = await ctx.newPage();
+    try {
+      const doc = { dsl: "2.9", study: "msk_chord_2024", views: [], cohorts: {
+        "Female held": { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }], notes },
+        "Male held": { all: [{ kind: "clinical", attribute: "SEX", values: ["Male"] }] } } };
+      await p.goto(BASE + "/portal/comparison?doc=" + encodeUrlJson(doc), { waitUntil: "domcontentloaded" });
+      await p.getByText("Male held").first().waitFor({ timeout: 120000 });
+      steps.drawn = true;
+      steps.copy = (await p.locator("header [data-copy-link]").count()) === 1;
+      // opening the page writes nothing; switching its tab writes its URL, which is past the limit
+      const tabs = p.locator("[role=tablist]").first().locator("[role=tab]");
+      await tabs.nth(1).click();
+      await p.locator("[data-link-held]").waitFor({ timeout: 30000 });
+      steps.held = HELD.test(p.url()) && !p.url().includes("doc=");
+      steps.stillDrawn = (await p.getByText("Male held").count()) > 0;
+    } catch (e) { steps.error = String(e.message || e).split("\n")[0].slice(0, 160); }
+    ok("a portal page past the limit draws from what it holds, holds its state out of the address once it writes it, and offers Copy link",
+      steps.drawn && steps.copy && steps.held && steps.stillDrawn, JSON.stringify(steps));
+    await ctx.close();
+  }
+
+  // Copy link is in the header of every page that keeps its state in its URL, and shortens a link
+  // well under the limit too: anything long in it is stored.
+  {
+    const steps = {};
+    const ctx = await browser.newContext();
+    const p = await ctx.newPage();
+    try {
+      await p.goto(longUrl, { waitUntil: "domcontentloaded" });
+      await p.waitForFunction((n) => (document.querySelector("#docjson")?.value || "").includes(n), notes, { timeout: 60000 });
+      steps.full = new URL(p.url()).searchParams.has("doc") && (await p.locator("[data-link-held]").count()) === 0;
+      const url = await copyLinkFrom(p, p.locator("header"));
+      steps.short = SHORT.test(url) && url.length < 200;
+      await p.goto(BASE + "/portal/comparison", { waitUntil: "domcontentloaded" });
+      await p.locator("header [data-copy-link]").waitFor({ timeout: 60000 });
+      steps.portal = true;
+    } catch (e) { steps.error = String(e.message || e).split("\n")[0].slice(0, 160); }
+    ok("Copy link is in the header, and shortens a link under the limit that carries a long parameter", steps.full && steps.short && steps.portal, JSON.stringify(steps));
     await ctx.close();
   }
 
@@ -95,7 +199,7 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
     await ctx.close();
   }
 
-  // A store that fails keeps the long URL (the page still works) and says why it could not be shortened.
+  // Copy link whose store fails says why, and leaves the page and its address as they were.
   {
     const steps = {};
     const ctx = await browser.newContext();
@@ -104,12 +208,15 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
     try {
       await failStore(p);
       await p.goto(longUrl, { waitUntil: "domcontentloaded" });
-      const said = p.locator("[data-link-problem]");
-      await said.waitFor({ timeout: 60000 });
-      steps.said = /too long to reload or share .* the link store is down \(e2e\)/.test((await said.innerText()).replace(/\s+/g, " "));
-      steps.kept = new URL(p.url()).searchParams.has("doc");
+      const bar = p.locator("[data-link-held]");
+      await bar.waitFor({ timeout: 60000 });
+      await bar.getByRole("button", { name: /copy link/i }).click();
+      const said = bar.locator("[data-copy-link-error]");
+      await said.waitFor({ timeout: 30000 });
+      steps.said = /could not make a link: the link store is down \(e2e\)/.test(await said.innerText());
+      steps.kept = HELD.test(p.url());
     } catch (e) { steps.error = String(e.message || e).split("\n")[0].slice(0, 160); }
-    ok("a link that could not be stored stays long, and the page says why", steps.said && steps.kept, JSON.stringify(steps));
+    ok("Copy link that could not store the link says why, and leaves the page as it was", steps.said && steps.kept, JSON.stringify(steps));
     await ctx.close();
   }
 
@@ -162,8 +269,11 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
       await p.waitForFunction(() => /"set":/.test(document.querySelector("#docjson")?.value || ""), null, { timeout: 60000 });
       const clause = (await docOf(p)).cohorts["Pasted e2e"].all[0];
       steps.named = typeof clause.set === "string" && !clause.ids && clause.n === ids.length;
-      await p.waitForFunction((re) => new RegExp(re).test(location.search), SHORT.source, { timeout: 60000 });
-      const linkId = new URL(p.url()).searchParams.get("s");
+      // the document editor is a modal dialog: close it, or nothing behind it can be clicked
+      await p.keyboard.press("Escape");
+      await p.locator("dialog[open]").waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
+      await p.locator("[data-link-held]").waitFor({ timeout: 60000 });
+      const linkId = new URL(await copyLinkFrom(p, p.locator("[data-link-held]"))).searchParams.get("s");
       const stored = await (await ctx.request.get(BASE + "/api/links/" + linkId)).json();
       const storedClause = decodeUrlJson(stored.params.doc).cohorts["Pasted e2e"].all[0];
       steps.linkNamesSet = storedClause.set === clause.set && !storedClause.ids;

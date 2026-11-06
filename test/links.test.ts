@@ -3,8 +3,8 @@
 // test/support/store-contracts.ts (linkContract); the page's use of it, test/e2e/links.cjs.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { LINK_PARAM, LONG_PARAM, LINK_URL_MAX, LINK_STORE_MAX, LINK_ID, linkUrlMax, validateLinkParams, canonicalLinkJson, effectiveParams,
-  resolveWrite, planLink, shortSearch, type LinkParams } from "../lib/links.ts";
+import { LINK_PARAM, LONG_PARAM, LINK_URL_MAX, LINK_STORE_MAX, LINK_ID, HELD_PARAM, linkUrlMax, validateLinkParams, canonicalLinkJson, effectiveParams,
+  resolveWrite, planLink, shortSearch, heldMark, heldSearch, type LinkParams } from "../lib/links.ts";
 import { linkId, setRefsOf } from "../lib/link-store.ts";
 import { encodeUrlJson } from "../lib/url-json.ts";
 import { withdrawnMessage, withdrawalNote, WITHDRAWAL_NOTE_MAX } from "../lib/id-set-withdrawal.ts";
@@ -66,6 +66,28 @@ describe("writing a page's URL", () => {
     assert.ok(short.length < 64);
     const back = effectiveParams(short, knownOnly(id, plan.stored));
     assert.deepEqual(Object.fromEntries(back), Object.fromEntries(new URLSearchParams(written)));
+  });
+});
+
+describe("parameters held out of the address", () => {
+  test("the held address keeps the short parameters and ends with long=<mark>", () => {
+    assert.equal(heldSearch("abc", [["tab", "analysis"], ["s", "x"], [HELD_PARAM, "old"]]), "?tab=analysis&long=abc");
+  });
+  test("the mark follows the held parameters, whatever order they were written in", () => {
+    assert.equal(heldMark({ a: "1", b: "2" }), heldMark({ b: "2", a: "1" }));
+    assert.notEqual(heldMark({ a: "1" }), heldMark({ a: "2" }));
+    assert.match(heldMark({ doc: LONG }), /^[0-9a-z]+$/);
+  });
+  test("held parameters come back, the address's own win, and the mark is dropped", () => {
+    const q = effectiveParams("?tab=explore&long=m", () => undefined, { doc: LONG, tab: "analysis" });
+    assert.deepEqual(Object.fromEntries(q), { doc: LONG, tab: "explore" });
+  });
+  test("an address saying it holds parameters, with none held here, is left as it is", () => {
+    assert.equal(effectiveParams("?tab=x&long=m", () => undefined).get(HELD_PARAM), "m");
+  });
+  test("a write beside held parameters keeps them; the mark is never stored", () => {
+    assert.equal(resolveWrite("?tab=x&long=m", () => undefined, { doc: "d" }), "?doc=d&tab=x");
+    assert.deepEqual(planLink("?tab=x&long=m&doc=" + LONG, 0)?.stored, { doc: LONG });
   });
 });
 

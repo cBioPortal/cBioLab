@@ -15,43 +15,74 @@ with many cohorts, or a cohort written as a list of ids, passes it.
 Legacy cBioPortal's `URLWrapper` handles this with its **session service**. Past 1,500 characters
 of "session" parameters, a page saves them as a `main_session` and its URL becomes
 `?session_id=<id>`. Group comparisons are always `comparison_session`s, holding each group as an
-explicit list of sample ids. This app takes the same idea and closes the gaps the legacy version
-has:
+explicit list of sample ids. This app takes the same idea, but stores a link only when someone
+asks for one, and closes the gaps the legacy version has:
 
 | | legacy cBioPortal | this app |
 |---|---|---|
 | short form | `?session_id=<id>` | `?s=<id>` |
-| when a link is stored | on every change, once past 1,500 chars | only once past `LINK_URL_MAX` (8,000), and once the page has been idle for `LINK_IDLE_MS`; shorter links stay self-contained `?doc=` |
+| when a link is stored | on every change, once past 1,500 chars | when someone asks for one: **Copy link**, or a page opening another; never while a page is worked on |
+| a long page's address | `?session_id=<id>`, a new one per change | up to `LINK_URL_MAX` (8,000) the full `?doc=`; past it the state is held in the tab's history and a bar says so |
 | id | a new random id per save | the hash of what is stored: same parameters, same id; an id never changes meaning |
-| while saving | the URL says `session_id=pending`, which can be copied or reloaded | the full URL until the store answers, then the short one; never a placeholder |
-| save fails | the page spins forever | the long URL stays, and the page says why it could not be shortened |
+| while saving | the URL says `session_id=pending`, which can be copied or reloaded | nothing is saved while working; Copy link shows a spinner, then the link |
+| save fails | the page spins forever | Copy link says why, and the page is left as it was |
 | link missing or unreadable | the page fails to render | the page says the link could not be opened, and why |
 | pages covered | Results and Group Comparison only (study view: unbounded `#filterJson`) | every page that keeps state in its URL |
 | comparison groups | explicit sample-id lists | definitions, re-run on the data; explicit lists only where a reader made one |
 | id lists in a stored state | copied into every session | stored once as an id set; the link names it, signed in or not |
 | ids at rest | anyone with a session id reads its sample lists | anyone with a link reads the lists it names; only their owner withdraws them |
 
-## Stored links (`?s=`)
+## Stored links (`?s=`) and Copy link
 
-**What is stored.** When a page writes its URL and the query string is longer than
-`LINK_URL_MAX`, its *long* parameters (each longer than `LONG_PARAM`, 256 characters: `doc`,
-`changes`, `cohort`, …) are stored on the server under an id. The address bar becomes `?s=<id>`
+**What is stored.** A link to a page stores its *long* parameters (each longer than `LONG_PARAM`,
+256 characters: `doc`, `changes`, `cohort`, …) on the server under an id, and is `?s=<id>`
 followed by the short parameters (`tab`, `study`, `patient`, …), which stay readable and editable.
 The stored parameters are kept exactly as the URL carried them, so a stored link holds no more and
 no less than the `?doc=` link it stands for.
 
+**When a link is stored: only when someone asks for one.**
+- **Copy link** (`app/_links/copy-link.tsx`, `copyLink()`) is in the header of every page that
+  keeps its state in its URL (the lab and the portal pages), always: even a 1,000-character link
+  is too long to paste comfortably, so anything long in the page is stored, whatever the address's
+  length. A page with nothing long is linked as it is. The link goes on the clipboard and is shown
+  beside the button, so it can be copied by hand where the clipboard is refused, and the address
+  bar becomes that link too. If storing fails, the button says why and the page is left as it was.
+- **A page opening another** (`linkTo`, below) stores what it carries when that is past the limit.
+
+Nothing is stored while a page is worked on, so a row is a link someone made.
+
 **The id** is the first 132 bits of the SHA-256 of the stored parameters with their names sorted:
 22 base64url characters. The same parameters always get the same id, so storing a link twice is
-one row, and a row never changes (a database trigger refuses updates and deletes).
+one row, and a row never changes (a database trigger refuses updates and deletes). A tab that has
+already stored or read a link does not send it again.
 
 **Who may store or read one:** anyone, signed in or not, as anyone may write or open a `?doc=`
 link. The first person to store a link is recorded in `created_by` when signed in, and nothing
 depends on it.
 
+## A page's address while it is worked on
+
+**Up to `LINK_URL_MAX`** (8,000 characters of query string) the address carries everything: the
+full `?doc=` (or `?changes=`, `?cohort=`), self-contained, as it always was.
+
+**Past it, the address stops carrying the state.** The page's long parameters are *held* in its
+history entry (`history.state`), and the address carries the short parameters and
+`long=<mark>`, where the mark is a hash of what is held (so the address still changes when the
+state does, and every hook reading it re-reads). A bar across the top of the page says the page is
+too long to keep in its address, that the address bar no longer changes as you work, that Reload,
+Back and Undo still work in this tab, and offers Copy link.
+- A reload keeps the page: the browser keeps an entry's `history.state` across a reload.
+- Back and Forward restore each entry's own held state.
+- Opening a `long=` address in another browser (one copied from the address bar) holds nothing
+  there: the page says the address was copied from a page whose state was too long to keep in its
+  address and asks for its Copy link link, rather than opening the page without its state.
+- If the page's long parameters are a link this tab already made or opened, the address is that
+  `?s=<id>` instead, whatever the length: a tab switch on an opened short link keeps it short.
+
 **Reading a page's parameters.** A page never reads `location.search` directly. It asks
 `linkParams()` (or the hook `useLinkParams()`), which returns the URL's own parameters with a known
-stored link's put back. A parameter written in the URL beside `s` wins over the stored one of the
-same name, because the page wrote it after the link was opened.
+stored link's, or the held ones, put back. A parameter written in the URL beside `s` or `long`
+wins over the stored or held one of the same name, because the page wrote it later.
 
 **Opening a link.** The lab and portal layouts wrap every page in `LinkGate`. When the URL names a
 stored link this tab has not read, the gate reads it (`GET /api/links/<id>`) before the page
@@ -61,28 +92,21 @@ memory and in that history entry's `history.state`, so Back, Forward and a reloa
 the server again.
 
 **Writing a page's URL.** Pages write through `writeSearch(search, { push, state })`:
-1. If the URL still names a known stored link, its parameters are folded back in, so a write that
-   changes only `?changes=` doesn't lose the stored `?doc=`.
-2. The full URL is written at once (a new history entry when `push`).
-3. If it is past the limit, its long parameters are stored once the page has written nothing for
-   `LINK_IDLE_MS` (1.5 s), so a run of edits to a long document is one stored link, not one per
-   edit. The long URL works meanwhile. When the server answers, and only if the page hasn't written
-   another URL meanwhile, the same history entry is rewritten to the short form, keeping its state
-   (the lab's undo depth, for one). `flushLink()` stores a waiting link at once, for a page about to
-   copy its own address.
-4. If storing fails, the long URL stays and the page shows a notice saying the address is too long
-   to reload or share, and why storing failed. The notice disappears after the next successful
-   store.
+1. A stored link or held parameters the URL still names are folded back in, so a write that
+   changes only `?changes=` doesn't lose the `?doc=`.
+2. If the long parameters are a link this tab knows, the address is that `?s=<id>`; otherwise, up
+   to the limit, the full URL; past it, the held form. A new history entry when `push`, keeping the
+   entry's own state (the lab's undo depth, for one).
 
-**Id lists are stored apart from the link.** In the lab, a document past the limit that still
-holds inline id lists (typed in the editor, set by an agent) has them stored as id sets first
-(`listsOutOfLink` in `app/lab/page.tsx`), so its stored links name each list instead of copying
-it once per edit. A reader who is not signed in stores unowned sets for this (below).
+**Id lists are stored apart from the document.** In the lab, a document past the limit that
+still holds inline id lists (typed in the editor, set by an agent) has them stored as id sets
+first (`listsOutOfLink` in `app/lab/page.tsx`), so the document, and any link made of it, names
+each list instead of copying it; often that brings the document back under the limit. A reader who is not signed in stores unowned sets for this (below).
 
-**How many rows to expect.** A row is written only for a distinct state past the limit, after an
-idle pause, and states differing only in short parameters (`tab`, `study`) share the long ones'
-row, so most pages never write one. Each row is at most `LINK_STORE_MAX` characters, and an id
-list in it is a reference, not its ids.
+**How many rows to expect.** One per distinct link someone made (Copy link, or a page opening
+another past the limit); copying the same page again, or a page differing only in short
+parameters (`tab`, `study`), is the same row. Each row is at most `LINK_STORE_MAX` characters, and
+an id list in it is a reference, not its ids.
 
 **Opening another page.** `linkTo(path, params)` returns a URL that is short however much it
 carries, storing first if it must. Explore's group comparison and "View patients" use it. On the
@@ -143,13 +167,14 @@ reader's sets, their own withdrawn ones included, with Export, Withdraw… and R
 
 | | |
 |---|---|
-| `lib/links.ts` | the rules, pure and browser-safe: `planLink`, `effectiveParams`, `resolveWrite`, `shortSearch`, `validateLinkParams`, limits |
+| `lib/links.ts` | the rules, pure and browser-safe: `planLink`, `effectiveParams`, `resolveWrite`, `shortSearch`, `heldSearch`, `heldMark`, `validateLinkParams`, limits |
 | `lib/link-store.ts` | the only module touching `stored_link`: `saveLink`, `readLink`, `linksNaming`, `linkId` |
 | `db/migrations/0012_stored_links.sql` | the table, its immutability trigger and grants |
 | `app/api/links/route.ts`, `app/api/links/[id]/route.ts` | `POST {params}` → `{id}`; `GET` → `{params}` (cacheable forever) |
-| `app/_links/link-state.ts` | the page's side, no React: `linkParams`, `writeSearch`, `openLink`, `linkTo`, `onLinkProblem` |
-| `app/_links/use-link.ts` | the hooks: `useLinkParams`, `useAddressLink` |
-| `app/_links/link-gate.tsx` | opens a stored link before the page renders; says when one could not be stored |
+| `app/_links/link-state.ts` | the page's side, no React: `linkParams`, `writeSearch`, `copyLink`, `openLink`, `linkTo`, `onHeld` |
+| `app/_links/use-link.ts` | the hooks: `useLinkParams`, `useAddressLink`; `LinkedPage`, which puts Copy link in the header |
+| `app/_links/link-gate.tsx` | opens a stored link before the page renders; the bar while the state is held; a held address from elsewhere |
+| `app/_links/copy-link.tsx` | the Copy link button (header and bar) |
 | `lib/id-set-store.ts` | stored id sets: read by id, `withdrawIdSet`, `restoreIdSet`, `idSetUsage` |
 | `lib/id-set-withdrawal.ts` | the withdrawal's shape and the refusal's wording, pure |
 | `db/migrations/0011_id_set_withdrawal.sql` | `withdrawn_note`, `replaced_by`, the access log's new actions |
@@ -160,29 +185,29 @@ reader's sets, their own withdrawn ones included, with Export, Withdraw… and R
 
 Each layer can be tested without the ones around it:
 
-- **The rules** — `test/links.test.ts`: what is stored and kept, reading back, writes beside a link,
-  validation, ids, the withdrawal's wording. No server, no browser.
+- **The rules** — `test/links.test.ts`: what is stored and kept, reading back, writes beside a link
+  or held parameters, the held address and its mark, validation, ids, the withdrawal's wording. No server, no browser.
 - **The page's side** — `test/link-state.test.ts` drives `link-state.ts` with a stand-in address
-  bar, history and `/api/links` whose answers the test can hold or fail: shortening, a write that
-  races a store, a failed store, a run of edits stored once when idle, `flushLink`, Back to a
-  shortened entry, opening and making links.
+  bar, history and `/api/links` whose answers the test can fail: holding past the limit with nothing
+  stored, a write beside held parameters, reload and Back, a held address from another browser,
+  Copy link (stored once, the address becoming it, under the limit too, a failed store), keeping
+  a known link across tab switches, opening and making links.
 - **The stores** — `linkContract` and `idSetContract` in `test/support/store-contracts.ts`, run on
   an in-process Postgres (`npm run test:db`) and on `lib/db.ts`'s own fallback (`npm test`): ids,
   immutability, read-by-id for anyone, owner-only management, withdrawal and restore, twins, usage
   counts, unowned sets stored once and managed by nobody.
 - **The request boundary** — `test/request-boundary.db-test.ts`: a request reads a set for anyone,
   and a withdrawn set stops the request before it runs.
-- **The browser** — `test/e2e/links.cjs` (an area of `node e2e.cjs`): the round trip through
-  `?s=`, a reload, a fresh signed-out browser, loading and missing links, a failed store, the
+- **The browser** — `test/e2e/links.cjs` (an area of `node e2e.cjs`): the bar past the limit, a
+  reload, Copy link in the bar and the header, the round trip through `?s=` in a fresh signed-out
+  browser, a held address opened elsewhere, loading and missing links, a failed store, the
   comparison page, a signed-out reader's long document storing its list once as an unowned set its
   link names, and withdrawing and restoring from the Id lists tab. Its helpers steer the page
   without touching the server, and any other area can import them:
-  - `linkMax(ctx, n)` shortens past `n` characters, by setting `window.__cbioLinkUrlMax` before the
+  - `linkMax(ctx, n)` holds the state out of the address past `n` characters, by setting `window.__cbioLinkUrlMax` before the
     page loads. That is the test hook `currentLinkUrlMax()` reads; it overrides `LINK_URL_MAX`.
   - `holdLinks(page)` holds every `GET /api/links/<id>` until the `release()` it returns is called.
   - `failStore(page)` answers every `POST /api/links` with a 500.
-  - `window.__cbioLinkIdleMs` sets the idle wait before storing (`currentLinkIdleMs()`), as
-    `__cbioLinkUrlMax` sets the limit; the unit tests set it to 0, or wait it out.
 
   The e2e server runs on `lib/db.ts`'s in-memory Postgres, so links and sets a check stores are
   real and disappear when the server stops.

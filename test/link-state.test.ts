@@ -1,5 +1,5 @@
 // The page's side of stored links (app/_links/link-state.ts), driven with a stand-in browser: an
-// address bar, a history and a /api/links server whose answers the test releases when it chooses.
+// address bar, a history and a /api/links server whose answers the test can hold or fail.
 // The rules themselves are test/links.test.ts; the store test/support/store-contracts.ts; the real
 // browser test/e2e/links.cjs.
 import { test, describe, beforeEach } from "node:test";
@@ -20,7 +20,10 @@ const set = (url: string, state: unknown, push: boolean) => {
 };
 Object.assign(globalThis, {
   window: globalThis,
-  location: { get pathname() { return browser.now.url.pathname; }, get search() { return browser.now.url.search; }, get hash() { return browser.now.url.hash; } },
+  location: {
+    get origin() { return browser.now.url.origin; }, get pathname() { return browser.now.url.pathname; },
+    get search() { return browser.now.url.search; }, get hash() { return browser.now.url.hash; },
+  },
   history: {
     get state() { return browser.now.state; },
     pushState: (s: unknown, _: string, u: string) => set(u, s, true),
@@ -32,11 +35,8 @@ Object.assign(globalThis, {
 const server = {
   links: new Map<string, LinkParams>(),
   posts: 0, fail: null as string | null,
-  /** answers wait for this when set */
-  hold: null as Promise<void> | null,
 };
 globalThis.fetch = (async (input: string, init?: RequestInit) => {
-  if (server.hold) await server.hold;
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   if (input === "/api/links" && init?.method === "POST") {
     server.posts++;
@@ -51,104 +51,125 @@ globalThis.fetch = (async (input: string, init?: RequestInit) => {
   return json({ error: "unexpected " + input }, 500);
 }) as typeof fetch;
 
-const { writeSearch, flushLink, linkParams, openLink, linkTo, onLinkProblem, currentLinkUrlMax, currentLinkIdleMs, knownLink } = await import("../app/_links/link-state.ts");
+const { writeSearch, copyLink, linkParams, heldElsewhere, currentHeld, openLink, linkTo, onHeld, currentLinkUrlMax, knownLink } =
+  await import("../app/_links/link-state.ts");
 
-/** wait until the stand-in server has answered and the page has acted on it */
-const settle = () => new Promise((r) => setTimeout(r, 20));
-const LONG = "1." + "y".repeat(400);
 const MAX = 300;
+/** a long parameter, different each time so no test sees another's stored link */
+let n = 0;
+const long = () => "1." + "y".repeat(400) + (n++);
+const HELD = /^\?(.*&)?long=[0-9a-z]+$/;
 
 beforeEach(() => {
   browser.reset("/lab?tab=analysis");
-  server.posts = 0; server.fail = null; server.hold = null;
+  server.posts = 0; server.fail = null;
   (globalThis as { __cbioLinkUrlMax?: number }).__cbioLinkUrlMax = MAX;
-  // store at once unless a test is about waiting
-  (globalThis as { __cbioLinkIdleMs?: number }).__cbioLinkIdleMs = 0;
 });
 
 describe("writing the page's URL", () => {
-  test("a short URL is written as it is and nothing is stored", async () => {
+  test("a URL up to the limit is written as it is, and nothing is stored", () => {
     writeSearch("?tab=analysis&doc=short", { push: true });
-    await settle();
     assert.equal(location.search, "?tab=analysis&doc=short");
     assert.equal(browser.entries.length, 2);
     assert.equal(server.posts, 0);
+    assert.equal(currentHeld(), null);
   });
 
-  test("a long one is stored, and the entry becomes ?s= plus the short parameters, keeping its own state", async () => {
-    writeSearch("?tab=analysis&doc=" + LONG, { push: true, state: { labDepth: 3 } });
-    assert.ok(location.search.includes("doc="), "written in full at once; shortened once stored");
-    await settle();
-    assert.match(location.search, /^\?s=[A-Za-z0-9_-]{22}&tab=analysis$/);
-    assert.equal((history.state as { labDepth: number }).labDepth, 3);
-    assert.equal(linkParams().get("doc"), LONG, "the page still reads what it wrote");
-    assert.equal(browser.entries.length, 2, "one history entry, rewritten in place");
-  });
-
-  test("a write made while the link was being stored wins: the older answer does not overwrite it", async () => {
-    let release!: () => void;
-    server.hold = new Promise((r) => { release = r; });
-    writeSearch("?doc=" + LONG + "a");
-    writeSearch("?tab=explore");
-    release();
-    await settle();
-    assert.equal(location.search, "?tab=explore");
-  });
-
-  test("a write beside a stored link keeps what the link held", async () => {
-    writeSearch("?tab=analysis&doc=" + LONG + "b&changes=" + LONG);
-    await settle();
-    const q = linkParams();
-    q.set("changes", "small");
-    writeSearch("?" + q.toString());
-    await settle();
-    assert.equal(linkParams().get("doc"), LONG + "b", "the stored doc survived a write that only changed ?changes=");
-    assert.equal(linkParams().get("changes"), "small");
-  });
-
-  test("a store that fails leaves the long URL and says so; the next one that works clears it", async () => {
+  test("past the limit the long parameters are held in the entry, the address says so, and nothing is stored", () => {
     const heard: unknown[] = [];
-    const off = onLinkProblem((p) => heard.push(p));
-    server.fail = "the database is down";
-    writeSearch("?doc=" + LONG + "c");
-    await settle();
-    assert.ok(location.search.startsWith("?doc="));
-    assert.deepEqual(heard.at(-1), { length: location.search.length, error: "the database is down" });
-    server.fail = null;
-    writeSearch("?doc=" + LONG + "d");
-    await settle();
-    assert.equal(heard.at(-1), null);
+    const off = onHeld((h) => heard.push(h));
+    const doc = long();
+    writeSearch("?tab=analysis&doc=" + doc, { push: true, state: { labDepth: 3 } });
+    assert.match(location.search, HELD);
+    assert.ok(location.search.startsWith("?tab=analysis&"), "the short parameters stay readable");
+    assert.equal(linkParams().get("doc"), doc, "the page still reads what it wrote");
+    assert.equal((history.state as { labDepth: number }).labDepth, 3);
+    assert.equal(server.posts, 0);
+    assert.deepEqual(heard.at(-1), { length: ("?tab=analysis&doc=" + doc).length });
+    assert.deepEqual(currentHeld(), heard.at(-1));
     off();
   });
 
-  test("a run of edits to a long page is stored once, when the page is idle", async () => {
-    (globalThis as { __cbioLinkIdleMs?: number }).__cbioLinkIdleMs = 60;
-    for (const x of ["f1", "f2", "f3"]) { writeSearch("?doc=" + LONG + x, { push: true }); await settle(); }
-    assert.equal(server.posts, 0, "nothing stored while the reader is still editing");
-    assert.ok(location.search.startsWith("?doc="), "the long URL works meanwhile");
-    await new Promise((r) => setTimeout(r, 120));
-    assert.equal(server.posts, 1);
-    assert.match(location.search, /^\?s=/);
-    assert.equal(linkParams().get("doc"), LONG + "f3", "the last edit is the one stored");
+  test("each edit changes the address's mark, so a page re-reads its parameters; a run of edits stores nothing", () => {
+    const marks = new Set<string>();
+    for (let i = 0; i < 3; i++) { writeSearch("?doc=" + long(), { push: true }); marks.add(location.search); }
+    assert.equal(marks.size, 3);
+    assert.equal(server.posts, 0);
   });
 
-  test("flushLink stores a waiting link at once, for a page about to copy its address", async () => {
-    (globalThis as { __cbioLinkIdleMs?: number }).__cbioLinkIdleMs = 60_000;
-    writeSearch("?doc=" + LONG + "g");
-    await flushLink();
-    assert.equal(server.posts, 1);
-    assert.match(location.search, /^\?s=/);
-    await flushLink();
-    assert.equal(server.posts, 1, "nothing waits any more");
+  test("a write beside held parameters keeps them", () => {
+    const doc = long();
+    writeSearch("?tab=analysis&doc=" + doc + "&changes=" + long());
+    const q = linkParams();
+    q.set("changes", "small");
+    writeSearch("?" + q.toString());
+    assert.equal(linkParams().get("doc"), doc);
+    assert.equal(linkParams().get("changes"), "small");
   });
 
-  test("Back to a shortened entry reads it from that entry's own state, without the server", async () => {
-    writeSearch("?doc=" + LONG + "e", { push: true });
-    await settle();
-    const id = new URLSearchParams(location.search).get("s")!;
-    writeSearch("?tab=other", { push: true });
+  test("a reload keeps the held parameters (history.state survives it); Back returns to an earlier entry's", () => {
+    const a = long(), b = long();
+    writeSearch("?doc=" + a, { push: true });
+    writeSearch("?doc=" + b, { push: true });
     browser.at--;   // Back
-    assert.equal(knownLink(id)?.doc, LONG + "e");
+    assert.equal(linkParams().get("doc"), a);
+    browser.entries[browser.at] = { ...browser.now, state: structuredClone(browser.now.state) };   // a reload: the same entry, the same state
+    assert.equal(linkParams().get("doc"), a);
+  });
+
+  test("an address holding nothing here (copied from another browser) is told apart, not read as empty", () => {
+    writeSearch("?tab=analysis&doc=" + long());
+    const copied = location.search;
+    browser.reset("/lab" + copied);   // another browser: the address, without its history entry
+    assert.ok(heldElsewhere(location.search));
+    assert.equal(linkParams().get("doc"), null);
+    assert.equal(currentHeld(), null);
+  });
+});
+
+describe("copying a link", () => {
+  test("a long page's link is stored once, and the address becomes the link it copied", async () => {
+    const doc = long();
+    writeSearch("?tab=analysis&doc=" + doc, { push: true });
+    const url = await copyLink();
+    assert.match(url, /^http:\/\/lab\.test\/lab\?s=[A-Za-z0-9_-]{22}&tab=analysis$/);
+    assert.equal(location.search, new URL(url).search);
+    assert.equal(server.posts, 1);
+    assert.equal(linkParams().get("doc"), doc);
+    assert.equal(currentHeld(), null);
+    assert.equal(await copyLink(), url);
+    assert.equal(server.posts, 1, "the same page copied again is not stored again");
+  });
+
+  test("a page of a link already made keeps that link as the reader moves between tabs", async () => {
+    writeSearch("?tab=analysis&doc=" + long());
+    const url = await copyLink();
+    const q = linkParams();
+    q.set("tab", "explore");
+    writeSearch("?" + q.toString());
+    assert.equal(location.search, new URL(url).search.replace("tab=analysis", "tab=explore"));
+    const edited = linkParams();
+    edited.set("doc", long());
+    writeSearch("?" + edited.toString());
+    assert.match(location.search, HELD, "an edit to the long parameters is no longer that link");
+  });
+
+  test("a link under the limit is shortened too when it holds a long parameter; one with none is copied as it is", async () => {
+    (globalThis as { __cbioLinkUrlMax?: number }).__cbioLinkUrlMax = 5000;
+    writeSearch("?tab=analysis&doc=" + long());
+    assert.ok(location.search.includes("doc="), "under the limit, the address carries it");
+    assert.match(await copyLink(), /\?s=[A-Za-z0-9_-]{22}&tab=analysis$/);
+    writeSearch("?tab=examples");
+    assert.equal(await copyLink(), "http://lab.test/lab?tab=examples");
+    assert.equal(server.posts, 1);
+  });
+
+  test("a store that fails is said, and the address is left as it was", async () => {
+    writeSearch("?doc=" + long());
+    const before = location.search;
+    server.fail = "the database is down";
+    await assert.rejects(copyLink(), /the database is down/);
+    assert.equal(location.search, before);
   });
 });
 
@@ -158,19 +179,18 @@ describe("opening and making links", () => {
     assert.deepEqual(await openLink("abcdefghijklmnopqrstu1"), { doc: "opened" });
     server.links.delete("abcdefghijklmnopqrstu1");
     assert.deepEqual(await openLink("abcdefghijklmnopqrstu1"), { doc: "opened" });
+    assert.deepEqual(knownLink("abcdefghijklmnopqrstu1"), { doc: "opened" });
     await assert.rejects(openLink("abcdefghijklmnopqrstu2"), /no stored link/);
   });
 
   test("a link to another page is short however much it carries", async () => {
     assert.equal(await linkTo("/portal/comparison", { doc: "small" }), "/portal/comparison?doc=small");
-    const url = await linkTo("/portal/comparison", { doc: LONG, off: "x" });
+    const url = await linkTo("/portal/comparison", { doc: long(), off: "x" });
     assert.match(url, /^\/portal\/comparison\?s=[A-Za-z0-9_-]{22}&off=x$/);
   });
 
   test("the limit is the deployment's, unless a test sets its own", () => {
     delete (globalThis as { __cbioLinkUrlMax?: number }).__cbioLinkUrlMax;
     assert.equal(currentLinkUrlMax(), 8000);
-    delete (globalThis as { __cbioLinkIdleMs?: number }).__cbioLinkIdleMs;
-    assert.equal(currentLinkIdleMs(), 1500);
   });
 });

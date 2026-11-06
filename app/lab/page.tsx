@@ -289,9 +289,9 @@ export default function AnalysisPage() {
   const storeLists = (def: CohortDef, name: string): Promise<CohortDef> => storeCohortLists(def, name);
   /**
    * A document too long for the address bar that still holds inline id lists (typed in the editor,
-   * set by an agent, opened from a ?doc= link) has them stored as sets, so its stored link holds
-   * each list's id rather than a copy of the list per edit. Bookkeeping, not an edit to undo; a
-   * list that cannot be stored stays inline, which is valid.
+   * set by an agent, opened from a ?doc= link) has them stored as sets, so the document, and any
+   * link made of it, names each list rather than copying it, often bringing it back under the
+   * limit. Bookkeeping, not an edit to undo; a list that cannot be stored stays inline, which is valid.
    */
   const listsOutOfLink = async (d: AnalysisDoc) => {
     if (docParam(d).length <= currentLinkUrlMax()) return;
