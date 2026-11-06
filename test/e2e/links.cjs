@@ -31,7 +31,7 @@ const SHORT = /[?&]s=[A-Za-z0-9_-]{22}(&|$)/;
 const noise = (n) => require("node:crypto").randomBytes(n).toString("base64url").slice(0, n);
 
 async function links({ browser, ok, BASE, LOGIN, signIn }) {
-  const { encodeUrlJson } = await import("../../lib/url-json.ts");
+  const { encodeUrlJson, decodeUrlJson } = await import("../../lib/url-json.ts");
   const docOf = async (p) => JSON.parse(await p.locator("#docjson").inputValue());
   // a document whose link is long: a cohort's notes change nothing it selects, so nothing is counted differently
   const notes = noise(1500);
@@ -134,6 +134,49 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
   }
 
   if (!LOGIN) return;
+
+  // A reader who is not signed in edits a long document holding an inline id list: the list is
+  // stored once as an unowned set, so the stored link names it instead of carrying it; storing the
+  // same list again answers the same set, and nobody can withdraw it.
+  {
+    const steps = {};
+    const owner = await browser.newContext();
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    await linkMax(ctx, 400);
+    const p = await ctx.newPage();
+    try {
+      await signIn(owner, "links.unowned." + LOGIN);
+      const ex = await (await owner.request.get(BASE + "/api/custom-data/example?study=msk_chord_2024")).json();
+      const ids = (ex.patients || []).slice(0, 20);
+      const doc = { dsl: "2.9", study: "msk_chord_2024", views: [],
+        cohorts: { "Pasted e2e": { all: [{ kind: "patientList", ids: ids.map((x) => "msk_chord_2024:" + x) }], notes: noise(1500) } } };
+      const start = { dsl: "2.9", study: "msk_chord_2024", views: [], cohorts: { Female: { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }] } } };
+      await p.goto(BASE + "/lab?tab=analysis&doc=" + encodeUrlJson(start), { waitUntil: "domcontentloaded" });
+      // the button is drawn before the page answers clicks: try until the editor opens
+      for (let i = 0; i < 30 && !(await p.locator("dialog[open] #docjson").count()); i++) {
+        await p.getByRole("button", { name: /show document json/i }).click({ timeout: 60000 });
+        await p.waitForTimeout(1000);
+      }
+      await p.locator("#docjson").fill(JSON.stringify(doc));
+      await p.locator("dialog[open]").getByRole("button", { name: /^run document/i }).click();
+      await p.waitForFunction(() => /"set":/.test(document.querySelector("#docjson")?.value || ""), null, { timeout: 60000 });
+      const clause = (await docOf(p)).cohorts["Pasted e2e"].all[0];
+      steps.named = typeof clause.set === "string" && !clause.ids && clause.n === ids.length;
+      await p.waitForFunction((re) => new RegExp(re).test(location.search), SHORT.source, { timeout: 60000 });
+      const linkId = new URL(p.url()).searchParams.get("s");
+      const stored = await (await ctx.request.get(BASE + "/api/links/" + linkId)).json();
+      const storedClause = decodeUrlJson(stored.params.doc).cohorts["Pasted e2e"].all[0];
+      steps.linkNamesSet = storedClause.set === clause.set && !storedClause.ids;
+      const again = await (await ctx.request.post(BASE + "/api/id-sets", { data: { name: "again", level: "patient", studies: ["msk_chord_2024"], ids } })).json();
+      steps.once = again.set?.id === clause.set && again.set?.owner === "";
+      const w = await owner.request.put(BASE + "/api/id-sets/" + clause.set + "/withdrawal", { data: { note: "mine now?" } });
+      steps.unmanaged = w.status() === 403 && /no owner/.test((await w.json()).error || "");
+    } catch (e) { steps.error = String(e.message || e).split("\n")[0].slice(0, 160); }
+    ok("a signed-out reader's long document stores its id list once, as an unowned set its stored link names, which nobody can withdraw",
+      steps.named && steps.linkNamesSet && steps.once && steps.unmanaged, JSON.stringify(steps));
+    await ctx.close();
+    await owner.close();
+  }
 
   // Id lists: its owner withdraws one from the Id lists tab — told what uses it — and everyone opening
   // a link that names it is refused with the note; restoring puts it back. The same ids saved again

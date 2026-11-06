@@ -188,6 +188,27 @@ export function idSetContract(backend: string): void {
       assert.deepEqual((await readIdSet(P, b.id)).perStudy, (await readIdSet(OTHER, b.id)).perStudy);
     });
 
+    test("a reader who is not signed in stores an unowned set: once per list, read by anyone, managed by nobody", async () => {
+      const a = await saveIdSet(null, input("anonymous list"));
+      const b = await saveIdSet(null, { ...input("the same list again"), perStudy: { s1: ["S-1", "S-2"], s2: ["T-1"] } });
+      assert.equal(b.id, a.id, "the same ids at the same level are one set");
+      assert.equal(b.name, "anonymous list", "the first name given is kept");
+      assert.equal(a.owner, "");
+      const other = await saveIdSet(null, { ...input("as patients"), level: "patient" });
+      assert.notEqual(other.id, a.id, "another level is another set");
+      const owned = await saveIdSet(P, input("anonymous list"));
+      assert.notEqual(owned.id, a.id, "a signed-in reader's set is their own, never the unowned one");
+      assert.deepEqual((await readIdSet(OTHER, a.id)).perStudy, { s1: ["S-1", "S-2"], s2: ["T-1"] });
+      assert.equal((await loadIdSetForRequest(null, a.id)).count, 3);
+      for (const who of [P, OTHER]) {
+        await assert.rejects(withdrawIdSet(who, a.id), /nobody can withdraw “anonymous list”: .* no owner/);
+        await assert.rejects(shareIdSet(who, a.id, { visibility: "public" }), /no owner/);
+        await assert.rejects(idSetUsage(who, a.id), /no owner/);
+        assert.ok(!(await listIdSets(who, { withdrawn: true })).some((x) => x.id === a.id), "in nobody's saved work");
+      }
+      await assert.rejects(saveIdSet(null, { ...input("a lock"), parts: { samples: { s1: ["S-1"] } } }), /locking a cohort needs a sign-in/);
+    });
+
     test("a replacement must be another set in use; restoring clears the withdrawal", async () => {
       const a = await saveIdSet(P, input("restorable"));
       const gone = await saveIdSet(P, input("already gone"));

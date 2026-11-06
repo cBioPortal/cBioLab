@@ -30,6 +30,13 @@ export const LONG_PARAM = 256;
  */
 export const LINK_URL_MAX = 8000;
 
+/**
+ * How long a page waits after its last URL write before storing a long link (milliseconds). A run
+ * of edits to a long document is then one stored link, not one per edit; the long URL works
+ * meanwhile, as it does while a store is on its way.
+ */
+export const LINK_IDLE_MS = 1500;
+
 /** The most one stored link holds, in characters of parameter names and values. */
 export const LINK_STORE_MAX = 2_000_000;
 

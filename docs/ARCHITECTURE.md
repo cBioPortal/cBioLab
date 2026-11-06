@@ -309,11 +309,12 @@ no longer match the kind folders and the maps keyed by `ViewKind`.
   it, signed in or not; a withdrawn set refuses it with its owner's note. An answer that reads one
   bypasses the result cache (`hasIdSets()`). Inline
   lists are refused by name past `INLINE_ID_SQL_LIMIT` (`lib/cohort2.ts`). In the web app every
-  list becomes a set where the reader is signed in (`app/lab/id-sets-client.ts`): oncoprint
-  selections and Cell Explorer imports as they enter the document, and any list still inline when a
-  cohort or analysis is saved (the page's `persist`/`persistSpaces` wrappers, which give the open
-  document the same sets so a re-save stores nothing new). Inline lists stay valid DSL for MCP,
-  scripts and signed-out readers.
+  list becomes a set (`app/lab/id-sets-client.ts`): oncoprint selections and Cell Explorer imports
+  as they enter the document, the lists of a document too long for the address bar, and any list
+  still inline when a cohort or analysis is saved (the page's `persist`/`persistSpaces` wrappers,
+  which give the open document the same sets so a re-save stores nothing new). A signed-in
+  reader's sets are their own; a reader who is not signed in stores unowned ones, one row per list
+  (`db/migrations/0013`). Inline lists stay valid DSL for MCP and scripts.
 - **Stored links** ([LINKS.md](LINKS.md)) — a page's URL past `LINK_URL_MAX` keeps its long
   parameters on the server (`lib/link-store.ts`, `db/migrations/0012`) under the hash of what they
   hold, and becomes `?s=<id>` plus its short ones. Pages read their parameters through

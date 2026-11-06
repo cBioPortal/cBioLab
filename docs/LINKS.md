@@ -21,13 +21,14 @@ has:
 | | legacy cBioPortal | this app |
 |---|---|---|
 | short form | `?session_id=<id>` | `?s=<id>` |
-| when a link is stored | on every change, once past 1,500 chars | only once past `LINK_URL_MAX` (8,000); shorter links stay self-contained `?doc=` |
+| when a link is stored | on every change, once past 1,500 chars | only once past `LINK_URL_MAX` (8,000), and once the page has been idle for `LINK_IDLE_MS`; shorter links stay self-contained `?doc=` |
 | id | a new random id per save | the hash of what is stored: same parameters, same id; an id never changes meaning |
 | while saving | the URL says `session_id=pending`, which can be copied or reloaded | the full URL until the store answers, then the short one; never a placeholder |
 | save fails | the page spins forever | the long URL stays, and the page says why it could not be shortened |
 | link missing or unreadable | the page fails to render | the page says the link could not be opened, and why |
 | pages covered | Results and Group Comparison only (study view: unbounded `#filterJson`) | every page that keeps state in its URL |
 | comparison groups | explicit sample-id lists | definitions, re-run on the data; explicit lists only where a reader made one |
+| id lists in a stored state | copied into every session | stored once as an id set; the link names it, signed in or not |
 | ids at rest | anyone with a session id reads its sample lists | anyone with a link reads the lists it names; only their owner withdraws them |
 
 ## Stored links (`?s=`)
@@ -63,12 +64,25 @@ the server again.
 1. If the URL still names a known stored link, its parameters are folded back in, so a write that
    changes only `?changes=` doesn't lose the stored `?doc=`.
 2. The full URL is written at once (a new history entry when `push`).
-3. If it is past the limit, its long parameters are stored. When the server answers, and only if
-   the page hasn't written another URL meanwhile, the same history entry is rewritten to the short
-   form, keeping its state (the lab's undo depth, for one).
+3. If it is past the limit, its long parameters are stored once the page has written nothing for
+   `LINK_IDLE_MS` (1.5 s), so a run of edits to a long document is one stored link, not one per
+   edit. The long URL works meanwhile. When the server answers, and only if the page hasn't written
+   another URL meanwhile, the same history entry is rewritten to the short form, keeping its state
+   (the lab's undo depth, for one). `flushLink()` stores a waiting link at once, for a page about to
+   copy its own address.
 4. If storing fails, the long URL stays and the page shows a notice saying the address is too long
    to reload or share, and why storing failed. The notice disappears after the next successful
    store.
+
+**Id lists are stored apart from the link.** In the lab, a document past the limit that still
+holds inline id lists (typed in the editor, set by an agent) has them stored as id sets first
+(`listsOutOfLink` in `app/lab/page.tsx`), so its stored links name each list instead of copying
+it once per edit. A reader who is not signed in stores unowned sets for this (below).
+
+**How many rows to expect.** A row is written only for a distinct state past the limit, after an
+idle pause, and states differing only in short parameters (`tab`, `study`) share the long ones'
+row, so most pages never write one. Each row is at most `LINK_STORE_MAX` characters, and an id
+list in it is a reference, not its ids.
 
 **Opening another page.** `linkTo(path, params)` returns a URL that is short however much it
 carries, storing first if it must. Explore's group comparison and "View patients" use it. On the
@@ -79,10 +93,20 @@ instead of the long `?cohort=` (`CohortNavigation.link`).
 
 A cohort can name a list of sample or patient ids stored on the server
 (`{"kind": "sampleList", "set": "<uuid>"}`) instead of carrying the ids
-(`lib/id-set-store.ts`, `db/migrations/0006`). Lists are stored when a signed-in reader pastes one,
-locks a cohort, drags a selection on an oncoprint, or saves a cohort or analysis that still holds an
+(`lib/id-set-store.ts`, `db/migrations/0006`). Lists are stored when a signed-in reader pastes one or
+locks a cohort, and for any reader when they drag a selection on an oncoprint, when a document
+grows too long for the address bar, or when they save a cohort or analysis that still holds an
 inline list. They exist for two reasons: they keep the document and its link small, and a long
 inlined list would break ClickHouse's query-size limit at around 12,000 ids.
+
+**Unowned sets** (`db/migrations/0013`). A reader who is not signed in still has their lists
+stored: an oncoprint selection, Cell Explorer donors, a long document's lists. Such a set has no
+owner, so nobody manages it: it is never withdrawn, shared or listed in anyone's saved work, and
+`withdrawIdSet` and the rest refuse it as having no owner. Unowned sets are stored by content: the
+same ids at the same level are one row (the first name given is kept), so the same list stored
+again, by anyone not signed in, answers the same id. A signed-in reader's set is always their own
+row, never the unowned one, so they can withdraw it. Locking a cohort needs a sign-in, and so
+does pasting a list in "From a list of ids", where the list is made to be managed.
 
 **Reading is by id.** Anyone holding a link, document or saved item that names a set may read its
 members, signed in or not: the set is as public as the link. A set's sharing (`lib/access.ts`) only
@@ -140,21 +164,25 @@ Each layer can be tested without the ones around it:
   validation, ids, the withdrawal's wording. No server, no browser.
 - **The page's side** — `test/link-state.test.ts` drives `link-state.ts` with a stand-in address
   bar, history and `/api/links` whose answers the test can hold or fail: shortening, a write that
-  races a store, a failed store, Back to a shortened entry, opening and making links.
+  races a store, a failed store, a run of edits stored once when idle, `flushLink`, Back to a
+  shortened entry, opening and making links.
 - **The stores** — `linkContract` and `idSetContract` in `test/support/store-contracts.ts`, run on
   an in-process Postgres (`npm run test:db`) and on `lib/db.ts`'s own fallback (`npm test`): ids,
   immutability, read-by-id for anyone, owner-only management, withdrawal and restore, twins, usage
-  counts.
+  counts, unowned sets stored once and managed by nobody.
 - **The request boundary** — `test/request-boundary.db-test.ts`: a request reads a set for anyone,
   and a withdrawn set stops the request before it runs.
 - **The browser** — `test/e2e/links.cjs` (an area of `node e2e.cjs`): the round trip through
   `?s=`, a reload, a fresh signed-out browser, loading and missing links, a failed store, the
-  comparison page, and withdrawing and restoring from the Id lists tab. Its helpers steer the page
+  comparison page, a signed-out reader's long document storing its list once as an unowned set its
+  link names, and withdrawing and restoring from the Id lists tab. Its helpers steer the page
   without touching the server, and any other area can import them:
   - `linkMax(ctx, n)` shortens past `n` characters, by setting `window.__cbioLinkUrlMax` before the
     page loads. That is the test hook `currentLinkUrlMax()` reads; it overrides `LINK_URL_MAX`.
   - `holdLinks(page)` holds every `GET /api/links/<id>` until the `release()` it returns is called.
   - `failStore(page)` answers every `POST /api/links` with a 500.
+  - `window.__cbioLinkIdleMs` sets the idle wait before storing (`currentLinkIdleMs()`), as
+    `__cbioLinkUrlMax` sets the limit; the unit tests set it to 0, or wait it out.
 
   The e2e server runs on `lib/db.ts`'s in-memory Postgres, so links and sets a check stores are
   real and disappear when the server stops.
@@ -165,9 +193,11 @@ Each layer can be tested without the ones around it:
   Results page's `?filters=` from the query editor, the examples' "copy link", and the
   `/oncoprint-lab` `?spec=` links, which have their own cut (`lib/lab-links.ts`). A soft navigation
   to one that is past 16 KB would fail.
-- **Stored links are never deleted** and have no per-client rate limit. Each holds at most
-  `LINK_STORE_MAX` characters, so they grow with use; a deployment open to the internet may want a
-  limit in front of `POST /api/links`.
+- **Stored links and unowned sets are never deleted** and have no per-client rate limit. A link
+  holds at most `LINK_STORE_MAX` characters and a set `ID_SET_MAX` ids, so they grow with use; a
+  deployment open to the internet may want a limit in front of `POST /api/links` and
+  `POST /api/id-sets`. Neither records when it was last read, so nothing yet tells a link someone
+  opened from one only its maker's page wrote.
 - **A stored link belongs to the deployment that stored it.** Opening it on another one says it
   isn't held there.
 - **Legacy links** (`session_id`, `comparisonId`, `#filterJson`) are not read.

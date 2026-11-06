@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { linkParams } from "../_links/link-state.ts";
+import { currentLinkUrlMax, linkParams } from "../_links/link-state.ts";
 import { useLinkParams } from "../_links/use-link.ts";
 import { ExploreCharts } from "./explore-charts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
@@ -194,9 +194,11 @@ export default function AnalysisPage() {
    * taking up permanent width beside the results.
    */
   const docDialog = useRef<HTMLDialogElement | null>(null);
+  /** whether listsOutOfLink is storing, and whether the document changed meanwhile */
+  const listsStoring = useRef<null | "busy" | "again">(null);
   // the document, its views' ids and the JSON editor's text (app/lab/doc-store.ts); every new
   // document goes into the URL, so a refresh or a shared link shows exactly it
-  const docs = useDocStore(EMPTY_DOC, (d, undoable) => syncUrl(undefined, d, undoable));
+  const docs = useDocStore(EMPTY_DOC, (d, undoable) => { syncUrl(undefined, d, undoable); void listsOutOfLink(d); });
   // each change the reader makes is a browser history entry: Back, Forward, Undo and Redo step through them
   const docHistory = useDocHistory(docs, EMPTY_DOC, () => tabRef.current);
   const doc = docs.current.doc;
@@ -283,8 +285,24 @@ export default function AnalysisPage() {
     return c;
   };
   const persistSpaces = async (name: string, d: AnalysisDoc) => savedArtifacts.saveWorkspace(name, await withListsStored(d));
-  /** a list entering the document is stored as an id set when the reader is signed in; inline otherwise */
-  const storeLists = async (def: CohortDef, name: string): Promise<CohortDef> => loggedIn ? storeCohortLists(def, name) : def;
+  /** a list entering the document is stored as an id set: the reader's own when signed in, unowned otherwise (docs/LINKS.md) */
+  const storeLists = (def: CohortDef, name: string): Promise<CohortDef> => storeCohortLists(def, name);
+  /**
+   * A document too long for the address bar that still holds inline id lists (typed in the editor,
+   * set by an agent, opened from a ?doc= link) has them stored as sets, so its stored link holds
+   * each list's id rather than a copy of the list per edit. Bookkeeping, not an edit to undo; a
+   * list that cannot be stored stays inline, which is valid.
+   */
+  const listsOutOfLink = async (d: AnalysisDoc) => {
+    if (docParam(d).length <= currentLinkUrlMax()) return;
+    // one at a time, so edits made while lists are stored do not store them again; the latest goes next
+    if (listsStoring.current) { listsStoring.current = "again"; return; }
+    listsStoring.current = "busy";
+    try { await withListsStored(d); } catch { /* kept inline: the link is stored with the list in it */ }
+    const again = (listsStoring.current as string | null) === "again";   // set by a call made while this one awaited
+    listsStoring.current = null;
+    if (again) void listsOutOfLink(docs.current.doc);
+  };
   /** Saving needs the login: logged out, ask for it rather than fail. Returns true when saving may go ahead. */
   const canSave = (): boolean => {
     if (loggedIn) return true;
@@ -391,7 +409,7 @@ export default function AnalysisPage() {
       return (typeof sp.study === "string" ? sp.study : "").split(",").map((x) => x.trim().replace(/[^A-Za-z0-9._-]/g, "")).filter(Boolean);
     } catch { return []; }
   });
-  const exploreState = useExploreState({ linkedStudies, addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, loggedIn, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
+  const exploreState = useExploreState({ linkedStudies, addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
   const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, drivers, setDrivers, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
   // The saved-work manager, opened over this page, opens what is chosen in it here, in place
   const savedWork = useSaved();

@@ -3,8 +3,10 @@
 //
 //   linkParams()         the page's parameters as they mean, a stored link's put back
 //   useLinkParams()      the same, for a component (use-link.ts, with the other hooks)
-//   writeSearch(s, push) write the URL; past linkUrlMax() its long parameters are stored and the
-//                        address bar becomes ?s=<id> plus the short ones
+//   writeSearch(s, push) write the URL; past linkUrlMax() its long parameters are stored, once the
+//                        page has written nothing for LINK_IDLE_MS, and the address bar becomes
+//                        ?s=<id> plus the short ones
+//   flushLink()          store a waiting long link now (before copying or sharing the address)
 //   openLink(id)         read a stored link (LinkGate does, before the page renders)
 //
 // A link's parameters are remembered in this tab (`known`) and in the history entry that names it
@@ -12,7 +14,7 @@
 // The server is reached only through /api/links (POST to store, GET /api/links/<id> to read), one
 // place a browser test can intercept or hold. No React here: test/link-state.test.ts drives it with
 // a stand-in history, location and fetch.
-import { LINK_PARAM, LINK_ID, effectiveParams, linkUrlMax, planLink, resolveWrite, shortSearch, type LinkParams } from "../../lib/links.ts";
+import { LINK_PARAM, LINK_ID, LINK_IDLE_MS, effectiveParams, linkUrlMax, planLink, resolveWrite, shortSearch, type LinkParams } from "../../lib/links.ts";
 
 const STATE_KEY = "cbioLink";
 const known = new Map<string, LinkParams>();
@@ -71,6 +73,11 @@ export function currentLinkUrlMax(): number {
   const test = typeof window === "undefined" ? undefined : (window as { __cbioLinkUrlMax?: number }).__cbioLinkUrlMax;
   return linkUrlMax(test ?? configured);
 }
+/** How long a page waits before storing a long link; a test may set `window.__cbioLinkIdleMs`. */
+export function currentLinkIdleMs(): number {
+  const test = typeof window === "undefined" ? undefined : (window as { __cbioLinkIdleMs?: number }).__cbioLinkIdleMs;
+  return typeof test === "number" && test >= 0 ? test : LINK_IDLE_MS;
+}
 
 export type LinkProblem = { length: number; error: string } | null;
 const listeners = new Set<(p: LinkProblem) => void>();
@@ -92,9 +99,10 @@ const stateWithout = (): Record<string, unknown> => {
 /**
  * Write the page's URL (`search` is "?…"): a new history entry when `push`, else over the current
  * one. A known stored link the URL still names is folded back in first, so nothing it held is lost;
- * past linkUrlMax() the long parameters are then stored and the entry rewritten to the short form,
- * once the server has them, and only if the page has not written another URL meanwhile. `state`
- * is merged into the entry's history.state.
+ * past linkUrlMax() the long parameters are then stored — once the page has written nothing for
+ * currentLinkIdleMs() — and the entry rewritten to the short form, once the server has them, and
+ * only if the page has not written another URL meanwhile. `state` is merged into the entry's
+ * history.state.
  */
 export function writeSearch(search: string, opts: { push?: boolean; state?: Record<string, unknown> } = {}): void {
   try {
@@ -102,8 +110,27 @@ export function writeSearch(search: string, opts: { push?: boolean; state?: Reco
     const url = location.pathname + full + location.hash;
     const state = { ...stateWithout(), ...(opts.state || {}) };
     if (opts.push) history.pushState(state, "", url); else history.replaceState(state, "", url);
-    void shorten(full);
+    schedule(full);
   } catch { /* URL state is a convenience, never a failure */ }
+}
+
+/** the long URL waiting to be stored, and its timer */
+let waiting: { full: string; timer: ReturnType<typeof setTimeout> } | null = null;
+
+function schedule(full: string): void {
+  if (waiting) { clearTimeout(waiting.timer); waiting = null; }
+  if (!planLink(full, currentLinkUrlMax())) { tell(null); return; }
+  const w = { full, timer: setTimeout(() => { if (waiting === w) waiting = null; void shorten(full); }, currentLinkIdleMs()) };
+  waiting = w;
+}
+
+/** Store the long URL waiting to be stored now, rather than when the page is idle; done when the address bar is as short as it will get. */
+export async function flushLink(): Promise<void> {
+  const w = waiting;
+  if (!w) return;
+  clearTimeout(w.timer);
+  waiting = null;
+  await shorten(w.full);
 }
 
 async function shorten(full: string): Promise<void> {

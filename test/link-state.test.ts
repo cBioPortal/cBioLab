@@ -51,7 +51,7 @@ globalThis.fetch = (async (input: string, init?: RequestInit) => {
   return json({ error: "unexpected " + input }, 500);
 }) as typeof fetch;
 
-const { writeSearch, linkParams, openLink, linkTo, onLinkProblem, currentLinkUrlMax, knownLink } = await import("../app/_links/link-state.ts");
+const { writeSearch, flushLink, linkParams, openLink, linkTo, onLinkProblem, currentLinkUrlMax, currentLinkIdleMs, knownLink } = await import("../app/_links/link-state.ts");
 
 /** wait until the stand-in server has answered and the page has acted on it */
 const settle = () => new Promise((r) => setTimeout(r, 20));
@@ -62,6 +62,8 @@ beforeEach(() => {
   browser.reset("/lab?tab=analysis");
   server.posts = 0; server.fail = null; server.hold = null;
   (globalThis as { __cbioLinkUrlMax?: number }).__cbioLinkUrlMax = MAX;
+  // store at once unless a test is about waiting
+  (globalThis as { __cbioLinkIdleMs?: number }).__cbioLinkIdleMs = 0;
 });
 
 describe("writing the page's URL", () => {
@@ -119,6 +121,27 @@ describe("writing the page's URL", () => {
     off();
   });
 
+  test("a run of edits to a long page is stored once, when the page is idle", async () => {
+    (globalThis as { __cbioLinkIdleMs?: number }).__cbioLinkIdleMs = 60;
+    for (const x of ["f1", "f2", "f3"]) { writeSearch("?doc=" + LONG + x, { push: true }); await settle(); }
+    assert.equal(server.posts, 0, "nothing stored while the reader is still editing");
+    assert.ok(location.search.startsWith("?doc="), "the long URL works meanwhile");
+    await new Promise((r) => setTimeout(r, 120));
+    assert.equal(server.posts, 1);
+    assert.match(location.search, /^\?s=/);
+    assert.equal(linkParams().get("doc"), LONG + "f3", "the last edit is the one stored");
+  });
+
+  test("flushLink stores a waiting link at once, for a page about to copy its address", async () => {
+    (globalThis as { __cbioLinkIdleMs?: number }).__cbioLinkIdleMs = 60_000;
+    writeSearch("?doc=" + LONG + "g");
+    await flushLink();
+    assert.equal(server.posts, 1);
+    assert.match(location.search, /^\?s=/);
+    await flushLink();
+    assert.equal(server.posts, 1, "nothing waits any more");
+  });
+
   test("Back to a shortened entry reads it from that entry's own state, without the server", async () => {
     writeSearch("?doc=" + LONG + "e", { push: true });
     await settle();
@@ -147,5 +170,7 @@ describe("opening and making links", () => {
   test("the limit is the deployment's, unless a test sets its own", () => {
     delete (globalThis as { __cbioLinkUrlMax?: number }).__cbioLinkUrlMax;
     assert.equal(currentLinkUrlMax(), 8000);
+    delete (globalThis as { __cbioLinkIdleMs?: number }).__cbioLinkIdleMs;
+    assert.equal(currentLinkIdleMs(), 1500);
   });
 });

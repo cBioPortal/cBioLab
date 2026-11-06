@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { requirePrincipal, AccessError } from "../../../lib/auth.ts";
+import { requirePrincipal, principalFor, AccessError } from "../../../lib/auth.ts";
 import { listIdSets } from "../../../lib/id-set-store.ts";
 import { createIdSet } from "../../../lib/id-set-import.ts";
 
@@ -20,11 +20,11 @@ export async function GET(req: Request) {
 
 /**
  * Save a list of ids as a stored set: `{ name, level, studies, ids }`. The ids are matched to the
- * studies' own samples or patients first; the answer is the set and what did not match.
+ * studies' own samples or patients first; the answer is the set and what did not match. A reader
+ * who is not signed in stores an unowned set (docs/LINKS.md): the same ids answer the same set.
  */
 export async function POST(req: Request) {
   try {
-    const principal = requirePrincipal(req, "save stored id sets");
-    return Response.json(await createIdSet(principal, await req.json()), { status: 201 });
+    return Response.json(await createIdSet(principalFor(req), await req.json()), { status: 201 });
   } catch (e) { return fail(e); }
 }

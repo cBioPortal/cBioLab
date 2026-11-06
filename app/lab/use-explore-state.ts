@@ -47,8 +47,6 @@ export interface ExplorePage {
   setToast: React.Dispatch<React.SetStateAction<string | null>>;
   /** saving needs the login; asks for it, and says whether saving may go ahead */
   canSave: () => boolean;
-  /** signed in: a link's long id lists are stored as id sets before it is made */
-  loggedIn: boolean;
   evalDef: (name: string, def: CohortDef) => Promise<{ count: number; text: string }>;
   persist: (name: string, def: CohortDef, lastEval: SavedCohort["lastEval"], id?: string) => Promise<unknown>;
   featureSaved: (d: StoredDataset) => string;
@@ -70,7 +68,7 @@ const DEFAULT_DERIVED: DerivedRequest[] = SHOW_DERIVED_FACETS
   ? [{ metric: "followupMonths" }, { metric: "historyMonths" }, { metric: "alteredGenes" }] : [];
 
 export function useExploreState(page: ExplorePage) {
-  const { linkedStudies, addCohortToView, analysisStudies, canSave, loggedIn, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, setError, setStudy, study } = page;
+  const { linkedStudies, addCohortToView, analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, setError, setStudy, study } = page;
   const [exMsg, setExMsg] = useState<string | null>(null);
   /** the chart whose comparison is waiting on the server's cuts */
   const [splittingBy, setSplittingBy] = useState<string | null>(null);
@@ -185,7 +183,7 @@ export function useExploreState(page: ExplorePage) {
   /**
    * "View patients": the Patient page stepping through the explored cohort, as the portal's study
    * view opens its selected patients. The link carries the cohort's definition, not its patients:
-   * a signed-in reader's long id lists are stored as sets first, and a link still too long for the
+   * long id lists are stored as sets first (unowned when the reader is not signed in), and a link still too long for the
    * address bar is a stored link (app/_links).
    */
   const viewPatients = async () => {
@@ -193,7 +191,7 @@ export function useExploreState(page: ExplorePage) {
     if (!d) { setExMsg("select at least one study first"); return; }
     setExMsg(null);
     try {
-      if (loggedIn && encodeParam(d).length > currentLinkUrlMax()) d = await storeCohortLists(d, barDefaultName());
+      if (encodeParam(d).length > currentLinkUrlMax()) d = await storeCohortLists(d, barDefaultName());
       window.location.assign(await linkTo("/portal/patient", { cohort: encodeParam(d) }));
     } catch (e) { setExMsg("Could not open the patients: " + String((e as Error)?.message || e)); }
   };
@@ -220,8 +218,8 @@ export function useExploreState(page: ExplorePage) {
    * a group of its own (the selection's `base` clauses and the arm's). `target` says where:
    * - "comparison": cBioPortal's group comparison, in a new tab so the selection stays here. The
    *   tab is opened before anything is awaited (a window opened later is a blocked pop-up) and sent
-   *   on once the groups are known; a refusal closes it and is said here. A signed-in reader's long
-   *   id lists are stored as sets first, and a link still too long for the address bar is a stored
+   *   on once the groups are known; a refusal closes it and is said here. Long id lists are stored as
+   *   sets first (unowned when the reader is not signed in), and a link still too long for the address bar is a stored
    *   link (app/_links).
    * - "analysis": a fresh analysis document with each group a cohort, on the Analysis tab — as
    *   Analyze does for the whole selection (it replaces the document; Back restores it).
@@ -232,7 +230,7 @@ export function useExploreState(page: ExplorePage) {
       const cohorts = await groups();
       if (target === "analysis") { startAnalysis(cohorts); return; }
       let nd: AnalysisDoc = { dsl: DOC_VERSION, study: exSel.current[0] || study, cohorts, views: [] };
-      if (loggedIn && encodeParam(nd).length > currentLinkUrlMax()) nd = await storeDocLists(nd);
+      if (encodeParam(nd).length > currentLinkUrlMax()) nd = await storeDocLists(nd);
       const url = await linkTo("/portal/comparison", { doc: encodeParam(nd) });
       if (w && !w.closed) w.location.href = url; else window.location.assign(url);
     } catch (e) {

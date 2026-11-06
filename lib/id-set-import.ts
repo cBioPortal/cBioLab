@@ -22,9 +22,10 @@ export interface IdSetCreated {
 /**
  * Save a list of sample or patient ids as a stored set. Each id is "<study>:<id>" or a bare id,
  * looked up in every study given; only ids that name a case of a patient-level study are kept,
- * and what did not match is reported, never silently dropped from the count.
+ * and what did not match is reported, never silently dropped from the count. With no principal (a
+ * reader who is not signed in) the set is unowned (lib/id-set-store.ts saveIdSet).
  */
-export async function createIdSet(principal: string, input: unknown): Promise<IdSetCreated> {
+export async function createIdSet(principal: string | null, input: unknown): Promise<IdSetCreated> {
   const b = (input && typeof input === "object" ? input : {}) as { name?: unknown; level?: unknown; studies?: unknown; ids?: unknown };
   const level = b.level === "sample" ? "sample" : b.level === "patient" ? "patient" : null;
   if (!level) throw new Error("level must be 'patient' or 'sample'");

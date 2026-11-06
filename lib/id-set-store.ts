@@ -7,6 +7,9 @@
 //   decides only whose saved-work list it appears in.
 // - Only its OWNER manages it: renames, shares, withdraws and restores it (canShare). A principal is
 //   a signed-in user's id (lib/auth.ts); null is a reader who is not signed in.
+// - A reader who is not signed in stores UNOWNED sets (db/migrations/0013): nobody manages one, so it
+//   is never withdrawn, shared or listed, and the same ids at the same level are one row, so a list
+//   stored again answers the same id.
 // - Withdrawing (db/migrations/0011) keeps the row and its members: a document naming the set is
 //   refused with who withdrew it, when, why, and the set its owner points to instead. It is one
 //   set's: another set holding the same ids is another row and stays readable.
@@ -101,6 +104,7 @@ async function byId(principal: string | null, id: string): Promise<{ r: SetRow; 
 /** The set, for its owner only: everything that changes it. */
 async function owned(principal: string, id: string, what: string): Promise<{ r: SetRow; groups: Set<string> }> {
   const x = await byId(principal, id);
+  if (!x.r.owner_id) throw new AccessError("nobody can " + what + " “" + x.r.name + "”: it was stored by a reader who was not signed in, so it has no owner", 403);
   if (!canShare(principal, x.r)) throw new AccessError("only its owner can " + what + " “" + x.r.name + "”", 403);
   return x;
 }
@@ -151,9 +155,10 @@ const sizeOf = (m: PerStudy) => Object.values(m).reduce((n, x) => n + x.length, 
 /**
  * Save a set: members already matched to the studies' own ids (lib/id-set-import.ts), as bare
  * ids per study. Empty studies are dropped; a set with no members at all is refused unless
- * `allowEmpty` (a lock freezing a cohort or arm that held nobody).
+ * `allowEmpty` (a lock freezing a cohort or arm that held nobody). With no principal the set is
+ * unowned and stored by content: the same ids at the same level answer the set already stored.
  */
-export async function saveIdSet(principal: string, input: { name: string; level: IdSetLevel; perStudy: Record<string, string[]>; source: IdSetSource;
+export async function saveIdSet(principal: string | null, input: { name: string; level: IdSetLevel; perStudy: Record<string, string[]>; source: IdSetSource;
   /** a lock's other lists, kept in the same row (db/migrations/0007) */
   parts?: Record<string, PerStudy> },
   opts: { allowEmpty?: boolean } = {}): Promise<IdSetMeta> {
@@ -167,18 +172,28 @@ export async function saveIdSet(principal: string, input: { name: string; level:
   // a pasted list that matched nothing is a mistake; a locked arm that held nobody is a fact (lib/cohort-lock-server.ts)
   if (!count && !opts.allowEmpty) throw new Error("none of the ids matched a " + input.level + " of the studies given; nothing to save");
   if (count > ID_SET_MAX) throw new Error("a stored id set holds at most " + ID_SET_MAX.toLocaleString("en-US") + " ids; this one has " + count.toLocaleString("en-US"));
+  if (!principal && parts) throw new AccessError("locking a cohort needs a sign-in: a lock is kept as its owner's", 403);
   const json = JSON.stringify(perStudy);
-  const id = randomUUID();
   const partsJson = parts ? JSON.stringify(parts) : null;
+  const sha256 = createHash("sha256").update(json + (partsJson ?? "")).digest("hex");
+  const groups = principal ? await groupsOf(principal) : new Set<string>();
+  const id = randomUUID();
   await dbQuery(
     "insert into id_set (id, name, owner_id, level, studies, id_count, per_study, ids_gz, sha256, source, kind, parts, parts_gz)" +
-    " values ($1::uuid, $2, $3::uuid, $4, $5::text[], $6::int, $7::jsonb, $8::bytea, $9, $10::jsonb, $11, $12::jsonb, $13::bytea)",
+    " values ($1::uuid, $2, $3::uuid, $4, $5::text[], $6::int, $7::jsonb, $8::bytea, $9, $10::jsonb, $11, $12::jsonb, $13::bytea)" +
+    (principal ? "" : " on conflict (level, sha256) where owner_id is null do nothing"),
     [id, name, principal, input.level, studies, count, JSON.stringify(Object.fromEntries(studies.map((s) => [s, perStudy[s].length]))),
-      gzipSync(json, { level: 6 }), createHash("sha256").update(json + (partsJson ?? "")).digest("hex"), JSON.stringify(input.source),
+      gzipSync(json, { level: 6 }), sha256, JSON.stringify(input.source),
       parts ? "lock" : "list", parts ? JSON.stringify(Object.fromEntries(Object.entries(parts).map(([k, m]) => [k, sizeOf(m)]))) : null,
       partsJson ? gzipSync(partsJson, { level: 6 }) : null]);
+  if (!principal) {
+    // stored by content: this list may have been stored before, under another id
+    const [r] = await dbQuery<SetRow>(ROW + " where s.owner_id is null and s.level = $1 and s.sha256 = $2", [input.level, sha256]);
+    if (r.id === id) await log(null, "create", id);
+    return metaOf(r, null, groups);
+  }
   await log(principal, "create", id);
-  return metaOf((await one(id))!, principal, await groupsOf(principal));
+  return metaOf((await one(id))!, principal, groups);
 }
 
 /**
