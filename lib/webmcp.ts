@@ -22,6 +22,9 @@ export const SITE_PAGES = [
   { path: "/campaign", what: "hypothesis campaigns: start one for a research question, then register hypotheses, lock and run them on held-out patients" },
   { path: "/datasets", what: "every study this deployment holds, with sample counts per data type; each opens in Explore" },
   { path: "/reproductions", what: "published papers reproduced against the live data, each an analysis that opens in /lab" },
+  { path: "/portal/patient", what: "one patient (?study=&patient=) or one sample (?study=&sample=), laid out as cBioPortal's Patient page: Summary, Pathways, Clinical Data; with ?cohort= it steps through that cohort's patients" },
+  { path: "/portal/results", what: "query results for genes over studies (?studies=&genes=): oncoprint, Mutations, Comparison/Survival and the other tabs" },
+  { path: "/portal/comparison", what: "a group comparison of an analysis document's cohorts (?doc=): overlap, survival, clinical, genomic tabs" },
   { path: "/oncoprint-lab", what: "an oncoprint drawn from a spec (?spec=<base64url>), with presets" },
   { path: "/rationale", what: "why the project is built this way, and what is built versus planned" }
 ];

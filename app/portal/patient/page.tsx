@@ -19,6 +19,7 @@ import { patientLayout, SAMPLE_COHORT, type PatientQuery } from "../patient-layo
 import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
 import { SiteHeader } from "../../_ui/site-header.tsx";
 import { api } from "../../lab/api.ts";
+import { usePortalTools } from "../agent-tools.ts";
 import { PatientHeader, usePatientRecord } from "../patient-header.tsx";
 import { CohortNav, useCohortPosition } from "../cohort-nav.tsx";
 import { navigationParams, patientHref, readNavigation, type CohortNavigation } from "../cohort-navigation.ts";
@@ -90,6 +91,8 @@ function PatientView({ study, patient, sample, nav, tab }: { study: string; pati
     ? patientLayout(query, { profileCatalog: known?.profileCatalog || [], held: basics.held.every, partial: !known })
     : null, [basics, known, study, patient, sample]);   // eslint-disable-line react-hooks/exhaustive-deps -- `query` is rebuilt every render from these ids
   const page = usePageDoc(fresh);
+  usePortalTools({ page: sample ? "sample" : "patient", subject: { study, ...(sample ? { sample } : { patient }), ...(owned && sample ? { patient: owned } : {}), ...(nav ? { steppingThroughCohort: true } : {}) },
+    doc: page.doc, layout: page.layout, open: page.open, openTab: page.openTab, note: page.note });
   const shell = (body: React.ReactNode) => <><SiteHeader page={sample ? "sample" : "patient"} /><main className="analysis-main">{body}</main></>;
   if (!study || !query) return shell(<p className="note">This page shows one patient, or one sample: give the study and the patient as <code>?study=&lt;study id&gt;&amp;patient=&lt;patient id&gt;</code>, or a sample as <code>?study=&lt;study id&gt;&amp;sample=&lt;sample id&gt;</code>.</p>);
   if (error || owner.error) return shell(<div className="error">{error || owner.error}</div>);
