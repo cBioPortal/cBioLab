@@ -264,16 +264,16 @@ describe("plot: several studies, pooled from per-site aggregates", () => {
   });
 
   // Every case is a point "from a participant that may show cases" (doc.ts), and a view is drawn over
-  // every patient of its cohorts or not at all (CLAUDE.md invariant 10); run.ts:560 instead lets a
-  // closed site contribute no cases and still marks the open site's cases as pointSet rule "all".
-  test("box: a site that may not show cases means no case is drawn as a point, and the density is", {
-    todo: "run.ts:560-566 draws the open site's cases alone as rule \"all\", silently missing the closed site's cases" }, async () => {
+  // every patient of its cohorts or not at all (CLAUDE.md invariant 10): one closed site means no
+  // site's cases are drawn, and the caption names the closed site.
+  test("box: a site that may not show cases means no case is drawn as a point, and the density is", async () => {
     const kinds = { xk: "cat", yk: "num", shape: "box" };
     const calls: Calls = [];
     const rows: BoxRow[] = [{ g: "A", n: 2, lo: 0, hi: 9, q1: 2, median: 4, q3: 6 }];
     const r = await run({ s1: fed({ kinds, boxRows: rows, points: [{ id: "P", g: "A", v: 1 }] }, calls), s2: fed({ kinds, boxRows: rows, mode: "aggregate-only" }, calls) }, {});
     assert.equal(r.plot!.points, undefined);
     assert.equal(r.plot!.overlay, "violin");
+    assert.match(r.plot!.note ?? "", /Cases are not drawn as points: s2 may not show individual cases/);
   });
   test("box: a peer that refuses its cases leaves the points out, and the pooled density is drawn", async () => {
     const kinds = { xk: "cat", yk: "num", shape: "box" };
