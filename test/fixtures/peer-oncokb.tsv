@@ -1,0 +1,25 @@
+alteration_type	hugo_gene_symbol	alteration	oncogenicity	mutation_effect	highest_sensitive_level	highest_resistance_level
+MUTATION	KRAS	G12C	Oncogenic	Gain-of-function	LEVEL_1	
+MUTATION	KRAS	G12D	Oncogenic	Gain-of-function		
+MUTATION	KRAS	G12V	Oncogenic	Gain-of-function		
+MUTATION	KRAS	G13D	Oncogenic	Gain-of-function		
+MUTATION	KRAS	Q61H	Oncogenic	Gain-of-function		
+MUTATION	TP53	R273H	Oncogenic	Loss-of-function		
+MUTATION	TP53	R175H	Oncogenic	Loss-of-function		
+MUTATION	TP53	R248Q	Oncogenic	Loss-of-function		
+MUTATION	EGFR	L858R	Oncogenic	Gain-of-function	LEVEL_1	
+MUTATION	EGFR	E746_A750del	Oncogenic	Gain-of-function	LEVEL_1	
+MUTATION	EGFR	T790M	Oncogenic	Gain-of-function	LEVEL_1	LEVEL_R1
+MUTATION	STK11	Q37*	Likely Oncogenic	Likely Loss-of-function		
+MUTATION	KEAP1	G333C	Likely Oncogenic	Likely Loss-of-function		
+MUTATION	PIK3CA	E545K	Oncogenic	Gain-of-function	LEVEL_1	
+MUTATION	BRAF	V600E	Oncogenic	Gain-of-function	LEVEL_1	
+MUTATION	FAT1	R1627*	Likely Oncogenic	Likely Loss-of-function		
+MUTATION	ARID1A	Q563*	Likely Oncogenic	Likely Loss-of-function		
+MUTATION	NF1	R1362*	Likely Oncogenic	Likely Loss-of-function		
+MUTATION	CDKN2A	R80*	Oncogenic	Loss-of-function		
+MUTATION	PTEN	R130Q	Oncogenic	Loss-of-function		
+CNA	EGFR	AMPLIFICATION	Oncogenic	Gain-of-function		
+CNA	MYC	AMPLIFICATION	Oncogenic	Gain-of-function		
+CNA	CDKN2A	DELETION	Oncogenic	Loss-of-function		
+CNA	FAT1	DELETION	Likely Oncogenic	Likely Loss-of-function		

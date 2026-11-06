@@ -23,6 +23,11 @@
 #   scripts/gate.sh local       unit, Postgres, planted sharing bugs, the Python port (no warehouse)
 #   scripts/gate.sh warehouse   the checks that query the warehouse and cbioportal.org from a script
 #   scripts/gate.sh e2e         build, then the browser suite and federation against that build
+#
+# The warehouse and e2e lanes read a second database (connection b, CLICKHOUSE2_*): the committed
+# fixture study in a private ClickHouse the gate starts itself (scripts/peer-db.ts), on a port of
+# its own derived from GATE_PORT (20000 + GATE_PORT % 10000; PEER_DB_PORT overrides), and stops
+# when it ends unless it was already running. Its CLICKHOUSE2_* override any in .env.local.
 set -euo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
 export NEXT_DIST_DIR=.next-gate
@@ -35,6 +40,26 @@ summary() { if [ -n "${CI:-}" ]; then cat; else "$@"; fi; }
 # every "== phase ==" line carries the wall clock and the seconds since the previous phase began
 T0=$(date +%s); TP=$T0
 phase() { local t; t=$(date +%s); echo "== $* == [$(date +%H:%M:%S) +$((t - TP))s, total $((t - T0))s]"; TP=$t; }
+
+# what a gate leaves running is stopped when it ends: the warehouse checks run beside e2e (WPID),
+# and the peer database, if this run started it
+WPID="" PEER_STARTED=""
+PEER_PORT="${PEER_DB_PORT:-$((20000 + PORT % 10000))}"
+cleanup() {
+  if [ -n "$WPID" ]; then { pkill -P "$WPID"; kill "$WPID"; } 2>/dev/null || true; fi
+  if [ -n "$PEER_STARTED" ]; then node scripts/peer-db.ts --stop --port "$PEER_PORT" || true; fi
+}
+trap cleanup EXIT
+
+# the second database: the fixture study (scripts/peer-db.ts), its CLICKHOUSE2_* exported for every
+# stage and server after this
+peer_db() {
+  phase "peer database (test/fixtures/peer-study on 127.0.0.1:$PEER_PORT)"
+  curl -sf -o /dev/null --max-time 2 "http://127.0.0.1:$PEER_PORT/ping" || PEER_STARTED=1
+  local envs line
+  envs=$(node --env-file-if-exists=.env.local scripts/peer-db.ts --port "$PEER_PORT")
+  while IFS= read -r line; do export "${line?}"; done <<<"$envs"
+}
 
 # the venv: lint runs ruff from it, and /oncoprint-lab/cli runs this interpreter and draws with
 # matplotlib, so a venv without the plot extra would turn that page's "not present" note into a traceback
@@ -109,21 +134,17 @@ e2e() {
   for _ in $(seq 1 40); do curl -sf -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/lab" && break; sleep 3; done
   set +e; E2E_PORT=$PORT E2E_LOGIN_EMAIL=e2e@gate.test node e2e.cjs; RC=$?; set -e
   fuser -k $PORT/tcp >/dev/null 2>&1 || true
-  # Patient-level federation: the same build restarted with its second database served to itself as a
-  # simulated peer through its own federation API (lib/loopback-peer.ts), both sides' rules allowing timelines and alterations.
-  # Skipped, and said so, where no second database is configured.
-  if [ -n "${CLICKHOUSE2_URL:-}" ] || grep -q '^CLICKHOUSE2_URL=.' .env.local 2>/dev/null; then
-    phase "e2e: federation (simulated peer)"
-    sleep 2
-    (DATABASE_URL= SUPABASE_DB_URL= PORT=$PORT LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations+oncoprint' FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations+oncoprint' \
-      npm start -- -p $PORT >/tmp/gate-server-fed-$PORT.log 2>&1 &)
-    for _ in $(seq 1 40); do curl -sf -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/lab" && break; sleep 3; done
-    set +e; E2E_PORT=$PORT node scripts/e2e-federation.cjs; FRC=$?; set -e
-    fuser -k $PORT/tcp >/dev/null 2>&1 || true
-    [ $RC -eq 0 ] && RC=$FRC
-  else
-    phase "e2e: federation (simulated peer)"; echo "SKIPPED: no second database (CLICKHOUSE2_*) configured"
-  fi
+  # Patient-level federation: the same build restarted with its second database (the fixture study)
+  # served to itself as a simulated peer through its own federation API (lib/loopback-peer.ts), both
+  # sides' rules allowing timelines and alterations.
+  phase "e2e: federation (simulated peer)"
+  sleep 2
+  (DATABASE_URL= SUPABASE_DB_URL= PORT=$PORT LOOPBACK_PEER=b FEDERATION_DISCLOSE_PATIENTS='*:timeline+alterations+oncoprint' FEDERATION_ACCEPT_PATIENT_LEVEL='*:timeline+alterations+oncoprint' \
+    npm start -- -p $PORT >/tmp/gate-server-fed-$PORT.log 2>&1 &)
+  for _ in $(seq 1 40); do curl -sf -o /dev/null --max-time 5 "http://127.0.0.1:$PORT/lab" && break; sleep 3; done
+  set +e; E2E_PORT=$PORT node scripts/e2e-federation.cjs; FRC=$?; set -e
+  fuser -k $PORT/tcp >/dev/null 2>&1 || true
+  [ $RC -eq 0 ] && RC=$FRC
   return 0
 }
 
@@ -131,14 +152,15 @@ phase "$(git branch --show-current 2>/dev/null || echo detached) @ $(git rev-par
 RC=0
 case "$LANE" in
   local)     python_venv; local_checks ;;
-  warehouse) splitby_cost; warehouse_checks ;;
-  e2e)       python_venv; build; e2e ;;
+  warehouse) peer_db; splitby_cost; warehouse_checks ;;
+  e2e)       python_venv; peer_db; build; e2e ;;
   all)
     python_venv
     # CI runs lint as a job of its own
     if [ -z "${GATE_SKIP_LINT:-}" ]; then phase "lint (eslint, knip, ruff)" && npm run lint 2>&1 | summary tail -15; fi
     build
     local_checks
+    peer_db
     splitby_cost
     # The warehouse checks mostly wait on the network, so by default they run beside e2e, which
     # mostly waits on the browser: several minutes less for a little more memory at peak. Their
@@ -151,7 +173,6 @@ case "$LANE" in
       WLOG=/tmp/gate-warehouse-$PORT.log
       phase "warehouse checks: started beside e2e, reported after it (log: $WLOG)"
       (CLICKHOUSE_MAX_INFLIGHT=4 warehouse_checks >"$WLOG" 2>&1) & WPID=$!
-      trap '{ pkill -P $WPID; kill $WPID; } 2>/dev/null || true' EXIT
       e2e
       phase "warehouse checks (ran beside e2e)"
       set +e; wait $WPID; WRC=$?; set -e

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { currentLinkUrlMax, linkParams } from "../_links/link-state.ts";
+import { useLinkParams } from "../_links/use-link.ts";
 import { ExploreCharts } from "./explore-charts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
@@ -20,6 +21,7 @@ import { useDocStore, EMPTY_DOC } from "./doc-store.ts";
 import { useDocHistory } from "./use-doc-history.ts";
 import { useExploreState } from "./use-explore-state.ts";
 import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
+import { Choice } from "../_ui/choice.tsx";
 import { useExamplesUrl } from "./examples-tab.tsx";
 import { useAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,7 +34,7 @@ import { DrawAtWidth } from "./figure.tsx";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
 import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, AssayFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
-import { CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx";
+import { CohortEditDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
 import { useCohortEdits } from "./use-cohort-edits.ts";
@@ -159,13 +161,14 @@ function useOverBar(onCancel: () => void) {
 }
 
 export default function AnalysisPage() {
-  // Read through useSearchParams, never `use(searchParams)`: every syncUrl() is a
+  // Read through useLinkParams (useSearchParams, with a stored link's parameters put back:
+  // app/_links), never `use(searchParams)`: every syncUrl() is a
   // history.replaceState, which hands the page a NEW searchParams promise, and
   // `use()` of an unresolved promise suspends the whole page — the layout's
   // Suspense then shows its empty fallback for React's minimum 300 ms, a white
   // flash on every click. The params only seed first-render state (the tab, a
   // ?doc= link's loading skeleton), so nothing here needs them to be reactive.
-  const params = useSearchParams();
+  const params = useLinkParams();
   const sp: SearchParams = Object.fromEntries(params.entries());
   // the ?doc= link as the page was opened with it: by the time the mount effect reads it, the
   // document store may already have written the URL
@@ -191,9 +194,11 @@ export default function AnalysisPage() {
    * taking up permanent width beside the results.
    */
   const docDialog = useRef<HTMLDialogElement | null>(null);
+  /** whether listsOutOfLink is storing, and whether the document changed meanwhile */
+  const listsStoring = useRef<null | "busy" | "again">(null);
   // the document, its views' ids and the JSON editor's text (app/lab/doc-store.ts); every new
   // document goes into the URL, so a refresh or a shared link shows exactly it
-  const docs = useDocStore(EMPTY_DOC, (d, undoable) => syncUrl(undefined, d, undoable));
+  const docs = useDocStore(EMPTY_DOC, (d, undoable) => { syncUrl(undefined, d, undoable); void listsOutOfLink(d); });
   // each change the reader makes is a browser history entry: Back, Forward, Undo and Redo step through them
   const docHistory = useDocHistory(docs, EMPTY_DOC, () => tabRef.current);
   const doc = docs.current.doc;
@@ -280,8 +285,24 @@ export default function AnalysisPage() {
     return c;
   };
   const persistSpaces = async (name: string, d: AnalysisDoc) => savedArtifacts.saveWorkspace(name, await withListsStored(d));
-  /** a list entering the document is stored as an id set when the reader is signed in; inline otherwise */
-  const storeLists = async (def: CohortDef, name: string): Promise<CohortDef> => loggedIn ? storeCohortLists(def, name) : def;
+  /** a list entering the document is stored as an id set: the reader's own when signed in, unowned otherwise (docs/LINKS.md) */
+  const storeLists = (def: CohortDef, name: string): Promise<CohortDef> => storeCohortLists(def, name);
+  /**
+   * A document too long for the address bar that still holds inline id lists (typed in the editor,
+   * set by an agent, opened from a ?doc= link) has them stored as sets, so the document, and any
+   * link made of it, names each list rather than copying it, often bringing it back under the
+   * limit. Bookkeeping, not an edit to undo; a list that cannot be stored stays inline, which is valid.
+   */
+  const listsOutOfLink = async (d: AnalysisDoc) => {
+    if (docParam(d).length <= currentLinkUrlMax()) return;
+    // one at a time, so edits made while lists are stored do not store them again; the latest goes next
+    if (listsStoring.current) { listsStoring.current = "again"; return; }
+    listsStoring.current = "busy";
+    try { await withListsStored(d); } catch { /* kept inline: the link is stored with the list in it */ }
+    const again = (listsStoring.current as string | null) === "again";   // set by a call made while this one awaited
+    listsStoring.current = null;
+    if (again) void listsOutOfLink(docs.current.doc);
+  };
   /** Saving needs the login: logged out, ask for it rather than fail. Returns true when saving may go ahead. */
   const canSave = (): boolean => {
     if (loggedIn) return true;
@@ -317,11 +338,11 @@ export default function AnalysisPage() {
         if (tabRef.current === "explore") fetchExplore();
       } else {
         // ?study=a,b opens Explore scoped to those studies (the data sets page links here)
-        const only = (new URLSearchParams(window.location.search).get("study") || "")
+        const only = (linkParams().get("study") || "")
           .split(",").map((x) => x.trim().replace(/[^A-Za-z0-9._-]/g, "")).filter(Boolean);
         if (only.length) { setStudy(only[0]); setExStudies(only); exSel.current = only; }
         // &custom=add opens Custom data → Add data on them (the homepage's "add custom data to" icon)
-        if (only.length && new URLSearchParams(window.location.search).get("custom") === "add") exploreState.setCustomTab("add");
+        if (only.length && linkParams().get("custom") === "add") exploreState.setCustomTab("add");
         if (tabRef.current === "explore") fetchExplore();
       }
     } catch (e) { setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
@@ -340,7 +361,7 @@ export default function AnalysisPage() {
   // change they did not make, rewrites the current one.
   const syncUrl = (nextTab?: string, d?: AnalysisDoc | null, push = false) => {
     try {
-      const q = new URLSearchParams(window.location.search);
+      const q = linkParams();
       q.set("tab", nextTab || tabRef.current);
       if (d) q.set("doc", docParam(d));
       docHistory.record("?" + q.toString(), push);
@@ -376,7 +397,7 @@ export default function AnalysisPage() {
   const workspace = useWorkspace({ canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study,
     sharedSpaces: savedArtifacts.sharedWorkspaces,
     saveShared: async (id, name, d, version) => savedArtifacts.saveShared("workspace", id, name, await withListsStored(d), version) });
-  const { sharedOpen, openShared, confirmSharedSave, analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openDocument, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
+  const { sharedOpen, openShared, confirmSharedSave, analysisSaved, clearAnalysis, confirmWorkspaceSave, deleteWorkspace, openDocument, openWorkspace, openWorkspaceSave, setParam, setWsOpen, wsError, wsOpen } = workspace;
   const savedReady = loggedIn && !savedArtifacts.cohortsState.pending && !savedArtifacts.cohortsState.error;
   const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, storeLists, study });
   const { lockCohorts, unlockCohort, unlockAll, analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells } = cohortEdits;
@@ -389,7 +410,7 @@ export default function AnalysisPage() {
     } catch { return []; }
   });
   const exploreState = useExploreState({ linkedStudies, addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
-  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
+  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, drivers, setDrivers, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
   // The saved-work manager, opened over this page, opens what is chosen in it here, in place
   const savedWork = useSaved();
   /** one of the reader's saved cohorts open in Explore to change its filters; false while their list has not arrived */
@@ -427,7 +448,7 @@ export default function AnalysisPage() {
   /** what Explore's sections read and the edits they can make (app/lab/explore-sections.tsx) */
   const exploreCtx: ExploreCtx = { ...exploreState, menuStore: menuOpenRef.current, showClauseData, studies };
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
-  const viewCtx = { VIEW_KINDS, docHistory, study, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, noteEdit, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, profileCatalog, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
+  const viewCtx = { VIEW_KINDS, docHistory, study, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, profileCatalog, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   /** what the Analysis tab's sections read and the actions they take (app/lab/analysis-sections.tsx) */
   const analysisCtx: AnalysisCtx = { lockCohorts, unlockCohort, unlockAll, canSave, analysisStudies, requestLogin, signIn: (!customState.enabled ? "off" : !loggedIn ? "locked" : "ready") as SignInState, VIEW_KINDS, addView, docHistory, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortCells, cohortSaveState, cohortSource, openCohortCells, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
   // what the page offers the researcher's AI assistant (app/lab/agent-tools.ts), current every render
@@ -467,12 +488,10 @@ export default function AnalysisPage() {
             and a menu that closes on an outside click fights that. */}
         {wsOpen && <WorkspaceDialog doc={doc} saved={doc.title ? spaces[doc.title] : undefined} busy={busy}
           shared={sharedOpen} onSaveShared={confirmSharedSave}
-          unusedParams={result?.unusedParams} error={wsError} onParam={setParam} onNotes={setNotes}
+          unusedParams={result?.unusedParams} error={wsError} onParam={setParam}
           onDelete={() => deleteWorkspace(doc.title!)} onSave={confirmWorkspaceSave} onClose={() => setWsOpen(false)} />}
-        {cohortEditing != null && <CohortEditDialog name={cohortEditing} notes={doc.cohorts?.[cohortEditing]?.notes || ""}
+        {cohortEditing != null && <CohortEditDialog name={cohortEditing}
           taken={(n) => !!doc.cohorts?.[n]} onSave={confirmCohortEdit} onClose={() => setCohortEditing(null)} />}
-        {viewNoteEditing != null && <ViewNoteDialog note={(doc.views || [])[viewNoteEditing]?.note || ""}
-          onSave={confirmViewNoteEdit} onClose={() => setViewNoteEditing(null)} />}
         <GenesDialog ctx={analysisCtx} />
         {/* a click on the open tab still writes it to the URL */}
         <Tabs value={tab} className="mb-4" onValueChange={(v) => openTab(v as typeof TABS[number])}>
@@ -525,6 +544,15 @@ export default function AnalysisPage() {
                   {shown} of {all.toLocaleString()} clinical attributes charted — the rest are in Add chart</span>;
               })()}
               {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
+              {(() => {
+                // drivers only where every selected study has OncoKB calls here; the server refuses the rest too
+                const without = exStudies.filter((id) => studies.find((x) => x.id === id)?.oncokb === false);
+                return <Choice value={drivers ? "drivers" : "all"} onChange={(v) => setDrivers(v === "drivers")} className="driverchoice ml-auto"
+                  disabled={!drivers && without.length > 0}
+                  title={without.length ? "drivers only needs OncoKB driver calls, which " + without.join(", ") + (without.length === 1 ? " does" : " do") + " not have on this deployment"
+                    : "count every alteration in the gene tables and gene charts, or only those OncoKB calls drivers; a click then selects the same"}
+                  options={[["all", "Alterations: all"], ["drivers", "Alterations: OncoKB drivers only"]]} />;
+              })()}
             </div>
           )}
           <AddChartDialog ctx={exploreCtx} />

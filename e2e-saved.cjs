@@ -83,7 +83,7 @@ async function savedLists(browser, ok, BASE, LOGIN) {
       ok("saving a cohort under a name it has updates it", stored === 1 && listed === 1, "stored " + stored + ", listed " + listed);
     }
 
-    // a saved cohort's menu (app/_saved/cohort-menu.tsx): duplicated, the copy renamed with a note,
+    // a saved cohort's menu (app/_saved/cohort-menu.tsx): duplicated, the copy renamed (no note to add),
     // split by a gene and the split removed, opened in Explore to edit and cancelled, then deleted
     {
       const steps = {};
@@ -97,10 +97,11 @@ async function savedLists(browser, ok, BASE, LOGIN) {
         await rowOf(first + " copy").first().waitFor({ timeout: 30000 });
         await (await menu(first + " copy")).getByRole("button", { name: /^rename/ }).click();
         const dlg = page.locator("[role=dialog].cohortdialog");
-        await dlg.locator("#cename").fill(copy); await dlg.locator("#cenotes").fill("e2e note");
+        steps.noNote = (await dlg.locator("textarea").count()) === 0;
+        await dlg.locator("#cename").fill(copy);
         await dlg.getByRole("button", { name: "Save" }).click();
         await rowOf(copy).waitFor({ timeout: 30000 });
-        steps.renamed = (await rowOf(copy).getByText("e2e note", { exact: true }).count()) === 1 && (await savedCount(first + " copy")) === 0;
+        steps.renamed = steps.noNote && (await savedCount(first + " copy")) === 0;
         const m = await menu(copy);
         await m.getByRole("button", { name: /split into arms/ }).click();
         await m.locator("[role=combobox]").first().click();
@@ -173,16 +174,10 @@ async function savedLists(browser, ok, BASE, LOGIN) {
 
       const vgear = page.locator(".viewcard .viewgear").first();
       await vgear.click();
-      await menu.getByRole("button", { name: /add note…/ }).click();
-      await page.locator("#vntext").fill("  e2e note  ");
-      await open("cohortdialog").locator("button[type=submit]").click();
-      const noted = await docUntil((d) => d.views[0].note === "e2e note");
-      await vgear.click();
-      await menu.getByRole("button", { name: /edit note…/ }).click();
-      await page.locator("#vntext").fill("");
-      await open("cohortdialog").locator("button[type=submit]").click();
-      const cleared = await docUntil((d) => d.views[0].note === undefined);
-      ok("view note dialog: saves the note trimmed, and emptying removes it", noted && cleared, "noted " + noted + ", cleared " + cleared);
+      await menu.getByRole("button", { name: "remove" }).waitFor({ timeout: 10000 });
+      const noNote = (await menu.getByRole("button", { name: /note…/ }).count()) === 0;
+      await page.keyboard.press("Escape");
+      ok("a view's menu offers no note to add (notes are not edited for now)", noNote, "note item present: " + !noNote);
     }
 
     // an upload's preview matches its ids against the explored study, saying what it drops

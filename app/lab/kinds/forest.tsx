@@ -1,5 +1,6 @@
 "use client";
 // The forest view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
+import { endpointText } from "../outcome-pairs.ts";
 import { DraftInput } from "./parts.tsx";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
@@ -71,7 +72,7 @@ export const forestUi: KindUi<"forest"> = {
   sub: (spec) => {
     const e = spec.exposure || {};
     const what = e.source === "alteration" ? (e.oql || (e.genes || [e.gene]).join(" or ") + " mutated") : e.attribute ? e.attribute + (spec.threshold != null ? " ≥ " + spec.threshold : spec.exposed ? " = " + spec.exposed : "") : "no exposure chosen";
-    return what + " · " + (spec.endpoint || "OS") + " hazard ratio per " + (spec.strata || "CANCER_TYPE") + ", random-effects pooled";
+    return what + " · " + endpointText(spec) + " hazard ratio per " + (spec.strata || "CANCER_TYPE") + ", random-effects pooled";
   },
   Controls,
 };

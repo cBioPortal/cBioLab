@@ -12,9 +12,14 @@
 # verification-report artifact, merged from the jobs that write it.
 #
 # Needs these repository secrets: the warehouse's read-only login (CLICKHOUSE_URL, CLICKHOUSE_USER,
-# CLICKHOUSE_PASSWORD, CLICKHOUSE_DB) and, for the federation checks, the second instance's
-# (CLICKHOUSE2_URL, _USER, _PASSWORD, _DB, _LABEL; leave them unset to run without one). The warehouse
-# must accept connections from GitHub's runners. Network access to www.cbioportal.org is required.
+# CLICKHOUSE_PASSWORD, CLICKHOUSE_DB). The warehouse must accept connections from GitHub's runners.
+# Network access to www.cbioportal.org is required.
+#
+# The second database the checks read (connection b: federation, the facet and value-folding checks,
+# Explore across two databases) is not a secret warehouse: scripts/gate.sh starts a private ClickHouse
+# on the runner holding the committed fixture study (scripts/peer-db.ts, test/fixtures/peer-study), so
+# no check depends on another database's contents. The ClickHouse binary and cBioPortal's reference
+# files it is set up from are cached, keyed on the versions the code pins.
 name: Verify
 
 on:
@@ -110,6 +115,29 @@ jobs:
 
       - run: npm ci
 
+      # the peer database's ClickHouse release and cBioPortal's schema and reference files, at the
+      # versions scripts/clickhouse-local.ts and lib/importer/setup.ts pin (scripts/gate.sh starts it)
+      - &peer-db-pins
+        name: Versions the peer database pins
+        id: pins
+        run: |
+          echo "clickhouse=$(sed -n 's/^export const CLICKHOUSE_VERSION = "\(.*\)";$/\1/p' scripts/clickhouse-local.ts)" >> "$GITHUB_OUTPUT"
+          echo "cbioportal=$(sed -n 's/^export const CBIOPORTAL_COMMIT = "\(.*\)";$/\1/p' lib/importer/setup.ts)" >> "$GITHUB_OUTPUT"
+
+      - &peer-db-binary
+        name: Cache the ClickHouse binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cbiolab/bin
+          key: clickhouse-${{ runner.os }}-${{ runner.arch }}-${{ steps.pins.outputs.clickhouse }}
+
+      - &peer-db-upstream
+        name: Cache cBioPortal's schema and reference files
+        uses: actions/cache@v4
+        with:
+          path: ~/.cbiolab/upstream
+          key: cbioportal-upstream-${{ steps.pins.outputs.cbioportal }}
+
       # every script reads its credentials with `node --env-file=.env.local`
       - &env-local
         name: Write .env.local from secrets
@@ -118,24 +146,18 @@ jobs:
           CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
           CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
           CLICKHOUSE_DB: ${{ secrets.CLICKHOUSE_DB }}
-          CLICKHOUSE2_URL: ${{ secrets.CLICKHOUSE2_URL }}
-          CLICKHOUSE2_USER: ${{ secrets.CLICKHOUSE2_USER }}
-          CLICKHOUSE2_PASSWORD: ${{ secrets.CLICKHOUSE2_PASSWORD }}
-          CLICKHOUSE2_DB: ${{ secrets.CLICKHOUSE2_DB }}
-          CLICKHOUSE2_LABEL: ${{ secrets.CLICKHOUSE2_LABEL }}
         run: |
           if [ -z "$CLICKHOUSE_URL" ]; then
             echo "::error::The CLICKHOUSE_* repository secrets are not set; the gate needs the warehouse."
             exit 1
           fi
           umask 077
-          for k in CLICKHOUSE_URL CLICKHOUSE_USER CLICKHOUSE_PASSWORD CLICKHOUSE_DB \
-                   CLICKHOUSE2_URL CLICKHOUSE2_USER CLICKHOUSE2_PASSWORD CLICKHOUSE2_DB CLICKHOUSE2_LABEL; do
+          for k in CLICKHOUSE_URL CLICKHOUSE_USER CLICKHOUSE_PASSWORD CLICKHOUSE_DB; do
             [ -n "${!k}" ] && printf '%s=%s\n' "$k" "${!k}" >> .env.local
           done
           true
 
-      - name: Gate, warehouse lane (cBioPortal, cohort logic, pooled paths, examples, method scripts, Explore checks)
+      - name: Gate, warehouse lane (peer database, cBioPortal, cohort logic, pooled paths, examples, method scripts, Explore checks)
         run: scripts/gate.sh warehouse
 
       - name: Keep this lane's part of the verification report
@@ -168,9 +190,13 @@ jobs:
       - name: Install Chromium for the e2e suite
         run: npx playwright install --with-deps chromium
 
+      - *peer-db-pins
+      - *peer-db-binary
+      - *peer-db-upstream
+
       - *env-local
 
-      - name: Gate, e2e lane (build, browser suite, federation)
+      - name: Gate, e2e lane (peer database, build, browser suite, federation)
         run: scripts/gate.sh e2e
 
       - name: Keep the e2e servers' logs

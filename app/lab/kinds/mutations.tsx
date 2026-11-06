@@ -3,6 +3,7 @@
 import { AnnotationBadge } from "../portal-bodies.tsx";
 import { DataTable, specQuery } from "../../_table/DataTable.tsx";
 import { DraftInput } from "./parts.tsx";
+import { sampleHref } from "../../portal/cohort-navigation.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 
@@ -15,8 +16,10 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
     <div className="pb">
       <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} onQuery={onQuery}
         num={(id, x) => id === "vaf" ? x.toFixed(2) : x.toLocaleString()}
-        cell={(id, x) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />
-          : id === "sample" ? <span className="mono">{x}</span> : undefined} />
+        cell={(id, x, r) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />
+          // as on the portal's table, a sample id opens that sample's page, in a new tab so the table keeps its place
+          : id === "sample" ? (r.study && x ? <a className="mono" href={sampleHref(r.study, String(x))} target="_blank" rel="noreferrer"
+            data-tip={"open sample " + x + "'s page"}>{x}</a> : <span className="mono">{x}</span>) : undefined} />
     </div>
   );
 }

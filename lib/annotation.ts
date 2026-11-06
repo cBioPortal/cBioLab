@@ -86,6 +86,12 @@ async function syncedStudies(): Promise<string[]> {
   return _syncedStudies;
 }
 
+/** of these studies, those the OncoKB store has not annotated (none when it has every one) */
+export async function studiesWithoutDrivers(studies: string[]): Promise<string[]> {
+  const synced = new Set(await syncedStudies());
+  return studies.filter((s) => !synced.has(s));
+}
+
 export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], study?: string | string[]): Promise<AnnotationIndex> {
   try {
     const pin = await oncokbPin();

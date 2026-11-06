@@ -15,7 +15,9 @@ What each suite checks, how to run it, and how the gate and CI put them together
   (`test/request-boundary.db-test.ts`: reading a request's sets, saving a pasted list, locking
   cohorts, against a stand-in warehouse that records which instance each statement and id table
   went to). A store promise belongs in `test/support/store-contracts.ts`, which runs there and on
-  `lib/db.ts`'s own fallback.
+  `lib/db.ts`'s own fallback. Stored links and id lists: [LINKS.md](LINKS.md), "Testing it" — which
+  layer each suite covers, and the e2e helpers (`linkMax`, `holdLinks`, `failStore`) that steer a
+  page's links without touching the server.
 - **`npm run test:python`** — the Python port's suite (below).
 - **`npx eslint <files you touched>`** — the full `npm run lint` takes ~2 min.
 - `npm run report:coverage && npm run check:coverage` — the unit suites' coverage and its rules (below).
@@ -114,9 +116,42 @@ own, and the boundary suite is in `npm test`.
 **What e2e actually proves.** It drives a local `npx next start` against the **built working
 tree** — the last build — not against a commit and not against production. So: rebuild before
 running it, and if the tree is dirty you are testing uncommitted code. It needs live ClickHouse
-credentials from `.env.local`; CI writes that file from repository secrets. The e2e scripts get
+credentials for the warehouse from `.env.local`; CI writes that file from repository secrets. The
+second database it reads is the fixture study (below), never a warehouse. The e2e scripts get
 their browser from `e2e-browser.cjs` (Playwright is a devDependency; `CHROME_PATH` overrides the
 Chromium it launches).
+
+## The second database is a committed fixture study
+
+Every check that reads a second database (connection b, `CLICKHOUSE2_*`) reads
+**`test/fixtures/peer-study/`**, a small synthetic study (`cbiolab_peer_fixture`: 40 patients, 44
+samples, patient ids `FX-P01`…`FX-P40`) in cBioPortal's study-folder format, built to hold what those
+checks assert rather than whatever a real warehouse happens to contain:
+
+- **KRAS-mutant patients** (`FX-P01`–`FX-P20`): the federation check's cohort is `KRAS: MUT` across
+  msk_chord_2024 and the peer.
+- **`FX-P10`, the patient the federation check opens**: mid-list (so prev / next both step to peer
+  patients), a dozen mutations with allele counts (so its table sorts by VAF and pages), timeline events.
+- **Timelines** (treatment and specimen events) for every patient, and TP53-mutant and wild-type
+  patients both, for the timeline, plot and oncoprint checks.
+- **Two gene panels**: `FX-P31`–`FX-P40` are on `PEERFIX_NO_EGFR`, and `FX-P33`, `FX-P35`, `FX-P37` are
+  EGFR-mutant there — mutated on no panel covering the gene, the case `check:genefacets` exists for.
+  `FX-P02` is FAT1-amplified in one sample and FAT1-deleted in the other, its other case.
+- **`DEAD` spelled `False`/`FALSE` and `True`/`TRUE`**, for `check:values`.
+- **OncoKB calls** for its variants (`test/fixtures/peer-oncokb.tsv`, a hand-written subset of
+  OncoKB's public calls; some variants are left unannotated). A peer annotates with its caller's pin,
+  so they are stored under the version the app pins (`ONCOKB_PIN`, else the warehouse's latest) and
+  under `fixture`.
+
+`npm run peer-db` (`scripts/peer-db.ts`) starts a private ClickHouse for it (the pinned release
+`npm run local` uses, data in `CBIOLAB_PEER_DATA`, default `~/.cbiolab-peer/<port>`), imports the
+study with `lib/importer`, seeds the OncoKB rows, and prints the `CLICKHOUSE2_*` lines; it is left
+running, and a second run takes about a second. `scripts/gate.sh` runs it for the warehouse and e2e
+lanes on a port derived from `GATE_PORT` (20000 + `GATE_PORT` % 10000, `PEER_DB_PORT` overrides), so
+concurrent gates never share one, exports its `CLICKHOUSE2_*` over `.env.local`'s, and stops it at
+the end if it started it. To point a dev server or a single check at it, pass those lines as
+environment variables. A change to the checks' expectations of connection b is a change to the
+fixture, made in the same commit.
 
 ## The gate and CI
 
@@ -135,7 +170,8 @@ same for its guard runs. A failed statement is never kept. The e2e server never 
 it caches through Next.
 
 **CI runs the gate on every PR and push to master** (`.github/workflows/verify.yml`), as parallel
-jobs, one lane each (`local`, `warehouse`, `e2e`), plus `check:mutants` after the warehouse lane,
+jobs, one lane each (`local`, `warehouse`, `e2e`; the last two start the fixture peer database, with
+the ClickHouse binary and cBioPortal's reference files cached), plus `check:mutants` after the warehouse lane,
 with `RECORD=1` and `REPORT_DIR` (a folder that starts empty, so a stage that never ran leaves no
 stale file), and merges the jobs' folders into the `verification-report` artifact. The planted-bug
 check strips `RECORD`/`REPORT_DIR` from its guard runs, so a run against a planted bug never writes

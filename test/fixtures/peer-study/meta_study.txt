@@ -1,0 +1,6 @@
+type_of_cancer: nsclc
+cancer_study_identifier: cbiolab_peer_fixture
+name: cBioLab peer fixture (synthetic)
+description: A small synthetic study committed for cBioLab's tests, served to them as the second database (connection b). Not real patients. docs/TESTING.md lists what it is built to contain.
+short_name: Peer fixture
+reference_genome: hg19

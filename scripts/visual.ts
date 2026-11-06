@@ -5,7 +5,9 @@
 //   node scripts/visual.ts                       compare the running app against it
 //   node scripts/visual.ts --only=example-03     a subset (substring of the shot name)
 //
-// VISUAL_BASE picks the server (default http://127.0.0.1:3109, this session's next dev).
+// VISUAL_BASE picks the server (default http://127.0.0.1:3109, this session's next dev). The Explore
+// shot picks the e2e suite's two studies (test/e2e/helpers.cjs), one of them the fixture study the
+// gate serves as the second database: run that server with CLICKHOUSE2_* from `npm run peer-db`.
 // Baselines, current shots and diffs go to .visual/ (ignored by git: they depend on the live
 // warehouse and this machine's fonts, so they are a local before/after tool, not a CI fixture).
 //
@@ -22,6 +24,7 @@ import { EXAMPLES } from "../lib/dsl-reference.ts";
 
 const require = createRequire(import.meta.url);
 const { launch } = require("../e2e-browser.cjs");
+const { pickExploreStudies } = require("../test/e2e/helpers.cjs");
 
 const BASE = process.env.VISUAL_BASE || "http://127.0.0.1:3109";
 const DIR = new URL("../.visual/", import.meta.url).pathname;
@@ -47,10 +50,7 @@ function shots(): Shot[] {
     { name: "lab-explore-empty", path: "/lab?tab=explore" },
     {
       name: "lab-explore-studies", path: "/lab?tab=explore",
-      setup: async (p) => {
-        await p.waitForFunction(() => (window as any).cohortLab?.selectStudies, null, { timeout: 120000 });
-        await p.evaluate(() => (window as any).cohortLab.selectStudies(["msk_chord_2024", "genie_public"]));
-      },
+      setup: pickExploreStudies,
     },
     { name: "lab-saved", path: "/lab?tab=cohorts" },
     { name: "lab-analysis-empty", path: "/lab?tab=analysis" },

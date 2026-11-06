@@ -272,25 +272,16 @@ export function useCohortEdits(page: CohortEditsPage) {
     setCohortEditing(name);
   };
 
-  /** Rename a cohort and/or change its note, from the gear menu's "edit…" dialog.
-   *  Renaming rewrites every `view.cohorts` reference too, so a view already
-   *  scoped to this cohort keeps drawing it under its new name — and since
-   *  the server keys everything (result.cohorts, every row/curve) by name,
-   *  a rename re-runs the analysis, unlike a note-only edit, which changes no
-   *  number and so re-runs nothing (use-analysis.ts leaves notes out of its keys). */
-  const confirmCohortEdit = (newName: string, notes: string) => {
+  /** Rename a cohort, from the gear menu's "edit…" dialog. Renaming rewrites every
+   *  `view.cohorts` reference too, so a view already scoped to this cohort keeps drawing it
+   *  under its new name — and since the server keys everything (result.cohorts, every
+   *  row/curve) by name, a rename re-runs the analysis. */
+  const confirmCohortEdit = (newName: string) => {
     if (!cohortEditing) return;
     const oldName = cohortEditing;
+    if (newName === oldName) return;
     const nextCohorts: Record<string, CohortDef> = {};
-    for (const [k, v] of Object.entries(doc.cohorts || {})) {
-      nextCohorts[k === oldName ? newName : k] = k === oldName ? { ...v, notes } : v;
-    }
-    if (newName === oldName) {
-      // a note-only edit re-runs nothing, so nothing else would put it in the shareable link
-      const d = { ...doc, cohorts: nextCohorts };
-      docs.set(d);
-      return;
-    }
+    for (const [k, v] of Object.entries(doc.cohorts || {})) nextCohorts[k === oldName ? newName : k] = v;
     // its splits travel with it; their arms are named after it, so views naming them follow too
     const views = renameInViews(doc.views, oldName, newName) as AnalysisDoc["views"];
     const d = { ...doc, cohorts: nextCohorts, views };

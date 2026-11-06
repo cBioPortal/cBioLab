@@ -122,6 +122,52 @@ async function portal({ browser, ok, BASE }) {
     ok("results selection: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
+
+  // The Comparison page's Genomic Alterations tab counts every alteration, or only OncoKB drivers: the
+  // choice travels as ?drivers=1, reaches every enrichment view as `measure`, and is disabled, saying
+  // why, for a study with no OncoKB calls here.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const link = (study, extra = "") => BASE + "/portal/comparison?doc=" + Buffer.from(JSON.stringify({ study, views: [], cohorts: {
+      Male: { all: [{ kind: "clinical", attribute: "SEX", values: ["Male"] }] }, Female: { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }] } } })).toString("base64url") +
+      "&tab=" + encodeURIComponent("Genomic Alterations") + extra;
+    const measures = [];
+    page.on("request", (r) => {
+      if (r.url().includes("/api/analysis")) try { measures.push(...(JSON.parse(r.postData() || "{}").views || []).filter((x) => x.kind === "enrichment").map((x) => x.measure)); } catch { /* not a document */ }
+    });
+    const settle = async () => {
+      await page.locator(".viewcard").first().waitFor({ timeout: 240000 });
+      await page.waitForFunction(() => !document.querySelector(".viewcard[aria-busy]"), null, { timeout: 240000 });
+    };
+    try {
+      await page.goto(link("luad_tcga_pan_can_atlas_2018"), { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => { const c = document.querySelector(".driverchoice"); return c && !c.disabled; }, null, { timeout: 120000 });
+      await settle();
+      const before = measures.splice(0);
+      await page.locator(".driverchoice").click();
+      await page.getByRole("option", { name: "Alterations: OncoKB drivers only" }).click();
+      for (let i = 0; i < 480 && !measures.includes("driver"); i++) await page.waitForTimeout(250);
+      await settle();
+      const after = measures.splice(0), url = new URL(page.url()).searchParams.get("drivers");
+      await page.goto(link("luad_tcga_pan_can_atlas_2018", "&drivers=1"), { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => /OncoKB drivers only/.test(document.querySelector(".driverchoice")?.textContent || ""), null, { timeout: 120000 });
+      ok("comparison: drivers only reaches every enrichment view, and the link keeps it",
+        before.length > 0 && before.every((m) => m === "any") && after.length > 0 && after.every((m) => m === "driver") && url === "1",
+        JSON.stringify({ before, after, url }));
+      await page.goto(link("prad_mskcc_2017", "&drivers=1"), { waitUntil: "domcontentloaded" });
+      await page.locator(".driverchoice[data-tip*='does not have']").waitFor({ timeout: 120000 });
+      const off = await page.locator(".driverchoice").isDisabled(), note = await page.locator("p.note").first().innerText().catch(() => "");
+      ok("comparison: drivers only is disabled, saying why, for a study with no OncoKB calls, and a link asking for it says it was not applied",
+        off && /prad_mskcc_2017 has no OncoKB driver calls/.test(note), note);
+    } catch (e) {
+      ok("comparison: drivers only", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("comparison: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
 }
 
 module.exports = { portal };

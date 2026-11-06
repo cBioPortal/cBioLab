@@ -73,6 +73,41 @@ export function checkHide(hide: unknown): string | null {
   return bad.length ? "unknown cell " + bad.join(", ") + " in hide — cells are <class>.driver or <class>.vus, classes " + IMPACT_TYPES.join(", ") : null;
 }
 
+/** A selection of codons on each gene's lollipop: `{"KRAS": [12, 13]}` — the stems a click picks. */
+export type CodonSelection = Record<string, number[]>;
+
+/** What is wrong with a view's `codons` selection, given the genes it draws, or null. */
+export function checkCodons(codons: unknown, genes: readonly string[]): string | null {
+  if (codons == null) return null;
+  const shape = "codons is an object from gene to a list of protein positions, like {\"KRAS\": [12, 13]}";
+  if (typeof codons !== "object" || Array.isArray(codons)) return shape;
+  for (const [g, ps] of Object.entries(codons as Record<string, unknown>)) {
+    if (!genes.includes(g)) return "codons." + g + ": not a gene of this view — its genes are " + genes.join(", ");
+    if (!Array.isArray(ps) || ps.some((p) => typeof p !== "number" || !Number.isInteger(p) || p < 0)) return "codons." + g + ": " + shape;
+    if (ps.length > 500) return "codons." + g + ": at most 500 positions";
+  }
+  return null;
+}
+
+/**
+ * The selection after a click on a stem, as the portal's mutation mapper makes it
+ * (react-mutation-mapper FilterUtils.updatePositionSelectionFilters): a plain click selects that
+ * codon alone, or clears the selection when it was already selected; with shift held it is added
+ * to or taken out of what is selected. Sorted, so the same selection is always spelled the same.
+ */
+export function clickCodon(selected: readonly number[], pos: number, multi: boolean): number[] {
+  const on = selected.includes(pos);
+  const next = multi ? selected.filter((p) => p !== pos) : [];
+  if (!on) next.push(pos);
+  return [...new Set(next)].sort((a, b) => a - b);
+}
+
+/** The selection with only the genes given kept and empty lists dropped; undefined when nothing is left. */
+export function pruneCodons(codons: CodonSelection | undefined, genes: readonly string[]): CodonSelection | undefined {
+  const kept = Object.entries(codons || {}).filter(([g, ps]) => genes.includes(g) && ps.length);
+  return kept.length ? Object.fromEntries(kept) : undefined;
+}
+
 /**
  * A gene's lollipop with the hidden cells left out — what the grid beside it selects. Each change
  * goes in or out whole by its class and driver status; stems, heights, colours and the label are

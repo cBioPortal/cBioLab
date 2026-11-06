@@ -9,7 +9,7 @@ import { PGlite as PGliteDb } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { startPostgres, reapplyMigrations, migrationFiles, target, APP_ROLE } from "./support/postgres.ts";
 import { migrate, migrationSql } from "../lib/migrate.ts";
-import { customStoreContract, artifactContract, userContract, sharingContract, idSetContract } from "./support/store-contracts.ts";
+import { customStoreContract, artifactContract, userContract, sharingContract, idSetContract, linkContract } from "./support/store-contracts.ts";
 import { saveDataset } from "../lib/custom-store.ts";
 import { userForEmail } from "../lib/users.ts";
 
@@ -17,13 +17,13 @@ const db: PGlite = await startPostgres();
 
 describe("migrations", () => {
   test("apply in order to an empty database, and again without harm", async () => {
-    assert.deepEqual(migrationFiles(), ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql", "0004_users.sql", "0005_sharing.sql", "0006_id_sets.sql", "0007_id_set_parts.sql", "0008_custom_dataset_note.sql", "0009_app_role.sql", "0010_app_settings.sql"]);
+    assert.deepEqual(migrationFiles(), ["0001_saved_artifacts.sql", "0002_campaigns.sql", "0003_custom_datasets.sql", "0004_users.sql", "0005_sharing.sql", "0006_id_sets.sql", "0007_id_set_parts.sql", "0008_custom_dataset_note.sql", "0009_app_role.sql", "0010_app_settings.sql", "0011_id_set_withdrawal.sql", "0012_stored_links.sql", "0013_unowned_id_sets.sql"]);
     const tables = async () => (await db.query<{ t: string }>(
       "select table_name as t from information_schema.tables where table_schema = 'public' order by 1")).rows.map((r) => r.t);
     const before = await tables();
     await reapplyMigrations(db);
     assert.deepEqual(await tables(), before);
-    for (const t of ["app_user", "user_identity", "saved_artifacts", "campaigns", "campaign_hypotheses", "custom_dataset", "custom_dataset_version", "custom_data_access_log", "user_group", "group_member", "id_set", "id_set_access_log", "app_setting", "app_setting_log"])
+    for (const t of ["app_user", "user_identity", "saved_artifacts", "campaigns", "campaign_hypotheses", "custom_dataset", "custom_dataset_version", "custom_data_access_log", "user_group", "group_member", "id_set", "id_set_access_log", "app_setting", "app_setting_log", "stored_link"])
       assert.ok(before.includes(t), t + " exists");
   });
 
@@ -64,6 +64,7 @@ artifactContract("Postgres");
 userContract("Postgres");
 sharingContract("Postgres");
 idSetContract("Postgres");
+linkContract("Postgres");
 
 describe("a stored dataset version is immutable in the database", () => {
   test("an update or delete of a version row is refused by its trigger", async () => {

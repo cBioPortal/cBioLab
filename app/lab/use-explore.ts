@@ -29,6 +29,8 @@ export interface ExploreRequest {
   derived: DerivedRequest[];
   /** the uploads' datasets and versions (customDataKey) — they are part of the answer */
   uploads: string;
+  /** the gene tables and gene charts count OncoKB drivers only */
+  drivers: boolean;
 }
 
 /** A request asked for, plus whether its answer may define the full attribute vocabulary: only
@@ -56,6 +58,7 @@ export function useExplore(onError: (message: string) => void) {
         ...(r.geneCharts.length ? { geneCharts: r.geneCharts } : {}),
         ...(r.assayCharts.length ? { assayCharts: r.assayCharts } : {}),
         ...(r.derived.length ? { derived: r.derived } : {}),
+        ...(r.drivers ? { drivers: true } : {}),
       }, { signal });
       if (res.status === 499) throw new Superseded();
       const j = await res.json();

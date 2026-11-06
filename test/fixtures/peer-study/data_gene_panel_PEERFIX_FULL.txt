@@ -1,0 +1,3 @@
+stable_id: PEERFIX_FULL
+description: cBioLab peer fixture panel, 15 genes
+gene_list: KRAS	TP53	EGFR	FAT1	STK11	KEAP1	PIK3CA	BRAF	SMARCA4	ARID1A	NF1	ATM	CDKN2A	PTEN	MYC

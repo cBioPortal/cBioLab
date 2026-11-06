@@ -7,7 +7,7 @@
 // it — is one analysis document built by results-layout.ts, whose changes travel in ?changes=
 // (page-doc.ts).
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useLinkParams } from "../../_links/use-link.ts";
 import { PortalTabs } from "../PortalTabs";
 import { useQueryKnown, expressionProfile, discreteCnaProfile, assayComparisonProfiles } from "../study-known";
 import { usePageDoc } from "../page-doc";
@@ -30,7 +30,7 @@ import { resultsMaxStudies, crossStudyExpression, expressionAcross, isExpression
 const IDS_SHOWN = 3;
 
 export default function ResultsPage() {
-  const q = useSearchParams();
+  const q = useLinkParams();
   const env = usePublicEnv();
   const qs = q.toString();
   const target = useMemo(() => readResultsTarget(new URLSearchParams(qs)), [qs]);

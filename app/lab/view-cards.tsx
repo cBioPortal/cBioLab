@@ -68,7 +68,6 @@ export interface ViewCtx {
   setViewCohorts: (vi: number, names: string[], all: string[]) => void;
   moveView: (vi: number, dir: -1 | 1) => void;
   removeView: (vi: number) => void;
-  noteEdit: (vi: number) => (() => void) | undefined;
   openGenes: (vi: number) => void;
   /** open "+ Add cohort" for the view at vi */
   openCohortChooser: (vi: number) => void;
@@ -125,7 +124,7 @@ export const viewHeadTitle = (kind: string): string => kindUi(kind)?.title ?? ki
 
 /** A view still waiting for its first result: its header, then a skeleton where the figure will be. */
 export function LoadingViewCard({ ctx, vi }: { ctx: Omit<ViewCtx, "result">; vi: number }) {
-  const { cohortChoice, doc, docView, maxCohortsOf, menuOpenRef, moveView, removeView, noteEdit } = ctx;
+  const { cohortChoice, doc, docView, maxCohortsOf, menuOpenRef, moveView, removeView } = ctx;
   const spec = docView(vi);
   const n = (doc.views || []).length;
   const max = maxCohortsOf(spec.kind);
@@ -134,7 +133,7 @@ export function LoadingViewCard({ ctx, vi }: { ctx: Omit<ViewCtx, "result">; vi:
       <ViewHead menuStore={menuOpenRef.current} v={{ kind: spec.kind, annotationNote: typeof spec.note === "string" ? spec.note.trim() || undefined : undefined }}
         title={viewHeadTitle(spec.kind)} cohorts={{ ...cohortChoice(vi, spec, max), busy: true }}
         onMoveUp={vi > 0 ? () => moveView(vi, -1) : undefined} onMoveDown={vi < n - 1 ? () => moveView(vi, 1) : undefined}
-        onRemove={() => removeView(vi)} onEditNote={noteEdit(vi)} />
+        onRemove={() => removeView(vi)} />
       <div className="skeleton skeleton-view" />
     </div>
   );
@@ -179,7 +178,7 @@ function ErrorHead({ ctx, v, vi }: CardProps) {
     {v.error && !drawsOwnHead(v) && <ViewHead menuStore={menuOpenRef.current} v={v}
       title={(VIEW_KINDS.find((k) => k.kind === v.kind) || { label: v.kind }).label}
       cohorts={cohortChoice(vi, docView(vi))}
-      {...placement(ctx, vi, false)} />}
+      {...placement(ctx, vi)} />}
   </>;
 }
 

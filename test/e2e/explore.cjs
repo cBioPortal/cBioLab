@@ -289,6 +289,33 @@ async function explore({ ok, BASE, page }) {
     groups = attr + " → " + names.join(", ") + " · " + (d.views || []).length + " views";
   } catch (e) { groups = String(e.message).split("\n")[0]; }
   ok("a chart's Analyze groups opens its values as the cohorts of a fresh analysis", groupsOk, groups);
+
+  // Alterations: OncoKB drivers only. The gene tables count driver calls (a gene mutated mostly by
+  // passengers leaves the top), the link keeps the choice, and checking a gene writes its driver
+  // clause, which selects exactly the samples its "#" counted.
+  let drv = "";
+  let drvOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    const table = page.locator("[data-genetable=mutated]");
+    await table.locator(".generow:not(.ghead)").first().waitFor({ timeout: 240000 });
+    const top = async () => (await table.locator(".generow:not(.ghead) .gname").allInnerTexts()).slice(0, 10);
+    const before = await top();
+    await page.locator(".driverchoice").click();
+    await page.getByRole("option", { name: "Alterations: OncoKB drivers only" }).click();
+    await page.waitForFunction(() => /OncoKB drivers/.test(document.querySelector("[data-genetable=mutated]")?.textContent || ""), null, { timeout: 240000 });
+    const after = await top(), url = new URL(page.url()).searchParams.get("drivers");
+    const egfr = table.locator(".generow", { has: page.locator(".gname", { hasText: /^EGFR$/ }) }).first();
+    const counted = Number((await egfr.locator(".gnum").nth(1).innerText()).replace(/,/g, ""));
+    await egfr.locator("[role=checkbox], input[type=checkbox]").first().click();
+    await table.getByRole("button", { name: "Apply filter" }).click();
+    await page.waitForFunction(() => /EGFR: MUT_DRIVER/.test(document.querySelector(".exbar")?.textContent || "") &&
+      /[\d,]+ patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
+    const matched = Number((/([\d,]+) patients match/.exec(await page.locator(".exbar").innerText()) || [])[1]?.replace(/,/g, ""));
+    drv = JSON.stringify({ before: before.slice(0, 5), after: after.slice(0, 5), url, counted, matched });
+    drvOk = before.includes("TTN") && !after.includes("TTN") && after.includes("EGFR") && url === "1" && counted > 0 && matched === counted;
+  } catch (e) { drv = String(e.message).split("\n")[0]; }
+  ok("explore: drivers only counts OncoKB driver calls, and a checked gene selects exactly the samples it counted", drvOk, drv);
 }
 
 module.exports = { explore };

@@ -9,7 +9,14 @@ export interface HotspotsView {
    * "truncating.driver", …): the grid beside it selects them. Applied where the figure is drawn,
    * so a change re-runs nothing; the counts in the grid stay whole.
    */
-  hide?: string[] }
+  hide?: string[];
+  /**
+   * The codons selected on each gene's lollipop (`{"KRAS": [12, 13]}`): clicking a stem selects it,
+   * shift-click adds or removes one. Drawn with a larger head; in the portal's Mutations tab it
+   * filters the mutation table to those protein positions. Applied where the figure is drawn, so a
+   * change re-runs nothing.
+   */
+  codons?: Record<string, number[]> }
 /** Recurrent protein changes in one gene, with the cohort's mutated total. */
 /** One drawn stem: a codon, its height (distinct patient + change pairs), and how it is coloured. */
 export interface LollipopPosition {
@@ -59,6 +66,8 @@ declare module "../../types.ts" {
       hotspots?: HotspotGene[];
       /** the cells the view hides, as applied to its figure (`hotspots` itself stays whole, so the app can re-filter it) */
       hide?: string[];
+      /** the codons selected on each gene's lollipop, as the figure draws them */
+      codons?: Record<string, number[]>;
     };
   }
   interface ViewResultMain { hotspots: "hotspots" }

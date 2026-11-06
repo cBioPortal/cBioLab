@@ -298,20 +298,31 @@ no longer match the kind folders and the maps keyed by `ViewKind`.
   `customRefs` and the server loads the pinned, immutable version.
 - **Stored id sets** — a cohort given as a long list of ids (`sampleList`/`patientList` with
   `"set": "<id>"` instead of `"ids"`). **`lib/id-set-store.ts`** is the only module touching its
-  tables (`db/migrations/0006_id_sets.sql`): owned and shared by `lib/access.ts`, members
-  immutable (trigger), soft delete, every read logged. `lib/id-set-import.ts` matches a pasted list
+  tables (`db/migrations/0006_id_sets.sql`): **read by id by anyone holding a link or document
+  that names it; managed (shared, withdrawn with a note and a replacement, restored) by its owner
+  only** ([LINKS.md](LINKS.md)), members immutable (trigger), every read logged. `lib/id-set-import.ts` matches a pasted list
   to the studies' cases before saving (`POST /api/id-sets`; UI: "+ Add cohort" → "From a list of
   ids"). Every engine route passes its body as `uses` to `withRequestCustomData`, which reads the
   sets it names (`lib/id-sets-server.ts`) into **`lib/id-sets.ts`**'s request context; the compiler
   then names one ClickHouse external table per set and study, and `lib/ch.ts` uploads it only to
-  the patient-level connection holding that study. A set is not read without a signed-in request
-  (MCP, scripts), and an answer that reads one bypasses the result cache (`hasIdSets()`). Inline
+  the patient-level connection holding that study. A request reads the sets it names whoever sends
+  it, signed in or not; a withdrawn set refuses it with its owner's note. An answer that reads one
+  bypasses the result cache (`hasIdSets()`). Inline
   lists are refused by name past `INLINE_ID_SQL_LIMIT` (`lib/cohort2.ts`). In the web app every
-  list becomes a set where the reader is signed in (`app/lab/id-sets-client.ts`): oncoprint
-  selections and Cell Explorer imports as they enter the document, and any list still inline when a
-  cohort or analysis is saved (the page's `persist`/`persistSpaces` wrappers, which give the open
-  document the same sets so a re-save stores nothing new). Inline lists stay valid DSL for MCP,
-  scripts and signed-out readers.
+  list becomes a set (`app/lab/id-sets-client.ts`): oncoprint selections and Cell Explorer imports
+  as they enter the document, the lists of a document too long for the address bar, and any list
+  still inline when a cohort or analysis is saved (the page's `persist`/`persistSpaces` wrappers,
+  which give the open document the same sets so a re-save stores nothing new). A signed-in
+  reader's sets are their own; a reader who is not signed in stores unowned ones, one row per list
+  (`db/migrations/0013`). Inline lists stay valid DSL for MCP and scripts.
+- **Stored links** ([LINKS.md](LINKS.md)) — **Copy link** (in the header of every page that keeps
+  its state in its URL) keeps the page's long parameters on the server (`lib/link-store.ts`,
+  `db/migrations/0012`) under the hash of what they hold, and the link is `?s=<id>` plus its short
+  ones. Nothing is stored while a page is worked on: past `LINK_URL_MAX` its address stops carrying
+  the state (held in `history.state`, the address says `long=`) and a bar says so. Pages read their parameters through
+  `linkParams()`/`useLinkParams()` and write through `writeSearch()` (`app/_links/`), never
+  `location.search` or `history.*State` directly; `LinkGate` (in the lab and portal layouts) reads a
+  stored link before the page renders. `lib/links.ts` holds the rules, pure.
 - **Signing in** (`lib/auth.ts`, the header's Sign in) guards custom data, saved
   cohorts/analyses (`/api/artifacts`) and campaign changes; exploring, analyses, `?doc=` links and
   MCP need none. A deployment has ONE way in: an OpenID Connect provider (`lib/oidc.ts`;

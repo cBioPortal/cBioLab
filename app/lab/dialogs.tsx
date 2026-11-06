@@ -12,7 +12,6 @@ import { RemoveBadge } from "../_ui/remove-badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Input } from "../_ui/input";
 import { Label } from "../_ui/label";
-import { Textarea } from "../_ui/textarea";
 
 /** A form in a modal that is open while mounted; Esc, a backdrop click and Cancel all close it. */
 function FormDialog({ className, title, onClose, onSubmit, children, footer }: {
@@ -40,7 +39,6 @@ function FormDialog({ className, title, onClose, onSubmit, children, footer }: {
 
 const META = "text-sm text-muted-foreground";
 const FIELD = "h-9 text-md md:text-md";
-const AREA = "min-h-18 bg-muted text-md md:text-md";
 
 function CancelSave({ onClose, disabled, label = "Save" }: { onClose: () => void; disabled?: boolean; label?: string }) {
   return <>
@@ -116,67 +114,40 @@ export function SaveFeatureDialog({ initial, meta, onSave, onClose }: {
   );
 }
 
-/** The cohort gear menu's "edit…": name and note together, since renaming is the one cohort-level
- *  edit the app supports without reopening Explore or the JSON editor. */
-export function CohortEditDialog({ name: initialName, notes: initialNotes, focusNotes, taken, onSave, onClose }: {
-  name: string; notes: string;
-  /** opened to write the note, so the cursor starts there */
-  focusNotes?: boolean;
+/** The cohort gear menu's "edit…": the cohort's name, the one cohort-level edit the app supports
+ *  without reopening Explore or the JSON editor. A note the cohort already has is kept. */
+export function CohortEditDialog({ name: initialName, taken, onSave, onClose }: {
+  name: string;
   /** another cohort already has this name */
   taken: (name: string) => boolean;
-  onSave: (name: string, notes: string) => void; onClose: () => void;
+  onSave: (name: string) => void; onClose: () => void;
 }) {
   const [name, setName] = useState(initialName);
-  const [notes, setNotes] = useState(initialNotes);
   const [error, setError] = useState<string | null>(null);
   return (
-    <FormDialog className="cohortdialog" title="Edit cohort" onClose={onClose}
+    <FormDialog className="cohortdialog" title="Rename cohort" onClose={onClose}
       onSubmit={() => {
         const n = name.trim();
         if (!n) return;
         if (n !== initialName && taken(n)) { setError("a cohort named “" + n + "” already exists"); return; }
-        onSave(n, notes); onClose();
+        onSave(n); onClose();
       }}
       footer={<CancelSave onClose={onClose} disabled={!name.trim()} />}>
       <div className="grid gap-1.5">
         <Label htmlFor="cename" className={META}>Name</Label>
-        <Input id="cename" className={FIELD} value={name} onChange={(e) => setName(e.target.value)} autoFocus={!focusNotes} />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="cenotes" className={META}>Note</Label>
-        <Textarea id="cenotes" className={AREA} value={notes} onChange={(e) => setNotes(e.target.value)} spellCheck autoFocus={focusNotes}
-          placeholder="What is this cohort? Why is it defined this way?" />
+        <Input id="cename" className={FIELD} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
       </div>
       {error && <p className="error text-md text-destructive">{error}</p>}
     </FormDialog>
   );
 }
 
-/** A view gear menu's "add note…" / "edit note…": one line of prose drawn below its title (see
- *  ViewHead) — what this figure shows, or what to read first, not a second title. Empty removes it. */
-export function ViewNoteDialog({ note: initial, onSave, onClose }: {
-  note: string; onSave: (note: string) => void; onClose: () => void;
-}) {
-  const [note, setNote] = useState(initial);
-  return (
-    <FormDialog className="cohortdialog" title="View note" onClose={onClose}
-      onSubmit={() => { onSave(note.trim()); onClose(); }}
-      footer={<CancelSave onClose={onClose} />}>
-      <div className="grid gap-1.5">
-        <Label htmlFor="vntext" className={META}>Note</Label>
-        <Textarea id="vntext" className={AREA} value={note} onChange={(e) => setNote(e.target.value)} autoFocus spellCheck
-          placeholder="What does this figure show? What should a reader look at first?" />
-      </div>
-    </FormDialog>
-  );
-}
-
 /**
- * The workspace editor: name, parameters, notes, and what to do with it, behind the "Save
- * workspace" button on the Analysis tab. Parameters and notes are the document's own and change
- * as they are edited (a parameter re-runs the views that use it); the name is saved with Save.
+ * The workspace editor: name, parameters, and what to do with it, behind the "Save workspace"
+ * button on the Analysis tab. Parameters are the document's own and change as they are edited (a
+ * parameter re-runs the views that use it); the name is saved with Save.
  */
-export function WorkspaceDialog({ doc, saved, shared, busy, unusedParams, error, onParam, onNotes, onDelete, onSave, onSaveShared, onClose }: {
+export function WorkspaceDialog({ doc, saved, shared, busy, unusedParams, error, onParam, onDelete, onSave, onSaveShared, onClose }: {
   doc: AnalysisDoc;
   /** the shared analysis this is a working copy of, when it is one */
   shared?: { owner: string; canEdit: boolean } | null;
@@ -187,7 +158,6 @@ export function WorkspaceDialog({ doc, saved, shared, busy, unusedParams, error,
   unusedParams: string[] | undefined;
   error: string | null;
   onParam: (name: string, value: unknown) => void;
-  onNotes: (notes: string) => void;
   onDelete: () => void;
   onSave: (name: string) => void;
   onClose: () => void;
@@ -249,12 +219,6 @@ export function WorkspaceDialog({ doc, saved, shared, busy, unusedParams, error,
         </p>
       )}
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="wsnotes" className={META}>Notes</Label>
-        <Textarea id="wsnotes" className={AREA} value={doc.notes || ""} spellCheck
-          placeholder="What is this analysis for? What should a reader look at first?"
-          onChange={(e) => onNotes(e.target.value)} />
-      </div>
       {error && <p className="error text-md text-destructive">{error}</p>}
     </FormDialog>
   );

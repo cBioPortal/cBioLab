@@ -1,7 +1,7 @@
 "use client";
 // THE app's header, the same on every page: the name (home), which page this is, the same links in
-// the same order, a page's own tools (its assistant menu), "Saved work", "Clear cache", the light/dark
-// switch and the sign-in. "Saved work"
+// the same order, a page's own tools (its assistant menu), "Copy link" on a page that keeps its state
+// in its URL, "Saved work", "Clear cache", the light/dark switch and the sign-in. "Saved work"
 // opens the saved-work manager over the page (app/_saved); its link is the same manager as a page.
 import { useState } from "react";
 import { Bookmark, Loader2, RotateCcw } from "lucide-react";
@@ -12,6 +12,8 @@ import { cn } from "../../lib/cn";
 import { useOpenSavedFromUrl, useSaved } from "../_saved/saved-context.tsx";
 import { usePublicEnv } from "../_env/public-env-context.tsx";
 import { ThemeToggle } from "./theme-toggle.tsx";
+import { useLinkedPage } from "../_links/use-link.ts";
+import { CopyLinkButton } from "../_links/copy-link.tsx";
 
 const LINKS = [
   ["studies", "/", "studies"],
@@ -64,6 +66,8 @@ export function SiteHeader({ page, current, onLink, children }: {
   useOpenSavedFromUrl();
   // a local instance (npm run local) imports its own studies
   const local = usePublicEnv().CBIOLAB_LOCAL === "1";
+  // a page that keeps its state in its URL (app/_links/link-gate.tsx) always offers a short link to it
+  const linked = useLinkedPage();
   return (
     <header>
       <h1><a href="/" className="text-foreground no-underline">cbio-lab</a></h1>
@@ -74,6 +78,7 @@ export function SiteHeader({ page, current, onLink, children }: {
       ))}
       {local && <a className="toplink" href="/import" aria-current={current === "import" ? "page" : undefined}>import data</a>}
       {children}
+      {linked && <CopyLinkButton />}
       <Button asChild variant="outline" size="sm" className={cn(TB, "savedbtn")} aria-current={current === "saved" ? "page" : undefined}>
         <a href="/saved" data-tip="your saved cohorts, analyses, uploads, groups and gene lists"
           onClick={(e) => { if (plainClick(e) && current !== "saved") { e.preventDefault(); saved.open("cohorts"); } }}><Bookmark />Saved work</a>

@@ -24,6 +24,10 @@ async function lollipop({ browser, ok, BASE }) {
       const svg = await page.locator(".lp-plot svg").first().innerHTML();
       ok("lollipop: the figure is the plot alone; the summary and the grid are controls beside it",
         !/Somatic Mutation Frequency|>Driver<|>VUS</.test(svg) && await page.locator(".lp-summary").count() > 0 && await page.locator(".lp-grid .lp-badge").count() >= 10);
+      // as on the portal's table, a sample id is a link to that sample's page, opened in a new tab
+      const sampleLink = await page.locator(".dt-table tbody a.mono").first().evaluate(a => ({ text: a.textContent, href: a.getAttribute("href"), target: a.target }));
+      ok("mutation table: a sample id links to its sample page, in a new tab",
+        sampleLink.href === "/portal/patient?study=coadread_tcga_pub&sample=" + encodeURIComponent(sampleLink.text) && sampleLink.target === "_blank", JSON.stringify(sampleLink));
       const h0 = await heads(), t0 = await tableCount();
       await page.locator(".lp-rowname", { hasText: "Missense" }).first().click();
       await page.waitForTimeout(300);
@@ -43,6 +47,32 @@ async function lollipop({ browser, ok, BASE }) {
       await page.getByRole("button", { name: "remove the filter on alteration" }).click();
       await settle();
       ok("lollipop: clearing the table's Alteration filter clears the grid", await heads() === h0 && await page.locator(".lp-banner").count() === 0 && (await tableCount()).kept === t0.kept);
+
+      // Clicking stems (app/_lollipop/use-stem-clicks.ts): a click selects one codon, shift-click adds
+      // another, and the table follows through its Protein Position filter; a click on the plot away
+      // from any stem clears it, as on the portal's mutation mapper.
+      const stems = await page.locator(".lp-plot g[data-codon]").evaluateAll((gs) => gs.map((g) => ({
+        codon: Number(g.getAttribute("data-codon")), n: Number(/: ([\d,]+) mutation/.exec(g.querySelector("title").textContent)[1].replace(/,/g, "")) })));
+      const [a, b] = [...stems].sort((x, y) => y.n - x.n);
+      const clickStem = async (codon, shift) => {
+        const box = await page.locator(`.lp-plot g[data-codon="${codon}"] circle`).first().boundingBox();
+        if (shift) await page.keyboard.down("Shift");
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        if (shift) await page.keyboard.up("Shift");
+        await settle();
+      };
+      const selected = () => page.locator(".lp-plot g[data-selected] circle[r='5']").count();
+      await clickStem(a.codon, false);
+      const s1 = await tableCount();
+      ok("lollipop: clicking a stem selects it and filters the table to that codon", await selected() === 1 && s1.kept === a.n && /Protein Position/.test(await page.locator(".dt-chips").innerText().catch(() => "")),
+        "codon " + a.codon + " (" + a.n + "): " + JSON.stringify(s1));
+      await clickStem(b.codon, true);
+      const s2 = await tableCount();
+      ok("lollipop: shift-click adds a second stem to the selection", await selected() === 2 && s2.kept === a.n + b.n, "codons " + a.codon + "+" + b.codon + ": " + JSON.stringify(s2));
+      const plot = await page.locator(".lp-plot svg").first().boundingBox();
+      await page.mouse.click(plot.x + plot.width - 30, plot.y + 40);
+      await settle();
+      ok("lollipop: a click on the plot away from any stem clears the selection", await selected() === 0 && (await tableCount()).kept === t0.kept);
     } catch (e) {
       ok("lollipop: the alteration grid", false, String(e.message).split("\n")[0].slice(0, 200));
     }

@@ -1039,13 +1039,15 @@ export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
 const GENEROW_H = 26;
 
 function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: ExploreCtx }) {
-  const { addClause, addMode, geneFilter, setGeneFilter, compareItems } = ctx;
+  const { addClause, addMode, geneFilter, setGeneFilter, compareItems, callOql } = ctx;
   const explore = ctx.explore!;
   const picks = usePicks();
+  // counting OncoKB drivers only, every number here and every clause a click writes is a driver call
+  const drivers = !!explore.drivers;
   const meta = {
-    mutated: { title: "Mutated Genes", rows: explore.mutatedGenes, total: explore.geneTotals?.mutated, oql: (g: any) => g.gene + ": MUT" },
-    cna:     { title: "CNA Genes",     rows: explore.cnaGenes,     total: explore.geneTotals?.cna,     oql: (g: any) => g.gene + (g.cna === 2 ? ": AMP" : ": HOMDEL") },
-    sv:      { title: "SV Genes",      rows: explore.svGenes,      total: explore.geneTotals?.sv,      oql: (g: any) => g.gene + ": FUSION" }
+    mutated: { title: "Mutated Genes", rows: explore.mutatedGenes, total: explore.geneTotals?.mutated, oql: (g: any) => g.gene + ": " + callOql("MUT") },
+    cna:     { title: "CNA Genes",     rows: explore.cnaGenes,     total: explore.geneTotals?.cna,     oql: (g: any) => g.gene + ": " + callOql(g.cna === 2 ? "AMP" : "HOMDEL") },
+    sv:      { title: "SV Genes",      rows: explore.svGenes,      total: explore.geneTotals?.sv,      oql: (g: any) => g.gene + ": " + callOql("FUSION") }
   }[kind];
   const all = meta.rows || [];
   // Client-side, over the rows already loaded. The table is capped
@@ -1062,12 +1064,13 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
     <div className="card" data-genetable={kind}>
       <div className="row baseline g5">
         <h2 className="flush">{meta.title}</h2>
+        {drivers && <span className="meta" data-tip={"counting only the calls OncoKB " + explore.drivers + " makes drivers (oncogenic, likely oncogenic or resistance); a sample with only other calls counts as unaltered"}>OncoKB drivers</span>}
         <span className="spacer" />
         <Input type="search" className="h-7 w-24 text-md md:text-md" placeholder="find gene" value={geneFilter[kind] || ""}
           data-tip={"filters the " + all.length + " genes loaded for this table, not all " + (meta.total || all.length)}
           onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
         {(() => {
-          const chart: ChartKey = { kind: "genes", specs: kind === "mutated" ? [": MUT"] : kind === "cna" ? [": AMP", ": HOMDEL"] : [": FUSION"] };
+          const chart: ChartKey = { kind: "genes", specs: (kind === "mutated" ? ["MUT"] : kind === "cna" ? ["AMP", "HOMDEL"] : ["FUSION"]).map((c) => ": " + callOql(c)) };
           const checked = picks.picked.map((k) => byKey.get(k)).filter(Boolean);
           return <ChartMenu label={meta.title} actions={addMode ? [] : checked.length < 2
             ? [{ label: "Check genes to compare or analyze", disabled: true, title: "check at least 2 genes: each becomes a group of the cases altered in it (a case altered in both is in both)" }]
@@ -1099,7 +1102,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
               </> : (
                 <span className="gnum" data-tip={g.events.toLocaleString() + " events across " + g.altered.toLocaleString() + " samples"}>{g.events.toLocaleString()}</span>
               )}
-              <span className="gnum" data-tip={g.altered.toLocaleString() + " samples altered in " + g.gene + (off > 0 ? ", " + off.toLocaleString() +
+              <span className="gnum" data-tip={g.altered.toLocaleString() + " samples " + (drivers ? "with an OncoKB driver call in " : "altered in ") + g.gene + (off > 0 ? ", " + off.toLocaleString() +
                 " of them by a call their panel does not cover (off-panel): counted here, as cBioPortal's \"#\" does, but not in the frequency" : "")}>
                 {g.altered.toLocaleString()}
               </span>
@@ -1115,7 +1118,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
         ? rows.length.toLocaleString() + " of " + all.length.toLocaleString() + " loaded genes match"
         : rows.length.toLocaleString() + " of " + (meta.total || rows.length).toLocaleString() + " genes" +
           (meta.total && meta.total > rows.length ? " (the most altered)" : "")}</span>
-      <PickBar picks={picks} hint="keep the samples altered in any of the checked genes (one OQL query)"
+      <PickBar picks={picks} hint={"keep the samples " + (drivers ? "with an OncoKB driver call in" : "altered in") + " any of the checked genes (one OQL query)"}
         onApply={(keys) => addClause({ kind: "oql", q: keys.map((k) => meta.oql(byKey.get(k))).join("; ") })} />
       {needle && !rows.length && (
         <p className="note flush mt-1.5">

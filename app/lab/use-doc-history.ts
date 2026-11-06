@@ -3,7 +3,8 @@
 // Ctrl-Y) are the same steps. An edit that breaks a view is one Back away from the last document
 // that worked.
 //
-// The URL holds the whole document (`?doc=`), so an entry needs nothing else to be restored. Each
+// The URL holds the whole document (`?doc=`, or a stored link standing for it: app/_links), so an
+// entry needs nothing else to be restored. Each
 // entry is stamped with its depth, and the page remembers the depth it loaded at: Undo and Redo
 // cover the changes made since this page load, and nothing before it — after a reload there is
 // nothing to undo, and Undo never steps off the app. The browser's own Back and Forward still
@@ -13,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc } from "../../lib/types.ts";
 import type { DocStore } from "./doc-store.ts";
 import { readUrlJson } from "../../lib/url-json.ts";
+import { linkIdOf, linkParams, openLink, writeSearch } from "../_links/link-state.ts";
 
 const KEY = "labDepth";
 
@@ -30,9 +32,9 @@ const depthOf = (state: unknown): number | null => {
   return typeof d === "number" ? d : null;
 };
 
-/** `?doc=` → the document it holds; null when there is none or it does not decode */
+/** `?doc=` (or a known stored link holding it) → the document it holds; null when there is none or it does not decode */
 export function decodeDocParam(search: string): AnalysisDoc | null {
-  return readUrlJson<AnalysisDoc>(new URLSearchParams(search).get("doc"));
+  return readUrlJson<AnalysisDoc>(linkParams(search).get("doc"));
 }
 
 export function useDocHistory(docs: DocStore, emptyDoc: AnalysisDoc, currentTab: () => string): DocHistory {
@@ -50,16 +52,20 @@ export function useDocHistory(docs: DocStore, emptyDoc: AnalysisDoc, currentTab:
     try { history.replaceState({ ...(history.state || {}), [KEY]: depth.current }, "", location.href); } catch { /* history is a convenience */ }
     sync();
 
-    const onPop = (e: PopStateEvent) => {
+    const onPop = async (e: PopStateEvent) => {
       const d = depthOf(e.state);
       if (d == null) return;
       depth.current = d;
+      // an entry standing for a stored link this tab has not read (one from before a reload) is read first
+      const id = linkIdOf(location.search);
+      if (id) { try { await openLink(id); } catch { /* restored as what the URL itself says */ } }
+      if (depthOf(history.state) !== d) return;   // the reader has moved on meanwhile
       docs.restore(decodeDocParam(location.search) ?? emptyDoc);
       // the document goes back; the tab the reader is on stays
       try {
         const q = new URLSearchParams(location.search);
         q.set("tab", currentTab());
-        history.replaceState({ ...(history.state || {}), [KEY]: d }, "", "?" + q.toString());
+        writeSearch("?" + q.toString(), { state: { [KEY]: d } });
       } catch { /* as above */ }
       sync();
     };
@@ -74,9 +80,10 @@ export function useDocHistory(docs: DocStore, emptyDoc: AnalysisDoc, currentTab:
       else if ((k === "z" && e.shiftKey) || k === "y") { if (depth.current >= base.current && depth.current < max.current) { e.preventDefault(); history.forward(); } }
     };
 
-    window.addEventListener("popstate", onPop);
+    const pop = (e: PopStateEvent) => { void onPop(e); };
+    window.addEventListener("popstate", pop);
     window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("popstate", onPop); window.removeEventListener("keydown", onKey); };
+    return () => { window.removeEventListener("popstate", pop); window.removeEventListener("keydown", onKey); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
@@ -85,10 +92,10 @@ export function useDocHistory(docs: DocStore, emptyDoc: AnalysisDoc, currentTab:
         if (push) {
           depth.current += 1;
           max.current = depth.current;   // a new step drops whatever was ahead of it, as the browser does
-          history.pushState({ ...(history.state || {}), [KEY]: depth.current }, "", search);
+          writeSearch(search, { push: true, state: { [KEY]: depth.current } });
           sync();
         } else {
-          history.replaceState({ ...(history.state || {}), [KEY]: depth.current }, "", search);
+          writeSearch(search, { state: { [KEY]: depth.current } });
         }
       } catch { /* URL state is a convenience, never a failure */ }
     },

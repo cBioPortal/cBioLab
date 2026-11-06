@@ -1,5 +1,6 @@
 "use client";
 // The rmst view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
+import { endpointText } from "../outcome-pairs.ts";
 import { DraftInput } from "./parts.tsx";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 
@@ -32,7 +33,7 @@ export const rmstUi: KindUi<"rmst"> = {
   why: (k) => k.attrs.some((a) => /_MONTHS$/i.test(a.attribute)) ? null : "this study has no <X>_MONTHS outcome column",
   sub: (spec) => {
     const lm = Array.isArray(spec.landmarkMonths) && spec.landmarkMonths.some((x: number) => x > 0) ? " · landmarks " + spec.landmarkMonths.join(", ") + " mo" : "";
-    return "area under the KM curve to " + (spec.tau != null ? "τ = " + spec.tau + " months" : "τ where every cohort has 10 at risk") + " · " + (spec.anchor?.eventType ? "OS from first " + spec.anchor.eventType + (spec.anchor.key ? " [" + spec.anchor.key + "=" + spec.anchor.value + "]" : "") : (spec.endpoint || "OS")) + lm;
+    return "area under the KM curve to " + (spec.tau != null ? "τ = " + spec.tau + " months" : "τ where every cohort has 10 at risk") + " · " + (spec.anchor?.eventType ? "OS from first " + spec.anchor.eventType + (spec.anchor.key ? " [" + spec.anchor.key + "=" + spec.anchor.value + "]" : "") : endpointText(spec)) + lm;
   },
   Controls,
 };

@@ -73,20 +73,23 @@ async function savedCohorts({ browser, ok, LOGIN, signIn, BASE }) {
       steps.counted = (await sp.locator(".cohortbox-head").first().innerText()).replace(/\s+/g, "").includes(String(patients.length));
       steps.noIds = !(await sp.locator("#docjson").inputValue()).includes(patients[0]);
       const doc = { dsl: "2.7", study: "msk_chord_2024", cohorts: { L: def }, views: [] };
+      // a set is read by its id (docs/LINKS.md): signed out, or as someone else, the analysis runs
       const anon = await browser.newContext();
       const r1 = await anon.request.post(BASE + "/api/analysis", { data: doc });
-      steps.signedOut = r1.status() >= 400 && /sign in/i.test((await r1.json()).error || "");
+      steps.signedOut = r1.ok();
       const other = await browser.newContext();
       await signIn(other, "other." + LOGIN);
       const r2 = await other.request.post(BASE + "/api/analysis", { data: doc });
-      steps.otherUser = r2.status() >= 400 && /no stored id set/.test((await r2.json()).error || "");
+      steps.otherUser = r2.ok();
+      // only its owner withdraws it; then everyone is told who, when and why
+      steps.notTheirs = (await other.request.put(BASE + "/api/id-sets/" + leaf.set + "/withdrawal", { data: { note: "x" } })).status() === 403;
+      await ctx.request.put(BASE + "/api/id-sets/" + leaf.set + "/withdrawal", { data: { note: "made by the e2e suite" } });
+      const r3 = await anon.request.post(BASE + "/api/analysis", { data: doc });
+      steps.withdrawn = r3.status() >= 400 && /was withdrawn by its owner .* on \d{4}-\d{2}-\d{2}: made by the e2e suite\./.test((await r3.json()).error || "");
       await anon.close(); await other.close();
-      await ctx.request.delete(BASE + "/api/id-sets/" + leaf.set);
-      const r3 = await ctx.request.post(BASE + "/api/analysis", { data: doc });
-      steps.deleted = r3.status() >= 400 && /was deleted on/.test((await r3.json()).error || "");
     } catch (e) { steps.error = String(e.message || e).slice(0, 160); }
-    ok("a pasted list of ids is matched, saved as a stored id set and named by the cohort; only its signed-in owner can read it",
-      steps.matched && steps.named && steps.counted && steps.noIds && steps.signedOut && steps.otherUser && steps.deleted, JSON.stringify(steps));
+    ok("a pasted list of ids is matched, saved as a stored id set and named by the cohort; anyone may read it, only its owner withdraw it",
+      steps.matched && steps.named && steps.counted && steps.noIds && steps.signedOut && steps.otherUser && steps.notTheirs && steps.withdrawn, JSON.stringify(steps));
     await ctx.close();
   }
   // A cohort from a list of ids can be made in the library (choosing its study) and from the

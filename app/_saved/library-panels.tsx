@@ -60,7 +60,7 @@ function ListStatus({ state, what, empty, isEmpty }: { state: ListState; what: s
   return isEmpty ? <p className="note">{empty}</p> : null;
 }
 
-/** The share dialog for one own cohort or analysis, and for the uploads and id lists it uses. */
+/** The share dialog for one own cohort or analysis, and for the uploads it uses. */
 function useShareDialog(saved: SavedArtifacts) {
   const login = useCustomDataState();
   const groups = useGroups(login.user?.id ?? null);
@@ -69,11 +69,7 @@ function useShareDialog(saved: SavedArtifacts) {
     groups={groups.groups} groupsError={groups.error}
     onSave={(s) => saved.share(sharing.kind, sharing.id, s)}
     onShareDatasets={async (items, s) => {
-      for (const w of items) {
-        if (w.kind !== "idSet") { await shareServerDataset(w.id, s); continue; }
-        const res = await api.idSets.share(w.id, s);
-        if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || res.statusText);
-      }
+      for (const w of items) await shareServerDataset(w.id, s);
     }}
     onClose={() => setSharing(null)} />;
   return { open: (kind: ArtifactKind, id: string, name: string, s?: Sharing) => setSharing({ kind, id, name, sharing: s ?? PRIVATE }), dialog };
@@ -89,7 +85,7 @@ export function CohortsPanel() {
   const [picked, setPicked] = useState<string[]>([]);
   const [newList, setNewList] = useState(false);
   /** the cohort whose name and note are being edited, and whether it was opened for the note */
-  const [renaming, setRenaming] = useState<{ name: string; note: boolean } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   /** a name not yet used by one of the reader's cohorts: `base`, else `base (2)`, … */
   const freeName = (base: string) => { if (!saved.cohorts[base]) return base; for (let i = 2; ; i++) if (!saved.cohorts[base + " (" + i + ")"]) return base + " (" + i + ")"; };
@@ -164,7 +160,7 @@ export function CohortsPanel() {
         meta={<>{c.lastEval && c.lastEval.count.toLocaleString() + " patients · "}saved {c.savedAt} · <ShareBadge sharing={c.sharing}
           onClick={() => share.open("cohort", c.id, n, c.sharing)} /></>}
         onAnalyze={() => analyzeOne(n, c.def)} onCustomData={actions.showClauseData?.(n)} onRemoveSplit={(s) => void unsplit(n, c, s)}
-        own={{ onRename: () => setRenaming({ name: n, note: false }), onNote: () => setRenaming({ name: n, note: true }), onEditFilters: () => { actions.editCohort(c.id); close(); }, onSplit: (spec) => split(n, c, spec),
+        own={{ onRename: () => setRenaming(n), onEditFilters: () => { actions.editCohort(c.id); close(); }, onSplit: (spec) => split(n, c, spec),
           onDuplicate: () => attempt("duplicate", () => saved.saveCohort(freeName(n + " copy"), c.def, c.lastEval ?? null)), onDelete: () => remove(n) }} />
     ))}
     {saved.sharedCohorts.map((x) => (
@@ -178,14 +174,14 @@ export function CohortsPanel() {
       doneLabel={<><Save />Save to your library</>} doneTitle={(as) => "save “" + as + "” to your library"}
       nameFor={freeName}
       onDone={async (name, def) => { await saved.saveCohort(name, def, null); }} onLogin={requestLogin} onClose={() => setNewList(false)} />}
-    {renaming && saved.cohorts[renaming.name] && <CohortEditDialog name={renaming.name} notes={saved.cohorts[renaming.name].def.notes || ""} focusNotes={renaming.note}
+    {renaming && saved.cohorts[renaming] && <CohortEditDialog name={renaming}
       taken={(n) => !!saved.cohorts[n]}
-      onSave={(name, notes) => {
-        const c = saved.cohorts[renaming.name];
-        const { notes: _old, ...def } = c.def;
+      onSave={(name) => {
+        const c = saved.cohorts[renaming];
+        if (name === renaming) return;
         void attempt("rename", async () => {
-          await saved.saveCohort(name, notes.trim() ? { ...def, notes: notes.trim() } : def, c.lastEval ?? null, c.id);
-          setPicked((p) => p.map((k) => k === "saved:" + renaming.name ? "saved:" + name : k));
+          await saved.saveCohort(name, c.def, c.lastEval ?? null, c.id);
+          setPicked((p) => p.map((k) => k === "saved:" + renaming ? "saved:" + name : k));
         });
       }}
       onClose={() => setRenaming(null)} />}

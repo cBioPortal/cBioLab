@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, View } from "../../lib/types";
 import { encodeUrlJson, readUrlJson } from "../../lib/url-json.ts";
 import { applyChanges, pageChanges, type PageChanges } from "./page-changes.ts";
+import { linkParams, writeSearch } from "../_links/link-state.ts";
 
 /**
  * A control over a whole tab — the portal's gene chips over its Mutations tab: one choice that
@@ -76,12 +77,12 @@ export function tabSlice(doc: AnalysisDoc, idx: number[]): AnalysisDoc {
   return { study: doc.study, cohorts: Object.fromEntries(Object.entries(all).filter(([n]) => names.has(n))), views };
 }
 
-/** the URL's state written back in place (no history entry per click, as the lab does) */
+/** the URL's state written back in place (no history entry per click, as the lab does); a long one becomes a stored link (app/_links) */
 export function syncUrl(params: Record<string, string | null>) {
   try {
-    const q = new URLSearchParams(window.location.search);
+    const q = linkParams();
     for (const [k, v] of Object.entries(params)) { if (v == null) q.delete(k); else q.set(k, v); }
-    history.replaceState(null, "", "?" + q.toString());
+    writeSearch("?" + q.toString());
   } catch { /* URL state is a convenience, never a failure */ }
 }
 
@@ -105,7 +106,7 @@ export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left:
 }
 
 
-const param = (k: string): string | null => { try { return new URLSearchParams(window.location.search).get(k); } catch { return null; } };
+const param = (k: string): string | null => { try { return linkParams().get(k); } catch { return null; } };
 
 /**
  * The page's document and open tab, kept in the URL: the page's defaults with the link's changes

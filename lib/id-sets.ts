@@ -77,8 +77,8 @@ export function hasIdSets(): boolean {
 /** The set a request read, or a specific refusal saying why it is not there. */
 export function loadedIdSet(set: string): LoadedIdSet {
   const s = store.getStore()?.sets.get(set);
-  if (!s) throw new Error("this cohort names stored id set " + set + ", which this request did not read: a stored set is read for a signed-in " +
-    "request through the web app's API (log in, or check you may read it). MCP clients and links without a sign-in carry their ids inline.");
+  if (!s) throw new Error("this cohort names stored id set " + set + ", which this request did not read: stored sets are read by the web app's " +
+    "engine routes (lib/id-sets-server.ts); a caller that does not go through them carries its ids inline.");
   return s;
 }
 
@@ -142,3 +142,4 @@ export function idSetRefsIn(x: unknown): string[] {
   walk(x);
   return [...out];
 }
+

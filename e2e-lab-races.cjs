@@ -126,7 +126,7 @@ async function labRaces(browser, ok, BASE) {
       const input = page.locator("[role=dialog].gene-query-dialog input[aria-label='search genes']");
       await input.click();
       await input.type("BRC");
-      await tool(page, "analysis_set_details", { notes: "re-render while typing" });
+      await tool(page, "analysis_set_details", { title: "re-render while typing" });
       await settled(page);
       const kept = await input.inputValue().catch(() => null);
       await page.keyboard.press("Escape");
