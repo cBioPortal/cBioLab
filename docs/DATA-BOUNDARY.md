@@ -266,7 +266,9 @@ suite fail. A test that cannot fail is decoration.
   Bedrock whenever the reader asks. The patient page's **Summarize** button
   (`app/portal/summarize-button.tsx`) makes that one click for one patient. It appears
   only where the sidebar is on and the reader may use it, adds no setting of its own, and
-  says in its tooltip that the patient's data goes to the provider. A deployment that
+  says in its tooltip that the patient's data goes to the provider. The sidebar's history keeps
+  conversations in the reader's browser (`localStorage`) as text only, so no tool results are stored
+  at rest, but the assistant's own replies can still state patient facts, and the history menu says so. A deployment that
   must not send patient-level data to a model provider leaves the chat off.
 - **No small-cell suppression.** Facet and compare counts are exact, so a value
   with n=1 is disclosive under a strict privacy regime. Real federated platforms
