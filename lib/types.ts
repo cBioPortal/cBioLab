@@ -974,6 +974,8 @@ export interface DerivedRequest {
 }
 export interface ExploreResult {
   study: string; studies?: string[]; draftCount: number | null;
+  /** the OncoKB pin when the gene tables and gene charts count drivers only; absent when they count every alteration */
+  drivers?: string;
   studyBreakdown?: StudyBreakdownRow[];
   clinical: ClinicalFacet[];
   events: { type: string; n: number }[];

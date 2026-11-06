@@ -60,6 +60,8 @@ export const ExploreRequest = z.object({
   /** generic-assay entities to chart, one each */
   assayCharts: z.array(z.object({ profileType: z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/), entity: z.string().max(120) })).max(6).optional(),
   derived: z.array(z.object({ metric: z.string(), eventType: z.string().optional(), lineGap: z.number().optional() })).optional(),
+  /** count only OncoKB drivers in the gene tables and gene charts */
+  drivers: z.boolean().optional(),
   ...customData,
 });
 

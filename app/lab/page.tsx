@@ -20,6 +20,7 @@ import { useDocStore, EMPTY_DOC } from "./doc-store.ts";
 import { useDocHistory } from "./use-doc-history.ts";
 import { useExploreState } from "./use-explore-state.ts";
 import { useStudies, useStudyCatalog, useTrackAttrs } from "./use-catalogs.ts";
+import { Choice } from "../_ui/choice.tsx";
 import { useExamplesUrl } from "./examples-tab.tsx";
 import { useAnalysis, rerunAnalysis } from "./use-analysis.ts";
 import { useQueryClient } from "@tanstack/react-query";
@@ -389,7 +390,7 @@ export default function AnalysisPage() {
     } catch { return []; }
   });
   const exploreState = useExploreState({ linkedStudies, addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
-  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
+  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, drivers, setDrivers, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
   // The saved-work manager, opened over this page, opens what is chosen in it here, in place
   const savedWork = useSaved();
   /** one of the reader's saved cohorts open in Explore to change its filters; false while their list has not arrived */
@@ -525,6 +526,15 @@ export default function AnalysisPage() {
                   {shown} of {all.toLocaleString()} clinical attributes charted — the rest are in Add chart</span>;
               })()}
               {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
+              {(() => {
+                // drivers only where every selected study has OncoKB calls here; the server refuses the rest too
+                const without = exStudies.filter((id) => studies.find((x) => x.id === id)?.oncokb === false);
+                return <Choice value={drivers ? "drivers" : "all"} onChange={(v) => setDrivers(v === "drivers")} className="driverchoice ml-auto"
+                  disabled={!drivers && without.length > 0}
+                  title={without.length ? "drivers only needs OncoKB driver calls, which " + without.join(", ") + (without.length === 1 ? " does" : " do") + " not have on this deployment"
+                    : "count every alteration in the gene tables and gene charts, or only those OncoKB calls drivers; a click then selects the same"}
+                  options={[["all", "Alterations: all"], ["drivers", "Alterations: OncoKB drivers only"]]} />;
+              })()}
             </div>
           )}
           <AddChartDialog ctx={exploreCtx} />

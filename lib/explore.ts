@@ -5,6 +5,7 @@ import { chQuery, PRIMARY, ensureChContext, registerChExternal, type ChConn } fr
 import { sq } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
+import { driverEventSql } from "./oql.ts";
 
 import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, DerivedRequest, AssayFacet } from "./types.ts";
 import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
@@ -176,6 +177,8 @@ export interface ExploreArgs {
   attributes?: string[]; geneCharts?: string[];
   /** the derived facets to compute; none when omitted */
   derived?: DerivedRequest[];
+  /** count only OncoKB drivers (at `oncokbPin`) in the gene tables and gene charts */
+  drivers?: boolean;
   /** the draft's cohort, already resolved by a caller that needed it first (the pooled gene pass) */
   resolved?: Awaited<ReturnType<typeof resolveCohort>>;
   /** this study's rows of the facet queries, fetched for every study on its connection at once */
@@ -191,8 +194,9 @@ export function buildExplore(args: ExploreArgs): Promise<ExploreResult> {
   return ensureChContext(() => buildExploreOne(args));
 }
 
-async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, attributes, geneCharts, derived: derivedReq, resolved, prefetched }: ExploreArgs): Promise<ExploreResult> {
+async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, attributes, geneCharts, derived: derivedReq, drivers, resolved, prefetched }: ExploreArgs): Promise<ExploreResult> {
   const db = conn.db;
+  const driverPin = driversPin(drivers, oncokbPin);
   const t0 = Date.now();
   let draftSet = NO_SET, draftCount: number | null = null, draftSamples: number | null = null;
   if (draft && Array.isArray(draft.all) && draft.all.length) {
@@ -311,7 +315,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   const { mutatedGenes, cnaGenes, svGenes, geneTotals } = skipGenes
     ? { mutatedGenes: [], cnaGenes: [], svGenes: [],
         geneTotals: { mutated: 0, cna: 0, sv: 0 } }
-    : await geneTables({ studies: [study], db, conn, geneSearch, set: draftSet });
+    : await geneTables({ studies: [study], db, conn, geneSearch, set: draftSet, driverPin });
 
   // ---- molecular data types (portal: molecular-profile sample counts) -----
   // Samples with data of each type. The three that our DSL can filter on
@@ -335,7 +339,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // notProfiled slice is measured against.
   const geneFacets = await geneStateFacets({
     genes: geneCharts || [], study, db, conn, set: draftSet, total: draftSamples ?? Number(pre.totals.smp),
-    draft, ctx: { oncokbPin, profiles, gaProfiles }
+    draft, ctx: { oncokbPin, profiles, gaProfiles }, driverPin
   });
 
   return {
@@ -345,8 +349,16 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
     mutatedGenes, cnaGenes, svGenes, geneTotals, geneFacets, totals, dataTypes,
     profiles: profiles || [], gaProfiles: gaProfiles || [],
+    ...(driverPin ? { drivers: driverPin } : {}),
     stats: { ms: Date.now() - t0 }
   };
+}
+
+/** the pin the drivers-only counts are made at; asking for drivers with no OncoKB store is refused */
+function driversPin(drivers: boolean | undefined, oncokbPin: string | null | undefined): string | null {
+  if (!drivers) return null;
+  if (!oncokbPin) throw new Error("drivers only needs the OncoKB annotation store, which this deployment does not have; count every alteration instead");
+  return oncokbPin;
 }
 
 /** Bucket edges are ours, not the study's — stated in each facet's note. */
@@ -502,10 +514,12 @@ async function buildDerivedFacets(
  * One study is just the list of length one, which is the ONLY implementation of
  * the panel-aware denominator: there is no second copy to drift.
  */
-export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET }: {
+export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET, driverPin = null }: {
   studies: string[]; db: string; conn: ChConn; geneSearch?: string;
   /** the draft: both tables read here are keyed by sample, so only its samples count */
   set?: CohortSet;
+  /** count only the calls OncoKB makes drivers at this pin; the denominator (profiled) is the same either way */
+  driverPin?: string | null;
 }): Promise<Pick<ExploreResult, "mutatedGenes" | "cnaGenes" | "svGenes" | "geneTotals">> {
 
   // ---- gene tables: Mutated / CNA / SV, cBioPortal study-view semantics ----
@@ -526,6 +540,7 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET }
       // the portal excludes uncalled mutations: they exist only to show read support
       (variantType === "mutation" ? "\n  AND mutation_status != 'UNCALLED'" : "") +
       (geneSearch ? "\n  AND positionCaseInsensitive(hugo_gene_symbol, " + sq(geneSearch) + ") > 0" : "") +
+      (driverPin ? "\n  AND " + driverEventSql(driverPin) : "") +
       inSamples(set);
 
     const [altered, panelProfiled, wes, distinct, surplus] = await Promise.all([
@@ -675,8 +690,11 @@ async function geneStateFacets(opts: {
   set: CohortSet; total: number;
   draft?: CohortDef | null;
   ctx?: { oncokbPin?: string | null; profiles?: string[]; gaProfiles?: string[] };
+  /** count only OncoKB drivers at this pin: the altered states are driver calls, and the unaltered state holds every profiled sample without one */
+  driverPin?: string | null;
 }): Promise<GeneStateFacet[]> {
   const { study, db, conn, total, draft } = opts;
+  const driver = opts.driverPin ? " AND " + driverEventSql(opts.driverPin) : "";
   const genes = [...new Set(opts.genes.map((g) => String(g).toUpperCase().trim()))]
     .filter((g) => /^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)).slice(0, GENE_FACET_LIMIT);
   if (!genes.length) return [];
@@ -759,7 +777,7 @@ async function geneStateFacets(opts: {
           "             SELECT gene_panel_id FROM " + db + ".gene_panel_to_gene_derived WHERE gene = " + sq(gene) + ")))) AS in_panel\n" +
           "FROM " + db + ".genomic_event_derived\n" +
           "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'mutation'\n" +
-          "  AND mutation_status != 'UNCALLED' AND hugo_gene_symbol = " + sq(gene) + cond, conn)
+          "  AND mutation_status != 'UNCALLED' AND hugo_gene_symbol = " + sq(gene) + driver + cond, conn)
       ]);
       const profiled = Number(prof.data[0]?.n || 0);
       const altered = Number(alt.data[0]?.in_panel || 0);
@@ -768,8 +786,8 @@ async function geneStateFacets(opts: {
         gene, type: "MUTATION", per: "sample", total, profiled,
         ...(orphan ? { alteredUnprofiled: orphan } : {}),
         states: [
-          { state: "altered", label: "Mutated", n: altered },
-          { state: "unaltered", label: "Not mutated", n: Math.max(0, profiled - altered) },
+          { state: "altered", label: driver ? "Driver mutation" : "Mutated", n: altered },
+          { state: "unaltered", label: driver ? "No driver mutation" : "Not mutated", n: Math.max(0, profiled - altered) },
           { state: "notProfiled", label: "Not profiled", n: Math.max(0, total - profiled) }
         ]
       };
@@ -782,7 +800,7 @@ async function geneStateFacets(opts: {
           "SELECT cna_alteration AS c, uniqExact(sample_unique_id) AS n\n" +
           "FROM " + db + ".genomic_event_derived\n" +
           "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'cna'\n" +
-          "  AND abs(cna_alteration) >= 2 AND hugo_gene_symbol = " + sq(gene) +
+          "  AND abs(cna_alteration) >= 2 AND hugo_gene_symbol = " + sq(gene) + driver +
           panelPred(gene, "COPY_NUMBER_ALTERATION") + cond + "\n" +
           "GROUP BY c", conn),
         // The UNION of the two calls, asked for directly. Diploid cannot be
@@ -793,7 +811,7 @@ async function geneStateFacets(opts: {
         chQuery<ChRow>(
           "SELECT uniqExact(sample_unique_id) AS n FROM " + db + ".genomic_event_derived\n" +
           "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'cna'\n" +
-          "  AND abs(cna_alteration) >= 2 AND hugo_gene_symbol = " + sq(gene) +
+          "  AND abs(cna_alteration) >= 2 AND hugo_gene_symbol = " + sq(gene) + driver +
           panelPred(gene, "COPY_NUMBER_ALTERATION") + cond, conn)
       ]);
       const profiled = Number(prof.data[0]?.n || 0);
@@ -810,9 +828,9 @@ async function geneStateFacets(opts: {
         gene, type: "CNA", per: "sample", total, profiled,
         ...(overlap ? { overlap } : {}),
         states: [
-          { state: "amp", label: "Amplified", n: amp },
-          { state: "del", label: "Deleted", n: del },
-          { state: "unaltered", label: "Diploid", n: Math.max(0, profiled - anyAltered) },
+          { state: "amp", label: driver ? "Driver amplification" : "Amplified", n: amp },
+          { state: "del", label: driver ? "Driver deletion" : "Deleted", n: del },
+          { state: "unaltered", label: driver ? "No driver call" : "Diploid", n: Math.max(0, profiled - anyAltered) },
           { state: "notProfiled", label: "Not profiled", n: Math.max(0, total - profiled) }
         ]
       };
@@ -833,6 +851,8 @@ export interface ExploreFederatedArgs {
   profilesByStudy: Map<string, { profiles: string[]; gaProfiles: string[] }>;
   connByStudy?: Map<string, ChConn>; geneSearch?: string; attributes?: string[]; geneCharts?: string[];
   derived?: DerivedRequest[];
+  /** count only OncoKB drivers in the gene tables and gene charts */
+  drivers?: boolean;
 }
 
 /** One context for the whole federated request, so pass 2 can still see pass 1's cohorts. */
@@ -840,7 +860,8 @@ export function buildExploreFederated(args: ExploreFederatedArgs): Promise<Explo
   return ensureChContext(() => buildExploreFederatedInner(args));
 }
 
-async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived }: ExploreFederatedArgs): Promise<ExploreResult> {
+async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived, drivers }: ExploreFederatedArgs): Promise<ExploreResult> {
+  const driverPin = driversPin(drivers, oncokbPin);
   // Every query below runs once per CONNECTION over all its studies, not once per study
   // (docs/PERFORMANCE.md §3b): the counts are additive over study-qualified ids, so a pooled count
   // is the per-study sum — and, for the gene tables, a better one, since no study's denominator is
@@ -873,7 +894,7 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
     for (const [st, p] of m) prefetched.set(st, p);
   }));
   const partsP = prefetchP.then(() => Promise.all(studies.map(s =>
-    buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: true, attributes, geneCharts, derived,
+    buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: true, attributes, geneCharts, derived, drivers,
       conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}), resolved: resolvedByStudy.get(s), prefetched: prefetched.get(s) }))));
   // Pass 2: every numeric facet binned once over the values of every study, pooled, as the
   // portal bins a multi-study selection. It needs the studies' facets, not the gene tables, so it
@@ -889,7 +910,7 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
     partsP,
     Promise.all(groups.map(async (grp) => {
       const { conn, studies: ss } = grp;
-      const g = await geneTables({ studies: ss, db: conn.db, conn, geneSearch, set: setOf.get(grp)! });
+      const g = await geneTables({ studies: ss, db: conn.db, conn, geneSearch, set: setOf.get(grp)!, driverPin });
       // A gene-only participant. It names no study and holds no patients or
       // facets, so every other field merges as a zero and it adds nothing to
       // the study breakdown. Feeding it through the SAME mergeExplore as the
@@ -902,6 +923,7 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
     binsP,
   ]);
   const merged = mergeExplore([...parts, ...geneParts], !!draft);
+  if (driverPin) merged.drivers = driverPin;
   for (const f of merged.clinical) {
     const b = f.kind === "num" ? bins.get(f.per + "|" + f.attribute) : undefined;
     if (b && f.kind === "num") { f.bins = b.bins; f.naCount = b.naCount; }
