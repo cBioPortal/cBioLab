@@ -5,7 +5,12 @@
 // (window.cohortLab.tools), they are declared here WITHOUT an implementation, and each call the
 // model makes streams back to the browser, which runs it through window.cohortLab.call and sends
 // the result with the next request. This route never touches the database, the engine or the
-// document; it holds no tool of its own.
+// document; it holds no page tool of its own.
+//
+// The one thing it runs itself is a CONNECTOR (lib/chat-connectors.ts): an external MCP server the
+// reader has switched on, whose tools each wait for the reader's approval. A connector reaches only
+// what the model puts in an approved call — never the app's data, the engine or the page — and a
+// request names it by id, so the address always comes from the deployment's registry.
 //
 // GET says whether this deployment has chat (lib/chat-model.ts: a dev server, or a deployment that
 // opts in off Vercel) and whether this browser must sign in first, as a deployment requires.
@@ -14,6 +19,8 @@ import { z } from "zod";
 import { connection } from "next/server";
 import { chatConfig, chatModel, chatProviderOptions, type ChatConfig } from "../../../lib/chat-model.ts";
 import { AccessError, loginEnabled, requirePrincipal, userFor } from "../../../lib/auth.ts";
+import { connectorInstructions, publicConnector, type Connector } from "../../../lib/chat-connectors.ts";
+import { approvalSecret, connectConnectors, registry } from "../../../lib/chat-connector-tools.ts";
 
 export const maxDuration = 300;
 
@@ -25,8 +32,11 @@ const PageTool = z.object({
 const ChatRequest = z.object({
   messages: z.array(z.record(z.string(), z.unknown())).min(1).max(400),
   page: z.string().max(100).default("unknown"),
-  tools: z.array(PageTool).max(64).default([])
+  tools: z.array(PageTool).max(64).default([]),
+  /** the connectors the reader has on, by id, each with the reader's token when it needs one */
+  connectors: z.array(z.object({ id: z.string().max(40), token: z.string().max(8000).optional() })).max(8).default([])
 });
+
 
 const instructions = (page: string, names: string[]) => `You are the research assistant in the chat sidebar of cbio-lab, a cohort-analysis tool built on cBioPortal data.
 
@@ -48,8 +58,10 @@ export async function GET(req: Request) {
   await connection();
   let c = null;
   try { c = config(); } catch { /* reported by POST */ }
+  let connectors: ReturnType<typeof publicConnector>[] = [], connectorsError: string | null = null;
+  try { connectors = registry().map(publicConnector); } catch (e) { connectorsError = String((e as Error)?.message || e); }
   return Response.json({ enabled: !!c, provider: c?.provider ?? null, model: c?.model ?? null,
-    signInRequired: !!c?.signIn && !userFor(req) });
+    signInRequired: !!c?.signIn && !userFor(req), connectors, connectorsError });
 }
 
 export async function POST(req: Request) {
@@ -75,17 +87,31 @@ export async function POST(req: Request) {
   const tools: ToolSet = {};
   for (const t of body.tools) tools[t.name] = tool({ description: t.description, inputSchema: jsonSchema(t.input) });
 
+  // the connectors the reader switched on: run here, each tool after the reader's approval
+  let known: Connector[];
+  try { known = registry(); } catch (e) { return Response.json({ error: String((e as Error)?.message || e) }, { status: 500 }); }
+  const connected = await connectConnectors(body.connectors, known);
+  for (const [name, t] of Object.entries(connected.tools)) if (!(name in tools)) tools[name] = t;
+  const on = body.connectors.map((a) => known.find((k) => k.id === a.id)).filter((k): k is Connector => !!k);
+
   const result = streamText({
     model: chatModel(c),
-    system: instructions(body.page, body.tools.map((t) => t.name)),
+    system: instructions(body.page, body.tools.map((t) => t.name)) + connectorInstructions(on, connected.status),
     messages: await convertToModelMessages(body.messages as unknown as UIMessage[], { ignoreIncompleteToolCalls: true }),
     tools,
     maxOutputTokens: 64000,
     providerOptions: chatProviderOptions(c),
-    abortSignal: req.signal
+    abortSignal: req.signal,
+    experimental_toolApprovalSecret: approvalSecret(),
+    // the connections end with the response, however it ends
+    onFinish: () => { void connected.close(); },
+    onAbort: () => { void connected.close(); },
+    onError: () => { void connected.close(); }
   });
   return result.toUIMessageStreamResponse({
     sendReasoning: true,
+    // what became of each connector this turn, for the sidebar's Connectors menu (reasons only; never a token)
+    headers: body.connectors.length ? { "x-chat-connectors": encodeURIComponent(JSON.stringify(connected.status)) } : {},
     onError: (e) => String((e as Error)?.message || e)
   });
 }

@@ -4,6 +4,7 @@
 // sidebar handles it exactly as it handles typed text. It adds no tool and no private way into the
 // page: the model still reads the page only through the page's own tools.
 import { useEffect, useState } from "react";
+import type { PublicConnector } from "../../lib/chat-connectors.ts";
 
 export const ASK_EVENT = "cbiolab:ask";
 export interface AskDetail { text: string; /** drop the current conversation first (the default) */ newChat?: boolean }
@@ -13,7 +14,7 @@ export function askAssistant(text: string, newChat = true): void {
   window.dispatchEvent(new CustomEvent<AskDetail>(ASK_EVENT, { detail: { text, newChat } }));
 }
 
-export interface ChatInfo { enabled: boolean; signInRequired: boolean; model: string | null }
+export interface ChatInfo { enabled: boolean; signInRequired: boolean; model: string | null; connectors: PublicConnector[]; connectorsError: string | null }
 
 // one request per page load, shared by the sidebar and every button that needs to know
 let info: Promise<ChatInfo | null> | null = null;
