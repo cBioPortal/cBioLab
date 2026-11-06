@@ -61,10 +61,9 @@ describe("numeric bin edges (the portal's LinearDataBinner)", () => {
     assert.ok(edges.includes(0.15));
     assert.ok(edges.every((e) => String(e).length <= 4));
   });
-  test("decimal data keeps its last interior edge, as integer data does (0–1 by 0.05 ends at 0.95, as 0–100 by 5 ends at 95)",
-    { todo: "the loop adds the interval repeatedly, so float drift (0.9500000000000003 > 0.95) drops the last edge: lib/explore.ts:160" }, () => {
-      assert.equal(numericBinEdges(0, 1, 0.25, 0.75, false).edges.at(-1), 0.95);
-    });
+  test("decimal data keeps its last interior edge, as integer data does (0–1 by 0.05 ends at 0.95, as 0–100 by 5 ends at 95)", () => {
+    assert.equal(numericBinEdges(0, 1, 0.25, 0.75, false).edges.at(-1), 0.95);
+  });
   test("integer data never gets a fractional interval", () => {
     assert.equal(numericBinEdges(0, 6, 1, 4, true).interval, 1);
   });
