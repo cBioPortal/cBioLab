@@ -207,7 +207,7 @@ function run(dir: string, guard: Guard, file?: string): { ok: boolean; failures:
   const r = spawnSync(cmd, args, { cwd: dir, env, encoding: "utf8", maxBuffer: 64 << 20, timeout: 600_000 });
   const out = (r.stdout || "") + (r.stderr || "");
   const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
-  const fail = lines.find((l) => /^FAIL |^not ok /.test(l))
+  const fail = lines.find((l) => /^FAIL |^not ok /.test(l) && !/ # (TODO|SKIP)\b/.test(l))
     || (r.status !== 0 ? "stopped with an error: " + (lines.find((l) => /Error/.test(l)) || lines[lines.length - 1] || "") : "");
   const unitFails = Number(lines.find((l) => /^# fail \d+/.test(l))?.slice(7) || 0);
   const failures = unitFails || lines.filter((l) => /^FAIL /.test(l)).length;

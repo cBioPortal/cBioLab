@@ -139,6 +139,9 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
     {},
     async () => {
       const sqls = catalogSqls(DB, STUDY);
+      // a study that is not there is refused by name, not described as one with no events
+      if (Number((await chQuery(sqls.studyCheck)).data[0]?.n) !== 1)
+        throw new Error(`unknown study '${STUDY}': describe_study describes the study this server is configured for (STUDY_ID), and the warehouse does not hold it`);
       const [tRes, vRes] = [await chQuery(sqls.types), await chQuery(sqls.values)];
       const values: Record<string, Record<string, string[]>> = {};
       vRes.data.forEach((r) => { (values[r.t] = values[r.t] || {}); (values[r.t][r.k] = values[r.t][r.k] || []).push(r.v); });

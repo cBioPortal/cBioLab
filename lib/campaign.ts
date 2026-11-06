@@ -99,9 +99,21 @@ function rowOut(r: Record<string, any>): HypothesisRow {
 }
 const iso = (d: unknown) => d ? new Date(d as string).toISOString() : null;
 
-export async function createCampaign(question: string, study: string, plan: Partial<Plan> = {}): Promise<Campaign> {
+/** The study as the engine knows it, or a refusal naming it ("unknown study 'x'"). */
+async function knownStudy(study: string): Promise<string> {
+  const { resolveStudy } = await import("./analysis.ts");
+  return resolveStudy(study);
+}
+
+/**
+ * A campaign is created only for a study the engine holds (or a peer holds for it): a well-formed
+ * id for a study that does not exist is refused here, not at the first hypothesis check.
+ */
+export async function createCampaign(question: string, study: string, plan: Partial<Plan> = {},
+  checkStudy: (study: string) => Promise<unknown> = knownStudy): Promise<Campaign> {
   if (!question.trim()) throw new Error("a campaign needs a question");
   if (!/^[A-Za-z0-9._-]{1,120}$/.test(study)) throw new Error("invalid study id");
+  await checkStudy(study);
   const full: Plan = { ...DEFAULT_PLAN, ...plan };
   const [r] = await dbQuery<{ id: string }>(
     "insert into campaigns (question, study, plan) values ($1, $2, $3) returning id", [question.trim(), study, full]);

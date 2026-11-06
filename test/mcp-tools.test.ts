@@ -30,12 +30,19 @@ type Result = { content: { type: string; text?: string; data?: string; mimeType?
 
 // ---------- the stand-ins ----------
 
+/** The studies the warehouse holds, unless a test's own route says otherwise: test_study (the
+ *  configured STUDY_ID) and msk_chord_2024 (campaign_create's default). */
+const HOLDS: [RegExp, Record<string, unknown>[]][] = [
+  [/SELECT count\(\) AS n FROM testdb\.cancer_study WHERE cancer_study_identifier = 'test_study'/, [{ n: 1 }]],
+  [/SELECT cancer_study_identifier AS id, name FROM testdb\.cancer_study/, [{ id: "test_study", name: "Test study" }, { id: "msk_chord_2024", name: "MSK-CHORD" }]],
+];
+
 /** The warehouse: each statement answered by the first route whose pattern it matches. */
 let routes: [RegExp, Record<string, unknown>[]][] = [];
 let statements: string[] = [];
 setChTransport(async (st) => {
   statements.push(st.query);
-  const hit = routes.find(([re]) => re.test(st.query));
+  const hit = routes.find(([re]) => re.test(st.query)) ?? HOLDS.find(([re]) => re.test(st.query));
   const data = hit ? hit[1] : [];
   return JSON.stringify({ meta: [], data, rows: data.length, statistics: { rows_read: 4321, elapsed: 0, bytes_read: 0 } });
 });
@@ -244,15 +251,15 @@ describe("describe_study", () => {
     } finally { await c.close(); }
   });
 
-  test("a study with no data is reported as unknown",
-    { todo: "invariant 1 (CLAUDE.md): an unknown study throws a specific error; describe_study never runs catalogSqls().studyCheck and prints an empty vocabulary (mcp/tools.ts:140-158)" },
-    async () => {
-      const c = await connect();
-      try {
-        const r = await c.call("describe_study");
-        assert.ok(r.isError || /REJECTED|unknown|not found|no such/i.test(textOf(r)), textOf(r));
-      } finally { await c.close(); }
-    });
+  test("a study the warehouse does not hold is refused by name (invariant 1)", async () => {
+    routes = [[/FROM testdb\.cancer_study WHERE cancer_study_identifier = 'test_study'/, [{ n: 0 }]]];
+    const c = await connect();
+    try {
+      const r = await c.call("describe_study");
+      assert.equal(r.isError, true, textOf(r));
+      assert.match(textOf(r), /unknown study 'test_study'/);
+    } finally { await c.close(); }
+  });
 });
 
 // ---------- query_cohort ----------
@@ -608,11 +615,10 @@ describe("hypothesis campaigns", () => {
     assert.match(textOf(r), /question/);
   });
 
-  test("campaign_create refuses a study that does not exist",
-    { todo: "invariant 1 (CLAUDE.md): an unknown study is refused loudly; createCampaign only checks the id's format, so any well-formed id becomes a campaign (lib/campaign.ts:104, called from mcp/tools.ts:286)" },
-    async () => {
-      assert.match(textOf(await c.call("campaign_create", { question: "A real question", study: "no_such_study_anywhere" })), /REJECTED/);
-    });
+  test("campaign_create refuses a study that does not exist, by name (invariant 1)", async () => {
+    assert.match(textOf(await c.call("campaign_create", { question: "A real question", study: "no_such_study_anywhere" })),
+      /REJECTED: .*unknown study 'no_such_study_anywhere'/);
+  });
 
   test("campaign_check_hypothesis reports discovery-half sizes only, without running any view", async () => {
     const t = textOf(await c.call("campaign_check_hypothesis", { hypothesis: hyp("TP53", "TP53 is more often altered in early failure") }));
