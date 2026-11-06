@@ -14,7 +14,7 @@ export const hotspotsKind: ViewKindDef<"hotspots"> = {
         (g.topChanges.slice(0, 6).map((x) => `${x.change} ${x.n.toLocaleString()} (${x.pct}%)`).join(", ") || "no change above the floor") +
         (g.unpositioned ? `  [${g.unpositioned.toLocaleString()} with no protein position, not drawn]` : "") +
         (g.withheld ? `  [${g.withheld.toLocaleString()} below the suppression floor]` : "")).join("\n") +
-      "\n  " + lollipopSummaryText(v.hotspots || [], v.hide || []) +
+      "\n  " + lollipopSummaryText(v.hotspots || [], v.hide || [], v.codons) +
       caveatOf(v) + noteOf(v));
   },
   help: {

@@ -3,7 +3,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildLollipopGene, canonicalType, impactType, labelledPosition, lollipopColor, lollipopLabelText, IMPACT_COLORS,
-  impactSql, filterHotspotGene, checkHide, ALTERATION_CELLS, cellLabel } from "../lib/lollipop.ts";
+  impactSql, filterHotspotGene, checkHide, ALTERATION_CELLS, cellLabel, clickCodon, checkCodons, pruneCodons } from "../lib/lollipop.ts";
+import { lollipopPanelsSvg, lollipopSummaryText } from "../lib/lollipop-svg.ts";
 
 test("mutation types map the way getCanonicalMutationType / getProteinImpactType map them", () => {
   assert.equal(impactType(canonicalType("Missense_Mutation")), "missense");
@@ -127,5 +128,50 @@ test("the alteration grid's selection", async (t) => {
     }
     assert.match(sql, /'other'\)$/, "anything else is other");
     assert.ok(sql.includes("'splice_region_variant'") && sql.includes("'nonsense_mutation'"));
+  });
+});
+
+test("selecting stems by clicking them (updatePositionSelectionFilters)", async (t) => {
+  await t.test("a click selects that codon alone; clicking it again clears the selection", () => {
+    assert.deepEqual(clickCodon([], 12, false), [12]);
+    assert.deepEqual(clickCodon([12, 61], 13, false), [13], "a plain click replaces what was selected");
+    assert.deepEqual(clickCodon([12], 12, false), []);
+    assert.deepEqual(clickCodon([12, 61], 12, false), [], "a selected codon clicked without shift clears all, as the portal does");
+  });
+  await t.test("shift adds a codon, or takes a selected one out, keeping the rest", () => {
+    assert.deepEqual(clickCodon([61], 12, true), [12, 61], "sorted, so one selection has one spelling");
+    assert.deepEqual(clickCodon([12, 13, 61], 13, true), [12, 61]);
+    assert.deepEqual(clickCodon([], 12, true), [12]);
+  });
+  await t.test("checkCodons rejects a shape or gene it cannot honour, naming what is accepted", () => {
+    assert.equal(checkCodons(undefined, ["KRAS"]), null);
+    assert.equal(checkCodons({ KRAS: [12, 13] }, ["KRAS"]), null);
+    assert.match(checkCodons({ TP53: [175] }, ["KRAS"])!, /codons\.TP53: not a gene of this view — its genes are KRAS/);
+    assert.match(checkCodons({ KRAS: [12.5] }, ["KRAS"])!, /protein positions/);
+    assert.match(checkCodons({ KRAS: ["12"] }, ["KRAS"])!, /protein positions/);
+    assert.match(checkCodons([12], ["KRAS"])!, /object from gene/);
+  });
+  await t.test("pruneCodons keeps the view's genes and drops empty lists", () => {
+    assert.deepEqual(pruneCodons({ KRAS: [12], TP53: [175] }, ["KRAS"]), { KRAS: [12] });
+    assert.equal(pruneCodons({ KRAS: [] }, ["KRAS"]), undefined);
+    assert.equal(pruneCodons(undefined, ["KRAS"]), undefined);
+  });
+  const rep = {
+    changes: [{ gene: "G", pos: 12, change: "G12D", n: 6, rows: 6, driver: true, impact: "missense" }, { gene: "G", pos: 61, change: "Q61H", n: 3, rows: 3, driver: true, impact: "missense" }],
+    types: [{ gene: "G", pos: 12, mtype: "Missense_Mutation", driver: true, rows: 6 }, { gene: "G", pos: 61, mtype: "Missense_Mutation", driver: true, rows: 3 }],
+    totals: [{ gene: "G", patients: 9, pairs: 9, somaticSamples: 9 }], cohortSamples: 50, minCount: 1, annotated: true,
+  };
+  const g = buildLollipopGene("G", [rep], { proteinLength: 189, transcriptId: "T", domains: [] });
+  await t.test("the figure tags every stem with its gene and codon, and draws a selected head larger", () => {
+    const svg = lollipopPanelsSvg([g], { width: 720 }, "", { G: [61] });
+    assert.match(svg, /<g data-gene="G" data-codon="12"><title>[^<]*<\/title><line[^>]*\/><circle class="lollipop-head"[^>]* r="2\.8"/);
+    assert.match(svg, /<g data-gene="G" data-codon="61" data-selected="1"><title>[^<]*<\/title><line[^>]*\/><circle class="lollipop-head"[^>]* r="5"/);
+    assert.ok(svg.indexOf('data-codon="61"') > svg.indexOf('data-codon="12"'), "a selected stem is drawn last, over its neighbours");
+    assert.doesNotMatch(lollipopPanelsSvg([g], { width: 720 }, ""), /data-selected/);
+  });
+  await t.test("a figure standing alone says in its caption what is selected", () => {
+    assert.match(lollipopSummaryText([g], [], { G: [12, 61] }), /Selected codons, drawn with a larger head: G 12, 61 \(9 mutations drawn there\)\./);
+    assert.match(lollipopSummaryText([g], ["missense.driver"], { G: [12] }), /G 12 \(0 mutations drawn there\)/, "counts what is drawn, after the grid's selection");
+    assert.doesNotMatch(lollipopSummaryText([g], []), /Selected/);
   });
 });

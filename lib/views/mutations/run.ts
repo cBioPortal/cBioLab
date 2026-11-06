@@ -21,6 +21,7 @@ function mutationValue(r: Record<string, unknown>, id: string, pin: string | nul
     case "vaf": return r.vaf == null ? null : Math.round(Number(r.vaf) * 1000) / 1000;
     case "alteration": return alterationOf(String(r.mutationType ?? ""), Number(r.drv) === 1, pin);
     case "altCount": case "refCount": case "mutCount": case "start": case "end": return num(r[id]);
+    case "proteinPos": return r.pos == null ? "" : String(r.pos);
     default: return r[id] == null ? "" : String(r[id]);
   }
 }

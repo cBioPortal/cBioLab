@@ -7,7 +7,8 @@
 import { kindUi } from "./kinds/index.ts";
 import { defaultView } from "./kind-cards";
 import { pruneSort } from "../_oncoprint/OncoprintCard.tsx";
-import type { GeneTrackSpec } from "../../lib/gene-tracks.ts";
+import { geneSymbols, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
+import { pruneCodons } from "../../lib/lollipop.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef } from "../../lib/types.ts";
 import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
 import { expandSplits, type PartitionShape } from "../../lib/partition-arms.ts";
@@ -126,7 +127,10 @@ export function useViewEdits(page: ViewEditsPage) {
   const setViewAttrs = (vi: number, attributes: string[]) => updateView(vi, (v: any) => ({ ...v, attributes }));
 
   const setViewGenes = (vi: number, genes: GeneTrackSpec[]) =>
-    updateView(vi, v => pruneSort({ ...v, genes }));
+    updateView(vi, v => v.kind === "hotspots"
+      // a codon selected on a gene the view no longer draws goes with it
+      ? { ...v, genes, codons: pruneCodons(v.codons, geneSymbols(genes)) }
+      : pruneSort({ ...v, genes }));
 
   /** the document's view at vi, whatever its kind */
   const docView = (vi: number): any => ((doc.views || [])[vi] || {});

@@ -9,6 +9,7 @@ import { ViewFigure } from "../lab/figure.tsx";
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, AnalysisResult, View, ViewResult } from "../../lib/types";
 import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
+import type { CodonSelection } from "../../lib/lollipop.ts";
 import { KindCardBody, KindCardControls, hasKindCard, drawsOwnWaiting, figureView } from "../lab/kind-cards";
 import { dataPart } from "../_oncoprint/view-display.ts";
 import { OncoprintCard, type TrackCatalog } from "../_oncoprint/OncoprintCard.tsx";
@@ -152,7 +153,8 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
         const mc = { vi: 0, spec, v: v || {}, busy, updating: busy, attrs: [], profiles: [], assays: [], events: [], locked: tab?.chooser?.locks || [], fixedPatient,
           patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
         const body = v && !v.error && v.kind === "hotspots" && v.hotspots
-          ? <HotspotsBody v={v} hide={spec.hide as string[] | undefined} onHide={(h) => edit(vi, { ...spec, hide: h } as unknown as View)} />
+          ? <HotspotsBody v={v} hide={spec.hide as string[] | undefined} onHide={(h) => edit(vi, { ...spec, hide: h } as unknown as View)}
+              codons={spec.codons as CodonSelection | undefined} onCodons={(c) => edit(vi, { ...spec, codons: c } as unknown as View)} />
           : v && !v.error && v.kind === "oncoprint" && v.spec
           // the lab's own oncoprint card; the page's cohorts are its own, so a drag counts but makes no cohort
           ? <OncoprintCard view={spec} spec={v.spec} uploads={doc.uploads} busy={busy} cohortNames={Object.keys(doc.cohorts || {})} catalog={catalog}
