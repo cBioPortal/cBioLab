@@ -137,6 +137,17 @@ see the security notes below.
 | `CHAT_EFFORT` | `medium` | `low`, `medium`, `high`, `xhigh` or `max` |
 | `CHAT_ON_DEPLOYMENT` | — | `1`: also on a built deployment (never on Vercel), for signed-in users only |
 
+The sidebar keeps a history of conversations in the browser's `localStorage` (key
+`cohortlab.chat.history`; `lib/chat-history.ts`), opened from the clock button in its header. It keeps
+the latest 30 conversations, up to 100 messages each, as **text only**: the reader's questions and the
+assistant's replies, never what the tools returned. The live conversation stays in `sessionStorage`
+with its tool results, which the resume-after-reload path needs. The history menu says when the
+oldest conversation was dropped, and when the browser's storage is full or blocked.
+
+Where the assistant is on, the patient page also shows a **Summarize** button that puts a fixed prompt
+(`lib/summarize-prompt.ts`) to it in a new conversation; it has no setting of its own, so turning the
+assistant off removes it. What it sends is described in `DATA-BOUNDARY.md`, "Known limits".
+
 Bedrock reads AWS credentials through the standard chain, re-read on every request, so a
 refreshed credentials file needs no restart. The internal instance
 (cbiolab.cbioportal.aws.mskcc.org) relies on that: it uses Bedrock with the credentials file the

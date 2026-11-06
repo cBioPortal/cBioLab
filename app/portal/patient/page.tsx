@@ -19,6 +19,7 @@ import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
 import { SiteHeader } from "../../_ui/site-header.tsx";
 import { api } from "../../lab/api.ts";
 import { usePortalTools } from "../agent-tools.ts";
+import { SummarizeButton } from "../summarize-button.tsx";
 import { PatientHeader, usePatientRecord } from "../patient-header.tsx";
 import { CohortNav, useCohortPosition } from "../cohort-nav.tsx";
 import { navigationParams, patientHref, readNavigation, type CohortNavigation } from "../cohort-navigation.ts";
@@ -99,6 +100,7 @@ function PatientView({ study, patient, sample, nav, tab }: { study: string; pati
     <PortalSummary eyebrow={sample ? "Sample" : "Patient"} title={sample || patient} study={study}
       detail={basics && <span>{basics.name}</span>}
       left={fresh?.left || []}
+      action={owned ? <SummarizeButton of={{ kind: sample ? "sample" : "patient", study, id: sample || owned }} /> : undefined}
       aside={nav && owned ? <CohortNav nav={nav} at={{ study, id: owned }} tab={tab} /> : undefined}>
       {record
         ? <PatientHeader record={record} sample={sample || null} hrefFor={(to) => hrefFor(study, to, nav, tab)} />
