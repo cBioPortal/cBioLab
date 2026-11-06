@@ -21,6 +21,7 @@ const { portal } = require("./test/e2e/portal.cjs");
 const { savedCohorts } = require("./test/e2e/saved-cohorts.cjs");
 const { studyPicker } = require("./test/e2e/study-picker.cjs");
 const { viewKinds } = require("./test/e2e/view-kinds.cjs");
+const { links } = require("./test/e2e/links.cjs");
 
 const BASE = "http://localhost:" + (process.env.E2E_PORT || 3100);
 
@@ -95,6 +96,7 @@ async function main() {
   if (want("portal")) await portal(t);
   if (want("saved-cohorts")) await savedCohorts(t);
   if (want("study-picker")) await studyPicker(t);
+  if (want("links")) await links(t);
 
   // the analysis page's requests finishing out of order (e2e-lab-races.cjs)
   if (want("lab-races")) await require("./e2e-lab-races.cjs").labRaces(browser, ok, BASE);

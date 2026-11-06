@@ -126,7 +126,8 @@ see the security notes below.
 | `EXAMPLES_URL` | — | on an instance whose database is not the public warehouse, a deployment that holds the gallery's studies (e.g. `https://cbiolab.vercel.app`): the Examples tab opens each example there, after saying the reader is leaving, instead of running it here |
 | `RESULTS_MAX_STUDIES` | `50` | the most studies one gene query (the Results page) covers; Explore's "Query genes…" and the page refuse more, naming the limit |
 | `CROSS_STUDY_EXPRESSION` | `pancan` | when expression data (mRNA, microRNA, protein) may be compared across studies on the Results page, as cBioPortal's `enable_cross_study_expression`: `pancan` (every study a TCGA PanCancer Atlas study), `all` or `none`. Elsewhere Plots offers no expression axes and Co-expression covers one study only |
-| `PUBLIC_ENV` | `EXAMPLES_URL,RESULTS_MAX_STUDIES,CROSS_STUDY_EXPRESSION` | the variables written into the page for the browser, comma-separated. Read per request, so one image serves every deployment; a name that looks like a secret (`PASSWORD`, `SECRET`, `KEY`, `TOKEN`, `CREDENTIAL`) is refused |
+| `LINK_URL_MAX` | `8000` | the query-string length (characters) past which a page stops writing its long URL parameters into its address, holds them in the tab's history and says so, offering Copy link ([LINKS.md](LINKS.md)); below 64 it is ignored |
+| `PUBLIC_ENV` | `EXAMPLES_URL,RESULTS_MAX_STUDIES,CROSS_STUDY_EXPRESSION,CBIOLAB_LOCAL,LINK_URL_MAX` | the variables written into the page for the browser, comma-separated. Read per request, so one image serves every deployment; a name that looks like a secret (`PASSWORD`, `SECRET`, `KEY`, `TOKEN`, `CREDENTIAL`) is refused |
 
 ## The assistant (chat sidebar)
 

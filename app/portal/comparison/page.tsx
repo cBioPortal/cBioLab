@@ -8,7 +8,7 @@
 // Alterations tab counts every alteration, or only OncoKB drivers (?drivers=1), a setting of the
 // page's own that each of its views carries as `measure`.
 import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useLinkParams } from "../../_links/use-link.ts";
 import type { AnalysisDoc, View } from "../../../lib/types";
 import { PortalTabs } from "../PortalTabs";
 import { useStudyKnown, expressionProfile, assayComparisonProfiles, type StudyKnown } from "../study-known";
@@ -44,7 +44,7 @@ function comparisonLayout(linked: AnalysisDoc, study: string, known: StudyKnown 
 }
 
 export default function ComparisonPage() {
-  const q = useSearchParams();
+  const q = useLinkParams();
   const linked = useMemo(() => decodeDoc(q.get("doc")), []);   // eslint-disable-line react-hooks/exhaustive-deps
   const study = (linked?.study || "").replace(/[^A-Za-z0-9._-]/g, "");
   const names = Object.keys(linked?.cohorts || {});

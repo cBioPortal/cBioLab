@@ -15,7 +15,9 @@ What each suite checks, how to run it, and how the gate and CI put them together
   (`test/request-boundary.db-test.ts`: reading a request's sets, saving a pasted list, locking
   cohorts, against a stand-in warehouse that records which instance each statement and id table
   went to). A store promise belongs in `test/support/store-contracts.ts`, which runs there and on
-  `lib/db.ts`'s own fallback.
+  `lib/db.ts`'s own fallback. Stored links and id lists: [LINKS.md](LINKS.md), "Testing it" — which
+  layer each suite covers, and the e2e helpers (`linkMax`, `holdLinks`, `failStore`) that steer a
+  page's links without touching the server.
 - **`npm run test:python`** — the Python port's suite (below).
 - **`npx eslint <files you touched>`** — the full `npm run lint` takes ~2 min.
 - `npm run report:coverage && npm run check:coverage` — the unit suites' coverage and its rules (below).

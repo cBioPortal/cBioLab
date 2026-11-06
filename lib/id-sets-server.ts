@@ -1,12 +1,13 @@
-// The request boundary for stored id sets: reading the sets a request names, as its signed-in
-// reader, and deciding which connections may receive their ids. Every engine route reaches it
+// The request boundary for stored id sets: reading the sets a request names — for anyone, signed in
+// or not, since a set is read by its id (lib/id-set-store.ts) — and deciding which connections may
+// receive their ids. Every engine route reaches it
 // through withRequestCustomData (lib/custom-data-server.ts), which is given the body it serves.
 //
 // Kept apart from lib/id-sets.ts because it needs the store and the federation routing, and
 // lib/id-sets.ts is imported by lib/ch.ts, which federation itself imports.
 import { idSetRefsIn, withIdSets } from "./id-sets.ts";
 import { loadIdSetForRequest } from "./id-set-store.ts";
-import { requirePrincipal } from "./auth.ts";
+import { principalFor } from "./auth.ts";
 import { studyRouting, instanceForStudy } from "./federation.ts";
 import { peerForStudy } from "./federation-remote.ts";
 
@@ -27,7 +28,7 @@ export async function withRequestIdSets<T>(body: unknown, req: Request, fn: () =
   if (!refs.length) return fn();
   if (refs.length > MAX_SETS_PER_REQUEST)
     throw new Error("a request names at most " + MAX_SETS_PER_REQUEST + " stored id sets; this one names " + refs.length);
-  const principal = requirePrincipal(req, "use stored id sets");
+  const principal = principalFor(req);
   const sets = await Promise.all(refs.map((id) => loadIdSetForRequest(principal, id)));
   const routing = await studyRouting();
   const studyConn = new Map<string, string>();

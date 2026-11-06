@@ -1,6 +1,6 @@
 "use client";
-// One manager for everything the reader keeps: saved cohorts and analyses, uploads, groups and gene
-// lists, a tab each. The dialog (opened from any page, saved-context.tsx) and the /saved page show
+// One manager for everything the reader keeps: saved cohorts and analyses, stored id lists, uploads,
+// groups and gene lists, a tab each. The dialog (opened from any page, saved-context.tsx) and the /saved page show
 // the same manager; only where its tab lives differs (the dialog's state, the page's URL).
 import { Bookmark } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../_ui/dialog";
@@ -15,10 +15,11 @@ import { CohortsPanel, AnalysesPanel } from "./library-panels.tsx";
 import { DataPanel } from "./data-panel.tsx";
 import { GroupsPanel } from "./groups-panel.tsx";
 import { GenesPanel } from "./genes-panel.tsx";
+import { ListsPanel } from "./lists-panel.tsx";
 
 /** what each tab keeps, said where it asks the reader to sign in */
 const NEEDS_SIGN_IN: Partial<Record<SavedTab, string>> = {
-  cohorts: "Saved cohorts are your own", analyses: "Saved analyses are your own",
+  cohorts: "Saved cohorts are your own", analyses: "Saved analyses are your own", lists: "Stored id lists are managed by whoever saved them",
   data: "Uploads are stored on the server as yours", groups: "Groups are made of people who have signed in",
 };
 
@@ -39,6 +40,7 @@ export function SavedManager({ tab, onTab, note }: { tab: SavedTab; onTab: (t: S
               : "This deployment has no sign-in, so nothing can be saved on it."}</p></div>
         : tab === "cohorts" ? <CohortsPanel />
         : tab === "analyses" ? <AnalysesPanel />
+        : tab === "lists" ? <ListsPanel />
         : tab === "data" ? <DataPanel />
         : tab === "groups" ? <GroupsPanel me={login.user!.id} />
         : <GenesPanel />}

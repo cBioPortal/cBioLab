@@ -1,9 +1,10 @@
-// Inline id lists in the page's documents become stored id sets (lib/id-set-store.ts) wherever the
-// reader is signed in: a cohort picked on an oncoprint, donors from Cell Explorer, and every list
-// still inline when a cohort or an analysis is saved. The document then names the set
-// (`{"kind":"sampleList","set":"<id>"}`), so it, its ?doc= link and every request stay small
-// however long the list is. Inline lists remain valid DSL for MCP clients, scripts and signed-out
-// readers, who cannot read a set.
+// Inline id lists in the page's documents become stored id sets (lib/id-set-store.ts): a cohort
+// picked on an oncoprint, donors from Cell Explorer, every list still inline when a cohort or an
+// analysis is saved, and the lists of a document too long for the address bar. The document then
+// names the set (`{"kind":"sampleList","set":"<id>"}`), so it, its ?doc= link, its stored link and
+// every request stay small however long the list is. Anyone with the document may read a set it
+// names (docs/LINKS.md). A signed-in reader's sets are their own, to withdraw; a reader who is not
+// signed in stores unowned ones, which nobody withdraws and which are stored once per list.
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
 import { api } from "./api.ts";
 

@@ -39,7 +39,7 @@ export function ShareDialog({ kind, name, sharing, groups, groupsError, onSave, 
   groupsError: string | null;
   /** saves the sharing; for an analysis, answers the datasets its audience could not read */
   onSave: (s: Sharing) => Promise<DatasetWarning[] | void>;
-  /** share the reader's own datasets and id sets in `warnings` the way this analysis now is */
+  /** share the reader's own datasets in `warnings` the way this analysis now is */
   onShareDatasets?: (items: DatasetWarning[], s: Sharing) => Promise<void>;
   onClose: () => void;
 }) {
@@ -88,12 +88,12 @@ export function ShareDialog({ kind, name, sharing, groups, groupsError, onSave, 
         {warnings ? (
           <form onSubmit={(e) => { e.preventDefault(); void shareDatasets(); }} className="flex flex-col gap-3">
             <DialogHeader><DialogTitle className="text-base">Shared — but some of the data it uses is not</DialogTitle></DialogHeader>
-            <p className={cn(META, "m-0")}>Some people who can now see “{name}” cannot read custom data or stored id sets it uses, so what uses them will not run for them:</p>
+            <p className={cn(META, "m-0")}>Some people who can now see “{name}” cannot read custom data it uses, so what uses them will not run for them:</p>
             <ul className="sharewarn m-0 grid gap-1 pl-4 text-sm">
-              {warnings.map((w) => <li key={w.id}><strong>{w.name}</strong> {w.kind === "idSet" ? "(stored id set)" : <code>custom:{w.slug}</code>} — shared with {sharingLabel({ visibility: w.visibility, groupId: null, groupCanEdit: false, groupName: w.groupName })}
+              {warnings.map((w) => <li key={w.id}><strong>{w.name}</strong> <code>custom:{w.slug}</code> — shared with {sharingLabel({ visibility: w.visibility, groupId: null, groupCanEdit: false, groupName: w.groupName })}
                 {w.yours ? "" : " (not yours: ask its owner to share it)"}</li>)}
             </ul>
-            {warnings.some((w) => w.yours) && <p className="note m-0">Custom data and id sets hold patient-level data: whoever you share them with can read every row and id.</p>}
+            {warnings.some((w) => w.yours) && <p className="note m-0">Custom data holds patient-level values: whoever you share it with can read every row.</p>}
             {err && <p className="error m-0">{err}</p>}
             <DialogFooter className="mt-1 items-center">
               <Button type="button" variant="ghost" onClick={onClose}>Leave it</Button>

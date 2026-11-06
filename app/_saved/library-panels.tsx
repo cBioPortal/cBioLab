@@ -60,7 +60,7 @@ function ListStatus({ state, what, empty, isEmpty }: { state: ListState; what: s
   return isEmpty ? <p className="note">{empty}</p> : null;
 }
 
-/** The share dialog for one own cohort or analysis, and for the uploads and id lists it uses. */
+/** The share dialog for one own cohort or analysis, and for the uploads it uses. */
 function useShareDialog(saved: SavedArtifacts) {
   const login = useCustomDataState();
   const groups = useGroups(login.user?.id ?? null);
@@ -69,11 +69,7 @@ function useShareDialog(saved: SavedArtifacts) {
     groups={groups.groups} groupsError={groups.error}
     onSave={(s) => saved.share(sharing.kind, sharing.id, s)}
     onShareDatasets={async (items, s) => {
-      for (const w of items) {
-        if (w.kind !== "idSet") { await shareServerDataset(w.id, s); continue; }
-        const res = await api.idSets.share(w.id, s);
-        if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || res.statusText);
-      }
+      for (const w of items) await shareServerDataset(w.id, s);
     }}
     onClose={() => setSharing(null)} />;
   return { open: (kind: ArtifactKind, id: string, name: string, s?: Sharing) => setSharing({ kind, id, name, sharing: s ?? PRIVATE }), dialog };

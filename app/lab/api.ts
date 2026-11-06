@@ -96,10 +96,16 @@ export const api = {
 
   /** Stored id sets (lib/id-set-store.ts): cohorts given as long lists of ids, kept on the server and named by id. */
   idSets: {
-    list: (opts: Opts = {}) => fetch("/api/id-sets", { signal: opts.signal }),
+    /** the sets in the reader's saved work; `withdrawn` adds their own withdrawn ones */
+    list: (opts: Opts & { withdrawn?: boolean } = {}) => fetch("/api/id-sets" + (opts.withdrawn ? "?withdrawn=1" : ""), { signal: opts.signal }),
     /** match `ids` ("<study>:<id>" or bare, looked up in every study given) and save the matches; answers what did not match */
     create: (body: { name: string; level: "sample" | "patient"; studies: string[]; ids: string[] }) => post("/api/id-sets", body),
-    remove: (id: string) => fetch("/api/id-sets/" + id, { method: "DELETE" }),
+    /** withdraw it (its owner only): documents naming it are refused with `note` and the set it points to instead */
+    withdraw: (id: string, body: { note?: string; replacedBy?: string | null }) => send("PUT", "/api/id-sets/" + id + "/withdrawal", body),
+    /** put a withdrawn set back in use (its owner only) */
+    restore: (id: string) => fetch("/api/id-sets/" + id + "/withdrawal", { method: "DELETE" }),
+    /** how many saved cohorts, analyses and stored links name it (its owner only) */
+    usage: (id: string, opts: Opts = {}) => fetch("/api/id-sets/" + id + "/usage", { signal: opts.signal }),
     /** who it is shared with (its owner only) */
     share: (id: string, sharing: Sharing) => send("PUT", "/api/id-sets/" + id + "/sharing", sharing),
   },
