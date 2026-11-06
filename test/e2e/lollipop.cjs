@@ -24,6 +24,10 @@ async function lollipop({ browser, ok, BASE }) {
       const svg = await page.locator(".lp-plot svg").first().innerHTML();
       ok("lollipop: the figure is the plot alone; the summary and the grid are controls beside it",
         !/Somatic Mutation Frequency|>Driver<|>VUS</.test(svg) && await page.locator(".lp-summary").count() > 0 && await page.locator(".lp-grid .lp-badge").count() >= 10);
+      // as on the portal's table, a sample id is a link to that sample's page, opened in a new tab
+      const sampleLink = await page.locator(".dt-table tbody a.mono").first().evaluate(a => ({ text: a.textContent, href: a.getAttribute("href"), target: a.target }));
+      ok("mutation table: a sample id links to its sample page, in a new tab",
+        sampleLink.href === "/portal/patient?study=coadread_tcga_pub&sample=" + encodeURIComponent(sampleLink.text) && sampleLink.target === "_blank", JSON.stringify(sampleLink));
       const h0 = await heads(), t0 = await tableCount();
       await page.locator(".lp-rowname", { hasText: "Missense" }).first().click();
       await page.waitForTimeout(300);
