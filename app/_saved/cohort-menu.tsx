@@ -6,7 +6,7 @@
 // Splits are proposed by the server from the data, as on the analysis page (POST /api/partition),
 // and stored on the cohort, so every analysis it is added to has them.
 import { useId, useState } from "react";
-import { BarChart3, ChevronDown, Copy, Filter, Pencil, Split, StickyNote, Trash2, X } from "lucide-react";
+import { BarChart3, ChevronDown, Copy, Filter, Pencil, Split, Trash2, X } from "lucide-react";
 import CohortPills, { type OnCustomData } from "../lab/pills";
 import { SplitForm, type SplitSpec } from "../lab/partitions.tsx";
 import { useStudyAttrs } from "../lab/use-catalogs.ts";
@@ -33,7 +33,7 @@ function SavedSplitForm({ name, def, onSplit, onDone }: {
 
 /** what the reader may do to a cohort of their own */
 export type OwnCohortActions = {
-  onRename: () => void; onNote: () => void; onEditFilters: () => void; onSplit: (spec: SplitSpec) => Promise<void>;
+  onRename: () => void; onEditFilters: () => void; onSplit: (spec: SplitSpec) => Promise<void>;
   onDuplicate: () => Promise<void>; onDelete: () => void;
 };
 
@@ -57,8 +57,6 @@ function SavedCohortMenu({ id, name, def, onAnalyze, own, onCopy }: {
           {own && <>
           <MenuSeparator />
           <MenuItem onClick={() => { close(); own.onRename(); }}><Pencil />rename…</MenuItem>
-          <MenuItem data-tip="what this cohort is, or why it is defined this way — shown under it, and in every analysis it joins"
-            onClick={() => { close(); own.onNote(); }}><StickyNote />{def.notes ? "edit note…" : "add note…"}</MenuItem>
           <MenuItem disabled={!!cannot} data-tip={cannot ? "can't edit its filters here: " + cannot : "change its studies and filters in Explore, then save them over it"}
             onClick={() => { close(); own.onEditFilters(); }}><Filter />edit filters in Explore…</MenuItem>
           <MenuItem data-tip="divide this cohort into arms that never overlap and add up to it"

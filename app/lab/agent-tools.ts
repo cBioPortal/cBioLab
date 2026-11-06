@@ -257,13 +257,13 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
       inputSchema: { type: "object", required: ["cohort", "name", "arms"], properties: {
         cohort: { type: "string" }, name: { type: "string" },
         arms: { type: "array", items: { type: "object", required: ["name", "where"], properties: { name: { type: "string" }, where: { type: "object" } } } },
-        other: { type: "string" }, notes: { type: "string" } } },
-      run: async ({ cohort, name, arms, other, notes }) => {
+        other: { type: "string" } } },
+      run: async ({ cohort, name, arms, other }) => {
         const key = splitKey(cohort, name);
         let existed = false;
         const d = editSplits(clone(get().doc), (f) => {
           existed = !!f.partitions[key];
-          return { ...f, partitions: { ...f.partitions, [key]: { of: cohort, split: name, arms, ...(other ? { other } : {}), ...(notes ? { notes } : {}) } as PartitionDef } };
+          return { ...f, partitions: { ...f.partitions, [key]: { of: cohort, split: name, arms, ...(other ? { other } : {}) } as PartitionDef } };
         });
         return edit(`${existed ? "replace" : "add"} split "${name}" of "${cohort}"`, d);
       } },
@@ -306,12 +306,12 @@ export function installLabTools(get: () => LabBridge): { webmcp: boolean; cleanu
         const vs = views(); const [v] = vs.splice(i, 1); vs.splice(j, 0, v);
         return edit(`move view ${i} to ${j}`, { ...clone(get().doc), views: vs }, []);
       } },
-    { name: "analysis_set_details", description: "Set the document's study, title, notes, or template parameters (only the keys given change). Changing the study re-runs everything against it.",
-      inputSchema: { type: "object", properties: { study: { type: "string" }, title: { type: "string" }, notes: { type: "string" }, params: { type: "object" } } },
+    { name: "analysis_set_details", description: "Set the document's study, title, or template parameters (only the keys given change). Changing the study re-runs everything against it.",
+      inputSchema: { type: "object", properties: { study: { type: "string" }, title: { type: "string" }, params: { type: "object" } } },
       run: async (a) => {
         const d: any = clone(get().doc);
-        for (const k of ["study", "title", "notes", "params"]) if (a[k] !== undefined) d[k] = clone(a[k]);
-        return edit("set " + ["study", "title", "notes", "params"].filter((k) => a[k] !== undefined).join(", "), d);
+        for (const k of ["study", "title", "params"]) if (a[k] !== undefined) d[k] = clone(a[k]);
+        return edit("set " + ["study", "title", "params"].filter((k) => a[k] !== undefined).join(", "), d);
       } },
     { name: "analysis_undo", description: "Undo the last edit made through these tools (the page's own buttons are not in this history).",
       inputSchema: { type: "object", properties: {} },
@@ -492,7 +492,7 @@ export const LAB_TOOL_NAMES = [
   ["analysis_split_cohort", "splitCohort({cohort, attribute|gene|oql|assay})"], ["analysis_set_split", "setSplit(cohort, name, {arms, other?})"],
   ["analysis_remove_split", "removeSplit(cohort, name)"], ["analysis_add_view", "addView(view, position?)"],
   ["analysis_update_view", "updateView(i, patch)"], ["analysis_remove_view", "removeView(i)"], ["analysis_move_view", "moveView(from, to)"],
-  ["analysis_set_details", "setDetails({study, title, notes, params})"], ["analysis_undo", "undo()"], ["analysis_load_example", "loadExample(title)"],
+  ["analysis_set_details", "setDetails({study, title, params})"], ["analysis_undo", "undo()"], ["analysis_load_example", "loadExample(title)"],
   ["analysis_share_link", "shareLink()"], ["analysis_save", "save(name)"], ["open_tab", "openTab(tab)"],
   ["explore_get_state", "exploreState()"], ["explore_get_facets", "exploreFacets(section?, limit?)"],
   ["explore_select_studies", "selectStudies([ids])"], ["explore_add_filter", "addFilter(clause)"],

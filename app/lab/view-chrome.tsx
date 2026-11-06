@@ -10,7 +10,7 @@ import { VIEW_HELP } from "../../lib/view-help.ts";
 import { previewPending } from "../../lib/preview-kinds.ts";
 import { SERIES, seriesStyle } from "../../lib/chart/style.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
-import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, ListChecks, Lock, LockOpen, Pencil, Plus, Save, Split, StickyNote, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Ellipsis, ExternalLink, ListChecks, Lock, LockOpen, Pencil, Plus, Save, Split, Trash2 } from "lucide-react";
 import { GeneQueryDialog } from "../_genes/GeneQueryDialog.tsx";
 import type { GeneQueryMode, QueryCheck } from "../../lib/gene-query.ts";
 import { oqlStatements } from "../../lib/oql-parse.ts";
@@ -501,11 +501,11 @@ export function AnalysisSources({ sources, names }: { sources?: AnalysisSource[]
  * Before this each view kind built its own, so the timing chip landed in a different place
  * in each card.
  */
-export function ViewHead({ v, title, sub, actions, chips, cohorts, cohortInSub, onMoveUp, onMoveDown, onRemove, onEditNote, menuStore }: {
+export function ViewHead({ v, title, sub, actions, chips, cohorts, cohortInSub, onMoveUp, onMoveDown, onRemove, menuStore }: {
   v: any; title: string; sub?: React.ReactNode; actions?: React.ReactNode; chips?: React.ReactNode;
   /** `sub` names the cohort drawn, so the "Showing" line under the header is left out */
   cohortInSub?: boolean;
-  onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; onEditNote?: () => void; menuStore: Map<string, boolean>;
+  onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void; menuStore: Map<string, boolean>;
   /** which cohorts this view draws; absent when the document has only one */
   cohorts?: { chosen: string[]; all: string[]; nodes: CohortNode[]; drawn: string[]; max?: number; busy?: boolean; viewKey: number | string; onChange: (n: string[]) => void; onAdd?: () => void };
 }) {
@@ -525,9 +525,9 @@ export function ViewHead({ v, title, sub, actions, chips, cohorts, cohortInSub, 
           <PreviewBadge kind={v.kind} />
           <Latency v={v} />
           <Participation p={v.participation} />
-          {(onMoveUp || onMoveDown || onRemove || onEditNote) && (
+          {(onMoveUp || onMoveDown || onRemove) && (
             <ViewMenu menuId={"reorder:" + menuKey} menuStore={menuStore} onMoveUp={onMoveUp} onMoveDown={onMoveDown}
-              onRemove={onRemove} onEditNote={onEditNote} hasNote={!!v.annotationNote} />
+              onRemove={onRemove} />
           )}
         </div>
       </div>
@@ -544,21 +544,14 @@ export function ViewHead({ v, title, sub, actions, chips, cohorts, cohortInSub, 
 }
 
 /** The gear at the end of every card's header: reorder this view, or drop it. */
-export function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove, onEditNote, hasNote }: {
+export function ViewMenu({ menuId, menuStore, onMoveUp, onMoveDown, onRemove }: {
   menuId: string; menuStore: Map<string, boolean>; onMoveUp?: () => void; onMoveDown?: () => void; onRemove?: () => void;
-  onEditNote?: () => void; hasNote?: boolean;
 }) {
   return (
     <GearMenu menuId={menuId} menuStore={menuStore} className="viewgear" label={<Ellipsis />} title="reorder or remove this view" ariaLabel="reorder or remove this view">
       {(close) => <>
         <MenuItem disabled={!onMoveUp} onClick={() => { close(); onMoveUp?.(); }}><ArrowUp />move up</MenuItem>
         <MenuItem disabled={!onMoveDown} onClick={() => { close(); onMoveDown?.(); }}><ArrowDown />move down</MenuItem>
-        {/* a note belongs to a saved analysis, as a cohort's edits do (see CohortEditMenu), so the
-            item only exists once there is a saved analysis for it to belong to */}
-        {onEditNote && <>
-          <MenuSeparator />
-          <MenuItem onClick={() => { close(); onEditNote(); }}><StickyNote />{hasNote ? "edit note…" : "add note…"}</MenuItem>
-        </>}
         {onRemove && <>
           <MenuSeparator />
           <MenuItem className="text-destructive hover:text-destructive" onClick={() => { close(); onRemove(); }}><Trash2 />remove</MenuItem>

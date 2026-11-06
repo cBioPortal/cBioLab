@@ -33,13 +33,12 @@ export const PAIRED_DEFAULT_GENES = ["TP53", "KRAS", "PIK3CA", "ESR1", "AR", "CD
 /** a p- or q-value for a table cell, where the column header already says "p" (lib/chart/format.ts) */
 export const pCell = pDigits;
 
-/** A card header's reorder and remove controls, and its note's when the analysis is saved. */
-export function placement({ result, moveView, removeView, noteEdit }: ViewCtx, vi: number, note = true) {
+/** A card header's reorder and remove controls. */
+export function placement({ result, moveView, removeView }: ViewCtx, vi: number) {
   return {
     onMoveUp: vi > 0 ? () => moveView(vi, -1) : undefined,
     onMoveDown: vi < result.views.length - 1 ? () => moveView(vi, 1) : undefined,
     onRemove: () => removeView(vi),
-    ...(note ? { onEditNote: noteEdit(vi) } : {}),
   };
 }
 

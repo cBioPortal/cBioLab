@@ -87,7 +87,7 @@ function CourseCard({ ctx, v, vi }: CardProps) {
       })()}
         </GearMenu>
         <Latency v={v} /><Participation p={v.participation} />
-        <ViewMenu menuId={"reorder:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} {...placement(ctx, vi)} hasNote={!!v.annotationNote} />
+        <ViewMenu menuId={"reorder:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} {...placement(ctx, vi)} />
         </div>
         </div>
       <DrawnCohorts drawn={cohortChoice(vi, docView(vi)).drawn} nodes={cohortChoice(vi, docView(vi)).nodes} />

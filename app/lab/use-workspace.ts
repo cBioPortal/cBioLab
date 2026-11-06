@@ -1,7 +1,6 @@
 "use client";
 // The analysis as a saved workspace: the workspace dialog (save under a name, open one, delete
-// it), template parameters and notes, a view's note (which belongs to a saved analysis, so its
-// menu item exists only once there is one), and clearing the page for a new analysis.
+// it), template parameters, and clearing the page for a new analysis.
 import { useState } from "react";
 import { parameterize } from "../../lib/params.ts";
 import type { AnalysisDoc } from "../../lib/types.ts";
@@ -41,8 +40,6 @@ export function useWorkspace(page: WorkspacePage) {
   const [sharedFrom, setSharedFrom] = useState<SharedOpen | null>(null);
   const sharedOpen = sharedFrom && doc.title === sharedFrom.name && !spaces[doc.title] ? sharedFrom : null;
 
-  // ---- editing a view's note (the gear menu's "add note…" / "edit note…") -
-  const [viewNoteEditing, setViewNoteEditing] = useState<number | null>(null); // index into doc.views / result.views
   // ---- workspaces ----------------------------------------------------------
   const openWorkspaceSave = () => {
     if (!canSave()) return;
@@ -109,43 +106,14 @@ export function useWorkspace(page: WorkspacePage) {
     const d = { ...doc, params: { ...(doc.params || {}), [key]: value } };
     docs.set(d);
   };
-  const setNotes = (text: string) => {
-    const d = { ...doc, notes: text };
-    docs.set(d);   // no re-run: prose changes no numbers
-  };
 
-  /** the analysis exists as a saved workspace — what a view's note, like a cohort's, belongs to */
+  /** the analysis exists as a saved workspace */
   const analysisSaved = !!(doc.title && spaces[doc.title]);
-  /** a view's note belongs to a saved analysis, so its menu item exists only once there is one */
-  const noteEdit = (vi: number) => analysisSaved ? () => openViewNoteEdit(vi) : undefined;
-  const openViewNoteEdit = (vi: number) => {
-    if (!analysisSaved) return;
-    setViewNoteEditing(vi);
-  };
-
-  /** A view's note is exactly like a cohort's or the workspace's: prose the
-   *  server never computes anything from, so this never re-runs — it patches
-   *  `doc.views[vi].note` (what gets saved/shared) AND mirrors the same text
-   *  straight into `result.views[vi].annotationNote` (what ViewHead actually
-   *  reads to display it), since nothing else would otherwise tell the
-   *  already-rendered card that its own annotation changed. */
-  const confirmViewNoteEdit = (trimmed: string) => {
-    if (viewNoteEditing == null) return;
-    const vi = viewNoteEditing;
-    const views = (doc.views || []).map((v: any, i: number) => {
-      if (i !== vi) return v;
-      const nv = { ...v };
-      if (trimmed) nv.note = trimmed; else delete nv.note;
-      return nv;
-    });
-    // the note is read from the document (use-analysis.ts): nothing re-runs
-    docs.set({ ...doc, views });
-  };
 
   const clearAnalysis = () => {
     const d = { ...EMPTY_DOC, study };
     docs.set(d); setError(null);
   };
 
-  return { sharedOpen, openShared, confirmSharedSave, wsOpen, setWsOpen, wsError, setWsError, viewNoteEditing, setViewNoteEditing, openWorkspaceSave, confirmWorkspaceSave, openWorkspace, openDocument, deleteWorkspace, makeTemplate, setParam, setNotes, analysisSaved, noteEdit, openViewNoteEdit, confirmViewNoteEdit, clearAnalysis };
+  return { sharedOpen, openShared, confirmSharedSave, wsOpen, setWsOpen, wsError, setWsError, openWorkspaceSave, confirmWorkspaceSave, openWorkspace, openDocument, deleteWorkspace, makeTemplate, setParam, analysisSaved, clearAnalysis };
 }
