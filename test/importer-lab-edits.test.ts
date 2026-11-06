@@ -222,7 +222,7 @@ test("recorded mutations are skipped, or rewritten with new read counts on updat
   await applyEdit(probe.conn, "st", { kind: "mutations", count: 1, perSample: 1 }, "skip", false);
   const [first] = probe.rows("lab_mutation");
   probe.restore();
-  const recorded = { ...first, tumor_alt_count: 1, tumor_ref_count: 1 };
+  const recorded: Record<string, unknown> = { ...first, tumor_alt_count: 1, tumor_ref_count: 1 };
   delete recorded.version; delete recorded.is_deleted;
   const c = database({ samples: SAMPLES, hasMutationProfile: true, mutationSamples: MUT_SAMPLES.slice(1), existingMutations: [recorded], hasMutationCount: true });
   const plan = await planEdit(c.conn, "st", { kind: "mutations", count: 1, perSample: 1 });

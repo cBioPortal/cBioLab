@@ -50,7 +50,7 @@ function ctx(cohorts: Record<string, EvaluatedCohort>, resolvers: Record<string,
   return {
     doc: { study: vStudies[0], cohorts: Object.fromEntries(vNames.map((n) => [n, { study: cohorts[n].studies[0] }])), views: [] } as never,
     cohorts, resolvers: resolvers as never, vNames, vStudies,
-    participationFor: (studies: string[], requiresPatientLevel: boolean): ViewParticipation => ({ studies, requiresPatientLevel, aggregateOnly: [] }),
+    participationFor: (studies: string[], requiresPatientLevel: boolean): ViewParticipation => ({ studies: studies.map((study) => ({ study, mode: "patient-level" as const, instance: "local" })), requiresPatientLevel, aggregateOnly: [] }),
     pin: null, studyProfiles: async () => ({ profiles: [], gaProfiles: [] }),
   };
 }

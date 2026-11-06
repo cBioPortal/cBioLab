@@ -145,7 +145,7 @@ test("approving builds side tables from the review, keeps the live study in <tab
   }
   const [rec] = records(c);
   assert.equal(rec[0], "approved");
-  assert.ok(rec[2] > 0, "the approval's version is recorded, for undo");
+  assert.ok(Number(rec[2]) > 0, "the approval's version is recorded, for undo");
 });
 
 test("a failed approval still drops its side tables", async () => {

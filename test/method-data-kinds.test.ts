@@ -155,7 +155,7 @@ describe("aggregate kinds", () => {
 
   test("a view without queries still gets a header-only file", async () => {
     const v = view("logistic", read("logistic_rows.csv"), []);
-    delete (v as Row).queries;
+    delete (v as unknown as Row).queries;
     const { files } = await methodFiles(v, runner({}));
     assert.equal(files["logistic_rows.csv"], "study\n");
   });

@@ -10,10 +10,10 @@ import {
   armsFromSelection, renamePartitionChild, splitKey, flattenSplits, withoutSplitTrees,
   unflattenSplits, editSplits, renameInViews, viewIsEmpty, SPLIT_BY_DEFAULT_MIN_COUNT
 } from "../lib/partition-arms.ts";
-import type { Clause, CohortDef, PartitionDef } from "../lib/types.ts";
+import type { Clause, CohortDef, Leaf, PartitionDef } from "../lib/types.ts";
 
 const clin = (attribute: string, v: string): Clause => ({ kind: "clinical", attribute, values: [v] });
-const oql = (q: string): Clause => ({ kind: "oql", q });
+const oql = (q: string): Leaf => ({ kind: "oql", q });
 
 describe("arms from an attribute's values", () => {
   test("the most frequent values get arms, ties alphabetical, and the rest are pooled and listed", () => {

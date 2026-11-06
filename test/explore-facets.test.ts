@@ -143,7 +143,7 @@ describe("merging participants' facets", () => {
     assert.equal(sex.patients, 130);
     assert.equal(sex.studyCount, 2);
     assert.equal(sex.distinct, 3);
-    assert.equal(sex.disjunctive, true, "one participant counted it without its own clauses");
+    assert.equal((sex as { disjunctive?: boolean }).disjunctive, true, "one participant counted it without its own clauses");
     const age = facet("AGE");
     assert.ok(age.kind === "num");
     assert.deepEqual([age.min, age.max, age.median, age.displayName, age.priority], [10, 90, 52, "Age", 3]);
@@ -309,7 +309,7 @@ describe("one study", () => {
       assert.ok(sent.filter((q) => /AS pts, uniqExact/.test(q)).every((q) => q.includes("_cohort_st1")));
       assert.deepEqual(r.studyBreakdown![0].n, 2);
       const sex = r.clinical.find((c) => c.attribute === "SEX")!;
-      assert.equal(sex.disjunctive, true);
+      assert.equal((sex as { disjunctive?: boolean }).disjunctive, true);
       // the disjunctive value count has no draft left: every SEX value of the study
       const disj = sent.filter((q) => /AS vkey/.test(q) && /IN \('SEX'\)/.test(q) && !/_cohort_st1/.test(q));
       assert.equal(disj.length, 1);
@@ -333,7 +333,7 @@ describe("one study", () => {
       const r = await buildExplore({ study: S, draft: { all: [{ not: { kind: "clinical" as const, attribute: "SEX", values: ["Female"] } }] }, skipGenes: true });
       const sex = r.clinical.find((c) => c.attribute === "SEX")!;
       assert.ok(sex.kind === "cat");
-      assert.equal(sex.disjunctive, true);
+      assert.equal((sex as { disjunctive?: boolean }).disjunctive, true);
       assert.equal(sex.patients, 0);
       assert.deepEqual(sex.values, [{ v: "Female", n: 60 }, { v: "Male", n: 40 }]);
     });
@@ -464,7 +464,7 @@ describe("several studies", () => {
     assert.ok(pooled.some((q) => q.includes("_cohorts_a_cbio_a") && /UNION ALL/.test(q)), "st3's definition beside st1's uploaded rows");
     assert.ok(pooled.some((q) => q.includes("_cohorts_b_cbio_b")));
     const sex = r.clinical.find((c) => c.attribute === "SEX")!;
-    assert.equal(sex.disjunctive, true, "the drafted attribute is counted without its clause, pooled");
+    assert.equal((sex as { disjunctive?: boolean }).disjunctive, true, "the drafted attribute is counted without its clause, pooled");
   });
 
   test("drivers only is carried into the merged answer", async () => {
