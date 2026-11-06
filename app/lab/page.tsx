@@ -33,7 +33,7 @@ import { DrawAtWidth } from "./figure.tsx";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
 import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, AssayFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
-import { CohortEditDialog, ViewNoteDialog, WorkspaceDialog } from "./dialogs.tsx";
+import { CohortEditDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
 import { useCohortEdits } from "./use-cohort-edits.ts";
@@ -377,7 +377,7 @@ export default function AnalysisPage() {
   const workspace = useWorkspace({ canSave, doc, docs, goTab, persistSpaces, removeSpace, setError, setStudy, spaces, study,
     sharedSpaces: savedArtifacts.sharedWorkspaces,
     saveShared: async (id, name, d, version) => savedArtifacts.saveShared("workspace", id, name, await withListsStored(d), version) });
-  const { sharedOpen, openShared, confirmSharedSave, analysisSaved, clearAnalysis, confirmViewNoteEdit, confirmWorkspaceSave, deleteWorkspace, noteEdit, openDocument, openWorkspace, openWorkspaceSave, setNotes, setParam, setViewNoteEditing, setWsOpen, viewNoteEditing, wsError, wsOpen } = workspace;
+  const { sharedOpen, openShared, confirmSharedSave, analysisSaved, clearAnalysis, confirmWorkspaceSave, deleteWorkspace, openDocument, openWorkspace, openWorkspaceSave, setParam, setWsOpen, wsError, wsOpen } = workspace;
   const savedReady = loggedIn && !savedArtifacts.cohortsState.pending && !savedArtifacts.cohortsState.error;
   const cohortEdits = useCohortEdits({ doc, docs, evalOf: (n) => { const c = result?.cohorts[n]; return c ? { count: c.count, text: c.text } : null; }, persist, proposePartition, saved, savedReady, setError, setToast, storeLists, study });
   const { lockCohorts, unlockCohort, unlockAll, analysisStudies, cohortEditing, cohortFromSelection, confirmCohortEdit, featureFromSelection, featureSaved, openCohortEdit, removeCohort, removePartitionNamed, renamePartitionRow, runEdited, setCohortEditing, setPartitionDef, splitCohortBy, splitsFlat, cohortSource, updateFromSaved, cohortSaveState, saveCohortToLibrary, cohortCells, openCohortCells } = cohortEdits;
@@ -428,7 +428,7 @@ export default function AnalysisPage() {
   /** what Explore's sections read and the edits they can make (app/lab/explore-sections.tsx) */
   const exploreCtx: ExploreCtx = { ...exploreState, menuStore: menuOpenRef.current, showClauseData, studies };
   /** what every view card reads and the edits it can make (app/lab/view-cards.tsx) */
-  const viewCtx = { VIEW_KINDS, docHistory, study, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, noteEdit, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, profileCatalog, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
+  const viewCtx = { VIEW_KINDS, docHistory, study, assayOptions, attrsLoading, busy, cat, catLoading, catalogAttrs, cohortChoice, cohortFromSelection, contracts, doc, docView, drawsOwnHead, explore, featureFromSelection, maxCohortsOf, menuOpenRef, moveView, ocView, openCohortChooser, openGenes, patchView, pendingKeys, profileOptions, profileCatalog, removeView, setContracts, setViewAttrs, setViewCohorts, trackAttrs, trackAttrsLoading, updateView, updateViewLocal, viewEvents, viewIds };
   /** what the Analysis tab's sections read and the actions they take (app/lab/analysis-sections.tsx) */
   const analysisCtx: AnalysisCtx = { lockCohorts, unlockCohort, unlockAll, canSave, analysisStudies, requestLogin, signIn: (!customState.enabled ? "off" : !loggedIn ? "locked" : "ready") as SignInState, VIEW_KINDS, addView, docHistory, applyText, busy, catalogAttrs, clearAnalysis, doc, docDialog, docText, docs, explore, fetchExplore, cohortCells, cohortSaveState, cohortSource, openCohortCells, emptyViewHint, genesFor, goTab, loggedIn, menuOpenRef, moveView, openCohortChooser, openCohortEdit, openCustomManager, openWorkspaceSave, removeCohort, removePartitionNamed, removeView, renamePartitionRow, result, saveCohortToLibrary, saved, setCdFocus, setGenesFor, setPartitionDef, setUpgradeNote, setViewGenes, showClauseData, spaces, splitCohortBy, splitsFlat, studyNames, tab, updateFromSaved, upgradeNote, viewCtx, viewIds, viewTitle };
   // what the page offers the researcher's AI assistant (app/lab/agent-tools.ts), current every render
@@ -468,12 +468,10 @@ export default function AnalysisPage() {
             and a menu that closes on an outside click fights that. */}
         {wsOpen && <WorkspaceDialog doc={doc} saved={doc.title ? spaces[doc.title] : undefined} busy={busy}
           shared={sharedOpen} onSaveShared={confirmSharedSave}
-          unusedParams={result?.unusedParams} error={wsError} onParam={setParam} onNotes={setNotes}
+          unusedParams={result?.unusedParams} error={wsError} onParam={setParam}
           onDelete={() => deleteWorkspace(doc.title!)} onSave={confirmWorkspaceSave} onClose={() => setWsOpen(false)} />}
-        {cohortEditing != null && <CohortEditDialog name={cohortEditing} notes={doc.cohorts?.[cohortEditing]?.notes || ""}
+        {cohortEditing != null && <CohortEditDialog name={cohortEditing}
           taken={(n) => !!doc.cohorts?.[n]} onSave={confirmCohortEdit} onClose={() => setCohortEditing(null)} />}
-        {viewNoteEditing != null && <ViewNoteDialog note={(doc.views || [])[viewNoteEditing]?.note || ""}
-          onSave={confirmViewNoteEdit} onClose={() => setViewNoteEditing(null)} />}
         <GenesDialog ctx={analysisCtx} />
         {/* a click on the open tab still writes it to the URL */}
         <Tabs value={tab} className="mb-4" onValueChange={(v) => openTab(v as typeof TABS[number])}>

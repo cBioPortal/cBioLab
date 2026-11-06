@@ -63,7 +63,7 @@ function SequenceCard({ ctx, v, vi }: CardProps) {
           </GearMenu>
         )}
         <Latency v={v} /><Participation p={v.participation} />
-        <ViewMenu menuId={"reorder:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} {...placement(ctx, vi)} hasNote={!!v.annotationNote} />
+        <ViewMenu menuId={"reorder:" + (viewIds[vi] ?? vi)} menuStore={menuOpenRef.current} {...placement(ctx, vi)} />
         </div>
       </div>
       <DrawnCohorts drawn={cohortChoice(vi, docView(vi), 1).drawn} nodes={cohortChoice(vi, docView(vi), 1).nodes} />
