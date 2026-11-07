@@ -112,6 +112,13 @@ function javaFloat(s: string): number {
   if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?[dDfF]?$/.test(t)) return -1;
   return Math.fround(Number(t.replace(/[dDfF]$/, "")));
 }
+/** A VAF as a fraction: one written with `%` is divided by 100; -1 where it does not parse. */
+function vafOf(s: string): number {
+  const t = s.trim();
+  if (!t.endsWith("%")) return javaFloat(t);
+  const pct = javaFloat(t.slice(0, -1));
+  return pct === -1 ? -1 : Math.fround(pct / 100);
+}
 /** Java's `Math.round(int * float)`. */
 const roundProduct = (depth: number, vaf: number) => Math.floor(Math.fround(depth * vaf) + 0.5);
 
@@ -125,7 +132,7 @@ export interface CountColumns { tAlt: string; tRef: string; nAlt: string; nRef: 
 export function alleleCounts(c: CountColumns): { tumor_alt_count: number | null; tumor_ref_count: number | null; normal_alt_count: number | null; normal_ref_count: number | null } {
   const i = (v: string) => javaInt(v);
   const side = (alt: string, ref: string, tot: string, vr: string, depth: string, vaf: string) => {
-    const a = i(alt), r = i(ref), t = i(tot), v = i(vr), d = i(depth), f = javaFloat(vaf);
+    const a = i(alt), r = i(ref), t = i(tot), v = i(vr), d = i(depth), f = vafOf(vaf);
     const fromVaf = d !== -1 && f !== -1;
     return [
       a !== -1 ? a : v !== -1 ? v : fromVaf ? roundProduct(d, f) : null,
@@ -166,7 +173,7 @@ export async function importMutations(ctx: ImportContext, f: DataFile, profile: 
   if (!h.has("tumor_sample_barcode")) throw new Error(path.basename(f.file) + " has no Tumor_Sample_Barcode column");
   const custom = f.meta.variant_classification_filter
     ? new Set(f.meta.variant_classification_filter.split(",").map((s) => s.trim()).filter(Boolean)) : null;
-  const panel = panelOf(ctx, f, r);
+  const panel = panelOf(ctx, f);
 
   // `#sequenced_samples:` lines list samples profiled even when nothing was found in them
   for (const c of t.comments) {
@@ -275,11 +282,19 @@ async function write(ctx: ImportContext, muts: Map<string, Mut>, profile: number
   await evIns.flush(); await mIns.flush(); await dIns.flush();
 }
 
-/** The meta file's `gene_panel`, as an internal id; null means whole exome/genome. */
-export function panelOf(ctx: ImportContext, f: DataFile, r: FileReport): number | null {
+/**
+ * The meta file's `gene_panel`, as an internal id; null (no `gene_panel`) means whole exome/genome.
+ * A panel that is not defined refuses the file: profiling its samples as whole-exome instead would
+ * count every gene as profiled and shrink every frequency.
+ */
+export function panelOf(ctx: ImportContext, f: DataFile): number | null {
   const p = f.meta.gene_panel;
   if (!p) return null;
   const id = ctx.panels.get(p);
-  if (id === undefined) { r.notes.push("gene panel " + p + " is not defined; samples are treated as whole-exome"); return null; }
+  if (id === undefined) {
+    const known = [...ctx.panels.keys()].sort();
+    throw new Error("gene_panel " + p + " is not a defined gene panel; defined: " +
+      (known.length ? known.slice(0, 20).join(", ") + (known.length > 20 ? " and " + (known.length - 20) + " more" : "") : "none"));
+  }
   return id;
 }

@@ -65,7 +65,7 @@ export async function importMatrix(ctx: ImportContext, f: DataFile, profile: num
     if (!raw || isNormalBarcode(raw)) continue;
     cols.push({ index: i, sample: ctx.sampleFor(sampleId(raw)) });
   }
-  const panel = panelOf(ctx, f, r);
+  const panel = panelOf(ctx, f);
   for (const c of cols) ctx.profiled(c.sample, profile, panel);
   await ctx.insertAll("genetic_profile_samples", [{ genetic_profile_id: profile, ordered_sample_list: cols.map((c) => c.sample).join(",") + "," }]);
 
@@ -157,7 +157,7 @@ export async function importDiscreteLong(ctx: ImportContext, f: DataFile, profil
     if (ev === undefined) { ev = ctx.id("cnaEvent"); events.set(key, ev); await newEvents.add({ cna_event_id: ev, entrez_gene_id: gene.entrez, alteration: alt }); }
     await sce.add({ cna_event_id: ev, sample_id: sample, genetic_profile_id: profile, annotation_json: null });
   }
-  const panel = panelOf(ctx, f, r);
+  const panel = panelOf(ctx, f);
   for (const s of samples) ctx.profiled(s, profile, panel);
   await ctx.insertAll("genetic_profile_samples", [{ genetic_profile_id: profile, ordered_sample_list: samples.join(",") + "," }]);
   const ga = ctx.sink("genetic_alteration");

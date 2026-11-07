@@ -9,7 +9,7 @@ import { exec, execScript, insertAll, query, sq, type WriteConn } from "./ch-wri
 import { ImportContext, sampleId, type FileReport, type Profile, type Progress } from "./context.ts";
 import { GeneResolver } from "./genes.ts";
 import { importClinicalPatients, importClinicalSamples } from "./clinical.ts";
-import { importMutations } from "./mutations.ts";
+import { importMutations, panelOf } from "./mutations.ts";
 import { importDiscreteLong, importMatrix } from "./matrix.ts";
 import { fractionGenomeAltered, importGenePanelMatrix, importSegments, importStructuralVariants, importTimeline, type SegmentTotals } from "./other.ts";
 import { importGenePanel } from "./panels.ts";
@@ -115,6 +115,8 @@ async function importFile(ctx: ImportContext, f: DataFile, kind: DataFile["kind"
   else if (kind === "timeline") await importTimeline(ctx, f);
   else if (kind === "gene_panel_matrix") await importGenePanelMatrix(ctx, f);
   else {
+    // an undefined gene_panel refuses the file before its profile or any of its rows are written
+    panelOf(ctx, f);
     const profile = await createProfile(ctx, f);
     if (kind === "mutations") await importMutations(ctx, f, profile.id);
     else if (kind === "cna_discrete") await importMatrix(ctx, f, profile.id, profile.showInAnalysisTab);
@@ -166,7 +168,7 @@ async function createProfile(ctx: ImportContext, f: DataFile): Promise<Profile> 
   const suffix = m.stable_id || (f.kind === "mutations" ? "mutations" : f.kind === "sv" ? "structural_variants" : "profile");
   const type = (m.genetic_alteration_type || "").toUpperCase() === "FUSION" ? "STRUCTURAL_VARIANT" : (m.genetic_alteration_type || "").toUpperCase();
   const datatype = (m.datatype || "").toUpperCase() === "DISCRETE_LONG" ? "DISCRETE" : (m.datatype || "").toUpperCase();
-  const p: Profile = { id: ctx.id("profile"), stableId: ctx.studyId + "_" + suffix, type, datatype, showInAnalysisTab: (m.show_profile_in_analysis_tab || "true").toLowerCase() !== "false" };
+  const p: Profile = { id: ctx.id("profile"), stableId: ctx.profileStableId(suffix), type, datatype, showInAnalysisTab: (m.show_profile_in_analysis_tab || "true").toLowerCase() !== "false" };
   await ctx.insertAll("genetic_profile", [{
     genetic_profile_id: p.id, stable_id: p.stableId, cancer_study_id: ctx.cancerStudyId, genetic_alteration_type: type,
     generic_assay_type: null, datatype, name: m.profile_name || suffix, description: m.profile_description || null,

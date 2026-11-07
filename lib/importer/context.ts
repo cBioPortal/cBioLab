@@ -184,8 +184,13 @@ export class ImportContext {
     this.sampleProfile.set(sample + ":" + profile, { sample, profile, panel });
   }
 
+  /** A profile's stable id: the meta file's, with the study prefix added when it lacks it. */
+  profileStableId(suffix: string): string {
+    return suffix.startsWith(this.studyId + "_") ? suffix : this.studyId + "_" + suffix;
+  }
+
   profileByStableSuffix(suffix: string): Profile | undefined {
-    const full = suffix.startsWith(this.studyId + "_") ? suffix : this.studyId + "_" + suffix;
+    const full = this.profileStableId(suffix);
     return this.profiles.find((p) => p.stableId === full);
   }
 }

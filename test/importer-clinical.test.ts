@@ -710,7 +710,7 @@ test("X5: groups are uppercased; access defaults to public; reference genome def
   } finally { ch.restore(); }
 });
 
-test("X5: a profile stable_id gets the study prefix only when it lacks it", { todo: "X5: spec says the prefix is added only if missing; importer turns st_mutations into st_st_mutations" }, async () => {
+test("X5: a profile stable_id gets the study prefix only when it lacks it", async () => {
   await study({
     "meta_study.txt": META_STUDY,
     "meta_clinical_sample.txt": META_CS,
@@ -720,6 +720,26 @@ test("X5: a profile stable_id gets the study prefix only when it lacks it", { to
   }, (ch) => {
     assert.deepEqual(ch.rows("genetic_profile").map((p) => p.stable_id), ["st_mutations"]);
   }, TP53);
+});
+
+test("P1: a data file naming an undefined gene_panel is not imported, and no profile is written for it", async () => {
+  const ch = fakeCh();
+  try {
+    ch.answer(/AS g FROM gene\b/, TP53);
+    ch.answer(/AS s, internal_id AS i FROM gene_panel/, []);
+    const r = await importStudy(ch.conn, "/nonexistent", studyDir({
+      "meta_study.txt": META_STUDY,
+      "meta_clinical_sample.txt": META_CS,
+      "cs.txt": "PATIENT_ID\tSAMPLE_ID\nP1\tS1\n",
+      "meta_mutations.txt": META_MUT + "gene_panel: NO_SUCH_PANEL\n",
+      "m.txt": MAF_HEAD + "TP53\t7157\tS1\tMissense_Mutation\t17\t7577120\t7577120\tC\tT\tp.R273H\n"
+    }), "st", () => {}, false, false);
+    assert.equal(r.notImported.length, 1);
+    assert.equal(r.notImported[0].file, "m.txt");
+    assert.match(r.notImported[0].reason, /gene_panel NO_SUCH_PANEL is not a defined gene panel; defined: none/);
+    assert.deepEqual(ch.rows("genetic_profile"), []);
+    assert.deepEqual(ch.rows("mutation"), []);
+  } finally { ch.restore(); }
 });
 
 const META_CNA_BARE = "cancer_study_identifier: st\ngenetic_alteration_type: COPY_NUMBER_ALTERATION\ndatatype: DISCRETE\nstable_id: gistic\nshow_profile_in_analysis_tab: true\ndata_filename: cna.txt\n";
