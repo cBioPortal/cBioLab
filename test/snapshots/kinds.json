@@ -10,6 +10,7 @@
     "mutations",
     "timeline",
     "alterations",
+    "evolution",
     "correlates",
     "overlap",
     "cancertypes",
@@ -1514,6 +1515,68 @@
       "preview": null,
       "sub": "mutations in every gene, per sample",
       "title": "Alteration enrichment (all genes)"
+    },
+    "evolution": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "evolution"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "evolution"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "evolution"
+      },
+      "card": {
+        "cohortInHeader": true,
+        "defaults": {
+          "kind": "evolution"
+        },
+        "defaultsBareStudy": {
+          "kind": "evolution"
+        },
+        "label": "Genomic evolution (mutation VAFs across a patient's samples; one patient at a time)",
+        "maxCohorts": 1,
+        "title": "Genomic evolution",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": true,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Genomic evolution — A vs B",
+      "headTitle": "Genomic evolution",
+      "help": {
+        "text": "Follows one patient's mutations across their tumour samples, as cBioPortal's Genomic Evolution tab does. For each mutation, the share of the sequencing reads at its position that carry it (the variant allele frequency, VAF) is drawn in every sample, in the order the samples were taken: a line per mutation, or a heatmap with a row per mutation. A mutation that rises, appears or disappears between samples shows how the tumour changed. A sample whose test did not cover the gene is marked not profiled — it is not counted as zero. Below the chart, the mutations as a table you can search, filter and sort; the chart draws the mutations the table keeps. Step to the previous or next patient with the arrows (or the ← and → keys), or open the patient list.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Genomic evolution (mutation VAFs across a patient's samples; one patient at a time)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": "(element)",
+      "title": "Genomic evolution (mutation VAFs across a patient's samples; one patient at a time)"
     },
     "exclusivity": {
       "added": {
@@ -3531,6 +3594,7 @@
     "mutations",
     "timeline",
     "alterations",
+    "evolution",
     "correlates",
     "overlap",
     "cancertypes",

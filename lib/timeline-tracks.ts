@@ -176,18 +176,24 @@ export function flattenTracks(tracks: TlTrack[], collapsed: ReadonlySet<string>)
   return out;
 }
 
-/**
- * The patient's samples numbered in collection order (the day a sample event names it, then
- * primary before metastasis before cfDNA, then by id — the portal's sortSamples), coloured by
- * sample type.
- */
-export function sampleMarks(samples: PatientSample[], events: PatientEvent[]): Map<string, SampleMark> {
+/** The day each sample was collected: the earliest sample event (specimen, acquisition, sequencing) naming it by SAMPLE_ID. */
+export function sampleDays(events: PatientEvent[]): Map<string, number> {
   const day = new Map<string, number>();
   for (const e of events) {
     if (!SAMPLE_TRACK.test(canonicalEventName(e.type))) continue;
     const id = attr(e, "SAMPLE_ID");
     if (id && (!day.has(id) || e.start < day.get(id)!)) day.set(id, e.start);
   }
+  return day;
+}
+
+/**
+ * The patient's samples numbered in collection order (the day a sample event names it, then
+ * primary before metastasis before cfDNA, then by id — the portal's sortSamples), coloured by
+ * sample type.
+ */
+export function sampleMarks(samples: PatientSample[], events: PatientEvent[]): Map<string, SampleMark> {
+  const day = sampleDays(events);
   const typeRank = (t: string) => { const i = ["primary", "metastasis", "cfdna"].indexOf(normalizeSampleType(t).toLowerCase()); return i < 0 ? 3 : i; };
   const ids = [...new Set([...samples.map((s) => s.id), ...day.keys()])];
   const typeOf = new Map(samples.map((s) => [s.id, s.type]));

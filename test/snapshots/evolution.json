@@ -1,0 +1,964 @@
+{
+  "study": "glioma_msk_2018",
+  "cohorts": {
+    "Glioma": {
+      "count": 42,
+      "samples": 91,
+      "text": "all samples in the study",
+      "studies": [
+        "glioma_msk_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "evolution",
+      "cohorts": [
+        "Glioma"
+      ],
+      "evolution": {
+        "columns": [
+          {
+            "id": "patient",
+            "name": "Patient ID",
+            "numeric": false
+          },
+          {
+            "id": "samples",
+            "name": "Samples",
+            "numeric": true
+          },
+          {
+            "id": "mutations",
+            "name": "Mutations",
+            "numeric": true
+          },
+          {
+            "id": "withVaf",
+            "name": "Mutations with VAF",
+            "numeric": true
+          }
+        ],
+        "shown": [
+          "patient",
+          "samples",
+          "mutations",
+          "withVaf"
+        ],
+        "defaults": [
+          "patient",
+          "samples",
+          "mutations",
+          "withVaf"
+        ],
+        "query": {},
+        "rows": [
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-7",
+            "sample": "",
+            "values": [
+              "IM-GBM-7",
+              6,
+              17,
+              17
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-28",
+            "sample": "",
+            "values": [
+              "IM-GBM-28",
+              4,
+              8,
+              8
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-10",
+            "sample": "",
+            "values": [
+              "IM-GBM-10",
+              3,
+              7,
+              7
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-15",
+            "sample": "",
+            "values": [
+              "IM-GBM-15",
+              3,
+              9,
+              9
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-17",
+            "sample": "",
+            "values": [
+              "IM-GBM-17",
+              3,
+              6,
+              6
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-21",
+            "sample": "",
+            "values": [
+              "IM-GBM-21",
+              3,
+              9,
+              9
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-30",
+            "sample": "",
+            "values": [
+              "IM-GBM-30",
+              3,
+              5,
+              5
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-34",
+            "sample": "",
+            "values": [
+              "IM-GBM-34",
+              3,
+              267,
+              267
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-36",
+            "sample": "",
+            "values": [
+              "IM-GBM-36",
+              3,
+              171,
+              171
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-1",
+            "sample": "",
+            "values": [
+              "IM-GBM-1",
+              2,
+              13,
+              13
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-11",
+            "sample": "",
+            "values": [
+              "IM-GBM-11",
+              2,
+              7,
+              7
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-12",
+            "sample": "",
+            "values": [
+              "IM-GBM-12",
+              2,
+              2,
+              2
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-13",
+            "sample": "",
+            "values": [
+              "IM-GBM-13",
+              2,
+              2,
+              2
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-14",
+            "sample": "",
+            "values": [
+              "IM-GBM-14",
+              2,
+              5,
+              5
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-16",
+            "sample": "",
+            "values": [
+              "IM-GBM-16",
+              2,
+              3,
+              3
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-18",
+            "sample": "",
+            "values": [
+              "IM-GBM-18",
+              2,
+              4,
+              4
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-19",
+            "sample": "",
+            "values": [
+              "IM-GBM-19",
+              2,
+              5,
+              5
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-2",
+            "sample": "",
+            "values": [
+              "IM-GBM-2",
+              2,
+              6,
+              6
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-20",
+            "sample": "",
+            "values": [
+              "IM-GBM-20",
+              2,
+              7,
+              7
+            ]
+          },
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-22",
+            "sample": "",
+            "values": [
+              "IM-GBM-22",
+              2,
+              9,
+              9
+            ]
+          },
+          {
+            "…": "5 more",
+            "sha256": "2bfaa662c0521c3d"
+          }
+        ],
+        "offset": 0,
+        "pageSize": 25,
+        "lists": [
+          {
+            "cohort": "Glioma",
+            "study": "glioma_msk_2018",
+            "total": 36,
+            "all": 36
+          }
+        ],
+        "total": 36,
+        "all": 36,
+        "patient": {
+          "study": "glioma_msk_2018",
+          "id": "IM-GBM-28",
+          "samples": [
+            {
+              "id": "Patient-28-T1",
+              "type": "Primary",
+              "label": "1",
+              "color": "black",
+              "day": 0,
+              "panel": "IMPACT410"
+            },
+            {
+              "id": "Patient-28-T3",
+              "type": "Recurrence",
+              "label": "2",
+              "color": "orange",
+              "day": 227,
+              "panel": "IMPACT410"
+            },
+            {
+              "id": "Patient-28-T2",
+              "type": "Recurrence",
+              "label": "3",
+              "color": "orange",
+              "day": 903,
+              "panel": "IMPACT410"
+            },
+            {
+              "id": "Patient-28-CSF",
+              "type": "Unknown_Tumor",
+              "label": "4",
+              "color": "#333333",
+              "day": 1279,
+              "panel": "IMPACT410"
+            }
+          ]
+        },
+        "position": {
+          "index": 1,
+          "prev": {
+            "study": "glioma_msk_2018",
+            "id": "IM-GBM-7"
+          },
+          "next": {
+            "study": "glioma_msk_2018",
+            "id": "IM-GBM-10"
+          }
+        },
+        "mutations": {
+          "columns": [
+            {
+              "id": "samples",
+              "name": "Samples",
+              "numeric": false
+            },
+            {
+              "id": "gene",
+              "name": "Gene",
+              "numeric": false
+            },
+            {
+              "id": "proteinChange",
+              "name": "Protein Change",
+              "numeric": false
+            },
+            {
+              "id": "mutationType",
+              "name": "Mutation Type",
+              "numeric": false
+            },
+            {
+              "id": "vafs",
+              "name": "VAF by sample",
+              "numeric": false
+            },
+            {
+              "id": "maxVaf",
+              "name": "Max VAF",
+              "numeric": true
+            },
+            {
+              "id": "called",
+              "name": "Samples called",
+              "numeric": true
+            },
+            {
+              "id": "variantType",
+              "name": "Variant Type",
+              "numeric": false
+            },
+            {
+              "id": "chr",
+              "name": "Chromosome",
+              "numeric": false
+            },
+            {
+              "id": "start",
+              "name": "Start Pos",
+              "numeric": true
+            },
+            {
+              "id": "end",
+              "name": "End Pos",
+              "numeric": true
+            },
+            {
+              "id": "ref",
+              "name": "Ref",
+              "numeric": false
+            },
+            {
+              "id": "var",
+              "name": "Var",
+              "numeric": false
+            }
+          ],
+          "shown": [
+            "samples",
+            "gene",
+            "proteinChange",
+            "mutationType",
+            "vafs",
+            "maxVaf"
+          ],
+          "defaults": [
+            "samples",
+            "gene",
+            "proteinChange",
+            "mutationType",
+            "vafs",
+            "maxVaf"
+          ],
+          "query": {},
+          "rows": [
+            {
+              "cohort": "Glioma",
+              "study": "glioma_msk_2018",
+              "patient": "IM-GBM-28",
+              "sample": "Patient-28-T1",
+              "values": [
+                "Patient-28-T1, Patient-28-T2",
+                "STAG2",
+                "N141I",
+                "Missense_Mutation",
+                "1: 0.81 · 2: not found · 3: 0.28 · 4: not found",
+                0.807,
+                2,
+                "SNP",
+                "23",
+                123176455,
+                123176455,
+                "A",
+                "T"
+              ]
+            },
+            {
+              "cohort": "Glioma",
+              "study": "glioma_msk_2018",
+              "patient": "IM-GBM-28",
+              "sample": "Patient-28-T1",
+              "values": [
+                "Patient-28-T1, Patient-28-T2",
+                "TP53",
+                "Q136E",
+                "Missense_Mutation",
+                "1: 0.76 · 2: not found · 3: 0.24 · 4: not found",
+                0.762,
+                2,
+                "SNP",
+                "17",
+                7578524,
+                7578524,
+                "G",
+                "C"
+              ]
+            },
+            {
+              "cohort": "Glioma",
+              "study": "glioma_msk_2018",
+              "patient": "IM-GBM-28",
+              "sample": "Patient-28-T1",
+              "values": [
+                "Patient-28-T1, Patient-28-T2",
+                "PIK3CA",
+                "E545K",
+                "Missense_Mutation",
+                "1: 0.42 · 2: not found · 3: 0.11 · 4: not found",
+                0.418,
+                2,
+                "SNP",
+                "3",
+                178936091,
+                178936091,
+                "G",
+                "A"
+              ]
+            },
+            {
+              "cohort": "Glioma",
+              "study": "glioma_msk_2018",
+              "patient": "IM-GBM-28",
+              "sample": "Patient-28-T1",
+              "values": [
+                "Patient-28-T1, Patient-28-T3, Patient-28-T2, Patient-28-CSF",
+                "TERT",
+                "Promoter",
+                "5'Flank",
+                "1: 0.39 · 2: 0.40 · 3: 0.20 · 4: 0.11",
+                0.4,
+                4,
+                "SNP",
+                "5",
+                1295228,
+                1295228,
+                "G",
+                "A"
+              ]
+            },
+            {
+              "cohort": "Glioma",
+              "study": "glioma_msk_2018",
+              "patient": "IM-GBM-28",
+              "sample": "Patient-28-T3",
+              "values": [
+                "Patient-28-T3, Patient-28-CSF",
+                "TP53",
+                "R282G",
+                "Missense_Mutation",
+                "1: not found · 2: 0.80 · 3: not found · 4: 0.24",
+                0.798,
+                2,
+                "SNP",
+                "17",
+                7577094,
+                7577094,
+                "G",
+                "C"
+              ]
+            },
+            {
+              "cohort": "Glioma",
+              "study": "glioma_msk_2018",
+              "patient": "IM-GBM-28",
+              "sample": "Patient-28-T3",
+              "values": [
+                "Patient-28-T3, Patient-28-CSF",
+                "POLE",
+                "V1195A",
+                "Missense_Mutation",
+                "1: not found · 2: 0.26 · 3: not found · 4: 0.10",
+                0.257,
+                2,
+                "SNP",
+                "12",
+                133226474,
+                133226474,
+                "A",
+                "G"
+              ]
+            },
+            {
+              "cohort": "Glioma",
+              "study": "glioma_msk_2018",
+              "patient": "IM-GBM-28",
+              "sample": "Patient-28-T3",
+              "values": [
+                "Patient-28-T3, Patient-28-CSF",
+                "PIK3R2",
+                "D610G",
+                "Missense_Mutation",
+                "1: not found · 2: 0.26 · 3: not found · 4: 0.15",
+                0.255,
+                2,
+                "SNP",
+                "19",
+                18279556,
+                18279556,
+                "A",
+                "G"
+              ]
+            },
+            {
+              "cohort": "Glioma",
+              "study": "glioma_msk_2018",
+              "patient": "IM-GBM-28",
+              "sample": "Patient-28-T3",
+              "values": [
+                "Patient-28-T3",
+                "RASA1",
+                "H1005R",
+                "Missense_Mutation",
+                "1: not found · 2: 0.15 · 3: not found · 4: not found",
+                0.148,
+                1,
+                "SNP",
+                "5",
+                86685298,
+                86685298,
+                "A",
+                "G"
+              ]
+            }
+          ],
+          "offset": 0,
+          "pageSize": 25,
+          "lists": [
+            {
+              "cohort": "Glioma",
+              "study": "glioma_msk_2018",
+              "total": 8,
+              "all": 8
+            }
+          ],
+          "total": 8,
+          "all": 8
+        },
+        "drawn": [
+          {
+            "key": "STAG2|N141I|23|123176455|123176455|A|T",
+            "gene": "STAG2",
+            "proteinChange": "N141I",
+            "mutationType": "Missense_Mutation",
+            "cells": [
+              {
+                "status": "called",
+                "vaf": 0.8072,
+                "alt": 134,
+                "ref": 32
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 416
+              },
+              {
+                "status": "called",
+                "vaf": 0.2759,
+                "alt": 48,
+                "ref": 126
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 231
+              }
+            ]
+          },
+          {
+            "key": "TP53|Q136E|17|7578524|7578524|G|C",
+            "gene": "TP53",
+            "proteinChange": "Q136E",
+            "mutationType": "Missense_Mutation",
+            "cells": [
+              {
+                "status": "called",
+                "vaf": 0.7622,
+                "alt": 125,
+                "ref": 39
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 290
+              },
+              {
+                "status": "called",
+                "vaf": 0.2427,
+                "alt": 175,
+                "ref": 546
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 324
+              }
+            ]
+          },
+          {
+            "key": "PIK3CA|E545K|3|178936091|178936091|G|A",
+            "gene": "PIK3CA",
+            "proteinChange": "E545K",
+            "mutationType": "Missense_Mutation",
+            "cells": [
+              {
+                "status": "called",
+                "vaf": 0.4178,
+                "alt": 89,
+                "ref": 124
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 288
+              },
+              {
+                "status": "called",
+                "vaf": 0.1081,
+                "alt": 101,
+                "ref": 833
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 144
+              }
+            ]
+          },
+          {
+            "key": "TERT|Promoter|5|1295228|1295228|G|A",
+            "gene": "TERT",
+            "proteinChange": "Promoter",
+            "mutationType": "5'Flank",
+            "cells": [
+              {
+                "status": "called",
+                "vaf": 0.3913,
+                "alt": 18,
+                "ref": 28
+              },
+              {
+                "status": "called",
+                "vaf": 0.4,
+                "alt": 30,
+                "ref": 45
+              },
+              {
+                "status": "called",
+                "vaf": 0.2008,
+                "alt": 50,
+                "ref": 199
+              },
+              {
+                "status": "called",
+                "vaf": 0.1084,
+                "alt": 36,
+                "ref": 296
+              }
+            ]
+          },
+          {
+            "key": "TP53|R282G|17|7577094|7577094|G|C",
+            "gene": "TP53",
+            "proteinChange": "R282G",
+            "mutationType": "Missense_Mutation",
+            "cells": [
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 208
+              },
+              {
+                "status": "called",
+                "vaf": 0.7984,
+                "alt": 404,
+                "ref": 102
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 508
+              },
+              {
+                "status": "called",
+                "vaf": 0.2369,
+                "alt": 104,
+                "ref": 335
+              }
+            ]
+          },
+          {
+            "key": "POLE|V1195A|12|133226474|133226474|A|G",
+            "gene": "POLE",
+            "proteinChange": "V1195A",
+            "mutationType": "Missense_Mutation",
+            "cells": [
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 133
+              },
+              {
+                "status": "called",
+                "vaf": 0.2574,
+                "alt": 61,
+                "ref": 176
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 160
+              },
+              {
+                "status": "called",
+                "vaf": 0.0991,
+                "alt": 33,
+                "ref": 300
+              }
+            ]
+          },
+          {
+            "key": "PIK3R2|D610G|19|18279556|18279556|A|G",
+            "gene": "PIK3R2",
+            "proteinChange": "D610G",
+            "mutationType": "Missense_Mutation",
+            "cells": [
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 132
+              },
+              {
+                "status": "called",
+                "vaf": 0.2553,
+                "alt": 108,
+                "ref": 315
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 470
+              },
+              {
+                "status": "called",
+                "vaf": 0.148,
+                "alt": 58,
+                "ref": 334
+              }
+            ]
+          },
+          {
+            "key": "RASA1|H1005R|5|86685298|86685298|A|G",
+            "gene": "RASA1",
+            "proteinChange": "H1005R",
+            "mutationType": "Missense_Mutation",
+            "cells": [
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 299
+              },
+              {
+                "status": "called",
+                "vaf": 0.1482,
+                "alt": 55,
+                "ref": 316
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 205
+              },
+              {
+                "status": "absent",
+                "vaf": 0,
+                "alt": 0,
+                "ref": 255
+              }
+            ]
+          }
+        ],
+        "noVaf": 0,
+        "x": "time",
+        "display": {
+          "chart": "line",
+          "logScale": false,
+          "dataRange": false
+        }
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "glioma_msk_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "IM-GBM-28: 4 samples in collection order, placed by the day each was collected (days from diagnosis, from the study's timeline). 8 mutations; 8 are drawn. VAF is variant reads ÷ (variant + reference reads) in each sample. A mutation called in one sample is followed into the others: there it is an uncalled mutation where the study's uncalled-mutations profile found variant reads (drawn with that VAF), not found (VAF 0) where the sample was sequenced for the gene, or NOT PROFILED where the sample's panel does not cover the gene — never 0. A line joins a mutation's VAFs from the first to the last sample with variant reads, as the portal draws it; it bridges a not-profiled sample, or one called without allele counts, with a dashed segment. Fusions recorded as mutations are left out, as the portal leaves them out. The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: 36 patients. Sorted with the most samples first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the patients per cohort and study",
+            "detail": "The evolution:counts query above: every patient of each cohort with two or more samples and at least one called mutation with allele counts (variant reads above zero, and reference reads), with their sample count, called mutations and those with allele counts.",
+            "params": [
+              [
+                "Glioma · glioma_msk_2018",
+                "36"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Sort them together and take one page",
+            "detail": "The evolution:rows query above: the patients of every cohort and study combined in one query, sorted most samples first, then by patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset."
+          },
+          {
+            "kind": "fetch",
+            "title": "Read IM-GBM-28's samples and mutations",
+            "detail": "The patient's samples (evolution:samples, with the gene panel each was sequenced with for mutations) and timeline (for each sample's collection day), numbered in collection order; then evolution:mutations: every mutation called in any of the patient's samples (fusions left out), merged across samples by gene, protein change and genomic position as the portal merges them, with its state in every sample — called (VAF = variant reads ÷ (variant + reference reads)), called without allele counts, uncalled with variant reads (the study's uncalled-mutations profile; drawn with its VAF), not found in a sample sequenced for the gene (VAF 0), or not profiled (the sample's panel omits the gene, or it was not sequenced for mutations: no VAF). The figure draws every mutation the table's query keeps that has a VAF in some sample where it was called.",
+            "params": [
+              [
+                "samples",
+                "4"
+              ],
+              [
+                "mutations",
+                "8"
+              ],
+              [
+                "drawn",
+                "8"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "runEvolution",
+            "evolutionPatientsSource",
+            "evolutionSamplesSource",
+            "evolutionMutationsSource",
+            "pageSql",
+            "countsSql",
+            "rankSql"
+          ],
+          "file": "lib/views/evolution/run.ts, lib/views/evolution/sql.ts, lib/table-query.ts",
+          "commit": null
+        },
+        "verification": "A listing of one patient's reads: each VAF is the ratio of two counts the query returns, with nothing else computed, so there is no script — the queries are the numbers."
+      }
+    }
+  ]
+}

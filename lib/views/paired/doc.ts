@@ -15,7 +15,7 @@ export const pairedDoc: KindDoc = {
       title: "Paired samples: what differs between a patient's primary and metastasis",
       snapshot: "paired",
       demonstrates: "A `paired` view: among patients with both a primary and a metastatic sample, per gene, how often a driver is on both, only the primary or only the metastasis — counted only where each side's own panel covered the gene — with an exact McNemar test of whether discordance runs one way. A patient-level comparison computed entirely inside the database; only the four counts per gene leave it.",
-      tags: ["metastasis", "evolution"],
+      tags: ["metastasis", "tumor evolution"],
       note: "MSK-IMPACT, the 2,278 patients sequenced at both a primary and a metastatic site. Truncal drivers agree (TP53 78% concordant); what the metastasis alone carries is the resistance biology — ESR1 mutations (49 metastasis-only against 7 primary-only) and AR alterations (71 against 1), both selected under hormone therapy — and MYC amplification and CDKN2A loss.",
       doc: {
         study: "msk_impact_50k_2026",
@@ -26,7 +26,7 @@ export const pairedDoc: KindDoc = {
     {
       title: "Paired samples, every gene: what the metastasis carries that the primary does not",
       demonstrates: "A `paired` view with no `genes`: it scans every gene with a driver in some patient sampled at both a primary and a metastatic site, tests each with an exact McNemar test, takes Benjamini–Hochberg q across all of them, and draws the most one-sided — the question asked without guessing the answer's genes first.",
-      tags: ["metastasis", "evolution", "scan"],
+      tags: ["metastasis", "tumor evolution", "scan"],
       note: "MSK-IMPACT again, the 2,278 patients with both kinds of sample, but no gene list. Of 347 genes with a discordant patient, the scan puts AR (71 metastasis-only against 1 primary-only) and ESR1 (49 against 7) first — the hormone-therapy resistance genes the hand-picked version above had to be told to look at — followed by MYC, NKX3-1 and PTEN.",
       doc: {
         study: "msk_impact_50k_2026",
