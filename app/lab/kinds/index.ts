@@ -39,6 +39,7 @@ import { logisticUi } from "./logistic.tsx";
 import { molsubtypeUi } from "./molsubtype.tsx";
 import { multistateUi } from "./multistate.tsx";
 import { mutationsUi } from "./mutations.tsx";
+import { svUi } from "./sv.tsx";
 import { oncoprintUi } from "./oncoprint.tsx";
 import { organotropismUi } from "./organotropism.tsx";
 import { overlapUi } from "./overlap.tsx";
@@ -75,6 +76,7 @@ export const KIND_UI: { [K in ViewKind]: KindUi<K> } = {
   composition: compositionUi,
   table: tableUi,
   mutations: mutationsUi,
+  sv: svUi,
   timeline: timelineUi,
   alterations: alterationsUi,
   evolution: evolutionUi,

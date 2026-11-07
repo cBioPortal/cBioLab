@@ -34,6 +34,7 @@ import { survivalCountsSql, survivalLeftOutSql, survivalEndpointsSql, anchoredSu
 import { axisSelect, highlightCohortSql, plotPointsSql, plotScatterPointsSql, plotRankedPointsSql } from "../lib/plot.ts";
 import { clinicalRowSource } from "../lib/clinical-table.ts";
 import { mutationRowSource } from "../lib/mutation-table.ts";
+import { svRowSource } from "../lib/sv-table.ts";
 import { alterationPatientRowSource, alterationSource, patientSamplesSource } from "../lib/patient-alterations.ts";
 import { pageSql } from "../lib/table-query.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
@@ -205,12 +206,13 @@ describe("remote peers: nothing identifying leaves before the network is touched
 
   test("a table view's rows are the entitlement, and live only where it lives", () => {
     // the row sources return patient and sample ids, so they sit outside the aggregate builders
-    for (const name of ["clinicalRowSource", "mutationRowSource", "pageSql", "rankSql", "alterationPatientRowSource", "alterationSource",
+    for (const name of ["clinicalRowSource", "mutationRowSource", "pageSql", "rankSql", "alterationPatientRowSource", "alterationSource", "svRowSource",
       "patientMutationsSource", "patientCnaSource", "patientSvSource", "patientSamplesSource"])
       assert.equal(name in (federation as Record<string, unknown>), false, name + " returns ids and must not sit among the aggregate builders");
     const part = [{ cohort: "c", study: "x", cohortSql: "SELECT '' AS pid" }];
     assert.match(pageSql(clinicalRowSource(part, "db", "sample", [{ id: "AGE", name: "Age", per: "patient", numeric: true }]), {}, [], 10, 0), /AS patient, replaceOne\(u\.suid/);
     assert.match(pageSql(mutationRowSource(part, "db", "KRAS", "v7.5"), {}, [], 10, 0), /m\.sid AS sid/);
+    assert.match(pageSql(svRowSource(part, "db", ["ALK"], "v7.5"), {}, [], 10, 0), /s\.sid AS sid/);
     // the alterations view's list and its three tables name one patient and their samples
     assert.match(pageSql(alterationPatientRowSource(part.map((p) => ({ ...p, source: "s" })), "db"), {}, [], 10, 0), /c\.pid AS patient/);
     for (const t of ["mutations", "cna", "sv"] as const)
@@ -480,6 +482,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // germline: carriers, somatic hits and panels stay in CTEs; patients are counted per gene and combination
     "germCarriersSql": () => aggregates.germCarriersSql(cohortSql, "x", "db"),
     "germCountsSql": () => aggregates.germCountsSql(cohortSql, "x", "db", ["BRCA1", "BRCA2"]),
+    // sv: per gene, counts of the cohort's samples profiled for its structural variants and carrying one
+    "svProfiledSql": () => aggregates.svProfiledSql(cohortSql, "x", "db", ["ALK", "ROS1"]),
     "germSurvivalSql": () => aggregates.germSurvivalSql(cohortSql, "x", "db", "BRCA2"),
     "orgIncidenceSql": () => aggregates.orgIncidenceSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }, { genes: ["EGFR"], alteration: "mutation", driverPin: "v7.5" }, true, "CNS/Brain"),
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),
@@ -833,7 +837,7 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     assert.doesNotMatch(read("timeline.ts"), /peerRowsFor\(\w+, "alterations"\)/);
     assert.doesNotMatch(read("alterations.ts"), /peerRowsFor\(\w+, "timeline"\)|patientTimeline/);
     // every other view's rows stay with local patient-level participants
-    for (const f of ["table.ts", "mutations.ts"]) assert.doesNotMatch(read(f), /peerRowsFor|rowHolders\(ctx, "/);
+    for (const f of ["table.ts", "mutations.ts", "sv.ts"]) assert.doesNotMatch(read(f), /peerRowsFor|rowHolders\(ctx, "/);
   });
 
   test("the simulated peer: only this process's own calls are answered as the peer, and one never makes another", async () => {

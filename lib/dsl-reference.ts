@@ -1378,7 +1378,7 @@ study-qualified, a synthetic **Study** track shows each column's origin, and dup
 
 ### Table views: columns, search, filters, sort
 
-Every view that lists rows — \`table\`, \`mutations\` — takes the same four fields, and its result
+Every view that lists rows — \`table\`, \`mutations\`, \`sv\` — takes the same four fields, and its result
 answers them the same way. They are the view's spec, so a shared document reproduces the
 filtered, sorted table; the page is the reader's and is not.
 

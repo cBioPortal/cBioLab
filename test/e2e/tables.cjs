@@ -84,6 +84,43 @@ async function tables({ browser, ok, BASE }) {
     ok("table: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
+  // The Results page's Structural Variants tab (lib/views/sv): shown after Mutations when the queried
+  // patients carry a call in a queried gene, one gene at a time. MSK-IMPACT 2017's counts are the
+  // portal's (/api/structural-variant/fetch: ALK 52 calls, ROS1 45); a query whose genes have none has no tab.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    try {
+      await page.goto(BASE + "/portal/results?study=msk_impact_2017&genes=ALK,ROS1,RET", { waitUntil: "domcontentloaded" });
+      const tab = page.locator("[role=tab]").filter({ hasText: /^Structural Variants$/ }).first();
+      await tab.click({ timeout: 240000 });
+      const tabs = await page.locator("[aria-label='results tabs'] [role=tab]").allInnerTexts();
+      const title = page.locator(".dt-title").first();
+      const rows = async (gene) => {
+        await page.waitForFunction((g) => new RegExp("^[\\d,]+ " + g + " structural variants").test(document.querySelector(".dt-title")?.textContent || "") && !document.querySelector(".dt-wait"),
+          gene, { timeout: 240000 });
+        return Number(/^([\d,]+)/.exec(await title.innerText())[1].replace(/,/g, ""));
+      };
+      const alk = await rows("ALK");
+      ok("results: the Structural Variants tab follows Mutations and lists ALK's calls, as the portal does", tabs[tabs.indexOf("Mutations") + 1] === "Structural Variants" && alk === 52,
+        tabs.join(", ") + " · ALK " + alk);
+      await page.getByRole("tab", { name: "ROS1", exact: true }).click();
+      const ros1 = await rows("ROS1");
+      ok("results: a gene chip lists that gene's structural variants", ros1 === 45, "ROS1 " + ros1);
+      await page.goto(BASE + "/portal/results?study=brca_tcga_pan_can_atlas_2018&genes=KRAS", { waitUntil: "domcontentloaded" });
+      // the check rides on the header's count: once it is shown, the tab is decided
+      await page.getByText(/queried patients altered in the queried genes/).waitFor({ timeout: 240000 });
+      await page.waitForTimeout(500);
+      ok("results: no Structural Variants tab when the queried genes have no call",
+        !(await page.locator("[aria-label='results tabs'] [role=tab]").allInnerTexts()).includes("Structural Variants"));
+    } catch (e) {
+      ok("results: the Structural Variants tab", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("results structural variants: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
 }
 
 module.exports = { tables };

@@ -38,6 +38,12 @@ export interface ResultsData {
   /** one generic-assay profile per kind, each a sub-tab of Comparison/Survival (assayComparisonProfiles) */
   assays?: { label: string; profile: string }[];
   /**
+   * whether the queried patients carry a structural variant with a queried gene as either partner
+   * (svCheckCohort's count), which decides the Structural Variants tab as the portal's
+   * `structuralVariants.result.length` does: undefined while it is asked, null when asking failed
+   */
+  svs?: boolean | null;
+  /**
    * only `held` is known yet: lay out the tabs that need nothing else (Plots, Co-expression and
    * Comparison's Clinical and assay sub-tabs follow once the profiles and attributes are known)
    */
@@ -126,12 +132,33 @@ export function linkMutations(vs: View[], changed: number): View[] {
   return next === lp ? vs : [next as View, tb];
 }
 
+/**
+ * The queried patients with a structural variant in any queried gene (gene 1 or gene 2, as the
+ * portal fetches them): the check behind the Structural Variants tab, sent beside the header's
+ * count of Altered and Queried rather than as a request of its own.
+ */
+export function svCheckCohort(q: ResultsQuery): CohortDef {
+  const scope = q.studies.length === 1 ? { study: q.studies[0] } : { studies: q.studies };
+  return { ...scope, all: [...q.filters, { kind: "oql", q: q.genes.map((g) => g + ": FUSION").join("; ") } as Clause] } as CohortDef;
+}
+
+/** The Structural Variants tab's table and the tab's gene chips, the portal's per-gene sub-tabs: one gene's calls at a time. */
+const svTab = (genes: string[], queried: string[]) => ({
+  title: "Structural Variants",
+  views: [{ title: "Structural variants", view: { kind: "sv", genes: [genes[0]], cohorts: queried } as unknown as View }],
+  chooser: { label: "gene", options: genes, locks: ["genes"],
+    value: (vs: View[]) => String(((vs[0] as unknown as { genes?: string[] }).genes || [genes[0]])[0]),
+    // a new gene starts the table's own query over, as the portal's sub-tab does
+    apply: (vs: View[], g: string) => [{ ...vs[0], genes: [g], sort: undefined, search: undefined, filters: undefined } as View] },
+});
+
 /** The Results page as the portal has it, for this query. */
 export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   const { genes } = q;
   const { cohorts, unchecked } = resultsGroups(q, data.held);
   const partly = data.held.some.filter((t) => q.entries.some((x) => parseOql(x).some((e) => e.specs.some((sp) => OQL_PROFILE[sp.type]?.includes(t)))));
   const multi = q.studies.length > 1;
+  const svHeld = data.held.every.includes("SV") || data.held.some.includes("SV");
   // as cBioPortal does: expression across studies only where its rule allows, and co-expression for one study only
   const expr = data.expr && (!multi || data.expressionAcross) ? data.expr : null;
   const plotY = data.partial ? null : expr ? { source: "profile", profile: expr, gene: genes[0] }
@@ -148,6 +175,9 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       !plotY ? "Plots (no mRNA profile or numeric clinical attribute)" : null,
     ]),
     genes.length < 2 ? "Mutual Exclusivity (one gene)" : null,
+    !svHeld ? "Structural Variants (no structural-variant data)"
+      : data.svs === false ? "Structural Variants (no structural variant in the queried genes)"
+      : data.svs === null ? "Structural Variants (could not check for structural variants in the queried genes)" : null,
     unchecked.length ? "Unaltered includes patients without data for " + unchecked.join(", ") + ", which cannot be checked for profiling" : null,
     partly.length ? "Unaltered is not checked for " + partly.map((t) => TYPE_WORD[t]).join(" or ") + " profiling, which only some of the selected studies hold" : null,
   ].filter(Boolean) as string[];
@@ -166,6 +196,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
         // a new gene keeps the grid's selection (it is about classes, not this gene) and starts the table's own query over
         apply: (vs: View[], g: string) => linkMutations([{ ...vs[0], genes: [g], codons: undefined } as View, { ...vs[1], gene: g, sort: undefined, search: undefined, filters: undefined } as View], 0) },
       link: linkMutations },
+    ...(svHeld && data.svs ? [svTab(genes, queried)] : []),
     ...(expr && !multi ? [{ title: "Co-expression", views: [v("Co-expression with " + genes[0], { kind: "correlates", gene: genes[0], profileType: expr, cohorts: queried })] }] : []),
     { title: "Comparison/Survival", sub: [
       { title: "Overlap", views: [v("Overlap", { kind: "overlap", cohorts: both })] },
@@ -176,5 +207,5 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       ...(data.assays || []).map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile, cohorts: both })] }))
     ] },
     { title: "CN Segments", views: [v("Genome-wide copy number", { kind: "genome", cohorts: queried })] }
-  ], left, { partial: data.partial });
+  ], left, { partial: data.partial || (svHeld && data.svs === undefined) });
 }

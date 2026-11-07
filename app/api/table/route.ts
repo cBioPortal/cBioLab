@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     (v.kind === "table" ? "clinical_" + v.table.unit + "s" : v.kind === "timeline" ? "timeline_patients"
       : v.kind === "alterations" ? (table && v.alterations?.patient ? v.alterations.patient.id + "_" + table : "alterations_patients")
       : v.kind === "evolution" ? (table && v.evolution?.patient ? v.evolution.patient.id + "_evolution_" + table : "evolution_patients")
-      : v.kind === "mutations" ? v.mutations.gene + "_mutations" : v.kind) + (filtered ? "_filtered" : "") + ".csv";
+      : v.kind === "mutations" ? v.mutations.gene + "_mutations" : v.kind === "sv" ? v.sv.genes.join("-") + "_structural_variants" : v.kind) + (filtered ? "_filtered" : "") + ".csv";
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {

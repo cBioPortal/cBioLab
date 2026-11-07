@@ -3,7 +3,7 @@
 // expression tabs follow cBioPortal's cross-study rule.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resultsGroups, resultsLayout, linkMutations } from "../app/portal/results-layout.ts";
+import { resultsGroups, resultsLayout, linkMutations, svCheckCohort } from "../app/portal/results-layout.ts";
 import type { View } from "../lib/types.ts";
 
 const ALL3 = { every: ["MUTATION", "CNA", "SV"] as const, some: [] as never[] };
@@ -81,7 +81,7 @@ test("a study's mutational signatures compare on single-base contributions first
 });
 
 test("before the profiles are known, the page lays out the tabs that need nothing else, under the same names", () => {
-  const full = resultsLayout(q(["a"], ["KRAS", "TP53"]), data());
+  const full = resultsLayout(q(["a"], ["KRAS", "TP53"]), data({ svs: false }));
   const first = resultsLayout(q(["a"], ["KRAS", "TP53"]), data({ expr: null, cna: null, clinical: [], numeric: [], partial: true }));
   assert.equal(first.partial, true);
   assert.equal(full.partial, undefined);
@@ -107,4 +107,35 @@ test("the Mutations tab: stems selected on the lollipop filter the table to thos
   assert.equal(c(linkMutations([{ ...lp, codons: { KRAS: [12] } } as View, tb], 1)), undefined);
   // a range on the column is not a set of codons: the plot keeps its selection
   assert.deepEqual(c(linkMutations([{ ...lp, codons: { KRAS: [12] } } as View, { ...tb, filters: { proteinPos: { min: 10, max: 20 } } } as View], 1)), { KRAS: [12] });
+});
+
+test("the Structural Variants tab: shown after Mutations once the queried patients are known to carry a call, one gene at a time", () => {
+  const Q = q(["a"], ["ALK", "ROS1: FUSION"]);
+  // asked: the page is not whole yet, and says nothing of the tab
+  const asking = resultsLayout(Q, data());
+  assert.equal(asking.partial, true);
+  assert.ok(!titles(asking).includes("Structural Variants") && !asking.left.some((l) => /Structural Variants/.test(l)));
+  // none: left out, and said so; no data: likewise; a failed check is named as one
+  assert.ok(resultsLayout(Q, data({ svs: false })).left.includes("Structural Variants (no structural variant in the queried genes)"));
+  assert.equal(resultsLayout(Q, data({ svs: false })).partial, undefined);
+  assert.ok(resultsLayout(Q, data({ held: { every: ["MUTATION"], some: [] } })).left.includes("Structural Variants (no structural-variant data)"));
+  assert.equal(resultsLayout(Q, data({ held: { every: ["MUTATION"], some: [] } })).partial, undefined, "a study without structural variants waits for nothing");
+  assert.ok(resultsLayout(Q, data({ svs: null })).left.some((l) => /could not check/.test(l)));
+  // some: right after Mutations, the queried patients, the first gene, chips over every gene
+  const l = resultsLayout(Q, data({ svs: true }));
+  assert.equal(titles(l)[titles(l).indexOf("Mutations") + 1], "Structural Variants");
+  const tab = l.tabs.find((t) => t.title === "Structural Variants")!;
+  const sv = l.doc.views![tab.views![0]] as any;
+  assert.deepEqual([sv.kind, sv.genes, sv.cohorts], ["sv", ["ALK"], ["Queried"]]);
+  assert.deepEqual(tab.chooser!.options, ["ALK", "ROS1"]);
+  assert.equal(tab.chooser!.value([sv]), "ALK");
+  const next = tab.chooser!.apply([{ ...sv, sort: { column: "gene2" }, search: "EML4" }], "ROS1")[0] as any;
+  assert.deepEqual([next.genes, next.sort, next.search], [["ROS1"], undefined, undefined], "a new gene starts the table's query over");
+  assert.equal(tab.chooser!.value([{ ...sv, genes: undefined }]), "ALK");
+});
+
+test("the Structural Variants check: the queried patients, with Explore's filters, with a call in any queried gene", () => {
+  const F = { kind: "clinical", attribute: "SEX", values: ["Female"] };
+  assert.deepEqual(svCheckCohort(q(["a"], ["ALK", "RET: MUT"], [F])), { study: "a", all: [F, { kind: "oql", q: "ALK: FUSION; RET: FUSION" }] });
+  assert.deepEqual((svCheckCohort(q(["a", "b"], ["ALK"])) as any).studies, ["a", "b"]);
 });

@@ -1,0 +1,43 @@
+Analysis over msk_impact_2017 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- MSK-IMPACT: 10,336 patients — all samples in the study
+
+Structural variants of ALK, ROS1, RET: 131 rows; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	sample	cancerType	gene1	gene2	annotation	connectionType	eventInfo	class
+  MSK-IMPACT	P-0008322-T01-IM5	Lung Adenocarcinoma	ALK			3to3	ALK-LOC1720 Fusion	INVERSION
+  MSK-IMPACT	P-0000058-T01-IM3	Breast Invasive Ductal Carcinoma	ALK	DDX11L2		5to5	ALK-DDX11L2 Fusion	INVERSION
+  MSK-IMPACT	P-0006776-T01-IM5	Lung Adenocarcinoma	ALK	DYSF		5to3	Antisense fusion	DUPLICATION
+  MSK-IMPACT	P-0000474-T01-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0000557-T01-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0000732-T01-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0001532-T01-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0001811-T01-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0002024-T01-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0002217-T02-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0002266-T01-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0002408-T01-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0002408-T02-IM5	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0002613-T01-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0003206-T01-IM5	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: mid-exon (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0003297-T01-IM5	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0003323-T01-IM5	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0003383-T01-IM5	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0003446-T01-IM5	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0003913-T01-IM3	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0004218-T01-IM5	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0005305-T01-IM5	Sarcomatoid Carcinoma of the Lung	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0005321-T01-IM5	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0005786-T01-IM5	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  MSK-IMPACT	P-0006313-T01-IM5	Lung Adenocarcinoma	ALK	EML4		3to3	Protein fusion: in frame (EML4-ALK)	INVERSION
+  … 106 more rows
+  CAVEAT (tell the user): Every structural variant in the cohort's samples whose gene 1 or gene 2 is one of ALK, ROS1, RET, one row per call as the portal lists them (a patient with several samples carrying the same event has a row for each; a call between two of the genes is listed once). Profiling, panel-aware — ALK: 52 samples with a call, 10,945 of 10,945 profiled; ROS1: 43 samples with a call, 10,945 of 10,945 profiled; RET: 31 samples with a call, 10,945 of 10,945 profiled. A sample not profiled for a gene's structural variants has no row and is not counted as without one. Annotation is OncoKB v7.5's gene-level fusion call (its 'Fusion' entry) for the stronger of the two partners, where its store holds one — not the portal's per-pair fusion annotation; a blank means no call for either gene. Genes 1 and 2 are as the study records the breakpoints (site 1, site 2), not reordered. 131 structural variants. Sorted drivers first, then by gene 1, then gene 2 across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
+  METHOD:
+    - Count the structural variants of ALK, ROS1, RET per cohort and study: The sv:counts query above: every call in the study's structural-variant profile, in each cohort's samples, whose gene 1 or gene 2 is one of ALK, ROS1, RET (matched by Entrez id, as the portal asks), once however many of them it involves, with the sample's CANCER_TYPE_DETAILED where recorded and the stronger of the two partners' OncoKB v7.5 fusion calls.
+        MSK-IMPACT · msk_impact_2017: 131
+    - Sort them together and take one page: The sv:rows query above: the structural variants of ALK, ROS1, RET of every cohort and study combined in one query, sorted drivers first, then by gene 1, then gene 2, then sample, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset.
+    - Count the samples profiled for each gene's structural variants: The sv:profiled query above, per cohort and study: the cohort's samples; those whose structural-variant panel lists the gene (or is whole-exome); those with a call involving it; and of those, the profiled. A sample not profiled contributes no row and is not read as having none.
+        MSK-IMPACT · msk_impact_2017 · ALK: 52 with a call · 10945 profiled · 10945 samples
+        MSK-IMPACT · msk_impact_2017 · ROS1: 43 with a call · 10945 profiled · 10945 samples
+        MSK-IMPACT · msk_impact_2017 · RET: 31 with a call · 10945 profiled · 10945 samples
+    A listing and the counts its caveat names: no statistic is computed, so there is no script — the queries are the numbers.
