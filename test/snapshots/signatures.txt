@@ -1,0 +1,54 @@
+Analysis over pancan_pcawg_2020 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- Melanoma: 107 patients — CANCER_TYPE in [Melanoma]
+
+Mutational signatures — patients to choose from (with signature values): 107; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	patient	samples	profiled	types
+  Melanoma	DO220841	1	1	DBS, ID, SBS
+  Melanoma	DO220842	1	1	DBS, ID, SBS
+  Melanoma	DO220843	1	1	DBS, ID, SBS
+  Melanoma	DO220844	1	1	DBS, ID, SBS
+  Melanoma	DO220845	1	1	DBS, ID, SBS
+  Melanoma	DO220846	1	1	DBS, ID, SBS
+  Melanoma	DO220847	1	1	DBS, ID, SBS
+  Melanoma	DO220848	1	1	DBS, ID, SBS
+  Melanoma	DO220849	1	1	DBS, ID, SBS
+  Melanoma	DO220850	1	1	DBS, ID, SBS
+  Melanoma	DO220851	1	1	DBS, ID, SBS
+  Melanoma	DO220852	1	1	DBS, ID, SBS
+  Melanoma	DO220853	1	1	DBS, ID, SBS
+  Melanoma	DO220855	1	1	DBS, ID, SBS
+  Melanoma	DO220857	1	1	DBS, ID, SBS
+  Melanoma	DO220858	1	1	DBS, ID, SBS
+  Melanoma	DO220859	1	1	DBS, ID, SBS
+  Melanoma	DO220860	1	1	DBS, ID, SBS
+  Melanoma	DO220861	1	1	DBS, ID, SBS
+  Melanoma	DO220862	1	1	DBS, ID, SBS
+  Melanoma	DO220863	1	1	DBS, ID, SBS
+  Melanoma	DO220864	1	1	DBS, ID, SBS
+  Melanoma	DO220865	1	1	DBS, ID, SBS
+  Melanoma	DO220866	1	1	DBS, ID, SBS
+  Melanoma	DO220867	1	1	DBS, ID, SBS
+  … 82 more rows
+DO220875 (pancan_pcawg_2020); Single base substitutions (SBS) from mutational_signatures_contribution_SBS; types with values: DBS, ID, SBS
+Contribution by sample (SP124409):
+  SBS7a: 90%
+  SBS7b (UV): 6%
+  SBS7c: 2%
+  SBS7d (UV): 2%
+  … 61 more signatures at 0 (or NA) in every sample
+SP124409's spectrum: 1,566 mutations in 96 channels; largest: T[C>T]C 422 (26.9%), T[C>T]G 199 (12.7%), T[C>T]A 197 (12.6%), C[C>T]C 150 (9.6%), C[C>T]A 110 (7.0%), T[C>T]T 95 (6.1%), C[C>T]T 85 (5.4%), C[C>T]G 46 (2.9%), A[C>T]C 38 (2.4%), G[C>T]C 38 (2.4%), G[C>T]T 27 (1.7%), G[T>C]T 11 (0.7%)
+  CAVEAT (tell the user): DO220875: Single base substitutions (SBS) from mutational_signatures_contribution_SBS, 1 sample profiled. The patient also has DBS, ID signatures. A contribution is the share of the sample's mutations the study's signature fitting assigned to the signature, as stored; a missing value is NA, not 0. This study records no p-value profile for SBS (mutational_signatures_pvalue_SBS), so no signature is marked significant. SP124409's spectrum: 1,566 single base substitutions counted in 96 channels, drawn as each channel's share of them; the counts may include silent and non-coding mutations not shown elsewhere. The patient list holds the cohort's patients with mutational-signature values: 107 patients. Sorted with the most profiled samples first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
+  METHOD:
+    - Count the patients per cohort and study: The signatures:counts query above: every patient of each cohort with a numeric value in one of the study's mutational-signature contribution profiles, with their sample count, how many of those samples have a value, and the signature types they have values in.
+        Melanoma · pancan_pcawg_2020: 107
+    - Sort them together and take one page: The signatures:rows query above: the patients of every cohort and study combined in one query, sorted most profiled samples first, then by patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset.
+    - Read DO220875's samples and signature values: signatures:samples (the patient's samples, numbered in sample order) and signatures:values: every entity of each of the study's mutational-signature profiles with the patient's value in each sample, and the entity's name, description and link. The table lists mutational_signatures_contribution_SBS as stored (a value that is not a number is NA).
+        type: SBS
+        profiled samples: SP124409
+        signatures with a value: 65
+    - SP124409's spectrum: Each channel's count in mutational_signatures_counts_SBS for SP124409, and its share of the sample's total over every channel, in percent.
+        total: 1,566
+        channels: 96
+    The contributions are listed as the study stores them; the spectrum's shares are each channel's count over the sample's total, which the script recomputes.

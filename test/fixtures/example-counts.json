@@ -341,6 +341,9 @@
     "A glioma's mutations across four samples over three and a half years": {
       "Glioma": 42
     },
+    "A melanoma's mutational signatures: UV light behind nine in ten of its mutations": {
+      "Melanoma": 107
+    },
     "KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first": {
       "Colorectal": 5543
     },
