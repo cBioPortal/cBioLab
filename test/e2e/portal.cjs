@@ -168,6 +168,46 @@ async function portal({ browser, ok, BASE }) {
     ok("comparison: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
+  // The Comparison page's expression tabs, as the portal's: mRNA, Protein and DNA methylation, each a
+  // diffexpr view on the profile the portal picks, for two groups; with three, none, and the page says why.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const er = (v) => ({ all: [{ kind: "clinical", attribute: "ER_STATUS_BY_IHC", values: [v] }] });
+    const link = (cohorts, tab) => BASE + "/portal/comparison?doc=" + Buffer.from(JSON.stringify({ study: "brca_tcga", views: [], cohorts })).toString("base64url") +
+      (tab ? "&tab=" + encodeURIComponent(tab) : "");
+    const settled = async () => {
+      await page.locator(".viewcard").first().waitFor({ timeout: 240000 });
+      await page.waitForFunction(() => !document.querySelector(".viewcard[aria-busy]"), null, { timeout: 240000 });
+      return page.locator(".viewcard").first().innerText();
+    };
+    try {
+      await page.goto(link({ "ER+": er("Positive"), "ER-": er("Negative") }, "Protein"), { waitUntil: "domcontentloaded" });
+      const protein = await settled();
+      const titles = await page.getByRole("tab").allInnerTexts();
+      await page.getByRole("tab", { name: "DNA methylation" }).click();
+      await page.waitForFunction(() => /methylation_hm450/.test(document.querySelector(".viewcard")?.innerText || ""), null, { timeout: 240000 });
+      const methylation = await settled();
+      ok("comparison: Protein and DNA methylation tabs compare two groups on the portal's profiles",
+        ["mRNA", "Protein", "DNA methylation"].every((t) => titles.includes(t)) &&
+          /protein_quantification/.test(protein) && /10,509 genes/.test(protein) && /16,133 genes/.test(methylation),
+        titles.join(" | ") + " — " + (protein.match(/[\d,]+ genes[^\n]*/) || [""])[0] + " / " + (methylation.match(/[\d,]+ genes[^\n]*/) || [""])[0]);
+      await page.goto(link({ "ER+": er("Positive"), "ER-": er("Negative"), "ER indeterminate": er("Indeterminate") }), { waitUntil: "domcontentloaded" });
+      await page.locator(".leftout").waitFor({ timeout: 240000 });
+      const three = await page.getByRole("tab").allInnerTexts();
+      await page.locator(".leftout").click();
+      const said = await page.getByRole("dialog").innerText();
+      ok("comparison: with three groups the expression tabs are left out, saying why",
+        !three.some((t) => /mRNA|Protein|methylation/.test(t)) && ["mRNA", "Protein", "DNA methylation"].every((t) => said.includes(t + " (compares exactly two groups, and 3 are compared")),
+        three.join(" | ") + " — " + said.replace(/\s+/g, " ").slice(0, 300));
+    } catch (e) {
+      ok("comparison: expression tabs", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("comparison expression tabs: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
   // "Open in cBioPortal": the same page and tab on the legacy portal, following the open tab; on the
   // Comparison page, which needs a portal session, disabled and saying why.
   {
