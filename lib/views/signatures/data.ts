@@ -4,6 +4,7 @@
 // shared/lib/GenericAssayUtils/MutationalSignaturesUtils.tsx, PatientViewPageStore.ts
 // (mutationalSignatureDataGroupByVersion) and MutationalSignatureBarChartUtils.ts. Browser-safe.
 import type { SignatureRow, SpectrumChannel } from "./types.ts";
+import { STYLE, type Style } from "../../oncoprint-style.ts";
 
 /**
  * A mutational-signature profile type as cBioPortal names it (MutationalSignaturesUtils.tsx): what it
@@ -140,4 +141,98 @@ export function spectrumOf(rows: { entity: string; name: string; vals: Map<strin
     return [{ ch: { entity: r.entity, label, group: c.group, count }, key: c.key }];
   }).sort((a, b) => cmpKey(a.key, b.key));
   return { total: ch.reduce((n, x) => n + x.ch.count, 0), channels: ch.map((x) => x.ch) };
+}
+
+// ---- the spectrum chart as the portal draws it (MutationalSignatureBarChart.tsx, MutationalSignaturesContainer.tsx)
+
+/** the header's name for a type's mutations, as the portal writes it before "count:" */
+export function countLabel(v: string): string {
+  return v === "SBS" ? "Single Base Substitution (SBS)" : v === "DBS" ? "Double Base Substitution (DBS)" : v === "ID" ? "Small insertions and deletions (ID)" : v;
+}
+/** the spectrum's y-axis title, as the portal's (updateYaxisLabel) */
+export function spectrumAxisTitle(v: string, scale: "percent" | "count"): string {
+  return (v === "SBS" ? "Single Base Substitution" : v === "DBS" ? "Double Base Substitutions" : "Indels") + (scale === "percent" ? " (%)" : " (#)");
+}
+/** the type selector's option text, as the portal's getVersionOption */
+export const typeOption = (v: string) => "Mutational Signature " + v.toUpperCase();
+/** the header's info tip, the portal's words */
+export const COUNT_TIP = "Mutation count may include silent, noncoding and other types of mutations that may not be shown elsewhere in cBioPortal.";
+/** the line above the signature table, the portal's words */
+export const ROW_CLICK_HINT = "Click on a mutational signature to update reference plot";
+
+/** a channel's colour, the portal's (STYLE.signatures) */
+export function channelColor(label: string, S: Style = STYLE): string {
+  const c = S.signatures;
+  let m = /^[ACGT]\[([CT]>[ACGT])\][ACGT]$/.exec(label);
+  if (m) return c.sbs[m[1]] ?? c.unknown;
+  m = /^([ACGT]{2})>[ACGT]{2}$/.exec(label);
+  if (m) return c.dbs[m[1]] ?? c.unknown;
+  m = /^(\d+):(Del|Ins):([CTRM]):\d+$/.exec(label);
+  if (m) return c.id[Math.min(5, Number(m[1])) + ":" + m[2] + ":" + m[3]] ?? c.unknown;
+  return c.unknown;
+}
+
+/**
+ * A channel's label under the bars, and which of its letters is drawn in its class's colour: SBS the
+ * trinucleotide with the mutated (middle) base coloured (A[C>A]A → ACA, the C); DBS the dinucleotide
+ * it becomes (AC>CA → CA); ID the repeat or homopolymer count on COSMIC's scale — a deletion's count
+ * from 1 (the stored 0 is 1, 5 is 6+), an insertion's and a microhomology's from 0 (5 is 5+).
+ */
+export function channelTick(label: string): { text: string; colored: number | null } {
+  let m = /^([ACGT])\[([CT])>[ACGT]\]([ACGT])$/.exec(label);
+  if (m) return { text: m[1] + m[2] + m[3], colored: 1 };
+  m = /^[ACGT]{2}>([ACGT]{2})$/.exec(label);
+  if (m) return { text: m[1], colored: null };
+  m = /^\d+:(Del|Ins):([CTRM]):(\d+)$/.exec(label);
+  if (m) {
+    const n = Number(m[3]);
+    const text = m[1] === "Del" && m[2] !== "M" ? (n >= 5 ? "6+" : String(n + 1)) : n >= 5 ? "5+" : String(n);
+    return { text, colored: null };
+  }
+  return { text: label, colored: null };
+}
+
+/**
+ * An indel channel's sub-class, the coloured box it sits in under its class: the base of a 1bp
+ * indel (C, T), else the indel's length (2, 3, 4, 5+); and the axis title under that class's boxes,
+ * the portal's words. null for SBS and DBS channels.
+ */
+export function indelBox(label: string): { box: string; title: string } | null {
+  const m = /^(\d+):(Del|Ins):([CTRM]):\d+$/.exec(label);
+  if (!m) return null;
+  const len = Number(m[1]);
+  return { box: len === 1 ? m[3] : len >= 5 ? "5+" : String(len),
+    title: m[3] === "M" ? "Microhomology" : len === 1 ? "Homopolymer length" : "Number of repeat units" };
+}
+
+/** the Y-axis Max slider: a whole percent from 1 to 100, 100 drawing the whole axis */
+export const YMAX_MIN = 1, YMAX_MAX = 100;
+
+/**
+ * The spectrum's axis maximum in percent for the slider's value, as the portal's domainMaxPercentage:
+ * 1 at or under 1, 80 between 80 and 100, else up to the next multiple of 20.
+ */
+export function percentAxisMax(ymax: number): number {
+  let perc = ymax;
+  if (perc < 100 && perc > 80) perc = 80;
+  return perc <= 1 ? 1 : Math.ceil(perc / 20) * 20 || 100;
+}
+/** the count axis's maximum: the largest channel's count scaled by the slider's share, up to a multiple of 10 (10 when every channel is 0) */
+export function countAxisMax(largest: number, ymax: number): number {
+  return largest !== 0 ? Math.ceil((largest * percentAxisMax(ymax)) / 100 / 10) * 10 : 10;
+}
+/** the reference's axis maximum, always in percent: the slider's value up to a multiple of 10 on the percent scale, 100 on the count scale */
+export function referenceAxisMax(scale: "percent" | "count", ymax: number): number {
+  return scale === "percent" ? Math.ceil(ymax / 10) * 10 : 100;
+}
+/** a spectrum tick, the portal's: whole numbers only; the top one "≥" when bars may run past it (not 100 on the percent axis) */
+export function spectrumTick(v: number, max: number, scale: "percent" | "count"): string {
+  if (!Number.isInteger(v)) return "";
+  if (v >= max) return scale === "percent" && v === 100 ? "100" : ">=" + v;
+  return String(v);
+}
+/** a reference tick: whole percents; the bottom one "≥" below 100 */
+export function referenceTick(v: number, max: number): string {
+  if (!Number.isInteger(v)) return "";
+  return (v >= max && v < 100 ? ">=" : "") + v + "%";
 }

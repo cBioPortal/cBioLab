@@ -1,11 +1,13 @@
-// Signatures figure: one patient's mutational signatures — each signature's contribution in each
-// profiled sample as horizontal bars (a bar per sample, in sample order), and, where the study has
-// the counts profile, one sample's mutational spectrum as a bar per channel grouped by class (the
-// portal's Mutational Signatures tab). Browser-safe; laid out with lib/chart through lib/svg-kit.ts.
+// Signatures figure: one patient's mutational signatures — where the study has the counts profile,
+// one sample's mutational spectrum drawn as the portal's Mutational Signatures tab draws it (class
+// bands, a bar per channel in its class's colour, coloured channel labels, and a chosen signature's
+// COSMIC reference profile mirrored underneath); then each signature's contribution in each profiled
+// sample as horizontal bars (a bar per sample, in sample order). Browser-safe; laid out with lib/chart through lib/svg-kit.ts.
 import type { DrawnResultOf } from "../../types.ts";
-import { palette, frame, caption, label, textWidth, legend, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, bandLabels,
-  seriesStyle, textOn, fmtInt, esc, FS, SW, r1, type SvgOpts } from "../../svg-kit.ts";
-import { SIGNIFICANT_P, pctText, spectrumUnit, versionLabel } from "./data.ts";
+import { palette, frame, caption, label, textWidth, legend, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight,
+  seriesStyle, textOn, fmtInt, esc, FS, SW, r1, type Scale, type SvgOpts } from "../../svg-kit.ts";
+import { SIGNIFICANT_P, YMAX_MAX, channelColor, channelTick, countAxisMax, countLabel, indelBox, pctText, percentAxisMax, referenceAxisMax, referenceTick,
+  spectrumAxisTitle, spectrumTick, spectrumUnit, versionLabel } from "./data.ts";
 import type { SignaturesResult } from "./types.ts";
 
 type Pal = ReturnType<typeof palette>;
@@ -60,45 +62,119 @@ function contributions(s: SignaturesResult, W: number, y0: number, p: Pal): { sv
   return { svg: out.join(""), y, left: rows.length - drawn.length };
 }
 
-/** One sample's spectrum: a bar per channel, coloured and labelled by class. */
-function spectrumChart(s: SignaturesResult, W: number, y0: number, p: Pal): { svg: string; y: number } {
-  const sp = s.spectrum!, pct = s.scale === "percent";
-  const out: string[] = [];
-  let y = y0;
-  out.push(label(PAD, y + FS.title, sp.sample + "'s mutational spectrum — " + fmtInt(sp.total) + " " + spectrumUnit(s.version || ""), { size: FS.title, weight: 600, fill: p.ink, maxW: W - 2 * PAD }));
-  y += FS.title + 10;
-  const val = (c: { count: number }) => pct ? (sp.total ? 100 * c.count / sp.total : 0) : c.count;
-  // a count axis keeps whole-number ticks: at least 0 to 5
-  const max = Math.max(...sp.channels.map(val), pct ? 1 : 5);
-  const H = 180, stripH = FS.small + 6;
-  const groups: { name: string; from: number; to: number }[] = [];
-  sp.channels.forEach((c, i) => { const g = groups[groups.length - 1]; if (g && g.name === c.group) g.to = i; else groups.push({ name: c.group, from: i, to: i }); });
-  const plotTop = y + stripH + 4;
-  const ys = linear(0, max, plotTop + H, plotTop);
-  const yTitle = pct ? "% of " + spectrumUnit(s.version || "") : "Mutations";
-  const L = PAD + leftAxisWidth(ys, yTitle, (t) => ys.fmt(t)), R = W - PAD;
-  const band = (R - L) / Math.max(1, sp.channels.length);
-  const colorOf = new Map(groups.map((g, i) => [g.name, seriesStyle(i)]));
-  out.push(axisLeft(ys, L, p, { title: yTitle, gridTo: R }));
-  groups.forEach((g) => {
-    const st = colorOf.get(g.name)!;
-    const x0 = L + g.from * band, x1 = L + (g.to + 1) * band;
-    out.push(`<rect x="${r1(x0 + 0.5)}" y="${r1(y)}" width="${r1(Math.max(1, x1 - x0 - 1))}" height="${stripH}" fill="${st.color}" fill-opacity="${st.tint}"/>`);
-    if (textWidth(g.name, FS.small) < x1 - x0 - 4) out.push(label((x0 + x1) / 2, y + stripH - 4, g.name, { size: FS.small, fill: st.tint < 1 ? p.ink : textOn(st.color), anchor: "middle", weight: 600 }));
-  });
-  sp.channels.forEach((c, i) => {
-    const st = colorOf.get(c.group)!, v = val(c);
-    const x = L + i * band + band * 0.1, w = Math.max(0.5, band * 0.8);
-    const tip = c.label + ": " + fmtInt(c.count) + " of " + fmtInt(sp.total) + " (" + (sp.total ? (100 * c.count / sp.total).toFixed(1) : "0") + "%)";
-    out.push(`<rect x="${r1(x)}" y="${r1(ys(v))}" width="${r1(w)}" height="${r1(Math.max(0, ys(0) - ys(v)))}" fill="${st.color}" fill-opacity="${st.tint}"><title>${esc(tip)}</title></rect>`);
-  });
-  out.push(`<line x1="${L}" y1="${r1(ys(0))}" x2="${R}" y2="${r1(ys(0))}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
-  const bl = bandLabels(sp.channels.map((c) => c.label), sp.channels.map((_, i) => L + (i + 0.5) * band), band, ys(0) + 2, p, { maxH: 60, minX: 0 });
-  out.push(bl.svg);
-  return { svg: out.join(""), y: ys(0) + 2 + bl.height + 6 };
+/** a scale with a tick at the end of its domain too, as the portal rounds its axes so the "≥" label always has one */
+function withTop(s: Scale): Scale {
+  const end = s.domain[1];
+  if (s.ticks.includes(end)) return s;
+  // a regular tick too close to the end would print over its label
+  const keep = s.ticks.filter((t) => end - t >= 0.1 * (end - s.domain[0]));
+  s.ticks.splice(0, s.ticks.length, ...keep, end);
+  return s;
 }
 
-export function signaturesSvg(v: DrawnResultOf<"signatures">, o: SvgOpts & { caption?: boolean } = {}): string | null {
+/**
+ * One sample's spectrum as the portal draws it: a coloured band per class above the bars, a bar per
+ * channel in its class's colour on a fixed axis (0–100% or the counts, cut at the Y-axis Max), the
+ * channels' labels under it with the mutated base coloured, and — once a signature is chosen — that
+ * signature's COSMIC reference profile drawn downward beneath, on its own percent axis.
+ */
+function spectrumChart(s: SignaturesResult, W: number, y0: number, p: Pal, head: boolean): { svg: string; y: number } {
+  const sp = s.spectrum!, pct = s.scale === "percent", ver = s.version || "";
+  const out: string[] = [];
+  let y = y0;
+  if (head) {
+    out.push(label(PAD, y + FS.title, "Sample: " + sp.sample + " | " + countLabel(ver) + " count: " + sp.total, { size: FS.title, weight: 600, fill: p.ink, maxW: W - 2 * PAD }));
+    y += FS.title + 10;
+  }
+  const val = (c: { count: number }) => pct ? (sp.total ? 100 * c.count / sp.total : 0) : c.count;
+  const max = pct ? percentAxisMax(s.ymax) : countAxisMax(Math.max(0, ...sp.channels.map((c) => c.count)), s.ymax);
+  const H = 220;
+  const yTitle = spectrumAxisTitle(ver, s.scale);
+  const fmtTop = (t: number) => spectrumTick(t, max, s.scale);
+  const ref = s.reference, refMax = referenceAxisMax(s.scale, s.ymax);
+  const refTitle = ref ? ["COSMIC Reference", ref.signature + " (%)"] : [];
+  const fmtRef = (t: number) => referenceTick(t, refMax);
+  const probeTop = linear(0, max, H, 0, { nice: false }), probeRef = linear(0, refMax, 0, H, { nice: false });
+  const L = PAD + Math.max(leftAxisWidth(probeTop, yTitle, fmtTop), ref ? leftAxisWidth(probeRef, "x", fmtRef) + FS.body + 2 : 0), R = W - PAD;
+  const n = Math.max(1, sp.channels.length), band = (R - L) / n;
+  const cx = (i: number) => L + (i + 0.5) * band;
+  const barW = Math.max(1, band * 0.45);
+  const colors = sp.channels.map((c) => channelColor(c.label));
+  // the class bands: a box per class (per class and sub-class for ID), the class's name above
+  const runs = (key: (i: number) => string) => {
+    const r: { key: string; from: number; to: number }[] = [];
+    sp.channels.forEach((_, i) => { const k = key(i), g = r[r.length - 1]; if (g && g.key === k) g.to = i; else r.push({ key: k, from: i, to: i }); });
+    return r;
+  };
+  const groups = runs((i) => sp.channels[i].group);
+  const boxes = runs((i) => sp.channels[i].group + "|" + (indelBox(sp.channels[i].label)?.box ?? ""));
+  const isId = sp.channels.some((c) => indelBox(c.label));
+  const stripH = FS.body + 8;
+  const boxSvg = (yy: number, withText: boolean) => boxes.map((b) => {
+    const x0 = L + b.from * band + 0.5, x1 = L + (b.to + 1) * band - 0.5, sub = indelBox(sp.channels[b.from].label)?.box;
+    return `<rect x="${r1(x0)}" y="${r1(yy)}" width="${r1(Math.max(1, x1 - x0))}" height="${stripH}" fill="${colors[b.from]}"/>` +
+      (withText && sub && textWidth(sub, FS.small) < x1 - x0 ? label((x0 + x1) / 2, yy + stripH / 2 + FS.small * 0.35, sub, { size: FS.small, weight: 700, fill: textOn(colors[b.from]), anchor: "middle" }) : "");
+  }).join("");
+  groups.forEach((g) => {
+    const x0 = L + g.from * band, x1 = L + (g.to + 1) * band;
+    out.push(label((x0 + x1) / 2, y + FS.body, g.key, { size: FS.body, weight: 700, fill: p.ink, anchor: "middle", maxW: x1 - x0 }));
+  });
+  y += FS.body + 4;
+  out.push(boxSvg(y, true));
+  y += stripH + 10;
+  // the sample's bars
+  const ys = withTop(linear(0, max, y + H, y, { nice: false }));
+  out.push(axisLeft(ys, L, p, { title: yTitle, gridTo: R, fmt: fmtTop, line: true }));
+  sp.channels.forEach((c, i) => {
+    const v = Math.min(val(c), max);
+    const tip = c.label + ": " + fmtInt(c.count) + " of " + fmtInt(sp.total) + " " + spectrumUnit(ver) + " (" + (sp.total ? (100 * c.count / sp.total).toFixed(1) : "0") + "%)" + (val(c) > max ? ", past the axis" : "");
+    out.push(`<rect x="${r1(cx(i) - barW / 2)}" y="${r1(ys(v))}" width="${r1(barW)}" height="${r1(Math.max(0, ys(0) - ys(v)))}" fill="${colors[i]}"><title>${esc(tip)}</title></rect>`);
+  });
+  y = ys(0) + 4;
+  // the channels' labels: SBS's mutated base in its class's colour, read upward; ID's counts level
+  const ticks = sp.channels.map((c) => channelTick(c.label));
+  if (isId) {
+    ticks.forEach((t, i) => out.push(label(cx(i), y + FS.small, t.text, { size: FS.small, fill: p.ink, anchor: "middle" })));
+    y += FS.small + 6;
+    out.push(boxSvg(y, false));
+    y += stripH + 2;
+    groups.forEach((g) => {
+      const x0 = L + g.from * band, x1 = L + (g.to + 1) * band;
+      out.push(label((x0 + x1) / 2, y + FS.body, indelBox(sp.channels[g.from].label)!.title, { size: FS.body, weight: 700, fill: p.ink, anchor: "middle", maxW: x1 - x0 }));
+    });
+    y += FS.body + 14;
+  } else {
+    const tickH = Math.max(...ticks.map((t) => textWidth(t.text, FS.small))) + 2;
+    const by = y + tickH;
+    ticks.forEach((t, i) => {
+      const x = r1(cx(i));
+      const body = t.colored == null ? esc(t.text)
+        : esc(t.text.slice(0, t.colored)) + `<tspan fill="${colors[i]}">${esc(t.text.charAt(t.colored))}</tspan>` + esc(t.text.slice(t.colored + 1));
+      out.push(`<text x="${x}" y="${r1(by)}" font-size="${FS.small}" fill="${p.ink}" dominant-baseline="middle" transform="rotate(-90 ${x} ${r1(by)})">${body}</text>`);
+    });
+    y = by + 6;
+  }
+  if (ref) {
+    const rs = withTop(linear(0, refMax, y, y + H, { nice: false }));
+    out.push(axisLeft(rs, L, p, { gridTo: R, fmt: fmtRef, line: true }));
+    const tx = L - leftAxisWidth(rs, "x", fmtRef) + FS.body * 0.8 - FS.body - 2, ty = y + H / 2;
+    refTitle.forEach((t, k) => out.push(label(tx + k * (FS.body + 2), ty, t, { size: FS.body, fill: p.ink, anchor: "middle", rotate: -90, maxW: H })));
+    ref.values.forEach((v, i) => {
+      const c = sp.channels[i], h = Math.max(0, rs(Math.min(v, refMax)) - rs(0));
+      const tip = ref.key + " · " + c.label + ": " + v.toFixed(2) + "% of the signature's mutations (" + ref.source + ")";
+      out.push(`<rect x="${r1(cx(i) - barW / 2)}" y="${r1(rs(0))}" width="${r1(barW)}" height="${r1(h)}" fill="${colors[i]}"><title>${esc(tip)}</title></rect>`);
+    });
+    y += H + 6;
+  }
+  return { svg: out.join(""), y };
+}
+
+/**
+ * The figure: the spectrum (with the reference profile under it once a signature is chosen) and then
+ * each signature's contribution. `spectrumHead: false` leaves out the spectrum's "Sample: … count: …"
+ * line, for a page that writes it above the figure.
+ */
+export function signaturesSvg(v: DrawnResultOf<"signatures">, o: SvgOpts & { caption?: boolean; spectrumHead?: boolean } = {}): string | null {
   const s = v.signatures;
   if (!s.patient || !s.version) return null;
   const p = palette(o.theme);
@@ -107,15 +183,18 @@ export function signaturesSvg(v: DrawnResultOf<"signatures">, o: SvgOpts & { cap
   const title = s.patient.id + " — " + versionLabel(s.version);
   out.push(label(PAD, 16, title, { size: FS.title, weight: 600, fill: p.ink, maxW: W - 2 * PAD }));
   let y = 28;
+  if (s.spectrum) { const sc = spectrumChart(s, W, y, p, o.spectrumHead !== false); out.push(sc.svg); y = sc.y + 12; }
   const c = contributions(s, W, y, p);
   out.push(c.svg); y = c.y + 8;
-  if (s.spectrum) { const sc = spectrumChart(s, W, y, p); out.push(sc.svg); y = sc.y + 4; }
   const anySig = s.signatures.some((r) => r.values.some(sig));
   const note = (c.left ? c.left + " more signatures with a contribution above zero are listed in the table but not drawn (the figure draws " + FIGURE_SIGNATURES + "). " : "") +
     (s.profiles?.pvalue ? (anySig ? "* and bold: significant, p < " + SIGNIFICANT_P + " in " + s.profiles.pvalue + ". " : "No value is significant (p < " + SIGNIFICANT_P + "). ")
       : "The study records no p-values for these signatures, so none is marked significant. ") +
     (s.notProfiled.length ? "Not profiled for mutational signatures: " + s.notProfiled.join(", ") + ". " : "") +
-    (s.spectrum ? "Spectrum " + (s.scale === "percent" ? "as each channel's share of the sample's " + spectrumUnit(s.version) : "as counts") + "; the counts may include silent and non-coding mutations." : s.noSpectrum ? s.noSpectrum + "." : "");
+    (s.spectrum ? "Spectrum " + (s.scale === "percent" ? "as each channel's share of the sample's " + spectrumUnit(s.version) : "as counts") + "; the counts may include silent and non-coding mutations." +
+      (s.ymax < YMAX_MAX ? " Y-axis Max " + s.ymax + ": a bar past the axis stops at it (≥ on the axis)." : "") +
+      (s.reference ? " Below: " + s.reference.key + "'s reference profile, " + s.reference.source + ", each channel's percent of the signature's mutations." : "")
+      : s.noSpectrum ? s.noSpectrum + "." : "");
   if (o.caption !== false) { const cap = caption(note, W, y, p.muted); out.push(cap.svg); y += cap.height; }
   return frame(W, y + 6, out.join(""), p.bg, false, title);
 }

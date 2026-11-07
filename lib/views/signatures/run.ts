@@ -13,9 +13,10 @@ import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
 import { plural, refuse } from "../shared.ts";
 import { SIGNATURE_PATIENT_COLUMNS, SIGNATURE_PATIENT_DEFAULT_COLUMNS, signaturePatientsSource, signatureValuesSource, type SignaturePart } from "./sql.ts";
-import { SIGNIFICANT_P, defaultVersion, pairsOf, signatureFamilies, signatureRows, spectrumOf, spectrumUnit, versionLabel, type SignatureFamily } from "./data.ts";
+import { SIGNIFICANT_P, defaultVersion, pairsOf, signatureFamilies, signatureRows, spectrumOf, spectrumUnit, versionLabel, YMAX_MAX, YMAX_MIN, type SignatureFamily } from "./data.ts";
 import type { SignaturesView, SignaturesResult } from "./types.ts";
 import { signaturesMethod } from "./method.ts";
+import { REFERENCE_SOURCE, referenceProfile, referenced } from "./reference.ts";
 
 const VERSION = /^[A-Za-z0-9.]{1,20}$/;
 const SAMPLE_ID = /^[A-Za-z0-9._-]{1,120}$/;
@@ -31,11 +32,14 @@ export async function runSignatures(view: SignaturesView, ctx: ViewRun): Promise
   if (view.version != null && (typeof view.version !== "string" || !VERSION.test(view.version))) return no("version is a signature type, e.g. \"SBS\", \"DBS\", \"ID\" or \"v2\"");
   if (view.sample != null && (typeof view.sample !== "string" || !SAMPLE_ID.test(view.sample))) return no("sample is one of the patient's sample ids");
   if (view.scale != null && view.scale !== "percent" && view.scale !== "count") return no("scale is \"percent\" (each channel's share of the sample's mutations, the default) or \"count\"");
+  if (view.signature != null && (typeof view.signature !== "string" || !view.signature.trim() || view.signature.length > 200)) return no("signature is the name of one of the table's signatures, e.g. \"SBS5\"");
+  if (view.ymax != null && !(Number.isInteger(view.ymax) && view.ymax >= YMAX_MIN && view.ymax <= YMAX_MAX)) return no("ymax is the Y-axis Max slider: a whole percent from " + YMAX_MIN + " to " + YMAX_MAX + " (100, the default, draws the whole axis)");
   if (view.samples != null && view.samples !== "patient" && view.samples !== "cohort")
     return no("samples is \"patient\" (every sample of the patient, the default) or \"cohort\" (only the cohort's samples)");
   if (ctx.table != null) return no("a signatures view pages only its patient list: no table may be named");
   const scope = view.samples || "patient";
   const scale = view.scale || "percent";
+  const ymax = view.ymax ?? YMAX_MAX;
   const q = viewQuery(view);
   { const bad = checkQuery(q, SIGNATURE_PATIENT_COLUMNS); if (bad) return no(bad); }
 
@@ -77,7 +81,7 @@ export async function runSignatures(view: SignaturesView, ctx: ViewRun): Promise
     rows: r.rows.map((x) => ({ cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: "",
       values: listColumns.map((c) => c.numeric ? n(x[c.id]) : String(x[c.id] ?? "")) })),
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) });
-  const bare = { versions: [], version: null, profiles: null, profiled: [], notProfiled: [], signatures: [], spectrum: null, counted: [], scale };
+  const bare = { versions: [], version: null, profiles: null, profiled: [], notProfiled: [], signatures: [], spectrum: null, counted: [], scale, ymax, referenced: [], reference: null };
   const typeWords = view.version ? view.version + " signature values" : "mutational-signature values";
 
   try {
@@ -142,18 +146,30 @@ export async function runSignatures(view: SignaturesView, ctx: ViewRun): Promise
     const noSpectrum = !f.counts ? want.study + " has no " + version + " counts profile (mutational_signatures_" + "counts_" + version + "), so no mutational spectrum is drawn"
       : !spectrum ? "none of " + want.id + "'s samples has " + version + " mutation counts" : undefined;
 
+    // the COSMIC reference profile drawn under the spectrum: the signature named, when the spectrum is drawn
+    const withReference = spectrum ? referenced(version, signatures.map((r) => r.name)) : [];
+    let reference: SignaturesResult["reference"] = null;
+    if (view.signature != null) {
+      if (!signatures.some((r) => r.name === view.signature))
+        return no("signature " + view.signature + " is not one of " + want.id + "'s " + version + " signatures (" + signatures.map((r) => r.name).join(", ") + ")");
+      if (!spectrum) return no("signature draws its COSMIC reference profile under the sample's spectrum, and there is none: " + noSpectrum);
+      const ref = referenceProfile(version, view.signature, spectrum.channels.map((c) => c.label));
+      if (typeof ref === "string") return no(ref + "; signatures here with a reference profile: " + (withReference.join(", ") || "none"));
+      reference = { signature: view.signature, key: ref.key, source: REFERENCE_SOURCE, values: ref.values };
+    }
+
     const position = await listPosition(r, !!view.patient, (first) => listRows(1, { locate: first }));
     const list = listOf(r);
     const sortName = q.sort ? listColumns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null;
     const significant = signatures.reduce((a, s) => a + s.values.filter((v) => v.p != null && v.p < SIGNIFICANT_P).length, 0);
     const result: SignaturesResult = { ...list, patient: { ...want, samples }, position, versions, version,
       profiles: { contribution: f.contribution!, pvalue: f.pvalue, counts: f.counts }, profiled, notProfiled, signatures,
-      spectrum, ...(noSpectrum ? { noSpectrum } : {}), counted, scale };
+      spectrum, ...(noSpectrum ? { noSpectrum } : {}), counted, scale, ymax, referenced: withReference, reference };
     return {
       kind: "signatures", cohorts: vNames,
       signatures: result,
       method: signaturesMethod({ cohorts: vNames, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length, lists: r.lists, excluded, instances: r.groups,
-        patient: want, version, profiles: result.profiles!, profiled, signatures: signatures.length, spectrum }),
+        patient: want, version, profiles: result.profiles!, profiled, signatures: signatures.length, spectrum, reference }),
       participation: ctx.participationFor(ctx.vStudies, true),
       ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
       caveat: want.id + ": " + versionLabel(version) + " from " + f.contribution + ", " + plural(profiled.length, "sample") + " profiled" +
@@ -163,7 +179,9 @@ export async function runSignatures(view: SignaturesView, ctx: ViewRun): Promise
         (f.pvalue ? "Significant (p < " + SIGNIFICANT_P + " in " + f.pvalue + "): " + plural(significant, "signature–sample value") + ". "
           : "This study records no p-value profile for " + version + " (mutational_signatures_pvalue_" + version + "), so no signature is marked significant. ") +
         (spectrum ? spectrum.sample + "'s spectrum: " + spectrum.total.toLocaleString("en-US") + " " + spectrumUnit(version) + " counted in " + spectrum.channels.length + " channels, drawn " +
-          (scale === "percent" ? "as each channel's share of them" : "as counts") + "; the counts may include silent and non-coding mutations not shown elsewhere. " : noSpectrum + ". ") +
+          (scale === "percent" ? "as each channel's share of them" : "as counts") + "; the counts may include silent and non-coding mutations not shown elsewhere. " +
+          (ymax < YMAX_MAX ? "The axis is cut at the Y-axis Max (" + ymax + "); a bar past it stops at the axis. " : "") +
+          (reference ? "Under it, " + reference.key + "'s reference profile from " + REFERENCE_SOURCE + ", in percent of the signature's mutations. " : "") : noSpectrum + ". ") +
         "The patient list holds the cohort's patients with " + typeWords + ": " + tableTail(r, q, listColumns, "patient", "with the most profiled samples first, then by patient id", excluded, false),
     };
   } catch (e) { return no((e as Error).message); }

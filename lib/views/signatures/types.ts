@@ -25,6 +25,13 @@ export interface SignaturesView extends TableQuery {
   /** the spectrum's bars: "percent" of the sample's mutations of this type (the default, as the portal) or "count" */
   scale?: "percent" | "count";
   /**
+   * the signature (its name in the table, e.g. "SBS5") whose COSMIC reference profile is drawn
+   * downward under the spectrum, as the portal draws it once a table row is clicked; none by default
+   */
+  signature?: string;
+  /** the spectrum's Y-axis Max slider, a whole percent from 1 to 100 (default 100: the whole axis) */
+  ymax?: number;
+  /**
    * which of the patient's samples are read: every one ("patient", the default — the portal's patient
    * view) or only the cohort's ("cohort" — its sample view, for a cohort of one sample)
    */
@@ -72,6 +79,12 @@ export interface SignaturesResult extends TableRows<string | number | null> {
   /** the samples with counts, any of which `sample` may name */
   counted: string[];
   scale: "percent" | "count";
+  /** the Y-axis Max slider's value (100 when not set) */
+  ymax: number;
+  /** the signatures of the table with a COSMIC reference profile, any of which `signature` may name */
+  referenced: string[];
+  /** the signature's reference profile drawn under the spectrum: each channel's percent, aligned with the spectrum's channels */
+  reference: { signature: string; key: string; source: string; values: number[] } | null;
 }
 
 declare module "../../types.ts" {

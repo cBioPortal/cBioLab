@@ -6,7 +6,8 @@ import type { SpectrumChannel } from "./types.ts";
 export function signaturesMethod(t: { cohorts: string[]; queryText: string; sortName: string | null; desc: boolean; shown: number;
   lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number;
   patient: { study: string; id: string }; version: string; profiles: { contribution: string; pvalue: string | null; counts: string | null };
-  profiled: string[]; signatures: number; spectrum: { sample: string; total: number; channels: SpectrumChannel[] } | null }): MethodRecord {
+  profiled: string[]; signatures: number; spectrum: { sample: string; total: number; channels: SpectrumChannel[] } | null;
+  reference?: { key: string; source: string } | null }): MethodRecord {
   const steps = tableSteps({ label: "signatures", what: "patients", queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
     source: "every patient of each cohort with a numeric value in one of the study's mutational-signature contribution profiles, with their sample count, how many of those samples have a value, and the signature types they have values in.",
     order: t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + " with missing values last, then patient id" : "most profiled samples first, then by patient id" });
@@ -21,6 +22,11 @@ export function signaturesMethod(t: { cohorts: string[]; queryText: string; sort
     kind: "transform" as const, title: t.spectrum.sample + "'s spectrum",
     detail: "Each channel's count in " + t.profiles.counts + " for " + t.spectrum.sample + ", and its share of the sample's total over every channel, in percent.",
     params: [["total", t.spectrum.total.toLocaleString("en-US")], ["channels", String(t.spectrum.channels.length)]],
+  });
+  if (t.reference) steps.push({
+    kind: "fetch" as const, title: t.reference.key + "'s COSMIC reference profile",
+    detail: "Each channel's share of " + t.reference.key + "'s mutations in " + t.reference.source + ", from the copy cBioPortal's frontend ships (lib/views/signatures/cosmic-reference.ts), drawn in percent under the spectrum. Read as stored; nothing is fitted.",
+    params: [["signature", t.reference.key], ["source", t.reference.source]],
   });
   const sp = t.spectrum;
   const python = sp ? withResult([

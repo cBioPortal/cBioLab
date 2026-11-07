@@ -7,6 +7,11 @@ import assert from "node:assert/strict";
 import { runSignatures } from "../lib/views/signatures/run.ts";
 import { signaturePatientsSource, signatureValuesSource } from "../lib/views/signatures/sql.ts";
 import { SIGNIFICANT_P, channelClass, defaultVersion, natural, pairsOf, pctText, signatureFamilies, signatureRows, spectrumOf, spectrumUnit, versionLabel } from "../lib/views/signatures/data.ts";
+import { COUNT_TIP, ROW_CLICK_HINT, channelColor, channelTick, countAxisMax, countLabel, indelBox, percentAxisMax, referenceAxisMax, referenceTick,
+  spectrumAxisTitle, spectrumTick, typeOption } from "../lib/views/signatures/data.ts";
+import { REFERENCE_SOURCE, referenceChannel, referenceKey, referenceProfile, referenced } from "../lib/views/signatures/reference.ts";
+import { COSMIC_REFERENCE } from "../lib/views/signatures/cosmic-reference.ts";
+import { STYLE } from "../lib/oncoprint-style.ts";
 import { signaturesSvg, FIGURE_SIGNATURES } from "../lib/views/signatures/figure.ts";
 import { signaturesKind } from "../lib/views/signatures/kind.ts";
 import { signaturesMethod } from "../lib/views/signatures/method.ts";
@@ -249,7 +254,7 @@ describe("the figure, text and method", () => {
     const v = await result();
     const svg = signaturesSvg(v as never, { width: 800, theme: "light" })!;
     assert.match(svg, /Signature contributions/);
-    assert.match(svg, /T1's mutational spectrum — 40 single base substitutions/);
+    assert.match(svg, /Sample: T1 \| Single Base Substitution \(SBS\) count: 40/);
     assert.match(svg, /SBS7a \(UV\) in T1: 75\.0%, p = 0\.010 \(significant\)/);
     assert.match(svg, /Not profiled for mutational signatures: T3/);
     assert.deepEqual(lintSvg(svg), []);
@@ -265,7 +270,7 @@ describe("the figure, text and method", () => {
     assert.match(signaturesSvg(none as never, { caption: false })!, /No signature contributes above zero/);
     assert.equal(signaturesSvg({ ...v, signatures: { ...v.signatures, patient: null } } as never), null);
     const counts = await result({ scale: "count" });
-    assert.match(signaturesSvg(counts as never)!, /Mutations/);
+    assert.match(signaturesSvg(counts as never)!, /Single Base Substitution \(#\)/);
   });
   test("the text lists the signatures above zero and the largest channels", async () => {
     const v = await result();
@@ -291,5 +296,133 @@ describe("the figure, text and method", () => {
     const n = signaturesMethod({ ...common, spectrum: null });
     assert.equal(n.python, undefined);
     assert.match(n.verification!, /nothing is computed/);
+  });
+});
+
+describe("the portal's spectrum chart: colours, labels, axes and the COSMIC reference", () => {
+  test("a channel's colour is the portal's, from the style", () => {
+    assert.equal(channelColor("A[C>A]A"), "#5DADE2");
+    assert.equal(channelColor("T[C>T]G"), "red");
+    assert.equal(channelColor("G[T>C]T"), "#2ECC71");
+    assert.equal(channelColor("CG>TT"), "darkred", "the portal's later CG entry wins");
+    assert.equal(channelColor("AC>CA"), "skyblue");
+    assert.equal(channelColor("1:Del:T:5"), "#d68910");
+    assert.equal(channelColor("5:Ins:R:3"), "#368BFD");
+    assert.equal(channelColor("7:Del:M:2"), STYLE.signatures.id["5:Del:M"], "lengths past 5 share the 5 colour");
+    assert.equal(channelColor("nonsense"), STYLE.signatures.unknown);
+    assert.equal(channelColor("A[C>A]A", { ...STYLE, signatures: { ...STYLE.signatures, sbs: {} } }), STYLE.signatures.unknown);
+  });
+  test("channel labels: SBS's mutated base coloured, DBS's new pair, ID's counts on COSMIC's scale", () => {
+    assert.deepEqual(channelTick("A[C>A]G"), { text: "ACG", colored: 1 });
+    assert.deepEqual(channelTick("AC>CA"), { text: "CA", colored: null });
+    assert.deepEqual(["1:Del:C:0", "1:Del:C:5", "1:Ins:T:0", "1:Ins:T:5", "3:Del:R:2", "4:Ins:R:5", "5:Del:M:1", "5:Del:M:5"].map((l) => channelTick(l).text),
+      ["1", "6+", "0", "5+", "3", "5+", "1", "5+"]);
+    assert.deepEqual(channelTick("x"), { text: "x", colored: null });
+    assert.deepEqual(indelBox("1:Del:C:2"), { box: "C", title: "Homopolymer length" });
+    assert.deepEqual(indelBox("3:Ins:R:0"), { box: "3", title: "Number of repeat units" });
+    assert.deepEqual(indelBox("5:Del:M:1"), { box: "5+", title: "Microhomology" });
+    assert.equal(indelBox("A[C>A]A"), null);
+  });
+  test("the header, axis and selector words are the portal's", () => {
+    assert.equal(countLabel("SBS"), "Single Base Substitution (SBS)");
+    assert.equal(countLabel("DBS"), "Double Base Substitution (DBS)");
+    assert.equal(countLabel("ID"), "Small insertions and deletions (ID)");
+    assert.equal(countLabel("v3"), "v3");
+    assert.equal(spectrumAxisTitle("SBS", "percent"), "Single Base Substitution (%)");
+    assert.equal(spectrumAxisTitle("DBS", "count"), "Double Base Substitutions (#)");
+    assert.equal(spectrumAxisTitle("ID", "percent"), "Indels (%)");
+    assert.equal(typeOption("v3"), "Mutational Signature V3");
+    assert.match(COUNT_TIP, /^Mutation count may include silent, noncoding and other types of mutations that may not be shown elsewhere in cBioPortal\.$/);
+    assert.equal(ROW_CLICK_HINT, "Click on a mutational signature to update reference plot");
+  });
+  test("the axes follow the Y-axis Max slider as the portal's do", () => {
+    assert.deepEqual([100, 99, 81, 80, 61, 41, 2, 1].map(percentAxisMax), [100, 80, 80, 80, 80, 60, 20, 1]);
+    assert.equal(countAxisMax(422, 100), 430);
+    assert.equal(countAxisMax(422, 40), 170);
+    assert.equal(countAxisMax(0, 100), 10);
+    assert.equal(referenceAxisMax("percent", 100), 100);
+    assert.equal(referenceAxisMax("percent", 33), 40);
+    assert.equal(referenceAxisMax("count", 33), 100);
+    assert.deepEqual([0, 20, 100].map((t) => spectrumTick(t, 100, "percent")), ["0", "20", "100"]);
+    assert.equal(spectrumTick(60, 60, "percent"), ">=60");
+    assert.equal(spectrumTick(100, 100, "count"), ">=100");
+    assert.equal(spectrumTick(0.5, 1, "percent"), "");
+    assert.deepEqual([0, 20, 100].map((t) => referenceTick(t, 100)), ["0%", "20%", "100%"]);
+    assert.equal(referenceTick(40, 40), ">=40%");
+    assert.equal(referenceTick(0.2, 1), "");
+  });
+  test("the vendored reference: the portal's v3.3 GRCh37 profiles, looked up by a row's first word", () => {
+    assert.equal(Object.keys(COSMIC_REFERENCE.SBS).length, 79);
+    assert.equal(Object.keys(COSMIC_REFERENCE.SBS.SBS5).length, 96);
+    assert.equal(Object.keys(COSMIC_REFERENCE.DBS.DBS1).length, 78);
+    assert.equal(Object.keys(COSMIC_REFERENCE.ID.ID2).length, 83);
+    // each profile sums to one
+    for (const t of ["SBS", "DBS", "ID"] as const) for (const [k, prof] of Object.entries(COSMIC_REFERENCE[t]))
+      assert.ok(Math.abs(Object.values(prof).reduce((a, b) => a + b, 0) - 1) < 0.01, t + " " + k);
+    assert.equal(COSMIC_REFERENCE.SBS.SBS5["A_T-C_A"], 0.0461907618476305);
+    assert.equal(referenceKey("SBS7a (UV)"), "SBS7a");
+    assert.equal(referenceChannel("A[C>A]G"), "A_C-A_G");
+    assert.equal(referenceChannel("AC>CA"), "AC-CA");
+    assert.equal(referenceChannel("1:Del:C:0"), "1:Del:C:0");
+    assert.deepEqual(referenced("SBS", ["SBS5", "SBS7a (UV)", "SBS999", "constructor"]), ["SBS5", "SBS7a (UV)"]);
+    assert.deepEqual(referenced("v2", ["Signature.1"]), []);
+    const ok = referenceProfile("SBS", "SBS5 (clock)", ["A[T>C]A", "A[C>A]A"]);
+    assert.deepEqual(ok, { key: "SBS5", values: [100 * 0.0461907618476305, 100 * COSMIC_REFERENCE.SBS.SBS5["A_C-A_A"]] });
+    assert.match(String(referenceProfile("v3", "SBS5", [])), /SBS, DBS and ID signatures only, not v3/);
+    assert.match(String(referenceProfile("SBS", "SBS999", [])), /no reference profile named SBS999/);
+    assert.match(String(referenceProfile("SBS", "SBS5", ["A[C>A]A", "X1", "X2", "X3", "X4", "X5", "X6"])), /no value for X1, X2, X3, X4, X5 and 1 more channels/);
+    assert.equal(REFERENCE_SOURCE, "COSMIC v3.3 (GRCh37)");
+  });
+  test("the runner draws the named signature's reference, and refuses what it cannot draw", async () => {
+    const v = await run({ signature: "SBS7a (UV)", ymax: 40 });
+    assert.equal(err(v), undefined);
+    const s = sig(v);
+    assert.deepEqual(s.referenced, ["SBS7a (UV)", "SBS1", "SBS2"], "COSMIC v3.3 splits SBS10 into SBS10a–d");
+    assert.equal(s.ymax, 40);
+    assert.equal(s.reference!.key, "SBS7a");
+    assert.equal(s.reference!.source, REFERENCE_SOURCE);
+    assert.deepEqual(s.reference!.values, [100 * COSMIC_REFERENCE.SBS.SBS7a["A_C-A_A"], 100 * COSMIC_REFERENCE.SBS.SBS7a["T_C-T_G"]]);
+    assert.match(String((v as { caveat?: string }).caveat), /cut at the Y-axis Max \(40\)/);
+    assert.match(String((v as { caveat?: string }).caveat), /SBS7a's reference profile from COSMIC v3\.3/);
+    assert.ok(v.method!.steps.some((x) => /SBS7a's COSMIC reference profile/.test(x.title)));
+    const d = sig(await run({}));
+    assert.equal(d.reference, null, "no reference until a signature is chosen, as the portal");
+    assert.equal(d.ymax, 100);
+    assert.match(String(err(await run({ signature: "SBS99" }))), /signature SBS99 is not one of P1's SBS signatures \(SBS7a \(UV\), SBS1/);
+    assert.match(String(err(await run({ signature: "" }))), /signature is the name of one of the table's signatures/);
+    assert.match(String(err(await run({ ymax: 0 }))), /ymax is the Y-axis Max slider: a whole percent from 1 to 100/);
+    assert.match(String(err(await run({ ymax: 50.5 }))), /ymax is the Y-axis Max slider/);
+    const odd = VALUES.map((r) => r.name === "SBS10" ? { ...r, name: "Signature X" } : r);
+    assert.match(String(err(await run({ signature: "Signature X" }, ctx({ t: tables({ values: odd }) })))), /no reference profile named Signature; signatures here with a reference profile: SBS7a \(UV\), SBS1, SBS2/);
+    const noCounts = PROFILES.filter((x) => x !== "mutational_signatures_counts_SBS");
+    assert.match(String(err(await run({ signature: "SBS1" }, ctx({ ga: noCounts })))), /draws its COSMIC reference profile under the sample's spectrum, and there is none/);
+    assert.deepEqual(sig(await run({}, ctx({ ga: noCounts }))).referenced, []);
+  });
+  test("the figure mirrors the reference under the spectrum, with the portal's labels", async () => {
+    const v = await run({ signature: "SBS1", ymax: 40 });
+    const svg = signaturesSvg(v as never, { width: 900, theme: "light" })!;
+    assert.deepEqual(lintSvg(svg), []);
+    assert.match(svg, /Sample: T1 \| Single Base Substitution \(SBS\) count: 40/);
+    assert.match(svg, /Single Base Substitution \(%\)/);
+    assert.match(svg, />COSMIC Reference</);
+    assert.match(svg, />SBS1 \(%\)</);
+    assert.match(svg, />&gt;=40%</, "the reference axis cut at 40%");
+    assert.match(svg, />&gt;=40</, "the spectrum axis cut at 40");
+    assert.match(svg, /T<tspan fill="red">C<\/tspan>G/, "the mutated base in its class's colour");
+    assert.match(svg, /SBS1 · T\[C&gt;T\]G: [\d.]+% of the signature's mutations \(COSMIC v3\.3 \(GRCh37\)\)/);
+    assert.match(svg, /T\[C&gt;T\]G: 30 of 40 single base substitutions \(75\.0%\), past the axis/);
+    assert.match(svg, /Y-axis Max 40/);
+    assert.match(svg, /Below: SBS1.s reference/);
+    assert.ok(svg.indexOf("Sample: T1") < svg.indexOf("Signature contributions"), "the spectrum comes first");
+    assert.doesNotMatch(signaturesSvg(v as never, { spectrumHead: false })!, /Sample: T1 \|/);
+    assert.doesNotMatch(signaturesSvg((await run({})) as never)!, /COSMIC Reference/);
+    // ID: boxes per sub-class with their labels, the axis titles under them, counts on COSMIC's scale
+    const s = sig(v);
+    const idv = { ...v, signatures: { ...s, version: "ID", reference: null, spectrum: { sample: "T1", total: 4, channels: [
+      { entity: "a", label: "1:Del:C:0", group: "1bp deletion", count: 1 }, { entity: "b", label: "1:Del:T:5", group: "1bp deletion", count: 1 },
+      { entity: "c", label: "2:Ins:R:5", group: ">1bp insertion", count: 1 }, { entity: "d", label: "5:Del:M:5", group: "Microhomology", count: 1 }] } } };
+    const ids = signaturesSvg(idv as never, { width: 900, theme: "light" })!;
+    assert.deepEqual(lintSvg(ids), []);
+    for (const re of [/Indels \(%\)/, />Homopolymer length</, />Number of repeat units</, />Microhomology</, />6\+</, />5\+</, /Small insertions and deletions \(ID\) count: 4/]) assert.match(ids, re);
   });
 });

@@ -726,7 +726,35 @@
         "counted": [
           "SP124409"
         ],
-        "scale": "percent"
+        "scale": "percent",
+        "ymax": 100,
+        "referenced": [
+          "SBS7a",
+          "SBS7b (UV)",
+          "SBS7c",
+          "SBS7d (UV)",
+          "SBS1",
+          "SBS2",
+          "SBS3 (HRD)",
+          "SBS4 (Smoking)",
+          "SBS5",
+          "SBS6 (MMR/MSI)",
+          "SBS8 (Unknown)",
+          "SBS9",
+          "SBS10a (POLE)",
+          "SBS10b",
+          "SBS11 (TMZ)",
+          "SBS12",
+          "SBS13",
+          "SBS14 (MMR/MSI)",
+          "SBS15 (MMR/MSI)",
+          "SBS16 (Unknown)",
+          {
+            "…": "44 more",
+            "sha256": "a666ff22d33f0e88"
+          }
+        ],
+        "reference": null
       },
       "participation": {
         "studies": [
