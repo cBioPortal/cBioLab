@@ -67,7 +67,11 @@ compare its compiled SQL and queries, computed result, figure and results text w
 `test/snapshots/<kind>.{sql,json,svg,txt}`. A diff there is a change to review, not noise:
 `UPDATE_SNAPSHOTS=1` accepts output changes, and a changed query needs
 `RECORD_SNAPSHOTS=1 node --env-file=.env.local --test test/view-snapshots*.test.ts` (public
-warehouse only; the answers hold public studies' patient-level rows).
+warehouse only; the answers hold public studies' patient-level rows). Calls to outside services
+(Genome Nexus and UniProt, for the lollipop's transcript, domains and entry name) are replayed too,
+from `test/snapshots/answers/_external-http.json`, so a case never depends on whether a service
+answered in time; one with no recorded answer fails the case, and
+`RECORD_HTTP=1 node --test --test-concurrency=1 test/view-snapshots*.test.ts` records just those.
 
 The cases are the gallery examples marked `snapshot: "<name>"`: a new view kind marks its smallest
 example in its `lib/views/<kind>/doc.ts` (a check fails until it does). Each case also runs with its answers
