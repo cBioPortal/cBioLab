@@ -101,6 +101,28 @@ export function expressionProfile(catalog: ProfileInfo[]): string | null {
   const m = catalog.filter((p) => p.type === "MRNA_EXPRESSION").sort((a, b) => a.order - b.order);
   return (m.find((p) => p.datatype === "CONTINUOUS") || m.find((p) => p.datatype === "Z-SCORE") || m[0])?.profile || null;
 }
+/** cBioPortal's order of a study's profiles in its API, which its comparison tabs take the first of: by id, character by character */
+const byId = (a: ProfileInfo, b: ProfileInfo) => (a.profile < b.profile ? -1 : a.profile > b.profile ? 1 : 0);
+/**
+ * The profile a comparison's Protein tab compares on, as the portal picks it: a PROTEIN_LEVEL
+ * profile (RPPA or mass spectrometry) that is not z-scores, unless merged_median_zscores, the first
+ * by id (the portal's filterAndSortProfiles, then its default of the first listed).
+ */
+export function proteinProfile(catalog: ProfileInfo[]): string | null {
+  return catalog.filter((p) => p.type === "PROTEIN_LEVEL" && (/merged_median_zscores/i.test(p.profile) || !/zscores/i.test(p.profile)))
+    .sort(byId)[0]?.profile || null;
+}
+/**
+ * The profile a comparison's DNA methylation tab compares on, as the portal picks it: the first
+ * METHYLATION profile by id (gene-level beta values). Per-probe methylation stored as a generic
+ * assay is not one; `probeMethylation` says whether the study has only that.
+ */
+export function methylationProfile(catalog: ProfileInfo[]): string | null {
+  return catalog.filter((p) => p.type === "METHYLATION").sort(byId)[0]?.profile || null;
+}
+export function probeMethylation(catalog: ProfileInfo[]): boolean {
+  return catalog.some((p) => p.type === "GENERIC_ASSAY" && (/METHYLATION/i.test(p.assayType || "") || /methylation/i.test(p.profile)));
+}
 /**
  * One generic-assay profile per kind (signatures, arm-level copy number, ancestry, …), for a
  * comparison's Generic Assay tabs, as the portal gives each kind its own: a signature's
