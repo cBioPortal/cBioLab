@@ -4,6 +4,7 @@ import { ChatSidebar } from "./_agent/ChatSidebar.tsx";
 import { LabProviders } from "./lab/providers.tsx";
 import { SavedProvider } from "./_saved/saved-context.tsx";
 import { TooltipLayer } from "./_ui/tooltip.tsx";
+import { THEME_SCRIPT } from "./_ui/theme-toggle.tsx";
 
 export const metadata = {
   title: "cbio-lab",
@@ -13,8 +14,11 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // data-theme is set by THEME_SCRIPT before React hydrates, so the server's <html> lacks it
+    <html lang="en" suppressHydrationWarning>
       <head>
+        {/* the reader's light/dark choice, applied before first paint (app/_ui/theme-toggle.tsx) */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Serif:wght@600&display=swap" />
       </head>
       <body>

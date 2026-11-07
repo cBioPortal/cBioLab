@@ -1,5 +1,5 @@
 // The site: no credentials in the page, retired routes stay gone, /rationale and /verification render, the header's links.
-async function site({ ok, BASE, page, errors }) {
+async function site({ ok, BASE, page, errors, scheme }) {
   // No credentials anywhere client-visible: check for env var names plus the
   // actual secrets read from .env.local at runtime (never hardcoded here)
   const pageContent = await page.content();
@@ -59,6 +59,31 @@ async function site({ ok, BASE, page, errors }) {
   ok("header nav points only at /rationale (oncoprint/builder links removed)",
     headerLinks.some(t => /rationale/i.test(t)) && !headerLinks.some(t => /^oncoprint$|^builder$/i.test(t)),
     headerLinks.join(", "));
+
+  // The header's light/dark switch (app/_ui/theme-toggle.tsx): it shows the other scheme, the choice
+  // survives a reload (applied before paint), and switching back follows the system again. Run in
+  // both passes, so it is checked from a light and from a dark system; it ends where it began.
+  let themeOk = false, themeInfo = "";
+  try {
+    const toggle = page.locator("header button[aria-label^='switch to']");
+    const read = () => page.evaluate(() => ({ attr: document.documentElement.getAttribute("data-theme"), bg: getComputedStyle(document.body).backgroundColor,
+      stored: localStorage.getItem("cbiolab-theme") }));
+    await toggle.waitFor({ timeout: 60000 });
+    const before = await read();
+    const other = scheme === "dark" ? "light" : "dark";
+    await toggle.click();
+    const flipped = await read();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const early = await page.evaluate(() => document.documentElement.getAttribute("data-theme"));
+    await toggle.waitFor({ timeout: 60000 });
+    await page.waitForFunction(() => !document.querySelector("header button[aria-label^='switch to']").disabled, null, { timeout: 60000 });
+    await toggle.click();
+    const back = await read();
+    themeOk = before.attr === null && flipped.attr === other && flipped.bg !== before.bg && flipped.stored === other &&
+      early === other && back.attr === null && back.bg === before.bg && back.stored === null;
+    themeInfo = JSON.stringify({ before, flipped, early, back });
+  } catch (e) { themeInfo = String(e.message || e).slice(0, 100); }
+  ok("header: the light/dark switch shows the other scheme, keeps it across a reload, and switching back follows the system (" + scheme + ")", themeOk, themeInfo);
 }
 
 module.exports = { site };
