@@ -180,13 +180,14 @@ export async function listPosition(r: Rows, named: boolean, locateFirst: (first:
 }
 
 /** The view kinds whose rows are paged, searched, filtered and sorted here (POST /api/view-page, /api/table). */
-export const PAGED_KINDS = ["table", "mutations", "sv", "timeline", "alterations", "evolution"];
+export const PAGED_KINDS = ["table", "mutations", "sv", "timeline", "alterations", "evolution", "datafiles"];
 
 /** A table view's rows in its result: its one table — or, for the alterations and evolution views, the patient list or the `table` named. */
 export function pagedTable(v: ViewResult, table?: string): TableRows<unknown> | undefined {
   switch (v.kind) {
     case "alterations": return v.alterations && table ? (v.alterations.tables as Record<string, TableRows<unknown> | undefined>)[table] : v.alterations;
     case "evolution": return v.evolution && table ? (table === "mutations" ? v.evolution.mutations : undefined) : v.evolution;
+    case "datafiles": return v.datafiles && table && table !== "cases" ? v.datafiles.tables[table] : v.datafiles;
     case "table": return v.table;
     case "mutations": return v.mutations;
     case "sv": return v.sv;

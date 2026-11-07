@@ -341,6 +341,9 @@
     "A glioma's mutations across four samples over three and a half years": {
       "Glioma": 42
     },
+    "Download tab: TP53, PIK3CA and GATA3 in TCGA breast cancer": {
+      "Queried": 996
+    },
     "KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first": {
       "Colorectal": 5543
     },

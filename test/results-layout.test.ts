@@ -85,11 +85,19 @@ test("before the profiles are known, the page lays out the tabs that need nothin
   const first = resultsLayout(q(["a"], ["KRAS", "TP53"]), data({ expr: null, cna: null, clinical: [], numeric: [], partial: true }));
   assert.equal(first.partial, true);
   assert.equal(full.partial, undefined);
-  assert.deepEqual(titles(first), ["Oncoprint", "Cancer Types Summary", "Mutual Exclusivity", "Mutations", "Comparison/Survival", "CN Segments"]);
+  assert.deepEqual(titles(first), ["Oncoprint", "Cancer Types Summary", "Mutual Exclusivity", "Mutations", "Comparison/Survival", "CN Segments", "Download"]);
   assert.ok(!first.left.some((l) => /Co-expression|Plots/.test(l)), "what the profiles decide is not said before they are known");
   // every view laid out first is the same view, under the same name, once the page is whole
   first.names.forEach((n, i) => assert.deepEqual(full.doc.views![full.names.indexOf(n)], first.doc.views![i], n));
   assert.deepEqual(first.doc.cohorts, full.doc.cohorts);
+});
+
+test("the Download tab comes last, over the queried samples, with the query's lines as written", () => {
+  const l = resultsLayout(q(["a"], ["KRAS", "TP53"]), data());
+  assert.equal(l.tabs[l.tabs.length - 1].title, "Download");
+  const v = l.doc.views![l.tabs[l.tabs.length - 1].views![0]] as unknown as { kind: string; oql: string[]; cohorts: string[] };
+  assert.deepEqual([v.kind, v.cohorts], ["datafiles", ["Queried"]]);
+  assert.deepEqual(v.oql, q(["a"], ["KRAS", "TP53"]).entries);
 });
 
 test("the Mutations tab: stems selected on the lollipop filter the table to those protein positions, and back", () => {
