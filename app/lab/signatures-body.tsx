@@ -16,6 +16,7 @@ import { Button } from "../_ui/button";
 import { TB } from "../_ui/toolbar.ts";
 import { Slider } from "../_ui/slider";
 import { Info } from "lucide-react";
+import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 
 type Spec = { patient?: PatientKey; version?: string; sample?: string; scale?: "percent" | "count"; signature?: string; ymax?: number } & Record<string, unknown>;
 
@@ -31,6 +32,18 @@ function YMaxSlider({ value, disabled, onCommit }: { value: number; disabled: bo
   );
 }
 
+type InfoTip = { row: SignatureRow; at: TipBox };
+
+/** A signature row's ⓘ: hovering or focusing it opens the portal's signature card (name, description, link), which the pointer can move into to follow the link. */
+function SignatureInfo({ row, show }: { row: SignatureRow; show: (t: InfoTip | null, x: number, y: number) => void }) {
+  const open = (el: HTMLElement, x: number, y: number) => { const b = el.getBoundingClientRect(); show({ row, at: { left: b.left, top: b.top, right: b.right, bottom: b.bottom } }, x, y); };
+  return (
+    <Button type="button" variant="ghost" size="icon-xs" className="ml-1 align-middle" aria-label={"about " + row.name}
+      onClick={(e) => e.stopPropagation()} onPointerEnter={(e) => open(e.currentTarget, e.clientX, e.clientY)} onPointerLeave={(e) => show(null, e.clientX, e.clientY)}
+      onFocus={(e) => { const b = e.currentTarget.getBoundingClientRect(); open(e.currentTarget, b.left, b.top); }}><Info /></Button>
+  );
+}
+
 export function SignaturesBody({ v, spec, vi, updating, docJson, patch, fixed }: {
   v: { signatures: SignaturesResult; caveat?: string } & Record<string, unknown>; spec: Spec; vi: number; updating: boolean; docJson?: () => string; patch: (p: Record<string, unknown>) => void;
   /** one patient only (the Patient page): no navigator through the cohort's others */
@@ -40,6 +53,7 @@ export function SignaturesBody({ v, spec, vi, updating, docJson, patch, fixed }:
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(900);
   const [listOpen, setListOpen] = useState(false);
+  const { tip: info, move: showInfo, hide: hideInfo, live: infoLive } = useHoverTip<InfoTip>();
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -57,13 +71,13 @@ export function SignaturesBody({ v, spec, vi, updating, docJson, patch, fixed }:
   const canPick = (r: SignatureRow) => !!sp && s.referenced.includes(r.name);
   const cols = useMemo((): Col<SignatureRow>[] => [
     { key: "name", label: "Mutational signature", value: (r) => r.name,
-      render: (r) => <span data-tip={(r.description || "no description recorded") + (sp && !s.referenced.includes(r.name) ? " — no COSMIC reference profile to draw under the spectrum" : "")}>
-        {r.url ? <a href={r.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{r.name}</a> : r.name}</span> },
+      render: (r) => <><span data-tip={sp && !s.referenced.includes(r.name) ? "no COSMIC reference profile to draw under the spectrum" : undefined}>{r.name}</span>
+        <SignatureInfo row={r} show={showInfo} /></> },
     ...s.profiled.map((id, i): Col<SignatureRow> => ({ key: "s" + i, label: id, num: true, value: (r) => r.values[i].value,
       title: p?.samples.find((x) => x.id === id)?.type || undefined,
       render: (r) => { const x = r.values[i]; const sig = x.p != null && x.p < SIGNIFICANT_P;
         return <span data-tip={x.p != null ? "p = " + x.p.toPrecision(2) + (sig ? ", significant" : "") : undefined} className={sig ? "font-semibold" : undefined}>{pctText(x.value)}</span>; } })),
-  ], [s.profiled, p, sp, s.referenced]);
+  ], [s.profiled, p, sp, s.referenced, showInfo]);
 
   return (
     // eslint-disable-next-line jsx-a11y-x/no-static-element-interactions -- arrow-key shortcuts for the patient buttons PatientNav already provides
@@ -110,11 +124,20 @@ export function SignaturesBody({ v, spec, vi, updating, docJson, patch, fixed }:
       {p && s.signatures.length > 0 && (
         <section className="alt-table" aria-label="Mutational signatures">
           {sp && <p className="meta">{ROW_CLICK_HINT}</p>}
-          <PortalTable rows={s.signatures} cols={cols} selected={chosen} onSelect={(r) => { if (!updating && canPick(r) && r !== chosen) patch({ signature: r.name }); }} initialSort={s.profiled.length ? { key: "s0", desc: true } : { key: "name" }} search={(r) => r.name + " " + r.description}
+          <PortalTable wide rows={s.signatures} cols={cols} selected={chosen} onSelect={(r) => { if (!updating && canPick(r) && r !== chosen) patch({ signature: r.name }); }} initialSort={s.profiled.length ? { key: "s0", desc: true } : { key: "name" }} search={(r) => r.name + " " + r.description}
             filters={[{ label: "above 0 in some sample", test: (r) => r.values.some((x) => (x.value ?? 0) > 0) },
               ...(s.profiles?.pvalue ? [{ label: "significant only (p < " + SIGNIFICANT_P + ")", test: (r: SignatureRow) => r.values.some((x) => x.p != null && x.p < SIGNIFICANT_P) }] : [])]}
             note={s.profiles?.contribution + (s.profiles?.pvalue ? "; bold: p < " + SIGNIFICANT_P + " in " + s.profiles.pvalue : "; no p-values recorded")} />
         </section>
+      )}
+      {info && (
+        <FloatingTip at={info.at} live={infoLive}>
+          <div className="lead">Signature: {info.row.name}</div>
+          <p className="mt-1">{info.row.description ? <><b>Description:</b> {info.row.description}</> : "No description annotated in data"}</p>
+          {info.row.url
+            ? <a className="tip-link" href={info.row.url} target="_blank" rel="noreferrer" onClick={hideInfo}>External link to signature (opens new tab)</a>
+            : <div className="dim">No url annotated in data</div>}
+        </FloatingTip>
       )}
       {listOpen && (
         <PatientsDialog title={"Patients of " + (s.lists[0]?.cohort ?? "the cohort") + " with mutational signatures"} onClose={() => setListOpen(false)}>

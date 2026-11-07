@@ -22,7 +22,7 @@ import { FIELD, TB } from "../_ui/toolbar.ts";
 
 export interface Col<T> { key: string; label: string; num?: boolean; value: (r: T) => string | number | null; render?: (r: T) => React.ReactNode; title?: string }
 
-export function PortalTable<T>({ rows, cols, initialSort, search, filters, selected, onSelect, pageSize = 25, note }: {
+export function PortalTable<T>({ rows, cols, initialSort, search, filters, selected, onSelect, pageSize = 25, note, wide }: {
   rows: T[]; cols: Col<T>[]; initialSort: { key: string; desc?: boolean };
   /** the text a row is found by */
   search?: (r: T) => string;
@@ -31,6 +31,8 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
   selected?: T | null; onSelect?: (r: T) => void; pageSize?: number;
   /** said under the pager: what the rows are out of */
   note?: React.ReactNode;
+  /** the table spans the card's width */
+  wide?: boolean;
 }) {
   const [sort, setSort] = useState(initialSort);
   const [q, setQ] = useState("");
@@ -56,7 +58,7 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
         ))}
         {search && <Input type="search" placeholder="search" className={cn(FIELD, "w-44")} value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />}
       </div>
-      <table className="pb-table">
+      <table className={cn("pb-table", wide && "w-full")}>
         <thead><tr>{cols.map((c) => (
           <th key={c.key} className={c.num ? "num" : undefined} data-tip={c.title} aria-sort={sort.key === c.key ? (sort.desc ? "descending" : "ascending") : "none"}
             onClick={() => setSort((s) => ({ key: c.key, desc: s.key === c.key ? !s.desc : !!c.num }))}>

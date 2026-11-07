@@ -64,9 +64,11 @@ the portal's:
   width rather than 7px on a fixed 1500px chart; the figure keeps its own title for MCP and
   exports; the toolbar sits in the card's header; the portal's SVG/PNG/PDF buttons are the card's
   own export.
-- The table lists every signature, as the portal's, with an "above 0 in some sample" filter to
-  tick; its rows show the description as a tip and link the name rather than the portal's per-row
-  ⓘ popover. The header's significant-signatures badge is not drawn.
+- The table spans the card and lists every signature, as the portal's, with an "above 0 in some
+  sample" filter to tick. Each name has the portal's ⓘ: hovering or focusing it opens a card the
+  pointer can move into — "Signature: …", "Description: …", "External link to signature (opens new
+  tab)" — with the portal's "No description/url annotated in data" fallbacks, spelled correctly
+  (the portal's say "annnotated"). The header's significant-signatures badge is not drawn.
 
 **The patient list** holds only the cohort's patients with a contribution value (of `version` when
 given) — the portal shows the tab only then. A named patient without values, a type the study lacks
