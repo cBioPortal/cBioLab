@@ -28,7 +28,7 @@ title there.
 - [x] **Results → Structural Variants tab** — the `sv` table view (#154)
   - [ ] The Annotation column: our OncoKB store has no structural-variant entries
 - [x] **Patient → Genomic Evolution** — the `evolution` view: VAF per mutation across samples, line chart, heatmap, table (#153)
-- [ ] **Patient → Mutational Signatures** — the `signatures` view, with the spectrum and the COSMIC reference under a clicked row (PR #156 open)
+- [x] **Patient → Mutational Signatures** — the `signatures` view: contributions per sample, the spectrum with the portal's toolbar, and the COSMIC v3.3 reference under a clicked row (#156)
 - [ ] **Comparison → Protein and DNA methylation tabs** — `diffexpr` wired into the page, 2 groups (PR #159 open)
   - [ ] More than 2 groups (ANOVA), for mRNA, Protein and Methylation
   - [ ] Per-probe methylation (generic assay) as in the PanCancer Atlas studies
