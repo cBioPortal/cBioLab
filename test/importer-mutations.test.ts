@@ -294,7 +294,7 @@ test("M6: read counts: the count column, else VarCov/TotCov, else depth × VAF (
   assert.equal(alleleCounts({ ...NO_COUNTS, tAlt: "abc" }).tumor_alt_count, null);
 });
 
-test("M6: a VAF written with '%' is divided by 100 before depth × VAF", { todo: "M6: spec says depth 100 × VAF '25%' gives alt 25 / ref 75; importer gives null counts" }, () => {
+test("M6: a VAF written with '%' is divided by 100 before depth × VAF", () => {
   assert.deepEqual(alleleCounts({ ...NO_COUNTS, tDepth: "100", tVaf: "25%" }),
     { tumor_alt_count: 25, tumor_ref_count: 75, normal_alt_count: null, normal_ref_count: null });
 });
