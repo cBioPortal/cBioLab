@@ -157,8 +157,10 @@ export function numericBinEdges(
   const end = (max + interval < upperOutlier) ? max : max - interval;
   const edges: number[] = [];
   // guard against pathological ranges producing thousands of bars
-  for (let d = start; d <= end && edges.length <= TARGET_BINS + 4; d += interval) {
-    edges.push(Math.round(d * 1e6) / 1e6);
+  // each edge is start + k·interval, rounded, so float error never accumulates past `end`
+  const round = (x: number) => Math.round(x * 1e6) / 1e6;
+  for (let k = 0, d = round(start); d <= round(end) && edges.length <= TARGET_BINS + 4; d = round(start + ++k * interval)) {
+    edges.push(d);
   }
   return { edges, interval };
 }

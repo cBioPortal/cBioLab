@@ -551,14 +551,15 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         data = { shape, n, ...label, groups, overlay: "none",
           note: scaleNote + ". Counts and extremes per group sum exactly; the quartiles are a size-weighted" +
             " approximation across sites (it can shift where an outlier bar falls, never a count)." };
-        // Points, unlike a density, just concatenate: each entitled site's own case-level
-        // rows are already independent of any shared scale. A site that may not disclose
-        // cases contributes none, the same rule the oncoprint's columns follow.
-        if (pv.allPoints !== false) {
-          const perSite = await peerSafe(sites.map((s) => resolvers[s]), () => Promise.all(sites.map((s) => {
-            const rc = plotCasesOf(resolvers[s]);
-            return rc ? rc.plotPoints(doc.cohorts[cn], spec) : Promise.resolve([]);
-          })), () => []);
+        // Points, unlike a density, just concatenate: each site's own case-level rows are already
+        // independent of any shared scale. They are drawn from every site or from none: a site that
+        // may not show cases leaves the boxes to the pooled density, and the caption names it.
+        const closed = sites.filter((s) => !plotCasesOf(resolvers[s]));
+        if (pv.allPoints !== false && closed.length) data.note += " Cases are not drawn as points: " + closed.join(", ") + " may not show individual cases.";
+        else if (pv.allPoints !== false) {
+          // a site past its cap answers null, and then no site's cases are drawn either
+          const perSite = await peerSafe(sites.map((s) => resolvers[s]),
+            () => Promise.all(sites.map((s) => plotCasesOf(resolvers[s])!.plotPoints(doc.cohorts[cn], spec))), () => [null]);
           const pts = perSite.every((p) => p) ? perSite.flatMap((p) => p!) : [];
           if (pts.length && pts.length <= POINTS_CAP) {
             data.points = pts; data.overlay = "points";
