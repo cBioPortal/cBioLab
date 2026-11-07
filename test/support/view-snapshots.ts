@@ -24,6 +24,12 @@
 //                                        queries changed: re-ask the warehouse, then rewrite everything
 // Recording reads the public warehouse only (the second instance is unset first); the answers are
 // stored gzipped in test/snapshots/answers/, keyed by statement, under the database name below.
+// Calls to outside services (Genome Nexus, UniProt — the lollipop's transcript, domains and entry
+// name) are recorded and replayed the same way, in answers/_external-http.json: a live call would
+// make a case depend on whether that service answered in time. A call with no recorded answer fails
+// the case as "not recorded";
+//   RECORD_HTTP=1 node --test --test-concurrency=1 test/view-snapshots*.test.ts
+//                                        records only the outside calls, leaving the warehouse answers
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -42,6 +48,35 @@ if (RECORD) {
   process.env.CLICKHOUSE_DB = SNAPSHOT_DB;
   for (const k of Object.keys(process.env)) if (k.startsWith("CLICKHOUSE2_")) delete process.env[k];
 }
+
+
+// ---- outside services: recorded and replayed, never called live by a replaying run ------------
+
+const RECORD_HTTP = RECORD || !!process.env.RECORD_HTTP;
+delete process.env.GENOME_NEXUS_URL; // every run asks (and records under) the public addresses
+const HTTP_FILE = join(import.meta.dirname, "..", "snapshots", "answers", "_external-http.json");
+type HttpAnswer = { status: number; type: string; body: string };
+const HTTP: Record<string, HttpAnswer> = existsSync(HTTP_FILE) ? JSON.parse(readFileSync(HTTP_FILE, "utf8")) : {};
+/** outside calls the recording never answered, since the case began */
+let httpMisses: string[] = [];
+const liveFetch = globalThis.fetch;
+const warehouse = [process.env.CLICKHOUSE_URL, process.env.CLICKHOUSE2_URL].flatMap((u) => { try { return u ? [new URL(u).origin] : []; } catch { return []; } });
+globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (warehouse.includes(new URL(url).origin)) return liveFetch(input, init);
+  const key = (init?.method || "GET") + " " + url + (typeof init?.body === "string" ? "\n" + init.body : "");
+  if (RECORD_HTTP && !(key in HTTP)) {
+    const r = await liveFetch(input, { ...init, signal: AbortSignal.timeout(60000) });
+    HTTP[key] = { status: r.status, type: r.headers.get("content-type") || "", body: await r.text() };
+    writeFileSync(HTTP_FILE, JSON.stringify(Object.fromEntries(Object.entries(HTTP).sort()), null, 1) + "\n");
+  }
+  const a = HTTP[key];
+  if (!a) {
+    httpMisses.push(key);
+    throw new Error("not recorded (an outside call; RECORD_HTTP=1, see this file's header): " + key);
+  }
+  return new Response(a.body, { status: a.status, headers: a.type ? { "content-type": a.type } : {} });
+};
 
 const { setChTransport } = await import("../../lib/ch.ts");
 const { EXAMPLES } = await import("../../lib/dsl-reference.ts");
@@ -182,7 +217,9 @@ export function snapshotCases(shard: number, of: number): [string, () => Promise
     assert.ok(ex, "no gallery example titled “" + title + "…”");
     const answersFile = join(ANSWERS, kind + ".json.gz");
     const recorded: Record<string, string> = {};
+    httpMisses = [];
     const result = await runCase(ex, recorded, RECORD ? null : "sent");
+    assert.deepEqual(httpMisses, [], "a view called an outside service the recording never answered");
     const failed = result.views.filter((v) => v.error && /not recorded/.test(v.error));
     assert.deepEqual(failed.map((v) => v.error), [], "a view asked something the recording never answered");
     if (RECORD) writeFileSync(answersFile, gzipSync(JSON.stringify(Object.fromEntries(Object.entries(recorded).sort())), { level: 9 }));
