@@ -395,6 +395,10 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "geneSetCountsSql:no-annotation-pin": () => aggregates.geneSetCountsSql(cohortSql, [{ name: "set", genes: ["APC"] }], "x", null, "db"),
     // diffexpr: `vals` is per (patient, gene); only per-gene totals leave
     "profileMomentsAllSql": () => aggregates.profileMomentsAllSql(cohortSql, "x", "db", "rna_seq_v2_mrna_median_Zscores", false),
+    // the Download tab's counts: per line, samples altered / profiled — the samples themselves stay in the database
+    "datafilesCountsSql": () => aggregates.datafilesCountsSql(cohortSql, [{ line: "TP53", gene: "TP53", types: ["MUTATION", "CNA", "SV"] }], { study: "x", db: "db", pin: null, profiles: [] }),
+    "datafilesCountsSql:driver": () => aggregates.datafilesCountsSql(cohortSql, [{ line: "KRAS: DRIVER", gene: "KRAS", types: ["MUTATION", "CNA", "SV"] }, { line: "EGFR: EXP>2", gene: "EGFR", types: [] }],
+      { study: "x", db: "db", pin: "v1", profiles: ["rna_seq_v2_mrna_median_Zscores"] }),
     "profileMomentsAllSql:log2": () => aggregates.profileMomentsAllSql(cohortSql, "x", "db", "rna_seq_v2_mrna", true),
     // gene-set membership is reference data, not patient data — no cohort at all
     "genesetMembersSql": () => aggregates.genesetMembersSql(["HALLMARK_E2F_TARGETS"], null, "db"),

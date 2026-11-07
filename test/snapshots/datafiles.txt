@@ -1,0 +1,48 @@
+Analysis over brca_tcga_pan_can_atlas_2018 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- Queried: 996 patients — in case list cnaseq
+
+Data files for TP53; PIK3CA; GATA3: Mutations (OQL is not in effect) (996 rows), Structural Variants (OQL is not in effect) (996 rows), Putative copy-number alterations from GISTIC (996 rows), Log2 copy-number values (996 rows), mRNA Expression, RSEM (Batch normalized from Illumina HiSeq_RNASeqV2) (996 rows), mRNA expression z-scores relative to normal samples (log RNA Seq V2 RSEM) (996 rows), mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM) (996 rows), mRNA expression z-scores relative to diploid samples (RNA Seq V2 RSEM) (996 rows), Protein levels (mass spectrometry by CPTAC) (996 rows), Protein expression z-scores (mass spectrometry by CPTAC) (996 rows), Protein expression (RPPA) (996 rows), Protein expression z-scores (RPPA) (996 rows), Altered samples (704 rows), Unaltered samples (292 rows), Sample matrix: every sample, 1 = altered, 0 = unaltered, NP = not profiled (996 rows). Gene alteration frequency: TP53 351 of 996 profiled (35.2%), PIK3CA 365 of 996 profiled (36.6%), GATA3 153 of 996 profiled (15.4%). Case table: the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	sample	patient	altered	TP53	PIK3CA	GATA3
+  Queried	TCGA-3C-AAAU-01	TCGA-3C-AAAU	altered	no alteration	no alteration	P408Afs*99
+  Queried	TCGA-3C-AALI-01	TCGA-3C-AALI	altered	S183*	no alteration	no alteration
+  Queried	TCGA-3C-AALJ-01	TCGA-3C-AALJ	altered	no alteration	no alteration	H423Afs*84
+  Queried	TCGA-3C-AALK-01	TCGA-3C-AALK	altered	no alteration	E542K, M1004I	no alteration
+  Queried	TCGA-5L-AAT0-01	TCGA-5L-AAT0	altered	no alteration	H1047L	no alteration
+  Queried	TCGA-A1-A0SD-01	TCGA-A1-A0SD	altered	no alteration	no alteration	S436Pfs*40
+  Queried	TCGA-A1-A0SH-01	TCGA-A1-A0SH	altered	no alteration	AMP	no alteration
+  Queried	TCGA-A1-A0SI-01	TCGA-A1-A0SI	altered	R175H	E726K, H1047R	no alteration
+  Queried	TCGA-A1-A0SK-01	TCGA-A1-A0SK	altered	M133K	no alteration	no alteration
+  Queried	TCGA-A1-A0SO-01	TCGA-A1-A0SO	altered	Y220C	no alteration	no alteration
+  Queried	TCGA-A1-A0SP-01	TCGA-A1-A0SP	altered	S183*	no alteration	no alteration
+  Queried	TCGA-A1-A0SQ-01	TCGA-A1-A0SQ	altered	no alteration	no alteration	S436Lfs*71
+  Queried	TCGA-A2-A04N-01	TCGA-A2-A04N	altered	no alteration	E542K	no alteration
+  Queried	TCGA-A2-A04P-01	TCGA-A2-A04P	altered	G108Vfs*15	R88Q, AMP	no alteration
+  Queried	TCGA-A2-A04T-01	TCGA-A2-A04T	altered	D208G, R273H	H1047Y, AMP	no alteration
+  Queried	TCGA-A2-A04U-01	TCGA-A2-A04U	altered	Y107Cfs*16	no alteration	no alteration
+  Queried	TCGA-A2-A04V-01	TCGA-A2-A04V	altered	no alteration	G118D	no alteration
+  Queried	TCGA-A2-A04W-01	TCGA-A2-A04W	altered	V272M	H1047R	no alteration
+  Queried	TCGA-A2-A0CL-01	TCGA-A2-A0CL	altered	R273L	no alteration	no alteration
+  Queried	TCGA-A2-A0CM-01	TCGA-A2-A0CM	altered	E204Sfs*43	no alteration	no alteration
+  Queried	TCGA-A2-A0CP-01	TCGA-A2-A0CP	altered	no alteration	E726K, H1047R	no alteration
+  Queried	TCGA-A2-A0CR-01	TCGA-A2-A0CR	altered	no alteration	E542K	no alteration
+  Queried	TCGA-A2-A0CS-01	TCGA-A2-A0CS	altered	no alteration	H1047R	no alteration
+  Queried	TCGA-A2-A0CU-01	TCGA-A2-A0CU	altered	HOMDEL	no alteration	no alteration
+  Queried	TCGA-A2-A0CV-01	TCGA-A2-A0CV	altered	no alteration	no alteration	X308_splice
+  … 971 more rows
+  CAVEAT (tell the user): The query alters 704 samples (70.7%) of the cohort's 996 samples; 292 samples are unaltered (profiled for every queried gene in every data type the query reads). A line's frequency is the samples it alters ÷ the samples profiled for its gene in any data type the line reads (their gene panels decide), a sample its panel does not cover is not profiled, never wild-type. The case table and the altered / unaltered lists follow the query's OQL; the gene-by-sample files list every call of each gene (OQL is not in effect), as the portal's do. DRIVER reads OncoKB v7.5. The case table: 996 samples. Sorted with altered samples first, then by sample id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
+  METHOD:
+    - Count the cohort's samples against each line of the query: The datafiles:counts query above, per study: each sample of the cohort is altered by a line when it has an event the line's OQL matches (the cohort OQL clause's conditions, read sample by sample; DRIVER is OncoKB v7.5), and profiled for it when its gene panel covers the line's gene in any data type the line reads (mutation, copy number, structural variant — those the study holds). Unaltered: altered by no line and profiled for every line's gene in every data type it reads. Counts only.
+        samples: 996
+        altered: 704
+        unaltered: 292
+        neither: 0
+    - Each line's frequency: Altered and profiled samples added across the study; frequency = altered and profiled ÷ profiled × 100, rounded to one decimal.
+        TP53: 351 / 996 = 35.2%
+        PIK3CA: 365 / 996 = 36.6%
+        GATA3: 153 / 996 = 15.4%
+    - Count the samples per cohort and study: The datafiles:cases:counts query above: every sample of the cohort with its status against the query and, per line, the events it matched — or no alteration, or not profiled.
+        Queried · brca_tcga_pan_can_atlas_2018: 996
+    - Sort them together and take one page: The datafiles:cases:rows query above: the samples of every cohort and study combined in one query, sorted altered samples first, then by sample id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset.
+    Counts and a listing: the frequencies are the queries' counts divided, so there is no script — the queries are the numbers.
