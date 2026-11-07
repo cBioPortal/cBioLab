@@ -23,7 +23,7 @@ export const SAMPLE_COHORT = "Sample";
 
 /** a mutational-signature generic-assay profile, which the portal's Mutational Signatures tab draws */
 const signatureProfile = (catalog: ProfileInfo[]) =>
-  catalog.find((p) => p.type === "GENERIC_ASSAY" && /signature/i.test((p.assayType || "") + " " + p.profile)) || null;
+  catalog.find((p) => p.type === "GENERIC_ASSAY" && /^mutational_signatures?_contribution_/.test(p.profile)) || null;
 
 /** The Patient page as the portal has it, for this patient. */
 export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
@@ -53,7 +53,8 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
     ] },
     // each mutation's allele frequency across the patient's samples; the view says so when the patient has one sample or no allele counts
     ...(q.sample || !data.held.includes("MUTATION") ? [] : [{ title: "Genomic Evolution", views: [v("Genomic evolution", { kind: "evolution" })] }]),
-    ...(signatures ? [{ title: "Mutational Signatures", views: [], pending: "The patient's samples' signature contributions from " + signatures.profile + ", as the portal's Mutational Signatures tab draws them: a bar per signature, and the 96-channel spectrum." }] : []),
+    // the view refuses, naming what there is, when this patient has no signature values
+    ...(signatures ? [{ title: "Mutational Signatures", views: [v("Mutational signatures", { kind: "signatures", ...(q.sample ? { samples: "cohort" } : {}) })] }] : []),
     { title: "Files & Links", views: [], pending: "Links out for the patient and each sample: the study's resource data (pathology reports, slide images) as the portal's Files & Links tab lists them." },
     { title: "Clinical Trials", views: [], pending: "Trials the patient's OncoKB-annotated alterations and cancer type match, as the portal's Clinical Trials tab lists them." },
   ], left, { partial: data.partial });

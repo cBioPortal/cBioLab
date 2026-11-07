@@ -12,7 +12,7 @@ export const assaysDoc: KindDoc = {
       title: "Mutational signatures: what UV light and tobacco leave behind",
       snapshot: "assays",
       demonstrates: "An `assays` view, the portal's generic-assay comparison tabs: every entity of one generic-assay profile — here the 30 COSMIC v2 mutational signatures — compared between two cohorts with Welch's t on each cohort's n, mean and variance, Benjamini–Hochberg across the signatures, drawn as a volcano of the difference in mean contribution beside a table. A categorical profile such as arm-level copy number is compared the same way with a chi-squared test.",
-      tags: ["signatures", "volcano"],
+      tags: ["mutational signatures", "volcano"],
       note: "Melanoma against non-small cell lung cancer in MSK-IMPACT 50K. The UV signature (7) makes up about half of a melanoma's mutations and almost none of a lung cancer's; the smoking signature (4) is the reverse.",
       doc: {
         study: "msk_impact_50k_2026",
