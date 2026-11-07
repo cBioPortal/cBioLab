@@ -49,6 +49,7 @@ export async function POST(req: Request) {
     (v.kind === "table" ? "clinical_" + v.table.unit + "s" : v.kind === "timeline" ? "timeline_patients"
       : v.kind === "alterations" ? (table && v.alterations?.patient ? v.alterations.patient.id + "_" + table : "alterations_patients")
       : v.kind === "evolution" ? (table && v.evolution?.patient ? v.evolution.patient.id + "_evolution_" + table : "evolution_patients")
+      : v.kind === "signatures" ? "signatures_patients"
       : v.kind === "mutations" ? v.mutations.gene + "_mutations" : v.kind === "sv" ? v.sv.genes.join("-") + "_structural_variants"
       : v.kind === "datafiles" ? (table && table !== "cases" ? table.replace(/^profile:/, "") : "alterations_by_sample") : v.kind) + (filtered ? "_filtered" : "") + ".csv";
   // every line leads with the row's cohort and study, so a table's own column of the same name is not repeated

@@ -10,6 +10,7 @@ import { adjustedUi } from "./adjusted.tsx";
 import { alterationsUi } from "./alterations.tsx";
 import { evolutionUi } from "./evolution.tsx";
 import { datafilesUi } from "./datafiles.tsx";
+import { signaturesUi } from "./signatures.tsx";
 import { assaysUi } from "./assays.tsx";
 import { attritionUi } from "./attrition.tsx";
 import { cancertypesUi } from "./cancertypes.tsx";
@@ -84,6 +85,7 @@ export const KIND_UI: { [K in ViewKind]: KindUi<K> } = {
   alterations: alterationsUi,
   evolution: evolutionUi,
   datafiles: datafilesUi,
+  signatures: signaturesUi,
   correlates: correlatesUi,
   overlap: overlapUi,
   cancertypes: cancertypesUi,

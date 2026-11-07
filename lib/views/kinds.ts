@@ -12,6 +12,7 @@ import { actionabilityKind } from "./actionability/kind.ts";
 import { adjustedKind } from "./adjusted/kind.ts";
 import { alterationsKind } from "./alterations/kind.ts";
 import { datafilesKind } from "./datafiles/kind.ts";
+import { signaturesKind } from "./signatures/kind.ts";
 import { assaysKind } from "./assays/kind.ts";
 import { attritionKind } from "./attrition/kind.ts";
 import { cancertypesKind } from "./cancertypes/kind.ts";
@@ -68,6 +69,7 @@ export const KINDS: { [K in ViewKind]: ViewKindDef<K> } = {
   alterations: alterationsKind,
   evolution: evolutionKind,
   datafiles: datafilesKind,
+  signatures: signaturesKind,
   assays: assaysKind,
   attrition: attritionKind,
   cancertypes: cancertypesKind,

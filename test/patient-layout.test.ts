@@ -23,3 +23,15 @@ test("the Summary's views are the timeline, the genomic overview and the alterat
   const l = patientLayout(q, { profileCatalog: [], held: ["MUTATION", "CNA"], partial: true });
   assert.deepEqual(l.names.filter((n) => n.startsWith("Summary")), ["Summary › Clinical timeline", "Summary › Genomic overview", "Summary › Genomic alterations"]);
 });
+
+test("the Mutational Signatures tab draws the signatures view, over the sample alone in sample mode", () => {
+  const l = patientLayout(q, { profileCatalog: SIG, held: ["MUTATION"] });
+  const at = l.names.indexOf("Mutational Signatures › Mutational signatures");
+  assert.ok(at >= 0, l.names.join(", "));
+  assert.deepEqual(l.doc.views![at], { kind: "signatures", cohorts: ["Patient"] });
+  const s = patientLayout({ study: "s", sample: "S1" }, { profileCatalog: SIG, held: ["MUTATION"] });
+  assert.deepEqual(s.doc.views![s.names.indexOf("Mutational Signatures › Mutational signatures")], { kind: "signatures", samples: "cohort", cohorts: ["Sample"] });
+  // a generic assay that is not a signature contribution profile adds no tab
+  const other = [{ profile: "armlevel_cna", type: "GENERIC_ASSAY", assayType: "ARMLEVEL_CNA" } as unknown as ProfileInfo];
+  assert.ok(!patientLayout(q, { profileCatalog: other, held: ["MUTATION"] }).tabs.some((t) => t.title === "Mutational Signatures"));
+});

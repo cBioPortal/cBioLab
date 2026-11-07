@@ -14,6 +14,7 @@
     "alterations",
     "evolution",
     "datafiles",
+    "signatures",
     "correlates",
     "overlap",
     "cancertypes",
@@ -3507,6 +3508,68 @@
       "sub": null,
       "title": "Treatment sequence"
     },
+    "signatures": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "signatures"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "signatures"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "signatures"
+      },
+      "card": {
+        "cohortInHeader": true,
+        "defaults": {
+          "kind": "signatures"
+        },
+        "defaultsBareStudy": {
+          "kind": "signatures"
+        },
+        "label": "Mutational signatures (contributions and spectrum; one patient at a time)",
+        "maxCohorts": 1,
+        "title": "Mutational signatures",
+        "why": null,
+        "whyBareStudy": "this study has no mutational-signature profile (mutational_signatures_contribution_<type>)"
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": true,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Mutational signatures — A vs B",
+      "headTitle": "Mutational signatures",
+      "help": {
+        "text": "Shows which mutational processes left their mark on one patient's tumour, as cBioPortal's Mutational Signatures tab does. Each process — ageing, UV light, tobacco smoke, a broken DNA-repair pathway — tends to cause its own pattern of mutations, a signature; the bars give the share of each sample's mutations the study attributed to each signature (bold with a star where the study's own test calls it significant). Where the study counted the mutations by type, the second chart is one sample's mutational spectrum: how many of its mutations fall in each kind of change and sequence context. Pick the signature type, the sample and percent or counts above the chart; the table lists every signature. Step to the previous or next patient with the arrows (or the ← and → keys), or open the patient list.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Mutational signatures (contributions and spectrum; one patient at a time)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": "this study has no mutational-signature profile (mutational_signatures_contribution_<type>)"
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": "(element)",
+      "title": "Mutational signatures (contributions and spectrum; one patient at a time)"
+    },
     "survival": {
       "added": {
         "cohorts": [
@@ -3891,6 +3954,7 @@
     "alterations",
     "evolution",
     "datafiles",
+    "signatures",
     "correlates",
     "overlap",
     "cancertypes",
