@@ -49,6 +49,7 @@ Other docs: [`DOMAIN.md`](docs/DOMAIN.md) (what the domain's words mean),
 [`PERFORMANCE.md`](docs/PERFORMANCE.md) (measured against cbioportal.org — read before claiming
 this project is "fast"), [`ENVIRONMENT.md`](docs/ENVIRONMENT.md) (settings),
 [`SESSIONS.md`](docs/SESSIONS.md) (several working copies on one machine),
+[`PORTAL-PARITY.md`](docs/PORTAL-PARITY.md) (what cBioLab still lacks from cBioPortal — a PR that closes a gap ticks it there),
 [`LINKS.md`](docs/LINKS.md) (Copy link and stored links `?s=`, a page's address past its limit, stored id lists read by id and
 withdrawn by their owner — before changing how a page reads or writes its URL).
 
