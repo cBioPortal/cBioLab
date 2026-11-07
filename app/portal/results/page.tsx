@@ -115,7 +115,7 @@ export default function ResultsPage() {
     {page.note && <p className="note">{page.note}</p>}
     {!ready
       ? <PortalLoading />
-      : <PortalTabs doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
+      : <PortalTabs legacy={{ page: { page: "results", studies, entries: check.entries.map((e) => e.text), filters }, held: basics?.portal || null }} doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
           catalog={{ attrs: known?.attrs || [], profiles, profileCatalog, loading: !known }} />}
   </>);
 }

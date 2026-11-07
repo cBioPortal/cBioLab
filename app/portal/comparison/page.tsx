@@ -101,7 +101,7 @@ export default function ComparisonPage() {
     {driversAsked && noDrivers.length > 0 && <p className="note">This link asks for OncoKB drivers only, but {noDrivers.join(", ")} has no OncoKB driver calls on this deployment, so every alteration is counted.</p>}
     {!ready
       ? <PortalLoading />
-      : <PortalTabs doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
+      : <PortalTabs legacy={{ page: { page: "comparison", study }, held: basics?.portal || null }} doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
           catalog={{ attrs: known?.attrs || [], profiles: known?.profiles || [], profileCatalog: known?.profileCatalog || [], loading: !known }}
           onCounts={(c) => setSized((o) => o?.key === comparedKey ? o : { key: comparedKey, c })} />}
   </>);
