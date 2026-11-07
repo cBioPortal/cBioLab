@@ -152,9 +152,34 @@ export function oqlLeafSql(q: string, opts: { oncokbPin?: string | null; profile
  */
 export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db = DB, unit }:
   { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string; unit: "patient" | "sample" }): string {
-  const caseCol = unit === "sample" ? "sample_unique_id" : "patient_unique_id";
+  return oqlSelectSql(q, { oncokbPin, profiles, study, db, caseCol: unit === "sample" ? "sample_unique_id" : "patient_unique_id", events: false });
+}
+
+/** an event row's label as the portal's download tab spells it: protein change, AMP / HOMDEL, the structural variant's event */
+const EVENT_LABEL = "multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info)";
+/** its kind's place in a sample's list: mutations, then copy number, then structural variants, then expression */
+const EVENT_ORDER = "multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3)";
+
+/**
+ * The events an OQL query matches, sample by sample: each matching event as (`sid`, the sample's
+ * bare id; `o`, its kind's order — mutation 1, copy number 2, structural variant 3, expression or
+ * protein 4; `ev`, its label — the protein change, AMP or HOMDEL, the structural variant's event
+ * info, or EXP / PROT HIGH or LOW). The same conditions as oqlCasesSql, row by row: a sample is in
+ * oqlCasesSql's samples exactly when it has a row here. The rows name samples: patient-level SQL.
+ */
+export function oqlEventsSql(q: string, { oncokbPin, profiles, study = STUDY, db = DB }:
+  { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string }): string {
+  return oqlSelectSql(q, { oncokbPin, profiles, study, db, caseCol: "sample_unique_id", events: true });
+}
+
+function oqlSelectSql(q: string, { oncokbPin, profiles, study, db, caseCol, events }:
+  { oncokbPin?: string | null; profiles?: string[]; study: string; db: string; caseCol: string; events: boolean }): string {
   const parsed = parseOql(q);
   const parts: string[] = [];
+  // what each part selects: the case alone, distinct; or, for events, the case with the event's order and label
+  const head = (t: "g" | "sd", order: string, label: string) => events
+    ? "SELECT replaceOne(" + t + "." + caseCol + ", " + sq(study + "_") + ", '') AS sid, " + order + " AS o, " + label + " AS ev\n"
+    : "SELECT DISTINCT replaceOne(" + t + "." + caseCol + ", " + sq(study + "_") + ", '') AS pid\n";
   // the plain event conditions of every gene, read in one pass over genomic_event_derived: one
   // subquery per gene had ClickHouse plan the view again for each
   const plain: { gene: string; cond: string }[] = [];
@@ -167,7 +192,7 @@ export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db 
         if (!prof) throw new Error("OQL " + spec.type + " requires an " + (spec.type === "EXP" ? "mRNA" : "protein") +
           " profile; this study has: " + ((profiles || []).join(", ") || "none"));
         parts.push(
-          "SELECT DISTINCT replaceOne(sd." + caseCol + ", " + sq(study + "_") + ", '') AS pid\n" +
+          head("sd", "4", sq(spec.type + (String(spec.op).startsWith(">") ? " HIGH" : " LOW"))) +
           "  FROM " + db + ".genetic_alteration_derived ga\n" +
           "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n" +
           "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.hugo_gene_symbol = " + sq(gene) + "\n" +
@@ -176,7 +201,7 @@ export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db 
       }
       if (!spec.range && !spec.driver) { plain.push({ gene, cond: specCond(spec) }); continue; }
       parts.push(
-        "SELECT DISTINCT replaceOne(g." + caseCol + ", " + sq(study + "_") + ", '') AS pid\n" +
+        head("g", spec.range ? "1" : EVENT_ORDER, spec.range ? "g.mutation_variant" : EVENT_LABEL) +
         "  FROM " + (spec.range ? mutationsWithPositions(db, study, gene) : db + ".genomic_event_derived g\n") +
         (spec.driver ? DRIVER_JOIN(oncokbPin!) : "") +
         "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
@@ -187,7 +212,7 @@ export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db 
   }
   if (plain.length)
     parts.unshift(
-      "SELECT DISTINCT replaceOne(g." + caseCol + ", " + sq(study + "_") + ", '') AS pid\n" +
+      head("g", EVENT_ORDER, EVENT_LABEL) +
       "  FROM " + db + ".genomic_event_derived g\n" +
       "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
       "    AND g.hugo_gene_symbol IN (" + [...new Set(plain.map((x) => x.gene))].map(sq).join(", ") + ")\n" +

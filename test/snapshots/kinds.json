@@ -12,6 +12,7 @@
     "timeline",
     "alterations",
     "evolution",
+    "datafiles",
     "correlates",
     "overlap",
     "cancertypes",
@@ -1334,6 +1335,106 @@
       "preview": "no method record or golden test of the maximally selected log-rank scan against R maxstat yet",
       "sub": "TMB_NONSYNONYMOUS on OS · best log-rank cut, 1000 permutations",
       "title": "Biomarker cut-point (best split of a number for OS)"
+    },
+    "datafiles": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "datafiles",
+        "oql": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF",
+          "ERBB2"
+        ]
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "datafiles",
+        "oql": [
+          "TP53"
+        ]
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "datafiles",
+        "oql": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF",
+          "ERBB2"
+        ]
+      },
+      "card": {
+        "defaults": {
+          "kind": "datafiles",
+          "oql": [
+            "TP53",
+            "KRAS",
+            "EGFR",
+            "STK11",
+            "KEAP1",
+            "PIK3CA",
+            "APC",
+            "BRAF",
+            "ERBB2"
+          ]
+        },
+        "defaultsBareStudy": {
+          "kind": "datafiles",
+          "oql": [
+            "TP53"
+          ]
+        },
+        "label": "Data files (the Download tab: per-gene files, altered / unaltered lists, frequencies)",
+        "maxCohorts": 1,
+        "title": "Download",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": true,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Downloadable data files — A vs B",
+      "headTitle": "Download",
+      "help": {
+        "text": "The files you can take away for the genes you asked about: each gene's mutations, structural variants and values in every kind of measurement the study holds, one row per sample, and the lists of samples the query does and does not find altered. Below them, how often each gene is altered among the samples tested for it, and a table of every sample with what was found in each gene. The lists can be opened as a cohort in the lab.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Data files (the Download tab: per-gene files, altered / unaltered lists, frequencies)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": "TP53 · KRAS · EGFR · STK11 · KEAP1 · PIK3CA · APC · BRAF · ERBB2",
+      "title": "Data files (the Download tab: per-gene files, altered / unaltered lists, frequencies)"
     },
     "diffexpr": {
       "added": {
@@ -3690,6 +3791,7 @@
     "timeline",
     "alterations",
     "evolution",
+    "datafiles",
     "correlates",
     "overlap",
     "cancertypes",

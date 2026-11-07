@@ -33,6 +33,7 @@ import { runTable } from "./table/run.ts";
 import { runMutations } from "./mutations/run.ts";
 import { runSv } from "./sv/run.ts";
 import { runAlterations } from "./alterations/run.ts";
+import { runDatafiles } from "./datafiles/run.ts";
 import { runTimeline } from "./timeline/run.ts";
 import { runEvolution } from "./evolution/run.ts";
 import { runAcquired } from "./acquired/run.ts";
@@ -125,6 +126,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   mutations: drawn(runMutations),
   sv: drawn(runSv),
   alterations: drawn(runAlterations),
+  datafiles: drawn(runDatafiles),
   timeline: drawn(runTimeline),
   evolution: drawn(runEvolution),
   acquired: drawn(runAcquired),

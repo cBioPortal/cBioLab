@@ -218,6 +218,9 @@ async function explore({ ok, BASE, page }) {
     await page.waitForTimeout(1500);
     const inList = await page.locator("text=e2e dialog cohort").count();
     await page.keyboard.press("Escape");
+    // the manager leaves with an animation: "Saved work" clicked again below before it is gone can
+    // land in its exit and leave it closed, so wait until it has left
+    await page.locator(".saveddialog").waitFor({ state: "detached", timeout: 30000 });
     savedOk = !!prefilled && closedOnEsc && inList > 0;
     saveFlow = "prefilled '" + prefilled + "', esc closed: " + closedOnEsc + ", in Cohorts: " + (inList > 0);
   } catch (e) { saveFlow = String(e.message).split("\n")[0]; }

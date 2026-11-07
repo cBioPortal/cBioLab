@@ -1,0 +1,617 @@
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "Queried": {
+      "count": 996,
+      "samples": 996,
+      "text": "in case list cnaseq",
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "datafiles",
+      "cohorts": [
+        "Queried"
+      ],
+      "datafiles": {
+        "columns": [
+          {
+            "id": "sample",
+            "name": "Sample ID",
+            "numeric": false
+          },
+          {
+            "id": "patient",
+            "name": "Patient ID",
+            "numeric": false
+          },
+          {
+            "id": "altered",
+            "name": "Altered",
+            "numeric": false
+          },
+          {
+            "id": "TP53",
+            "name": "TP53",
+            "numeric": false
+          },
+          {
+            "id": "PIK3CA",
+            "name": "PIK3CA",
+            "numeric": false
+          },
+          {
+            "id": "GATA3",
+            "name": "GATA3",
+            "numeric": false
+          }
+        ],
+        "shown": [
+          "sample",
+          "patient",
+          "altered",
+          "TP53",
+          "PIK3CA",
+          "GATA3"
+        ],
+        "defaults": [
+          "sample",
+          "patient",
+          "altered",
+          "TP53",
+          "PIK3CA",
+          "GATA3"
+        ],
+        "query": {},
+        "rows": [
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-3C-AAAU",
+            "sample": "TCGA-3C-AAAU-01",
+            "values": [
+              "TCGA-3C-AAAU-01",
+              "TCGA-3C-AAAU",
+              "altered",
+              "no alteration",
+              "no alteration",
+              "P408Afs*99"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-3C-AALI",
+            "sample": "TCGA-3C-AALI-01",
+            "values": [
+              "TCGA-3C-AALI-01",
+              "TCGA-3C-AALI",
+              "altered",
+              "S183*",
+              "no alteration",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-3C-AALJ",
+            "sample": "TCGA-3C-AALJ-01",
+            "values": [
+              "TCGA-3C-AALJ-01",
+              "TCGA-3C-AALJ",
+              "altered",
+              "no alteration",
+              "no alteration",
+              "H423Afs*84"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-3C-AALK",
+            "sample": "TCGA-3C-AALK-01",
+            "values": [
+              "TCGA-3C-AALK-01",
+              "TCGA-3C-AALK",
+              "altered",
+              "no alteration",
+              "E542K, M1004I",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-5L-AAT0",
+            "sample": "TCGA-5L-AAT0-01",
+            "values": [
+              "TCGA-5L-AAT0-01",
+              "TCGA-5L-AAT0",
+              "altered",
+              "no alteration",
+              "H1047L",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A1-A0SD",
+            "sample": "TCGA-A1-A0SD-01",
+            "values": [
+              "TCGA-A1-A0SD-01",
+              "TCGA-A1-A0SD",
+              "altered",
+              "no alteration",
+              "no alteration",
+              "S436Pfs*40"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A1-A0SH",
+            "sample": "TCGA-A1-A0SH-01",
+            "values": [
+              "TCGA-A1-A0SH-01",
+              "TCGA-A1-A0SH",
+              "altered",
+              "no alteration",
+              "AMP",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A1-A0SI",
+            "sample": "TCGA-A1-A0SI-01",
+            "values": [
+              "TCGA-A1-A0SI-01",
+              "TCGA-A1-A0SI",
+              "altered",
+              "R175H",
+              "E726K, H1047R",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A1-A0SK",
+            "sample": "TCGA-A1-A0SK-01",
+            "values": [
+              "TCGA-A1-A0SK-01",
+              "TCGA-A1-A0SK",
+              "altered",
+              "M133K",
+              "no alteration",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A1-A0SO",
+            "sample": "TCGA-A1-A0SO-01",
+            "values": [
+              "TCGA-A1-A0SO-01",
+              "TCGA-A1-A0SO",
+              "altered",
+              "Y220C",
+              "no alteration",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A1-A0SP",
+            "sample": "TCGA-A1-A0SP-01",
+            "values": [
+              "TCGA-A1-A0SP-01",
+              "TCGA-A1-A0SP",
+              "altered",
+              "S183*",
+              "no alteration",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A1-A0SQ",
+            "sample": "TCGA-A1-A0SQ-01",
+            "values": [
+              "TCGA-A1-A0SQ-01",
+              "TCGA-A1-A0SQ",
+              "altered",
+              "no alteration",
+              "no alteration",
+              "S436Lfs*71"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A2-A04N",
+            "sample": "TCGA-A2-A04N-01",
+            "values": [
+              "TCGA-A2-A04N-01",
+              "TCGA-A2-A04N",
+              "altered",
+              "no alteration",
+              "E542K",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A2-A04P",
+            "sample": "TCGA-A2-A04P-01",
+            "values": [
+              "TCGA-A2-A04P-01",
+              "TCGA-A2-A04P",
+              "altered",
+              "G108Vfs*15",
+              "R88Q, AMP",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A2-A04T",
+            "sample": "TCGA-A2-A04T-01",
+            "values": [
+              "TCGA-A2-A04T-01",
+              "TCGA-A2-A04T",
+              "altered",
+              "D208G, R273H",
+              "H1047Y, AMP",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A2-A04U",
+            "sample": "TCGA-A2-A04U-01",
+            "values": [
+              "TCGA-A2-A04U-01",
+              "TCGA-A2-A04U",
+              "altered",
+              "Y107Cfs*16",
+              "no alteration",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A2-A04V",
+            "sample": "TCGA-A2-A04V-01",
+            "values": [
+              "TCGA-A2-A04V-01",
+              "TCGA-A2-A04V",
+              "altered",
+              "no alteration",
+              "G118D",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A2-A04W",
+            "sample": "TCGA-A2-A04W-01",
+            "values": [
+              "TCGA-A2-A04W-01",
+              "TCGA-A2-A04W",
+              "altered",
+              "V272M",
+              "H1047R",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A2-A0CL",
+            "sample": "TCGA-A2-A0CL-01",
+            "values": [
+              "TCGA-A2-A0CL-01",
+              "TCGA-A2-A0CL",
+              "altered",
+              "R273L",
+              "no alteration",
+              "no alteration"
+            ]
+          },
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "patient": "TCGA-A2-A0CM",
+            "sample": "TCGA-A2-A0CM-01",
+            "values": [
+              "TCGA-A2-A0CM-01",
+              "TCGA-A2-A0CM",
+              "altered",
+              "E204Sfs*43",
+              "no alteration",
+              "no alteration"
+            ]
+          },
+          {
+            "…": "5 more",
+            "sha256": "5da22edeadd6866c"
+          }
+        ],
+        "offset": 0,
+        "pageSize": 25,
+        "lists": [
+          {
+            "cohort": "Queried",
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "total": 996,
+            "all": 996
+          }
+        ],
+        "total": 996,
+        "all": 996,
+        "lines": [
+          {
+            "line": "TP53",
+            "gene": "TP53",
+            "column": "TP53"
+          },
+          {
+            "line": "PIK3CA",
+            "gene": "PIK3CA",
+            "column": "PIK3CA"
+          },
+          {
+            "line": "GATA3",
+            "gene": "GATA3",
+            "column": "GATA3"
+          }
+        ],
+        "counts": {
+          "samples": 996,
+          "altered": 704,
+          "unaltered": 292,
+          "unprofiled": 0
+        },
+        "frequency": [
+          {
+            "line": "TP53",
+            "gene": "TP53",
+            "altered": 351,
+            "profiled": 996,
+            "percent": 35.2,
+            "offPanel": 0
+          },
+          {
+            "line": "PIK3CA",
+            "gene": "PIK3CA",
+            "altered": 365,
+            "profiled": 996,
+            "percent": 36.6,
+            "offPanel": 0
+          },
+          {
+            "line": "GATA3",
+            "gene": "GATA3",
+            "altered": 153,
+            "profiled": 996,
+            "percent": 15.4,
+            "offPanel": 0
+          }
+        ],
+        "files": [
+          {
+            "id": "mutations",
+            "name": "Mutations (OQL is not in effect)",
+            "description": "per sample and gene: its mutations' protein changes, space-separated ([germline] marked); WT when profiled with none; NP when its panel did not cover the gene",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "sv",
+            "name": "Structural Variants (OQL is not in effect)",
+            "description": "per sample and gene: its structural variants' event info; NA when it has none; NP when its panel did not cover the gene",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "profile:gistic",
+            "name": "Putative copy-number alterations from GISTIC",
+            "description": "per sample and gene: its value in gistic (copy number alteration, discrete); NA when none is stored; NP when its panel did not cover the gene",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "profile:log2CNA",
+            "name": "Log2 copy-number values",
+            "description": "per sample and gene: its value in log2CNA (copy number alteration, log2-value); NA when none is stored",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "profile:rna_seq_v2_mrna",
+            "name": "mRNA Expression, RSEM (Batch normalized from Illumina HiSeq_RNASeqV2)",
+            "description": "per sample and gene: its value in rna_seq_v2_mrna (mrna expression, continuous); NA when none is stored",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "profile:rna_seq_v2_mrna_median_all_sample_ref_normal_Zscores",
+            "name": "mRNA expression z-scores relative to normal samples (log RNA Seq V2 RSEM)",
+            "description": "per sample and gene: its value in rna_seq_v2_mrna_median_all_sample_ref_normal_Zscores (mrna expression, z-score); NA when none is stored",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "profile:rna_seq_v2_mrna_median_all_sample_Zscores",
+            "name": "mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)",
+            "description": "per sample and gene: its value in rna_seq_v2_mrna_median_all_sample_Zscores (mrna expression, z-score); NA when none is stored",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "profile:rna_seq_v2_mrna_median_Zscores",
+            "name": "mRNA expression z-scores relative to diploid samples (RNA Seq V2 RSEM)",
+            "description": "per sample and gene: its value in rna_seq_v2_mrna_median_Zscores (mrna expression, z-score); NA when none is stored",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "profile:protein_quantification",
+            "name": "Protein levels (mass spectrometry by CPTAC)",
+            "description": "per sample and gene: its value in protein_quantification (protein level, continuous); NA when none is stored",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "profile:protein_quantification_zscores",
+            "name": "Protein expression z-scores (mass spectrometry by CPTAC)",
+            "description": "per sample and gene: its value in protein_quantification_zscores (protein level, z-score); NA when none is stored",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "profile:rppa",
+            "name": "Protein expression (RPPA)",
+            "description": "per sample and gene: its value in rppa (protein level, log2-value); NA when none is stored",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "profile:rppa_Zscores",
+            "name": "Protein expression z-scores (RPPA)",
+            "description": "per sample and gene: its value in rppa_Zscores (protein level, z-score); NA when none is stored",
+            "group": "data",
+            "rows": 996
+          },
+          {
+            "id": "altered",
+            "name": "Altered samples",
+            "group": "list",
+            "rows": 704,
+            "description": "the samples the query alters (any line), one per row"
+          },
+          {
+            "id": "unaltered",
+            "name": "Unaltered samples",
+            "group": "list",
+            "rows": 292,
+            "description": "the samples no line alters that were profiled for every queried gene in every data type the query reads, one per row"
+          },
+          {
+            "id": "matrix",
+            "name": "Sample matrix: every sample, 1 = altered, 0 = unaltered, NP = not profiled",
+            "group": "list",
+            "rows": 996,
+            "description": "per sample: whether the query alters it, and per line whether that line does"
+          }
+        ],
+        "tables": {},
+        "unchecked": [],
+        "oncokbPin": "v7.5"
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "The query alters 704 samples (70.7%) of the cohort's 996 samples; 292 samples are unaltered (profiled for every queried gene in every data type the query reads). A line's frequency is the samples it alters ÷ the samples profiled for its gene in any data type the line reads (their gene panels decide), a sample its panel does not cover is not profiled, never wild-type. The case table and the altered / unaltered lists follow the query's OQL; the gene-by-sample files list every call of each gene (OQL is not in effect), as the portal's do. DRIVER reads OncoKB v7.5. The case table: 996 samples. Sorted with altered samples first, then by sample id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the cohort's samples against each line of the query",
+            "detail": "The datafiles:counts query above, per study: each sample of the cohort is altered by a line when it has an event the line's OQL matches (the cohort OQL clause's conditions, read sample by sample; DRIVER is OncoKB v7.5), and profiled for it when its gene panel covers the line's gene in any data type the line reads (mutation, copy number, structural variant — those the study holds). Unaltered: altered by no line and profiled for every line's gene in every data type it reads. Counts only.",
+            "params": [
+              [
+                "samples",
+                "996"
+              ],
+              [
+                "altered",
+                "704"
+              ],
+              [
+                "unaltered",
+                "292"
+              ],
+              [
+                "neither",
+                "0"
+              ]
+            ]
+          },
+          {
+            "kind": "transform",
+            "title": "Each line's frequency",
+            "detail": "Altered and profiled samples added across the study; frequency = altered and profiled ÷ profiled × 100, rounded to one decimal.",
+            "params": [
+              [
+                "TP53",
+                "351 / 996 = 35.2%"
+              ],
+              [
+                "PIK3CA",
+                "365 / 996 = 36.6%"
+              ],
+              [
+                "GATA3",
+                "153 / 996 = 15.4%"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count the samples per cohort and study",
+            "detail": "The datafiles:cases:counts query above: every sample of the cohort with its status against the query and, per line, the events it matched — or no alteration, or not profiled.",
+            "params": [
+              [
+                "Queried · brca_tcga_pan_can_atlas_2018",
+                "996"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Sort them together and take one page",
+            "detail": "The datafiles:cases:rows query above: the samples of every cohort and study combined in one query, sorted altered samples first, then by sample id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "datafilesCountsSql",
+            "statusRowSource",
+            "matrixRowSource",
+            "oqlEventsSql",
+            "pageSql",
+            "countsSql"
+          ],
+          "file": "lib/views/datafiles/run.ts, lib/views/datafiles/sql.ts, lib/views/datafiles/tables.ts, lib/oql.ts",
+          "commit": null
+        },
+        "verification": "Counts and a listing: the frequencies are the queries' counts divided, so there is no script — the queries are the numbers."
+      }
+    }
+  ]
+}
