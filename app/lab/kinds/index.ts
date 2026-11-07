@@ -31,6 +31,7 @@ import { enrichmentUi } from "./enrichment.tsx";
 import { exclusivityUi } from "./exclusivity.tsx";
 import { forestUi } from "./forest.tsx";
 import { genomeUi } from "./genome.tsx";
+import { segmentsUi } from "./segments.tsx";
 import { germlineUi } from "./germline.tsx";
 import { hlaUi } from "./hla.tsx";
 import { hotspotsUi } from "./hotspots.tsx";
@@ -73,6 +74,7 @@ export const KIND_UI: { [K in ViewKind]: KindUi<K> } = {
   sequence: sequenceUi,
   attrition: attritionUi,
   genome: genomeUi,
+  segments: segmentsUi,
   pathways: pathwaysUi,
   pathwaymap: pathwaymapUi,
   enrichment: enrichmentUi,

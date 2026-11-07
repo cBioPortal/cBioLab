@@ -19,6 +19,7 @@ import { sequenceDoc } from "./sequence/doc.ts";
 import { plotDoc } from "./plot/doc.ts";
 import { attritionDoc } from "./attrition/doc.ts";
 import { genomeDoc } from "./genome/doc.ts";
+import { segmentsDoc } from "./segments/doc.ts";
 import { pathwaysDoc } from "./pathways/doc.ts";
 import { pathwaymapDoc } from "./pathwaymap/doc.ts";
 import { diffexprDoc } from "./diffexpr/doc.ts";
@@ -74,6 +75,7 @@ export const KIND_DOCS: Record<ViewKind, KindDoc> = {
   plot: plotDoc,
   attrition: attritionDoc,
   genome: genomeDoc,
+  segments: segmentsDoc,
   pathways: pathwaysDoc,
   pathwaymap: pathwaymapDoc,
   diffexpr: diffexprDoc,

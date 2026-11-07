@@ -12,7 +12,7 @@ export const instabilityDoc: KindDoc = {
       title: "Genomic instability by cancer type: aneuploidy score, FGA and arm-level changes",
       snapshot: "instability",
       demonstrates: "An `instability` view (preview): from each sample's copy-number segments, computed per sample inside the database, the fraction of the genome altered and arm-level gains and losses (an arm called when more than half its length is past ±0.2) — their count is the aneuploidy score, after Taylor et al. 2018 — drawn per cohort as boxes from histograms with a Kruskal–Wallis test, and each arm's gain and loss frequency as a heatmap. Only histograms and per-arm counts leave the database.",
-      tags: ["copy-number", "aneuploidy", "segments", "preview"],
+      tags: ["copy-number", "aneuploidy", "copy-number segments", "preview"],
       note: "MSK-IMPACT 50k: colorectal, breast and pancreatic cancer. Colorectal shows its textbook arms — 20q gained in 60%, 13q in 42%, 18q lost in 53% — and breast 1q and 8q gains with 16q loss. Pancreatic tumours look the most stable (median 2 arms, against 7 and 8), which is mostly purity: their low tumour content pulls every log ratio toward 0, the bias the caption names.",
       doc: {
         study: "msk_impact_50k_2026",

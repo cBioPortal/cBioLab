@@ -2,6 +2,7 @@
   "cardOrder": [
     "attrition",
     "genome",
+    "segments",
     "pathways",
     "pathwaymap",
     "enrichment",
@@ -3445,6 +3446,67 @@
       "sub": "area under the KM curve to τ where every cohort has 10 at risk · OS",
       "title": "Restricted mean OS time (RMST, landmarks)"
     },
+    "segments": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "segments"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "kind": "segments"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "segments"
+      },
+      "card": {
+        "defaults": {
+          "kind": "segments"
+        },
+        "defaultsBareStudy": {
+          "kind": "segments"
+        },
+        "label": "Copy-number segments (a heat strip per sample, the portal's CN Segments tab)",
+        "maxCohorts": 1,
+        "title": "Copy-number segments",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws one cohort.",
+      "figureTitle": "Copy-number segments — A vs B",
+      "headTitle": "Copy-number segments",
+      "help": {
+        "text": "Each row is one tumour sample, drawn along the chromosomes (or zoomed to one gene or stretch of DNA). The colour says how many copies of each stretch the sample has compared with normal: red where it has extra copies (deeper red, more copies), blue where copies were lost, white where it looks normal, grey where the sample was not measured. A column of red or blue running down many rows at a gene marks a gain or loss the tumours share. This is cBioPortal's CN Segments tab, and the patient page's genomic overview.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 1,
+      "menu": {
+        "label": "Copy-number segments (a heat strip per sample, the portal's CN Segments tab)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": "whole genome",
+      "title": "Copy-number segments (a heat strip per sample, the portal's CN Segments tab)"
+    },
     "sequence": {
       "added": {
         "cohorts": [
@@ -3942,6 +4004,7 @@
     "sequence",
     "attrition",
     "genome",
+    "segments",
     "pathways",
     "pathwaymap",
     "enrichment",

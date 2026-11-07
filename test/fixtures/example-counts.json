@@ -215,6 +215,12 @@
       "Colorectal": 4993,
       "Breast": 5803
     },
+    "One patient's copy-number segments, sample by sample": {
+      "IM-GBM-28": 1
+    },
+    "ERBB2 copy number across breast tumours, most gained first": {
+      "Breast": 1084
+    },
     "Oncogenic signalling pathways: colorectal against pancreatic": {
       "Colorectal": 5543,
       "Pancreatic": 3109

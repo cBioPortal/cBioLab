@@ -9,7 +9,7 @@ import { wrapWidth } from "./chart/text.ts";
 import { FS } from "./chart/style.ts";
 import { fmtP } from "./chart/format.ts";
 export { esc };
-export { SERIES, seriesStyle, seriesColor, textOn, FS, MIN_FS, SW, OTHER, PORTAL_ENRICHMENT } from "./chart/style.ts";
+export { SERIES, seriesStyle, seriesColor, textOn, FS, MIN_FS, SW, OTHER, PORTAL_ENRICHMENT, segmentColor, SEGMENT_SCALE } from "./chart/style.ts";
 export { textWidth, ellipsize, wrapWidth, label, packLines, paragraph } from "./chart/text.ts";
 export { fmtInt, fmtNum, fmtPct, fmtShare, fmtP, fmtQ, pDigits, portalP, fmtRatio, fmtMonths, fmtCI, tickFormat } from "./chart/format.ts";
 export { linear, log, symlog, type Scale } from "./chart/scale.ts";

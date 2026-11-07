@@ -152,6 +152,25 @@ const svTab = (genes: string[], queried: string[]) => ({
     apply: (vs: View[], g: string) => [{ ...vs[0], genes: [g], sort: undefined, search: undefined, filters: undefined } as View] },
 });
 
+/** the CN Segments tab's whole-genome choice, beside one chip per queried gene */
+export const WHOLE_GENOME = "Whole genome";
+
+/**
+ * The CN Segments tab as the portal has it: every queried sample's segments as a track, zoomed to
+ * one queried gene at a time (the first, to start) or the whole genome — the portal's pills —
+ * then the cohort's genome-wide gain and loss frequency beneath.
+ */
+const cnSegmentsTab = (genes: string[], queried: string[]) => ({
+  title: "CN Segments",
+  views: [
+    { title: "Copy-number segments", view: { kind: "segments", gene: genes[0], cohorts: queried } as unknown as View },
+    { title: "Genome-wide copy number", view: { kind: "genome", cohorts: queried } as unknown as View },
+  ],
+  chooser: { label: "locus", options: [...genes, WHOLE_GENOME], locks: ["gene", "region"],
+    value: (vs: View[]) => (vs[0] as unknown as { gene?: string }).gene || WHOLE_GENOME,
+    apply: (vs: View[], g: string) => [{ ...vs[0], gene: g === WHOLE_GENOME ? undefined : g, region: undefined } as View, ...vs.slice(1)] },
+});
+
 /** The Results page as the portal has it, for this query. */
 export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   const { genes } = q;
@@ -206,7 +225,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
         v("Copy-number alterations", { kind: "enrichment", alteration: "cna", cohorts: both })] },
       ...(data.assays || []).map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile, cohorts: both })] }))
     ] },
-    { title: "CN Segments", views: [v("Genome-wide copy number", { kind: "genome", cohorts: queried })] },
+    cnSegmentsTab(genes, queried),
     // the portal's PathwayMapper tab: the pathway holding most of the queried genes, each gene's altered %
     { title: "Pathways", views: [v("Pathways", { kind: "pathwaymap", genes, cohorts: queried })] },
     // the portal's Download tab, after Pathways, last as there: the files of the queried samples for the query's lines

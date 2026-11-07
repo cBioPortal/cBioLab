@@ -35,3 +35,10 @@ test("the Mutational Signatures tab draws the signatures view, over the sample a
   const other = [{ profile: "armlevel_cna", type: "GENERIC_ASSAY", assayType: "ARMLEVEL_CNA" } as unknown as ProfileInfo];
   assert.ok(!patientLayout(q, { profileCatalog: other, held: ["MUTATION"] }).tabs.some((t) => t.title === "Mutational Signatures"));
 });
+
+test("the genomic overview is the patient's samples' copy-number segments, as the portal's overview track", () => {
+  const l = patientLayout(q, { profileCatalog: [], held: ["MUTATION", "CNA"] });
+  assert.equal((l.doc.views![l.names.indexOf("Summary › Genomic overview")] as any).kind, "segments");
+  const noCna = patientLayout(q, { profileCatalog: [], held: ["MUTATION"] });
+  assert.equal(noCna.names.includes("Summary › Genomic overview"), false);
+});

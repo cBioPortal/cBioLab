@@ -8,7 +8,7 @@
 const covers = [
   "alterations", "assays", "cancertypes", "clinical", "coexpression", "compare", "cooccurrence",
   "correlates", "datafiles", "diffexpr", "enrichment", "hotspots", "mutations", "overlap", "pathwaymap", "pathways", "plot",
-  "survival", "sv", "table", "timeline",
+  "segments", "survival", "sv", "table", "timeline",
 ];
 
 /** at most this many pages at once: each runs its example against the warehouse */

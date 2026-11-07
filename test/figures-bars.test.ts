@@ -3,7 +3,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { viewToSvg } from "../lib/view-svg.ts";
-import { chromLabels } from "../lib/views/genome/figure.ts";
+import { chromLabels } from "../lib/figures/genome-axis.ts";
 import { textWidth } from "../lib/chart/text.ts";
 import { FS } from "../lib/chart/style.ts";
 import type { ViewResult } from "../lib/types.ts";

@@ -21,7 +21,7 @@ const COUNTS: Col[] = [
   { key: "microarray", label: "mRNA Microarray", title: "samples with microarray expression" },
   { key: "patients", label: "Patients", title: "distinct patients" },
   { key: "sv", label: "Structural Variants", title: "samples profiled for structural variants" },
-  { key: "segments", label: "Segments", title: "samples with copy-number segments (the genome view reads these)" },
+  { key: "segments", label: "Segments", title: "samples with copy-number segments (the genome and segments views read these)" },
   { key: "protein", label: "Protein", title: "samples with protein data (RPPA or mass spectrometry)" },
   { key: "timeline", label: "Timeline", title: "patients with any timeline event" },
   { key: "treatments", label: "Treatments", title: "patients with treatment records" }

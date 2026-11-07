@@ -33,6 +33,7 @@ import { enrichmentKind } from "./enrichment/kind.ts";
 import { exclusivityKind } from "./exclusivity/kind.ts";
 import { forestKind } from "./forest/kind.ts";
 import { genomeKind } from "./genome/kind.ts";
+import { segmentsKind } from "./segments/kind.ts";
 import { germlineKind } from "./germline/kind.ts";
 import { hlaKind } from "./hla/kind.ts";
 import { hotspotsKind } from "./hotspots/kind.ts";
@@ -90,6 +91,7 @@ export const KINDS: { [K in ViewKind]: ViewKindDef<K> } = {
   exclusivity: exclusivityKind,
   forest: forestKind,
   genome: genomeKind,
+  segments: segmentsKind,
   germline: germlineKind,
   hla: hlaKind,
   hotspots: hotspotsKind,

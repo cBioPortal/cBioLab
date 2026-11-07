@@ -1,0 +1,336 @@
+{
+  "study": "glioma_msk_2018",
+  "cohorts": {
+    "IM-GBM-28": {
+      "count": 1,
+      "samples": 4,
+      "text": "in a list of 1 patient",
+      "studies": [
+        "glioma_msk_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "segments",
+      "cohorts": [
+        "IM-GBM-28"
+      ],
+      "segments": {
+        "build": "hg19",
+        "region": {
+          "label": "whole genome",
+          "chrom": null,
+          "start": 1,
+          "end": 0
+        },
+        "chroms": [
+          {
+            "c": "1",
+            "length": 249250621
+          },
+          {
+            "c": "2",
+            "length": 243199373
+          },
+          {
+            "c": "3",
+            "length": 198022430
+          },
+          {
+            "c": "4",
+            "length": 191154276
+          },
+          {
+            "c": "5",
+            "length": 180915260
+          },
+          {
+            "c": "6",
+            "length": 171115067
+          },
+          {
+            "c": "7",
+            "length": 159138663
+          },
+          {
+            "c": "8",
+            "length": 146364022
+          },
+          {
+            "c": "9",
+            "length": 141213431
+          },
+          {
+            "c": "10",
+            "length": 135534747
+          },
+          {
+            "c": "11",
+            "length": 135006516
+          },
+          {
+            "c": "12",
+            "length": 133851895
+          },
+          {
+            "c": "13",
+            "length": 115169878
+          },
+          {
+            "c": "14",
+            "length": 107349540
+          },
+          {
+            "c": "15",
+            "length": 102531392
+          },
+          {
+            "c": "16",
+            "length": 90354753
+          },
+          {
+            "c": "17",
+            "length": 81195210
+          },
+          {
+            "c": "18",
+            "length": 78077248
+          },
+          {
+            "c": "19",
+            "length": 59128983
+          },
+          {
+            "c": "20",
+            "length": 63025520
+          },
+          {
+            "…": "4 more",
+            "sha256": "e5c2141fa5c41e31"
+          }
+        ],
+        "sort": "order",
+        "samples": [
+          {
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-28",
+            "sample": "Patient-28-T1",
+            "score": 0.096,
+            "mark": {
+              "label": "1",
+              "color": "black"
+            },
+            "segs": [
+              0,
+              2488138,
+              8073863,
+              -0.2889,
+              0,
+              8075406,
+              8085061,
+              -6.8125,
+              0,
+              9770584,
+              22587878,
+              0.0327,
+              0,
+              23881061,
+              23889061,
+              -2.9292,
+              0,
+              27023463,
+              36826878,
+              0.0141,
+              {
+                "…": "528 more",
+                "sha256": "55afec6c4e5b045d"
+              }
+            ]
+          },
+          {
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-28",
+            "sample": "Patient-28-T3",
+            "score": -0.0372,
+            "mark": {
+              "label": "2",
+              "color": "orange"
+            },
+            "segs": [
+              0,
+              2488138,
+              245977996,
+              0.004,
+              1,
+              4717089,
+              136870061,
+              0.0608,
+              1,
+              136872974,
+              136877061,
+              -0.4576,
+              1,
+              141599218,
+              242800953,
+              0.0677,
+              2,
+              1449872,
+              24205251,
+              0.4914,
+              {
+                "…": "212 more",
+                "sha256": "3757569f19ab0dc4"
+              }
+            ]
+          },
+          {
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-28",
+            "sample": "Patient-28-T2",
+            "score": -0.0104,
+            "mark": {
+              "label": "3",
+              "color": "orange"
+            },
+            "segs": [
+              0,
+              2488138,
+              46743849,
+              -0.0275,
+              0,
+              51434461,
+              59250761,
+              0.3559,
+              0,
+              59564373,
+              245977996,
+              -0.0267,
+              1,
+              4717089,
+              242800953,
+              -0.0102,
+              2,
+              1449872,
+              52442556,
+              -0.0149,
+              {
+                "…": "232 more",
+                "sha256": "480c7a5b2487510d"
+              }
+            ]
+          },
+          {
+            "study": "glioma_msk_2018",
+            "patient": "IM-GBM-28",
+            "sample": "Patient-28-CSF",
+            "score": -0.0026,
+            "mark": {
+              "label": "4",
+              "color": "#333333"
+            },
+            "segs": [
+              0,
+              2488138,
+              245977996,
+              0.0156,
+              1,
+              4717089,
+              14528016,
+              -0.0103,
+              1,
+              16081061,
+              16087561,
+              1.5416,
+              1,
+              17675735,
+              242800953,
+              -0.0018,
+              2,
+              1449872,
+              194238390,
+              0.0218,
+              {
+                "…": "112 more",
+                "sha256": "31f22e5d6d714bf7"
+              }
+            ]
+          }
+        ],
+        "cohortSamples": 4,
+        "segmented": 4,
+        "rowsLimit": 300,
+        "leftOut": 0,
+        "noSegment": 0,
+        "otherChrom": 0
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "glioma_msk_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "One row per sample, coloured by each segment's mean log2 copy-number ratio (hg19, whole genome): white within ±0.1, deepening to red at +1.5 and blue at −1.5 and beyond (IGV's segment scale, as the portal draws it); grey where no segment of the sample reaches. All 4 samples with segments are drawn. Rows: the patient's samples in collection order (the numbers the patient's other views give them). Log ratios are not purity- or ploidy-corrected, and chromosome X reads low in male samples against a female reference.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "List the cohort's samples with segments",
+            "detail": "The segments:samples query above, per study: every sample of the cohort with any copy-number segment (finite segment mean), its segments in the region drawn (whole genome, hg19), and its mean log2 ratio over that region — each segment's mean weighted by the bases of it inside the region. Ordered the patient's samples in collection order (the numbers the patient's other views give them), and cut to the row limit (300).",
+            "params": [
+              [
+                "cohort samples",
+                "4"
+              ],
+              [
+                "with segments",
+                "4"
+              ],
+              [
+                "drawn",
+                "4"
+              ],
+              [
+                "left out by the row limit",
+                "0"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Read the drawn samples' segments",
+            "detail": "The segments:segments query above: the drawn samples' segments in the region, as stored (chromosome 23/24 and a \"chr\" prefix folded to X/Y). Each is drawn at its start and end, coloured by its mean on IGV's segment scale (white within ±0.1, red to +1.5, blue to −1.5).",
+            "params": [
+              [
+                "segments drawn",
+                "291"
+              ],
+              [
+                "drawn samples with no segment in the region",
+                "0"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "runSegments",
+            "segmentSamplesRows",
+            "segmentRows",
+            "geneLocus",
+            "segmentColor"
+          ],
+          "file": "lib/views/segments/run.ts, lib/views/segments/sql.ts, lib/gene-loci.ts, lib/chart/style.ts",
+          "commit": null
+        },
+        "verification": "A drawing of stored segments: each segment mean is drawn as the database holds it, and the only number computed (a row's mean over the region, for sort) is a base-weighted average in the query — so there is no script; the queries are the numbers."
+      }
+    }
+  ]
+}
