@@ -17,6 +17,7 @@ import { runOncoprint } from "./oncoprint/run.ts";
 import { runAttrition } from "./attrition/run.ts";
 import { runGenome } from "./genome/run.ts";
 import { runPathways } from "./pathways/run.ts";
+import { runPathwayMap } from "./pathwaymap/run.ts";
 import { runDiffexpr } from "./diffexpr/run.ts";
 import { runPaired } from "./paired/run.ts";
 import { runClonality } from "./clonality/run.ts";
@@ -106,6 +107,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   attrition: drawn(runAttrition),
   genome: drawn(runGenome),
   pathways: drawn(runPathways),
+  pathwaymap: drawn(runPathwayMap),
   diffexpr: drawn(runDiffexpr),
   paired: drawn(runPaired),
   clonality: drawn(runClonality),

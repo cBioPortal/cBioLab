@@ -46,7 +46,8 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
       // in sample mode, the sample's alterations alone, as the portal's sample view lists them
       ...(genomic ? [v("Genomic alterations", { kind: "alterations", ...(q.sample ? { samples: "cohort" } : {}) })] : []),
     ] },
-    ...(genomic ? [{ title: "Pathways", views: [v("Canonical pathways", { kind: "pathways", measure: "any" })] }] : []),
+    // the portal's PathwayMapper tab: the pathway holding most of the patient's altered genes, then the canonical ten as bars
+    ...(genomic ? [{ title: "Pathways", views: [v("Pathway diagram", { kind: "pathwaymap" }), v("Canonical pathways", { kind: "pathways", measure: "any" })] }] : []),
     { title: "Clinical Data", views: [
       v("Patient", { kind: "table", unit: "patient" }),
       v("Samples", { kind: "table", unit: "sample" }),

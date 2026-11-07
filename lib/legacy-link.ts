@@ -37,6 +37,7 @@ export const RESULTS_TABS: Record<string, Tab> = {
   "Co-expression": t("coexpression", "Co-expression"),
   "Comparison/Survival": t("comparison", "Comparison/Survival"),
   "CN Segments": t("cnSegments", "CN Segments"),
+  "Pathways": t("pathways", "Pathways"),
   "Download": t("download", "Download"),
 };
 /** Comparison/Survival's sub-tabs by their title here (ResultsViewComparisonSubTab); a generic-assay one is `generic_assay_<type>` */

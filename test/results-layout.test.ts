@@ -85,7 +85,7 @@ test("before the profiles are known, the page lays out the tabs that need nothin
   const first = resultsLayout(q(["a"], ["KRAS", "TP53"]), data({ expr: null, cna: null, clinical: [], numeric: [], partial: true }));
   assert.equal(first.partial, true);
   assert.equal(full.partial, undefined);
-  assert.deepEqual(titles(first), ["Oncoprint", "Cancer Types Summary", "Mutual Exclusivity", "Mutations", "Comparison/Survival", "CN Segments", "Download"]);
+  assert.deepEqual(titles(first), ["Oncoprint", "Cancer Types Summary", "Mutual Exclusivity", "Mutations", "Comparison/Survival", "CN Segments", "Pathways", "Download"]);
   assert.ok(!first.left.some((l) => /Co-expression|Plots/.test(l)), "what the profiles decide is not said before they are known");
   // every view laid out first is the same view, under the same name, once the page is whole
   first.names.forEach((n, i) => assert.deepEqual(full.doc.views![full.names.indexOf(n)], first.doc.views![i], n));

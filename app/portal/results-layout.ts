@@ -207,7 +207,9 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       ...(data.assays || []).map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile, cohorts: both })] }))
     ] },
     { title: "CN Segments", views: [v("Genome-wide copy number", { kind: "genome", cohorts: queried })] },
-    // the portal's Download tab, last as there: the files of the queried samples for the query's lines
+    // the portal's PathwayMapper tab: the pathway holding most of the queried genes, each gene's altered %
+    { title: "Pathways", views: [v("Pathways", { kind: "pathwaymap", genes, cohorts: queried })] },
+    // the portal's Download tab, after Pathways, last as there: the files of the queried samples for the query's lines
     { title: "Download", views: [v("Download", { kind: "datafiles", oql: q.entries, cohorts: queried })] }
   ], left, { partial: data.partial || (svHeld && data.svs === undefined) });
 }

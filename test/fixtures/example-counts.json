@@ -219,6 +219,9 @@
       "Colorectal": 5543,
       "Pancreatic": 3109
     },
+    "Pathway diagram: TCGA breast cancer and its most-altered genes": {
+      "all patients": 1084
+    },
     "Differential expression and enrichment: basal-like against luminal A breast cancer": {
       "Basal-like": 171,
       "Luminal A": 499

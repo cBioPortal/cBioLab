@@ -2145,5 +2145,77 @@
     }
    }
   ]
+ },
+ "pathwaymap-4": {
+  "study": "msk_impact_50k_2026",
+  "cohorts": {
+   "Non-Small Cell Lung Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Non-Small Cell Lung Cancer"
+      ]
+     }
+    ]
+   },
+   "Breast Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Breast Cancer"
+      ]
+     }
+    ]
+   },
+   "Colorectal Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Colorectal Cancer"
+      ]
+     }
+    ]
+   },
+   "Prostate Cancer": {
+    "all": [
+     {
+      "kind": "clinical",
+      "attribute": "CANCER_TYPE",
+      "values": [
+       "Prostate Cancer"
+      ]
+     }
+    ]
+   }
+  },
+  "views": [
+   {
+    "kind": "pathwaymap",
+    "genes": [
+     "KRAS",
+     "EGFR",
+     "PIK3CA",
+     "TP53",
+     "BRAF",
+     "ERBB2",
+     "STK11",
+     "KEAP1"
+    ],
+    "pathway": "LUSC-2012-RTK-RAS-PI(3)K-pathway",
+    "pancanOnly": false,
+    "cohorts": [
+     "Non-Small Cell Lung Cancer",
+     "Breast Cancer",
+     "Colorectal Cancer",
+     "Prostate Cancer"
+    ]
+   }
+  ]
  }
 }

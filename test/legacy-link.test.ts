@@ -33,7 +33,7 @@ describe("the Results page on cBioPortal", () => {
   test("every Results tab title maps to the portal's tab id", () => {
     const want: Record<string, string> = { "Oncoprint": "oncoprint", "Cancer Types Summary": "cancerTypesSummary", "Mutual Exclusivity": "mutualExclusivity",
       "Plots": "plots", "Mutations": "mutations", "Structural Variants": "structuralVariants", "Co-expression": "coexpression",
-      "Comparison/Survival": "comparison/overlap", "CN Segments": "cnSegments", "Download": "download" };
+      "Comparison/Survival": "comparison/overlap", "CN Segments": "cnSegments", "Pathways": "pathways", "Download": "download" };
     assert.deepEqual(Object.keys(RESULTS_TABS).sort(), Object.keys(want).sort());
     for (const [title, id] of Object.entries(want)) {
       const l = legacyLink(results(["s"], ["TP53"]), { tab: title }, held("s"));

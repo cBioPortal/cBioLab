@@ -42,6 +42,8 @@ export function dataPart(v: Record<string, unknown>): Record<string, unknown> {
   if (v.kind === "timeline") { const { collapsed, expandGaps, ...rest } = v; void collapsed; void expandGaps; return rest; }
   // the risk model's volcano labels are chosen in the browser, from the whole result
   if (v.kind === "riskmodel") { const { labelAbove, ...rest } = v; void labelAbove; return rest; }
+  // the pathway map's pathway and ranking are applied in the browser, from every library gene's counts
+  if (v.kind === "pathwaymap") { const { pathway, rank, byFrequency, pancanOnly, ...rest } = v; void pathway; void rank; void byFrequency; void pancanOnly; return rest; }
   if (v.kind !== "oncoprint") return v;
   const { sort, display, ...rest } = v;
   void sort;

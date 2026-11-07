@@ -48,6 +48,7 @@ import { organotropismKind } from "./organotropism/kind.ts";
 import { overlapKind } from "./overlap/kind.ts";
 import { pairedKind } from "./paired/kind.ts";
 import { pathwaysKind } from "./pathways/kind.ts";
+import { pathwaymapKind } from "./pathwaymap/kind.ts";
 import { plotKind } from "./plot/kind.ts";
 import { predictiveKind } from "./predictive/kind.ts";
 import { riskmodelKind } from "./riskmodel/kind.ts";
@@ -103,6 +104,7 @@ export const KINDS: { [K in ViewKind]: ViewKindDef<K> } = {
   overlap: overlapKind,
   paired: pairedKind,
   pathways: pathwaysKind,
+  pathwaymap: pathwaymapKind,
   plot: plotKind,
   predictive: predictiveKind,
   riskmodel: riskmodelKind,

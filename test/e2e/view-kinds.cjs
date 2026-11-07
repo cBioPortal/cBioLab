@@ -7,7 +7,7 @@
 /** the kinds this area draws; a kind leaves this list only for an area that checks it more closely */
 const covers = [
   "alterations", "assays", "cancertypes", "clinical", "coexpression", "compare", "cooccurrence",
-  "correlates", "datafiles", "diffexpr", "enrichment", "hotspots", "mutations", "overlap", "pathways", "plot",
+  "correlates", "datafiles", "diffexpr", "enrichment", "hotspots", "mutations", "overlap", "pathwaymap", "pathways", "plot",
   "survival", "sv", "table", "timeline",
 ];
 

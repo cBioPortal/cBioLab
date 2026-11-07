@@ -89,7 +89,10 @@ export const STYLE = {
   },
   ramps: {
     sequential: { from: [222, 235, 247], to: [8, 72, 135] },            // #deebf7 -> #084887
-    diverging: { low: [33, 102, 172], mid: [255, 255, 255], high: [178, 24, 43] }  // #2166ac -> white -> #b2182b
+    diverging: { low: [33, 102, 172], mid: [255, 255, 255], high: [178, 24, 43] },  // #2166ac -> white -> #b2182b
+    // an altered % (0-100) on a pathway diagram's gene node: PathwayMapper's own scale (GenomicDataOverlayManager),
+    // white to red on log(1 + %), reaching `reach` of the way at 100% so a frequent gene is never solid red
+    frequency: { from: [255, 255, 255], to: [255, 0, 0], reach: 0.8 }
   },
   geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17,
     // whitespace between columns: a hairline of this many px, once a column is padMinZoom px wide
@@ -140,6 +143,14 @@ export function numericColor(v: number, center: number | null | undefined, S: St
   if (v <= center) { const t = center ? v / center : 1; return rgb([lerp(low[0], mid[0], t), lerp(low[1], mid[1], t), lerp(low[2], mid[2], t)]); }
   const t = (v - center) / (255 - center || 1);
   return rgb([lerp(mid[0], high[0], t), lerp(mid[1], high[1], t), lerp(mid[2], high[2], t)]);
+}
+
+/** Colour for an altered % (0..100) on a pathway diagram's gene node, as hex (so `textOn` can pick its ink). */
+export function frequencyColor(pct: number, S: Style = STYLE): string {
+  const { from, to, reach } = S.ramps.frequency;
+  const p = Math.max(0, Math.min(100, pct));
+  const t = (Math.log(1 + p) / Math.log(101)) * reach;
+  return "#" + [0, 1, 2].map((i) => lerp(from[i], to[i], t).toString(16).padStart(2, "0")).join("");
 }
 
 // ---- numeric cells: a value scaled to a 0..255 code over the track's min..max -----------------

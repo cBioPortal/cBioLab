@@ -46,6 +46,7 @@ import { organotropismUi } from "./organotropism.tsx";
 import { overlapUi } from "./overlap.tsx";
 import { pairedUi } from "./paired.tsx";
 import { pathwaysUi } from "./pathways.tsx";
+import { pathwaymapUi } from "./pathwaymap.tsx";
 import { plotUi } from "./plot.tsx";
 import { predictiveUi } from "./predictive.tsx";
 import { riskmodelUi } from "./riskmodel.tsx";
@@ -72,6 +73,7 @@ export const KIND_UI: { [K in ViewKind]: KindUi<K> } = {
   attrition: attritionUi,
   genome: genomeUi,
   pathways: pathwaysUi,
+  pathwaymap: pathwaymapUi,
   enrichment: enrichmentUi,
   assays: assaysUi,
   composition: compositionUi,
