@@ -1766,3 +1766,26 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .import-report, .import-studies { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
 .import-report th, .import-report td, .import-studies th, .import-studies td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .import-report td.num, .import-studies td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Evolution figure: the mutation under the pointer (its line or heatmap row, or its table row) stands out */
+.evo-fig .evo-line, .evo-fig .evo-row { transition: opacity 80ms; }
+.evo-fig.evo-hot .evo-line:not(.hot), .evo-fig.evo-hot .evo-row:not(.hot) { opacity: 0.15; }
+.evo-fig .evo-line.hot line[stroke-opacity] { stroke: var(--accent); stroke-opacity: 1; stroke-width: 2.5px; }
+.evo-fig .evo-line.hot circle, .evo-fig .evo-line.hot rect { stroke: var(--accent); }
+.evo-fig .evo-line.hot circle:not([stroke]) { fill: var(--accent); }
+.evo-fig .evo-row.hot > rect:first-child { stroke: var(--accent); stroke-width: 1.5px; }
+.dt-table tr.dt-hot td { background: var(--accent-soft); }
+.evo-fig-wrap { position: relative; }
+.evo-tip {
+  position: absolute; z-index: 20; pointer-events: none; transform: translate(-50%, calc(-100% - 12px));
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.18); padding: 10px 14px; font-size: var(--t-base); line-height: 1.55; white-space: nowrap;
+}
+.evo-tip::after, .evo-tip::before {
+  content: ""; position: absolute; left: var(--arrow, 50%); transform: translateX(-50%); border: 8px solid transparent; border-bottom: 0;
+}
+.evo-tip::before { top: 100%; border-top-color: var(--line); }
+.evo-tip::after { top: calc(100% - 1px); border-top-color: var(--bg); }
+.evo-tip.below { transform: translate(-50%, 12px); }
+.evo-tip.below::before { top: auto; bottom: 100%; border: 8px solid transparent; border-top: 0; border-bottom-color: var(--line); }
+.evo-tip.below::after { top: auto; bottom: calc(100% - 1px); border: 8px solid transparent; border-top: 0; border-bottom-color: var(--bg); }

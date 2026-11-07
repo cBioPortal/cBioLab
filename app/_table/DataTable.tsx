@@ -338,12 +338,16 @@ export interface DataTableProps<V> {
   onRow?: (row: TableRows<V>["rows"][number]) => void;
   /** which row is chosen, highlighted */
   selected?: (row: TableRows<V>["rows"][number]) => boolean;
+  /** the pointer entered a row (null: left the table's rows) — for a figure that highlights the row's mark */
+  onHover?: (row: TableRows<V>["rows"][number] | null) => void;
+  /** which row the figure's pointer is on, highlighted */
+  hot?: (row: TableRows<V>["rows"][number]) => boolean;
   /** a column whose runs of one value are drawn as groups (the alterations view's gene): the value shown on a run's
    *  first row only, no rule inside a run, alternate runs shaded */
   groupBy?: string;
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, num, title, onRow, selected, groupBy }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, num, title, onRow, selected, groupBy, onHover, hot }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -466,13 +470,13 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                   </th>);
               })}
             </tr></thead>
-            <tbody>
+            <tbody onMouseLeave={onHover ? () => onHover(null) : undefined}>
               {p.rows.map((r, k) => {
                 const g = groups ? groups[k] : null;
-                const cls = [onRow ? "dt-pick" + (selected && selected(r) ? " sel" : "") : "", g?.odd ? "dt-galt" : "", g?.more ? "dt-gmid" : ""].filter(Boolean).join(" ");
+                const cls = [onRow ? "dt-pick" + (selected && selected(r) ? " sel" : "") : "", g?.odd ? "dt-galt" : "", g?.more ? "dt-gmid" : "", hot && hot(r) ? "dt-hot" : ""].filter(Boolean).join(" ");
                 return (
                 <tr key={k} className={cls || undefined}
-                  onClick={onRow ? () => onRow(r) : undefined} aria-selected={onRow ? !!(selected && selected(r)) : undefined}>
+                  onClick={onRow ? () => onRow(r) : undefined} onMouseEnter={onHover ? () => onHover(r) : undefined} aria-selected={onRow ? !!(selected && selected(r)) : undefined}>
                   {multi && <td className="meta">{r.cohort}</td>}
                   {multi && <td className="meta">{r.study}</td>}
                   {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>

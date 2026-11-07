@@ -629,6 +629,7 @@
         },
         "drawn": [
           {
+            "key": "STAG2|N141I|23|123176455|123176455|A|T",
             "gene": "STAG2",
             "proteinChange": "N141I",
             "mutationType": "Missense_Mutation",
@@ -660,6 +661,7 @@
             ]
           },
           {
+            "key": "TP53|Q136E|17|7578524|7578524|G|C",
             "gene": "TP53",
             "proteinChange": "Q136E",
             "mutationType": "Missense_Mutation",
@@ -691,6 +693,7 @@
             ]
           },
           {
+            "key": "PIK3CA|E545K|3|178936091|178936091|G|A",
             "gene": "PIK3CA",
             "proteinChange": "E545K",
             "mutationType": "Missense_Mutation",
@@ -722,6 +725,7 @@
             ]
           },
           {
+            "key": "TERT|Promoter|5|1295228|1295228|G|A",
             "gene": "TERT",
             "proteinChange": "Promoter",
             "mutationType": "5'Flank",
@@ -753,6 +757,7 @@
             ]
           },
           {
+            "key": "TP53|R282G|17|7577094|7577094|G|C",
             "gene": "TP53",
             "proteinChange": "R282G",
             "mutationType": "Missense_Mutation",
@@ -784,6 +789,7 @@
             ]
           },
           {
+            "key": "POLE|V1195A|12|133226474|133226474|A|G",
             "gene": "POLE",
             "proteinChange": "V1195A",
             "mutationType": "Missense_Mutation",
@@ -815,6 +821,7 @@
             ]
           },
           {
+            "key": "PIK3R2|D610G|19|18279556|18279556|A|G",
             "gene": "PIK3R2",
             "proteinChange": "D610G",
             "mutationType": "Missense_Mutation",
@@ -846,6 +853,7 @@
             ]
           },
           {
+            "key": "RASA1|H1005R|5|86685298|86685298|A|G",
             "gene": "RASA1",
             "proteinChange": "H1005R",
             "mutationType": "Missense_Mutation",

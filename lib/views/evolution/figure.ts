@@ -7,6 +7,11 @@ import { palette, frame, caption, label, textWidth, legend, linear, log, axisLef
 import { STYLE, numericColor, encodeNumeric } from "../../oncoprint-style.ts";
 import type { EvolutionCell, EvolutionMutation, EvolutionSample } from "./types.ts";
 
+/** the table columns that identify a mutation: one key names its line or heatmap row and its table row alike */
+export const EVOLUTION_KEY_COLUMNS = ["gene", "proteinChange", "chr", "start", "end", "ref", "var"];
+/** A mutation's key from its values in EVOLUTION_KEY_COLUMNS, in that order. */
+export const evolutionKey = (values: (string | number | null)[]) => values.map((x) => x == null ? "" : String(x)).join("|");
+
 /** where a VAF of 0 sits on a log axis: the portal's floor */
 export const LOG_FLOOR = 0.001;
 const MARK_R = 7;
@@ -96,18 +101,19 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
       const t = yOf(c);
       if (t == null) { gap = true; continue; }
       const pt = { x: xs[i], y: yv(t) };
-      if (prev) g.push(`<line x1="${r1(prev.x)}" y1="${r1(prev.y)}" x2="${r1(pt.x)}" y2="${r1(pt.y)}" stroke="${p.ink}" stroke-width="${SW.line}" stroke-opacity="0.55"${gap ? ` stroke-dasharray="3 3"` : ""}/>`);
+      if (prev) g.push(`<line x1="${r1(prev.x)}" y1="${r1(prev.y)}" x2="${r1(pt.x)}" y2="${r1(pt.y)}" stroke="${p.ink}" stroke-width="${SW.line}" stroke-opacity="0.55"${gap ? ` stroke-dasharray="3 3"` : ""}/>`,
+        `<line x1="${r1(prev.x)}" y1="${r1(prev.y)}" x2="${r1(pt.x)}" y2="${r1(pt.y)}" stroke="transparent" stroke-width="8"/>`);
       prev = pt; gap = false;
     }
     for (const { i, c } of pts) {
       const t = yOf(c);
       if (t == null) continue;
       const x = r1(xs[i]), yy = r1(yv(t));
-      g.push(c.status === "called" ? `<circle cx="${x}" cy="${yy}" r="3" fill="${p.ink}"/>`
-        : c.status === "uncalled" ? `<circle cx="${x}" cy="${yy}" r="3" fill="${p.bg}" stroke="${p.ink}" stroke-width="${SW.line}"/>`
-        : `<rect x="${r1(xs[i] - 2.5)}" y="${r1(yv(t) - 2.5)}" width="5" height="5" fill="${p.bg}" stroke="${p.ink}" stroke-width="${SW.line}"/>`);
+      g.push(c.status === "called" ? `<circle data-s="${i}" cx="${x}" cy="${yy}" r="3" fill="${p.ink}"/>`
+        : c.status === "uncalled" ? `<circle data-s="${i}" cx="${x}" cy="${yy}" r="3" fill="${p.bg}" stroke="${p.ink}" stroke-width="${SW.line}"/>`
+        : `<rect data-s="${i}" x="${r1(xs[i] - 2.5)}" y="${r1(yv(t) - 2.5)}" width="5" height="5" fill="${p.bg}" stroke="${p.ink}" stroke-width="${SW.line}"/>`);
     }
-    out.push(`<g class="evo-line"><title>${esc(mutationTip(m, samples))}</title>${g.join("")}</g>`);
+    out.push(`<g class="evo-line"${m.key ? ` data-key="${esc(m.key)}"` : ""}><title>${esc(mutationTip(m, samples))}</title>${g.join("")}</g>`);
   }
   let h = bottom + 6;
   const key = keyRow([
@@ -145,6 +151,7 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
   const y0 = top + 2 * MARK_R + 6;
   drawn.forEach((m, i) => {
     const y = y0 + i * rowH;
+    out.push(`<g class="evo-row"${m.key ? ` data-key="${esc(m.key)}"` : ""}>`, `<rect x="8" y="${r1(y)}" width="${r1(x0 + samples.length * colW - 8)}" height="${rowH}" fill="transparent"/>`);
     out.push(label(x0 - 6, y + rowH / 2 + FS.small * 0.35, mutationName(m), { size: FS.small, fill: p.ink, anchor: "end", maxW: labelW - 6 }));
     const cells = m.cells.map((c, j) => {
       const x = x0 + j * colW, w = colW - gap, h = rowH - gap;
@@ -155,9 +162,9 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
       } else if (c.status === "absent") body = band([0, 1], STYLE.palette.unaltered);
       else if (c.status === "noVaf") body = band([0, 1], STYLE.palette.unaltered) + band(G.mutation.band, G.mutation.single.color);
       else body = band([0, 1], G.notProfiled.fill) + band(G.notProfiled.stripe.band, G.notProfiled.stripe.color);
-      return `<g><title>${esc(mutationName(m) + " in " + samples[j].label + " (" + samples[j].id + "): " + cellText(c))}</title>${body}</g>`;
+      return `<g data-s="${j}"><title>${esc(mutationName(m) + " in " + samples[j].label + " (" + samples[j].id + "): " + cellText(c))}</title>${body}</g>`;
     });
-    out.push(...cells);
+    out.push(...cells, "</g>");
   });
   let h = y0 + drawn.length * rowH + 10;
   // the key: the VAF ramp, then the states without a VAF
@@ -190,5 +197,5 @@ export function evolutionSvg(v: DrawnResultOf<"evolution">, o: SvgOpts & { capti
   y += key.height + 4;
   const cap = caption(o.caption === false ? "" : v.caveat || "", W, y, p.muted);
   return frame(W, y + cap.height + 8, body.svg + key.svg + cap.svg, p.bg, false,
-    "Genomic evolution — " + pt.id + ": " + e.drawn.length + " mutations across " + pt.samples.length + " samples (" + (e.display.chart === "heatmap" ? "heatmap" : "VAF lines") + ")");
+    "Genomic evolution — " + pt.id + ": " + e.drawn.length + " mutations across " + pt.samples.length + " samples (" + (e.display.chart === "heatmap" ? "heatmap" : "VAF lines") + ")", { tip: false });
 }

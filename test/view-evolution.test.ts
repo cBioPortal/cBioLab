@@ -259,7 +259,7 @@ describe("evolution: cells, lines and the figure", () => {
   });
 
   test("a line runs from the first to the last sample with variant reads, as the portal trims it", () => {
-    const m = (st: string[]): EvolutionMutation => ({ gene: "G", proteinChange: "P", mutationType: "", cells: st.map((s) => ({ status: s as never, vaf: s === "absent" ? 0 : 0.3, alt: null, ref: null })) });
+    const m = (st: string[]): EvolutionMutation => ({ key: "G|P", gene: "G", proteinChange: "P", mutationType: "", cells: st.map((s) => ({ status: s as never, vaf: s === "absent" ? 0 : 0.3, alt: null, ref: null })) });
     assert.deepEqual(lineCells(m(["absent", "called", "np", "absent", "uncalled", "absent"])).map((x) => x.i), [1, 2, 3, 4]);
     assert.deepEqual(lineCells(m(["absent", "np"])), []);
     assert.equal(cellText({ status: "noVaf", vaf: null, alt: null, ref: null }), "called, no allele counts");

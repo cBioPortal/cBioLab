@@ -62,6 +62,8 @@ export interface EvolutionSample {
 }
 /** A drawn mutation: its name, and its state in each sample, aligned with the patient's samples. */
 export interface EvolutionMutation {
+  /** the mutation's identity (gene, protein change and genomic event), shared with its table row — `evolutionKey` */
+  key: string;
   gene: string; proteinChange: string; mutationType: string;
   cells: EvolutionCell[];
 }

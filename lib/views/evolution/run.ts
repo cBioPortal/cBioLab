@@ -17,6 +17,7 @@ import {
 } from "./sql.ts";
 import type { EvolutionView, EvolutionResult, EvolutionSample, EvolutionMutation, EvolutionCell, EvolutionStatus } from "./types.ts";
 import { evolutionMethod } from "./method.ts";
+import { EVOLUTION_KEY_COLUMNS, evolutionKey } from "./figure.ts";
 
 type Cell = string | number | null;
 
@@ -168,7 +169,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
     const over = m.total > EVOLUTION_DRAW_MAX;
     const kept = over ? [] : m.rows.map((x) => ({ x, cells: cellsOf(x.cells, order) }));
     const drawn: EvolutionMutation[] | null = over ? null : kept.filter((k) => k.cells.some((c) => c.status === "called"))
-      .map((k) => ({ gene: String(k.x.gene ?? ""), proteinChange: String(k.x.proteinChange ?? ""), mutationType: String(k.x.mutationType ?? ""), cells: k.cells }));
+      .map((k) => ({ key: evolutionKey(EVOLUTION_KEY_COLUMNS.map((id) => cellOf(k.x, EVOLUTION_COLUMNS.find((c) => c.id === id)!))), gene: String(k.x.gene ?? ""), proteinChange: String(k.x.proteinChange ?? ""), mutationType: String(k.x.mutationType ?? ""), cells: k.cells }));
     const noVaf = over ? 0 : kept.length - drawn!.length;
     const noDay = samples.filter((s) => s.day == null).map((s) => s.id);
     const x: EvolutionResult["x"] = view.sequential || noDay.length ? "sequence" : "time";

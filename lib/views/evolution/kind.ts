@@ -28,5 +28,4 @@ export const evolutionKind: ViewKindDef<"evolution"> = {
     text: "Follows one patient's mutations across their tumour samples, as cBioPortal's Genomic Evolution tab does. For each mutation, the share of the sequencing reads at its position that carry it (the variant allele frequency, VAF) is drawn in every sample, in the order the samples were taken: a line per mutation, or a heatmap with a row per mutation. A mutation that rises, appears or disappears between samples shows how the tumour changed. A sample whose test did not cover the gene is marked not profiled — it is not counted as zero. Below the chart, the mutations as a table you can search, filter and sort; the chart draws the mutations the table keeps. Step to the previous or next patient with the arrows (or the ← and → keys), or open the patient list.",
   },
   need: "patients",
-  e2ePending: "new kind: the line chart, heatmap and table layout may still change after review",
 };
