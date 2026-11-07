@@ -121,6 +121,56 @@ async function tables({ browser, ok, BASE }) {
     ok("results structural variants: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
+  // The Structural Variants table's controls, on TCGA prostate's TMPRSS2–ERG fusion, reached by the tab's own
+  // link. The portal's /api/structural-variant/fetch: 236 TMPRSS2 calls (194 with ERG as the partner), 220 ERG calls.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 }, acceptDownloads: true });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    try {
+      await page.goto(BASE + "/portal/results?study=prad_tcga_pan_can_atlas_2018&genes=TMPRSS2%20ERG&tab=Structural%20Variants", { waitUntil: "domcontentloaded" });
+      const title = page.locator(".dt-title").first();
+      const count = async (gene) => {
+        await page.waitForFunction((g) => new RegExp("^(?:[\\d,]+ of )?[\\d,]+ " + g + " structural variants").test(document.querySelector(".dt-title")?.textContent || "")
+          && !document.querySelector(".dt-wait") && !document.querySelector(".dt-bar .waiting"), gene, { timeout: 240000 });
+        await page.waitForTimeout(200);
+        const m = /^(?:([\d,]+) of )?([\d,]+)/.exec(await title.innerText());
+        return { kept: Number((m[1] || m[2]).replace(/,/g, "")), all: Number(m[2].replace(/,/g, "")) };
+      };
+      const all = await count("TMPRSS2");
+      const selected = await page.locator("[role=tab][aria-selected=true]").allInnerTexts();
+      ok("results: ?tab=Structural Variants opens the tab on the first gene, with the portal's TMPRSS2 count",
+        selected.includes("Structural Variants") && all.all === 236, selected.join(", ") + " · " + JSON.stringify(all));
+      const heads = (await page.locator(".dt-table thead th").allInnerTexts()).map((x) => x.trim()).filter(Boolean);
+      ok("results: the SV table shows the portal's default columns, in its order",
+        ["Sample ID", "Cancer Type Detailed", "Gene 1", "Gene 2", "Annotation (OncoKB)", "Connection Type", "Event Info", "Variant Class"].every((c, i) => heads[i]?.startsWith(c)),
+        heads.join(" | "));
+      const link = page.locator(".dt-table tbody tr td a").first();
+      const href = (await link.getAttribute("href")) || "";
+      ok("results: an SV row's sample id opens that sample's page",
+        href.startsWith("/portal/patient?") && href.includes("study=prad_tcga_pan_can_atlas_2018") && href.includes("sample=" + encodeURIComponent((await link.innerText()).trim())), href);
+      await page.locator(".dt-search input").fill("ERG");
+      await page.locator(".dt-search input").press("Enter");
+      await page.waitForTimeout(300);
+      const searched = await count("TMPRSS2");
+      ok("results: searching the SV table keeps the TMPRSS2–ERG calls", searched.kept === 194 && searched.all === 236, JSON.stringify(searched));
+      const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 120000 }).catch(() => null), page.locator("form[action='/api/table'] button").first().click()]);
+      const csv = dl ? require("fs").readFileSync(await dl.path(), "utf8") : "";
+      const lines = csv.trim().split(/\r?\n/);
+      ok("results: the SV CSV holds the kept rows, named for the gene, the study named once", !!dl && /TMPRSS2_structural_variants/.test(dl.suggestedFilename()) && lines.length - 1 === 194 && lines[0].startsWith("cohort,study,sample,cancerType,gene1,"),
+        (dl ? dl.suggestedFilename() : "no download") + " · " + (lines.length - 1) + " rows, header " + lines[0].slice(0, 60));
+      // a new gene starts from a fresh table: the search does not carry over
+      await page.getByRole("tab", { name: "ERG", exact: true }).click();
+      const erg = await count("ERG");
+      ok("results: the ERG chip lists ERG's calls, with the search reset", erg.kept === 220 && erg.all === 220 && (await page.locator(".dt-search input").inputValue()) === "",
+        JSON.stringify(erg));
+    } catch (e) {
+      ok("results: the Structural Variants table's controls", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("results structural variant table: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
 }
 
 module.exports = { tables };
