@@ -39,12 +39,10 @@ every profile sums to 1). The profiles are COSMIC's: *COSMIC Mutational Signatur
 Sanger Institute (https://cancer.sanger.ac.uk/signatures), from Alexandrov et al., *The repertoire
 of mutational signatures in human cancer*, Nature 578, 94–101 (2020).
 
-- **Licence — needs a reviewer's decision.** cbioportal-frontend is Apache-2.0 and ships the file
-  with no attribution or licence of its own. COSMIC's signature download page needs no login but
-  says use of the data is subject to the COSMIC Terms and Conditions, and COSMIC licenses its data
-  separately for non-commercial use and (through QIAGEN) commercial use. Nothing found grants the
-  signatures under an open licence, so redistributing this copy rests on the same footing as
-  cBioPortal's own; someone should confirm that is acceptable before this merges.
+- **Licence.** cbioportal-frontend is Apache-2.0 and ships the file with no attribution or licence
+  of its own. COSMIC's signature download page needs no login and says use of the data is subject
+  to the COSMIC Terms and Conditions (separate non-commercial and commercial licences). This copy
+  is redistributed on the same footing as cBioPortal's own.
 
 **Deliberate differences.** A study without a p-value profile marks nothing significant — the
 portal reads the missing p-value as 0, which would call every signature significant in its header.
@@ -52,8 +50,9 @@ A missing contribution is NA, not 0 as the portal's table fills it. Where this c
 the portal's:
 
 - *Shares are exact*, not rounded to whole percent (the portal draws 0.4% as 0).
-- *ID labels are COSMIC's*: a deletion's count from 1 (the stored 0 is drawn 1, 5 is 6+), an
-  insertion's from 0 (5 is 5+). The portal adds the 1 to insertions instead, which mislabels both.
+- *ID labels are COSMIC's* (decided in review): a deletion's count from 1 (the stored 0 is drawn 1,
+  5 is 6+), an insertion's from 0 (5 is 5+). The portal adds the 1 to insertions instead, which
+  mislabels both.
 - *Hover tips say more*: a bar names its channel, count, total and share (the portal's shows only
   the label, "ACA"); a reference bar names the signature, channel, percent to two places and the
   source (the portal's: "ACAA 1%").
@@ -65,7 +64,7 @@ the portal's:
   exports; the toolbar sits in the card's header; the portal's SVG/PNG/PDF buttons are the card's
   own export.
 - The table spans the card and lists every signature, as the portal's, with an "above 0 in some
-  sample" filter to tick. Each name has the portal's ⓘ: hovering or focusing it opens a card the
+  sample" filter to tick. Each name has the portal's ⓘ (white on a black circle, as the header's; `app/_ui/info-button.tsx`): hovering or focusing it opens a card the
   pointer can move into — "Signature: …", "Description: …", "External link to signature (opens new
   tab)" — with the portal's "No description/url annotated in data" fallbacks, spelled correctly
   (the portal's say "annnotated"). The header's significant-signatures badge is not drawn.

@@ -15,8 +15,8 @@ import { OptionSelect } from "../_ui/choice.tsx";
 import { Button } from "../_ui/button";
 import { TB } from "../_ui/toolbar.ts";
 import { Slider } from "../_ui/slider";
-import { Info } from "lucide-react";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
+import { InfoButton, InfoLine } from "../_ui/info-button.tsx";
 
 type Spec = { patient?: PatientKey; version?: string; sample?: string; scale?: "percent" | "count"; signature?: string; ymax?: number } & Record<string, unknown>;
 
@@ -38,9 +38,9 @@ type InfoTip = { row: SignatureRow; at: TipBox };
 function SignatureInfo({ row, show }: { row: SignatureRow; show: (t: InfoTip | null, x: number, y: number) => void }) {
   const open = (el: HTMLElement, x: number, y: number) => { const b = el.getBoundingClientRect(); show({ row, at: { left: b.left, top: b.top, right: b.right, bottom: b.bottom } }, x, y); };
   return (
-    <Button type="button" variant="ghost" size="icon-xs" className="ml-1 align-middle" aria-label={"about " + row.name}
+    <InfoButton aria-label={"about " + row.name}
       onClick={(e) => e.stopPropagation()} onPointerEnter={(e) => open(e.currentTarget, e.clientX, e.clientY)} onPointerLeave={(e) => show(null, e.clientX, e.clientY)}
-      onFocus={(e) => { const b = e.currentTarget.getBoundingClientRect(); open(e.currentTarget, b.left, b.top); }}><Info /></Button>
+      onFocus={(e) => { const b = e.currentTarget.getBoundingClientRect(); open(e.currentTarget, b.left, b.top); }} />
   );
 }
 
@@ -71,8 +71,8 @@ export function SignaturesBody({ v, spec, vi, updating, docJson, patch, fixed }:
   const canPick = (r: SignatureRow) => !!sp && s.referenced.includes(r.name);
   const cols = useMemo((): Col<SignatureRow>[] => [
     { key: "name", label: "Mutational signature", value: (r) => r.name,
-      render: (r) => <><span data-tip={sp && !s.referenced.includes(r.name) ? "no COSMIC reference profile to draw under the spectrum" : undefined}>{r.name}</span>
-        <SignatureInfo row={r} show={showInfo} /></> },
+      render: (r) => <InfoLine><span data-tip={sp && !s.referenced.includes(r.name) ? "no COSMIC reference profile to draw under the spectrum" : undefined}>{r.name}</span>
+        <SignatureInfo row={r} show={showInfo} /></InfoLine> },
     ...s.profiled.map((id, i): Col<SignatureRow> => ({ key: "s" + i, label: id, num: true, value: (r) => r.values[i].value,
       title: p?.samples.find((x) => x.id === id)?.type || undefined,
       render: (r) => { const x = r.values[i]; const sig = x.p != null && x.p < SIGNIFICANT_P;
@@ -115,8 +115,9 @@ export function SignaturesBody({ v, spec, vi, updating, docJson, patch, fixed }:
         </div>
       ) : <p className="meta">No patient to draw: no patient of the cohort has mutational-signature values.</p>}
       {p && sp && s.version && (
-        <p className="my-2 text-sm"><strong>Sample:</strong> {sp.sample} | <strong>{countLabel(s.version)} count:</strong> {sp.total}
-          <Button type="button" variant="ghost" size="icon-xs" className="text-muted-foreground align-middle" aria-label="about this count" data-tip={COUNT_TIP}><Info /></Button></p>)}
+        <p className="my-2 text-sm">
+          <InfoLine><span><strong>Sample:</strong> {sp.sample} | <strong>{countLabel(s.version)} count:</strong> {sp.total}</span>
+            <InfoButton aria-label="about this count" data-tip={COUNT_TIP} /></InfoLine></p>)}
       {p && s.notProfiled.length > 0 && <p className="note">{s.notProfiled.join(", ")} {s.notProfiled.length === 1 ? "is" : "are"} not profiled for mutational signatures.</p>}
       <div ref={box} className={"tl-fig" + (updating ? " stale" : "")}>
         {p && svg && <div dangerouslySetInnerHTML={{ __html: svg }} />}
