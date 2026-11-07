@@ -54,6 +54,7 @@ import { sequenceKind } from "./sequence/kind.ts";
 import { survivalKind } from "./survival/kind.ts";
 import { tableKind } from "./table/kind.ts";
 import { timelineKind } from "./timeline/kind.ts";
+import { evolutionKind } from "./evolution/kind.ts";
 import { txendpointsKind } from "./txendpoints/kind.ts";
 
 /** one entry per kind: a kind in the View union without one is a type error here */
@@ -62,6 +63,7 @@ export const KINDS: { [K in ViewKind]: ViewKindDef<K> } = {
   actionability: actionabilityKind,
   adjusted: adjustedKind,
   alterations: alterationsKind,
+  evolution: evolutionKind,
   assays: assaysKind,
   attrition: attritionKind,
   cancertypes: cancertypesKind,

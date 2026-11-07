@@ -1,0 +1,63 @@
+Analysis over glioma_msk_2018 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- Glioma: 42 patients — all samples in the study
+
+Genomic evolution — patients to choose from (two or more samples, with allele counts): 36; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	patient	samples	mutations	withVaf
+  Glioma	IM-GBM-7	6	17	17
+  Glioma	IM-GBM-28	4	8	8
+  Glioma	IM-GBM-10	3	7	7
+  Glioma	IM-GBM-15	3	9	9
+  Glioma	IM-GBM-17	3	6	6
+  Glioma	IM-GBM-21	3	9	9
+  Glioma	IM-GBM-30	3	5	5
+  Glioma	IM-GBM-34	3	267	267
+  Glioma	IM-GBM-36	3	171	171
+  Glioma	IM-GBM-1	2	13	13
+  Glioma	IM-GBM-11	2	7	7
+  Glioma	IM-GBM-12	2	2	2
+  Glioma	IM-GBM-13	2	2	2
+  Glioma	IM-GBM-14	2	5	5
+  Glioma	IM-GBM-16	2	3	3
+  Glioma	IM-GBM-18	2	4	4
+  Glioma	IM-GBM-19	2	5	5
+  Glioma	IM-GBM-2	2	6	6
+  Glioma	IM-GBM-20	2	7	7
+  Glioma	IM-GBM-22	2	9	9
+  Glioma	IM-GBM-23	2	6	6
+  Glioma	IM-GBM-24	2	3	3
+  Glioma	IM-GBM-25	2	7	7
+  Glioma	IM-GBM-26	2	4	4
+  Glioma	IM-GBM-27	2	3	3
+  … 11 more rows
+IM-GBM-28 (glioma_msk_2018); samples in order: 1 = Patient-28-T1 (Primary), day 0; 2 = Patient-28-T3 (Recurrence), day 227; 3 = Patient-28-T2 (Recurrence), day 903; 4 = Patient-28-CSF (Unknown_Tumor), day 1279
+VAF of each drawn mutation by sample (8 drawn, placed by collection day):
+  STAG2 N141I: 1 VAF 0.81 (134 of 166 reads); 2 not found (0 of 416 reads); 3 VAF 0.28 (48 of 174 reads); 4 not found (0 of 231 reads)
+  TP53 Q136E: 1 VAF 0.76 (125 of 164 reads); 2 not found (0 of 290 reads); 3 VAF 0.24 (175 of 721 reads); 4 not found (0 of 324 reads)
+  PIK3CA E545K: 1 VAF 0.42 (89 of 213 reads); 2 not found (0 of 288 reads); 3 VAF 0.11 (101 of 934 reads); 4 not found (0 of 144 reads)
+  TERT Promoter: 1 VAF 0.39 (18 of 46 reads); 2 VAF 0.40 (30 of 75 reads); 3 VAF 0.20 (50 of 249 reads); 4 VAF 0.11 (36 of 332 reads)
+  TP53 R282G: 1 not found (0 of 208 reads); 2 VAF 0.80 (404 of 506 reads); 3 not found (0 of 508 reads); 4 VAF 0.24 (104 of 439 reads)
+  POLE V1195A: 1 not found (0 of 133 reads); 2 VAF 0.26 (61 of 237 reads); 3 not found (0 of 160 reads); 4 VAF 0.10 (33 of 333 reads)
+  PIK3R2 D610G: 1 not found (0 of 132 reads); 2 VAF 0.26 (108 of 423 reads); 3 not found (0 of 470 reads); 4 VAF 0.15 (58 of 392 reads)
+  RASA1 H1005R: 1 not found (0 of 299 reads); 2 VAF 0.15 (55 of 371 reads); 3 not found (0 of 205 reads); 4 not found (0 of 255 reads)
+Mutation table: 8 rows; the first 8, tab-separated (the web app's view pages and downloads every row, with every column):
+  cohort	samples	gene	proteinChange	mutationType	vafs	maxVaf
+  Glioma	Patient-28-T1, Patient-28-T2	STAG2	N141I	Missense_Mutation	1: 0.81 · 2: not found · 3: 0.28 · 4: not found	0.807
+  Glioma	Patient-28-T1, Patient-28-T2	TP53	Q136E	Missense_Mutation	1: 0.76 · 2: not found · 3: 0.24 · 4: not found	0.762
+  Glioma	Patient-28-T1, Patient-28-T2	PIK3CA	E545K	Missense_Mutation	1: 0.42 · 2: not found · 3: 0.11 · 4: not found	0.418
+  Glioma	Patient-28-T1, Patient-28-T3, Patient-28-T2, Patient-28-CSF	TERT	Promoter	5'Flank	1: 0.39 · 2: 0.40 · 3: 0.20 · 4: 0.11	0.4
+  Glioma	Patient-28-T3, Patient-28-CSF	TP53	R282G	Missense_Mutation	1: not found · 2: 0.80 · 3: not found · 4: 0.24	0.798
+  Glioma	Patient-28-T3, Patient-28-CSF	POLE	V1195A	Missense_Mutation	1: not found · 2: 0.26 · 3: not found · 4: 0.10	0.257
+  Glioma	Patient-28-T3, Patient-28-CSF	PIK3R2	D610G	Missense_Mutation	1: not found · 2: 0.26 · 3: not found · 4: 0.15	0.255
+  Glioma	Patient-28-T3	RASA1	H1005R	Missense_Mutation	1: not found · 2: 0.15 · 3: not found · 4: not found	0.148
+  CAVEAT (tell the user): IM-GBM-28: 4 samples in collection order, placed by the day each was collected (days from diagnosis, from the study's timeline). 8 mutations; 8 are drawn. VAF is variant reads ÷ (variant + reference reads) in each sample. A mutation called in one sample is followed into the others: there it is an uncalled mutation where the study's uncalled-mutations profile found variant reads (drawn with that VAF), not found (VAF 0) where the sample was sequenced for the gene, or NOT PROFILED where the sample's panel does not cover the gene — never 0. A line joins a mutation's VAFs from the first to the last sample with variant reads, as the portal draws it; it bridges a not-profiled sample, or one called without allele counts, with a dashed segment. Fusions recorded as mutations are left out, as the portal leaves them out. The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: 36 patients. Sorted with the most samples first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
+  METHOD:
+    - Count the patients per cohort and study: The evolution:counts query above: every patient of each cohort with two or more samples and at least one called mutation with allele counts (variant reads above zero, and reference reads), with their sample count, called mutations and those with allele counts.
+        Glioma · glioma_msk_2018: 36
+    - Sort them together and take one page: The evolution:rows query above: the patients of every cohort and study combined in one query, sorted most samples first, then by patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset.
+    - Read IM-GBM-28's samples and mutations: The patient's samples (evolution:samples, with the gene panel each was sequenced with for mutations) and timeline (for each sample's collection day), numbered in collection order; then evolution:mutations: every mutation called in any of the patient's samples (fusions left out), merged across samples by gene, protein change and genomic position as the portal merges them, with its state in every sample — called (VAF = variant reads ÷ (variant + reference reads)), called without allele counts, uncalled with variant reads (the study's uncalled-mutations profile; drawn with its VAF), not found in a sample sequenced for the gene (VAF 0), or not profiled (the sample's panel omits the gene, or it was not sequenced for mutations: no VAF). The figure draws every mutation the table's query keeps that has a VAF in some sample where it was called.
+        samples: 4
+        mutations: 8
+        drawn: 8
+    A listing of one patient's reads: each VAF is the ratio of two counts the query returns, with nothing else computed, so there is no script — the queries are the numbers.

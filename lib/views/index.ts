@@ -33,6 +33,7 @@ import { runTable } from "./table/run.ts";
 import { runMutations } from "./mutations/run.ts";
 import { runAlterations } from "./alterations/run.ts";
 import { runTimeline } from "./timeline/run.ts";
+import { runEvolution } from "./evolution/run.ts";
 import { runAcquired } from "./acquired/run.ts";
 import { runCtdna } from "./ctdna/run.ts";
 import { runExclusivity } from "./exclusivity/run.ts";
@@ -123,6 +124,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   mutations: drawn(runMutations),
   alterations: drawn(runAlterations),
   timeline: drawn(runTimeline),
+  evolution: drawn(runEvolution),
   acquired: drawn(runAcquired),
   ctdna: reportsLeftOut(drawn(runCtdna), () => OS, drew("survival")),
   exclusivity: drawn(runExclusivity),

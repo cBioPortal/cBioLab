@@ -50,6 +50,7 @@ import { mutationsDoc } from "./mutations/doc.ts";
 import { tableDoc } from "./table/doc.ts";
 import { timelineDoc } from "./timeline/doc.ts";
 import { alterationsDoc } from "./alterations/doc.ts";
+import { evolutionDoc } from "./evolution/doc.ts";
 import { correlatesDoc } from "./correlates/doc.ts";
 import { oncoprintDoc } from "./oncoprint/doc.ts";
 
@@ -100,6 +101,7 @@ export const KIND_DOCS: Record<ViewKind, KindDoc> = {
   table: tableDoc,
   timeline: timelineDoc,
   alterations: alterationsDoc,
+  evolution: evolutionDoc,
   correlates: correlatesDoc,
   oncoprint: oncoprintDoc,
 };

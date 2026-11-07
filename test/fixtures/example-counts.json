@@ -338,6 +338,9 @@
     "A patient's mutations, copy-number alterations and structural variants": {
       "Prostate": 3211
     },
+    "A glioma's mutations across four samples over three and a half years": {
+      "Glioma": 42
+    },
     "KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first": {
       "Colorectal": 5543
     }

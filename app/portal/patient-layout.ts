@@ -51,7 +51,8 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
       v("Patient", { kind: "table", unit: "patient" }),
       v("Samples", { kind: "table", unit: "sample" }),
     ] },
-    ...(q.sample ? [] : [{ title: "Genomic Evolution", views: [], pending: "Each alteration's allele frequency across the patient's samples, in sample order, as a line per alteration and a heatmap — the portal's Genomic Evolution tab, for a patient with more than one sample." }]),
+    // each mutation's allele frequency across the patient's samples; the view says so when the patient has one sample or no allele counts
+    ...(q.sample || !data.held.includes("MUTATION") ? [] : [{ title: "Genomic Evolution", views: [v("Genomic evolution", { kind: "evolution" })] }]),
     ...(signatures ? [{ title: "Mutational Signatures", views: [], pending: "The patient's samples' signature contributions from " + signatures.profile + ", as the portal's Mutational Signatures tab draws them: a bar per signature, and the 96-channel spectrum." }] : []),
     { title: "Files & Links", views: [], pending: "Links out for the patient and each sample: the study's resource data (pathology reports, slide images) as the portal's Files & Links tab lists them." },
     { title: "Clinical Trials", views: [], pending: "Trials the patient's OncoKB-annotated alterations and cancer type match, as the portal's Clinical Trials tab lists them." },

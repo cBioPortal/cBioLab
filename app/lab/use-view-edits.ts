@@ -121,7 +121,7 @@ export function useViewEdits(page: ViewEditsPage) {
     if (next.splitBy && names.length === 1 && next.splitBy.cohort !== names[0])
       next.splitBy = { ...next.splitBy, cohort: names[0] };
     // a timeline's (or alterations view's) patient belongs to its cohort: another cohort starts at its own first patient
-    if ((next.kind === "timeline" || next.kind === "alterations") && JSON.stringify(next.cohorts) !== JSON.stringify(v.cohorts)) delete next.patient;
+    if ((next.kind === "timeline" || next.kind === "alterations" || next.kind === "evolution") && JSON.stringify(next.cohorts) !== JSON.stringify(v.cohorts)) delete next.patient;
     return next;
   });
   const setViewAttrs = (vi: number, attributes: string[]) => updateView(vi, (v: any) => ({ ...v, attributes }));
