@@ -343,6 +343,9 @@
     },
     "KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first": {
       "Colorectal": 5543
+    },
+    "ALK, ROS1 and RET structural variants in MSK-IMPACT": {
+      "MSK-IMPACT": 10336
     }
   }
 }

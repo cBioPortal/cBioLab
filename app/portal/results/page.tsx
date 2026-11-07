@@ -11,7 +11,7 @@ import { useLinkParams } from "../../_links/use-link.ts";
 import { PortalTabs } from "../PortalTabs";
 import { useQueryKnown, expressionProfile, discreteCnaProfile, assayComparisonProfiles } from "../study-known";
 import { usePageDoc } from "../page-doc";
-import { resultsLayout } from "../results-layout.ts";
+import { resultsLayout, svCheckCohort } from "../results-layout.ts";
 import { Button } from "../../_ui/button";
 import { TB } from "../../_ui/toolbar.ts";
 import { Pencil } from "lucide-react";
@@ -25,6 +25,7 @@ import { QueryGenesDialog, RESULTS_MAX_GENES, readResultsTarget, studiesProblem 
 import { QueryFlow } from "../../_home/query-flow.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../_ui/dialog";
 import { checkGeneQuery } from "../../../lib/gene-query.ts";
+import type { CohortDef } from "../../../lib/types.ts";
 import { resultsMaxStudies, crossStudyExpression, expressionAcross, isExpressionProfile, isExpressionType } from "../../../lib/results-settings.ts";
 
 const IDS_SHOWN = 3;
@@ -44,28 +45,38 @@ export default function ResultsPage() {
   const across = expressionAcross(studies, crossStudyExpression(env));
   // laid out in two steps: from the study list the tabs that need nothing else, so the oncoprint
   // starts at once; with the profiles and attributes Explore's facets give, the rest
+  // whether the queried patients carry a structural variant in a queried gene: asked beside the header's count (below)
+  const [svs, setSvs] = useState<boolean | null | undefined>(undefined);
   const fresh = useMemo(() => basics && genes.length && genes.length <= RESULTS_MAX_GENES && !queryError
     ? resultsLayout({ studies, filters, entries: check.entries.map((e) => e.text), genes }, known ? {
         expr: expressionProfile(known.profileCatalog), cna: discreteCnaProfile(known.profileCatalog), clinical: known.clinical,
         numeric: known.attrs.filter((a) => a.kind === "num").map((a) => a.attribute), expressionAcross: across, held: known.held,
-        assays: assayComparisonProfiles(known.profileCatalog) }
-      : { expr: null, cna: null, clinical: [], numeric: [], expressionAcross: across, held: basics.held, partial: true })
-    : null, [basics, known, studies, filters, check, genes, queryError, across]);
+        assays: assayComparisonProfiles(known.profileCatalog), svs }
+      : { expr: null, cna: null, clinical: [], numeric: [], expressionAcross: across, held: basics.held, partial: true, svs })
+    : null, [basics, known, studies, filters, check, genes, queryError, across, svs]);
   const page = usePageDoc(fresh);
   // the header's "altered in N of the queried": its own request, beside the tabs', so no tab waits for it
   const [altered, setAltered] = useState<{ altered: number; queried: number } | null>(null);
   const groups = fresh?.doc.cohorts;
   const groupsKey = JSON.stringify(groups || null);
+  const svHeld = !!basics && (basics.held.every.includes("SV") || basics.held.some.includes("SV"));
   useEffect(() => {
     setAltered(null);
+    setSvs(undefined);
     if (!groups) return;
     const ctl = new AbortController();
-    api.analysis({ study: fresh!.doc.study, cohorts: { Altered: groups.Altered, Queried: groups.Queried }, views: [] }, { signal: ctl.signal })
+    // the Structural Variants tab's check rides on the same request, as a third cohort counted beside these
+    const fused: Record<string, CohortDef> = svHeld ? { Fused: svCheckCohort({ studies, filters, entries: check.entries.map((e) => e.text), genes }) } : {};
+    api.analysis({ study: fresh!.doc.study, cohorts: { Altered: groups.Altered, Queried: groups.Queried, ...fused }, views: [] }, { signal: ctl.signal })
       .then((r) => r.json())
-      .then((j) => { if (!j.error) setAltered({ altered: j.cohorts?.Altered?.count ?? 0, queried: j.cohorts?.Queried?.count ?? 0 }); })
-      .catch(() => {});
+      .then((j) => {
+        if (j.error) { if (svHeld) setSvs(null); return; }
+        setAltered({ altered: j.cohorts?.Altered?.count ?? 0, queried: j.cohorts?.Queried?.count ?? 0 });
+        if (svHeld) setSvs(typeof j.cohorts?.Fused?.count === "number" ? j.cohorts.Fused.count > 0 : null);
+      })
+      .catch(() => { if (!ctl.signal.aborted && svHeld) setSvs(null); });
     return () => ctl.abort();
-  }, [groupsKey]);   // eslint-disable-line react-hooks/exhaustive-deps -- `groupsKey` is the groups, by value
+  }, [groupsKey, svHeld]);   // eslint-disable-line react-hooks/exhaustive-deps -- `groupsKey` is the groups, by value
   const [modifying, setModifying] = useState(false);
   const [editingGenes, setEditingGenes] = useState(false);
   const shell = (body: React.ReactNode) => <><SiteHeader page="query results" /><main className="analysis-main">{body}</main></>;

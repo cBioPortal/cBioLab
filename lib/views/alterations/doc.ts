@@ -17,7 +17,7 @@ export const alterationsDoc: KindDoc = {
       title: "A patient's mutations, copy-number alterations and structural variants",
       snapshot: "alterations",
       demonstrates: "An `alterations` view, the portal's patient-view genomic tables: three tables in one view — Mutations, Copy Number Alterations, Structural Variants — for the chosen patient, with the cohort's patients listed to choose from. Each table has its own query under its own key (`mutations`, `cna`, `sv`: columns, search, filters, sort, rows); the top-level query is the patient list's. A variant, call or event is one row however many of the patient's samples carry it. Only a study that may disclose patients takes part.",
-      tags: ["data-table", "patient", "cna", "sv"],
+      tags: ["data-table", "patient", "cna", "structural-variants"],
       note: "MSK-CHORD prostate cancer patients, those with the most structural variants first; P-0024249's tables, mutations kept to OncoKB-oncogenic calls.",
       doc: {
         study: "msk_chord_2024",

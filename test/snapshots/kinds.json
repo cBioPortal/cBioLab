@@ -8,6 +8,7 @@
     "composition",
     "table",
     "mutations",
+    "sv",
     "timeline",
     "alterations",
     "evolution",
@@ -3356,6 +3357,99 @@
       "sub": null,
       "title": "Survival"
     },
+    "sv": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1"
+        ],
+        "kind": "sv"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "ALK",
+          "ROS1",
+          "RET"
+        ],
+        "kind": "sv"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1"
+        ],
+        "kind": "sv"
+      },
+      "card": {
+        "defaults": {
+          "genes": [
+            "TP53",
+            "KRAS",
+            "EGFR",
+            "STK11",
+            "KEAP1"
+          ],
+          "kind": "sv"
+        },
+        "defaultsBareStudy": {
+          "genes": [
+            "ALK",
+            "ROS1",
+            "RET"
+          ],
+          "kind": "sv"
+        },
+        "genes": true,
+        "label": "Structural variant table (genes)",
+        "maxCohorts": 6,
+        "title": "Structural variants",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": true,
+      "emptyHint": "It draws up to 6 cohorts, side by side.",
+      "figureTitle": "Structural variants — A vs B",
+      "headTitle": "Structural variants",
+      "help": {
+        "text": "Lists every structural variant — a fusion, deletion, duplication, inversion or translocation — that involves one of your genes, in the samples of your groups, one row per variant: which sample it was in, the two genes joined, how they are joined, and the study's own description of the event. Click a column to sort by it; the download saves every row. The note under the table says how many samples were tested for each gene's structural variants.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 6,
+      "menu": {
+        "label": "Structural variant table (genes)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": "Cannot be drawn without leaving out the patients of s1 — primary answers with aggregate counts only."
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": "patients",
+      "preview": null,
+      "sub": "TP53, KRAS, EGFR, STK11, KEAP1 · every structural variant",
+      "title": "Structural variant table (genes)"
+    },
     "table": {
       "added": {
         "cohorts": [
@@ -3592,6 +3686,7 @@
     "composition",
     "table",
     "mutations",
+    "sv",
     "timeline",
     "alterations",
     "evolution",

@@ -49,18 +49,20 @@ export async function POST(req: Request) {
     (v.kind === "table" ? "clinical_" + v.table.unit + "s" : v.kind === "timeline" ? "timeline_patients"
       : v.kind === "alterations" ? (table && v.alterations?.patient ? v.alterations.patient.id + "_" + table : "alterations_patients")
       : v.kind === "evolution" ? (table && v.evolution?.patient ? v.evolution.patient.id + "_evolution_" + table : "evolution_patients")
-      : v.kind === "mutations" ? v.mutations.gene + "_mutations" : v.kind) + (filtered ? "_filtered" : "") + ".csv";
+      : v.kind === "mutations" ? v.mutations.gene + "_mutations" : v.kind === "sv" ? v.sv.genes.join("-") + "_structural_variants" : v.kind) + (filtered ? "_filtered" : "") + ".csv";
+  // every line leads with the row's cohort and study, so a table's own column of the same name is not repeated
+  const keep = t.columns.map((c, i) => (c.id === "cohort" || c.id === "study" ? -1 : i)).filter((i) => i >= 0);
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        controller.enqueue(enc.encode(line(["cohort", "study", ...t.columns.map((c) => c.id)])));
+        controller.enqueue(enc.encode(line(["cohort", "study", ...keep.map((i) => t.columns[i].id)])));
         // one order across every cohort and study: page through it whole, as the page view does
         for (let offset = 0; offset < t.total; offset += TABLE_CHUNK) {
           const r = await run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table }));
           const page = r.views[0];
           const p = pagedTable(page, table);
           if (!p) throw new Error(page.error || "the page at row " + offset + " returned nothing");
-          controller.enqueue(enc.encode(p.rows.map((row) => line([row.cohort, row.study, ...row.values])).join("")));
+          controller.enqueue(enc.encode(p.rows.map((row) => line([row.cohort, row.study, ...keep.map((i) => row.values[i])])).join("")));
         }
         controller.close();
       } catch (e) {

@@ -1,0 +1,906 @@
+{
+  "study": "msk_impact_2017",
+  "cohorts": {
+    "MSK-IMPACT": {
+      "count": 10336,
+      "samples": 10945,
+      "text": "all samples in the study",
+      "studies": [
+        "msk_impact_2017"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "sv",
+      "cohorts": [
+        "MSK-IMPACT"
+      ],
+      "sv": {
+        "genes": [
+          "ALK",
+          "ROS1",
+          "RET"
+        ],
+        "columns": [
+          {
+            "id": "study",
+            "name": "Study",
+            "numeric": false
+          },
+          {
+            "id": "sample",
+            "name": "Sample ID",
+            "numeric": false
+          },
+          {
+            "id": "cancerType",
+            "name": "Cancer Type Detailed",
+            "numeric": false
+          },
+          {
+            "id": "gene1",
+            "name": "Gene 1",
+            "numeric": false
+          },
+          {
+            "id": "site1Entrez",
+            "name": "Site1 Entrez Gene Id",
+            "numeric": false
+          },
+          {
+            "id": "site1Transcript",
+            "name": "Site1 Ensembl Transcript Id",
+            "numeric": false
+          },
+          {
+            "id": "site1Chr",
+            "name": "Site1 Chromosome",
+            "numeric": false
+          },
+          {
+            "id": "site1Pos",
+            "name": "Site1 Position",
+            "numeric": true
+          },
+          {
+            "id": "site1Desc",
+            "name": "Site1 Description",
+            "numeric": false
+          },
+          {
+            "id": "gene2",
+            "name": "Gene 2",
+            "numeric": false
+          },
+          {
+            "id": "site2Entrez",
+            "name": "Site2 Entrez Gene Id",
+            "numeric": false
+          },
+          {
+            "id": "site2Transcript",
+            "name": "Site2 Ensembl Transcript Id",
+            "numeric": false
+          },
+          {
+            "id": "site2Chr",
+            "name": "Site2 Chromosome",
+            "numeric": false
+          },
+          {
+            "id": "site2Pos",
+            "name": "Site2 Position",
+            "numeric": true
+          },
+          {
+            "id": "site2Desc",
+            "name": "Site2 Description",
+            "numeric": false
+          },
+          {
+            "id": "frame",
+            "name": "Effect on Frame",
+            "numeric": false
+          },
+          {
+            "id": "annotation",
+            "name": "Annotation (OncoKB)",
+            "numeric": false
+          },
+          {
+            "id": "status",
+            "name": "MS",
+            "numeric": false
+          },
+          {
+            "id": "ncbiBuild",
+            "name": "NCBI Build",
+            "numeric": false
+          },
+          {
+            "id": "dnaSupport",
+            "name": "DNA Support",
+            "numeric": false
+          },
+          {
+            "…": "16 more",
+            "sha256": "cd168b2d0f77923d"
+          }
+        ],
+        "shown": [
+          "sample",
+          "cancerType",
+          "gene1",
+          "gene2",
+          "annotation",
+          "connectionType",
+          "eventInfo",
+          "class"
+        ],
+        "defaults": [
+          "sample",
+          "cancerType",
+          "gene1",
+          "gene2",
+          "annotation",
+          "connectionType",
+          "eventInfo",
+          "class"
+        ],
+        "query": {},
+        "rows": [
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0008322",
+            "sample": "P-0008322-T01-IM5",
+            "values": [
+              "msk_impact_2017",
+              "P-0008322-T01-IM5",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447302,
+              "Intron of ALK(-): 908bp before exon 20",
+              "",
+              "",
+              "NA",
+              "2",
+              82835552,
+              "IGR: 248Kb before LOC1720(+)",
+              "NA",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "819bcc25b4b29536"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0000058",
+            "sample": "P-0000058-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0000058-T01-IM3",
+              "Breast Invasive Ductal Carcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29446846,
+              "Intron of ALK(-): 452bp before exon 20",
+              "DDX11L2",
+              "84771",
+              "NA",
+              "2",
+              114360988,
+              "3-UTR of DDX11L2(-): 307bp after coding stop",
+              "NA",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "ddb8b2f9fd1e6c13"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0006776",
+            "sample": "P-0006776-T01-IM5",
+            "values": [
+              "msk_impact_2017",
+              "P-0006776-T01-IM5",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447418,
+              "Intron of ALK(-): 909bp after exon 19",
+              "DYSF",
+              "8291",
+              "NA",
+              "2",
+              71808849,
+              "Intron of DYSF(+): 7Kb after exon 30",
+              "NA",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "55fb26a8eb90f1f8"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0000474",
+            "sample": "P-0000474-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0000474-T01-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447002,
+              "Intron of ALK(-): 608bp before exon 20",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42497097,
+              "Intron of EML4(+): 5Kb after exon 5",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "723060adc9bd08ac"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0000557",
+            "sample": "P-0000557-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0000557-T01-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29446543,
+              "Intron of ALK(-): 149bp before exon 20",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42494981,
+              "Intron of EML4(+): 3Kb after exon 5",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "1cef561118c01bb1"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0000732",
+            "sample": "P-0000732-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0000732-T01-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447537,
+              "Intron of ALK(-): 790bp after exon 19",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42498669,
+              "Intron of EML4(+): 7Kb after exon 5",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "4053f49034581ca6"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0001532",
+            "sample": "P-0001532-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0001532-T01-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447553,
+              "Intron of ALK(-): 774bp after exon 19",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42525673,
+              "Intron of EML4(+): 3Kb before exon 13",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "4264338cc7701ce0"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0001811",
+            "sample": "P-0001811-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0001811-T01-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29448205,
+              "Intron of ALK(-): 122bp after exon 19",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42525322,
+              "Intron of EML4(+): 3Kb after exon 12",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "6c33f9aa3f0a13a2"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0002024",
+            "sample": "P-0002024-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0002024-T01-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447133,
+              "Intron of ALK(-): 739bp before exon 20",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42552725,
+              "Intron of EML4(+): 31bp after exon 19",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "c1d2c42450f670c5"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0002217",
+            "sample": "P-0002217-T02-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0002217-T02-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29446594,
+              "Intron of ALK(-): 200bp before exon 20",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42523244,
+              "Intron of EML4(+): 588bp after exon 12",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "a75ba043ead33622"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0002266",
+            "sample": "P-0002266-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0002266-T01-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447283,
+              "Intron of ALK(-): 889bp before exon 20",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42473849,
+              "Intron of EML4(+): 1Kb after exon 2",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "bbbad4cb727e99f2"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0002408",
+            "sample": "P-0002408-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0002408-T01-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29448053,
+              "Intron of ALK(-): 274bp after exon 19",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42544452,
+              "Intron of EML4(+): 115bp before exon 18",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "30f47bc09b3675cf"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0002408",
+            "sample": "P-0002408-T02-IM5",
+            "values": [
+              "msk_impact_2017",
+              "P-0002408-T02-IM5",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29448053,
+              "Intron of ALK(-): 274bp after exon 19",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42544452,
+              "Intron of EML4(+): 115bp before exon 18",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "c311f4afd1c9d290"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0002613",
+            "sample": "P-0002613-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0002613-T01-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447199,
+              "Intron of ALK(-): 805bp before exon 20",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42528199,
+              "Intron of EML4(+): 182bp before exon 13",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "058e44f93ccc52bb"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0003206",
+            "sample": "P-0003206-T01-IM5",
+            "values": [
+              "msk_impact_2017",
+              "P-0003206-T01-IM5",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29448365,
+              "Exon 19 of ALK(-)",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42492359,
+              "Intron of EML4(+): 488bp after exon 5",
+              "NA",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "44ac87ccfdf01731"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0003297",
+            "sample": "P-0003297-T01-IM5",
+            "values": [
+              "msk_impact_2017",
+              "P-0003297-T01-IM5",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29448259,
+              "Intron of ALK(-): 68bp after exon 19",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42504374,
+              "Intron of EML4(+): 4Kb before exon 6",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "eb501e769c6e10a8"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0003323",
+            "sample": "P-0003323-T01-IM5",
+            "values": [
+              "msk_impact_2017",
+              "P-0003323-T01-IM5",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447530,
+              "Intron of ALK(-): 797bp after exon 19",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42492435,
+              "Intron of EML4(+): 564bp after exon 5",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "f3af9defaed3f46e"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0003383",
+            "sample": "P-0003383-T01-IM5",
+            "values": [
+              "msk_impact_2017",
+              "P-0003383-T01-IM5",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447572,
+              "Intron of ALK(-): 755bp after exon 19",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42525071,
+              "Intron of EML4(+): 2Kb after exon 12",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "505944a9cbde2aad"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0003446",
+            "sample": "P-0003446-T01-IM5",
+            "values": [
+              "msk_impact_2017",
+              "P-0003446-T01-IM5",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29446534,
+              "Intron of ALK(-): 140bp before exon 20",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42523253,
+              "Intron of EML4(+): 597bp after exon 12",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "1ffdf0cffaec7dc7"
+              }
+            ]
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "patient": "P-0003913",
+            "sample": "P-0003913-T01-IM3",
+            "values": [
+              "msk_impact_2017",
+              "P-0003913-T01-IM3",
+              "Lung Adenocarcinoma",
+              "ALK",
+              "238",
+              "NA",
+              "2",
+              29447211,
+              "Intron of ALK(-): 817bp before exon 20",
+              "EML4",
+              "27436",
+              "NA",
+              "2",
+              42523334,
+              "Intron of EML4(+): 678bp after exon 12",
+              " in frame ",
+              "",
+              "SOMATIC",
+              "GRCh37",
+              "Yes",
+              {
+                "…": "16 more",
+                "sha256": "95dfbfa997e5d2e5"
+              }
+            ]
+          },
+          {
+            "…": "5 more",
+            "sha256": "64becc7b6a8c6d4e"
+          }
+        ],
+        "offset": 0,
+        "pageSize": 25,
+        "lists": [
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "total": 131,
+            "all": 131
+          }
+        ],
+        "total": 131,
+        "all": 131,
+        "oncokbPin": "v7.5",
+        "profiled": [
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "gene": "ALK",
+            "samples": 10945,
+            "profiled": 10945,
+            "altered": 52,
+            "alteredProfiled": 52
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "gene": "ROS1",
+            "samples": 10945,
+            "profiled": 10945,
+            "altered": 43,
+            "alteredProfiled": 43
+          },
+          {
+            "cohort": "MSK-IMPACT",
+            "study": "msk_impact_2017",
+            "gene": "RET",
+            "samples": 10945,
+            "profiled": 10945,
+            "altered": 31,
+            "alteredProfiled": 31
+          }
+        ]
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "msk_impact_2017",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "Every structural variant in the cohort's samples whose gene 1 or gene 2 is one of ALK, ROS1, RET, one row per call as the portal lists them (a patient with several samples carrying the same event has a row for each; a call between two of the genes is listed once). Profiling, panel-aware — ALK: 52 samples with a call, 10,945 of 10,945 profiled; ROS1: 43 samples with a call, 10,945 of 10,945 profiled; RET: 31 samples with a call, 10,945 of 10,945 profiled. A sample not profiled for a gene's structural variants has no row and is not counted as without one. Annotation is OncoKB v7.5's gene-level fusion call (its 'Fusion' entry) for the stronger of the two partners, where its store holds one — not the portal's per-pair fusion annotation; a blank means no call for either gene. Genes 1 and 2 are as the study records the breakpoints (site 1, site 2), not reordered. 131 structural variants. Sorted drivers first, then by gene 1, then gene 2 across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the structural variants of ALK, ROS1, RET per cohort and study",
+            "detail": "The sv:counts query above: every call in the study's structural-variant profile, in each cohort's samples, whose gene 1 or gene 2 is one of ALK, ROS1, RET (matched by Entrez id, as the portal asks), once however many of them it involves, with the sample's CANCER_TYPE_DETAILED where recorded and the stronger of the two partners' OncoKB v7.5 fusion calls.",
+            "params": [
+              [
+                "MSK-IMPACT · msk_impact_2017",
+                "131"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Sort them together and take one page",
+            "detail": "The sv:rows query above: the structural variants of ALK, ROS1, RET of every cohort and study combined in one query, sorted drivers first, then by gene 1, then gene 2, then sample, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset."
+          },
+          {
+            "kind": "fetch",
+            "title": "Count the samples profiled for each gene's structural variants",
+            "detail": "The sv:profiled query above, per cohort and study: the cohort's samples; those whose structural-variant panel lists the gene (or is whole-exome); those with a call involving it; and of those, the profiled. A sample not profiled contributes no row and is not read as having none.",
+            "params": [
+              [
+                "MSK-IMPACT · msk_impact_2017 · ALK",
+                "52 with a call · 10945 profiled · 10945 samples"
+              ],
+              [
+                "MSK-IMPACT · msk_impact_2017 · ROS1",
+                "43 with a call · 10945 profiled · 10945 samples"
+              ],
+              [
+                "MSK-IMPACT · msk_impact_2017 · RET",
+                "31 with a call · 10945 profiled · 10945 samples"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "svRowSource",
+            "svProfiledSql",
+            "pageSql",
+            "countsSql"
+          ],
+          "file": "lib/sv-table.ts, lib/views/sv/sql.ts, lib/table-query.ts",
+          "commit": null
+        },
+        "verification": "A listing and the counts its caveat names: no statistic is computed, so there is no script — the queries are the numbers."
+      }
+    }
+  ]
+}

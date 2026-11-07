@@ -290,6 +290,7 @@ describe("pagedTable: a paged view's table in its result", () => {
     const t = { total: 1 };
     assert.equal(pagedTable({ kind: "table", table: t } as unknown as ViewResult), t);
     assert.equal(pagedTable({ kind: "mutations", mutations: t } as unknown as ViewResult), t);
+    assert.equal(pagedTable({ kind: "sv", sv: t } as unknown as ViewResult), t);
     assert.equal(pagedTable({ kind: "timeline", timeline: t } as unknown as ViewResult), t);
     const alt = { total: 2, tables: { cna: t } };
     assert.equal(pagedTable({ kind: "alterations", alterations: alt } as unknown as ViewResult), alt);

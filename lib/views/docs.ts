@@ -47,6 +47,7 @@ import { germlineDoc } from "./germline/doc.ts";
 import { assaysDoc } from "./assays/doc.ts";
 import { compositionDoc } from "./composition/doc.ts";
 import { mutationsDoc } from "./mutations/doc.ts";
+import { svDoc } from "./sv/doc.ts";
 import { tableDoc } from "./table/doc.ts";
 import { timelineDoc } from "./timeline/doc.ts";
 import { alterationsDoc } from "./alterations/doc.ts";
@@ -98,6 +99,7 @@ export const KIND_DOCS: Record<ViewKind, KindDoc> = {
   assays: assaysDoc,
   composition: compositionDoc,
   mutations: mutationsDoc,
+  sv: svDoc,
   table: tableDoc,
   timeline: timelineDoc,
   alterations: alterationsDoc,

@@ -31,6 +31,7 @@ import { runComposition } from "./composition/run.ts";
 import { runCorrelates } from "./correlates/run.ts";
 import { runTable } from "./table/run.ts";
 import { runMutations } from "./mutations/run.ts";
+import { runSv } from "./sv/run.ts";
 import { runAlterations } from "./alterations/run.ts";
 import { runTimeline } from "./timeline/run.ts";
 import { runEvolution } from "./evolution/run.ts";
@@ -122,6 +123,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   correlates: drawn(runCorrelates),
   table: drawn(runTable),
   mutations: drawn(runMutations),
+  sv: drawn(runSv),
   alterations: drawn(runAlterations),
   timeline: drawn(runTimeline),
   evolution: drawn(runEvolution),

@@ -333,6 +333,7 @@ patient — so the arm counts summing to more than the base cohort is expected, 
 | `assays` | `profileType:"<generic-assay profile>", minN?:3, label?:12, cohorts:[2–6 names]` | **every entity of one generic-assay profile compared between cohorts**, cBioPortal's group-comparison tabs for generic assays (mutational signatures, arm-level copy number, treatment response, …): one value per sample (every sample of each cohort's patients) or per patient for a patient-level profile. A numeric profile: each entity's n, Σv and Σv² per cohort — values that are not numbers, such as a limit `">8"` or NA, are counted and left out — then Welch's t for two cohorts (drawn as a volcano of the difference in means) or Welch's ANOVA for more. A categorical one: each entity's count per value per cohort — NA and blank are not called and are counted apart — then a chi-squared test on cohort × value. q is Benjamini–Hochberg across every entity tested; an entity with fewer than `minN` values in a cohort, or with no spread, is counted as not tested. Per-probe methylation is refused (hundreds of thousands of probes), as is any profile past 20,000 entities. Counts and moments only |
 | `composition` | `profileType:"<generic-assay profile>", entities?:[ids] | attributes:["<numeric attribute>", …2–16], unit?:"patient"|"sample", normalize?:true, sort?:"<part>", cohorts:[1–8 names]` | **what each case is made of, as parts of a whole, compared between cohorts** — the stacked-bar panels of single-cell studies (cell types, cell states) and of signature studies. The parts are a generic-assay profile's entities (per sample, or per patient for a patient-level profile; at most 16 — choose them with `entities`) or 2–16 numeric clinical attributes, `custom:` uploads included (per patient unless `unit:"sample"`). A case with every part, none below zero and a sum above zero is kept, its parts divided by their sum unless `normalize:false`; the rest are counted as left out. Inside the database, per cohort: n, Σp and Σp² per part and Σ, Σ² of each case's Shannon entropy. Each cohort against the view's other cohorts pooled, part by part: log2 of the ratio of means (each + 0.001) and Welch's t, Benjamini–Hochberg across the comparisons (with two cohorts, once per part). The figure draws each cohort's cases as stacked bars ordered by `sort` (default the first part), beside the cohort's mean, and a cohort × part matrix; the bars come only from participants that may show cases, and past 2,000 cases a cohort is drawn as its mean alone, saying so. Sums only, apart from those bars, which carry no ids |
 | `mutations` | `gene:"<symbol>", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[≤6 names]` | **one gene's mutation table**, the table under cBioPortal's Mutations-tab lollipop: every called mutation of `gene` in each cohort's samples (uncalled calls left out), one row per call — sample, detailed cancer type, protein change, the OncoKB annotation at the pinned version, mutation and variant type, allele frequency (variant / variant + reference reads) with both read counts, the study's MUTATION_COUNT, chromosome, positions, alleles, mutation status. Column ids: `sample`, `cancerType`, `proteinChange`, `proteinPos` (the stored protein start position, the codon the lollipop draws it at; a lollipop stem selected in the portal's Mutations tab filters on it), `annotation`, `mutationType`, `variantType`, `vaf`, `altCount`, `refCount`, `mutCount`, `chr`, `start`, `end`, `ref`, `var`, `status`; shown by default: sample, cancerType, proteinChange, annotation, mutationType, mutCount (the portal's own). Searched, filtered and sorted as every table view is (see *Table views* below; default order drivers first, then by codon; `proteinChange` sorts by codon, `annotation` drivers first). Its rows name samples, so only a patient-level participant contributes them; any other study is named |
+| `sv` | `genes:["<symbol>", …≤32], columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[≤6 names]` | **the structural-variant table**, cBioPortal's Results View Structural Variants tab: every call in each cohort's samples (the study's structural-variant profile) whose gene 1 **or** gene 2 is one of `genes` — matched by Entrez id, as the portal fetches them, and listed once however many of the genes it involves — one row per call (a patient with several samples carrying an event has a row for each, as on the portal). Column ids: `study`, `sample`, `cancerType` (the sample's CANCER_TYPE_DETAILED), `gene1`, `site1Entrez`, `site1Transcript`, `site1Chr`, `site1Pos`, `site1Desc`, `gene2`, `site2Entrez`, `site2Transcript`, `site2Chr`, `site2Pos`, `site2Desc`, `frame` (effect on frame), `annotation`, `status` (MS), `ncbiBuild`, `dnaSupport`, `rnaSupport`, `normalReadCount`, `tumorReadCount`, `normalVariantCount`, `tumorVariantCount`, `normalPairedEndReadCount`, `tumorPairedEndReadCount`, `normalSplitReadCount`, `tumorSplitReadCount`, `svDescription` (the study's own annotation), `breakpointType`, `connectionType`, `eventInfo`, `class` (variant class), `length`, `comments`; shown by default the portal's: sample, cancerType, gene1, gene2, annotation, connectionType, eventInfo, class. Gene 1 and 2 are the study's site 1 and site 2, never reordered. `annotation` is OncoKB's gene-level fusion call at the pinned version for the stronger partner, where the store holds one (not the portal's per-pair call). Values are as stored (the portal's `NA` and `-1` included). Searched, filtered and sorted as every table view is (see *Table views* below; default order drivers first, then by gene 1, gene 2, sample). Panel-aware: `profiled` in the result and the caveat give, per gene, the cohort's samples, those whose structural-variant panel lists the gene (or is whole-exome) and those with a call — a sample not profiled has no row and is never read as having none. Its rows name samples, so only a patient-level participant contributes them; any other study is named. A listing: no statistic |
 | `table` | `unit?:"sample"|"patient", patient?:{study, id}, columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[≤6 names]` | **the clinical data table**, cBioPortal's Clinical Data tab: one row per sample of each cohort's patients — carrying its patient's attributes too — or per patient (patient attributes only), with every clinical attribute the study records (highest priority first; at most 200 — past that, name the ones you want in `columns`), values as recorded. Column ids: `patient`, `sample` (or `samples`, the count, per patient), and the attribute ids; every one is shown by default. Searched, filtered and sorted as every table view is (see *Table views* below; an attribute the study declares NUMBER is numeric; default order patient and sample id). `attributes` and `sort.attribute` are older spellings of `columns` and `sort.column`. Its rows are patients, so only a patient-level participant contributes them; an aggregate-only or remote study is named with how many of each cohort's patients it holds. A patient in two cohorts is listed under each. With `unit:"patient"`, `patient` places that patient in the list's order: the result's `position` is its `index` from 0 and the `prev` and `next` patients as `{study, id}`, null when the query leaves it out — how the Patient page steps through a cohort. A listing: no statistic |
 | `timeline` | `patient?:{study, id}, collapsed?:[track ids], expandGaps?:false, columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[1 name]` | **one patient's clinical timeline**, cBioPortal's patient-view Timeline: every clinical event the study records for `patient` (default: the first patient of the list), in days from diagnosis, as tracks — one per event type (case-folded), in the portal's order (sample acquisition, sequencing, surgery, … treatment, diagnosis, lab tests), nested by attribute as the portal nests them (Treatment by TREATMENT_TYPE → SUBTYPE → AGENT, Lab_Test by TEST, Diagnosis and Pathology by SUBTYPE; a lone "Other" level is folded into its parent). Points are events, bars are events with a stop date, same-day events stack with their count; samples are numbered markers (collection order) coloured by SAMPLE_TYPE; a lab test whose every RESULT is a number is a line chart (a result recorded as `<x`/`>x` is drawn hollow at x); STYLE_COLOR / STYLE_SHAPE attributes are honoured. Runs of four or more years with no event are cut to one dashed mark unless `expandGaps`. `collapsed` names tracks drawn folded, by id: the event type in lower case, then each nesting value, dot-joined (`treatment`, `treatment.Chemo`, `lab_test`). The cohort's patients to choose from — in the lab card, a dialog its navigator opens — are a table view (see *Table views* below) with column ids `patient`, `samples`, `events`, `first`, `last` (event days), `span` (days), `types` (event types recorded); default order patients with a timeline first, then by id. A named patient must be one of the cohort's patients. The view reads ONE cohort (name it in `cohorts` when the document has several). The result gives the drawn patient's `position` in the list's order (its search, filters and sort) — `index` from 0, and the `prev` and `next` patients as `{study, id}`, what the card's ‹ prev / next › step to by setting `patient`; null when the query leaves the patient out. Both the list and the timeline name a patient, so only a patient-level participant contributes; any other study is named. A listing: no statistic |
 | `alterations` | `patient?:{study, id}, samples?:"patient"|"cohort", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, mutations?:{…}, cna?:{…}, sv?:{…}, cohorts:[1 name]` | **one patient's genomic alterations**, cBioPortal's patient-view tables: three table views in one — **Mutations** (column ids `samples`, `gene`, `proteinChange`, `annotation`, `mutationType`, `copy` (Copy #: the gene's deep copy-number calls in the patient), `freq` (Cohort %), `vaf`, `altCount`, `refCount`, `variantType`, `chr`, `start`, `end`, `ref`, `var`, `status`), **Copy Number Alterations** (the deep calls, AMP and HOMDEL: `samples`, `gene`, `cna`, `annotation`, `cytoband`, `freq`) and **Structural Variants** (`samples`, `gene1`, `gene2`, `class`, `eventInfo`, `breakpointType`, `connectionType`, `frame`, `site1`, `site2`, `pos1`, `pos2`, `length`, `tumorVariantCount`, `tumorReadCount`, `dnaSupport`, `rnaSupport`, `status`, `svAnnotation`, `comments`) — for `patient` (default: the list's first). `samples` is which of the patient's samples the tables read: every one (`"patient"`, the default — the portal's patient view, whichever of them the cohort holds) or only the cohort's (`"cohort"` — the portal's sample view: over a cohort of one sample, that sample's alterations alone); the patient list's counts follow it. A variant, a gene's call or an event is one row however many of the patient's samples carry it (`samples` lists them; allele frequency and read counts are the highest among them). With no sort, a gene's rows sit together — genes with a driver first, then by name (structural variants: by the first gene) — and within a gene in the patient's sample order (the numbered markers), then by codon; `samples` lists the samples in that order. `freq` is the share of the study's samples profiled for the gene (by their panel) with a mutation in it, or with the same copy-number call, in percent; `annotation` is OncoKB at the pinned version (none for structural variants). Each table's query is under its own key — `mutations`, `cna`, `sv`, each `{columns?, search?, filters?, sort?, rows?}`, searched, filtered, sorted and paged as every table view is (see *Table views* below); the top-level query is the patient list's: column ids `patient`, `samples`, `mutations`, `cna`, `sv` (each table's row count), default order patients with any alteration first, then by id. The view reads ONE cohort; a named patient must be one of its patients; the result's `position` places the patient in the list's order as the timeline's does. Every table names a patient, so only a patient-level participant contributes; any other study is named. A listing: no statistic |
@@ -352,7 +353,7 @@ study-qualified, a synthetic **Study** track shows each column's origin, and dup
 
 ### Table views: columns, search, filters, sort
 
-Every view that lists rows — `table`, `mutations` — takes the same four fields, and its result
+Every view that lists rows — `table`, `mutations`, `sv` — takes the same four fields, and its result
 answers them the same way. They are the view's spec, so a shared document reproduces the
 filtered, sorted table; the page is the reader's and is not.
 
@@ -5538,7 +5539,35 @@ MSK-CHORD patients with a colorectal cancer sample: their KRAS G12/G13 calls at 
 }
 ```
 
-### Example 89: Clinical data: every pancreatic cancer sample, oldest patients first
+### Example 89: ALK, ROS1 and RET structural variants in MSK-IMPACT
+
+MSK-IMPACT 2017 (10,945 samples): every call involving ALK, ROS1 or RET as either partner, drivers first.
+
+```json
+{
+  "study": "msk_impact_2017",
+  "cohorts": {
+    "MSK-IMPACT": {
+      "all": []
+    }
+  },
+  "views": [
+    {
+      "kind": "sv",
+      "cohorts": [
+        "MSK-IMPACT"
+      ],
+      "genes": [
+        "ALK",
+        "ROS1",
+        "RET"
+      ]
+    }
+  ]
+}
+```
+
+### Example 90: Clinical data: every pancreatic cancer sample, oldest patients first
 
 Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 
@@ -5574,7 +5603,7 @@ Pancreatic cancer in MSK-CHORD, sorted by age, highest first.
 }
 ```
 
-### Example 90: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
+### Example 91: A patient's timeline: treatments, diagnoses, samples and lab values from diagnosis
 
 MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 drawn, with chemotherapy folded into one row, and P-0000012's alterations beside it.
 
@@ -5626,7 +5655,7 @@ MSK-CHORD breast cancer patients with the most timeline events first; P-0000012 
 }
 ```
 
-### Example 91: A patient's mutations, copy-number alterations and structural variants
+### Example 92: A patient's mutations, copy-number alterations and structural variants
 
 MSK-CHORD prostate cancer patients, those with the most structural variants first; P-0024249's tables, mutations kept to OncoKB-oncogenic calls.
 
@@ -5673,7 +5702,7 @@ MSK-CHORD prostate cancer patients, those with the most structural variants firs
 }
 ```
 
-### Example 92: A glioma's mutations across four samples over three and a half years
+### Example 93: A glioma's mutations across four samples over three and a half years
 
 MSK glioma (2018): IM-GBM-28's eight mutations in two tumour resections, a recurrence and cerebrospinal fluid — TP53 Q136E and STAG2 N141I in the first tumours, replaced by TP53 R282G later; TERT promoter throughout.
 
@@ -5700,7 +5729,7 @@ MSK glioma (2018): IM-GBM-28's eight mutations in two tumour resections, a recur
 }
 ```
 
-### Example 93: Co-expression: the genes that rise and fall with ESR1
+### Example 94: Co-expression: the genes that rise and fall with ESR1
 
 TCGA PanCancer Atlas breast cancer. The oestrogen-receptor programme lines up behind ESR1 — CCDC170 (its neighbour on 6q25, often co-amplified), THSD4, FOXA1, TBC1D9 — and the genes of basal-like tumours fall away from it.
 

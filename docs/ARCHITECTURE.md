@@ -179,7 +179,7 @@ no longer match the kind folders and the maps keyed by `ViewKind`.
   `lib/views/kinds.ts`) by **`lib/view-svg.ts`**; what several figures share is in `lib/figures/`; all
   browser-safe, laid out with **`lib/chart/`** (see "Figures share one layout kit" in docs/UI.md); cards:
   `app/lab/kinds/<kind>.tsx`.
-- **Table views** (`table`, `mutations`, `timeline`'s patient list, `alterations`' list and three tables, and any later view that lists rows) — **every one must
+- **Table views** (`table`, `mutations`, `sv`, `timeline`'s patient list, `alterations`' list and three tables, and any later view that lists rows) — **every one must
   support the same five things: pagination, search over its text, a filter per column (text
   conditions or a value list for text, a range for numbers), sorting, and a CSV download of every
   row kept — plus choosing the columns shown.** Don't build these per view: a table supplies only a
