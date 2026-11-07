@@ -1,0 +1,14 @@
+Analysis over brca_tcga_pan_can_atlas_2018 — OncoKB pin v7.5 — (time)ms.
+
+Cohorts:
+- all patients: 1,084 patients — all samples in the study
+
+PathwayMapper pathway PI3K (best-ranked; ranked by count, TCGA PanCanAtlas pathways; query TP53 PIK3CA CDH1 GATA3 MAP3K1 PTEN AKT1):
+  ranking: PI3K 3 (PIK3CA,PTEN,AKT1); Cell Cycle 1 (TP53); TP53 1 (TP53); HIPPO 0; MYC 0; NOTCH 0; NRF2 0; RTK-RAS 0; TGF-Beta 0; WNT 0
+  gene nodes: AKT3 all patients 10.7%; RPTOR all patients 5.26%; PIK3CA all patients 33.95%; PIK3R2 all patients 1.57%; RHEB all patients 0.65%; AKT2 all patients 2.03%; PPP2R1A all patients 1.66%; PIK3R3 all patients 1.38%; PTEN all patients 10.7%; MTOR all patients 2.49%; PIK3R1 all patients 3.51%; INPP4B all patients 1.57%; TSC1 all patients 1.75%; TSC2 all patients 5.07%; RICTOR all patients 2.4%; AKT1 all patients 3.78%; STK11 all patients 1.75%
+  CAVEAT (tell the user): Each gene node's % is the share of the cohort's samples profiled for THAT gene (on a mutation, copy-number or structural-variant panel covering it) with a mutation, a high-level copy-number change (amplification or deep deletion) or a structural variant in it; a sample whose panel omits the gene is not counted, and a gene no sample was profiled for reads N/P, never 0%. Pathways are ranked by how many of the 7 query genes each holds, as PathwayMapper ranks them. Every alteration of a gene counts here, whatever narrower OQL a query may give it. Pathway diagrams: PathwayMapper (i-Vis at Bilkent), 55 pathways from TCGA publications.
+  METHOD:
+    - Count profiled and altered samples per gene [all patients · brca_tcga_pan_can_atlas_2018]: The geneCounts query above, for every gene PathwayMapper's library names as a gene symbol and every query gene. Per gene: samples on a panel that covers it (profiled — the denominator, so a sample whose panel omits the gene is not counted as unaltered) and of those, any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion). Counts only.
+        genes: 214
+    - Rank the pathways: For each of the ten TCGA PanCanAtlas pathways: the number of query genes among its gene nodes. Best first; equal scores by the matched genes' summed % and then by name.
+        query genes: TP53 PIK3CA CDH1 GATA3 MAP3K1 PTEN AKT1

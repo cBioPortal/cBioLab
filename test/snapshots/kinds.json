@@ -3,6 +3,7 @@
     "attrition",
     "genome",
     "pathways",
+    "pathwaymap",
     "enrichment",
     "assays",
     "composition",
@@ -2954,6 +2955,103 @@
       "sub": "SAMPLE_TYPE: Primary vs Metastasis, drivers",
       "title": "Paired samples (primary vs metastasis, before vs after)"
     },
+    "pathwaymap": {
+      "added": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF",
+          "ERBB2"
+        ],
+        "kind": "pathwaymap"
+      },
+      "addedBareStudy": {
+        "cohorts": [
+          "A"
+        ],
+        "genes": [],
+        "kind": "pathwaymap"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "genes": [
+          "TP53",
+          "KRAS",
+          "EGFR",
+          "STK11",
+          "KEAP1",
+          "PIK3CA",
+          "APC",
+          "BRAF",
+          "ERBB2"
+        ],
+        "kind": "pathwaymap"
+      },
+      "card": {
+        "defaults": {
+          "genes": [
+            "TP53",
+            "KRAS",
+            "EGFR",
+            "STK11",
+            "KEAP1",
+            "PIK3CA",
+            "APC",
+            "BRAF",
+            "ERBB2"
+          ],
+          "kind": "pathwaymap"
+        },
+        "defaultsBareStudy": {
+          "genes": [],
+          "kind": "pathwaymap"
+        },
+        "genes": true,
+        "label": "Pathway diagram (PathwayMapper)",
+        "maxCohorts": 4,
+        "title": "Pathways",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It draws up to 4 cohorts, side by side.",
+      "figureTitle": "pathway diagram — A vs B",
+      "headTitle": "Pathways",
+      "help": {
+        "text": "Draws one signalling pathway as a diagram — genes as boxes, arrows for which gene switches which on or off — and shows in each gene's box how often it is altered in the patients' tumours. Beside it, every pathway in the library is ranked by how many of your genes it contains, so you can pick the one that best explains them.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 4,
+      "menu": {
+        "label": "Pathway diagram (PathwayMapper)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": null,
+      "preview": null,
+      "sub": "TCGA PanCanAtlas pathways, ranked by match count",
+      "title": "Pathway diagram (PathwayMapper)"
+    },
     "pathways": {
       "added": {
         "cohorts": [
@@ -3782,6 +3880,7 @@
     "attrition",
     "genome",
     "pathways",
+    "pathwaymap",
     "enrichment",
     "assays",
     "composition",
