@@ -393,8 +393,7 @@ describe("T9/P1: profiled samples of a matrix profile", () => {
     assert.deepEqual(profiledSamples(ctx, p.id), [{ sample: "S1", panel: 42 }, { sample: "S2", panel: 42 }]);
   });
 
-  test("P1: an unknown meta gene_panel is an error",
-    { todo: "P1: spec says an unknown gene_panel throws; importer notes it and profiles the samples as whole-exome (panel null)" }, async () => {
+  test("P1: an unknown meta gene_panel is an error", async () => {
     const ctx = await importContext(ch, { genes: genes(STANDARD) });
     await assert.rejects(wide("Hugo_Symbol\tS1\nTP53\t1\n", { ctx, meta: { ...EXPR_META, gene_panel: "NO_SUCH_PANEL" } }));
   });
