@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { api } from "../lab/api.ts";
 import type { Clause } from "../../lib/types";
 import { profileGroup, type ProfileInfo } from "../../lib/profile-catalog.ts";
+import type { PortalHold } from "../../lib/legacy-link.ts";
 
 type ProfileType = "MUTATION" | "CNA" | "SV";
 
@@ -20,6 +21,8 @@ export interface StudyBasics {
   held: { every: ProfileType[]; some: ProfileType[] };
   /** the queried studies with no OncoKB driver calls on this deployment (none: every study has them) */
   noDrivers: string[];
+  /** whether the legacy portal holds each queried study (lib/legacy-link.ts portalHold), by id */
+  portal: Record<string, PortalHold>;
 }
 
 export interface StudyKnown extends StudyBasics {
@@ -51,7 +54,7 @@ export function useQueryKnown(studies: string[], filters: Clause[] = []): { basi
     const scope = studies.length === 1 ? { study: studies[0] } : { studies };
     const fail = (e: string) => { if (live) setError(e); };
     const listed = api.studies().then((r) => r.json()).catch(() => ({ studies: [] })).then((st): StudyBasics | null => {
-      const catalog = (st.studies || []) as { id: string; name: string; caps?: Record<string, boolean>; oncokb?: boolean }[];
+      const catalog = (st.studies || []) as { id: string; name: string; caps?: Record<string, boolean>; oncokb?: boolean; portal?: PortalHold }[];
       const rows = studies.map((id) => catalog.find((x) => x.id === id));
       const missing = studies.filter((_, i) => !rows[i]);
       if (missing.length) { fail("no study named " + missing.join(", ") + " on this deployment"); return null; }
@@ -64,6 +67,7 @@ export function useQueryKnown(studies: string[], filters: Clause[] = []): { basi
           some: CAPS.filter(([, c]) => holding(c) > 0 && holding(c) < studies.length).map(([t]) => t),
         },
         noDrivers: rows.filter((r) => !r!.oncokb).map((r) => r!.id),
+        portal: Object.fromEntries(rows.map((r) => [r!.id, r!.portal || { why: "this deployment did not say whether cBioPortal holds " + r!.id }])),
       };
       if (live) setBasics(b);
       return b;

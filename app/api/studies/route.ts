@@ -1,7 +1,8 @@
-import { directConnections, withoutFailedQueries } from "../../../lib/ch.ts";
+import { directConnections, withoutFailedQueries, PORTAL, PRIMARY, studiesChangeWhileRunning } from "../../../lib/ch.ts";
 import { studiesFor, type StudyRow } from "../../../lib/study-list.ts";
 import { federationPeers, peerPatientKinds, remoteStudies } from "../../../lib/federation-remote.ts";
-import { instanceForStudy } from "../../../lib/federation.ts";
+import { instanceForStudy, restrictedByName } from "../../../lib/federation.ts";
+import { portalHold, type PortalHold } from "../../../lib/legacy-link.ts";
 import type { StudyAccess } from "../../../lib/view-coverage.ts";
 import { pack, throughCache, cacheVersion, resultEntry } from "../../../lib/next-cache.ts";
 import { connection } from "next/server";
@@ -48,16 +49,20 @@ export async function GET() {
 }
 
 /**
- * Each study's access (lib/view-coverage.ts), so the page offers only views it can draw. Read from
- * this deployment's settings on every request, outside the cache: a changed setting applies at once.
+ * Each study's access (lib/view-coverage.ts), so the page offers only views it can draw, and whether
+ * the portal at PORTAL_URL holds it (`portal`, lib/legacy-link.ts), so a portal page can open the
+ * same page there. Read from this deployment's settings on every request, outside the cache: a
+ * changed setting applies at once.
  */
-async function withAccess(rows: StudyRow[]): Promise<(StudyRow & { access?: StudyAccess })[]> {
+async function withAccess(rows: StudyRow[]): Promise<(StudyRow & { access?: StudyAccess; portal: PortalHold })[]> {
+  const local = studiesChangeWhileRunning();
   return Promise.all(rows.map(async (row) => {
+    const portal = portalHold(row, { portal: PORTAL, primary: PRIMARY.id, local, restricted: restrictedByName(row.id, row.name) });
     if (row.instance === "peer")
-      return { ...row, access: { instance: row.instanceLabel, patientLevel: false, remote: true, shares: [...peerPatientKinds(row.id)] } };
+      return { ...row, portal, access: { instance: row.instanceLabel, patientLevel: false, remote: true, shares: [...peerPatientKinds(row.id)] } };
     try {
       const inst = await instanceForStudy(row.id);
-      return { ...row, access: { instance: inst.label, patientLevel: inst.mode === "patient-level", remote: false, shares: [] } };
-    } catch { return row; }   // not routed here (a collision's loser): access unknown, nothing held against it
+      return { ...row, portal, access: { instance: inst.label, patientLevel: inst.mode === "patient-level", remote: false, shares: [] } };
+    } catch { return { ...row, portal }; }   // not routed here (a collision's loser): access unknown, nothing held against it
   }));
 }

@@ -4,7 +4,9 @@
 import { SeriesSwatch } from "../lab/view-chrome.tsx";
 import { Badge } from "../_ui/badge";
 import { Button } from "../_ui/button";
-import { Info, Pencil } from "lucide-react";
+import { ExternalLink, Info, Pencil } from "lucide-react";
+import { TB } from "../_ui/toolbar.ts";
+import type { LegacyLink } from "../../lib/legacy-link.ts";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
@@ -135,4 +137,16 @@ export function PortalLoading() {
       </div>
     </div>
   );
+}
+
+/**
+ * "Open in cBioPortal": the same page and tab on the legacy portal (lib/legacy-link.ts), in a new
+ * browser tab; where there is no such page, the button stays, disabled, and its tip says why.
+ */
+export function LegacyLinkButton({ link, className }: { link: LegacyLink | null; className?: string }) {
+  const body = <><ExternalLink />Open in cBioPortal</>;
+  const cls = cn(TB, "legacylink", className);
+  if (!link) return <Button variant="outline" size="sm" className={cn(cls, "cursor-wait opacity-50")} aria-disabled="true" data-tip="waiting for the page's studies">{body}</Button>;
+  if (!link.href) return <Button variant="outline" size="sm" className={cn(cls, "cursor-not-allowed opacity-50 hover:bg-card hover:text-foreground")} aria-disabled="true" data-tip={link.tip}>{body}</Button>;
+  return <Button asChild variant="outline" size="sm" className={cls}><a href={link.href} target="_blank" rel="noopener" data-tip={link.tip}>{body}</a></Button>;
 }

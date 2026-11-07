@@ -18,7 +18,7 @@ optional.
 | `CLICKHOUSE_DB` | — | the cBioPortal database, e.g. `cbioportal_public_librechat_blue` |
 | `CLICKHOUSE_LABEL` | `primary` | the name of this database in the UI (the study picker, a view's sources) |
 | `STUDY_ID` | `msk_chord_2024` | the study a document without one, and the legacy single-study endpoints, use |
-| `PORTAL_URL` | `https://www.cbioportal.org` | the cBioPortal that study and patient links open |
+| `PORTAL_URL` | `https://www.cbioportal.org` | the cBioPortal that study and patient links open, and the portal pages' "Open in cBioPortal" button (`lib/legacy-link.ts`): it is taken to serve the primary connection's studies, so the button is enabled only for those |
 | `ONCOKB_PIN` | the store's newest release | the OncoKB release to annotate with, e.g. `v7.5`; every result echoes the one used |
 | `GENOME_NEXUS_URL` | `https://www.genomenexus.org` | the Genome Nexus server the lollipop view asks for protein length and Pfam domains (a gene symbol only) |
 | `STUDY_DENY` | — | study ids to exclude entirely, comma-separated |

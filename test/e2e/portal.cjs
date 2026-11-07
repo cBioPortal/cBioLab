@@ -168,6 +168,38 @@ async function portal({ browser, ok, BASE }) {
     ok("comparison: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
+  // "Open in cBioPortal": the same page and tab on the legacy portal, following the open tab; on the
+  // Comparison page, which needs a portal session, disabled and saying why.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const legacy = async () => page.locator(".legacylink").evaluate((e) => ({ href: e.getAttribute("href"), target: e.getAttribute("target"), tip: e.getAttribute("data-tip"), off: e.getAttribute("aria-disabled") }));
+    const until = (re) => page.waitForFunction((src) => new RegExp(src).test(document.querySelector(".legacylink")?.getAttribute("href") || ""), re.source, { timeout: 240000 });
+    try {
+      await page.goto(BASE + "/portal/results?study=brca_tcga&genes=" + encodeURIComponent("KRAS\nTP53: MUT") + "&tab=Mutations", { waitUntil: "domcontentloaded" });
+      await until(/\/results\/mutations\?/);
+      const first = await legacy();
+      const q = new URL(first.href).searchParams;
+      await page.getByRole("tab", { name: "Comparison/Survival" }).click();
+      await page.getByRole("tab", { name: "Survival", exact: true }).click();
+      await until(/\/results\/comparison\/survival\?/);
+      const second = await legacy();
+      ok("portal: Open in cBioPortal links the same query and tab, in a new tab, and follows the open tab",
+        first.target === "_blank" && q.get("cancer_study_list") === "brca_tcga" && q.get("case_set_id") === "brca_tcga_all" && q.get("gene_list") === "KRAS\nTP53: MUT" &&
+          /^https?:\/\/[^/]+\/results\/comparison\/survival\?/.test(second.href || ""), first.href + " → " + second.href);
+      await page.goto(BASE + "/portal/comparison?doc=" + Buffer.from(JSON.stringify({ study: "brca_tcga", views: [], cohorts: {
+        Male: { all: [{ kind: "clinical", attribute: "SEX", values: ["Male"] }] }, Female: { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }] } } })).toString("base64url"), { waitUntil: "domcontentloaded" });
+      await page.locator(".legacylink[data-tip*='session']").waitFor({ timeout: 240000 });
+      const cmp = await legacy();
+      ok("portal: on the Comparison page Open in cBioPortal is disabled, saying why", cmp.off === "true" && !cmp.href, cmp.tip);
+    } catch (e) {
+      ok("portal: Open in cBioPortal", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("portal open in cBioPortal: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
 }
 
 module.exports = { portal };

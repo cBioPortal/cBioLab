@@ -21,13 +21,15 @@ import { ViewHead } from "../lab/view-chrome.tsx";
 import { Updating } from "../lab/view-cards.tsx";
 import { PlotControls } from "../lab/plot-controls.tsx";
 import { cn } from "../../lib/cn";
+import { legacyLink, type LegacyPage, type PortalHold } from "../../lib/legacy-link.ts";
+import { LegacyLinkButton } from "./portal-chrome.tsx";
 
 type Patch = Record<string, unknown>;
 
 
 type ViewState = { sent: string; result?: ViewResult; error?: string; loading: boolean };
 
-export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, onCounts, catalog, fixedPatient }: {
+export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, onCounts, catalog, fixedPatient, legacy }: {
   doc: AnalysisDoc; tabs: PageTab[]; titles: string[];
   /** the page's first tabs only (PageLayout.partial): a tab the page opens on that is not among them yet is waited for */
   partial?: boolean;
@@ -42,6 +44,8 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
   onCounts?: (c: Record<string, number>) => void;
   /** the page is about one patient (the Patient page), so its patient views do not step through others */
   fixedPatient?: boolean;
+  /** the page's state for its "Open in cBioPortal" link, and whether the portal holds its studies (null while the study list loads) */
+  legacy: { page: LegacyPage; held: Record<string, PortalHold> | null };
 }) {
   const [state, setState] = useState<Record<string, ViewState>>({});
   const gen = useRef<Record<string, number>>({});
@@ -96,10 +100,12 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
     const next = chooser!.apply(idx.map((i) => views[i]), o);
     onDoc({ ...doc, views: views.map((v, j) => { const k = idx.indexOf(j); return k >= 0 ? next[k] : v; }) });
   };
+  const link = legacy.held ? legacyLink(legacy.page, { tab: tab?.title ?? mainTitle, sub: sub?.title ?? subTitle, gene: chooser?.value(idx.map((i) => views[i])) }, legacy.held) : null;
   return (
     <div className="portal">
-      <Tabs data-tw value={tab?.title ?? mainTitle ?? ""} onValueChange={onOpen} className="mb-4">
-        <TabsList variant="line" aria-label="results tabs" className={LINE_TABS}>
+      <div data-tw className="mb-4 flex items-end gap-2.5 border-b">
+      <Tabs value={tab?.title ?? mainTitle ?? ""} onValueChange={onOpen} className="min-w-0 flex-1">
+        <TabsList variant="line" aria-label="results tabs" className={cn(LINE_TABS, "border-b-0")}>
           {tabs.map((t) => (
             <TabsTrigger key={t.title} value={t.title} className={PAGE_TAB}>
               {t.title}
@@ -108,6 +114,8 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
           {waiting && <span data-tw className="skeleton my-auto block h-5 w-28" role="status" aria-label={"laying out " + open} />}
         </TabsList>
       </Tabs>
+      <LegacyLinkButton link={link} className="mb-1.5" />
+      </div>
       {waiting && <div className="card viewcard viewloading" aria-busy="true"><div className="vhead"><span data-tw className="skeleton block h-[34px] w-56" /></div><div className="skeleton skeleton-view" /></div>}
       {(tab?.sub || chooser) && (
         <div className="viewtb mt-0 mb-4">

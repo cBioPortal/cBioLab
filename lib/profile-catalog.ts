@@ -68,6 +68,12 @@ export function profileGroup(p: Pick<ProfileInfo, "type" | "assayType">): string
   return TYPE_LABEL[p.type] || p.type;
 }
 
+/** the generic-assay type a group label names (profileGroup's label read back): "Mutational signature" → MUTATIONAL_SIGNATURE */
+export function assayTypeOfGroup(label: string): string {
+  const known = Object.entries(ASSAY_LABEL).find(([, l]) => l === label);
+  return known ? known[0] : label.trim().toUpperCase().replace(/\s+/g, "_");
+}
+
 /** the profiles a plot axis can read, in the portal's order: by type, then the study's own order */
 export function plottableProfiles(ps: ProfileInfo[]): ProfileInfo[] {
   const rank = (p: ProfileInfo) => { const i = TYPE_ORDER.indexOf(p.type); return i < 0 ? TYPE_ORDER.length : i; };
