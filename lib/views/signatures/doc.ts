@@ -1,0 +1,26 @@
+// The `signatures` view in the DSL reference: its row of the Views table, its entry in the agent grammar and its gallery examples.
+// lib/dsl-reference.ts assembles these from lib/views/docs.ts.
+import type { KindDoc } from "../kind-doc.ts";
+
+export const signaturesDoc: KindDoc = {
+  summary: "one patient's mutational signatures — each signature's contribution per sample, significance where the study records p-values, and a sample's mutational spectrum — as on cBioPortal's Mutational Signatures tab; patient-level studies only",
+  reference: `\`patient?:{study, id}, version?:"SBS"\|"DBS"\|"ID"\|"v2"\|…, sample?:"<sample id>", scale?:"percent"\|"count", signature?:"<signature name>", ymax?:1–100, samples?:"patient"\|"cohort", columns?, search?, filters?, sort?:{column, desc?}, rows?:25, cohorts:[1 name]\` | **one patient's mutational signatures**, cBioPortal's patient-view Mutational Signatures tab, from the study's generic-assay profiles named \`mutational_signatures_<contribution\|pvalue\|counts>_<type>\`. \`version\` is the signature type (what follows \`contribution_\`); default as the portal picks among the types the patient has values for — v3 when both v2 and v3, else SBS, else the first. Each signature's **contribution** in each of the patient's samples is listed as the study stores it (a share of the sample's mutations; NA when not a number — never 0), signatures with a value in some sample, the first sample's highest first; a value is **significant** where the same signature's value in the matching \`pvalue\` profile is under 0.05 (a study without one marks none — the portal would treat its missing p-values as 0). Where the study has the matching \`counts\` profile, one sample's **mutational spectrum** is drawn — each channel's count (COSMIC order: SBS's 96 trinucleotide substitutions, DBS's 78, ID's 83), as its share of the sample's total (\`scale:"percent"\`, the default) or as counts; \`sample\` picks it (default the first, in sample order, with counts). The spectrum is drawn as the portal draws it: a coloured band per class, each channel's bar in its class's colour on a fixed axis (0–100%, or the counts), the channel's label under it (SBS's mutated base coloured). \`ymax\` is the portal's Y-axis Max slider, a whole percent from 1 to 100 (default 100): it cuts the axis the way the portal does, a bar past it stopping at the axis. \`signature\` (a name from the signature table, e.g. \`"SBS5"\`; none by default, as the portal shows none until a table row is clicked) draws that signature's **COSMIC reference profile** downward under the spectrum — COSMIC v3.3 (GRCh37), the copy cBioPortal's frontend ships, looked up by the name's first word; a signature with no reference profile there (and any type but SBS, DBS and ID) is refused, naming those with one. \`samples\` is which of the patient's samples are read: every one (\`"patient"\`, the default) or only the cohort's (\`"cohort"\` — the portal's sample view). A sample with no contribution value is named as not profiled. The top-level query is the patient list's: only the cohort's patients with signature values (of \`version\` when given; the portal shows the tab only then), column ids \`patient\`, \`samples\`, \`profiled\`, \`types\`; default order most profiled samples first. A named patient without values, a type the study lacks and a sample without counts are refused, naming what there is. ONE cohort; the result's \`position\` places the patient in the list's order as the timeline's does. Everything names a patient, so only a patient-level participant contributes. A listing: no statistic`,
+  grammar: `{"kind":"signatures","patient":{"study":"<study>","id":"<patient id>"}?,"version":"SBS"|"DBS"|"ID"|"v2"|…?,"sample":"<sample id>"?,"scale":"percent"|"count"?,"signature":"<signature name>"?,"ymax":1-100?,"samples":"patient"|"cohort"?,
+ "columns"|"search"|"filters"|"sort"|"rows" as for table (the patient list)?}
+  // one patient's mutational signatures (cBioPortal's Mutational Signatures tab): contribution per signature and sample, significant where p < 0.05,
+  // and one sample's mutational spectrum when the study has counts, with signature's COSMIC v3.3 reference profile mirrored under it; list columns patient, samples, profiled, types. One cohort; patient-level studies only`,
+  examples: [
+    {
+      title: "A melanoma's mutational signatures: UV light behind nine in ten of its mutations",
+      snapshot: "signatures",
+      demonstrates: "A `signatures` view, the portal's Mutational Signatures tab: each single-base-substitution signature's contribution to the patient's tumour, and the sample's 96-channel mutational spectrum from the study's counts profile. The cohort's patients with signature values are listed to choose from.",
+      tags: ["patient", "mutational signatures", "spectrum"],
+      note: "PCAWG melanoma: DO220875's mutations are dominated by SBS7a (UV light); its spectrum is the C>T substitutions at dipyrimidines that UV leaves behind.",
+      doc: {
+        study: "pancan_pcawg_2020",
+        cohorts: { "Melanoma": { all: [{ kind: "clinical", attribute: "CANCER_TYPE", values: ["Melanoma"] }] } },
+        views: [{ kind: "signatures", cohorts: ["Melanoma"], patient: { study: "pancan_pcawg_2020", id: "DO220875" } }]
+      }
+    }
+  ],
+};

@@ -94,6 +94,23 @@ export const STYLE = {
     // white to red on log(1 + %), reaching `reach` of the way at 100% so a frequent gene is never solid red
     frequency: { from: [255, 255, 255], to: [255, 0, 0], reach: 0.8 }
   },
+  // A mutational spectrum's channel colours, the portal's (cbioportal-frontend
+  // MutationalSignatureBarChartUtils.ts colorMap): SBS by substitution class, DBS by reference
+  // dinucleotide, ID by length, deletion or insertion and repeat type (lengths of 5 and more share
+  // the "5" colour). Where the portal's list names a class twice (CG), the later entry is the one
+  // it draws. A channel in none of these is drawn in `unknown`.
+  signatures: {
+    sbs: { "C>A": "#5DADE2", "C>G": "#154360", "C>T": "red", "T>A": "#99A3A4", "T>C": "#2ECC71", "T>G": "#F5B7B1" } as Record<string, string>,
+    dbs: { AC: "skyblue", AT: "blue", CC: "lightgreen", CG: "darkred", CT: "pink", GC: "gold", TA: "#FF7F50", TC: "orange", TG: "#ba55D3", TT: "purple" } as Record<string, string>,
+    id: {
+      "1:Del:C": "#f39c12", "1:Del:T": "#d68910", "1:Ins:C": "#82e0aa", "1:Ins:T": "#28b463",
+      "2:Del:R": "#f1948a", "3:Del:R": "#ec7063", "4:Del:R": "#e74c3c", "5:Del:R": "#F7406C",
+      "2:Ins:R": "#33ffff", "3:Ins:R": "#aed6F1", "4:Ins:R": "#5dade2", "5:Ins:R": "#368BFD",
+      "2:Del:M": "#D2B7F2", "3:Del:M": "#E194EB", "4:Del:M": "#DD75EA", "5:Del:M": "#DB3AEE",
+      "2:Ins:M": "#aed6f1", "3:Ins:M": "#85c1e9", "4:Ins:M": "#85c1e9", "5:Ins:M": "#3498db"
+    } as Record<string, string>,
+    unknown: "#EE4B2B"
+  },
   geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17,
     // whitespace between columns: a hairline of this many px, once a column is padMinZoom px wide
     cellPad: 1, padMinZoom: 6,

@@ -347,6 +347,9 @@
     "Download tab: TP53, PIK3CA and GATA3 in TCGA breast cancer": {
       "Queried": 996
     },
+    "A melanoma's mutational signatures: UV light behind nine in ten of its mutations": {
+      "Melanoma": 107
+    },
     "KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first": {
       "Colorectal": 5543
     },

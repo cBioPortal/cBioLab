@@ -1,0 +1,947 @@
+{
+  "study": "pancan_pcawg_2020",
+  "cohorts": {
+    "Melanoma": {
+      "count": 107,
+      "samples": 107,
+      "text": "CANCER_TYPE in [Melanoma]",
+      "studies": [
+        "pancan_pcawg_2020"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "signatures",
+      "cohorts": [
+        "Melanoma"
+      ],
+      "signatures": {
+        "columns": [
+          {
+            "id": "patient",
+            "name": "Patient ID",
+            "numeric": false
+          },
+          {
+            "id": "samples",
+            "name": "Samples",
+            "numeric": true
+          },
+          {
+            "id": "profiled",
+            "name": "Samples with signatures",
+            "numeric": true
+          },
+          {
+            "id": "types",
+            "name": "Signature types",
+            "numeric": false
+          }
+        ],
+        "shown": [
+          "patient",
+          "samples",
+          "profiled",
+          "types"
+        ],
+        "defaults": [
+          "patient",
+          "samples",
+          "profiled",
+          "types"
+        ],
+        "query": {},
+        "pageSize": 25,
+        "offset": 0,
+        "lists": [
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "total": 107,
+            "all": 107
+          }
+        ],
+        "total": 107,
+        "all": 107,
+        "rows": [
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220841",
+            "sample": "",
+            "values": [
+              "DO220841",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220842",
+            "sample": "",
+            "values": [
+              "DO220842",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220843",
+            "sample": "",
+            "values": [
+              "DO220843",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220844",
+            "sample": "",
+            "values": [
+              "DO220844",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220845",
+            "sample": "",
+            "values": [
+              "DO220845",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220846",
+            "sample": "",
+            "values": [
+              "DO220846",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220847",
+            "sample": "",
+            "values": [
+              "DO220847",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220848",
+            "sample": "",
+            "values": [
+              "DO220848",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220849",
+            "sample": "",
+            "values": [
+              "DO220849",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220850",
+            "sample": "",
+            "values": [
+              "DO220850",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220851",
+            "sample": "",
+            "values": [
+              "DO220851",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220852",
+            "sample": "",
+            "values": [
+              "DO220852",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220853",
+            "sample": "",
+            "values": [
+              "DO220853",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220855",
+            "sample": "",
+            "values": [
+              "DO220855",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220857",
+            "sample": "",
+            "values": [
+              "DO220857",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220858",
+            "sample": "",
+            "values": [
+              "DO220858",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220859",
+            "sample": "",
+            "values": [
+              "DO220859",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220860",
+            "sample": "",
+            "values": [
+              "DO220860",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220861",
+            "sample": "",
+            "values": [
+              "DO220861",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "cohort": "Melanoma",
+            "study": "pancan_pcawg_2020",
+            "patient": "DO220862",
+            "sample": "",
+            "values": [
+              "DO220862",
+              1,
+              1,
+              "DBS, ID, SBS"
+            ]
+          },
+          {
+            "…": "5 more",
+            "sha256": "9346a3f05dc682ec"
+          }
+        ],
+        "patient": {
+          "study": "pancan_pcawg_2020",
+          "id": "DO220875",
+          "samples": [
+            {
+              "id": "SP124409",
+              "type": "Metastasis",
+              "label": "1"
+            }
+          ]
+        },
+        "position": {
+          "index": 32,
+          "prev": {
+            "study": "pancan_pcawg_2020",
+            "id": "DO220874"
+          },
+          "next": {
+            "study": "pancan_pcawg_2020",
+            "id": "DO220877"
+          }
+        },
+        "versions": [
+          "DBS",
+          "ID",
+          "SBS"
+        ],
+        "version": "SBS",
+        "profiles": {
+          "contribution": "mutational_signatures_contribution_SBS",
+          "pvalue": null,
+          "counts": "mutational_signatures_counts_SBS"
+        },
+        "profiled": [
+          "SP124409"
+        ],
+        "notProfiled": [],
+        "signatures": [
+          {
+            "entity": "mutational_signature_contribution_SBS7a",
+            "name": "SBS7a",
+            "description": "Mutational signature contribution",
+            "url": "",
+            "values": [
+              {
+                "value": 0.9022525786204483,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS7b",
+            "name": "SBS7b (UV)",
+            "description": "Attributed to ultraviolet light (UV) exposure and found in cancers of the skin; one of 4 signatures associated with UV exposure (SBS7a, SBS7c, and SBS7d); also associated with DSB1 and ID13",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs7b",
+            "values": [
+              {
+                "value": 0.05526022289700986,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS7c",
+            "name": "SBS7c",
+            "description": "Mutational signature contribution",
+            "url": "",
+            "values": [
+              {
+                "value": 0.02395450882063222,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS7d",
+            "name": "SBS7d (UV)",
+            "description": "Attributed to ultraviolet light (UV) exposure and found in cancers of the skin; one of 4 signatures associated with UV exposure (SBS7a, SBS7b, and SBS7c)",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs7d",
+            "values": [
+              {
+                "value": 0.018532689661909685,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS1",
+            "name": "SBS1",
+            "description": "Mutational signature contribution",
+            "url": "",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS2",
+            "name": "SBS2",
+            "description": "Mutational signature contribution",
+            "url": "",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS3",
+            "name": "SBS3 (HRD)",
+            "description": "Attributed to homologous recombination defects (HRD) in DNA damage response, most often found with germline and somatic BRCA mutations in breast, pancreatic, ovarian cancers, and in pancreatic tumors responsive to platinum therapy; associated with ID6",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs3",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS4",
+            "name": "SBS4 (Smoking)",
+            "description": "Associated with tobacco smoking likely due to direct DNA damage by tobacco smoke mutagens; frequently found in lung and head & neck cancers; associated with DSB2",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs4",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS5",
+            "name": "SBS5",
+            "description": "Mutational signature contribution",
+            "url": "",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS6",
+            "name": "SBS6 (MMR/MSI)",
+            "description": "Associated with defective DNA mismatch repair (MMR) and is found in microsatellite unstable (MSI) tumors; one of 7 signatures associated with MMR/MSI along with SBS14, SBS15, SBS20, SBS21, SBS26, and SBS44; also associated with large numbers of ID1 and ID2 ",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs6",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS8",
+            "name": "SBS8 (Unknown)",
+            "description": "Unknown etiology",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs8",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS9",
+            "name": "SBS9",
+            "description": "Mutational signature contribution",
+            "url": "",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS10a",
+            "name": "SBS10a (POLE)",
+            "description": "Attributed to polymerase epsilon exonuclease domain mutations; usually found in hypermutated samples (>100 per Mb); associated with SBS10b, SBS28 and DSB3",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs10a",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS10b",
+            "name": "SBS10b",
+            "description": "Mutational signature contribution",
+            "url": "",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS11",
+            "name": "SBS11 (TMZ)",
+            "description": "Exhibits a mutational pattern resembling that of alkylating agents and associated with patient histories of temozolomide (TMZ); usually generates large number of mutations (>10 per Mb)",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs11",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS12",
+            "name": "SBS12",
+            "description": "Mutational signature contribution",
+            "url": "",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS13",
+            "name": "SBS13",
+            "description": "Mutational signature contribution",
+            "url": "",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS14",
+            "name": "SBS14 (MMR/MSI)",
+            "description": "Associated with concurrent polymerase epsilon mutation, defective DNA mismatch repair (MMR), and microsatellite instability (MSI); present in very high numbers in all samples where it has been observed; one of 7 signatures associated with MMR/MSI (SBS6, SBS15, SBS20, SBS21, SBS26, and SBS44); associated with ID1 and ID2",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs14",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS15",
+            "name": "SBS15 (MMR/MSI)",
+            "description": "Associated with defective DNA mismatch repair (MMR), and microsatellite instability (MSI); one of 7 signatures associated with MMR/MSI (SBS6, SBS14, SBS20, SBS21, SBS26, and SBS44); associated with ID1 and ID2",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs15",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "entity": "mutational_signature_contribution_SBS16",
+            "name": "SBS16 (Unknown)",
+            "description": "Unknown etiology; lower levels of nucleotide excision repair and elevated levels of DNA damage on untranscribed strands may contribute",
+            "url": "https://cancer.sanger.ac.uk/signatures/sbs/sbs16",
+            "values": [
+              {
+                "value": 0,
+                "p": null
+              }
+            ]
+          },
+          {
+            "…": "45 more",
+            "sha256": "553f5755888150c3"
+          }
+        ],
+        "spectrum": {
+          "sample": "SP124409",
+          "total": 1566,
+          "channels": [
+            {
+              "entity": "mutational_signatures_matrix_A_C-A_A",
+              "label": "A[C>A]A",
+              "group": "C>A",
+              "count": 0
+            },
+            {
+              "entity": "mutational_signatures_matrix_A_C-A_C",
+              "label": "A[C>A]C",
+              "group": "C>A",
+              "count": 0
+            },
+            {
+              "entity": "mutational_signatures_matrix_A_C-A_G",
+              "label": "A[C>A]G",
+              "group": "C>A",
+              "count": 1
+            },
+            {
+              "entity": "mutational_signatures_matrix_A_C-A_T",
+              "label": "A[C>A]T",
+              "group": "C>A",
+              "count": 0
+            },
+            {
+              "entity": "mutational_signatures_matrix_C_C-A_A",
+              "label": "C[C>A]A",
+              "group": "C>A",
+              "count": 2
+            },
+            {
+              "entity": "mutational_signatures_matrix_C_C-A_C",
+              "label": "C[C>A]C",
+              "group": "C>A",
+              "count": 2
+            },
+            {
+              "entity": "mutational_signatures_matrix_C_C-A_G",
+              "label": "C[C>A]G",
+              "group": "C>A",
+              "count": 1
+            },
+            {
+              "entity": "mutational_signatures_matrix_C_C-A_T",
+              "label": "C[C>A]T",
+              "group": "C>A",
+              "count": 1
+            },
+            {
+              "entity": "mutational_signatures_matrix_G_C-A_A",
+              "label": "G[C>A]A",
+              "group": "C>A",
+              "count": 0
+            },
+            {
+              "entity": "mutational_signatures_matrix_G_C-A_C",
+              "label": "G[C>A]C",
+              "group": "C>A",
+              "count": 3
+            },
+            {
+              "entity": "mutational_signatures_matrix_G_C-A_G",
+              "label": "G[C>A]G",
+              "group": "C>A",
+              "count": 2
+            },
+            {
+              "entity": "mutational_signatures_matrix_G_C-A_T",
+              "label": "G[C>A]T",
+              "group": "C>A",
+              "count": 0
+            },
+            {
+              "entity": "mutational_signatures_matrix_T_C-A_A",
+              "label": "T[C>A]A",
+              "group": "C>A",
+              "count": 2
+            },
+            {
+              "entity": "mutational_signatures_matrix_T_C-A_C",
+              "label": "T[C>A]C",
+              "group": "C>A",
+              "count": 6
+            },
+            {
+              "entity": "mutational_signatures_matrix_T_C-A_G",
+              "label": "T[C>A]G",
+              "group": "C>A",
+              "count": 2
+            },
+            {
+              "entity": "mutational_signatures_matrix_T_C-A_T",
+              "label": "T[C>A]T",
+              "group": "C>A",
+              "count": 1
+            },
+            {
+              "entity": "mutational_signatures_matrix_A_C-G_A",
+              "label": "A[C>G]A",
+              "group": "C>G",
+              "count": 1
+            },
+            {
+              "entity": "mutational_signatures_matrix_A_C-G_C",
+              "label": "A[C>G]C",
+              "group": "C>G",
+              "count": 1
+            },
+            {
+              "entity": "mutational_signatures_matrix_A_C-G_G",
+              "label": "A[C>G]G",
+              "group": "C>G",
+              "count": 0
+            },
+            {
+              "entity": "mutational_signatures_matrix_A_C-G_T",
+              "label": "A[C>G]T",
+              "group": "C>G",
+              "count": 1
+            },
+            {
+              "…": "76 more",
+              "sha256": "a71f393db17ac184"
+            }
+          ]
+        },
+        "counted": [
+          "SP124409"
+        ],
+        "scale": "percent",
+        "ymax": 100,
+        "referenced": [
+          "SBS7a",
+          "SBS7b (UV)",
+          "SBS7c",
+          "SBS7d (UV)",
+          "SBS1",
+          "SBS2",
+          "SBS3 (HRD)",
+          "SBS4 (Smoking)",
+          "SBS5",
+          "SBS6 (MMR/MSI)",
+          "SBS8 (Unknown)",
+          "SBS9",
+          "SBS10a (POLE)",
+          "SBS10b",
+          "SBS11 (TMZ)",
+          "SBS12",
+          "SBS13",
+          "SBS14 (MMR/MSI)",
+          "SBS15 (MMR/MSI)",
+          "SBS16 (Unknown)",
+          {
+            "…": "44 more",
+            "sha256": "a666ff22d33f0e88"
+          }
+        ],
+        "reference": null
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "pancan_pcawg_2020",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": true,
+        "aggregateOnly": []
+      },
+      "caveat": "DO220875: Single base substitutions (SBS) from mutational_signatures_contribution_SBS, 1 sample profiled. The patient also has DBS, ID signatures. A contribution is the share of the sample's mutations the study's signature fitting assigned to the signature, as stored; a missing value is NA, not 0. This study records no p-value profile for SBS (mutational_signatures_pvalue_SBS), so no signature is marked significant. SP124409's spectrum: 1,566 single base substitutions counted in 96 channels, drawn as each channel's share of them; the counts may include silent and non-coding mutations not shown elsewhere. The patient list holds the cohort's patients with mutational-signature values: 107 patients. Sorted with the most profiled samples first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Count the patients per cohort and study",
+            "detail": "The signatures:counts query above: every patient of each cohort with a numeric value in one of the study's mutational-signature contribution profiles, with their sample count, how many of those samples have a value, and the signature types they have values in.",
+            "params": [
+              [
+                "Melanoma · pancan_pcawg_2020",
+                "107"
+              ]
+            ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Sort them together and take one page",
+            "detail": "The signatures:rows query above: the patients of every cohort and study combined in one query, sorted most profiled samples first, then by patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset."
+          },
+          {
+            "kind": "fetch",
+            "title": "Read DO220875's samples and signature values",
+            "detail": "signatures:samples (the patient's samples, numbered in sample order) and signatures:values: every entity of each of the study's mutational-signature profiles with the patient's value in each sample, and the entity's name, description and link. The table lists mutational_signatures_contribution_SBS as stored (a value that is not a number is NA).",
+            "params": [
+              [
+                "type",
+                "SBS"
+              ],
+              [
+                "profiled samples",
+                "SP124409"
+              ],
+              [
+                "signatures with a value",
+                "65"
+              ]
+            ]
+          },
+          {
+            "kind": "transform",
+            "title": "SP124409's spectrum",
+            "detail": "Each channel's count in mutational_signatures_counts_SBS for SP124409, and its share of the sample's total over every channel, in percent.",
+            "params": [
+              [
+                "total",
+                "1,566"
+              ],
+              [
+                "channels",
+                "96"
+              ]
+            ]
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "runSignatures",
+            "signaturePatientsSource",
+            "signatureValuesSource",
+            "signatureRows",
+            "spectrumOf",
+            "pageSql",
+            "countsSql",
+            "rankSql"
+          ],
+          "file": "lib/views/signatures/run.ts, lib/views/signatures/sql.ts, lib/views/signatures/data.ts, lib/table-query.ts",
+          "commit": null
+        },
+        "verification": "The contributions are listed as the study stores them; the spectrum's shares are each channel's count over the sample's total, which the script recomputes.",
+        "check": {
+          "signatures:total": {
+            "v": 1566
+          },
+          "signatures:A[C>A]A:percent": {
+            "v": 0,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:A[C>A]C:percent": {
+            "v": 0,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:A[C>A]G:percent": {
+            "v": 0.06385696040868455,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:A[C>A]T:percent": {
+            "v": 0,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:C[C>A]A:percent": {
+            "v": 0.1277139208173691,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:C[C>A]C:percent": {
+            "v": 0.1277139208173691,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:C[C>A]G:percent": {
+            "v": 0.06385696040868455,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:C[C>A]T:percent": {
+            "v": 0.06385696040868455,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:G[C>A]A:percent": {
+            "v": 0,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:G[C>A]C:percent": {
+            "v": 0.19157088122605365,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:G[C>A]G:percent": {
+            "v": 0.1277139208173691,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:G[C>A]T:percent": {
+            "v": 0,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:T[C>A]A:percent": {
+            "v": 0.1277139208173691,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:T[C>A]C:percent": {
+            "v": 0.3831417624521073,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:T[C>A]G:percent": {
+            "v": 0.1277139208173691,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:T[C>A]T:percent": {
+            "v": 0.06385696040868455,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:A[C>G]A:percent": {
+            "v": 0.06385696040868455,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:A[C>G]C:percent": {
+            "v": 0.06385696040868455,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "signatures:A[C>G]G:percent": {
+            "v": 0,
+            "rel": 1e-9,
+            "abs": 1e-12
+          },
+          "…": {
+            "more": 77,
+            "sha256": "c53ca7cc184a66b9"
+          }
+        }
+      }
+    }
+  ]
+}
