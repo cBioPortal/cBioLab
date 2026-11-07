@@ -186,6 +186,24 @@ async function portal({ browser, ok, BASE }) {
     try {
       await page.goto(link({ "ER+": er("Positive"), "ER-": er("Negative") }, "Protein"), { waitUntil: "domcontentloaded" });
       const protein = await settled();
+      // as the portal's tab: the table of every listed gene under the volcano, and a gene's values per group on a click
+      const body = page.locator("[data-test=diffexpr-body]");
+      const heads = await body.locator(".pb-table thead th").allInnerTexts();
+      const first = await body.locator(".pb-table tbody tr").first().innerText();
+      await body.locator(".pb-table tbody tr").first().click();
+      await body.locator("[data-test=diffexpr-box] svg").waitFor({ timeout: 120000 });
+      const box = await body.locator("[data-test=diffexpr-box]").innerText();
+      ok("comparison: an expression tab lists its genes in a table, and a gene clicked there draws its values per group",
+        ["Gene", "Cytoband", "μ in ER+", "μ in ER-", "σ in ER+", "σ in ER-", "Log2 Ratio", "p-Value", "q-Value", "Higher expression in"].every((h) => heads.some((x) => x.startsWith(h))) &&
+          /^AGR3\t7p21\.1/.test(first) && /AGR3 · p-Value/.test(box) && /ER\+ \(\d+\)/.test(box) && /ER- \(\d+\)/.test(box),
+        heads.join(" | ") + " — " + first.replace(/\s+/g, " ") + " — " + box.replace(/\s+/g, " ").slice(0, 160));
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const vb = await body.locator("[data-test=diffexpr-volcano]").boundingBox();
+      await page.mouse.move(vb.x + vb.width * 0.7, vb.y + vb.height * 0.15);
+      await page.mouse.down(); await page.mouse.move(vb.x + vb.width * 0.98, vb.y + vb.height * 0.75, { steps: 6 }); await page.mouse.up();
+      const pager = await body.locator(".pb-pager").innerText();
+      ok("comparison: a box dragged over the volcano lists only the genes inside it", /selected on the volcano/.test(await body.innerText()) && !/of 1,500/.test(pager),
+        pager.replace(/\s+/g, " "));
       const titles = await page.getByRole("tab").allInnerTexts();
       await page.getByRole("tab", { name: "DNA methylation" }).click();
       await page.waitForFunction(() => /methylation_hm450/.test(document.querySelector(".viewcard")?.innerText || ""), null, { timeout: 240000 });

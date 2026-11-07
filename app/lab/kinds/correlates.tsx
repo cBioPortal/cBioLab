@@ -1,6 +1,6 @@
 "use client";
 // The correlates view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
-import type { CohortDef, DrawnResultOf, View, ViewResult, ViewResultOf } from "../../../lib/types";
+import type { DrawnResultOf, ViewResultOf } from "../../../lib/types";
 import { type Col, PortalTable } from "../portal-bodies.tsx";
 import { DraftInput } from "./parts.tsx";
 import { profileUse } from "../../../lib/profile-catalog.ts";
@@ -8,38 +8,14 @@ import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
 import { SERIES } from "../../../lib/svg-kit";
 import { ViewFigure } from "../figure.tsx";
-import { api } from "../api.ts";
+import { useSidePlot } from "../side-plot.ts";
 import { fmtP } from "../../../lib/chart/format";
 import { pDigits } from "../../../lib/chart/format.ts";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 // ---- Co-expression: the correlated genes, and the query gene against the one picked ----------
 
 type CoRow = NonNullable<ViewResultOf<"correlates">["correlates"]>["positive"][number];
-
-/**
- * A plot of two values over one cohort, computed when asked: an ordinary plot view sent for the
- * pair, drawn here by the shared renderer. A newer pick supersedes one still in flight.
- */
-function usePairPlot(docJson: (() => string) | undefined, cohort: string, view: Record<string, unknown> | null) {
-  const [state, setState] = useState<{ key: string; view?: ViewResult; error?: string } | null>(null);
-  const want = useRef("");
-  const key = JSON.stringify(view);
-  useEffect(() => {
-    if (!view || !docJson) return;
-    want.current = key;
-    setState(null);
-    let doc: { study?: string; cohorts?: Record<string, CohortDef> };
-    try { doc = JSON.parse(docJson()); } catch { setState({ key, error: "no document to plot from" }); return; }
-    const def = doc.cohorts && doc.cohorts[cohort];
-    if (!def) { setState({ key, error: "cohort “" + cohort + "” is not in the document" }); return; }
-    api.analysis({ study: doc.study, cohorts: { [cohort]: def }, views: [{ ...view, cohorts: [cohort] } as View] }, { query: "?oncoprint=spec" })
-      .then((r) => r.json())
-      .then((j) => { if (want.current !== key) return; const pv = j.views && j.views[0]; setState({ key, ...(j.error || pv?.error ? { error: j.error || pv.error } : { view: pv }) }); })
-      .catch((e) => { if (want.current === key) setState({ key, error: String(e) }); });
-  }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
-  return state && state.key === key ? state : null;
-}
 
 function CorrelatesBody({ v, docJson }: { v: DrawnResultOf<"correlates">; docJson?: () => string }) {
   const r = v.correlates;
@@ -47,7 +23,7 @@ function CorrelatesBody({ v, docJson }: { v: DrawnResultOf<"correlates">; docJso
   const rows = useMemo(() => which === "positive" ? r.positive : which === "negative" ? r.negative : [...r.positive, ...r.negative], [r, which]);
   const [sel, setSel] = useState<CoRow | null>(null);
   const picked = sel && rows.includes(sel) ? sel : [...rows].sort((a, b) => a.q - b.q || Math.abs(b.rho ?? 0) - Math.abs(a.rho ?? 0))[0] || null;
-  const plot = usePairPlot(docJson, r.cohort, picked ? { kind: "plot", unit: "patient",
+  const plot = useSidePlot(docJson, [r.cohort], picked ? { kind: "plot", unit: "patient",
     x: { source: "profile", profile: r.profileType, gene: r.gene }, y: { source: "profile", profile: r.otherProfile, ...(r.otherIsAssay ? { entity: picked.gene } : { gene: picked.gene }) } } : null);
   const cols: Col<CoRow>[] = [
     r.otherIsAssay

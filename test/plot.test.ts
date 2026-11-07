@@ -322,3 +322,19 @@ test("a scatter's sparse cells are binned exactly as its density is", () => {
   assert.throws(() => plotScatterPointsSql(x, y, "SELECT '' AS pid", 5000, { grid: [240, 160], extent, cellMax: 0 }), /cellMax/);
   assert.throws(() => plotScatterPointsSql(x, y, "SELECT '' AS pid", 5000, { grid: [240, 160], extent: { ...extent, x1: Infinity }, cellMax: 2 }), /finite/);
 });
+
+test("the cohort as an axis: a plot's x only, every case of the cohort with its name as the value", () => {
+  const co = { source: "cohort" as const, label: "ER+ (IHC)" };
+  assert.throws(() => validateAxis(co, "x"), /the cohort is an axis only on a plot's x axis/, "refused where the caller does not allow it (Cox, forest, logistic)");
+  validateAxis(co, "x", { cohort: true });
+  validateAxis({ source: "cohort" }, "x", { cohort: true });
+  assert.throws(() => validateAxis({ source: "cohort", label: "x".repeat(201) }, "x", { cohort: true }), /label is the cohort's name/);
+  assert.equal(axisKind(co), "cat");
+  assert.equal(axisLabel(co), "cohort");
+  const s = axisSelect(co, ctx, "cat");
+  assert.match(s, /^SELECT DISTINCT replaceOne\(sd\.sample_unique_id, 'x_', ''\) AS id, 'ER\+ \(IHC\)' AS v/);
+  assert.match(s, /FROM db\.sample_derived sd\nWHERE sd\.cancer_study_identifier = 'x' AND /);
+  assert.match(axisSelect({ source: "cohort", label: "it's" }, { ...ctx, unit: "patient" }, "cat"), /replaceOne\(sd\.patient_unique_id, 'x_', ''\) AS id, 'it\\'s' AS v/,
+    "a patient is the case in patient mode, and the name is quoted");
+  assert.match(axisSelect({ source: "cohort" }, ctx, "cat"), /'cohort' AS v/);
+});

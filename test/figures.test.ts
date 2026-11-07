@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
 import { wrap } from "../lib/figures/common.ts";
 import { defaultLog2 } from "../lib/views/diffexpr/run.ts";
+import { diffexprVolcanoSvg, diffexprGseaSvg } from "../lib/views/diffexpr/figure.ts";
 import { niceCeil } from "../lib/views/shared.ts";
 import type { ViewResult } from "../lib/types.ts";
 import type { GenomeResult } from "../lib/views/genome/types.ts";
@@ -104,7 +105,7 @@ describe("diffexpr", () => {
     assert.equal(defaultLog2("rppa"), false);
     assert.equal(defaultLog2("methylation_hm450"), false);
   });
-  const g = (gene: string, effect: number, p: number, q: number) => ({ gene, nA: 10, nB: 10, meanA: effect, meanB: 0, effect, t: effect * 10, p, q });
+  const g = (gene: string, effect: number, p: number, q: number) => ({ gene, nA: 10, nB: 10, meanA: effect, meanB: 0, sdA: 1, sdB: 1, effect, t: effect * 10, p, q });
   const v: ViewResult = { kind: "diffexpr", cohorts: ["<A>", "B"], caveat: "moments only",
     diffexpr: { profileType: "z", log2: false, effectLabel: "difference in mean z-score", groups: ["<A>", "B"], tested: 3, skipped: 0, up: 1, down: 1,
       points: [g("UP1", 2, 1e-20, 1e-18), g("DN1", -2, 1e-10, 1e-9)], grid: { xMax: 5, yMax: 25, nx: 90, ny: 60, cells: [[45, 1, 1, 0]] },
@@ -120,6 +121,22 @@ describe("diffexpr", () => {
   test("enrichment switched off draws the volcano alone", () => {
     const svg = viewToSvg({ ...v, diffexpr: { ...v.diffexpr!, gsea: undefined } })!;
     assert.ok(!svg.includes("gene-set enrichment"));
+  });  test("the page's volcano: each point keyed by its gene, a selection keeping its colour and the rest grey, the picked gene ringed", () => {
+    const dv = v as never;
+    const plain = diffexprVolcanoSvg(dv, { width: 480 });
+    assert.ok(plain.includes('data-key="UP1"') && plain.includes('data-key="DN1"'));
+    assert.ok(!plain.includes("Gene-set enrichment"), "the gene sets are drawn apart");
+    const fills = (svg: string) => [...svg.matchAll(/<circle [^>]*fill="([^"]+)"[^>]*data-key="(\w+)"/g)].map((m) => m[2] + ":" + m[1]);
+    const sel = diffexprVolcanoSvg(dv, { width: 480 }, { selected: new Set(["UP1"]), picked: "DN1" });
+    const before = Object.fromEntries(fills(plain).map((x) => x.split(":"))), after = Object.fromEntries(fills(sel).map((x) => x.split(":")));
+    assert.equal(after.UP1, before.UP1, "the selected gene keeps its colour");
+    assert.notEqual(after.DN1, before.DN1, "an unselected gene is drawn grey");
+    assert.equal((sel.match(/fill="none" stroke="[^"]+" stroke-width="[\d.]+"\/>/g) || []).length - (plain.match(/fill="none" stroke="[^"]+" stroke-width="[\d.]+"\/>/g) || []).length, 1, "one ring for the picked gene");
+    assert.ok(plain.includes("&lt;A&gt;"), "cohort names are escaped");
+  });
+  test("the page's gene-set panel, or nothing without enrichment", () => {
+    assert.ok(diffexprGseaSvg(v as never, { width: 700 })!.includes("e2f targets"));
+    assert.equal(diffexprGseaSvg({ ...v, diffexpr: { ...v.diffexpr!, gsea: undefined } } as never, { width: 700 }), null);
   });
 });
 

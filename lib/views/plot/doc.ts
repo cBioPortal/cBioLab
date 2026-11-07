@@ -22,6 +22,8 @@ export const plotDoc: KindDoc = {
   //        | {"source":"alteration","genes":[G,...(2-20)],"by":"mutated"?}  // any-of-N as one category; only "mutated"
   //        | {"source":"alteration","oql":"KRAS: G12C, STK11: MUT","by":"any|statement"?}
   //            // any: Altered / Unaltered / Not profiled; statement: one group per statement (max 6)
+  //        | {"source":"cohort"}  // x only: one box (or column) per cohort of the view's cohorts, a case in two in both;
+  //            // each cohort is plotted on its own, so colorBy, ringBy and point layers are refused with it
   // two numeric axes -> scatter (binned; every case a point up to ${POINTS_CAP_TEXT}, else sparse-cell outliers); one categorical -> box;
   // two categorical -> a contingency table`,
 };

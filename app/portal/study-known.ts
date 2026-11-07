@@ -103,14 +103,24 @@ export function expressionProfile(catalog: ProfileInfo[]): string | null {
 }
 /** cBioPortal's order of a study's profiles in its API, which its comparison tabs take the first of: by id, character by character */
 const byId = (a: ProfileInfo, b: ProfileInfo) => (a.profile < b.profile ? -1 : a.profile > b.profile ? 1 : 0);
+/** the portal's filterAndSortProfiles: no z-scores but merged_median_zscores, by id, RNA-seq first */
+const expressionTabProfiles = (catalog: ProfileInfo[], type: string) =>
+  catalog.filter((p) => p.type === type && (/merged_median_zscores/i.test(p.profile) || !/zscores/i.test(p.profile)))
+    .sort((a, b) => Number(/rna_seq/i.test(b.profile)) - Number(/rna_seq/i.test(a.profile)) || byId(a, b));
+/**
+ * The profile a comparison's mRNA tab compares on, as the portal picks it: an MRNA_EXPRESSION
+ * profile that is not z-scores (merged_median_zscores excepted), RNA-seq first, then by id.
+ */
+export function mrnaComparisonProfile(catalog: ProfileInfo[]): string | null {
+  return expressionTabProfiles(catalog, "MRNA_EXPRESSION")[0]?.profile || null;
+}
 /**
  * The profile a comparison's Protein tab compares on, as the portal picks it: a PROTEIN_LEVEL
  * profile (RPPA or mass spectrometry) that is not z-scores, unless merged_median_zscores, the first
  * by id (the portal's filterAndSortProfiles, then its default of the first listed).
  */
 export function proteinProfile(catalog: ProfileInfo[]): string | null {
-  return catalog.filter((p) => p.type === "PROTEIN_LEVEL" && (/merged_median_zscores/i.test(p.profile) || !/zscores/i.test(p.profile)))
-    .sort(byId)[0]?.profile || null;
+  return expressionTabProfiles(catalog, "PROTEIN_LEVEL")[0]?.profile || null;
 }
 /**
  * The profile a comparison's DNA methylation tab compares on, as the portal picks it: the first

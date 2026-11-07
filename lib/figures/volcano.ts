@@ -8,7 +8,8 @@ import type { Pal } from "./common.ts";
 
 /** every tested item not drawn as a point, binned on the volcano's axes: [x bin, y bin, count, class?] */
 export interface VolcanoGrid { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number, ...number[]][] }
-export interface VolcanoPoint { key: string; label?: string; x: number; p: number; color: string; tip?: string }
+/** `ring`: the point is ringed in the ink colour, as a picked item is */
+export interface VolcanoPoint { key: string; label?: string; x: number; p: number; color: string; tip?: string; ring?: boolean }
 
 /** "3 of 25 named genes …" — what the volcano could not label, for its caption */
 export function unplacedNote(unplaced: string[], total: number, noun: string): string {
@@ -34,6 +35,8 @@ export function volcano(p: Pal, o: {
   xTitle: string; sides?: [string, string]; r?: number; cellColor?: (cls: number) => string; noun?: string;
   /** what `p` is, for the y axis's title (default "p") */
   pName?: string;
+  /** each point carries its key as data-key, for a page that picks points on the drawing */
+  keyed?: boolean;
 }): { svg: string; height: number; unplaced: string[] } {
   const g = o.grid, r = o.r ?? 2.6;
   const T = o.y0 + FS.small;
@@ -61,8 +64,10 @@ export function volcano(p: Pal, o: {
   }
   out.push(dens);
   const at = o.pts.map((d) => ({ d, x: X(d.x), y: Y(lp(d.p)) }));
-  out.push(at.map(({ d, x, y }) => `<circle cx="${r1(x)}" cy="${r1(y)}" r="${r}" fill="${d.color}" opacity="0.8">` +
-    (d.tip ? `<title>${esc(d.tip)}</title>` : "") + `</circle>`).join(""));
+  out.push(at.map(({ d, x, y }) => `<circle cx="${r1(x)}" cy="${r1(y)}" r="${r}" fill="${d.color}" opacity="0.8"` +
+    (o.keyed ? ` data-key="${esc(d.key)}"` : "") + `>` + (d.tip ? `<title>${esc(d.tip)}</title>` : "") + `</circle>`).join(""));
+  out.push(at.filter((a) => a.d.ring).map(({ x, y }) =>
+    `<circle cx="${r1(x)}" cy="${r1(y)}" r="${r + 2.5}" fill="none" stroke="${p.ink}" stroke-width="${SW.series}"/>`).join(""));
   // the named ones: ringed, labelled where a label fits
   const byKey = new Map(at.map((a) => [a.d.key, a]));
   const wants: LabelWant[] = [];

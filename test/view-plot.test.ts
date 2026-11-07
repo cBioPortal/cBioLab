@@ -287,3 +287,67 @@ describe("plot: several studies, pooled from per-site aggregates", () => {
     assert.equal(calls.filter((x) => x === "violin").length, 2);
   });
 });
+
+describe("plot: by cohort, one box per cohort", () => {
+  /** a participant that answers each cohort's plot from its x label: a box (or a column) named for it, and that cohort's cases */
+  function byCohort(calls: Calls, o: { shape?: "box" | "table"; noPointsFor?: string; total?: number } = {}) {
+    const name = (spec: any) => String(spec.x.label);
+    return {
+      instance: { id: "local", mode: "patient-level", conn: { db: "db" }, label: "local" },
+      plot: async (_def: unknown, spec: any): Promise<PlotData> => {
+        calls.push("plot " + name(spec));
+        if (o.shape === "table") return { shape: "table", n: 3, x: { label: "cohort", kind: "cat" }, y: { label: "SEX", kind: "cat" },
+          cells: [{ cx: name(spec), cy: "Female", n: 2 }, { cx: name(spec), cy: "Male", n: 1 }] };
+        const d = boxData([name(spec)], 2);
+        return { ...d, x: { label: "cohort", kind: "cat" }, coverage: { total: o.total ?? 3, nx: o.total ?? 3, ny: 2 } };
+      },
+      plotPoints: async (_def: unknown, spec: any) => { calls.push("points " + name(spec)); return name(spec) === o.noPointsFor ? [] : [{ id: name(spec) + "-1", g: name(spec), v: 1 }, { id: name(spec) + "-2", g: name(spec), v: 2 }]; },
+    };
+  }
+  async function two(r: Record<string, unknown>, view: Record<string, unknown> = {}) {
+    const c = {
+      doc: { cohorts: { A: { all: [] }, B: { all: [] } } },
+      cohorts: { A: evaluated(["s1"], 3), B: evaluated(["s1"], 3) }, resolvers: { s1: r }, vNames: ["A", "B"], vStudies: ["s1"],
+      participationFor: (s: string[]) => ({ studies: s.map((x) => ({ study: x, mode: "patient-level", instance: "" })), requiresPatientLevel: false, aggregateOnly: [] }),
+      pin: null, studyProfiles: async () => ({ profiles: [], gaProfiles: [] }),
+    } as unknown as ViewRun;
+    const out = await runPlot({ kind: "plot", cohorts: ["A", "B"], x: { source: "cohort" }, y: { source: "clinical", attribute: "Y" }, ...view } as never, c);
+    return "result" in (out as object) ? (out as { result: Box }).result : out as Box;
+  }
+
+  test("each cohort is plotted on its own and the boxes and cases laid side by side", async () => {
+    const calls: Calls = [];
+    const r = await two(byCohort(calls));
+    assert.equal(r.error, undefined);
+    assert.deepEqual(calls, ["plot A", "points A", "plot B", "points B"]);
+    assert.deepEqual(r.cohorts, ["A", "B"]);
+    assert.deepEqual(r.plot!.groups!.map((g) => g.g), ["A", "B"]);
+    assert.equal(r.plot!.n, 4);
+    assert.deepEqual(r.plot!.points!.map((p) => p.g), ["A", "A", "B", "B"]);
+    assert.equal(r.plot!.overlay, "points");
+    assert.deepEqual(r.plot!.pointSet, { rule: "all", drawn: 4 });
+    assert.deepEqual(r.plot!.coverage, { total: 6, nx: 6, ny: 4 });
+    assert.match(r.note!, /^4 of 6 samples have a value on both axes \(2 have no mRNA\); only those are drawn\. One box per cohort; a sample in more than one cohort is in each\.$/);
+  });
+
+  test("the cases are drawn from every cohort or from none", async () => {
+    const r = await two(byCohort([], { noPointsFor: "B" }));
+    assert.equal(r.plot!.points, undefined);
+    assert.equal(r.plot!.overlay, "none");
+    assert.match(r.note!, /Each cohort's values are drawn as its box alone\./);
+  });
+
+  test("a categorical value gives one contingency column per cohort", async () => {
+    const r = await two(byCohort([], { shape: "table" }));
+    assert.equal(r.plot!.shape, "table");
+    assert.deepEqual(r.plot!.cells!.map((c) => c.cx + "/" + c.cy), ["A/Female", "A/Male", "B/Female", "B/Male"]);
+    assert.match(r.note!, /One column per cohort/);
+  });
+
+  test("colour, ring and point layers are refused, and a cohort's own refusal is named with it", async () => {
+    assert.match((await two(byCohort([]), { colorBy: { source: "clinical", attribute: "SEX" } })).error!, /colorBy, ringBy and point layers are not offered/);
+    assert.match((await two(byCohort([]), { points: [{ rule: "outliers" }] })).error!, /not offered/);
+    const failing = { ...byCohort([]), plot: async () => { throw new Error("no such attribute"); } };
+    assert.match((await two(failing)).error!, /^A: no such attribute/);
+  });
+});

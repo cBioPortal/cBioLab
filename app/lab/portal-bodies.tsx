@@ -22,7 +22,7 @@ import { FIELD, TB } from "../_ui/toolbar.ts";
 
 export interface Col<T> { key: string; label: string; num?: boolean; value: (r: T) => string | number | null; render?: (r: T) => React.ReactNode; title?: string }
 
-export function PortalTable<T>({ rows, cols, initialSort, search, filters, selected, onSelect, pageSize = 25, note, wide }: {
+export function PortalTable<T>({ rows, cols, initialSort, search, filters, selected, onSelect, pageSize = 25, note, wide, bar }: {
   rows: T[]; cols: Col<T>[]; initialSort: { key: string; desc?: boolean };
   /** the text a row is found by */
   search?: (r: T) => string;
@@ -33,6 +33,8 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
   note?: React.ReactNode;
   /** the table spans the card's width */
   wide?: boolean;
+  /** controls of the card's own, first in the table's bar */
+  bar?: React.ReactNode;
 }) {
   const [sort, setSort] = useState(initialSort);
   const [q, setQ] = useState("");
@@ -53,6 +55,7 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
   return (
     <div className="pb-tablewrap">
       <div className="pb-tablebar">
+        {bar}
         {(filters || []).map((f, i) => (
           <label key={f.label} className="chk"><Checkbox checked={on[i]} onCheckedChange={(c) => { setOn((o) => o.map((x, j) => j === i ? (c === true) : x)); setPage(0); }} /> {f.label}</label>
         ))}

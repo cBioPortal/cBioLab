@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { comparisonLayout } from "../app/portal/comparison-layout.ts";
-import { proteinProfile, methylationProfile, probeMethylation, type StudyKnown } from "../app/portal/study-known.ts";
+import { mrnaComparisonProfile, proteinProfile, methylationProfile, probeMethylation, type StudyKnown } from "../app/portal/study-known.ts";
 import type { ProfileInfo } from "../lib/profile-catalog.ts";
 
 let order = 0;
@@ -34,6 +34,13 @@ const tabOf = (l: ReturnType<typeof layout>, title: string) => {
   const t = l.tabs.find((x) => x.title === title);
   return t?.views && (l.doc.views![t.views[0]] as any);
 };
+
+test("the mRNA profile is picked as the portal picks it: not z-scores, RNA-seq first, then by id", () => {
+  assert.equal(mrnaComparisonProfile([prof("mrna", "MRNA_EXPRESSION", "CONTINUOUS"), ...BRCA_TCGA]), "rna_seq_v2_mrna", "RNA-seq before the microarray");
+  assert.equal(mrnaComparisonProfile([prof("mrna_U133", "MRNA_EXPRESSION", "CONTINUOUS"), prof("mrna", "MRNA_EXPRESSION", "CONTINUOUS")]), "mrna");
+  assert.equal(mrnaComparisonProfile([prof("mrna_median_Zscores", "MRNA_EXPRESSION", "Z-SCORE")]), null);
+  assert.equal(mrnaComparisonProfile([prof("mrna_merged_median_zscores", "MRNA_EXPRESSION", "Z-SCORE")]), "mrna_merged_median_zscores");
+});
 
 test("protein and methylation profiles are picked as the portal picks them: not z-scores, first by id", () => {
   assert.equal(proteinProfile(BRCA_TCGA), "protein_quantification", "the portal lists profiles by id, so mass spectrometry before RPPA");

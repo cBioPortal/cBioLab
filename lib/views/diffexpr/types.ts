@@ -18,9 +18,17 @@ export interface DiffexprView {
   /** genes labelled on the volcano (default 12, max 40) */
   label?: number;
 }
-export interface DiffexprGene { gene: string; nA: number; nB: number; meanA: number; meanB: number; effect: number; t: number; p: number; q: number }
+export interface DiffexprGene {
+  gene: string; nA: number; nB: number; meanA: number; meanB: number;
+  /** each cohort's sample standard deviation, on the compared scale */
+  sdA: number; sdB: number;
+  effect: number; t: number; p: number; q: number;
+  cytoband?: string;
+}
 export interface DiffexprResult {
   profileType: string; log2: boolean;
+  /** the profile as the study names it, and its kind (cBioPortal's genetic_alteration_type: MRNA_EXPRESSION, PROTEIN_LEVEL, METHYLATION, …) */
+  profileName?: string; profileKind?: string;
   /** what `effect` is: a difference of means on the compared scale */
   effectLabel: string;
   /** cohorts in order: effect = first − second */
@@ -29,7 +37,7 @@ export interface DiffexprResult {
   /** genes left out for fewer than 3 patients in a cohort, or no variance in either */
   skipped: number;
   up: number; down: number;
-  /** genes at q < 0.05, and the labelled ones, drawn individually (≤1,500, the most significant) */
+  /** the most significant genes by p (≤1,500) and the labelled ones: the volcano's points and the table's rows */
   points: DiffexprGene[];
   /** every other tested gene, binned on the axes below: [x bin, y bin, count, 0 not significant | 1 higher in the first cohort | 2 in the second] */
   grid: { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number, 0 | 1 | 2][] };

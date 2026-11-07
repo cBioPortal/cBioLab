@@ -70,9 +70,16 @@ export type PlotAxis =
    * profiled" by the same rule. Per patient (any of its samples in the cohort) or per sample, following the unit.
    */
   | { source: "alteration"; oql: string; by?: "any" | "statement" }
+  /**
+   * The cohort a case belongs to, the plot's x axis only: one box per cohort the view draws, as
+   * the portal's group comparison draws a gene's values per group. A case in two cohorts is in
+   * both boxes. The plot runs once per cohort, so `label` (the cohort's name) is filled in by the
+   * engine, not given.
+   */
+  | { source: "cohort"; label?: string }
   | { source: "none" };
 export type AlterationBy = "mutated" | "mutationType" | "cna" | "sv";
-const AXIS_SOURCES: readonly string[] = ["clinical", "profile", "molecular", "assay", "alteration", "none"] satisfies PlotAxis["source"][];
+const AXIS_SOURCES: readonly string[] = ["clinical", "profile", "molecular", "assay", "alteration", "cohort", "none"] satisfies PlotAxis["source"][];
 /** an alteration axis given as an OQL query, rather than as genes */
 function isOqlAxis(a: PlotAxis): a is { source: "alteration"; oql: string; by?: "any" | "statement" } {
   return a.source === "alteration" && "oql" in a && a.oql != null;
@@ -170,6 +177,7 @@ export function axisLabel(a: PlotAxis): string {
     const name = genes.length > 1 ? (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") : genes[0];
     return name + (a.by === "cna" ? " copy number" : a.by === "sv" ? " structural variant" : a.by === "mutationType" ? " mutation type" : " mutation status");
   }
+  if (a.source === "cohort") return "cohort";
   return "ordered cases";
 }
 
@@ -183,16 +191,22 @@ export function axisKind(a: PlotAxis, clinicalKind?: (attr: string) => "num" | "
   if (a.source === "profile") throw new Error("a profile axis is read only once resolved against the study's profiles (lib/plot-profile.ts)");
   if (a.source === "molecular") return a.discrete ? "cat" : "num";
   if (a.source === "assay") return a.categorical ? "cat" : "num";
-  if (a.source === "alteration") return "cat";
+  if (a.source === "alteration" || a.source === "cohort") return "cat";
   const k = clinicalKind ? clinicalKind(a.attribute) : undefined;
   if (!k) throw new Error("clinical attribute '" + a.attribute + "' is not declared by this study, so its type is unknown");
   return k;
 }
 
-export function validateAxis(a: PlotAxis, which: string): void {
+/** `cohort`: the axis may be the cohort, which only a plot's x axis is (runPlot decides that) */
+export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean } = {}): void {
   if (!a || typeof a !== "object" || !("source" in a)) throw new Error(which + " axis needs a source");
   if (!AXIS_SOURCES.includes(a.source))
-    throw new Error(which + " axis: unknown source '" + String(a.source).slice(0, 40) + "' — use one of " + AXIS_SOURCES.join(", "));
+    throw new Error(which + " axis: unknown source '" + String(a.source).slice(0, 40) + "' — use one of " + AXIS_SOURCES.filter((x) => o.cohort || x !== "cohort").join(", "));
+  if (a.source === "cohort") {
+    if (!o.cohort) throw new Error(which + " axis: the cohort is an axis only on a plot's x axis");
+    if (a.label != null && (typeof a.label !== "string" || a.label.length > 200)) throw new Error(which + " axis: a cohort axis's label is the cohort's name");
+    return;
+  }
   if (a.source === "clinical" && !ATTR_RE.test(String(a.attribute || "")))
     throw new Error(which + " axis: '" + a.attribute + "' is not a clinical attribute name");
   if (a.source === "profile") {
@@ -413,6 +427,13 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
       "LEFT JOIN (\n     " + events + "\n) g ON g.sample_unique_id = sd.sample_unique_id\n" +
       "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + sampleIn("sd.sample_unique_id") + "\n" +
       "GROUP BY alt_case)";
+  }
+  if (a.source === "cohort") {
+    // every case of the cohort, its value the cohort's name
+    const idCol = strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study);
+    return "SELECT DISTINCT " + idCol + " AS id, " + sq(a.label || "cohort") + " AS v\n" +
+      "FROM " + db + ".sample_derived sd\n" +
+      "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + sampleIn("sd.sample_unique_id");
   }
   throw new Error("axis source '" + (a as { source: string }).source + "' cannot be selected");
 }

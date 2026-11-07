@@ -2,7 +2,7 @@
 // tab, each drawing the compared groups. Pure: the page builds it, and so can a test.
 import type { AnalysisDoc, View } from "../../lib/types.ts";
 import { arrange, type PageLayout } from "./page-doc.ts";
-import { expressionProfile, proteinProfile, methylationProfile, probeMethylation, assayComparisonProfiles, type StudyKnown } from "./study-known.ts";
+import { mrnaComparisonProfile, proteinProfile, methylationProfile, probeMethylation, assayComparisonProfiles, type StudyKnown } from "./study-known.ts";
 
 const CLINICAL_SHOWN = 8;
 
@@ -13,7 +13,7 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
   // the portal's expression tabs, each a diffexpr view on one profile, which compares exactly two
   // cohorts; protein and methylation open as the portal shows them, without gene-set enrichment
   const expression = !known ? [] : [
-    { title: "mRNA", profile: expressionProfile(catalog), none: "no mRNA profile", extra: {} },
+    { title: "mRNA", profile: mrnaComparisonProfile(catalog), none: "no mRNA profile", extra: {} },
     { title: "Protein", profile: proteinProfile(catalog), none: "no protein profile", extra: { geneSets: [] } },
     { title: "DNA methylation", profile: methylationProfile(catalog), extra: { geneSets: [] },
       none: probeMethylation(catalog) ? "this study's methylation is per probe, a generic assay, which this page does not compare" : "no methylation profile" },

@@ -32,9 +32,12 @@ title there.
   - [ ] The patient header's significant-signatures badge (no warehouse study has a p-value profile yet, so it would show nothing today)
   - [ ] The signature table's download (the portal's table exports; ours is client-side `PortalTable` with no CSV)
   - [ ] A browser check: the kind is still `e2ePending`
-- [ ] **Comparison → Protein and DNA methylation tabs** — `diffexpr` wired into the page, 2 groups (PR #159 open)
+- [x] **Comparison → mRNA, Protein and DNA methylation tabs** — `diffexpr` laid out as the portal's tab: volcano and the clicked gene's box plot per group (a `plot` by cohort), then the gene table with the "High expression/methylation in" filter and "Significant only"; profiles picked as the portal picks them, 2 groups (PR #159)
   - [ ] More than 2 groups (ANOVA), for mRNA, Protein and Methylation
   - [ ] Per-probe methylation (generic assay) as in the PanCancer Atlas studies
+  - [ ] The table lists the 1,500 most significant genes; the portal lists every gene tested (the rest are on the volcano as density, not as points)
+  - [ ] The Data Set picker's ⓘ profile description (the catalog carries no description)
+  - [ ] Downloads: the volcano's and box plot's SVG/PNG/data buttons, the table's copy and download
 - [ ] **Comparison → Mutations tab** — the two-group lollipop
 - [ ] **Query-by-gene form controls** — genomic-profile choice with z-score thresholds, case-set selector, user-defined case lists, GSVA gene sets
 - [x] **"Open in cBioPortal"** on every portal page (#158)

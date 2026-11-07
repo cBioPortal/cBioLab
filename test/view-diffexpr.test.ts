@@ -27,7 +27,10 @@ function site(values: Values, sets: { set_name: string; genes: string[] }[] = []
       const cohort = label.replace("diffexpr:moments:", "");
       return Object.entries(values[cohort] ?? {}).map(([g, xs]) => moments(g, xs));
     },
-    viewMeta: async (label: string, build: (s: string, d: string) => string) => { asked.push(label, build("s1", "db")); return sets; },
+    viewMeta: async (label: string, build: (s: string, d: string) => string) => {
+      asked.push(label, build("s1", "db"));
+      return label === "cytobands" ? [{ gene: "UP", cytoband: "1p36.33" }] : sets;
+    },
   };
 }
 const remote = (): Fake => ({ instance: { id: "peer", mode: "aggregate-only", label: "peer", conn: PRIMARY } });
@@ -115,6 +118,11 @@ describe("diffexpr: the per-gene test", () => {
     const w = welchT(5, mean(A.UP), varianceFromMoments(5, ma.sx, ma.sxx), 5, mean(B.UP), varianceFromMoments(5, mb.sx, mb.sxx));
     assert.equal(up.p, w.p);
     assert.ok(up.t > 0);
+    // each cohort's sample standard deviation, and the gene's cytoband where the warehouse has one
+    const sd = (xs: number[]) => Math.sqrt(xs.reduce((a, x) => a + (x - mean(xs)) ** 2, 0) / (xs.length - 1));
+    assert.ok(Math.abs(up.sdA - sd(A.UP)) < 1e-12 && Math.abs(up.sdB - sd(B.UP)) < 1e-12);
+    assert.equal(up.cytoband, "1p36.33");
+    assert.equal(d.points.find((g) => g.gene === "SAME")!.cytoband, undefined);
     assert.ok(de(r).points.find((g) => g.gene === "DOWN")!.effect < 0);
     // labels name both directions; z-scores are compared as stored
     assert.ok(d.labels.includes("UP") && d.labels.includes("DOWN"));
@@ -131,7 +139,11 @@ describe("diffexpr: the per-gene test", () => {
   test("q is Benjamini–Hochberg over the tested genes, and up/down count the q < 0.05 genes by sign", async () => {
     const d = de(await run({ label: 0 }, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }) }, { s1: site({ A, B }) })));
     assert.deepEqual(d.labels, []);
-    for (const g of d.points) assert.ok(g.q >= g.p && g.q < 0.05, g.gene);
+    // every tested gene is a row, significant or not, most significant first
+    assert.deepEqual(d.points.map((g) => g.gene).sort(), ["DOWN", "SAME", "UP"]);
+    for (let i = 1; i < d.points.length; i++) assert.ok(d.points[i - 1].p <= d.points[i].p);
+    for (const g of d.points) assert.ok(g.q >= g.p, g.gene);
+    assert.ok(d.points.find((g) => g.gene === "SAME")!.q >= 0.05);
     assert.equal(d.up + d.down, d.points.filter((g) => g.q < 0.05).length + d.pooledSignificant);
     assert.equal(d.up, 1); assert.equal(d.down, 1);
   });
