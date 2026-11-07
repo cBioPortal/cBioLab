@@ -2,8 +2,9 @@
 // scored with the ensemble's mean coefficients, cut at the training thresholds, and judged by
 // Harrell's C-index, Kaplan–Meier curves by risk group, the log-rank test and each group's HR.
 
-import { concordance, type CoxSubject } from "../../coxnet.ts";
-import { kaplanMeier, logRankK, coxRegression, seededRandom } from "../../stats.ts";
+import type { CoxSubject } from "../../coxnet.ts";
+import { compute } from "../../compute-pool.ts";
+import { kaplanMeier, logRankK, coxRegression } from "../../stats.ts";
 import { keepRiskRows, riskFitSpec, riskViewRows, RiskRefusal, type RiskFit, type RiskFitArgs, type RiskGrouping, type RiskResolver } from "./run.ts";
 import type { RiskExternal } from "./types.ts";
 
@@ -41,15 +42,7 @@ export async function riskExternal(r: RiskResolver, args: RiskFitArgs, cohort: s
   const sIndex = new Map(strata.map((v, i) => [v, i] as const));
   const subj: CoxSubject[] = scored.map((k) => ({ time: k.t, event: k.ev, entry: k.entry, stratum: sIndex.get(k.stratum)! }));
   const score = Float64Array.from(scored, (k) => k.genes.reduce((a, gene) => a + (coef.get(gene) ?? 0), 0));
-  const all = Int32Array.from(scored, (_, i) => i);
-  const cIndex = concordance(subj, all, score);
-  const rand = seededRandom(seed), boots: number[] = [];
-  for (let b = 0; b < RISK_EXTERNAL_BOOTSTRAP; b++) {
-    const rowsB = Int32Array.from(all, () => Math.floor(rand() * all.length));
-    const c = concordance(subj, rowsB, Float64Array.from(rowsB, (i) => score[i]));
-    if (Number.isFinite(c)) boots.push(c);
-  }
-  boots.sort((x, y) => x - y);
+  const { cIndex, boots } = await compute("concordanceBootstrap", subj, score, RISK_EXTERNAL_BOOTSTRAP, seed);
   const q = (f: number) => boots.length ? boots[Math.min(boots.length - 1, Math.max(0, Math.round(f * (boots.length - 1))))] : NaN;
   const cuts = g.groups.slice(1).map((x) => x.from!).filter((c) => c != null);
   const groupOf = (v: number) => { let k = 0; while (k < cuts.length && v > cuts[k]) k++; return k; };

@@ -9,13 +9,14 @@
 import type { ViewResult, CohortDef } from "../../types.ts";
 import { hasViewAggregates, isPatientLevel, resolverFor, type PatientLevelCapable, type ViewAggregateCapable } from "../../federation.ts";
 import { riskmodelRowsSql, riskmodelPanelGenesSql } from "../../federation-views.ts";
-import { coxnetEnsemble, coxFit, concordance, type CoxSubject, type CoxDesign } from "../../coxnet.ts";
+import { coxFit, concordance, type CoxSubject, type CoxDesign } from "../../coxnet.ts";
 import { kaplanMeier, logRankK } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, refuse } from "../shared.ts";
 import { RISK_LABEL_ABOVE, RISK_FIGURE_GENES, riskGroupNames } from "./figure.ts";
 import { tableAttributesSql } from "../../clinical-table.ts";
 import { riskExternal } from "./validate.ts";
+import { compute } from "../../compute-pool.ts";
 import { buildTable1, table1DefaultCandidates, TABLE1_MAX_ATTRIBUTES, TABLE1_MAX_GENES, type Table1Patient } from "./table1.ts";
 import type { RiskmodelView, RiskmodelResult } from "./types.ts";
 import { riskmodelMethod } from "./method.ts";
@@ -192,7 +193,7 @@ export async function fitRiskmodel(r: RiskResolver, args: RiskFitArgs): Promise<
   const disc = Int32Array.from(kept.map((_, i) => i).filter((i) => !s.validate || kept[i].half === 0));
   const valid = s.validate ? Int32Array.from(kept.map((_, i) => i).filter((i) => kept[i].half === 1)) : new Int32Array(0);
   if (s.validate && (disc.length < 50 || valid.length < 50)) throw new RiskRefusal("validation needs at least 50 patients in each half; this cohort has " + disc.length + " and " + valid.length, logged());
-  const fit = coxnetEnsemble(subj, X, { runs: s.runs, alpha: s.alpha, seed: s.seed, folds: RISK_FOLDS, testShare: RISK_TEST_SHARE, nLambda: RISK_LAMBDAS,
+  const fit = await compute("coxnetEnsemble", subj, X, { runs: s.runs, alpha: s.alpha, seed: s.seed, folds: RISK_FOLDS, testShare: RISK_TEST_SHARE, nLambda: RISK_LAMBDAS,
     unpenalized: dense.map((d) => d.name), pool: disc, ...(s.validate ? { alsoScore: valid } : {}) });
   const nb = X.binary.length;
   const orNull = (x: number) => Number.isNaN(x) ? null : x;
@@ -270,7 +271,7 @@ export const groupQuantiles = (g: { groups: number } | { cuts: number[] }): numb
  * same patients, or with validation on the other half, cut at the discovery half's quantiles — so
  * nothing reported was used to train or to place the cuts. Pure: the fit alone decides it.
  */
-export function groupRiskmodel(fit: RiskFit, qs: number[]): RiskGrouping {
+export async function groupRiskmodel(fit: RiskFit, qs: number[]): Promise<RiskGrouping> {
   const validate = fit.validated, anchored = fit.anchored;
   const subj: CoxSubject[] = fit.subjects.time.map((time, i) => ({ time, event: fit.subjects.event[i] === 1, entry: fit.subjects.entry[i], stratum: fit.subjects.stratum[i] }));
   const poolScored = fit.pool.filter((i) => fit.heldOut[i] != null);
@@ -307,13 +308,13 @@ export function groupRiskmodel(fit: RiskFit, qs: number[]): RiskGrouping {
   try {
     const dummies = members.slice(1).map((_, g) => { const col = new Float64Array(n); for (const i of members[g + 1]) col[i] = 1; return col; })
       .filter((_, g) => nonEmpty[g + 1]);
-    if (nonEmpty[0] && dummies.length) groupFit = coxFit(subj, repRows, dummies);
+    if (nonEmpty[0] && dummies.length) groupFit = await compute("coxFit", subj, repRows, dummies);
   } catch { groupFit = null; }
   try {
     const vals = reported.map(scoreOf), mean = vals.reduce((x, y) => x + y, 0) / vals.length;
     const sd = Math.sqrt(vals.reduce((x, y) => x + (y - mean) ** 2, 0) / vals.length) || 1;
     const col = new Float64Array(n); for (const i of reported) col[i] = (scoreOf(i) - mean) / sd;
-    const f = coxFit(subj, repRows, [col]);
+    const f = await compute("coxFit", subj, repRows, [col]);
     refit = { hr: f.hr[0], ciLow: f.ciLow[0], ciHigh: f.ciHigh[0], p: f.p[0] };
   } catch { refit = null; }
   let gi = 0;
@@ -475,7 +476,7 @@ export async function runRiskmodel(view: RiskmodelView, ctx: ViewRun): Promise<V
     const out = refuse("riskmodel", ctx, (e.aboutCohort ? "“" + name + "” " : "") + e.message);
     return e.queries.length ? { ...out, queries: e.queries.map((q) => ({ study, ...q })) } : out;
   }
-  const g = groupRiskmodel(fit, groupQuantiles(cutsChosen ? { cuts: cutsChosen } : { groups: nGroups }));
+  const g = await groupRiskmodel(fit, groupQuantiles(cutsChosen ? { cuts: cutsChosen } : { groups: nGroups }));
   let t1: Awaited<ReturnType<typeof riskTable1>> | null = null;
   if (describe) {
     try { t1 = await riskTable1(r, args, fit, g, describe); }

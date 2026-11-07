@@ -1,72 +1,17 @@
 // Adjusted view: each gene's alteration compared between two cohorts by a logistic regression of
 // altered ~ cohort + covariates on per-patient rows inside each local study, beside the raw odds
 // ratio and Fisher test. Covariates are coded by ./covariates.ts, as the cox and logistic views code them.
-import { logisticRegression, fisherExact, benjaminiHochberg, LOGISTIC_MAX_ITERATIONS, type LogisticRow } from "../../stats.ts";
-import type { ViewResult, CoxCovariate } from "../../types.ts";
+import type { ViewResult } from "../../types.ts";
 import { isPatientLevel, hasViewAggregates } from "../../federation.ts";
 import { riskmodelPanelGenesSql } from "../../federation-views.ts";
-import type { AxisKind } from "../../plot.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, refuse, plural, ATTR_NAME } from "../shared.ts";
-import { buildCoxColumns } from "../covariates.ts";
-import type { AdjustedView, AdjustedGene, AdjustedResult } from "./types.ts";
+import type { AdjustedView, AdjustedResult } from "./types.ts";
 import { adjustedRowsSql } from "./sql.ts";
+import { compute } from "../../compute-pool.ts";
+import { covariateKinds, type AdjustedPatient } from "./fit.ts";
 
 export const ADJUSTED_MAX_GENES = 200, ADJUSTED_MAX_COVARIATES = 6;
-/** a gene's cohort term is reported only when its log-OR's standard error is below this (larger: separation) */
-const ADJUSTED_MAX_SE = 5;
-
-/** one patient as the fits read them: which cohort (1 = the first), the genes their panels cover (null: every gene), mutated genes, covariates */
-export interface AdjustedPatient { group: 0 | 1; covers: Set<string> | null; genes: Set<string>; values: (number | string)[] }
-
-/** numbers when every value parses as one, else categories */
-export function covariateKinds(patients: { values: (number | string)[] }[], n: number): AxisKind[] {
-  return Array.from({ length: n }, (_, k) => patients.every((r) => r.values[k] !== "" && Number.isFinite(Number(r.values[k]))) ? "num" : "cat");
-}
-
-/**
- * Per gene: the patients profiled for it, the raw 2×2 (Fisher), and the logistic fit of altered on
- * the cohort indicator and the covariates (coded within the gene's patients); genes whose fit does
- * not converge or separates are returned in `failed`, never dropped. q is BH over the genes fit.
- * Pure, so it is testable without a database.
- */
-export function adjustedFit(patients: AdjustedPatient[], genes: string[], covariates: string[], kinds: AxisKind[]):
-  { rows: AdjustedGene[]; failed: { gene: string; reason: string }[] } {
-  const axes: CoxCovariate[] = covariates.map((a) => ({ source: "clinical", attribute: a }));
-  const rows: AdjustedGene[] = [], failed: { gene: string; reason: string }[] = [];
-  for (const gene of genes) {
-    const pts = patients.filter((r) => !r.covers || r.covers.has(gene));
-    const altered: [number, number] = [0, 0], profiled: [number, number] = [0, 0];
-    for (const r of pts) { const i = r.group ? 0 : 1; profiled[i]++; if (r.genes.has(gene)) altered[i]++; }
-    const [a, c] = altered, b = profiled[0] - a, d = profiled[1] - c;
-    if (!profiled[0] || !profiled[1]) { failed.push({ gene, reason: "not profiled in one of the cohorts" }); continue; }
-    const rawOr = b * c > 0 && a * d > 0 ? (a * d) / (b * c) : null;
-    const fisherP = fisherExact(a, b, c, d);
-    // a numeric covariate that does not vary has nothing to adjust; a category in which no patient (or
-    // every patient) is mutated separates, so for this gene it joins the reference level
-    let merged = false;
-    const cols = buildCoxColumns(axes, kinds, pts).filter((col) => {
-      if (kinds[col.axisIndex] === "num") return new Set(pts.map((r) => Number(r.values[col.axisIndex]))).size > 1;
-      const at = pts.filter((r) => String(r.values[col.axisIndex]) === col.level), hit = at.filter((r) => r.genes.has(gene)).length;
-      const keep = hit > 0 && hit < at.length;
-      if (!keep) merged = true;
-      return keep;
-    });
-    const input: LogisticRow[] = pts.map((r) => ({ y: r.genes.has(gene) ? 1 : 0,
-      x: [r.group, ...cols.map((col) => kinds[col.axisIndex] === "num" ? Number(r.values[col.axisIndex]) : String(r.values[col.axisIndex]) === col.level ? 1 : 0)] }));
-    let fit;
-    try { fit = logisticRegression(input); }
-    catch { fit = null; }
-    if (!fit || fit.iterations >= LOGISTIC_MAX_ITERATIONS || !(fit.se[0] > 0 && fit.se[0] < ADJUSTED_MAX_SE) || !Number.isFinite(fit.beta[0])) {
-      failed.push({ gene, reason: rawOr == null ? "an empty cell in the 2×2" : "the fit did not converge: a covariate nearly decides the alteration" });
-      continue;
-    }
-    rows.push({ gene, altered, profiled, rawOr, fisherP, or: fit.or[0], ciLow: fit.ciLow[0], ciHigh: fit.ciHigh[0], p: fit.p[0], q: 1, ...(merged ? { merged } : {}) });
-  }
-  benjaminiHochberg(rows.map((g) => g.p)).forEach((q, i) => { rows[i].q = q; });
-  rows.sort((x, y) => x.p - y.p || x.gene.localeCompare(y.gene));
-  return { rows, failed };
-}
 
 export async function runAdjusted(view: AdjustedView, ctx: ViewRun): Promise<ViewResult> {
   const { doc, cohorts, resolvers, vNames, vStudies, pin } = ctx;
@@ -130,7 +75,7 @@ export async function runAdjusted(view: AdjustedView, ctx: ViewRun): Promise<Vie
   if (!genes.length) return no("no gene is mutated in at least " + (100 * minShare).toFixed(1) + "% (and " + minAltered + ") of the patients profiled for it; lower minShare");
   { const e = overLimit("an adjusted view", ADJUSTED_MAX_GENES, genes.length); if (e) return no(e.replace("at most " + ADJUSTED_MAX_GENES, "at most " + ADJUSTED_MAX_GENES + " genes").replace("remove " + (genes.length - ADJUSTED_MAX_GENES), "raise minShare to test fewer") + " (" + genes.length + " genes are mutated in at least " + (100 * minShare).toFixed(1) + "% of patients)"); }
 
-  const { rows, failed } = adjustedFit(patients, genes, covariates, kinds);
+  const { rows, failed } = await compute("adjustedFit", patients, genes, covariates, kinds);
   if (!rows.length) return no("no gene could be fit: " + failed.slice(0, 10).map((f) => f.gene + " (" + f.reason + ")").join("; "));
   const significant = rows.filter((g) => g.q < 0.05).length;
   const labels = rows.filter((g) => g.q < 0.05).slice(0, labelN).map((g) => g.gene);

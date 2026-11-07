@@ -38,7 +38,7 @@ export interface PathFit {
   coefs: Float64Array[];
 }
 
-import { chiSquareP1df, Z_975 } from "./stats.ts";
+import { chiSquareP1df, seededRandom, Z_975 } from "./stats.ts";
 
 // ---- risk sets ------------------------------------------------------------------------------
 
@@ -422,6 +422,24 @@ export function coxnetEnsemble(subj: CoxSubject[], X: CoxDesign, o: EnsembleOpti
   return { risk, heldOut, runs, external,
     selected: Float64Array.from(keptCount, (k) => k / o.runs),
     meanCoef: Float64Array.from(coefSum, (s, j) => keptCount[j] ? s / keptCount[j] : 0) };
+}
+
+/**
+ * Harrell's C over all of `score`'s patients, and over `resamples` bootstrap resamples of them
+ * (rows drawn with replacement from a generator seeded with `seed`): the finite resampled values,
+ * sorted, for an interval.
+ */
+export function concordanceBootstrap(subj: CoxSubject[], score: Float64Array, resamples: number, seed: number): { cIndex: number; boots: number[] } {
+  const all = Int32Array.from(score, (_, i) => i);
+  const cIndex = concordance(subj, all, score);
+  const rand = seededRandom(seed), boots: number[] = [];
+  for (let b = 0; b < resamples; b++) {
+    const rowsB = Int32Array.from(all, () => Math.floor(rand() * all.length));
+    const c = concordance(subj, rowsB, Float64Array.from(rowsB, (i) => score[i]));
+    if (Number.isFinite(c)) boots.push(c);
+  }
+  boots.sort((x, y) => x - y);
+  return { cIndex, boots };
 }
 
 // ---- an unpenalised fit with standard errors ------------------------------------------------
