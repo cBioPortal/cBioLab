@@ -4,11 +4,10 @@
 // DNA Methylation): the volcano (two groups) and the picked gene's values per group side by side,
 // then every listed gene in a table. The picked gene is the view's (`gene`, which re-runs nothing); the
 // volcano's drag selection and the table's filters are this browser's (invariant 9).
-import { useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Checkbox } from "../../_ui/checkbox";
 import { Button } from "../../_ui/button";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "../../_ui/dropdown-menu";
+import { PickVolcano, GroupFilter } from "../pick-volcano.tsx";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
 import { Badge, type Col, PortalTable } from "../portal-bodies.tsx";
@@ -19,8 +18,6 @@ import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 import { diffexprVolcanoSvg, diffexprGseaSvg } from "../../../lib/views/diffexpr/figure.ts";
 import { portalP } from "../../../lib/chart/format.ts";
 import { seriesStyle } from "../../../lib/chart/style";
-import { TB } from "../../_ui/toolbar.ts";
-import { cn } from "../../../lib/cn";
 
 type DeGene = NonNullable<ViewResultOf<"diffexpr">["diffexpr"]>["points"][number];
 type De = NonNullable<ViewResultOf<"diffexpr">["diffexpr"]>;
@@ -28,77 +25,6 @@ type De = NonNullable<ViewResultOf<"diffexpr">["diffexpr"]>;
 /** the portal's two-decimal log ratio, past ±10 written as a bound */
 const ratio = (x: number) => x < -10 ? "<-10" : x > 10 ? ">10" : x.toFixed(2);
 const methylation = (d: De) => d.profileKind === "METHYLATION" || /methylation/i.test(d.profileType);
-
-/**
- * The volcano, its points picked by click and selected by dragging a box over them, as the
- * portal's: a click on a gene draws its box plot, a drag lists only the genes inside it in the
- * table, and a click off the points clears that.
- */
-function Volcano({ v, picked, selected, onPick, onSelect }: {
-  v: DrawnResultOf<"diffexpr">; picked: string | null; selected: Set<string> | null;
-  onPick: (gene: string) => void; onSelect: (genes: Set<string> | null) => void;
-}) {
-  const box = useRef<HTMLDivElement>(null);
-  const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  const at = (e: React.PointerEvent) => { const r = box.current!.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
-  const down = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
-    const p = at(e);
-    setDrag({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-  };
-  const move = (e: React.PointerEvent) => { if (drag) { const p = at(e); setDrag({ ...drag, x1: p.x, y1: p.y }); } };
-  const up = (e: React.PointerEvent) => {
-    if (!drag) return;
-    const d = drag;
-    setDrag(null);
-    if (Math.abs(d.x1 - d.x0) < 4 && Math.abs(d.y1 - d.y0) < 4) {
-      // a click: on a point picks its gene, off the points clears the selection
-      const under = document.elementsFromPoint(e.clientX, e.clientY).find((el) => el instanceof SVGCircleElement && el.dataset.key) as SVGCircleElement | undefined;
-      if (under) onPick(under.dataset.key!);
-      else onSelect(null);
-      return;
-    }
-    const r = box.current!.getBoundingClientRect();
-    const [lx, hx] = [Math.min(d.x0, d.x1) + r.left, Math.max(d.x0, d.x1) + r.left];
-    const [ly, hy] = [Math.min(d.y0, d.y1) + r.top, Math.max(d.y0, d.y1) + r.top];
-    const inside = new Set<string>();
-    box.current!.querySelectorAll<SVGCircleElement>("circle[data-key]").forEach((c) => {
-      const b = c.getBoundingClientRect(), cx = b.left + b.width / 2, cy = b.top + b.height / 2;
-      if (cx >= lx && cx <= hx && cy >= ly && cy <= hy) inside.add(c.dataset.key!);
-    });
-    onSelect(inside.size ? inside : null);
-  };
-  return (
-    <div ref={box} className="relative cursor-crosshair select-none touch-none" data-test="diffexpr-volcano"
-      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => setDrag(null)}>
-      <DrawAtWidth min={320} draw={(width) => diffexprVolcanoSvg(v, { width }, { selected, picked })} deps={[v, selected, picked]} />
-      {drag && <div className="pointer-events-none absolute border border-[var(--accent)] bg-[var(--accent-soft)] opacity-60"
-        style={{ left: Math.min(drag.x0, drag.x1), top: Math.min(drag.y0, drag.y1), width: Math.abs(drag.x1 - drag.x0), height: Math.abs(drag.y1 - drag.y0) }} />}
-    </div>
-  );
-}
-
-/** the groups whose higher genes the table lists, as the portal's "High expression in ..." */
-function GroupFilter({ groups, shown, onShown, word }: { groups: string[]; shown: Set<string>; onShown: (s: Set<string>) => void; word: string }) {
-  const label = shown.size === groups.length ? "High " + word + " in: all groups" : shown.size ? "High " + word + " in: " + [...shown].join(", ") : "High " + word + " in ...";
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className={cn(TB, "gap-1 font-normal")} data-tip={"list the genes with the higher mean " + word + " in these groups"}>
-          {label}<ChevronDown className="opacity-60" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-52">
-        {groups.map((g) => (
-          // stays open, so both can be ticked in one go
-          <DropdownMenuCheckboxItem key={g} checked={shown.has(g)} onSelect={(e) => e.preventDefault()}
-            onCheckedChange={() => { const n = new Set(shown); if (n.has(g)) n.delete(g); else n.add(g); onShown(n); }}>{g}</DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
   v: DrawnResultOf<"diffexpr">; docJson?: () => string; pickedGene: string | null; setPicked: (gene: string) => void;
@@ -141,7 +67,8 @@ function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
     <div className="pb" data-test="diffexpr-body">
       <div className="pb-row">
         {two && <div className="pb-plot">
-          <Volcano v={v} picked={pickedGene} selected={selected} onPick={setPicked} onSelect={setSelected} />
+          <PickVolcano draw={(width) => diffexprVolcanoSvg(v, { width }, { selected, picked: pickedGene })} deps={[v, selected, pickedGene]}
+            onPick={setPicked} onSelect={setSelected} />
         </div>}
         <div className="pb-plot" data-test="diffexpr-box">
           {!boxGene && <div className={two ? "pb-placeholder" : "pb-hint"}>Click on gene in the table to render this plot.</div>}
@@ -157,7 +84,8 @@ function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
       {selected && <p className="meta">{selected.size.toLocaleString()} gene{selected.size === 1 ? "" : "s"} selected on the volcano · <Button type="button" variant="link" size="inline" onClick={() => setSelected(null)}>show every gene</Button></p>}
       <PortalTable wide rows={rows} cols={cols} initialSort={{ key: "q" }} pageSize={20} search={(g) => g.gene + " " + (g.cytoband || "") + " " + higherIn(g)}
         selected={picked} onSelect={(g) => setPicked(g.gene)} filters={[{ label: "Significant only", test: (g) => g.q < 0.05 }]}
-        bar={<GroupFilter groups={d.groups} shown={shown} onShown={(s) => setHidden(new Set(d.groups.filter((g) => !s.has(g))))} word={word} />}
+        bar={<GroupFilter groups={d.groups} shown={shown} onShown={(s) => setHidden(new Set(d.groups.filter((g) => !s.has(g))))} prefix={"High " + word + " in"}
+          tip={"list the genes with the higher mean " + word + " in these groups"} />}
         note={d.tested > d.points.length ? "the " + d.points.length.toLocaleString() + " most significant of " + d.tested.toLocaleString() + " genes tested" : undefined} />
     </div>
   );

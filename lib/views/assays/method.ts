@@ -33,7 +33,7 @@ export function assaysMethod(t: AssaysTrace): MethodRecord {
   steps.push({ kind: "statistic", title: t.test + " per entity, then Benjamini–Hochberg",
     detail: (cat ? "On each entity's cohort × value table, no continuity correction; an all-zero column is dropped."
       : two ? "Unequal-variance t from each cohort's n, mean and variance (Σv² − (Σv)²/n)/(n − 1), Welch–Satterthwaite df, two-sided."
-        : "The unequal-variance F test from each cohort's n, mean and variance; a cohort with fewer than 2 values or no variance is left out of that entity's test.") +
+        : "The classic one-way ANOVA F from each cohort's n, mean and variance (the pooled within-cohort variance), as cBioPortal's group comparison tests three or more groups.") +
       " q across every entity tested, one value per " + one + "." });
   const file = cat ? "assays_counts.csv" : "assays_moments.csv";
   const python = [
@@ -72,8 +72,7 @@ export function assaysMethod(t: AssaysTrace): MethodRecord {
         "    a, b = g.iloc[0], g.iloc[1]",
         "    p = ttest_ind_from_stats(a[\"mean\"], np.sqrt(a[\"var\"]), a[\"n\"], b[\"mean\"], np.sqrt(b[\"var\"]), b[\"n\"], equal_var=False).pvalue",
       ] : [
-        "    g = g[(g[\"n\"] >= 2) & (g[\"var\"] > 0)]  # a cohort with under 2 values or no variance says nothing",
-        "    p = anova_generic(g[\"mean\"].to_numpy(), g[\"var\"].to_numpy(), g[\"n\"].to_numpy(), use_var=\"unequal\", welch_correction=True).pvalue if len(g) >= 2 else 1.0",
+        "    p = anova_generic(g[\"mean\"].to_numpy(), g[\"var\"].to_numpy(), g[\"n\"].to_numpy(), use_var=\"equal\").pvalue",
       ]),
       "    rows.append((entity, p))",
     ]),
@@ -88,9 +87,9 @@ export function assaysMethod(t: AssaysTrace): MethodRecord {
   ].join("\n") + "\n";
   return {
     steps,
-    implementation: { functions: [cat ? "chiSquareTest" : two ? "welchT" : "welchAnovaTest", "varianceFromMoments", "benjaminiHochberg"], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    implementation: { functions: [cat ? "chiSquareTest" : two ? "welchT" : "oneWayAnova", "varianceFromMoments", "benjaminiHochberg"], file: "lib/stats.ts", commit: BUILD_COMMIT },
     verification: (cat ? "The chi-squared test matches scipy " + VERIFIED.chi2.version + " chi2_contingency"
-      : "Welch's t and ANOVA from moments match scipy " + VERIFIED.welch.version + " ttest_ind(equal_var=False) and statsmodels " + VERIFIED.anova.version + " " + VERIFIED.anova.fn) +
+      : "Welch's t and the one-way ANOVA from moments match scipy " + VERIFIED.welch.version + " ttest_ind(equal_var=False) and " + VERIFIED.anovaClassic.fn) +
       " and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts).",
     python: withResult(python),
     check: { "assays:tested": { v: t.tested }, ...checks("assays:", t.results.slice(0, 40), (r) => r.entity, [["p", "p", { rel: 1e-6, abs: 1e-300 }], ["q", "q", { rel: 1e-6, abs: 1e-300 }]]) },

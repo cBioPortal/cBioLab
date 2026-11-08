@@ -285,14 +285,26 @@ export function assayProfileSql(study: string, db: string, profileType: string):
     "WHERE stable_id = " + sq(study + "_" + profileType) + " AND genetic_alteration_type = 'GENERIC_ASSAY'");
 }
 
-/** Display names for a profile's entities, where the study gave them (NAME). Metadata only: an
- *  entity is a signature, an arm or a compound, never a patient. */
-export function assayEntityNamesSql(study: string, db: string, profileType: string): AggregateSql {
+/** How many entities have a value in a profile, counted up to `cap` (the count stops there, so a
+ *  profile of hundreds of thousands of probes is not read through). Metadata only. */
+export function assayEntityCountSql(study: string, db: string, profileType: string, cap: number): AggregateSql {
+  return aggregateSql("SELECT count() AS n FROM (SELECT DISTINCT entity_stable_id FROM " + db + ".generic_assay_data_derived\n" +
+    "  WHERE profile_type = " + sq(profileType) + " AND profile_stable_id = " + sq(study + "_" + profileType) + "\n" +
+    "  LIMIT " + Math.max(1, Math.floor(cap)) + ")");
+}
+
+/** Display names for a profile's entities, where the study gave them (NAME) — every entity with a
+ *  value in the profile, or only the `only` ones (a probe-level profile has hundreds of thousands).
+ *  Metadata only: an entity is a signature, an arm, a probe or a compound, never a patient. */
+export function assayEntityNamesSql(study: string, db: string, profileType: string, only?: string[]): AggregateSql {
+  const which = only
+    ? "ge.stable_id IN (" + (only.length ? only.map(sq).join(",") : "''") + ")"
+    : "ge.stable_id IN (SELECT DISTINCT entity_stable_id FROM " + db + ".generic_assay_data_derived\n" +
+      "    WHERE profile_type = " + sq(profileType) + " AND profile_stable_id = " + sq(study + "_" + profileType) + ")";
   return aggregateSql("WITH named AS (\n" +
     "  SELECT ge.stable_id AS entity, p.value AS name FROM " + db + ".generic_entity_properties p\n" +
     "  JOIN " + db + ".genetic_entity ge ON ge.id = p.genetic_entity_id\n" +
-    "  WHERE p.name = 'NAME' AND ge.stable_id IN (SELECT DISTINCT entity_stable_id FROM " + db + ".generic_assay_data_derived\n" +
-    "    WHERE profile_type = " + sq(profileType) + " AND profile_stable_id = " + sq(study + "_" + profileType) + ")\n" +
+    "  WHERE p.name = 'NAME' AND " + which + "\n" +
     ")\nSELECT entity, name FROM named");
 }
 

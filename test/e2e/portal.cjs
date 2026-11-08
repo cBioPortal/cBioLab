@@ -209,7 +209,7 @@ async function portal({ browser, ok, BASE }) {
         ok("comparison: the gene picked on an expression tab is kept in the link", /^AGR3 · p-Value/.test(meta), meta);
       } finally { await again.close(); }
       await page.evaluate(() => window.scrollTo(0, 0));
-      const vb = await body.locator("[data-test=diffexpr-volcano]").boundingBox();
+      const vb = await body.locator("[data-test=pick-volcano]").boundingBox();
       await page.mouse.move(vb.x + vb.width * 0.7, vb.y + vb.height * 0.15);
       await page.mouse.down(); await page.mouse.move(vb.x + vb.width * 0.98, vb.y + vb.height * 0.75, { steps: 6 }); await page.mouse.up();
       const pager = await body.locator(".pb-pager").innerText();
@@ -235,11 +235,32 @@ async function portal({ browser, ok, BASE }) {
       const tabs3 = await page.getByRole("tab").allInnerTexts();
       const hint3 = await body3.locator("[data-test=diffexpr-box]").evaluate((el) => ({ text: el.innerText, h: el.getBoundingClientRect().height }));
       ok("comparison: with three groups the expression tabs test by ANOVA, a mean and SD per group, no volcano, and one line saying to click a gene",
-        ["mRNA", "Protein"].every((t) => tabs3.includes(t)) && await body3.locator("[data-test=diffexpr-volcano]").count() === 0 &&
+        ["mRNA", "Protein"].every((t) => tabs3.includes(t)) && await body3.locator("[data-test=pick-volcano]").count() === 0 &&
           ["μ in LumA", "μ in LumB", "μ in Basal", "σ in LumA", "σ in LumB", "σ in Basal", "p-Value", "q-Value", "Higher expression in"].every((h) => heads3.some((x) => x.startsWith(h))) &&
           !heads3.some((x) => /Log2 Ratio|Mean Difference/.test(x)) && /ANOVA/.test(pTip) && /\t(LumA|LumB|Basal)$/.test(first3.trim()) &&
           /Click on gene in the table to render this plot\./.test(hint3.text) && hint3.h < 80,
         tabs3.join(" | ") + " — " + heads3.join(" | ") + " — " + pTip + " — " + first3.replace(/\s+/g, " "));
+      // a PanCancer Atlas study's methylation is per probe: its own Methylation tab, on the merged probes, each probe by its genes and id
+      await page.goto(BASE + "/portal/comparison?doc=" + Buffer.from(JSON.stringify({ study: "brca_tcga_pan_can_atlas_2018", views: [],
+        cohorts: { LumA: sub("BRCA_LumA"), Basal: sub("BRCA_Basal") } })).toString("base64url") + "&tab=Methylation", { waitUntil: "domcontentloaded" });
+      const probes = page.locator("[data-test=assays-body]");
+      const probeRow = probes.locator(".pb-table tbody tr").first();
+      await probeRow.waitFor({ timeout: 240000 });
+      const probeHeads = await probes.locator(".pb-table thead th").allInnerTexts();
+      const probeFirst = await probeRow.innerText();
+      const probeNote = await probes.locator(".pb-pager").innerText();
+      const probeSettings = await page.locator(".viewcard .viewtb").first().innerText();
+      const probeTabs = await page.getByRole("tab").allInnerTexts();
+      await probeRow.click();
+      await probes.locator("[data-test=assays-box] svg").waitFor({ timeout: 120000 });
+      const probeBox = await probes.locator("[data-test=assays-box]").innerText();
+      ok("comparison: per-probe methylation has its own Methylation tab, laid out as the portal's generic-assay tab: volcano, the probe's box plot, the table",
+        probeTabs.includes("Methylation") && !probeTabs.includes("DNA methylation") && /of 22,601 entities tested/.test(probeNote) &&
+          await probes.locator("[data-test=pick-volcano]").count() === 1 &&
+          ["Gene / Probe", "μ in LumA", "μ in Basal", "σ in LumA", "σ in Basal", "Log Ratio", "p-Value", "q-Value", "Higher in"].every((h) => probeHeads.some((x) => x.startsWith(h))) &&
+          /^\S.*\(cg\d{8}\)\t/.test(probeFirst) && /\(cg\d{8}\) · p-Value/.test(probeBox) && /LumA \(\d+\)/.test(probeBox) &&
+          /data set/i.test(probeSettings) && !/test with/.test(probeSettings),
+        probeTabs.join(" | ") + " — " + probeHeads.join(" | ") + " — " + probeFirst.replace(/\s+/g, " ") + " — " + probeBox.replace(/\s+/g, " ").slice(0, 120) + " — " + probeSettings.replace(/\s+/g, " "));
     } catch (e) {
       ok("comparison: expression tabs", false, String(e.message).split("\n")[0].slice(0, 200));
     }

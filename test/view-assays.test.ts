@@ -1,11 +1,11 @@
 // The assays view (lib/views/assays/): every entity of one generic-assay profile compared between
-// cohorts — Welch's t for two cohorts and Welch's ANOVA for more on numeric profiles, chi-squared on
+// cohorts — Welch's t for two cohorts and the classic one-way ANOVA for more on numeric profiles (as cBioPortal), chi-squared on
 // cohort × value for categorical ones, Benjamini–Hochberg across the entities — driven with
 // hand-made participants whose answers are counts and moments, and its figures.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runAssays } from "../lib/views/assays/run.ts";
-import { assaysSvg, assayEntitySvg, valueColors } from "../lib/views/assays/figure.ts";
+import { assaysSvg, assayEntitySvg, assaysVolcanoSvg, entityLabel, valueColors } from "../lib/views/assays/figure.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult } from "../lib/types.ts";
 import type { AssaysResult, AssaysView } from "../lib/views/assays/types.ts";
@@ -23,13 +23,13 @@ const cohort = (counts: Record<string, number>): EvaluatedCohort => ({
 const mom = (entity: string, vals: number[], other = 0): Row =>
   ({ entity, n: vals.length, sx: vals.reduce((a, b) => a + b, 0), sxx: vals.reduce((a, b) => a + b * b, 0), other });
 
-interface SiteOpts { meta?: Row; names?: Row[]; rows: Record<string, Row[]> }
-/** a local participant: its profile's metadata, entity names, and per cohort its moments or value counts */
+interface SiteOpts { meta?: Row; names?: Row[]; rows: Record<string, Row[]>; entities?: number; asked?: string[] }
+/** a local participant: its profile's metadata, entity names (and how many it has), and per cohort its moments or value counts */
 const site = (o: SiteOpts) => ({
   instance: { id: "local", mode: "patient-level", label: "local", conn: PRIMARY },
   viewMeta: async (label: string, build: (s: string, d: string) => unknown) => {
-    build("s", "db");
-    return label === "assays:profile" ? (o.meta ? [o.meta] : []) : (o.names ?? []);
+    o.asked?.push(label, String(build("s", "db")));
+    return label === "assays:profile" ? (o.meta ? [o.meta] : []) : label === "assays:entities" ? [{ n: o.entities ?? 0 }] : (o.names ?? []);
   },
   viewAggregate: async (label: string, _def: unknown, build: (c: string, s: string, d: string) => unknown) => {
     build("SELECT 'p' AS patient_id", "s", "db");
@@ -88,16 +88,31 @@ describe("assays: what it refuses", () => {
     assert.match(await refusal(v(), ctx({ A: cohort({ s1: 2 }), B: cohort({ s1: 2 }) }, { s1 }, { s1: [] })), /these studies have no generic-assay profiles/);
   });
 
-  test("per-probe methylation is refused; so is a profile numeric in one study and categorical in another", async () => {
-    assert.match(await refusal(v(), two({ s1: site({ meta: { ...NUM, generic_assay_type: "METHYLATION" }, rows: {} }) })), /per-probe methylation.*at most 20,000 entities/);
+  test("per-probe methylation past 25,000 probes is refused before any cohort is asked, naming a smaller profile; so is a profile numeric in one study and categorical in another", async () => {
+    const asked: string[] = [];
+    const big = site({ meta: { ...NUM, generic_assay_type: "METHYLATION" }, entities: 25001, rows: { A: [mom("cg1", [1, 2, 3])] }, asked });
+    const probes = ctx({ A: cohort({ s1: 10 }), B: cohort({ s1: 10 }) }, { s1: big }, { s1: [PT, "methylation_hm27_hm450_merge", "armlevel_cna"] });
+    assert.match(await refusal(v(), probes), /“sigs” has more than 25,000 probes in s1, more than this view compares — compare methylation_hm27_hm450_merge instead \(the PanCancer Atlas merged profile has the 22,601 probes/);
+    // the count stops just past the limit, so a profile of hundreds of thousands of probes is not read through
+    assert.match(asked[asked.indexOf("assays:entities") + 1], /SELECT DISTINCT entity_stable_id FROM db\.generic_assay_data_derived[\s\S]*LIMIT 25001\)/);
     const c = ctx({ A: cohort({ s1: 2, s2: 2 }), B: cohort({ s1: 2, s2: 2 }) }, { s1: site({ meta: CAT, rows: {} }), s2: site({ rows: {} }) });
     assert.match(await refusal(v(), c), /categorical in s1 and numeric in s2; compare one kind at a time/);
   });
 
-  test("no value at all, or more than 20,000 entities, or nothing testable", async () => {
+  test("per-probe methylation within the limit is compared, its names asked only for the listed probes", async () => {
+    const asked: string[] = [];
+    const s1 = site({ meta: { ...NUM, generic_assay_type: "METHYLATION", name: "Methylation (HM27 and HM450 merge)" }, entities: 22601, asked,
+      names: [{ entity: "cg1", name: "TP53;WRAP53" }], rows: { A: [mom("cg1", [0.1, 0.2, 0.15]), mom("cg2", [0.5, 0.6, 0.4])], B: [mom("cg1", [0.8, 0.9, 0.85]), mom("cg2", [0.5, 0.4, 0.6])] } });
+    const r = res(await runAssays(v(), two({ s1 })));
+    assert.equal(r.tested, 2);
+    assert.deepEqual(r.rows.map((e) => [e.entity, e.name]), [["cg1", "TP53;WRAP53"], ["cg2", "cg2"]]);
+    assert.match(asked[asked.indexOf("assays:names") + 1], /ge\.stable_id IN \('cg1','cg2'\)/);
+  });
+
+  test("no value at all, or more than 25,000 entities, or nothing testable", async () => {
     assert.match(await refusal(v(), two({ s1: site({ meta: NUM, rows: {} }) })), /none of these cohorts' samples has a value in “sigs”/);
-    const many = Array.from({ length: 20001 }, (_, i) => mom("E" + i, [1, 2, 3]));
-    assert.match(await refusal(v(), two({ s1: site({ meta: NUM, rows: { A: many } }) })), /has 20,001 entities with values here; an assays view compares at most 20,000/);
+    const many = Array.from({ length: 25001 }, (_, i) => mom("E" + i, [1, 2, 3]));
+    assert.match(await refusal(v(), two({ s1: site({ meta: NUM, rows: { A: many } }) })), /has 25,001 entities with values here; an assays view compares at most 25,000/);
     assert.match(await refusal(v(), two({ s1: site({ meta: NUM, rows: { A: [mom("E", [1, 2])], B: [mom("E", [1, 2])] } }) })),
       /no entity of “sigs” had at least 3 samples with a value in every cohort and any spread/);
     assert.match(await refusal(v(), two({ s1: site({ meta: CAT, rows: { A: [{ entity: "1p", value: "Gain", n: 5 }], B: [{ entity: "1p", value: "Gain", n: 5 }] } }) })),
@@ -163,16 +178,16 @@ describe("assays: a numeric profile", () => {
     assert.deepEqual(out.studies, ["s1", "s2", "s3", "p"]);
   });
 
-  test("three cohorts: Welch's ANOVA, highest mean named, no difference or volcano", async () => {
-    // means 2, 5, 8, each n 3 and variance 1: w = 3 each, weighted mean 5, A = 3·(9 + 0 + 9)/2 = 27,
-    // Σ(1 − w/W)²/(n − 1) = 3·(2/3)²/2 = 2/3, B = 1 + 2·(3 − 2)/(9 − 1)·(2/3) = 7/6, F = 27/(7/6)
+  test("three cohorts: the one-way ANOVA, highest mean named, no difference or volcano", async () => {
+    // means 2, 5, 8, each n 3 and variance 1: grand mean 5, between = 3·(9 + 0 + 9)/2 = 27 on 2 df,
+    // within = 3·2·1/6 = 1 on 6 df, F = 27
     const c = ctx({ A: cohort({ s1: 3 }), B: cohort({ s1: 3 }), C: cohort({ s1: 3 }) },
       { s1: site({ meta: { ...NUM, patient_level: 1 }, rows: { A: [mom("E", [1, 2, 3])], B: [mom("E", [4, 5, 6])], C: [mom("E", [7, 8, 9])] } }) });
     const out = await runAssays(v(), c);
     const r = res(out);
-    assert.equal(r.test, "Welch's ANOVA");
+    assert.equal(r.test, "one-way ANOVA");
     assert.equal(r.unit, "patients", "a patient-level profile gives one value per patient");
-    close(r.rows[0].statistic, 27 / (7 / 6), 1e-4);
+    close(r.rows[0].statistic, 27, 1e-9);
     assert.equal(r.rows[0].higherIn, "C");
     assert.equal(r.rows[0].diff, undefined);
     assert.equal(r.grid, undefined);
@@ -224,6 +239,26 @@ describe("assays: figures", () => {
     const rows = { A: [mom("E1", [1, 2, 3]), mom("E2", [1, 2, 3])], B: [mom("E1", [4, 5, 6]), mom("E2", [1, 2, 4])] };
     return runAssays(v(), two({ s1: site({ meta: NUM, names: [{ entity: "E1", name: "SBS7 (UV)" }], rows }) }));
   };
+
+  test("the page's volcano, as the portal's generic-assay tab: blue at q < 0.05, grey otherwise, the selection orange, each entity by name and id", async () => {
+    const r = res(await numeric());
+    const plain = assaysVolcanoSvg(r, { width: 480 })!;
+    const fills = (svg: string) => Object.fromEntries([...svg.matchAll(/<circle [^>]*fill="([^"]+)"[^>]*data-key="(\w+)"/g)].map((m) => [m[2], m[1]]));
+    assert.deepEqual(fills(plain), { E1: "#58ACFA", E2: "#D3D3D3" }, "E1 at q < 0.05, E2 not");
+    const sel = assaysVolcanoSvg(r, { width: 480 }, { selected: new Set(["E2"]), picked: "E1" })!;
+    assert.deepEqual(fills(sel), { E1: "#58ACFA", E2: "#FE9929" });
+    assert.ok(plain.includes("Log Ratio") && plain.includes("−log₁₀ p-Value") && plain.includes("SBS7 (UV) (E1)\nLog Ratio: -3.00"));
+    assert.equal(entityLabel({ entity: "E2", name: "E2" }), "E2", "an entity without a name of its own is its id");
+    const three = res(await runAssays(v(), ctx({ A: cohort({ s1: 3 }), B: cohort({ s1: 3 }), C: cohort({ s1: 3 }) },
+      { s1: site({ meta: NUM, rows: { A: [mom("E", [1, 2, 3])], B: [mom("E", [4, 5, 6])], C: [mom("E", [7, 8, 9])] } }) })));
+    assert.equal(assaysVolcanoSvg(three, { width: 480 }), null, "no volcano past two cohorts, as the portal's");
+  });
+
+  test("the picked entity is carried to the result; anything that is not an id is refused", async () => {
+    const rows = { A: [mom("E1", [1, 2, 3])], B: [mom("E1", [4, 5, 6])] };
+    assert.equal(res(await runAssays(v({ entity: " E1 " }), two({ s1: site({ meta: NUM, rows }) }))).entity, "E1");
+    assert.match(String((await runAssays(v({ entity: "x\"; DROP" }), two({ s1: site({ meta: NUM, rows }) }))).error), /entity is one entity's stable id/);
+  });
 
   test("two numeric cohorts: a volcano beside the table when it fits, above it when it doesn't", async () => {
     const out = await numeric();

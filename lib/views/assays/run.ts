@@ -1,7 +1,7 @@
 // Assays view: every entity of one generic-assay profile, compared between cohorts
 import type { ViewResult } from "../../types.ts";
-import { assayProfileSql, assayEntityNamesSql } from "../../federation-views.ts";
-import { chiSquareTest, benjaminiHochberg, welchT, welchAnovaTest, varianceFromMoments } from "../../stats.ts";
+import { assayProfileSql, assayEntityNamesSql, assayEntityCountSql } from "../../federation-views.ts";
+import { chiSquareTest, benjaminiHochberg, welchT, oneWayAnova, varianceFromMoments } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, answering, refuse, niceCeil, PROFILE_NAME, askEachSite } from "../shared.ts";
 import type { AssaysView, AssaysEntity, AssaysResult } from "./types.ts";
@@ -10,8 +10,9 @@ import { assaysMethod } from "./method.ts";
 
 const ASSAY_ROWS = 300;
 /** past this many entities a profile is refused rather than compared: the per-cohort answer
- *  carries a row per entity, and a probe-level profile has hundreds of thousands */
-const ASSAY_MAX_ENTITIES = 20000;
+ *  carries a row per entity. A PanCancer Atlas study's merged methylation profile (the probes the
+ *  27k and 450k arrays share) has 22,601; its full 450k one, hundreds of thousands */
+const ASSAY_MAX_ENTITIES = 25000;
 /** values a categorical assay uses for "not called"; counted apart, never a category */
 const MISSING_VALUES = new Set(["", "NA", "N/A", "NaN", "nan", "null", "NULL"]);
 
@@ -23,6 +24,8 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
   if (!PROFILE_NAME.test(pt)) return refuse("assays", ctx, "profileType names a generic-assay profile, e.g. mutational_signatures_contribution_v2");
   const minN = view.minN == null ? 3 : Math.floor(Number(view.minN));
   if (!(minN >= 2 && minN <= 10000)) return refuse("assays", ctx, "minN is 2 to 10000");
+  const pickedEntity = view.entity == null ? null : String(view.entity).trim();
+  if (pickedEntity != null && !/^[\w.:;@()\-+/ ]{1,200}$/.test(pickedEntity)) return refuse("assays", ctx, "entity is one entity's stable id, like \"cg00000029\"");
   const label = view.label == null ? 12 : Math.floor(Number(view.label));
   if (!(label >= 0 && label <= 40)) return refuse("assays", ctx, "label is 0 to 40 entities");
   const empty = vNames.filter((n) => !cohorts[n].count);
@@ -38,9 +41,19 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
   }
   const metas = await Promise.all(holders.map(async (st) => ({ st, m: (await ok[st].viewMeta("assays:profile", (s, d) => assayProfileSql(s, d, pt)))[0] || {} })));
   const assayType = String(metas[0].m.generic_assay_type || "");
-  if (metas.some((x) => String(x.m.generic_assay_type || "") === "METHYLATION"))
-    return refuse("assays", ctx, "“" + pt + "” is per-probe methylation: hundreds of thousands of probes per study, more than this view compares (at most " +
-      ASSAY_MAX_ENTITIES.toLocaleString("en-US") + " entities) — compare chosen probes with a plot view, or split cohorts on one with a genericAssay clause");
+  // a per-probe methylation profile can be far past the limit: counted (up to just past it) before
+  // any cohort's values are asked for
+  if (metas.some((x) => String(x.m.generic_assay_type || "") === "METHYLATION")) {
+    const over = (await Promise.all(holders.map(async (st) => ({ st,
+      n: Number((await ok[st].viewMeta("assays:entities", (s, d) => assayEntityCountSql(s, d, pt, ASSAY_MAX_ENTITIES + 1)))[0]?.n || 0) }))))
+      .filter((x) => x.n > ASSAY_MAX_ENTITIES);
+    if (over.length) {
+      const smaller = [...new Set(inventory.flatMap((x) => x.ga))].filter((g) => g !== pt && /methylation/i.test(g)).sort();
+      return refuse("assays", ctx, "“" + pt + "” has more than " + ASSAY_MAX_ENTITIES.toLocaleString("en-US") + " probes in " + over.map((x) => x.st).join(", ") +
+        ", more than this view compares" + (smaller.length ? " — compare " + smaller.join(" or ") + " instead (the PanCancer Atlas merged profile has the 22,601 probes the 27k and 450k arrays share)" : "") +
+        "; a chosen probe can be drawn with a plot view, or cohorts split on it with a genericAssay clause");
+    }
+  }
   const categorical = (dt: unknown) => /^(CATEGORICAL|BINARY)$/i.test(String(dt));
   const kinds = new Set(metas.map((x) => categorical(x.m.datatype)));
   if (kinds.size > 1) return refuse("assays", ctx, "“" + pt + "” is categorical in " + metas.filter((x) => categorical(x.m.datatype)).map((x) => x.st).join(", ") +
@@ -57,14 +70,9 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
   let missing = 0;
   const perSite: { cohort: string; study: string; rows: number }[] = [];
   const holding = Object.fromEntries(holders.map((st) => [st, ok[st]]));
-  const [nameRows, answers] = await Promise.all([
-    Promise.all(holders.map((st) => ok[st].viewMeta("assays:names", (s, d) => assayEntityNamesSql(s, d, pt)))),
-    askEachSite(ctx, holding, (n, _st, r) => isCat
-      ? r.viewAggregate("assays:values:" + n, doc.cohorts[n], (c, s, d) => assayValueCountsSql(c, s, d, pt))
-      : r.viewAggregate("assays:moments:" + n, doc.cohorts[n], (c, s, d) => assayMomentsSql(c, s, d, pt)))
-  ]);
-  // the first study (in the view's order) to name an entity names it
-  for (const rows of nameRows) for (const r of rows) if (!names.has(String(r.entity))) names.set(String(r.entity), String(r.name));
+  const answers = await askEachSite(ctx, holding, (n, _st, r) => isCat
+    ? r.viewAggregate("assays:values:" + n, doc.cohorts[n], (c, s, d) => assayValueCountsSql(c, s, d, pt))
+    : r.viewAggregate("assays:moments:" + n, doc.cohorts[n], (c, s, d) => assayMomentsSql(c, s, d, pt)));
   for (const { cohort: n, study: st, answer: rows } of answers) {
     if (isCat) {
       for (const r of rows) {
@@ -93,7 +101,7 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
   let untested = 0;
   const valueTotals = new Map<string, number>();
   for (const e of [...entities].sort()) {
-    const name = names.get(e) || e;
+    const name = e;
     if (isCat) {
       const per = vNames.map((n) => counts.get(n + "\t" + e) || new Map<string, number>());
       const vals = [...new Set(per.flatMap((m) => [...m.keys()]))].sort();
@@ -120,7 +128,7 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
       if (cells.some((c) => c.n < minN) || flat) { untested++; continue; }
       let statistic: number, p: number;
       if (two) { const w = welchT(cells[0].n, cells[0].mean!, cells[0].v, cells[1].n, cells[1].mean!, cells[1].v); statistic = w.t; p = w.p; }
-      else { const w = welchAnovaTest(cells.map((c) => ({ n: c.n, mean: c.mean!, variance: c.v }))); statistic = w.f; p = w.p; }
+      else { const w = oneWayAnova(cells.map((c) => ({ n: c.n, mean: c.mean!, variance: c.v }))); statistic = w.f; p = w.p; }
       const means = cells.map((c) => c.mean!);
       tested.push({ entity: e, name, cells: cells.map(({ v, ...c }) => { void v; return c; }),
         ...(two ? { diff: means[0] - means[1] } : {}), statistic, p, q: 1, higherIn: vNames[means.indexOf(Math.max(...means))] });
@@ -130,6 +138,11 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
   benjaminiHochberg(tested.map((g) => g.p)).forEach((q, i) => { tested[i].q = q; });
   tested.sort((a, b) => a.p - b.p || a.entity.localeCompare(b.entity));
   const rows = tested.slice(0, ASSAY_ROWS);
+  // the listed entities' names, the first study (in the view's order) to name one naming it
+  const listed = rows.map((g) => g.entity);
+  for (const nameRows of await Promise.all(holders.map((st) => ok[st].viewMeta("assays:names", (s, d) => assayEntityNamesSql(s, d, pt, listed)))))
+    for (const r of nameRows) if (!names.has(String(r.entity))) names.set(String(r.entity), String(r.name));
+  for (const g of rows) g.name = names.get(g.entity) || g.entity;
   // only what is significant is named on the figure
   const labels = rows.filter((g) => g.q < 0.05).slice(0, label).map((g) => g.entity);
   let grid: AssaysResult["grid"];
@@ -146,13 +159,13 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
     grid = { xMax, yMax, nx, ny, cells: [...cellMap].map(([k, c]) => { const [x, y] = k.split(",").map(Number); return [x, y, c] as [number, number, number]; }) };
   }
   const significant = tested.filter((g) => g.q < 0.05).length;
-  const test = isCat ? "Pearson chi-squared test (cohort × value)" : two ? "Welch's t-test" : "Welch's ANOVA";
+  const test = isCat ? "Pearson chi-squared test (cohort × value)" : two ? "Welch's t-test" : "one-way ANOVA";
   const values = isCat ? [...valueTotals].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([v]) => v) : undefined;
   const profileName = String(metas[0].m.name || pt);
   const multi = holders.length > 1;
   return {
     kind: "assays", cohorts: vNames,
-    assays: { profileType: pt, profileName, assayType, datatype: isCat ? "categorical" : "numeric", unit, groups: vNames, tested: tested.length, untested, significant, minN, test,
+    assays: { profileType: pt, profileName, assayType, ...(pickedEntity ? { entity: pickedEntity } : {}), datatype: isCat ? "categorical" : "numeric", unit, groups: vNames, tested: tested.length, untested, significant, minN, test,
       ...(values ? { values } : {}), missing, rows, ...(grid ? { grid } : {}), labels, ...(excluded.length ? { excluded } : {}) },
     method: assaysMethod({ profileType: pt, categorical: isCat, unit, cohorts: vNames, minN, test, perSite, tested: tested.length, untested, missing,
       moments: isCat ? [] : [...mom].map(([k, m]) => { const [cohort, entity] = k.split("\t"); return { cohort, entity, ...m }; }),

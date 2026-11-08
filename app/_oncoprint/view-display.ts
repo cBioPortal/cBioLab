@@ -43,6 +43,8 @@ export function dataPart(v: Record<string, unknown>): Record<string, unknown> {
   // the risk model's volcano labels are chosen in the browser, from the whole result
   // the expression volcano's picked gene is ringed in the browser, its box plot a request of its own
   if (v.kind === "diffexpr") { const { gene, ...rest } = v; void gene; return rest; }
+  // the generic-assay tab's picked entity likewise: its box plot is a request of its own
+  if (v.kind === "assays") { const { entity, ...rest } = v; void entity; return rest; }
   if (v.kind === "riskmodel") { const { labelAbove, ...rest } = v; void labelAbove; return rest; }
   // the pathway map's pathway and ranking are applied in the browser, from every library gene's counts
   if (v.kind === "pathwaymap") { const { pathway, rank, byFrequency, pancanOnly, ...rest } = v; void pathway; void rank; void byFrequency; void pancanOnly; return rest; }
