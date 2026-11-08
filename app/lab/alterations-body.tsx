@@ -4,13 +4,14 @@
 // (app/_table/DataTable.tsx) with its own query in the spec. The navigator above them steps through
 // the cohort's patients and opens their list (app/lab/patient-nav.tsx); the cohort is the header's
 // picker, as for every view.
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { sampleMarks } from "../../lib/timeline-tracks.ts";
 import type { TableQuery } from "../../lib/types";
 import { AnnotationBadge } from "./portal-bodies";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import type { AlterationsResult } from "../../lib/views/alterations/types";
+import { emitLocus, onLocus, patientKey } from "./locus-bus";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
 
@@ -32,6 +33,11 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
   // the samples the tables read, each keeping its number among all the patient's (the portal's sample view)
   const marks = useMemo(() => p?.shown ? new Map([...allMarks].filter(([id]) => p.shown!.includes(id))) : allMarks, [p, allMarks]);
   const go = (to: PatientKey | null | undefined) => { if (to && !updating) patch({ patient: to }); };
+  // the mutation or copy-number row clicked: the genomic overview zooms to its gene, and its Reset view lets go
+  // (the portal's onMutationTableRowClick / onCnaTableRowClick / onResetViewClick); one row at a time across the tables
+  const busKey = p ? patientKey(p.study, p.id) : "";
+  const [picked, setPicked] = useState<{ table: string; row: string } | null>(null);
+  useEffect(() => { setPicked(null); return busKey ? onLocus(busKey, (e) => { if (e.kind === "reset") setPicked(null); }) : undefined; }, [busKey]);
   const isSel = (row: { study: string; patient: string }) => p != null && row.study === p.study && row.patient === p.id;
   // a table's query goes to its own key, keeping its page size; an empty one leaves the key out
   const setQuery = (key: string, q: TableQuery) => {
@@ -85,6 +91,14 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
           <section key={key} className="alt-table" aria-label={name}>
             <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name} groupBy={key === "sv" ? "gene1" : "gene"}
               onQuery={(q) => setQuery(key, q)}
+              {...(key === "sv" ? {} : {
+                onRow: (r: { values: unknown[] }) => {
+                  setPicked({ table: key, row: JSON.stringify(r) });
+                  const gene = r.values[t.columns.findIndex((c) => c.id === "gene")];
+                  if (gene) emitLocus(busKey, { kind: "gene", gene: String(gene) });
+                },
+                selected: (r: { values: unknown[] }) => picked?.table === key && picked.row === JSON.stringify(r),
+              })}
               num={(id, x) => id === "vaf" ? x.toFixed(2) : id === "freq" ? x.toFixed(1) + "%" : x.toLocaleString()}
               cell={(id, x) => id === "samples" ? sampleCell(x)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />

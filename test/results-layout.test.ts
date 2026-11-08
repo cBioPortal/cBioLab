@@ -147,3 +147,19 @@ test("the Structural Variants check: the queried patients, with Explore's filter
   assert.deepEqual(svCheckCohort(q(["a"], ["ALK", "RET: MUT"], [F])), { study: "a", all: [F, { kind: "oql", q: "ALK: FUSION; RET: FUSION" }] });
   assert.deepEqual((svCheckCohort(q(["a", "b"], ["ALK"])) as any).studies, ["a", "b"]);
 });
+
+test("CN Segments: every queried sample's segments zoomed to the first gene, a chip per gene and Whole genome; the frequency view beneath", () => {
+  const l = resultsLayout(q(["s"], ["ERBB2", "MYC"]), data());
+  const tab = l.tabs.find((t) => t.title === "CN Segments")!;
+  const vs = tab.views!.map((i) => l.doc.views![i]) as any[];
+  assert.deepEqual(vs.map((v) => [v.kind, v.gene, v.cohorts]), [["segments", "ERBB2", ["Queried"]], ["genome", undefined, ["Queried"]]]);
+  const ch = tab.chooser!;
+  assert.deepEqual(ch.options, ["ERBB2", "MYC", "Whole genome"]);
+  assert.deepEqual(ch.locks, ["gene", "region"]);
+  assert.equal(ch.value(vs as View[]), "ERBB2");
+  const whole = ch.apply(vs as View[], "Whole genome") as any[];
+  assert.equal(whole[0].gene, undefined);
+  assert.equal(ch.value(whole as View[]), "Whole genome");
+  assert.equal((ch.apply(whole as View[], "MYC") as any[])[0].gene, "MYC");
+  assert.equal(whole[1], vs[1], "the frequency view is left as it is");
+});

@@ -50,3 +50,19 @@ export function textOn(fill: string): string {
   // contrast against white vs against #16232b; pick the larger
   return (1.05 / (L + 0.05)) >= ((L + 0.05) / 0.0655) ? "#ffffff" : "#16232b";
 }
+
+/**
+ * The copy-number segment scale: IGV's seg-track default, which the portal's CN Segments tab and
+ * patient genomic overview draw with. A log2 segment mean within ±0.1 is white; past it the colour
+ * runs linearly to pure red at +1.5 and pure blue at −1.5 (and stays there beyond), each channel
+ * floored as igv.js's GradientColorScale floors it.
+ */
+export const SEGMENT_SCALE = { neutral: 0.1, saturate: 1.5, gain: [255, 0, 0], loss: [0, 0, 255] } as const;
+export function segmentColor(v: number): string {
+  const { neutral, saturate, gain, loss } = SEGMENT_SCALE;
+  if (!(Math.abs(v) > neutral)) return "rgb(255,255,255)";
+  const to = v > 0 ? gain : loss;
+  const f = Math.min(1, (Math.abs(v) - neutral) / (saturate - neutral));
+  const ch = (k: number) => Math.floor(255 + f * (to[k] - 255));
+  return "rgb(" + ch(0) + "," + ch(1) + "," + ch(2) + ")";
+}

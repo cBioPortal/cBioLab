@@ -16,6 +16,7 @@ import { runCooccurrence } from "./cooccurrence/run.ts";
 import { runOncoprint } from "./oncoprint/run.ts";
 import { runAttrition } from "./attrition/run.ts";
 import { runGenome } from "./genome/run.ts";
+import { runSegments } from "./segments/run.ts";
 import { runPathways } from "./pathways/run.ts";
 import { runPathwayMap } from "./pathwaymap/run.ts";
 import { runDiffexpr } from "./diffexpr/run.ts";
@@ -107,6 +108,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   oncoprint: runOncoprint,
   attrition: drawn(runAttrition),
   genome: drawn(runGenome),
+  segments: drawn(runSegments),
   pathways: drawn(runPathways),
   pathwaymap: drawn(runPathwayMap),
   diffexpr: drawn(runDiffexpr),

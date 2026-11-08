@@ -39,6 +39,7 @@ import { alterationPatientRowSource, alterationSource, patientSamplesSource } fr
 import { pageSql } from "../lib/table-query.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
 import { signaturePatientsSource, signatureValuesSource } from "../lib/views/signatures/sql.ts";
+import { segmentSamplesRows, segmentRows, overviewMutationRows, overviewPanelRows, SEGMENT_CHROMS } from "../lib/views/segments/sql.ts";
 import { RemoteAggregateResolver, RemotePatientResolver, RemoteTimelineResolver, peerPatientKinds, remoteStudies, remoteCatalog } from "../lib/federation-remote.ts";
 import { parseRules, allowedKinds } from "../lib/disclosure.ts";
 import { asLoopbackPeer, isLoopbackRequest, loopbackHeaders, loopbackUrl, LOOPBACK_HEADER } from "../lib/loopback-peer.ts";
@@ -228,6 +229,15 @@ describe("remote peers: nothing identifying leaves before the network is touched
     for (const name of ["signaturePatientsSource", "signatureValuesSource"]) assert.doesNotMatch(name, /Sql$/, name + " must not be swept as an aggregate");
     assert.match(pageSql(signaturePatientsSource(part.map((p) => ({ ...p, profiles: ["mutational_signatures_contribution_SBS"] })), "db"), {}, [], 10, 0), /c\.pid AS patient/);
     assert.match(pageSql(signatureValuesSource(part[0], "P-1", "db", ["mutational_signatures_contribution_SBS"]), {}, [], 10, 0), /'P-1' AS patient/);
+    // the segments view's sample rows and their segments name samples: PatientSql for PatientLevelResolver.viewRows, not aggregate builders
+    for (const name of ["segmentSamplesRows", "segmentRows", "overviewMutationRows", "overviewPanelRows"]) {
+      assert.doesNotMatch(name, /Sql$/, name + " must not be swept as an aggregate");
+      assert.equal(name in (federation as Record<string, unknown>), false, name + " returns ids and must not sit among the aggregate builders");
+    }
+    assert.match(segmentSamplesRows("SELECT '' AS pid", "x", "db", { axis: SEGMENT_CHROMS, sort: "order", limit: 10 }), /sample_stable_id AS sample/);
+    assert.match(segmentRows("SELECT '' AS pid", "x", "db", { axis: SEGMENT_CHROMS }, [1]), /SELECT sid, indexOf/);
+    assert.match(overviewMutationRows("SELECT '' AS pid", "x", "db"), /samp\.sample AS sample/);
+    assert.match(overviewPanelRows("SELECT '' AS pid", "x", "db"), /samp\.sample AS sample/);
     for (const m of ["rowsPage", "rowsCounts", "rowsValues", "rowsRank"]) {
       for (const R of [AggregateResolver, RemoteAggregateResolver])
         assert.equal(typeof (R.prototype as unknown as Record<string, unknown>)[m], "undefined", R.name + " must not be able to run a table view's " + m);

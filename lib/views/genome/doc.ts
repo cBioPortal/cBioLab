@@ -12,7 +12,7 @@ export const genomeDoc: KindDoc = {
       title: "Genome-wide copy number: colorectal against breast",
       snapshot: "genome",
       demonstrates: "A `genome` view: the copy-number SEGMENTS (33M of them in this warehouse, unused by every other view) binned along the genome, as the share of each cohort's segmented samples gained or lost in each bin, with a per-bin Fisher test between exactly two cohorts. Each bin's denominator is the samples whose segmentation actually covers it, the same panel-aware rule every per-gene frequency follows.",
-      tags: ["copy-number", "segments"],
+      tags: ["copy-number", "copy-number segments"],
       note: "Colorectal and breast cancers in MSK-IMPACT, 2 Mb bins. The textbook colorectal pattern is all there — 20q gained in 60%, 13q in 42%, 8q in 32%, 18q lost in 54% — beside breast cancer's 1q and 8q gains and 16q loss. The strip underneath marks every bin where the two differ at q < 0.05, coloured by which cohort is higher.",
       doc: {
         study: "msk_impact_50k_2026",
