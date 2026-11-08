@@ -168,6 +168,73 @@ async function portal({ browser, ok, BASE }) {
     ok("comparison: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
+  // The Comparison page's expression tabs, as the portal's: mRNA, Protein and DNA methylation, each a
+  // diffexpr view on the profile the portal picks, for two groups; with three, none, and the page says why.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const er = (v) => ({ all: [{ kind: "clinical", attribute: "ER_STATUS_BY_IHC", values: [v] }] });
+    const link = (cohorts, tab) => BASE + "/portal/comparison?doc=" + Buffer.from(JSON.stringify({ study: "brca_tcga", views: [], cohorts })).toString("base64url") +
+      (tab ? "&tab=" + encodeURIComponent(tab) : "");
+    const settled = async () => {
+      await page.locator(".viewcard").first().waitFor({ timeout: 240000 });
+      await page.waitForFunction(() => !document.querySelector(".viewcard[aria-busy]"), null, { timeout: 240000 });
+      return page.locator(".viewcard").first().innerText();
+    };
+    try {
+      await page.goto(link({ "ER+": er("Positive"), "ER-": er("Negative") }, "Protein"), { waitUntil: "domcontentloaded" });
+      const protein = await settled();
+      // as the portal's tab: the table of every listed gene under the volcano, and a gene's values per group on a click
+      const body = page.locator("[data-test=diffexpr-body]");
+      const heads = await body.locator(".pb-table thead th").allInnerTexts();
+      const first = await body.locator(".pb-table tbody tr").first().innerText();
+      const placeholder = await body.locator("[data-test=diffexpr-box] .pb-placeholder").innerText();
+      await body.locator(".pb-table tbody tr").first().click();
+      await body.locator("[data-test=diffexpr-box] svg").waitFor({ timeout: 120000 });
+      const box = await body.locator("[data-test=diffexpr-box]").innerText();
+      ok("comparison: an expression tab lists its genes in a table, and a gene clicked there draws its values per group",
+        ["Gene", "Cytoband", "μ in ER+", "μ in ER-", "σ in ER+", "σ in ER-", "Log2 Ratio", "p-Value", "q-Value", "Higher expression in"].every((h) => heads.some((x) => x.startsWith(h))) &&
+          /^AGR3\t7p21\.1/.test(first) && /AGR3 · p-Value/.test(box) && /ER\+ \(\d+\)/.test(box) && /ER- \(\d+\)/.test(box) && /Click on a gene/.test(placeholder),
+        heads.join(" | ") + " — " + first.replace(/\s+/g, " ") + " — " + box.replace(/\s+/g, " ").slice(0, 160));
+      // the picked gene is the view's: the link carries it, so opening it draws the same box plot
+      const again = await browser.newPage();
+      try {
+        await again.goto(page.url(), { waitUntil: "domcontentloaded" });
+        await again.locator("[data-test=diffexpr-box] svg").waitFor({ timeout: 240000 });
+        const meta = await again.locator("[data-test=diffexpr-box] .meta").innerText();
+        ok("comparison: the gene picked on an expression tab is kept in the link", /^AGR3 · p-Value/.test(meta), meta);
+      } finally { await again.close(); }
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const vb = await body.locator("[data-test=diffexpr-volcano]").boundingBox();
+      await page.mouse.move(vb.x + vb.width * 0.7, vb.y + vb.height * 0.15);
+      await page.mouse.down(); await page.mouse.move(vb.x + vb.width * 0.98, vb.y + vb.height * 0.75, { steps: 6 }); await page.mouse.up();
+      const pager = await body.locator(".pb-pager").innerText();
+      ok("comparison: a box dragged over the volcano lists only the genes inside it", /selected on the volcano/.test(await body.innerText()) && !/of 1,500/.test(pager),
+        pager.replace(/\s+/g, " "));
+      const titles = await page.getByRole("tab").allInnerTexts();
+      await page.getByRole("tab", { name: "DNA methylation" }).click();
+      await page.waitForFunction(() => /methylation_hm450/.test(document.querySelector(".viewcard")?.innerText || ""), null, { timeout: 240000 });
+      const methylation = await settled();
+      ok("comparison: Protein and DNA methylation tabs compare two groups on the portal's profiles",
+        ["mRNA", "Protein", "DNA methylation"].every((t) => titles.includes(t)) &&
+          /protein_quantification/.test(protein) && /10,509 genes/.test(protein) && /16,133 genes/.test(methylation),
+        titles.join(" | ") + " — " + (protein.match(/[\d,]+ genes[^\n]*/) || [""])[0] + " / " + (methylation.match(/[\d,]+ genes[^\n]*/) || [""])[0]);
+      await page.goto(link({ "ER+": er("Positive"), "ER-": er("Negative"), "ER indeterminate": er("Indeterminate") }), { waitUntil: "domcontentloaded" });
+      await page.locator(".leftout").waitFor({ timeout: 240000 });
+      const three = await page.getByRole("tab").allInnerTexts();
+      await page.locator(".leftout").click();
+      const said = await page.getByRole("dialog").innerText();
+      ok("comparison: with three groups the expression tabs are left out, saying why",
+        !three.some((t) => /mRNA|Protein|methylation/.test(t)) && ["mRNA", "Protein", "DNA methylation"].every((t) => said.includes(t + " (compares exactly two groups, and 3 are compared")),
+        three.join(" | ") + " — " + said.replace(/\s+/g, " ").slice(0, 300));
+    } catch (e) {
+      ok("comparison: expression tabs", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("comparison expression tabs: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
   // "Open in cBioPortal": the same page and tab on the legacy portal, following the open tab; on the
   // Comparison page, which needs a portal session, disabled and saying why.
   {

@@ -27,6 +27,8 @@
       ],
       "diffexpr": {
         "profileType": "rna_seq_v2_mrna_median_all_sample_Zscores",
+        "profileName": "mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)",
+        "profileKind": "MRNA_EXPRESSION",
         "log2": false,
         "effectLabel": "difference in mean z-score",
         "groups": [
@@ -44,10 +46,13 @@
             "nB": 499,
             "meanA": -1.7445479532163737,
             "meanB": 0.40476012024048075,
+            "sdA": 0.34699086059148626,
+            "sdB": 0.7463315587425509,
             "effect": -2.1493080734568544,
             "t": -50.375531995793814,
             "p": 8.091447449982316e-220,
-            "q": 1.618774976843462e-215
+            "q": 1.618774976843462e-215,
+            "cytoband": "11q23.3"
           },
           {
             "gene": "FSIP1",
@@ -55,10 +60,13 @@
             "nB": 499,
             "meanA": -1.5407900584795324,
             "meanB": 0.4491647294589175,
+            "sdA": 0.35624475668462857,
+            "sdB": 0.6510087815792118,
             "effect": -1.98995478793845,
             "t": -49.881713753034575,
             "p": 2.3035779855211427e-204,
-            "q": 2.304269058916799e-200
+            "q": 2.304269058916799e-200,
+            "cytoband": "15q14"
           },
           {
             "gene": "SRARP",
@@ -66,10 +74,13 @@
             "nB": 499,
             "meanA": -2.056445614035087,
             "meanB": 0.3802805611222444,
+            "sdA": 0.44177169166230973,
+            "sdB": 0.7083748877035391,
             "effect": -2.4367261751573315,
             "t": -52.589706308468806,
             "p": 2.5912634422014837e-200,
-            "q": 1.728027214156096e-196
+            "q": 1.728027214156096e-196,
+            "cytoband": "1p36.13"
           },
           {
             "gene": "DRAIC",
@@ -77,10 +88,13 @@
             "nB": 499,
             "meanA": -1.7021637426900584,
             "meanB": 0.391529659318637,
+            "sdA": 0.4032024575030498,
+            "sdB": 0.6527755427087627,
             "effect": -2.0936934020086952,
-            "t": -49.28514705096115,
-            "p": 5.510248672861103e-190,
-            "q": 2.7559508737314804e-186
+            "t": -49.28514705096121,
+            "p": 5.510248672854827e-190,
+            "q": 2.7559508737283417e-186,
+            "cytoband": "15q23"
           },
           {
             "gene": "NAT1",
@@ -88,10 +102,13 @@
             "nB": 499,
             "meanA": -1.3843912280701751,
             "meanB": 0.5428809619238473,
+            "sdA": 0.387538779667445,
+            "sdB": 0.7134277400405131,
             "effect": -1.9272721899940224,
             "t": -44.23467399694228,
             "p": 2.7043279892965445e-182,
-            "q": 1.0820557150773334e-178
+            "q": 1.0820557150773334e-178,
+            "cytoband": "8p22"
           },
           {
             "gene": "MAPT-IT1",
@@ -99,10 +116,13 @@
             "nB": 499,
             "meanA": -1.6838713450292402,
             "meanB": 0.20232264529058122,
+            "sdA": 0.25144873398192924,
+            "sdB": 0.9671976667955912,
             "effect": -1.8861939903198215,
             "t": -39.813705837039535,
             "p": 2.012953202068773e-175,
-            "q": 6.711856960097978e-172
+            "q": 6.711856960097978e-172,
+            "cytoband": "17q21.31"
           },
           {
             "gene": "CT62",
@@ -110,10 +130,13 @@
             "nB": 499,
             "meanA": -2.0318602339181253,
             "meanB": 0.41401743486973935,
+            "sdA": 0.535370373334823,
+            "sdB": 0.6221169726565111,
             "effect": -2.4458776687878645,
             "t": -49.396461591675205,
             "p": 6.399560110513753e-157,
-            "q": 1.8289942795848305e-153
+            "q": 1.8289942795848305e-153,
+            "cytoband": "15q23"
           },
           {
             "gene": "SLC7A13",
@@ -121,10 +144,13 @@
             "nB": 499,
             "meanA": -1.9130122807017553,
             "meanB": 0.004921242484969942,
+            "sdA": 0.37527310936571046,
+            "sdB": 1.0188684266542911,
             "effect": -1.9179335231867252,
             "t": -35.59112691767468,
             "p": 3.892473730009011e-156,
-            "q": 9.734103680320035e-153
+            "q": 9.734103680320035e-153,
+            "cytoband": "8q21.3"
           },
           {
             "gene": "CYP2B7P",
@@ -132,10 +158,13 @@
             "nB": 499,
             "meanA": -1.3962970760233915,
             "meanB": 0.37895871743486925,
+            "sdA": 0.4308026142018705,
+            "sdB": 0.7708930428230952,
             "effect": -1.7752557934582607,
             "t": -37.209164655790694,
             "p": 6.350257193661754e-150,
-            "q": 1.411591615737745e-146
+            "q": 1.411591615737745e-146,
+            "cytoband": "19q13.2"
           },
           {
             "gene": "TFF1",
@@ -143,10 +172,13 @@
             "nB": 499,
             "meanA": -1.8730280701754396,
             "meanB": 0.36800981963927853,
+            "sdA": 0.5398145409482737,
+            "sdB": 0.7072713045477774,
             "effect": -2.2410378898147183,
             "t": -43.07647717317006,
             "p": 5.06156284235556e-149,
-            "q": 1.0126162622416535e-145
+            "q": 1.0126162622416535e-145,
+            "cytoband": "21q22.3"
           },
           {
             "gene": "NEK10",
@@ -154,10 +186,13 @@
             "nB": 499,
             "meanA": -1.2707538011695905,
             "meanB": 0.5132166332665336,
+            "sdA": 0.43980335595801995,
+            "sdB": 0.7998953061664977,
             "effect": -1.783970434436124,
-            "t": -36.31404827096978,
-            "p": 8.11674727394396e-147,
-            "q": 1.4762149632956623e-143
+            "t": -36.31404827096979,
+            "p": 8.116747273940266e-147,
+            "q": 1.4762149632949904e-143,
+            "cytoband": "3p24.1"
           },
           {
             "gene": "ABCC8",
@@ -165,10 +200,13 @@
             "nB": 499,
             "meanA": -1.9394450292397662,
             "meanB": 0.32998637274549114,
+            "sdA": 0.5690019538024645,
+            "sdB": 0.790770182658525,
             "effect": -2.2694314019852575,
             "t": -40.45792875224148,
             "p": 5.87227616446542e-145,
-            "q": 9.790063078857933e-142
+            "q": 9.790063078857933e-142,
+            "cytoband": "11p15.1"
           },
           {
             "gene": "MAPT-AS1",
@@ -176,10 +214,13 @@
             "nB": 499,
             "meanA": -1.6475619883040904,
             "meanB": 0.08925931863727456,
+            "sdA": 0.2148787483391403,
+            "sdB": 1.0640566666714177,
             "effect": -1.736821306941365,
             "t": -34.4686932425371,
             "p": 2.798241678756928e-144,
-            "q": 4.306278694247008e-141
+            "q": 4.306278694247008e-141,
+            "cytoband": "17q21.31"
           },
           {
             "gene": "ANKRD30A",
@@ -187,10 +228,13 @@
             "nB": 499,
             "meanA": -1.9812163742690039,
             "meanB": 0.27829458917835664,
+            "sdA": 0.5729332646393619,
+            "sdB": 0.8279446646859371,
             "effect": -2.2595109634473607,
             "t": -39.372802266052844,
             "p": 5.063304961990813e-144,
-            "q": 7.235462790684872e-141
+            "q": 7.235462790684872e-141,
+            "cytoband": "10p11.21"
           },
           {
             "gene": "BCL11A",
@@ -198,10 +242,13 @@
             "nB": 499,
             "meanA": 1.4358286549707597,
             "meanB": -0.28800460921843696,
+            "sdA": 0.44328209932934354,
+            "sdB": 0.7069616649732607,
             "effect": 1.7238332641891967,
             "t": 37.17100854249826,
             "p": 2.01624509778694e-142,
-            "q": 2.689133295088368e-139
+            "q": 2.689133295088368e-139,
+            "cytoband": "2p16.1"
           },
           {
             "gene": "TPSG1",
@@ -209,10 +256,13 @@
             "nB": 499,
             "meanA": -1.3738625730994132,
             "meanB": 0.22565631262525057,
+            "sdA": 0.2232477771507671,
+            "sdB": 0.992300074071973,
             "effect": -1.5995188857246638,
             "t": -33.61101647588246,
             "p": 1.644677554817353e-141,
-            "q": 2.0564636976047478e-138
+            "q": 2.0564636976047478e-138,
+            "cytoband": "16p13.3"
           },
           {
             "gene": "PGR",
@@ -220,10 +270,13 @@
             "nB": 499,
             "meanA": -1.2939280701754385,
             "meanB": 0.5647364729458928,
+            "sdA": 0.4858655275428483,
+            "sdB": 0.7016100241990632,
             "effect": -1.8586645431213313,
             "t": -38.20350861907165,
             "p": 1.2738662408657868e-139,
-            "q": 1.4991157655741723e-136
+            "q": 1.4991157655741723e-136,
+            "cytoband": "11q22.1"
           },
           {
             "gene": "CDCA7",
@@ -231,10 +284,13 @@
             "nB": 499,
             "meanA": 1.3095035087719298,
             "meanB": -0.5064813627254511,
+            "sdA": 0.4763857795199106,
+            "sdB": 0.7173346183841086,
             "effect": 1.8159848714973807,
             "t": 37.39449379332356,
             "p": 1.9378342114113162e-139,
-            "q": 2.1537950685274883e-136
+            "q": 2.1537950685274883e-136,
+            "cytoband": "2q31.1"
           },
           {
             "gene": "SERPINA11",
@@ -242,10 +298,13 @@
             "nB": 499,
             "meanA": -1.6144187134502925,
             "meanB": 0.43775290581162324,
+            "sdA": 0.542712735194102,
+            "sdB": 0.7801920967800721,
             "effect": -2.052171619261916,
             "t": -37.833088738047195,
             "p": 6.464638024466878e-138,
-            "q": 6.806923595657072e-135
+            "q": 6.806923595657072e-135,
+            "cytoband": "14q32.13"
           },
           {
             "gene": "SLC39A6",
@@ -253,14 +312,17 @@
             "nB": 499,
             "meanA": -1.2425690058479533,
             "meanB": 0.4289593186372747,
+            "sdA": 0.4395283273058743,
+            "sdB": 0.7719318123643412,
             "effect": -1.671528324485228,
             "t": -34.67420941703025,
             "p": 2.0692347359947134e-137,
-            "q": 2.0698555064155116e-134
+            "q": 2.0698555064155116e-134,
+            "cytoband": "18q12.2"
           },
           {
             "…": "1480 more",
-            "sha256": "18632a4d08118c27"
+            "sha256": "54443a93f2071c2f"
           }
         ],
         "grid": {
@@ -2694,7 +2756,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Welch's t-test per gene on rna_seq_v2_mrna_median_all_sample_Zscores as stored, Basal-like minus Luminal A, each sample in the cohort one observation, as the portal's group comparison tests expression; computed from three running totals per gene and cohort, so it is exact across sites. 20,006 genes tested, 14 left out (fewer than 3 samples with a value in a cohort, or no variance); q is Benjamini–Hochberg across every gene tested. The 1500 most significant genes are drawn as points, the rest as density. Z-scores are standardised within each study, so a difference is in study-specific units. A t-test on thousands of samples finds tiny differences significant — read the effect, not only the q. Enrichment is preranked GSEA on the unrounded t (Subramanian et al. 2005, weight 1), significance from 1000 random sets of the same size drawn from the same ranking, seeded by the set's name so a shared link reproduces it; p = (b+1)/(m+1) over the same-sign nulls, q is Benjamini–Hochberg across the sets tested (not GSEA's own NES-based FDR). Gene-set permutation ignores gene–gene correlation, so it is anti-conservative next to phenotype permutation, which needs patient-level values. ",
+      "caveat": "Welch's t-test per gene on rna_seq_v2_mrna_median_all_sample_Zscores as stored, Basal-like minus Luminal A, each sample in the cohort one observation, as the portal's group comparison tests expression; computed from three running totals per gene and cohort, so it is exact across sites. 20,006 genes tested, 14 left out (fewer than 3 samples with a value in a cohort, or no variance); q is Benjamini–Hochberg across every gene tested. The 1,500 most significant genes are drawn as points and listed in the table, the rest drawn as density. Z-scores are standardised within each study, so a difference is in study-specific units. A t-test on thousands of samples finds tiny differences significant — read the effect, not only the q. Enrichment is preranked GSEA on the unrounded t (Subramanian et al. 2005, weight 1), significance from 1000 random sets of the same size drawn from the same ranking, seeded by the set's name so a shared link reproduces it; p = (b+1)/(m+1) over the same-sign nulls, q is Benjamini–Hochberg across the sets tested (not GSEA's own NES-based FDR). Gene-set permutation ignores gene–gene correlation, so it is anti-conservative next to phenotype permutation, which needs patient-level values. ",
       "method": {
         "steps": [
           {
@@ -2792,12 +2854,12 @@
             "abs": 1e-300
           },
           "diffexpr:DRAIC:p": {
-            "v": 5.510248672861103e-190,
+            "v": 5.510248672854827e-190,
             "rel": 0.000001,
             "abs": 1e-300
           },
           "diffexpr:DRAIC:q": {
-            "v": 2.7559508737314804e-186,
+            "v": 2.7559508737283417e-186,
             "rel": 0.000001,
             "abs": 1e-300
           },
@@ -2858,7 +2920,7 @@
           },
           "…": {
             "more": 3131,
-            "sha256": "a0e9435cde599a20"
+            "sha256": "45fe1963f48d995b"
           }
         }
       }

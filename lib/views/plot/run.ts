@@ -7,7 +7,7 @@ import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, 
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
-import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
+import { untimed, Untimed, type ViewRun, type DocView } from "../run.ts";
 import { resolveAxes } from "../../plot-profile.ts";
 import { assayEntitiesKnown } from "../shared.ts";
 import type { PlotView } from "./types.ts";
@@ -434,9 +434,63 @@ function layerNote(ls: PlotLayer[], unit: "patient" | "sample"): string {
     (ls.some((l) => l.shown !== "none") ? " The statistics are over the whole plotted cohort." : "");
 }
 
+/**
+ * A plot by cohort: the plot run once per cohort, its x axis that cohort's name, and the answers
+ * laid side by side, a box (or a contingency column) per cohort. Point layers, colour and ring are
+ * refused: each is decided over one cohort's cases. The cases are drawn from every cohort or from
+ * none, and a density, binned over each cohort's own range, is not drawn.
+ */
+/** marks the per-cohort runs of a plot by cohort; a document cannot carry a Symbol key */
+const ONE_COHORT = Symbol("one cohort of a plot by cohort");
+
+async function runPlotByCohort(pv: PlotView, c: ViewRun): Promise<ViewResult | Untimed> {
+  const { cohorts, vNames, participationFor } = c;
+  if (pv.colorBy || pv.ringBy || (Array.isArray(pv.points) && pv.points.length))
+    return untimed({ kind: "plot", error: "a plot by cohort draws each cohort's cases plainly: colorBy, ringBy and point layers are not offered with it" });
+  if (!vNames.length) return untimed({ kind: "plot", error: "a plot by cohort needs the cohorts it compares" });
+  const unit = pv.unit === "patient" ? "patient" as const : "sample" as const;
+  const parts: PlotData[] = [];
+  for (const n of vNames) {
+    const r0 = await runPlot({ ...pv, x: { source: "cohort", label: n }, points: [], cohorts: [n], [ONE_COHORT]: true } as unknown as DocView,
+      { ...c, vNames: [n], vStudies: cohorts[n].studies });
+    const r = (r0 instanceof Untimed ? r0.result : r0) as { error?: string; plot?: PlotData };
+    if (r.error || !r.plot) return untimed({ kind: "plot", error: (vNames.length > 1 ? n + ": " : "") + (r.error || "no plot") });
+    parts.push(r.plot);
+  }
+  const first = parts[0];
+  const n = parts.reduce((a, d) => a + d.n, 0);
+  const data: PlotData = { shape: first.shape, n, x: first.x, y: first.y };
+  if (first.shape === "table") data.cells = parts.flatMap((d) => d.cells || []);
+  else {
+    data.groups = parts.flatMap((d) => d.groups || []);
+    const drawn = parts.reduce((a, d) => a + (d.points?.length || 0), 0);
+    if (parts.every((d) => d.points?.length || !d.n) && drawn && drawn <= POINTS_CAP) {
+      data.points = parts.flatMap((d) => d.points || []);
+      data.overlay = "points"; data.pointSet = { rule: "all", drawn };
+    } else {
+      data.overlay = "none";
+      const why = parts.map((d) => d.pointSet?.why).find(Boolean) || (drawn > POINTS_CAP ? "more than " + fmt(POINTS_CAP) + " values" : undefined);
+      data.pointSet = { rule: "none", drawn: 0, ...(why ? { why } : {}) };
+    }
+  }
+  data.coverage = parts.reduce<NonNullable<PlotData["coverage"]>>((a, d) => ({
+    total: a.total + (d.coverage?.total ?? d.n), nx: a.nx + (d.coverage?.nx ?? d.n), ny: a.ny + (d.coverage?.ny ?? d.n),
+    ...(d.coverage?.multi != null || a.multi != null ? { multi: (a.multi || 0) + (d.coverage?.multi || 0) } : {}) }), { total: 0, nx: 0, ny: 0 });
+  const studies = [...new Set(vNames.flatMap((x) => cohorts[x].studies))];
+  const cases = data.points ? "" : data.shape === "box" && n
+    ? "Each cohort's values are drawn as its box alone" + (data.pointSet?.why ? ": no case is drawn as a point (" + data.pointSet.why + ")." : ".") : "";
+  return {
+    kind: "plot", plot: data, cohorts: vNames, studies, participation: participationFor(studies, false),
+    note: [coverageNote(data, unit), combineNote(data, unit), cases,
+      vNames.length > 1 ? "One " + (data.shape === "table" ? "column" : "box") + " per cohort; a " + unit + " in more than one cohort is in each." : ""]
+      .filter(Boolean).join(" ") || undefined
+  };
+}
+
 export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;
   const pv = view as PlotView;
+  if (pv.x && pv.x.source === "cohort" && !(view as unknown as Record<symbol, unknown>)[ONE_COHORT]) return runPlotByCohort(pv, c);
   const cn = vNames[0];
   const sites = cohorts[cn].studies;
   // a point is a sample unless the view asks for patients, as on cBioPortal's Plots tab

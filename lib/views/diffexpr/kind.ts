@@ -14,6 +14,7 @@ export const diffexprKind: ViewKindDef<"diffexpr"> = {
       `${d.tested.toLocaleString()} genes tested, ${d.up.toLocaleString()} higher in ${d.groups[0]} and ${d.down.toLocaleString()} higher in ${d.groups[1]} at q<0.05 (${d.effectLabel}).\n` +
       `  most significant, higher in ${d.groups[0]}: ${top(1) || "none"}\n` +
       `  most significant, higher in ${d.groups[1]}: ${top(-1) || "none"}` +
+      (d.gene ? "\n  picked: " + ((g) => g ? `${g.gene} ${g.effect > 0 ? "+" : ""}${g.effect.toFixed(2)} (p=${pFmt(g.p)}, q=${pFmt(g.q)})` : d.gene + " (not among the genes listed)")(d.points.find((g) => g.gene === d.gene)) : "") +
       (d.gsea ? `\n  GSEA (${d.gsea.ranking}; ${d.gsea.permutations} gene-set permutations):\n` +
         d.gsea.sets.slice(0, 12).map((x) => `    ${x.name}: NES ${x.nes.toFixed(2)}, q=${pFmt(x.q)}, ${x.size} genes, leading edge ${x.leadingEdge.slice(0, 8).join(" ")}${x.leadingEdge.length > 8 ? " …" : ""}`).join("\n") : "") +
       caveatOf(v) + noteOf(v));

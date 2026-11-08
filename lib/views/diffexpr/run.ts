@@ -2,13 +2,14 @@
 import type { ViewResult, ViewResultOf } from "../../types.ts";
 import { benjaminiHochberg, varianceFromMoments, welchT, preRankedGsea } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
-import { overLimit, answering, refuse, niceCeil, askEachSite } from "../shared.ts";
+import { overLimit, answering, refuse, niceCeil, askEachSite, cytobands } from "../shared.ts";
 import type { DiffexprView, DiffexprGene } from "./types.ts";
 import { profileMomentsAllSql, genesetMembersSql } from "./sql.ts";
 import { diffexprMethod } from "./method.ts";
 
 const DE_MIN_N = 3, DE_POINT_CAP = 1500, DE_PERMUTATIONS = 1000;
 const SET_NAME = /^[A-Z0-9_]{3,120}$/;
+const GENE = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,39}$/;
 
 /** RNA-seq counts/RSEM/TPM are compared on log2(v + 1); z-scores, protein and methylation as stored. */
 export function defaultLog2(profileType: string): boolean {
@@ -31,6 +32,8 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
     const bad = setNames.filter((x) => !SET_NAME.test(x));
     if (bad.length) return refuse("diffexpr", ctx, "not an MSigDB set name: " + bad.slice(0, 3).join(", "));
   }
+  const gene = view.gene == null ? null : String(view.gene).trim();
+  if (gene != null && !GENE.test(gene)) return refuse("diffexpr", ctx, "gene is one gene symbol, like \"ESR1\"; got " + JSON.stringify(String(view.gene).slice(0, 40)));
   const log2 = view.log2 == null ? defaultLog2(profileType) : view.log2 === true;
   const empty = vNames.filter((n) => !cohorts[n].count);
   if (empty.length) return refuse("diffexpr", ctx, "nothing to compare: cohort " + empty.map((n) => "“" + n + "”").join(" and ") +
@@ -41,10 +44,12 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
   // the profile must exist wherever a cohort has patients — named, with what IS there, if not
   const missing: string[] = [];
   const offered = new Set<string>();
+  let info: { name: string; type: string } | undefined;
   for (const st of Object.keys(ok)) {
     if (!vNames.some((n) => (cohorts[n].perStudy[st]?.count || 0) > 0)) continue;
-    const { profiles } = await ctx.studyProfiles(st);
+    const { profiles, catalog } = await ctx.studyProfiles(st);
     profiles.forEach((x) => offered.add(x));
+    info = info || catalog?.find((x) => x.profile === profileType);
     if (!profiles.includes(profileType)) missing.push(st);
   }
   if (missing.length)
@@ -77,7 +82,8 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
     const w = welchT(a.n, ma, va, b.n, mb, vb);
     // the ranking uses the unrounded statistic; welchT's rounded one is for display
     const t = (ma - mb) / Math.sqrt(va / a.n + vb / b.n);
-    tested.push({ gene: g, nA: a.n, nB: b.n, meanA: ma, meanB: mb, effect: ma - mb, t, p: w.p, q: 1 });
+    tested.push({ gene: g, nA: a.n, nB: b.n, meanA: ma, meanB: mb, sdA: Math.sqrt(Math.max(0, va)), sdB: Math.sqrt(Math.max(0, vb)),
+      effect: ma - mb, t, p: w.p, q: 1 });
   }
   if (!tested.length)
     return refuse("diffexpr", ctx, "no gene had at least " + DE_MIN_N + " samples with a " + profileType + " value in both cohorts" +
@@ -91,8 +97,11 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
   const half = Math.ceil(label / 2);
   const labels = [...upFirst.slice(0, Math.max(half, label - downFirst.length)), ...downFirst.slice(0, Math.max(label - half, label - upFirst.length))]
     .slice(0, label).map((g) => g.gene);
-  const pointSet = new Set([...labels, ...byP.filter((g) => g.q < 0.05).slice(0, DE_POINT_CAP).map((g) => g.gene)]);
+  // the most significant genes, whether or not they reach q < 0.05: the volcano's points and the table's rows
+  const pointSet = new Set([...labels, ...byP.slice(0, DE_POINT_CAP).map((g) => g.gene)]);
   const points = byP.filter((g) => pointSet.has(g.gene));
+  const bands = await cytobands(ok, points.map((g) => g.gene));
+  for (const g of points) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
   const P_FLOOR = 1e-300;
   const yOf = (p: number) => -Math.log10(Math.max(P_FLOOR, p));
   const xMax = niceCeil(Math.max(1e-9, ...tested.map((g) => Math.abs(g.effect))));
@@ -145,7 +154,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
       results: { genes: points.map((g) => ({ gene: g.gene, p: g.p, q: g.q })),
         sets: (gsea?.sets || []).map((x) => ({ name: x.name, es: x.es, nes: x.nes, p: x.p })) },
     }),
-    diffexpr: { profileType, log2, effectLabel, groups: [A, B], tested: tested.length, skipped, up, down,
+    diffexpr: { profileType, ...(gene ? { gene } : {}), ...(info ? { profileName: info.name, profileKind: info.type } : {}), log2, effectLabel, groups: [A, B], tested: tested.length, skipped, up, down,
       points, grid: { xMax, yMax, nx, ny, cells }, pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
       labels, ...(gsea ? { gsea } : {}), ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
@@ -154,7 +163,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
       ", each sample in the cohort one observation, as the portal's group comparison tests expression; computed from three running totals per gene and cohort, so it is exact across sites. " +
       tested.length.toLocaleString("en-US") + " genes tested" + (skipped ? ", " + skipped.toLocaleString("en-US") + " left out (fewer than " + DE_MIN_N + " samples with a value in a cohort, or no variance)" : "") +
       "; q is Benjamini–Hochberg across every gene tested. " +
-      (sig.length > points.filter((g) => g.q < 0.05).length ? "The " + DE_POINT_CAP + " most significant genes are drawn as points, the rest as density. " : "") +
+      (tested.length > points.length ? "The " + DE_POINT_CAP.toLocaleString("en-US") + " most significant genes are drawn as points and listed in the table, the rest drawn as density. " : "") +
       (/zscore/i.test(profileType) ? "Z-scores are standardised within each study, so a difference is in study-specific units. " : "") +
       "A t-test on thousands of samples finds tiny differences significant — read the effect, not only the q. " +
       (gsea ? "Enrichment is preranked GSEA on the unrounded t (Subramanian et al. 2005, weight 1), significance from " + DE_PERMUTATIONS +

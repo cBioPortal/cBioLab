@@ -4,7 +4,7 @@
 import type { ViewResultOf, DrawnResultOf } from "../../types.ts";
 import {
   palette, frame, caption, label, textWidth, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight,
-  legend, fmtInt, fmtNum, fmtQ, FS, SW, SERIES, OTHER, type SvgOpts
+  legend, fmtInt, fmtNum, fmtP, fmtQ, FS, SW, SERIES, OTHER, type SvgOpts
 } from "../../svg-kit.ts";
 import { volcano, volcanoPlotH } from "../../figures/volcano.ts";
 
@@ -29,23 +29,9 @@ export function diffexprSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): string {
   const vw = side ? Math.round((W - GAP) * 0.5) : W;
 
   const out: string[] = [];
-  // the count of genes each way, as a legend of the volcano's colours
-  const lg = legend([
-    { label: fmtInt(d.up) + " higher in " + A, color: SERIES[0], kind: "dot" },
-    { label: fmtInt(d.down) + " higher in " + B, color: SERIES[1], kind: "dot" },
-    { label: "not significant", color: OTHER, kind: "dot" },
-  ], 8, 2, vw - 16, p, { size: FS.small, title: fmtInt(d.tested) + " genes, q < 0.05:" });
-  out.push(lg.svg);
-  const y0 = 2 + lg.height + 4;
-  const vo = volcano(p, {
-    x0: 0, y0, width: vw, plotH: volcanoPlotH(vw), grid: d.grid, labels: d.labels, r: 2,
-    xTitle: d.effectLabel + " (" + A + " − " + B + ")", sides: ["higher in " + A, "higher in " + B],
-    cellColor: (cls) => cls === 1 ? SERIES[0] : cls === 2 ? SERIES[1] : OTHER,
-    pts: d.points.map((g) => ({ key: g.gene, x: g.effect, p: g.p, color: g.q < 0.05 ? (g.effect > 0 ? SERIES[0] : SERIES[1]) : OTHER,
-      tip: g.gene + ": " + fmtNum(g.effect) + " · " + fmtQ(g.q) })),
-  });
-  out.push(vo.svg);
-  let bottom = y0 + vo.height;
+  const vp = volcanoPanel(d, p, vw, { picked: d.gene });
+  out.push(vp.svg);
+  let bottom = vp.height;
   if (hasGsea) {
     const gx = side ? vw + GAP : 0, gy = side ? 2 : bottom + GAP;
     const g = gseaPanel(d, p, gx, gy, side ? W - gx : W);
@@ -55,6 +41,49 @@ export function diffexprSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): string {
   const cap = caption(v.caveat || "", W, bottom + 4, p.muted);
   return frame(W, bottom + 4 + cap.height + 8, out.join("") + cap.svg, p.bg, W > want,
     "Differential expression — " + d.profileType + " — " + A + " vs " + B);
+}
+
+/**
+ * The volcano alone, as the page draws it beside the gene's box plot: each point carries its gene
+ * (data-key) so the page can pick one or drag over several. `selected` genes keep their colour and
+ * the rest are drawn grey while a selection stands; `picked` is ringed.
+ */
+export function diffexprVolcanoSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts, pick: { selected?: Set<string> | null; picked?: string | null } = {}): string {
+  const p = palette(o.theme), d = v.diffexpr;
+  const want = o.width || 480, W = Math.max(MIN_PANEL, want);
+  const vp = volcanoPanel(d, p, W, { keyed: true, ...pick });
+  return frame(W, vp.height + 8, vp.svg, p.bg, W > want, "Volcano — " + d.profileType + " — " + d.groups[0] + " vs " + d.groups[1]);
+}
+
+/** The gene-set panel alone, or null when the view ran no enrichment. */
+export function diffexprGseaSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): string | null {
+  const p = palette(o.theme), d = v.diffexpr;
+  if (!(d.gsea && d.gsea.sets.length)) return null;
+  const want = o.width || 960, W = Math.max(MIN_PANEL, want);
+  const g = gseaPanel(d, p, 0, 2, W);
+  return frame(W, g.height + 10, g.svg, p.bg, W > want, "Gene-set enrichment — " + d.groups[0] + " vs " + d.groups[1]);
+}
+
+/** the count of genes each way as a legend of the volcano's colours, then the volcano */
+function volcanoPanel(d: DeResult, p: Pal, vw: number, o: { keyed?: boolean; selected?: Set<string> | null; picked?: string | null }): { svg: string; height: number } {
+  const [A, B] = d.groups;
+  const lg = legend([
+    { label: fmtInt(d.up) + " higher in " + A, color: SERIES[0], kind: "dot" },
+    { label: fmtInt(d.down) + " higher in " + B, color: SERIES[1], kind: "dot" },
+    { label: "not significant", color: OTHER, kind: "dot" },
+  ], 8, 2, vw - 16, p, { size: FS.small, title: fmtInt(d.tested) + " genes, q < 0.05:" });
+  const y0 = 2 + lg.height + 4;
+  const sel = o.selected && o.selected.size ? o.selected : null;
+  const vo = volcano(p, {
+    x0: 0, y0, width: vw, plotH: volcanoPlotH(vw), grid: d.grid, r: 2,
+    labels: o.picked && !d.labels.includes(o.picked) && d.points.some((g) => g.gene === o.picked) ? [...d.labels, o.picked] : d.labels, keyed: o.keyed,
+    xTitle: d.effectLabel + " (" + A + " − " + B + ")", sides: ["higher in " + A, "higher in " + B],
+    cellColor: (cls) => cls === 1 ? SERIES[0] : cls === 2 ? SERIES[1] : OTHER,
+    pts: d.points.map((g) => ({ key: g.gene, x: g.effect, p: g.p, ring: o.picked === g.gene,
+      color: sel && !sel.has(g.gene) ? OTHER : g.q < 0.05 ? (g.effect > 0 ? SERIES[0] : SERIES[1]) : OTHER,
+      tip: g.gene + ": " + fmtNum(g.effect) + " · " + fmtP(g.p) + " · " + fmtQ(g.q) })),
+  });
+  return { svg: lg.svg + vo.svg, height: y0 + vo.height };
 }
 
 /** the gene sets: one bar per set on a shared NES axis, then the strongest set each way as a curve */

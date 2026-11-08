@@ -9,39 +9,15 @@
 // page's own that each of its views carries as `measure`.
 import { useMemo, useState } from "react";
 import { useLinkParams } from "../../_links/use-link.ts";
-import type { AnalysisDoc, View } from "../../../lib/types";
 import { PortalTabs } from "../PortalTabs";
-import { useStudyKnown, expressionProfile, assayComparisonProfiles, type StudyKnown } from "../study-known";
-import { arrange, decodeDoc, decodeParam, encodeParam, syncUrl, usePageDoc, type PageLayout } from "../page-doc";
+import { useStudyKnown } from "../study-known";
+import { comparisonLayout } from "../comparison-layout.ts";
+import { decodeDoc, decodeParam, encodeParam, syncUrl, usePageDoc } from "../page-doc";
 import { COMPARISON_MAX_ACTIVE, COMPARISON_MAX_GROUPS, exclusiveCohorts } from "../../../lib/partition-arms.ts";
 import { Choice } from "../../_ui/choice.tsx";
 import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
 import { SiteHeader } from "../../_ui/site-header.tsx";
 import { fmtInt } from "../../../lib/chart/format.ts";
-
-const CLINICAL_SHOWN = 8;
-
-/** the page's tabs; before the study's profiles and attributes are known (`known` null), those that need neither */
-function comparisonLayout(linked: AnalysisDoc, study: string, known: StudyKnown | null, drivers: boolean): PageLayout {
-  const names = Object.keys(linked.cohorts || {});
-  const expr = known && expressionProfile(known.profileCatalog);
-  const assays = known ? assayComparisonProfiles(known.profileCatalog) : [];
-  const clinical = known?.clinical || [];
-  const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
-  const measure = drivers ? "driver" : "any";
-  const left = !known ? [] : [!clinical.length && "Clinical (no attributes)", !(expr && names.length === 2) && "mRNA (" + (expr ? "compares exactly two cohorts" : "no mRNA profile") + ")",
-    !assays.length && "Generic Assays (no generic-assay profile)"].filter(Boolean) as string[];
-  return arrange({ study, cohorts: linked.cohorts }, [
-    { title: "Overlap", views: [v("Overlap", { kind: "overlap" })] },
-    { title: "Survival", views: [v("Survival", { kind: "survival" })] },
-    ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", attributes: clinical.slice(0, CLINICAL_SHOWN) })] }] : []),
-    { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", measure }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna", measure }),
-      v("Structural variants", { kind: "enrichment", alteration: "sv", measure })] },
-    ...(expr && names.length === 2 ? [{ title: "mRNA", views: [v("mRNA", { kind: "diffexpr", profileType: expr })] }] : []),
-    ...assays.map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile })] })),
-    { title: "Clinical Data", views: [v("Clinical data", { kind: "table" })] }
-  ], left, { partial: !known });
-}
 
 export default function ComparisonPage() {
   const q = useLinkParams();

@@ -1672,7 +1672,7 @@ abstract class BaseResolver implements AggregateCapable {
    */
   async plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData> {
     const db = this.instance.conn.db, conn = this.instance.conn;
-    validateAxis(spec.x, "x");
+    validateAxis(spec.x, "x", { cohort: true });
     validateAxis(spec.y, "y");
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
     const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
@@ -1768,7 +1768,7 @@ abstract class BaseResolver implements AggregateCapable {
    * figure into two incompatible shapes.
    */
   async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }> {
-    validateAxis(spec.x, "x"); validateAxis(spec.y, "y");
+    validateAxis(spec.x, "x", { cohort: true }); validateAxis(spec.y, "y");
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
     return { xk, yk, shape: plotShape(xk, yk), xLabel: axisLabel(spec.x), yLabel: axisLabel(spec.y) };
