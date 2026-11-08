@@ -17,10 +17,13 @@ const BRCA_TCGA = [
   prof("methylation_hm450", "METHYLATION", "CONTINUOUS"), prof("rna_seq_v2_mrna", "MRNA_EXPRESSION", "CONTINUOUS"),
   prof("rna_seq_v2_mrna_median_Zscores", "MRNA_EXPRESSION", "Z-SCORE"), prof("mutations", "MUTATION_EXTENDED", "MAF"),
 ];
-// a PanCancer Atlas study: methylation only per probe, as a generic assay
+// a PanCancer Atlas study: methylation only per probe, as a generic assay — the full 450k array, and
+// the probes it shares with the 27k one, listed in the database's order, which is not the portal's
 const PANCAN = [
   prof("rppa", "PROTEIN_LEVEL", "LOG2-VALUE"), prof("rppa_Zscores", "PROTEIN_LEVEL", "Z-SCORE"),
   prof("methylation_hm450", "GENERIC_ASSAY", "LIMIT-VALUE", "METHYLATION"), prof("rna_seq_v2_mrna", "MRNA_EXPRESSION", "CONTINUOUS"),
+  prof("armlevel_cna", "GENERIC_ASSAY", "CATEGORICAL", "ARMLEVEL_CNA"),
+  prof("methylation_hm27_hm450_merge", "GENERIC_ASSAY", "LIMIT-VALUE", "METHYLATION"),
 ];
 const known = (profileCatalog: ProfileInfo[]): StudyKnown => ({
   name: "s", names: { s: "s" }, held: { every: ["MUTATION"], some: [] }, noDrivers: [], portal: {},
@@ -80,11 +83,18 @@ test("more than ten groups: no expression tab, and the page says why", () => {
     assert.ok(l.left.includes(t + " (compares 2 to 10 groups, and 11 are compared)"), t + ": " + l.left.join("; "));
 });
 
-test("a study without a profile says so, and per-probe methylation is named as the reason", () => {
+test("per-probe methylation is its own Methylation tab, on the merged probes, as the portal's", () => {
   const l = layout(2, PANCAN);
   assert.equal(tabOf(l, "Protein").profileType, "rppa");
   assert.equal(tabOf(l, "DNA methylation"), undefined);
-  assert.ok(l.left.includes("DNA methylation (this study's methylation is per probe, a generic assay, which this page does not compare)"), l.left.join("; "));
+  assert.deepEqual(tabOf(l, "Methylation"), { kind: "assays", profileType: "methylation_hm27_hm450_merge" });
+  assert.ok(l.tabs.some((t) => t.title === "Arm-level copy number"), "another generic assay keeps its tab");
+  assert.ok(!l.left.some((x) => /methylation/i.test(x)), l.left.join("; "));
+  // with three groups too: the assays view compares any number
+  assert.deepEqual(tabOf(layout(3, PANCAN), "Methylation"), { kind: "assays", profileType: "methylation_hm27_hm450_merge" });
+});
+
+test("a study without a profile says so", () => {
   const none = layout(2, [prof("mutations", "MUTATION_EXTENDED", "MAF")]);
   assert.ok(none.left.includes("Protein (no protein profile)") && none.left.includes("DNA methylation (no methylation profile)") && none.left.includes("mRNA (no mRNA profile)"));
 });

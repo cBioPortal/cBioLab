@@ -18,7 +18,8 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
     { title: "mRNA", profile: mrnaComparisonProfile(catalog), none: "no mRNA profile", extra: { geneSets: [] } },
     { title: "Protein", profile: proteinProfile(catalog), none: "no protein profile", extra: { geneSets: [] } },
     { title: "DNA methylation", profile: methylationProfile(catalog), extra: { geneSets: [] },
-      none: probeMethylation(catalog) ? "this study's methylation is per probe, a generic assay, which this page does not compare" : "no methylation profile" },
+      // per-probe methylation has its own tab, Methylation, as the portal's
+      none: probeMethylation(catalog) ? null : "no methylation profile" },
   ];
   const groupsOk = names.length >= 2 && names.length <= EXPRESSION_MAX_GROUPS;
   const assays = known ? assayComparisonProfiles(catalog) : [];
@@ -26,7 +27,7 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
   const measure = drivers ? "driver" : "any";
   const left = !known ? [] : [!clinical.length && "Clinical (no attributes)",
-    ...expression.filter((e) => !e.profile || !groupsOk).map((e) => e.title + " (" + (!e.profile ? e.none
+    ...expression.filter((e) => (!e.profile && e.none) || (e.profile && !groupsOk)).map((e) => e.title + " (" + (!e.profile ? e.none
       : "compares 2 to " + EXPRESSION_MAX_GROUPS + " groups, and " + names.length + (names.length === 1 ? " is" : " are") + " compared") + ")"),
     !assays.length && "Generic Assays (no generic-assay profile)"].filter(Boolean) as string[];
   return arrange({ study, cohorts: linked.cohorts }, [

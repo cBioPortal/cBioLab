@@ -125,27 +125,33 @@ export function proteinProfile(catalog: ProfileInfo[]): string | null {
 /**
  * The profile a comparison's DNA methylation tab compares on, as the portal picks it: the first
  * METHYLATION profile by id (gene-level beta values). Per-probe methylation stored as a generic
- * assay is not one; `probeMethylation` says whether the study has only that.
+ * assay is not one: it has its own tab (assayComparisonProfiles); `probeMethylation` says whether a study has it.
  */
 export function methylationProfile(catalog: ProfileInfo[]): string | null {
   return catalog.filter((p) => p.type === "METHYLATION").sort(byId)[0]?.profile || null;
 }
 export function probeMethylation(catalog: ProfileInfo[]): boolean {
-  return catalog.some((p) => p.type === "GENERIC_ASSAY" && (/METHYLATION/i.test(p.assayType || "") || /methylation/i.test(p.profile)));
+  return catalog.some(isProbeMethylation);
 }
+const isProbeMethylation = (p: ProfileInfo) => p.type === "GENERIC_ASSAY" && (/METHYLATION/i.test(p.assayType || "") || /methylation/i.test(p.profile));
 /**
- * One generic-assay profile per kind (signatures, arm-level copy number, ancestry, …), for a
- * comparison's Generic Assay tabs, as the portal gives each kind its own: a signature's
- * contributions before its counts and single-base (SBS) signatures before doublet and indel ones,
- * the study's own order otherwise. Methylation is left out — per
- * probe, it is more entities than the assays view compares.
+ * One generic-assay profile per kind (signatures, arm-level copy number, ancestry, methylation, …),
+ * for a comparison's Generic Assay tabs, as the portal gives each kind its own: a signature's
+ * contributions before its counts and single-base (SBS) signatures before doublet and indel ones;
+ * per-probe methylation by id, so a PanCancer Atlas study's merged profile (the 22,601 probes the
+ * 27k and 450k arrays share) before its full 450k one, which is more probes than the assays view
+ * compares; the study's own order otherwise. Methylation's tab is "Methylation", as the portal's.
  */
-export function assayComparisonProfiles(catalog: ProfileInfo[], max = 4): { label: string; profile: string }[] {
+export function assayComparisonProfiles(catalog: ProfileInfo[], max = 6): { label: string; profile: string }[] {
   const out = new Map<string, string>();
-  const ga = catalog.filter((p) => p.type === "GENERIC_ASSAY" && !/METHYLATION/i.test(p.assayType || "") && !/methylation/i.test(p.profile))
+  const methylation = catalog.filter(isProbeMethylation).sort(byId)[0];
+  const ga = catalog.filter((p) => p.type === "GENERIC_ASSAY")
     .sort((a, b) => Number(/contribution/i.test(b.profile)) - Number(/contribution/i.test(a.profile)) ||
       Number(/_SBS$/i.test(b.profile)) - Number(/_SBS$/i.test(a.profile)) || a.order - b.order || a.profile.localeCompare(b.profile));
-  for (const p of ga) { const g = profileGroup(p); if (!out.has(g)) out.set(g, p.profile); }
+  for (const p of ga) {
+    const g = isProbeMethylation(p) ? "Methylation" : profileGroup(p);
+    if (!out.has(g)) out.set(g, isProbeMethylation(p) ? methylation.profile : p.profile);
+  }
   return [...out].slice(0, max).map(([label, profile]) => ({ label, profile }));
 }
 /** the study's discrete copy-number profile (GISTIC, or a panel study's calls) */

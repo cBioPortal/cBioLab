@@ -521,6 +521,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "assayValueCountsSql": () => aggregates.assayValueCountsSql(cohortSql, "x", "db", "armlevel_cna"),
     "assayProfileSql": () => federation.assayProfileSql("x", "db", "armlevel_cna"),
     "assayEntityNamesSql": () => federation.assayEntityNamesSql("x", "db", "armlevel_cna"),
+    "assayEntityNamesSql:listed": () => federation.assayEntityNamesSql("x", "db", "methylation_hm27_hm450_merge", ["cg00000029", "cg00000108"]),
+    // a methylation profile's probe count, stopped just past the limit: one number leaves
+    "assayEntityCountSql": () => federation.assayEntityCountSql("x", "db", "methylation_hm450", 25001),
     // composition: each case's vector is built and summed in CTEs; one row of sums (and two counts) leaves
     "compositionMomentsSql": () => aggregates.compositionMomentsSql(cohortSql, "x", "db",
       { kind: "genericAssay", profileType: "cell_type_relative_counts", parts: ["T_cell", "B_cell", "Fibroblast"], unit: "sample", normalize: true }),

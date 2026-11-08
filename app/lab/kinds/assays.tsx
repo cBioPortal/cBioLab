@@ -21,8 +21,11 @@ function AssaysBody({ v }: { v: DrawnResultOf<"assays"> }) {
   const picked = sel && r.rows.includes(sel) ? sel : r.rows[0] || null;
   const color = (g: string) => seriesStyle(Math.max(0, r.groups.indexOf(g))).color;
   const numeric = r.datatype === "numeric";
+  // a methylation probe is named by its genes, which several probes share: its id beside them, as the portal's "Gene / Probe"
+  const probes = r.assayType === "METHYLATION";
   const cols: Col<AsRow>[] = [
-    { key: "name", label: "Entity", value: (e) => e.name, render: (e) => <strong data-tip={e.entity}>{e.name}</strong> },
+    { key: "name", label: probes ? "Gene / Probe" : "Entity", value: (e) => e.name,
+      render: (e) => probes && e.name !== e.entity ? <><strong>{e.name}</strong> <span className="text-muted-foreground">{e.entity}</span></> : <strong data-tip={e.entity}>{e.name}</strong> },
     ...r.groups.flatMap((name, i): Col<AsRow>[] => numeric
       ? [{ key: "m" + i, label: name + " mean", num: true, value: (e) => e.cells[i].mean ?? null, render: (e) => e.cells[i].mean == null ? "—" : fmtNum(e.cells[i].mean!) },
          { key: "s" + i, label: name + " SD", num: true, value: (e) => e.cells[i].sd ?? null, render: (e) => e.cells[i].sd == null ? "—" : fmtNum(e.cells[i].sd!) }]

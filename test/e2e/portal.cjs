@@ -240,6 +240,19 @@ async function portal({ browser, ok, BASE }) {
           !heads3.some((x) => /Log2 Ratio|Mean Difference/.test(x)) && /ANOVA/.test(pTip) && /\t(LumA|LumB|Basal)$/.test(first3.trim()) &&
           /Click on gene in the table to render this plot\./.test(hint3.text) && hint3.h < 80,
         tabs3.join(" | ") + " — " + heads3.join(" | ") + " — " + pTip + " — " + first3.replace(/\s+/g, " "));
+      // a PanCancer Atlas study's methylation is per probe: its own Methylation tab, on the merged probes, each probe by its genes and id
+      await page.goto(BASE + "/portal/comparison?doc=" + Buffer.from(JSON.stringify({ study: "brca_tcga_pan_can_atlas_2018", views: [],
+        cohorts: { LumA: sub("BRCA_LumA"), Basal: sub("BRCA_Basal") } })).toString("base64url") + "&tab=Methylation", { waitUntil: "domcontentloaded" });
+      const probeRow = page.locator(".viewcard .pb-table tbody tr").first();
+      await probeRow.waitFor({ timeout: 240000 });
+      const probeMeta = await page.locator(".viewcard .meta").first().innerText();
+      const probeHead = await page.locator(".viewcard .pb-table thead th").first().innerText();
+      const probeFirst = await probeRow.innerText();
+      const probeTabs = await page.getByRole("tab").allInnerTexts();
+      ok("comparison: per-probe methylation has its own Methylation tab, on the merged probes, each probe by its genes and id",
+        probeTabs.includes("Methylation") && !probeTabs.includes("DNA methylation") && /Methylation \(HM27 and HM450 merge\) · Welch's t-test · 22,601 entities tested/.test(probeMeta) &&
+          /^Gene \/ Probe/.test(probeHead) && /\bcg\d{8}\b/.test(probeFirst),
+        probeTabs.join(" | ") + " — " + probeMeta + " — " + probeFirst.replace(/\s+/g, " "));
     } catch (e) {
       ok("comparison: expression tabs", false, String(e.message).split("\n")[0].slice(0, 200));
     }
