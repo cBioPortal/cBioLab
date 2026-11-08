@@ -8,7 +8,7 @@ import { defaultLog2, runDiffexpr } from "../lib/views/diffexpr/run.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewResult, ViewParticipation } from "../lib/types.ts";
 import type { DiffexprResult } from "../lib/views/diffexpr/types.ts";
-import { welchT, welchAnovaTest, varianceFromMoments } from "../lib/stats.ts";
+import { welchT, oneWayAnova, varianceFromMoments } from "../lib/stats.ts";
 import { PRIMARY } from "../lib/ch.ts";
 import { analysisText } from "../lib/result-text.ts";
 
@@ -160,13 +160,13 @@ describe("diffexpr: the per-gene test", () => {
     assert.match(text("NOPE"), /picked: NOPE \(not among the genes listed\)/);
   });
 
-  test("three cohorts: Welch's ANOVA per gene from the same moments, no volcano and no enrichment", async () => {
+  test("three cohorts: one-way ANOVA per gene, as the portal's from the same moments, no volcano and no enrichment", async () => {
     const C = { UP: [1, 1.5, 0.5, 1.2], DOWN: [2, 2.5, 3, 2.2], SAME: [1, 2, 3], FEW: [1, 2, 3], FLAT: [2, 2, 2] };
     const r = await run({ geneSets: undefined, gene: "UP" }, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }), C: cohort({ s1: 4 }) }, { s1: site({ A, B, C }) }));
     const d = de(r);
     assert.equal(r.error, undefined);
     assert.deepEqual(d.groups, ["A", "B", "C"]);
-    assert.equal(d.test, "Welch's ANOVA");
+    assert.equal(d.test, "one-way ANOVA");
     assert.equal(d.tested, 3);
     assert.equal(d.grid, undefined);
     assert.equal(d.gsea, undefined, "no enrichment, though geneSets was left to its default");
@@ -175,20 +175,20 @@ describe("diffexpr: the per-gene test", () => {
     assert.deepEqual(up.n, [5, 5, 4]);
     assert.equal(up.effect, undefined);
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-    const w = welchAnovaTest([A.UP, B.UP, C.UP].map((xs) => { const m = moments("UP", xs); return { n: xs.length, mean: mean(xs), variance: varianceFromMoments(xs.length, m.sx, m.sxx) }; }));
+    const w = oneWayAnova([A.UP, B.UP, C.UP].map((xs) => { const m = moments("UP", xs); return { n: xs.length, mean: mean(xs), variance: varianceFromMoments(xs.length, m.sx, m.sxx) }; }));
     assert.equal(up.p, w.p);
     assert.equal(up.f, w.f);
     assert.equal(d.significant, d.points.filter((g) => g.q < 0.05).length);
     for (let i = 1; i < d.points.length; i++) assert.ok(d.points[i - 1].p <= d.points[i].p);
-    assert.match(r.caveat!, /Welch's ANOVA per gene across the 3 cohorts/);
-    assert.match(r.caveat!, /cBioPortal's group comparison uses the classic one-way ANOVA/);
+    assert.match(r.caveat!, /One-way ANOVA per gene across the 3 cohorts/);
+    assert.match(r.caveat!, /as the portal's group comparison tests three or more groups/);
     const text = analysisText({ study: "s", cohorts: {}, views: [] } as never, { cohorts: {}, involvedStudies: ["s"], stats: { ms: 1 }, views: [r] } as never).join("\n");
-    assert.match(text, /across A, B, C on mrna_zscores, Welch's ANOVA: 3 genes tested/);
+    assert.match(text, /across A, B, C on mrna_zscores, one-way ANOVA: 3 genes tested/);
     assert.match(text, /UP F=[\d.]+, q=.* — highest in A; A 5\.90, B 0\.48, C 1\.05/);
     assert.match(text, /picked: UP \(p=.*; A 5\.90/);
     // the method's script recomputes the same test
-    assert.match(r.method!.python!, /anova_generic\(.*use_var="unequal", welch_correction=True\)/);
-    assert.ok(r.method!.steps.some((s) => s.title === "Welch's ANOVA per gene"));
+    assert.match(r.method!.python!, /anova_generic\(.*use_var="equal"\)/);
+    assert.ok(r.method!.steps.some((s) => s.title === "One-way ANOVA per gene"));
   });
 
   test("q is Benjamini–Hochberg over the tested genes, and up/down count the q < 0.05 genes by sign", async () => {

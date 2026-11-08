@@ -856,6 +856,29 @@ export function welchAnovaTest(groups: { n: number; mean: number; variance: numb
   return { f: Math.round(f * 1e4) / 1e4, df1, df2: Math.round(df2 * 100) / 100, p: fTestP(f, df1, df2) };
 }
 
+export interface OneWayAnova { f: number; df1: number; df2: number; p: number }
+
+/**
+ * The classic one-way ANOVA (Fisher's F, equal variances assumed) for k >= 2 groups from each
+ * group's n, mean and sample variance — the moments a site reports, so it is exact across sites.
+ * cBioPortal's group comparison tests three or more groups' expression this way (Apache Commons
+ * Math's OneWayAnova): between-group mean square over within-group mean square, on k − 1 and
+ * N − k degrees of freedom. A group with no members is dropped; no within-group spread at all
+ * says nothing (p = 1) rather than dividing by zero.
+ */
+export function oneWayAnova(groups: { n: number; mean: number; variance: number }[]): OneWayAnova {
+  const gs = groups.filter((g) => g.n >= 1);
+  const k = gs.length, N = gs.reduce((a, g) => a + g.n, 0);
+  if (k < 2 || N <= k) return { f: 0, df1: Math.max(0, k - 1), df2: Math.max(0, N - k), p: 1 };
+  const grand = gs.reduce((a, g) => a + g.n * g.mean, 0) / N;
+  const ssb = gs.reduce((a, g) => a + g.n * (g.mean - grand) ** 2, 0);
+  const ssw = gs.reduce((a, g) => a + (g.n - 1) * Math.max(0, g.variance), 0);
+  const df1 = k - 1, df2 = N - k;
+  if (!(ssw > 0)) return { f: 0, df1, df2, p: 1 };
+  const f = (ssb / df1) / (ssw / df2);
+  return { f, df1, df2, p: fTestP(f, df1, df2) };
+}
+
 /** Sample variance from the additive moments a federated site can report. */
 export function varianceFromMoments(n: number, sum: number, sumsq: number): number {
   if (n < 2) return 0;

@@ -133,7 +133,7 @@ function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
     ...(two ? [{ key: "lr", label: lr ? "Log2 Ratio" : "Mean Difference", num: true, value: (g: DeGene) => g.effect ?? null, render: (g: DeGene) => ratio(g.effect ?? 0),
       title: "Mean in " + A + " minus mean in " + B + (lr ? ", on log2 values: the log2 of the ratio of their (unlogged) means" : " (cBioPortal labels this Log2 Ratio; on " + d.profileType + "'s values it is a plain difference)") }] : []),
     { key: "p", label: "p-Value", num: true, value: (g) => g.p, render: (g) => pDigits(g.p),
-      title: two ? "Derived from Welch's two-sided t-test" : "Derived from Welch's one-way ANOVA (cBioPortal uses the classic one-way ANOVA, which assumes every group's variance is the same)" },
+      title: two ? "Derived from Welch's two-sided t-test" : "Derived from one-way ANOVA" },
     { key: "q", label: "q-Value", num: true, value: (g) => g.q, render: (g) => <span style={{ fontWeight: g.q < 0.05 ? 700 : 400 }}>{pDigits(g.q)}</span>, title: "Derived from Benjamini-Hochberg procedure" },
     { key: "in", label: "Higher " + word + " in", value: (g) => higherIn(g), render: (g) => <Badge text={higherIn(g)} color={g.q < 0.05 ? color(higherIn(g)) : null} />,
       title: two ? (lr ? "Log ratio" : "Difference") + " > 0: enriched in " + A + "; ≤ 0: enriched in " + B + "; q-Value < 0.05: significant association"

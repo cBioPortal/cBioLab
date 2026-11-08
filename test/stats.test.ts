@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 
 import { logRank, logRankK, chiSquareP1df, fisherExact, kaplanMeier,
   benjaminiHochberg, cochranMantelHaenszel, log2OddsRatio,
-  chiSquareP, studentTP, chiSquareTest, welchT, welchAnovaTest, varianceFromMoments,
+  chiSquareP, studentTP, chiSquareTest, welchT, welchAnovaTest, oneWayAnova, varianceFromMoments,
   pearsonFromMoments, fisherZMeta, normalP, applyCutoff, toIncidence, survivalAxis,
   coxRegression, coxPartialLogLik, mannWhitneyU, kruskalWallis, quantilesFromHistogram,
   logisticRegression, logisticLogLik, type CoxRow, type Histogram, type LogisticRow } from "../lib/stats.ts";
@@ -684,6 +684,24 @@ describe("mannWhitneyU: Wilcoxon rank-sum from complete histograms", () => {
     const r = mannWhitneyU([], [{ v: 1, n: 1 }]);
     assert.equal(r.p, 1);
     assert.equal(r.n1, 0);
+  });
+});
+
+describe("oneWayAnova: the classic F, from each group's moments", () => {
+  const g = (xs: number[]) => { const n = xs.length, s = xs.reduce((a, b) => a + b, 0), ss = xs.reduce((a, b) => a + b * b, 0); return { n, mean: s / n, variance: varianceFromMoments(n, s, ss) }; };
+  // scipy 1.18.1 stats.f_oneway on the raw values
+  test("matches scipy f_oneway", () => {
+    const a = oneWayAnova([g([1, 2, 3, 4, 5.5]), g([2, 4, 6, 5]), g([7, 8, 6.5, 9, 10, 8])]);
+    assert.ok(Math.abs(a.f - 15.420977422120608) < 1e-9 && Math.abs(a.p - 0.0004829162299975499) / 0.0004829162299975499 < 1e-6, JSON.stringify(a));
+    assert.deepEqual([a.df1, a.df2], [2, 12]);
+    const b = oneWayAnova([g([0.1, 0.2, 0.15, 0.3]), g([0.12, 0.25, 0.18]), g([0.2, 0.22, 0.19, 0.35, 0.3])]);
+    assert.ok(Math.abs(b.f - 1.160188003880507) < 1e-9 && Math.abs(b.p - 0.3562193094430349) < 1e-9, JSON.stringify(b));
+  });
+  test("two groups: F is the pooled-variance t squared; no spread at all says nothing", () => {
+    const a = oneWayAnova([g([1, 2, 3]), g([4, 6, 5, 7])]);
+    assert.ok(Math.abs(a.p - studentTP(Math.sqrt(a.f), a.df2)) < 1e-12);
+    assert.equal(oneWayAnova([g([2, 2, 2]), g([3, 3, 3])]).p, 1);
+    assert.equal(oneWayAnova([g([1, 2])]).p, 1);
   });
 });
 

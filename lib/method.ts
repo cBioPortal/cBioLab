@@ -93,6 +93,7 @@ export const VERIFIED = {
   cmh: { library: "statsmodels", version: "0.15.0", fn: "StratifiedTable" },
   welch: { library: "scipy", version: "1.18.1", fn: "ttest_ind(equal_var=False)" },
   anova: { library: "statsmodels", version: "0.15.0", fn: "anova_generic(use_var=\"unequal\")" },
+  anovaClassic: { library: "scipy", version: "1.18.1", fn: "f_oneway" },
   ranks: { library: "scipy", version: "1.18.1", fn: "mannwhitneyu / kruskal" },
   pearson: { library: "scipy", version: "1.18.1", fn: "pearsonr" },
   meta: { library: "statsmodels", version: "0.15.0", fn: "combine_effects (fixed effect)" },

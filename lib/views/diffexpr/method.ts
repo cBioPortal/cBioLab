@@ -37,8 +37,8 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
     rowsIn: t.tested + t.skipped, rowsOut: t.tested });
   steps.push(two ? { kind: "statistic", title: "Welch's t-test per gene",
     detail: "Mean A − mean B (" + A + " minus " + B + ") with each cohort's variance (Σv² − (Σv)²/n)/(n − 1); unequal-variance t, Welch–Satterthwaite df, two-sided. With thousands of patients a tiny difference is significant: read the effect too.",
-    params: [["genes tested", t.tested.toLocaleString()]] } : { kind: "statistic", title: "Welch's ANOVA per gene",
-    detail: "Across the " + t.groups.length + " cohorts, from each cohort's n, mean and variance (Σv² − (Σv)²/n)/(n − 1): Welch's F, which does not assume equal variances (cBioPortal uses the classic one-way ANOVA, which does). A cohort with under 2 values or no variance for a gene is left out of that gene's test. With thousands of patients a tiny difference is significant: read the means too.",
+    params: [["genes tested", t.tested.toLocaleString()]] } : { kind: "statistic", title: "One-way ANOVA per gene",
+    detail: "Across the " + t.groups.length + " cohorts, from each cohort's n, mean and variance (Σv² − (Σv)²/n)/(n − 1): the classic F, the between-cohort mean square over the pooled within-cohort one on k − 1 and N − k degrees of freedom, as cBioPortal's group comparison tests three or more groups (it assumes the cohorts' variances are equal). With thousands of patients a tiny difference is significant: read the means too.",
     params: [["genes tested", t.tested.toLocaleString()]] });
   steps.push({ kind: "statistic", title: "Benjamini–Hochberg across genes", detail: "q-values over all " + t.tested.toLocaleString() + " genes tested." });
   if (t.gsea) steps.push({ kind: "statistic", title: "Preranked gene-set enrichment (GSEA)",
@@ -83,8 +83,7 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
       "    m = m.set_index(\"cohort\").reindex(cohorts)",
       "    if m[\"n\"].isna().any() or (m[\"n\"] < " + t.minN + ").any() or not m[\"var\"].sum() > 1e-9 * (1 + (m[\"mean\"] ** 2).sum()):",
       "        continue",
-      "    m = m[(m[\"n\"] >= 2) & (m[\"var\"] > 0)]  # a cohort with under 2 values or no variance says nothing",
-      "    p = anova_generic(m[\"mean\"].to_numpy(), m[\"var\"].to_numpy(), m[\"n\"].to_numpy(), use_var=\"unequal\", welch_correction=True).pvalue if len(m) >= 2 else 1.0",
+      "    p = anova_generic(m[\"mean\"].to_numpy(), m[\"var\"].to_numpy(), m[\"n\"].to_numpy(), use_var=\"equal\").pvalue",
       "    rows.append((gene, p))",
       "g = pd.DataFrame(rows, columns=[\"gene\", \"p\"]).set_index(\"gene\")",
       "g[\"q\"] = multipletests(g[\"p\"], method=\"fdr_bh\")[1]",
@@ -112,9 +111,9 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
   ].join("\n") + "\n";
   return {
     steps,
-    implementation: { functions: [two ? "welchT" : "welchAnovaTest", "varianceFromMoments", "benjaminiHochberg", ...(t.gsea ? ["preRankedGsea"] : [])], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    implementation: { functions: [two ? "welchT" : "oneWayAnova", "varianceFromMoments", "benjaminiHochberg", ...(t.gsea ? ["preRankedGsea"] : [])], file: "lib/stats.ts", commit: BUILD_COMMIT },
     verification: (two ? "Welch's t from moments matches scipy " + VERIFIED.welch.version + " ttest_ind(equal_var=False)"
-      : "Welch's ANOVA from moments matches statsmodels " + VERIFIED.anova.version + " " + VERIFIED.anova.fn) + " and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts)" +
+      : "The one-way ANOVA from moments matches scipy " + VERIFIED.anovaClassic.version + " " + VERIFIED.anovaClassic.fn + " (test/stats.test.ts)") + " and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts)" +
       (t.gsea ? "; enrichment scores match gseapy " + VERIFIED.gsea.version + " prerank, and NES and p match the script's port of our seeded null exactly (test/gsea-golden.test.ts)" : "") + ".",
     python: withResult(python),
     check: {

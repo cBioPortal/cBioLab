@@ -221,7 +221,7 @@ async function portal({ browser, ok, BASE }) {
         ["mRNA", "Protein", "DNA methylation"].every((t) => titles.includes(t)) &&
           /protein_quantification/.test(protein) && /10,509 genes/.test(protein) && /16,133 genes/.test(methylation),
         titles.join(" | ") + " — " + (protein.match(/[\d,]+ genes[^\n]*/) || [""])[0] + " / " + (methylation.match(/[\d,]+ genes[^\n]*/) || [""])[0]);
-      // three groups: no volcano, a mean and SD per group, p from Welch's ANOVA, the group with the highest mean
+      // three groups: no volcano, a mean and SD per group, p from one-way ANOVA, as the portal's, the group with the highest mean
       const sub = (v) => ({ all: [{ kind: "clinical", attribute: "SUBTYPE", values: [v] }] });
       await page.goto(BASE + "/portal/comparison?doc=" + Buffer.from(JSON.stringify({ study: "brca_tcga_pan_can_atlas_2018", views: [],
         cohorts: { LumA: sub("BRCA_LumA"), LumB: sub("BRCA_LumB"), Basal: sub("BRCA_Basal") } })).toString("base64url") + "&tab=Protein", { waitUntil: "domcontentloaded" });

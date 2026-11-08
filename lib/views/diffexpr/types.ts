@@ -3,7 +3,7 @@ import type {  } from "../../types.ts";
 
 /**
  * Differential expression between cohorts on one molecular profile: every gene's Welch t-test (two
- * cohorts) or Welch's ANOVA (three or more) from per-cohort moments (n, Σv, Σv² — additive, so exact
+ * cohorts) or one-way ANOVA (three or more, as cBioPortal's group comparison) from per-cohort moments (n, Σv, Σv² — additive, so exact
  * across sites). Two cohorts are drawn as a volcano, with preranked GSEA of the t ranking against
  * MSigDB gene sets; more are drawn as each cohort's mean of the most significant genes.
  */
@@ -31,7 +31,7 @@ export interface DiffexprGene {
   n: number[]; mean: number[]; sd: number[];
   /** two cohorts: the first's mean minus the second's, and Welch's t (unrounded, the enrichment's ranking) */
   effect?: number; t?: number;
-  /** three or more cohorts: Welch's F */
+  /** three or more cohorts: the one-way ANOVA's F */
   f?: number;
   p: number; q: number;
   cytoband?: string;
@@ -46,7 +46,7 @@ export interface DiffexprResult {
   effectLabel: string;
   /** cohorts in order; with two, effect = first − second */
   groups: string[];
-  /** "Welch's t-test" (two cohorts) or "Welch's ANOVA" */
+  /** "Welch's t-test" (two cohorts) or "one-way ANOVA" */
   test: string;
   tested: number;
   /** genes left out for fewer than 3 samples with a value in a cohort, or no variance in any */

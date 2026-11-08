@@ -1,7 +1,7 @@
 // Differential expression view: every gene tested between cohorts — two as a volcano with preranked
-// GSEA of the same ranking, more by Welch's ANOVA
+// GSEA of the same ranking, more by one-way ANOVA, as cBioPortal's group comparison
 import type { ViewResult, ViewResultOf } from "../../types.ts";
-import { benjaminiHochberg, varianceFromMoments, welchT, welchAnovaTest, preRankedGsea } from "../../stats.ts";
+import { benjaminiHochberg, varianceFromMoments, welchT, oneWayAnova, preRankedGsea } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, answering, refuse, niceCeil, askEachSite, cytobands } from "../shared.ts";
 import type { DiffexprView, DiffexprGene } from "./types.ts";
@@ -90,7 +90,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
       const t = (a.mean - b.mean) / Math.sqrt(a.v / a.n + b.v / b.n);
       tested.push({ ...base, effect: a.mean - b.mean, t, p: w.p });
     } else {
-      const w = welchAnovaTest(cs.map((c) => ({ n: c.n, mean: c.mean, variance: Math.max(0, c.v) })));
+      const w = oneWayAnova(cs.map((c) => ({ n: c.n, mean: c.mean, variance: Math.max(0, c.v) })));
       tested.push({ ...base, f: w.f, p: w.p });
     }
   }
@@ -167,15 +167,15 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
         sets: (gsea?.sets || []).map((x) => ({ name: x.name, es: x.es, nes: x.nes, p: x.p })) },
     }),
     diffexpr: { profileType, ...(gene ? { gene } : {}), ...(info ? { profileName: info.name, profileKind: info.type } : {}), log2, effectLabel, groups: vNames,
-      test: two ? "Welch's t-test" : "Welch's ANOVA", tested: tested.length, skipped, significant: sig.length, ...(two ? { up, down } : {}),
+      test: two ? "Welch's t-test" : "one-way ANOVA", tested: tested.length, skipped, significant: sig.length, ...(two ? { up, down } : {}),
       points, ...(grid ? { grid } : {}), pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
       labels, ...(gsea ? { gsea } : {}), ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
     caveat: (two ? "Welch's t-test per gene on " + profileType + (log2 ? " as log2(v + 1)" : " as stored") + ", " + A + " minus " + B +
       ", each sample in the cohort one observation, as the portal's group comparison tests expression"
-      : "Welch's ANOVA per gene across the " + vNames.length + " cohorts on " + profileType + (log2 ? " as log2(v + 1)" : " as stored") +
-        ", each sample in a cohort one observation; cBioPortal's group comparison uses the classic one-way ANOVA, which assumes every cohort's variance is the same") +
+      : "One-way ANOVA per gene across the " + vNames.length + " cohorts on " + profileType + (log2 ? " as log2(v + 1)" : " as stored") +
+        ", each sample in a cohort one observation, as the portal's group comparison tests three or more groups (it assumes the cohorts' variances are equal)") +
       "; computed from three running totals per gene and cohort, so it is exact across sites. " +
       tested.length.toLocaleString("en-US") + " genes tested" + (skipped ? ", " + skipped.toLocaleString("en-US") + " left out (fewer than " + DE_MIN_N + " samples with a value in a cohort, or no variance)" : "") +
       "; q is Benjamini–Hochberg across every gene tested. " +

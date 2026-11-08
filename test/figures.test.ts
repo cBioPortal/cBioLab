@@ -127,8 +127,8 @@ describe("diffexpr", () => {
   });
   test("three cohorts: each cohort's mean of the top genes, a row per gene, no volcano; the picked gene ringed", () => {
     const g3 = (gene: string, mean: number[], q: number) => ({ gene, n: [10, 10, 10], mean, sd: [1, 1, 1], f: 30, p: q / 10, q });
-    const v3 = { kind: "diffexpr", cohorts: ["<A>", "B", "C"], caveat: "Welch's ANOVA",
-      diffexpr: { profileType: "z", log2: false, effectLabel: "", groups: ["<A>", "B", "C"], test: "Welch's ANOVA", tested: 30, skipped: 0, significant: 2,
+    const v3 = { kind: "diffexpr", cohorts: ["<A>", "B", "C"], caveat: "one-way ANOVA",
+      diffexpr: { profileType: "z", log2: false, effectLabel: "", groups: ["<A>", "B", "C"], test: "one-way ANOVA", tested: 30, skipped: 0, significant: 2,
         points: [g3("G1", [2, 0, -1], 1e-9), g3("G2", [0, 1, 0.5], 0.2)], pooledSignificant: 0, labels: ["G1", "G2"], gene: "G2" } } as unknown as ViewResult;
     const svg = viewToSvg(v3)!;
     assert.ok(svg.includes(">G1<") && svg.includes(">G2<"));
@@ -137,7 +137,7 @@ describe("diffexpr", () => {
     assert.ok(svg.includes("G1 in &lt;A&gt;: mean 2"), "each dot's tip, escaped");
     assert.ok(svg.includes("the 2 most significant of 30 genes tested"));
     assert.ok(/<rect x="4" y="[\d.]+" width="[\d.]+" height="16" rx="3" fill="none"/.test(svg), "the picked gene's row ringed");
-    assert.ok(svg.includes("Welch's ANOVA"));
+    assert.ok(svg.includes("one-way ANOVA"));
   });
   test("enrichment switched off draws the volcano alone", () => {
     const svg = viewToSvg({ ...v, diffexpr: { ...v.diffexpr!, gsea: undefined } })!;

@@ -21,7 +21,7 @@ import pathlib
 import numpy as np
 import scipy
 import statsmodels
-from scipy.stats import kruskal, mannwhitneyu, norm, pearsonr, ttest_ind
+from scipy.stats import f_oneway, kruskal, mannwhitneyu, norm, pearsonr, ttest_ind
 from statsmodels.stats.meta_analysis import combine_effects
 from statsmodels.stats.oneway import anova_generic
 
@@ -53,12 +53,16 @@ for kind, n1, n2, d, s2 in [("continuous", 40, 55, 0.4, 1.0), ("continuous", 300
     welch.append({"a": moments(x), "b": moments(y), "t": float(r.statistic), "df": float(r.df), "p": float(r.pvalue)})
 
 anova = []
+anova_classic = []
 for ks in [(30, 45, 60), (200, 150, 90, 300), (12, 15, 9, 20, 11), (500, 520)]:
     gs = [sample("continuous", n, 50 + i * 1.5, 8 + i * 2) for i, n in enumerate(ks)]
     r = anova_generic(np.array([g.mean() for g in gs]), np.array([g.var(ddof=1) for g in gs]), np.array([g.size for g in gs]),
                       use_var="unequal", welch_correction=True)
     anova.append({"groups": [moments(g) for g in gs], "f": float(r.statistic), "df1": float(r.df[0]), "df2": float(r.df[1]),
                   "p": float(r.pvalue)})
+    # the classic F on the same groups, as cBioPortal's group comparison tests three or more
+    c = f_oneway(*gs)
+    anova_classic.append({"groups": [moments(g) for g in gs], "f": float(c.statistic), "p": float(c.pvalue)})
 
 ranks = []
 for kind, ns in [("integer", (40, 50)), ("continuous", (35, 60)), ("integer", (300, 280)), ("integer", (20, 25, 30)),
@@ -97,10 +101,11 @@ OUT.write_text(json.dumps({
     "libraries": {"statsmodels": statsmodels.__version__, "numpy": np.__version__, "scipy": scipy.__version__},
     "reference": {"welch": "scipy ttest_ind(equal_var=False)",
                   "anova": "statsmodels anova_generic(use_var='unequal', welch_correction=True)",
+                  "anovaClassic": "scipy f_oneway",
                   "mannWhitney": "scipy mannwhitneyu(two-sided, use_continuity=True, method='asymptotic')",
                   "kruskal": "scipy kruskal", "quantiles": "numpy percentile (linear)",
                   "pearson": "scipy pearsonr", "meta": "statsmodels combine_effects, fixed effect"},
-    "welch": welch, "anova": anova, "ranks": ranks, "pearson": pearson, "meta": meta,
+    "welch": welch, "anova": anova, "anovaClassic": anova_classic, "ranks": ranks, "pearson": pearson, "meta": meta,
 }, separators=(",", ":")) + "\n")
 print(f"wrote {OUT.relative_to(OUT.parents[3])}: {len(welch)} Welch, {len(anova)} ANOVA, {len(ranks)} rank, "
       f"{len(pearson)} Pearson, {len(meta)} meta cases")
