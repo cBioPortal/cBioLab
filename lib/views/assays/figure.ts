@@ -4,7 +4,7 @@
 import type { ViewResultOf, DrawnResultOf } from "../../types.ts";
 import {
   palette, frame, caption, label, textWidth, wrapWidth, linear, axisBottom, bottomAxisHeight, legend,
-  seriesStyle, fmtInt, fmtNum, pDigits, esc, FS, SW, type SvgOpts, type LegendItem
+  seriesStyle, fmtInt, fmtNum, pDigits, portalP, esc, PORTAL_ENRICHMENT, FS, SW, type SvgOpts, type LegendItem
 } from "../../svg-kit.ts";
 import { AMP, DEL } from "../../figures/common.ts";
 import { volcano, volcanoPlotH } from "../../figures/volcano.ts";
@@ -88,6 +88,32 @@ export function assaysSvg(v: DrawnResultOf<"assays">, o: SvgOpts): string {
   const cap = caption(v.caveat || "", W, bottom, p.muted);
   return frame(W, bottom + cap.height + 8, out.join("") + cap.svg, p.bg, W > want,
     "Generic assays — " + r.profileName + " — " + r.groups.join(" vs "));
+}
+
+/** an entity as the portal labels it: its name and, where that differs, its id ("TP53;WRAP53 (cg00000029)") */
+export const entityLabel = (e: { entity: string; name: string }) => e.name !== e.entity ? e.name + " (" + e.entity + ")" : e.entity;
+
+/**
+ * A numeric profile's volcano between two cohorts as the page draws it, as cBioPortal's generic-assay
+ * tab draws it: blue at q < 0.05, grey otherwise, the dragged selection orange, no names; "Log Ratio"
+ * against −log₁₀ p-Value. Each point carries its entity (data-key) for the page to pick or select;
+ * `picked` is ringed. The entities past the listed ones are a density grid behind. Null without one.
+ */
+export function assaysVolcanoSvg(r: AsResult, o: SvgOpts, pick: { selected?: Set<string> | null; picked?: string | null } = {}): string | null {
+  if (r.groups.length !== 2 || !r.grid) return null;
+  const p = palette(o.theme);
+  const want = o.width || 480, W = Math.max(MIN_W, want);
+  const sel = pick.selected && pick.selected.size ? pick.selected : null;
+  const C = PORTAL_ENRICHMENT;
+  const ratio = (x: number) => x < -10 ? "<-10" : x > 10 ? ">10" : x.toFixed(2);
+  const vo = volcano(p, {
+    x0: 0, y0: 2, width: W, plotH: volcanoPlotH(W), grid: r.grid, r: 3, pointOpacity: 0.4, labels: [], keyed: true, noun: "entities",
+    xTitle: "Log Ratio", pName: "p-Value", sides: [r.groups[0], r.groups[1]], cellColor: () => C.other,
+    pts: r.rows.map((e) => ({ key: e.entity, x: e.diff ?? 0, p: e.p, ring: pick.picked === e.entity,
+      color: sel?.has(e.entity) ? C.selected : e.q < 0.05 ? C.significant : C.other,
+      tip: entityLabel(e) + "\nLog Ratio: " + ratio(e.diff ?? 0) + "\np-Value: " + portalP(e.p) + "\nq-Value: " + portalP(e.q) })),
+  });
+  return frame(W, 2 + vo.height + 8, vo.svg, p.bg, W > want, "Volcano — " + r.profileName + " — " + r.groups[0] + " vs " + r.groups[1]);
 }
 
 /** one row per entity: its name, each cohort's mean as a bar (or its mix of values as a 100% bar), q */

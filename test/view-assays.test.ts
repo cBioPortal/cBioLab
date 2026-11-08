@@ -1,11 +1,11 @@
 // The assays view (lib/views/assays/): every entity of one generic-assay profile compared between
-// cohorts — Welch's t for two cohorts and Welch's ANOVA for more on numeric profiles, chi-squared on
+// cohorts — Welch's t for two cohorts and the classic one-way ANOVA for more on numeric profiles (as cBioPortal), chi-squared on
 // cohort × value for categorical ones, Benjamini–Hochberg across the entities — driven with
 // hand-made participants whose answers are counts and moments, and its figures.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runAssays } from "../lib/views/assays/run.ts";
-import { assaysSvg, assayEntitySvg, valueColors } from "../lib/views/assays/figure.ts";
+import { assaysSvg, assayEntitySvg, assaysVolcanoSvg, entityLabel, valueColors } from "../lib/views/assays/figure.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult } from "../lib/types.ts";
 import type { AssaysResult, AssaysView } from "../lib/views/assays/types.ts";
@@ -178,16 +178,16 @@ describe("assays: a numeric profile", () => {
     assert.deepEqual(out.studies, ["s1", "s2", "s3", "p"]);
   });
 
-  test("three cohorts: Welch's ANOVA, highest mean named, no difference or volcano", async () => {
-    // means 2, 5, 8, each n 3 and variance 1: w = 3 each, weighted mean 5, A = 3·(9 + 0 + 9)/2 = 27,
-    // Σ(1 − w/W)²/(n − 1) = 3·(2/3)²/2 = 2/3, B = 1 + 2·(3 − 2)/(9 − 1)·(2/3) = 7/6, F = 27/(7/6)
+  test("three cohorts: the one-way ANOVA, highest mean named, no difference or volcano", async () => {
+    // means 2, 5, 8, each n 3 and variance 1: grand mean 5, between = 3·(9 + 0 + 9)/2 = 27 on 2 df,
+    // within = 3·2·1/6 = 1 on 6 df, F = 27
     const c = ctx({ A: cohort({ s1: 3 }), B: cohort({ s1: 3 }), C: cohort({ s1: 3 }) },
       { s1: site({ meta: { ...NUM, patient_level: 1 }, rows: { A: [mom("E", [1, 2, 3])], B: [mom("E", [4, 5, 6])], C: [mom("E", [7, 8, 9])] } }) });
     const out = await runAssays(v(), c);
     const r = res(out);
-    assert.equal(r.test, "Welch's ANOVA");
+    assert.equal(r.test, "one-way ANOVA");
     assert.equal(r.unit, "patients", "a patient-level profile gives one value per patient");
-    close(r.rows[0].statistic, 27 / (7 / 6), 1e-4);
+    close(r.rows[0].statistic, 27, 1e-9);
     assert.equal(r.rows[0].higherIn, "C");
     assert.equal(r.rows[0].diff, undefined);
     assert.equal(r.grid, undefined);
@@ -239,6 +239,26 @@ describe("assays: figures", () => {
     const rows = { A: [mom("E1", [1, 2, 3]), mom("E2", [1, 2, 3])], B: [mom("E1", [4, 5, 6]), mom("E2", [1, 2, 4])] };
     return runAssays(v(), two({ s1: site({ meta: NUM, names: [{ entity: "E1", name: "SBS7 (UV)" }], rows }) }));
   };
+
+  test("the page's volcano, as the portal's generic-assay tab: blue at q < 0.05, grey otherwise, the selection orange, each entity by name and id", async () => {
+    const r = res(await numeric());
+    const plain = assaysVolcanoSvg(r, { width: 480 })!;
+    const fills = (svg: string) => Object.fromEntries([...svg.matchAll(/<circle [^>]*fill="([^"]+)"[^>]*data-key="(\w+)"/g)].map((m) => [m[2], m[1]]));
+    assert.deepEqual(fills(plain), { E1: "#58ACFA", E2: "#D3D3D3" }, "E1 at q < 0.05, E2 not");
+    const sel = assaysVolcanoSvg(r, { width: 480 }, { selected: new Set(["E2"]), picked: "E1" })!;
+    assert.deepEqual(fills(sel), { E1: "#58ACFA", E2: "#FE9929" });
+    assert.ok(plain.includes("Log Ratio") && plain.includes("−log₁₀ p-Value") && plain.includes("SBS7 (UV) (E1)\nLog Ratio: -3.00"));
+    assert.equal(entityLabel({ entity: "E2", name: "E2" }), "E2", "an entity without a name of its own is its id");
+    const three = res(await runAssays(v(), ctx({ A: cohort({ s1: 3 }), B: cohort({ s1: 3 }), C: cohort({ s1: 3 }) },
+      { s1: site({ meta: NUM, rows: { A: [mom("E", [1, 2, 3])], B: [mom("E", [4, 5, 6])], C: [mom("E", [7, 8, 9])] } }) })));
+    assert.equal(assaysVolcanoSvg(three, { width: 480 }), null, "no volcano past two cohorts, as the portal's");
+  });
+
+  test("the picked entity is carried to the result; anything that is not an id is refused", async () => {
+    const rows = { A: [mom("E1", [1, 2, 3])], B: [mom("E1", [4, 5, 6])] };
+    assert.equal(res(await runAssays(v({ entity: " E1 " }), two({ s1: site({ meta: NUM, rows }) }))).entity, "E1");
+    assert.match(String((await runAssays(v({ entity: "x\"; DROP" }), two({ s1: site({ meta: NUM, rows }) }))).error), /entity is one entity's stable id/);
+  });
 
   test("two numeric cohorts: a volcano beside the table when it fits, above it when it doesn't", async () => {
     const out = await numeric();

@@ -4,7 +4,7 @@ import type {  } from "../../types.ts";
 /**
  * Generic-assay comparison (cBioPortal's group-comparison tabs for mutational signatures, arm-level
  * copy number, treatment response and every other generic assay): every entity of one generic-assay
- * profile compared between cohorts. Numeric profiles by Welch's t (two cohorts) or Welch's ANOVA;
+ * profile compared between cohorts. Numeric profiles by Welch's t (two cohorts) or the classic one-way ANOVA, as cBioPortal's group comparison;
  * categorical ones by chi-squared on values × cohorts; Benjamini–Hochberg across the entities.
  * Counts and moments only.
  */
@@ -17,6 +17,12 @@ export interface AssaysView {
   minN?: number;
   /** entities named on the volcano (default 12) */
   label?: number;
+  /**
+   * The entity picked on the volcano or in the table (what clicking one sets), by its stable id: in
+   * the web app its values per cohort drawn beside the table. Applied where the figure is drawn, so
+   * a change re-runs nothing.
+   */
+  entity?: string;
 }
 export interface AssaysEntity {
   entity: string; name: string;
@@ -31,6 +37,8 @@ export interface AssaysEntity {
 }
 export interface AssaysResult {
   profileType: string; profileName: string; assayType: string;
+  /** the view's picked entity */
+  entity?: string;
   datatype: "numeric" | "categorical";
   /** what one value describes */
   unit: "samples" | "patients";

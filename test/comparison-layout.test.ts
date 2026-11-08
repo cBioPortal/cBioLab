@@ -89,6 +89,7 @@ test("per-probe methylation is its own Methylation tab, on the merged probes, as
   assert.equal(tabOf(l, "DNA methylation"), undefined);
   assert.deepEqual(tabOf(l, "Methylation"), { kind: "assays", profileType: "methylation_hm27_hm450_merge" });
   assert.ok(l.tabs.some((t) => t.title === "Arm-level copy number"), "another generic assay keeps its tab");
+  assert.deepEqual(l.tabs.find((t) => t.title === "Methylation")!.locks, ["minN"], "the portal's tab offers the data set alone");
   assert.ok(!l.left.some((x) => /methylation/i.test(x)), l.left.join("; "));
   // with three groups too: the assays view compares any number
   assert.deepEqual(tabOf(layout(3, PANCAN), "Methylation"), { kind: "assays", profileType: "methylation_hm27_hm450_merge" });

@@ -1,7 +1,7 @@
 // Assays view: every entity of one generic-assay profile, compared between cohorts
 import type { ViewResult } from "../../types.ts";
 import { assayProfileSql, assayEntityNamesSql, assayEntityCountSql } from "../../federation-views.ts";
-import { chiSquareTest, benjaminiHochberg, welchT, welchAnovaTest, varianceFromMoments } from "../../stats.ts";
+import { chiSquareTest, benjaminiHochberg, welchT, oneWayAnova, varianceFromMoments } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, answering, refuse, niceCeil, PROFILE_NAME, askEachSite } from "../shared.ts";
 import type { AssaysView, AssaysEntity, AssaysResult } from "./types.ts";
@@ -24,6 +24,8 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
   if (!PROFILE_NAME.test(pt)) return refuse("assays", ctx, "profileType names a generic-assay profile, e.g. mutational_signatures_contribution_v2");
   const minN = view.minN == null ? 3 : Math.floor(Number(view.minN));
   if (!(minN >= 2 && minN <= 10000)) return refuse("assays", ctx, "minN is 2 to 10000");
+  const pickedEntity = view.entity == null ? null : String(view.entity).trim();
+  if (pickedEntity != null && !/^[\w.:;@()\-+/ ]{1,200}$/.test(pickedEntity)) return refuse("assays", ctx, "entity is one entity's stable id, like \"cg00000029\"");
   const label = view.label == null ? 12 : Math.floor(Number(view.label));
   if (!(label >= 0 && label <= 40)) return refuse("assays", ctx, "label is 0 to 40 entities");
   const empty = vNames.filter((n) => !cohorts[n].count);
@@ -126,7 +128,7 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
       if (cells.some((c) => c.n < minN) || flat) { untested++; continue; }
       let statistic: number, p: number;
       if (two) { const w = welchT(cells[0].n, cells[0].mean!, cells[0].v, cells[1].n, cells[1].mean!, cells[1].v); statistic = w.t; p = w.p; }
-      else { const w = welchAnovaTest(cells.map((c) => ({ n: c.n, mean: c.mean!, variance: c.v }))); statistic = w.f; p = w.p; }
+      else { const w = oneWayAnova(cells.map((c) => ({ n: c.n, mean: c.mean!, variance: c.v }))); statistic = w.f; p = w.p; }
       const means = cells.map((c) => c.mean!);
       tested.push({ entity: e, name, cells: cells.map(({ v, ...c }) => { void v; return c; }),
         ...(two ? { diff: means[0] - means[1] } : {}), statistic, p, q: 1, higherIn: vNames[means.indexOf(Math.max(...means))] });
@@ -157,13 +159,13 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
     grid = { xMax, yMax, nx, ny, cells: [...cellMap].map(([k, c]) => { const [x, y] = k.split(",").map(Number); return [x, y, c] as [number, number, number]; }) };
   }
   const significant = tested.filter((g) => g.q < 0.05).length;
-  const test = isCat ? "Pearson chi-squared test (cohort × value)" : two ? "Welch's t-test" : "Welch's ANOVA";
+  const test = isCat ? "Pearson chi-squared test (cohort × value)" : two ? "Welch's t-test" : "one-way ANOVA";
   const values = isCat ? [...valueTotals].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([v]) => v) : undefined;
   const profileName = String(metas[0].m.name || pt);
   const multi = holders.length > 1;
   return {
     kind: "assays", cohorts: vNames,
-    assays: { profileType: pt, profileName, assayType, datatype: isCat ? "categorical" : "numeric", unit, groups: vNames, tested: tested.length, untested, significant, minN, test,
+    assays: { profileType: pt, profileName, assayType, ...(pickedEntity ? { entity: pickedEntity } : {}), datatype: isCat ? "categorical" : "numeric", unit, groups: vNames, tested: tested.length, untested, significant, minN, test,
       ...(values ? { values } : {}), missing, rows, ...(grid ? { grid } : {}), labels, ...(excluded.length ? { excluded } : {}) },
     method: assaysMethod({ profileType: pt, categorical: isCat, unit, cohorts: vNames, minN, test, perSite, tested: tested.length, untested, missing,
       moments: isCat ? [] : [...mom].map(([k, m]) => { const [cohort, entity] = k.split("\t"); return { cohort, entity, ...m }; }),

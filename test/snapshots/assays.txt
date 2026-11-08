@@ -43,4 +43,4 @@ Generic-assay comparison, Mutational Signature Contribution Scores (COSMIC v2) (
         tested: 30
         not tested: 0
     - Welch's t-test per entity, then Benjamini–Hochberg: Unequal-variance t from each cohort's n, mean and variance (Σv² − (Σv)²/n)/(n − 1), Welch–Satterthwaite df, two-sided. q across every entity tested, one value per sample.
-    Welch's t and ANOVA from moments match scipy 1.18.1 ttest_ind(equal_var=False) and statsmodels 0.15.0 anova_generic(use_var="unequal") and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts).
+    Welch's t and the one-way ANOVA from moments match scipy 1.18.1 ttest_ind(equal_var=False) and f_oneway and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts).

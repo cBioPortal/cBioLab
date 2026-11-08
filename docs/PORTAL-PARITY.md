@@ -34,10 +34,11 @@ title there.
   - [ ] A browser check: the kind is still `e2ePending`
 - [x] **Comparison → mRNA, Protein and DNA methylation tabs** — `diffexpr` laid out as the portal's tab: volcano and the clicked gene's box plot per group (a `plot` by cohort), then the gene table with the "High expression/methylation in" filter and "Significant only"; profiles picked as the portal picks them, 2 groups (PR #159)
   - [x] More than 2 groups: 3 to 10 compared by one-way ANOVA (p-values checked against cbioportal.org's), the table a mean and SD per group, no volcano, as the portal's
-    - [x] Where there is no volcano, the box plot's place before a gene is clicked is one line saying to click a gene; the portal leaves an empty 360px box there
+    - [x] Where there is no volcano, the box plot's place before a gene is clicked is one line saying to click a gene (expression and generic-assay tabs alike); the portal leaves an empty 360px box there
   - [x] Per-probe methylation (generic assay) as in the PanCancer Atlas studies: its own Methylation tab, as the portal's, the `assays` view on the merged profile (the 22,601 probes the 27k and 450k arrays share), each probe by its genes and id
     - [ ] The full 450k profile (~396,000 probes) is refused: one cohort's answer is a row per probe, past what one request holds (it ran the dev server out of memory, past the 60 s limit); the portal compares it
-    - [ ] The generic-assay tab's layout: ours is the table and the picked entity's mean ± SD; the portal's is a volcano (two groups), a box plot of the picked entity's values and the table, as on the expression tabs
+    - [x] Laid out as the portal's generic-assay tab, as every numeric generic-assay tab now is: volcano (two groups), the picked entity's box plot, the table with the portal's columns and tips; tested as the portal tests them (Welch's t for two groups, the classic one-way ANOVA past two, checked against cbioportal.org's)
+    - [ ] Categorical generic assays (arm-level copy number) keep our table and the picked entity's mix of values; the portal has a separate categorical tab
   - [ ] The table lists the 1,500 most significant genes; the portal lists every gene tested (the rest are on the volcano as density, not as points)
   - [ ] The Data Set picker's ⓘ profile description (the catalog carries no description)
   - [ ] Downloads: the volcano's and box plot's SVG/PNG/data buttons, the table's copy and download

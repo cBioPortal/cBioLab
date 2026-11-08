@@ -39,7 +39,8 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
     ...(groupsOk ? expression.filter((e) => e.profile).map((e) => ({ title: e.title, views: [v(e.title, { kind: "diffexpr", profileType: e.profile, ...e.extra })],
       // the portal's tab offers the data set alone
       locks: ["log2", "geneSets"] })) : []),
-    ...assays.map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile })] })),
+    // the portal's generic-assay tab offers the data set alone
+    ...assays.map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile })], locks: ["minN"] })),
     { title: "Clinical Data", views: [v("Clinical data", { kind: "table" })] }
   ], left, { partial: !known });
 }
