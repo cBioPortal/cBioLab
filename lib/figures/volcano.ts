@@ -56,11 +56,13 @@ export function volcano(p: Pal, o: {
   // the density of everything not drawn as a point
   const cw = (xs(g.xMax) - xs(-g.xMax)) / g.nx, ch = (ys(0) - ys(g.yMax)) / g.ny;
   const maxC = Math.max(1, ...g.cells.map((c) => c[2]));
+  const noun = o.noun || "genes";
+  const cellTip = (n: number) => fmtInt(n) + " " + (n === 1 ? noun.replace(/ies$/, "y").replace(/s$/, "") : noun) + " here, counted rather than drawn: only the most significant are dots";
   let dens = "";
   for (const c of g.cells) {
     const [bx, by, n] = c;
     const col = o.cellColor ? o.cellColor(c[3] ?? 0) : OTHER;
-    dens += `<rect x="${r1(xs(-g.xMax) + bx * cw)}" y="${r1(ys(0) - (by + 1) * ch)}" width="${r1(cw + 0.3)}" height="${r1(ch + 0.3)}" fill="${col}" opacity="${r2(0.15 + 0.6 * Math.log1p(n) / Math.log1p(maxC))}"/>`;
+    dens += `<rect x="${r1(xs(-g.xMax) + bx * cw)}" y="${r1(ys(0) - (by + 1) * ch)}" width="${r1(cw + 0.3)}" height="${r1(ch + 0.3)}" fill="${col}" opacity="${r2(0.15 + 0.6 * Math.log1p(n) / Math.log1p(maxC))}"><title>${esc(cellTip(n))}</title></rect>`;
   }
   out.push(dens);
   const at = o.pts.map((d) => ({ d, x: X(d.x), y: Y(lp(d.p)) }));
