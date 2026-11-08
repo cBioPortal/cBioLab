@@ -1464,7 +1464,7 @@
           "profileType": ""
         },
         "label": "Differential expression + GSEA",
-        "maxCohorts": 2,
+        "maxCohorts": 10,
         "minCohorts": 2,
         "title": "Differential expression",
         "why": null,
@@ -1475,15 +1475,15 @@
         "withData": true
       },
       "drawsOwnWaiting": false,
-      "emptyHint": "It compares exactly 2 cohorts.",
+      "emptyHint": "It compares 2 to 10 cohorts.",
       "figureTitle": "Differential expression — A vs B",
       "headTitle": "Differential expression",
       "help": {
-        "text": "Compares how active every gene is between two groups of patients. Each dot is a gene: further left or right means a bigger difference in activity between the groups, higher up means the difference is less likely to be chance. The panel beside it asks whether whole families of related genes, such as those that drive cell division, lean towards one group.",
+        "text": "Compares how active every gene is between groups of patients. With two groups, each dot is a gene: further left or right means a bigger difference in activity between the groups, higher up means the difference is less likely to be chance, and the panel beside it asks whether whole families of related genes, such as those that drive cell division, lean towards one group. With three or more, the genes whose activity differs most across the groups are listed, with each group's average.",
         "title": "What is this?"
       },
       "isNew": false,
-      "maxCohorts": 2,
+      "maxCohorts": 10,
       "menu": {
         "label": "Differential expression + GSEA",
         "loading": false,

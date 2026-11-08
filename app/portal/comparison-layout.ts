@@ -5,28 +5,29 @@ import { arrange, type PageLayout } from "./page-doc.ts";
 import { mrnaComparisonProfile, proteinProfile, methylationProfile, probeMethylation, assayComparisonProfiles, type StudyKnown } from "./study-known.ts";
 
 const CLINICAL_SHOWN = 8;
+/** the most groups an expression tab compares (the diffexpr view's limit) */
+const EXPRESSION_MAX_GROUPS = 10;
 
 /** the page's tabs; before the study's profiles and attributes are known (`known` null), those that need neither */
 export function comparisonLayout(linked: AnalysisDoc, study: string, known: StudyKnown | null, drivers: boolean): PageLayout {
   const names = Object.keys(linked.cohorts || {});
   const catalog = known?.profileCatalog || [];
-  // the portal's expression tabs, each a diffexpr view on one profile, which compares exactly two
-  // cohorts; protein and methylation open as the portal shows them, without gene-set enrichment
+  // the portal's expression tabs, each a diffexpr view on one profile: a t-test for two groups, an
+  // ANOVA for more; without gene-set enrichment, which the portal's tabs do not have
   const expression = !known ? [] : [
-    { title: "mRNA", profile: mrnaComparisonProfile(catalog), none: "no mRNA profile", extra: {} },
+    { title: "mRNA", profile: mrnaComparisonProfile(catalog), none: "no mRNA profile", extra: { geneSets: [] } },
     { title: "Protein", profile: proteinProfile(catalog), none: "no protein profile", extra: { geneSets: [] } },
     { title: "DNA methylation", profile: methylationProfile(catalog), extra: { geneSets: [] },
       none: probeMethylation(catalog) ? "this study's methylation is per probe, a generic assay, which this page does not compare" : "no methylation profile" },
   ];
-  const twoGroups = names.length === 2;
+  const groupsOk = names.length >= 2 && names.length <= EXPRESSION_MAX_GROUPS;
   const assays = known ? assayComparisonProfiles(catalog) : [];
   const clinical = known?.clinical || [];
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
   const measure = drivers ? "driver" : "any";
   const left = !known ? [] : [!clinical.length && "Clinical (no attributes)",
-    ...expression.filter((e) => !e.profile || !twoGroups).map((e) => e.title + " (" + (!e.profile ? e.none
-      : "compares exactly two groups, and " + names.length + (names.length === 1 ? " is" : " are") + " compared" +
-        (names.length > 2 ? "; cBioPortal tests more than two with ANOVA, which this page does not yet" : "")) + ")"),
+    ...expression.filter((e) => !e.profile || !groupsOk).map((e) => e.title + " (" + (!e.profile ? e.none
+      : "compares 2 to " + EXPRESSION_MAX_GROUPS + " groups, and " + names.length + (names.length === 1 ? " is" : " are") + " compared") + ")"),
     !assays.length && "Generic Assays (no generic-assay profile)"].filter(Boolean) as string[];
   return arrange({ study, cohorts: linked.cohorts }, [
     { title: "Overlap", views: [v("Overlap", { kind: "overlap" })] },
@@ -34,7 +35,9 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
     ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", attributes: clinical.slice(0, CLINICAL_SHOWN) })] }] : []),
     { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", measure }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna", measure }),
       v("Structural variants", { kind: "enrichment", alteration: "sv", measure })] },
-    ...(twoGroups ? expression.filter((e) => e.profile).map((e) => ({ title: e.title, views: [v(e.title, { kind: "diffexpr", profileType: e.profile, ...e.extra })] })) : []),
+    ...(groupsOk ? expression.filter((e) => e.profile).map((e) => ({ title: e.title, views: [v(e.title, { kind: "diffexpr", profileType: e.profile, ...e.extra })],
+      // the portal's tab offers the data set alone
+      locks: ["log2", "geneSets"] })) : []),
     ...assays.map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile })] })),
     { title: "Clinical Data", views: [v("Clinical data", { kind: "table" })] }
   ], left, { partial: !known });

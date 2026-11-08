@@ -1,10 +1,11 @@
-// Differential expression figure: a volcano of every gene (the shared one, lib/views/enrichment/figure.ts),
-// and the GSEA gene sets — their normalised scores as bars, the strongest set each way as a
-// running-sum curve over the ranking.
+// Differential expression figure. Two cohorts: a volcano of every gene (the shared one,
+// lib/figures/volcano.ts), and the GSEA gene sets — their normalised scores as bars, the strongest
+// set each way as a running-sum curve over the ranking. More cohorts: each cohort's mean of the
+// most significant genes, a row per gene.
 import type { ViewResultOf, DrawnResultOf } from "../../types.ts";
 import {
   palette, frame, caption, label, textWidth, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight,
-  legend, fmtInt, fmtNum, fmtP, fmtQ, FS, SW, SERIES, OTHER, type SvgOpts
+  legend, seriesStyle, pDigits, portalP, esc, PORTAL_ENRICHMENT, fmtInt, fmtNum, fmtP, fmtQ, FS, SW, SERIES, OTHER, type SvgOpts
 } from "../../svg-kit.ts";
 import { volcano, volcanoPlotH } from "../../figures/volcano.ts";
 
@@ -24,6 +25,12 @@ export function diffexprSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): string {
   const p = palette(o.theme), d = v.diffexpr;
   const want = o.width || 960, W = Math.max(MIN_PANEL, want);
   const [A, B] = d.groups;
+  if (d.groups.length > 2) {
+    const mp = meansPanel(d, p, W);
+    const cap = caption(v.caveat || "", W, mp.height + 4, p.muted);
+    return frame(W, mp.height + 4 + cap.height + 8, mp.svg + cap.svg, p.bg, W > want,
+      "Differential expression — " + d.profileType + " — " + d.groups.join(", "));
+  }
   const hasGsea = !!(d.gsea && d.gsea.sets.length);
   const side = hasGsea && (W - GAP) / 2 >= MIN_PANEL;
   const vw = side ? Math.round((W - GAP) * 0.5) : W;
@@ -44,16 +51,30 @@ export function diffexprSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): string {
 }
 
 /**
- * The volcano alone, as the page draws it beside the gene's box plot: each point carries its gene
- * (data-key) so the page can pick one or drag over several. `selected` genes keep their colour and
- * the rest are drawn grey while a selection stands; `picked` is ringed.
+ * The volcano alone, as the page draws it beside the gene's box plot, as cBioPortal's tab draws
+ * it: blue at q < 0.05, grey otherwise, the dragged selection orange, no names; "Log2 Ratio"
+ * against −log₁₀ p-Value. Each point carries its gene (data-key) so the page can pick one or drag
+ * over several; `picked` is ringed. The genes past the listed ones are a density grid behind.
  */
 export function diffexprVolcanoSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts, pick: { selected?: Set<string> | null; picked?: string | null } = {}): string {
   const p = palette(o.theme), d = v.diffexpr;
   const want = o.width || 480, W = Math.max(MIN_PANEL, want);
-  const vp = volcanoPanel(d, p, W, { keyed: true, ...pick });
-  return frame(W, vp.height + 8, vp.svg, p.bg, W > want, "Volcano — " + d.profileType + " — " + d.groups[0] + " vs " + d.groups[1]);
+  const [A, B] = d.groups;
+  const sel = pick.selected && pick.selected.size ? pick.selected : null;
+  const C = PORTAL_ENRICHMENT;
+  const vo = volcano(p, {
+    x0: 0, y0: 2, width: W, plotH: volcanoPlotH(W), grid: d.grid!, r: 3, pointOpacity: 0.4, labels: [], keyed: true,
+    xTitle: "Log2 Ratio", pName: "p-Value", sides: [A, B],
+    cellColor: (cls) => cls ? C.significant : C.other,
+    pts: d.points.map((g) => ({ key: g.gene, x: g.effect!, p: g.p, ring: pick.picked === g.gene,
+      color: sel?.has(g.gene) ? C.selected : g.q < 0.05 ? C.significant : C.other,
+      tip: "Gene: " + g.gene + "\nLog2 Ratio: " + ratioText(g.effect!) + "\np-Value: " + portalP(g.p) + "\nq-Value: " + portalP(g.q) })),
+  });
+  return frame(W, 2 + vo.height + 8, vo.svg, p.bg, W > want, "Volcano — " + d.profileType + " — " + A + " vs " + B);
 }
+
+/** cBioPortal's two-decimal log ratio, past ±10 written as a bound */
+const ratioText = (x: number) => x < -10 ? "<-10" : x > 10 ? ">10" : x.toFixed(2);
 
 /** The gene-set panel alone, or null when the view ran no enrichment. */
 export function diffexprGseaSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): string | null {
@@ -64,24 +85,66 @@ export function diffexprGseaSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): strin
   return frame(W, g.height + 10, g.svg, p.bg, W > want, "Gene-set enrichment — " + d.groups[0] + " vs " + d.groups[1]);
 }
 
+/** rows of the means panel; the rest are counted */
+const MEAN_ROWS = 20;
+
+/**
+ * Three or more cohorts: the most significant genes, a row each, with every cohort's mean as a dot in
+ * its colour on one shared axis, and the gene's q beside it — the picked gene among them, ringed.
+ */
+function meansPanel(d: DeResult, p: Pal, W: number): { svg: string; height: number } {
+  const out: string[] = [];
+  const lg = legend(d.groups.map((g, i) => ({ label: g, color: seriesStyle(i).color, kind: "dot" as const })), 8, 2, W - 16, p,
+    { size: FS.small, title: fmtInt(d.tested) + " genes, " + fmtInt(d.significant) + " at q < 0.05 · " + d.test + " · mean per cohort:" });
+  out.push(lg.svg);
+  const picked = d.gene ? d.points.find((g) => g.gene === d.gene) : undefined;
+  const rows = [...d.points.slice(0, MEAN_ROWS), ...(picked && d.points.indexOf(picked) >= MEAN_ROWS ? [picked] : [])];
+  const ROW = 18, top = 2 + lg.height + 10;
+  const nameW = Math.min(160, Math.max(...rows.map((g) => textWidth(g.gene, FS.body, 600))));
+  const qOf = (g: typeof rows[number]) => "q " + pDigits(g.q);
+  const qW = Math.max(...rows.map((g) => textWidth(qOf(g), FS.small)));
+  const L = 8 + nameW + 12, R = W - qW - 16;
+  const vals = rows.flatMap((g) => g.mean);
+  const xs = linear(Math.min(...vals), Math.max(...vals), L + 6, R - 6);
+  const B = top + rows.length * ROW;
+  out.push(axisBottom(xs, B, p, { title: "mean " + (d.log2 ? "log2(v + 1)" : /zscore/i.test(d.profileType) ? "z-score" : "value"), minX: 0, maxX: W, gridTo: top }));
+  rows.forEach((g, i) => {
+    const y = top + i * ROW, cy = y + ROW / 2;
+    const ring = g === picked;
+    out.push(label(8, cy + FS.body * 0.35, g.gene, { size: FS.body, fill: g.q < 0.05 ? p.ink : p.muted, weight: ring ? 700 : 600, maxW: nameW }));
+    const xsOf = g.mean.map((m) => xs(m));
+    out.push(`<line x1="${r1(Math.min(...xsOf))}" y1="${r1(cy)}" x2="${r1(Math.max(...xsOf))}" y2="${r1(cy)}" stroke="${p.line}" stroke-width="${SW.line}"/>`);
+    g.mean.forEach((m, j) => out.push(`<circle cx="${r1(xs(m))}" cy="${r1(cy)}" r="4" fill="${seriesStyle(j).color}"><title>${esc(g.gene + " in " + d.groups[j] + ": mean " + fmtNum(m) + ", SD " + fmtNum(g.sd[j]) + ", n " + fmtInt(g.n[j]))}</title></circle>`));
+    if (ring) out.push(`<rect x="4" y="${y + 1}" width="${W - 8}" height="${ROW - 2}" rx="3" fill="none" stroke="${p.ink}" stroke-width="${SW.line}"/>`);
+    out.push(label(W - 8, cy + FS.small * 0.35, qOf(g), { size: FS.small, fill: p.muted, anchor: "end" }));
+  });
+  let h = B + bottomAxisHeight("mean") + 4;
+  if (d.tested > rows.length) {
+    h += FS.small + 2;
+    out.push(label(8, h, "the " + fmtInt(rows.length) + " most significant of " + fmtInt(d.tested) + " genes tested; every listed gene is in the result and the MCP text", { size: FS.small, fill: p.muted, maxW: W - 16 }));
+    h += 4;
+  }
+  return { svg: out.join(""), height: h };
+}
+
 /** the count of genes each way as a legend of the volcano's colours, then the volcano */
 function volcanoPanel(d: DeResult, p: Pal, vw: number, o: { keyed?: boolean; selected?: Set<string> | null; picked?: string | null }): { svg: string; height: number } {
   const [A, B] = d.groups;
   const lg = legend([
-    { label: fmtInt(d.up) + " higher in " + A, color: SERIES[0], kind: "dot" },
-    { label: fmtInt(d.down) + " higher in " + B, color: SERIES[1], kind: "dot" },
+    { label: fmtInt(d.up ?? 0) + " higher in " + A, color: SERIES[0], kind: "dot" },
+    { label: fmtInt(d.down ?? 0) + " higher in " + B, color: SERIES[1], kind: "dot" },
     { label: "not significant", color: OTHER, kind: "dot" },
   ], 8, 2, vw - 16, p, { size: FS.small, title: fmtInt(d.tested) + " genes, q < 0.05:" });
   const y0 = 2 + lg.height + 4;
   const sel = o.selected && o.selected.size ? o.selected : null;
   const vo = volcano(p, {
-    x0: 0, y0, width: vw, plotH: volcanoPlotH(vw), grid: d.grid, r: 2,
+    x0: 0, y0, width: vw, plotH: volcanoPlotH(vw), grid: d.grid!, r: 2,
     labels: o.picked && !d.labels.includes(o.picked) && d.points.some((g) => g.gene === o.picked) ? [...d.labels, o.picked] : d.labels, keyed: o.keyed,
     xTitle: d.effectLabel + " (" + A + " − " + B + ")", sides: ["higher in " + A, "higher in " + B],
     cellColor: (cls) => cls === 1 ? SERIES[0] : cls === 2 ? SERIES[1] : OTHER,
-    pts: d.points.map((g) => ({ key: g.gene, x: g.effect, p: g.p, ring: o.picked === g.gene,
-      color: sel && !sel.has(g.gene) ? OTHER : g.q < 0.05 ? (g.effect > 0 ? SERIES[0] : SERIES[1]) : OTHER,
-      tip: g.gene + ": " + fmtNum(g.effect) + " · " + fmtP(g.p) + " · " + fmtQ(g.q) })),
+    pts: d.points.map((g) => ({ key: g.gene, x: g.effect!, p: g.p, ring: o.picked === g.gene,
+      color: sel && !sel.has(g.gene) ? OTHER : g.q < 0.05 ? (g.effect! > 0 ? SERIES[0] : SERIES[1]) : OTHER,
+      tip: g.gene + ": " + fmtNum(g.effect!) + " · " + fmtP(g.p) + " · " + fmtQ(g.q) })),
   });
   return { svg: lg.svg + vo.svg, height: y0 + vo.height };
 }

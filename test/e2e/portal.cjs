@@ -191,13 +191,15 @@ async function portal({ browser, ok, BASE }) {
       const heads = await body.locator(".pb-table thead th").allInnerTexts();
       const first = await body.locator(".pb-table tbody tr").first().innerText();
       const placeholder = await body.locator("[data-test=diffexpr-box] .pb-placeholder").innerText();
+      const settings = await page.locator(".viewcard .viewtb").first().innerText();
       await body.locator(".pb-table tbody tr").first().click();
       await body.locator("[data-test=diffexpr-box] svg").waitFor({ timeout: 120000 });
       const box = await body.locator("[data-test=diffexpr-box]").innerText();
       ok("comparison: an expression tab lists its genes in a table, and a gene clicked there draws its values per group",
         ["Gene", "Cytoband", "μ in ER+", "μ in ER-", "σ in ER+", "σ in ER-", "Log2 Ratio", "p-Value", "q-Value", "Higher expression in"].every((h) => heads.some((x) => x.startsWith(h))) &&
-          /^AGR3\t7p21\.1/.test(first) && /AGR3 · p-Value/.test(box) && /ER\+ \(\d+\)/.test(box) && /ER- \(\d+\)/.test(box) && /Click on a gene/.test(placeholder),
-        heads.join(" | ") + " — " + first.replace(/\s+/g, " ") + " — " + box.replace(/\s+/g, " ").slice(0, 160));
+          /^AGR3\t7p21\.1/.test(first) && /AGR3 · p-Value/.test(box) && /ER\+ \(\d+\)/.test(box) && /ER- \(\d+\)/.test(box) && /Click on gene in the table to render this plot\./.test(placeholder) &&
+          /data set/i.test(settings) && !/log2|enrichment/.test(settings),
+        heads.join(" | ") + " — " + first.replace(/\s+/g, " ") + " — " + box.replace(/\s+/g, " ").slice(0, 160) + " — " + settings.replace(/\s+/g, " "));
       // the picked gene is the view's: the link carries it, so opening it draws the same box plot
       const again = await browser.newPage();
       try {
@@ -221,14 +223,23 @@ async function portal({ browser, ok, BASE }) {
         ["mRNA", "Protein", "DNA methylation"].every((t) => titles.includes(t)) &&
           /protein_quantification/.test(protein) && /10,509 genes/.test(protein) && /16,133 genes/.test(methylation),
         titles.join(" | ") + " — " + (protein.match(/[\d,]+ genes[^\n]*/) || [""])[0] + " / " + (methylation.match(/[\d,]+ genes[^\n]*/) || [""])[0]);
-      await page.goto(link({ "ER+": er("Positive"), "ER-": er("Negative"), "ER indeterminate": er("Indeterminate") }), { waitUntil: "domcontentloaded" });
-      await page.locator(".leftout").waitFor({ timeout: 240000 });
-      const three = await page.getByRole("tab").allInnerTexts();
-      await page.locator(".leftout").click();
-      const said = await page.getByRole("dialog").innerText();
-      ok("comparison: with three groups the expression tabs are left out, saying why",
-        !three.some((t) => /mRNA|Protein|methylation/.test(t)) && ["mRNA", "Protein", "DNA methylation"].every((t) => said.includes(t + " (compares exactly two groups, and 3 are compared")),
-        three.join(" | ") + " — " + said.replace(/\s+/g, " ").slice(0, 300));
+      // three groups: no volcano, a mean and SD per group, p from one-way ANOVA, as the portal's, the group with the highest mean
+      const sub = (v) => ({ all: [{ kind: "clinical", attribute: "SUBTYPE", values: [v] }] });
+      await page.goto(BASE + "/portal/comparison?doc=" + Buffer.from(JSON.stringify({ study: "brca_tcga_pan_can_atlas_2018", views: [],
+        cohorts: { LumA: sub("BRCA_LumA"), LumB: sub("BRCA_LumB"), Basal: sub("BRCA_Basal") } })).toString("base64url") + "&tab=Protein", { waitUntil: "domcontentloaded" });
+      const body3 = page.locator("[data-test=diffexpr-body]");
+      await body3.locator(".pb-table tbody tr").first().waitFor({ timeout: 240000 });
+      const heads3 = await body3.locator(".pb-table thead th").allInnerTexts();
+      const pTip = await body3.locator(".pb-table thead th", { hasText: "p-Value" }).first().evaluate((el) => (el.closest("[data-tip]") || el.querySelector("[data-tip]"))?.getAttribute("data-tip") || "");
+      const first3 = await body3.locator(".pb-table tbody tr").first().innerText();
+      const tabs3 = await page.getByRole("tab").allInnerTexts();
+      const hint3 = await body3.locator("[data-test=diffexpr-box]").evaluate((el) => ({ text: el.innerText, h: el.getBoundingClientRect().height }));
+      ok("comparison: with three groups the expression tabs test by ANOVA, a mean and SD per group, no volcano, and one line saying to click a gene",
+        ["mRNA", "Protein"].every((t) => tabs3.includes(t)) && await body3.locator("[data-test=diffexpr-volcano]").count() === 0 &&
+          ["μ in LumA", "μ in LumB", "μ in Basal", "σ in LumA", "σ in LumB", "σ in Basal", "p-Value", "q-Value", "Higher expression in"].every((h) => heads3.some((x) => x.startsWith(h))) &&
+          !heads3.some((x) => /Log2 Ratio|Mean Difference/.test(x)) && /ANOVA/.test(pTip) && /\t(LumA|LumB|Basal)$/.test(first3.trim()) &&
+          /Click on gene in the table to render this plot\./.test(hint3.text) && hint3.h < 80,
+        tabs3.join(" | ") + " — " + heads3.join(" | ") + " — " + pTip + " — " + first3.replace(/\s+/g, " "));
     } catch (e) {
       ok("comparison: expression tabs", false, String(e.message).split("\n")[0].slice(0, 200));
     }

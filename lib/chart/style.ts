@@ -19,6 +19,12 @@ export const SW = { hair: 0.75, line: 1, series: 2 } as const;
 export const OTHER = "#9aa5ad";
 
 /**
+ * cBioPortal's group-comparison enrichment colours, for the pages that reproduce its tabs: a
+ * volcano point at q < 0.05, one that is not, one in the dragged selection, and a box plot's boxes.
+ */
+export const PORTAL_ENRICHMENT = { significant: "#58ACFA", other: "#D3D3D3", selected: "#FE9929", box: "#00AAF8" } as const;
+
+/**
  * Okabe–Ito, colour-blind safe. Past six series a figure does not reuse a colour alone: the
  * seventh onward repeat the hues with a dash pattern (lines) or a hatch-free lighter tint
  * (fills), so every series stays distinguishable and its legend entry shows how.

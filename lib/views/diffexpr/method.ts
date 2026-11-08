@@ -9,7 +9,7 @@ export const GSEA_NULL_PY = "import math\n\n\ndef seed_of(s):\n    \"\"\"FNV-1a 
 export interface DiffexprTrace {
   profileType: string;
   log2: boolean;
-  groups: [string, string];
+  groups: string[];
   perSite: { cohort: string; study: string; cohortSamples: number }[];
   /** per cohort, summed over its studies: each gene's n, Σv and Σv² */
   moments: { cohort: string; gene: string; n: number; sx: number; sxx: number }[];
@@ -23,6 +23,7 @@ export interface DiffexprTrace {
 
 export function diffexprMethod(t: DiffexprTrace): MethodRecord {
   const [A, B] = t.groups;
+  const two = t.groups.length === 2;
   const steps: MethodStep[] = t.perSite.map((s) => ({
     kind: "fetch" as const, title: "Sum every gene's values",
     detail: "The diffexpr:moments query above, on “" + t.profileType + "”" + (t.log2 ? " as log2(v + 1) (a negative stored value has no log and is left out, not clamped)" : " as stored") +
@@ -32,10 +33,12 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
   if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length) steps.push({ kind: "transform", title: "Add each cohort's sums across its studies",
     detail: "The totals add exactly; there is no batch correction between studies." });
   steps.push({ kind: "transform", title: "Leave out genes that cannot be tested",
-    detail: "A gene with fewer than " + t.minN + " samples with a value in either cohort, or with no variance (Var A + Var B ≤ 1e-9 · (1 + mean A² + mean B²) — judged to a tolerance, since a constant gene's variance from the sums is rounding noise).",
+    detail: "A gene with fewer than " + t.minN + " samples with a value in " + (two ? "either cohort" : "any cohort") + ", or with no variance (the cohorts' variances sum to ≤ 1e-9 · (1 + the sum of their squared means) — judged to a tolerance, since a constant gene's variance from the sums is rounding noise).",
     rowsIn: t.tested + t.skipped, rowsOut: t.tested });
-  steps.push({ kind: "statistic", title: "Welch's t-test per gene",
+  steps.push(two ? { kind: "statistic", title: "Welch's t-test per gene",
     detail: "Mean A − mean B (" + A + " minus " + B + ") with each cohort's variance (Σv² − (Σv)²/n)/(n − 1); unequal-variance t, Welch–Satterthwaite df, two-sided. With thousands of patients a tiny difference is significant: read the effect too.",
+    params: [["genes tested", t.tested.toLocaleString()]] } : { kind: "statistic", title: "One-way ANOVA per gene",
+    detail: "Across the " + t.groups.length + " cohorts, from each cohort's n, mean and variance (Σv² − (Σv)²/n)/(n − 1): the classic F, the between-cohort mean square over the pooled within-cohort one on k − 1 and N − k degrees of freedom, as cBioPortal's group comparison tests three or more groups (it assumes the cohorts' variances are equal). With thousands of patients a tiny difference is significant: read the means too.",
     params: [["genes tested", t.tested.toLocaleString()]] });
   steps.push({ kind: "statistic", title: "Benjamini–Hochberg across genes", detail: "q-values over all " + t.tested.toLocaleString() + " genes tested." });
   if (t.gsea) steps.push({ kind: "statistic", title: "Preranked gene-set enrichment (GSEA)",
@@ -50,26 +53,43 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
     "import json",
     "import numpy as np",
     "import pandas as pd",
-    "from scipy.stats import ttest_ind_from_stats",
+    two ? "from scipy.stats import ttest_ind_from_stats" : "from statsmodels.stats.oneway import anova_generic",
     "from statsmodels.stats.multitest import multipletests",
     "",
     RESULT_INIT,
     ...pyTable("moments", "Each gene's n, sum and sum of squares per cohort (" + (t.log2 ? "log2(v + 1)" : "as stored") + "), from the diffexpr:moments queries, summed over each cohort's studies",
       ["cohort", "gene", "n", "sx", "sxx"], t.moments.map((r) => [r.cohort, r.gene, r.n, r.sx, r.sxx]), "diffexpr_moments.csv"),
     "",
-    "a = moments[moments[\"cohort\"] == " + py(A) + "].set_index(\"gene\")",
-    "b = moments[moments[\"cohort\"] == " + py(B) + "].set_index(\"gene\")",
-    "g = a.join(b, lsuffix=\"_a\", rsuffix=\"_b\", how=\"inner\")",
-    "g[\"mean_a\"], g[\"mean_b\"] = g[\"sx_a\"] / g[\"n_a\"], g[\"sx_b\"] / g[\"n_b\"]",
-    "g[\"var_a\"] = ((g[\"sxx_a\"] - g[\"sx_a\"] ** 2 / g[\"n_a\"]) / (g[\"n_a\"] - 1)).clip(lower=0)  # a constant gene's is rounding noise, sometimes below 0",
-    "g[\"var_b\"] = ((g[\"sxx_b\"] - g[\"sx_b\"] ** 2 / g[\"n_b\"]) / (g[\"n_b\"] - 1)).clip(lower=0)",
-    "keep = (g[\"n_a\"] >= " + t.minN + ") & (g[\"n_b\"] >= " + t.minN + ") & (g[\"var_a\"] + g[\"var_b\"] > 1e-9 * (1 + g[\"mean_a\"] ** 2 + g[\"mean_b\"] ** 2))",
-    "g = g[keep].copy()",
-    "g[\"t\"], g[\"p\"] = ttest_ind_from_stats(g[\"mean_a\"], np.sqrt(g[\"var_a\"]), g[\"n_a\"], g[\"mean_b\"], np.sqrt(g[\"var_b\"]), g[\"n_b\"], equal_var=False)",
-    "g[\"effect\"] = g[\"mean_a\"] - g[\"mean_b\"]",
-    "g[\"q\"] = multipletests(g[\"p\"], method=\"fdr_bh\")[1]",
-    "print(len(g), \"genes tested\")",
-    "print(g.sort_values(\"p\")[[\"effect\", \"t\", \"p\", \"q\"]].head(20))",
+    ...(two ? [
+      "a = moments[moments[\"cohort\"] == " + py(A) + "].set_index(\"gene\")",
+      "b = moments[moments[\"cohort\"] == " + py(B) + "].set_index(\"gene\")",
+      "g = a.join(b, lsuffix=\"_a\", rsuffix=\"_b\", how=\"inner\")",
+      "g[\"mean_a\"], g[\"mean_b\"] = g[\"sx_a\"] / g[\"n_a\"], g[\"sx_b\"] / g[\"n_b\"]",
+      "g[\"var_a\"] = ((g[\"sxx_a\"] - g[\"sx_a\"] ** 2 / g[\"n_a\"]) / (g[\"n_a\"] - 1)).clip(lower=0)  # a constant gene's is rounding noise, sometimes below 0",
+      "g[\"var_b\"] = ((g[\"sxx_b\"] - g[\"sx_b\"] ** 2 / g[\"n_b\"]) / (g[\"n_b\"] - 1)).clip(lower=0)",
+      "keep = (g[\"n_a\"] >= " + t.minN + ") & (g[\"n_b\"] >= " + t.minN + ") & (g[\"var_a\"] + g[\"var_b\"] > 1e-9 * (1 + g[\"mean_a\"] ** 2 + g[\"mean_b\"] ** 2))",
+      "g = g[keep].copy()",
+      "g[\"t\"], g[\"p\"] = ttest_ind_from_stats(g[\"mean_a\"], np.sqrt(g[\"var_a\"]), g[\"n_a\"], g[\"mean_b\"], np.sqrt(g[\"var_b\"]), g[\"n_b\"], equal_var=False)",
+      "g[\"effect\"] = g[\"mean_a\"] - g[\"mean_b\"]",
+      "g[\"q\"] = multipletests(g[\"p\"], method=\"fdr_bh\")[1]",
+      "print(len(g), \"genes tested\")",
+      "print(g.sort_values(\"p\")[[\"effect\", \"t\", \"p\", \"q\"]].head(20))",
+    ] : [
+      "cohorts = " + JSON.stringify(t.groups),
+      "moments[\"mean\"] = moments[\"sx\"] / moments[\"n\"]",
+      "moments[\"var\"] = ((moments[\"sxx\"] - moments[\"sx\"] ** 2 / moments[\"n\"]) / (moments[\"n\"] - 1)).clip(lower=0)  # a constant gene's is rounding noise, sometimes below 0",
+      "rows = []",
+      "for gene, m in moments.groupby(\"gene\"):",
+      "    m = m.set_index(\"cohort\").reindex(cohorts)",
+      "    if m[\"n\"].isna().any() or (m[\"n\"] < " + t.minN + ").any() or not m[\"var\"].sum() > 1e-9 * (1 + (m[\"mean\"] ** 2).sum()):",
+      "        continue",
+      "    p = anova_generic(m[\"mean\"].to_numpy(), m[\"var\"].to_numpy(), m[\"n\"].to_numpy(), use_var=\"equal\").pvalue",
+      "    rows.append((gene, p))",
+      "g = pd.DataFrame(rows, columns=[\"gene\", \"p\"]).set_index(\"gene\")",
+      "g[\"q\"] = multipletests(g[\"p\"], method=\"fdr_bh\")[1]",
+      "print(len(g), \"genes tested\")",
+      "print(g.sort_values(\"p\").head(20))",
+    ]),
     "RESULT[\"diffexpr:tested\"] = len(g)",
     "for gene, r in g.iterrows():",
     "    RESULT[f\"diffexpr:{gene}:p\"], RESULT[f\"diffexpr:{gene}:q\"] = r[\"p\"], r[\"q\"]",
@@ -91,8 +111,9 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
   ].join("\n") + "\n";
   return {
     steps,
-    implementation: { functions: ["welchT", "benjaminiHochberg", ...(t.gsea ? ["preRankedGsea"] : [])], file: "lib/stats.ts", commit: BUILD_COMMIT },
-    verification: "Welch's t from moments matches scipy " + VERIFIED.welch.version + " ttest_ind(equal_var=False) and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts)" +
+    implementation: { functions: [two ? "welchT" : "oneWayAnova", "varianceFromMoments", "benjaminiHochberg", ...(t.gsea ? ["preRankedGsea"] : [])], file: "lib/stats.ts", commit: BUILD_COMMIT },
+    verification: (two ? "Welch's t from moments matches scipy " + VERIFIED.welch.version + " ttest_ind(equal_var=False)"
+      : "The one-way ANOVA from moments matches scipy " + VERIFIED.anovaClassic.version + " " + VERIFIED.anovaClassic.fn + " (test/stats.test.ts)") + " and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/moments-golden.test.ts, test/tables-golden.test.ts)" +
       (t.gsea ? "; enrichment scores match gseapy " + VERIFIED.gsea.version + " prerank, and NES and p match the script's port of our seeded null exactly (test/gsea-golden.test.ts)" : "") + ".",
     python: withResult(python),
     check: {

@@ -8,7 +8,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { welchT, welchAnovaTest, varianceFromMoments, mannWhitneyU, kruskalWallis, quantilesFromHistogram,
+import { welchT, welchAnovaTest, oneWayAnova, varianceFromMoments, mannWhitneyU, kruskalWallis, quantilesFromHistogram,
   pearsonFromMoments, fisherZMeta } from "../lib/stats.ts";
 import { VERIFIED } from "../lib/method.ts";
 
@@ -35,6 +35,13 @@ describe("welchAnovaTest matches statsmodels anova_generic(use_var='unequal') â€
   golden.anova.forEach((c: any, i: number) => test("case " + (i + 1) + ": " + c.groups.length + " groups", () => {
     const r = welchAnovaTest(c.groups.map(fromMoments));
     within(r.f, c.f, 5e-5, "F"); assert.equal(r.df1, c.df1); within(r.df2, c.df2, 5e-3, "df2"); closeRel(r.p, c.p, "p");
+  }));
+});
+
+describe("oneWayAnova matches scipy f_oneway â€” scipy " + golden.libraries.scipy, () => {
+  golden.anovaClassic.forEach((c: any, i: number) => test("case " + (i + 1) + ": " + c.groups.length + " groups", () => {
+    const r = oneWayAnova(c.groups.map(fromMoments));
+    within(r.f, c.f, 5e-5, "F"); closeRel(r.p, c.p, "p");
   }));
 });
 
