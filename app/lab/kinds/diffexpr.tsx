@@ -2,8 +2,8 @@
 // The diffexpr view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
 // The card lays the view out as cBioPortal's group-comparison expression tabs do (mRNA, Protein,
 // DNA Methylation): the volcano and the picked gene's values per group side by side, then every
-// listed gene in a table. Which gene is picked, the volcano's drag selection and the table's
-// filters are this browser's (invariant 9).
+// listed gene in a table. The picked gene is the view's (`gene`, which re-runs nothing); the
+// volcano's drag selection and the table's filters are this browser's (invariant 9).
 import { useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Checkbox } from "../../_ui/checkbox";
@@ -102,19 +102,21 @@ function GroupFilter({ groups, shown, onShown, word }: { groups: string[]; shown
   );
 }
 
-function DiffexprBody({ v, docJson }: { v: DrawnResultOf<"diffexpr">; docJson?: () => string }) {
+function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
+  v: DrawnResultOf<"diffexpr">; docJson?: () => string; pickedGene: string | null; setPicked: (gene: string) => void;
+}) {
   const d = v.diffexpr;
   const [A, B] = d.groups;
   const meth = methylation(d), word = meth ? "methylation" : "expression";
-  const [pickedGene, setPicked] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string> | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
   const shown = useMemo(() => new Set(d.groups.filter((g) => !hidden.has(g))), [d, hidden]);
   const picked = pickedGene ? d.points.find((g) => g.gene === pickedGene) || null : null;
+  const boxGene = picked?.gene || pickedGene;
   const higherIn = (g: DeGene) => g.effect > 0 ? A : B;
   const rows = useMemo(() => d.points.filter((g) => shown.has(higherIn(g)) && (!selected || selected.has(g.gene))), [d, shown, selected]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const plot = useSidePlot(docJson, d.groups, picked ? { kind: "plot", unit: "sample", x: { source: "cohort" },
-    y: { source: "profile", profile: d.profileType, gene: picked.gene, ...(d.log2 ? { log: true } : {}) } } : null);
+  const plot = useSidePlot(docJson, d.groups, boxGene ? { kind: "plot", unit: "sample", x: { source: "cohort" },
+    y: { source: "profile", profile: d.profileType, gene: boxGene, ...(d.log2 ? { log: true } : {}) } } : null);
   const color = (g: string) => seriesStyle(Math.max(0, d.groups.indexOf(g))).color;
   const scale = d.log2 ? "log2(v + 1) " : "";
   const what = meth ? "methylation (beta value)" : d.profileKind === "PROTEIN_LEVEL" ? "protein level" : "expression";
@@ -141,9 +143,10 @@ function DiffexprBody({ v, docJson }: { v: DrawnResultOf<"diffexpr">; docJson?: 
           <Volcano v={v} picked={pickedGene} selected={selected} onPick={setPicked} onSelect={setSelected} />
         </div>
         <div className="pb-plot" data-test="diffexpr-box">
-          {!picked && <p className="note">Click on a gene in the table or on the volcano to draw its values per group.</p>}
+          {!boxGene && <div className="pb-placeholder">Click on a gene in the table or on the volcano to draw its values per group.</div>}
           {picked && <p className="meta">{picked.gene} · p-Value: {pDigits(picked.p)} · q-Value: {pDigits(picked.q)}</p>}
-          {!plot && picked && <div className="loading-block"><span className="spinner" /> drawing {picked.gene} per group…</div>}
+          {!picked && boxGene && <p className="meta">{boxGene} · not among the {d.points.length.toLocaleString()} genes listed</p>}
+          {!plot && boxGene && <div className="loading-block"><span className="spinner" /> drawing {boxGene} per group…</div>}
           {plot?.error && <p className="note">{plot.error}</p>}
           {plot?.view && <ViewFigure v={plot.view} min={320} />}
         </div>
@@ -214,7 +217,8 @@ export const diffexprUi: KindUi<"diffexpr"> = {
   },
   sub: (spec, v) => (v.diffexpr?.profileName || spec.profileType || "no profile") + (v.diffexpr ? (v.diffexpr.log2 ? ", log2(v+1)" : "") + " · volcano, box plot and table" + (v.diffexpr.gsea ? ", GSEA" : "") : ""),
   Controls,
-  // a new result (another profile, other cohorts) starts with nothing picked or selected
+  // a new result (another profile, other cohorts) starts with nothing selected; the picked gene stays
   body: (c) => c.v.diffexpr && c.v.diffexpr.tested
-    ? <DiffexprBody key={JSON.stringify([c.v.diffexpr.profileType, c.v.diffexpr.groups, c.v.diffexpr.log2, c.v.diffexpr.tested])} v={c.v} docJson={c.docJson} /> : null,
+    ? <DiffexprBody key={JSON.stringify([c.v.diffexpr.profileType, c.v.diffexpr.groups, c.v.diffexpr.log2, c.v.diffexpr.tested])} v={c.v} docJson={c.docJson}
+        pickedGene={typeof c.spec.gene === "string" ? c.spec.gene : null} setPicked={(gene) => c.patch({ gene })} /> : null,
 };

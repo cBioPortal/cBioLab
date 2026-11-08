@@ -118,6 +118,13 @@ describe("diffexpr", () => {
     assert.ok(!svg.includes("<A>") && svg.includes("&lt;A&gt;"));
     assert.ok(svg.includes("e2f targets") && svg.includes("leading-edge"));
   });
+  test("the view's picked gene is ringed and named on the volcano", () => {
+    const rings = (svg: string) => (svg.match(/fill="none" stroke="[^"]+" stroke-width="[\d.]+"\/>/g) || []).length;
+    const base = { ...v, diffexpr: { ...v.diffexpr!, gsea: undefined, labels: ["UP1"] } };
+    const plain = viewToSvg(base)!, picked = viewToSvg({ ...base, diffexpr: { ...base.diffexpr, gene: "DN1" } })!;
+    assert.ok(!plain.includes(">DN1<") && picked.includes(">DN1<"));
+    assert.equal(rings(picked) - rings(plain), 2, "ringed as a named gene, and again as the picked one");
+  });
   test("enrichment switched off draws the volcano alone", () => {
     const svg = viewToSvg({ ...v, diffexpr: { ...v.diffexpr!, gsea: undefined } })!;
     assert.ok(!svg.includes("gene-set enrichment"));

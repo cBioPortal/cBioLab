@@ -9,6 +9,7 @@ import type { ViewResult, ViewParticipation } from "../lib/types.ts";
 import type { DiffexprResult } from "../lib/views/diffexpr/types.ts";
 import { welchT, varianceFromMoments } from "../lib/stats.ts";
 import { PRIMARY } from "../lib/ch.ts";
+import { analysisText } from "../lib/result-text.ts";
 
 type Moments = { gene: string; n: number; sx: number; sxx: number };
 /** cohort → gene → values, as one site holds them */
@@ -72,6 +73,10 @@ describe("diffexpr: refusals", () => {
     assert.match(await err({}, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }), C: cohort({ s1: 5 }) }, { s1: site({}) })), /draws 3 — name two/);
   });
   test("no profileType", async () => assert.match(await err({ profileType: "  " }), /needs profileType/));
+  test("a picked gene that is not a gene symbol", async () => {
+    assert.match(await err({ gene: "ESR1 PGR" }), /gene is one gene symbol, like "ESR1"; got "ESR1 PGR"/);
+    assert.match(await err({ gene: "" }), /gene is one gene symbol/);
+  });
   test("label outside 0..40", async () => {
     assert.match(await err({ label: 41 }), /label is 0 to 40 genes; got 41/);
     assert.match(await err({ label: "x" }), /label is 0 to 40/);
@@ -134,6 +139,16 @@ describe("diffexpr: the per-gene test", () => {
     // every tested gene is a point or a grid cell, never both, never neither
     const inGrid = d.grid.cells.reduce((a, c) => a + c[2], 0);
     assert.equal(d.points.length + inGrid, d.tested);
+  });
+
+  test("the picked gene is carried to the result and named in its text", async () => {
+    const r = await run({ gene: " UP " }, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }) }, { s1: site({ A, B }) }));
+    assert.equal(de(r).gene, "UP");
+    assert.equal(de(await run({}, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }) }, { s1: site({ A, B }) }))).gene, undefined);
+    const text = (gene: string) => analysisText({ study: "s", cohorts: {}, views: [] } as never,
+      { cohorts: {}, involvedStudies: ["s"], stats: { ms: 1 }, views: [{ ...r, diffexpr: { ...de(r), gene } }] } as never).join("\n");
+    assert.match(text("UP"), /picked: UP \+[\d.]+ \(p=/);
+    assert.match(text("NOPE"), /picked: NOPE \(not among the genes listed\)/);
   });
 
   test("q is Benjamini–Hochberg over the tested genes, and up/down count the q < 0.05 genes by sign", async () => {

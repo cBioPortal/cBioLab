@@ -17,6 +17,12 @@ export interface DiffexprView {
   geneSets?: string[];
   /** genes labelled on the volcano (default 12, max 40) */
   label?: number;
+  /**
+   * The gene picked on the volcano or in the table (what clicking one sets): ringed on the volcano,
+   * and in the web app its values per group drawn beside it. Applied where the figure is drawn, so a
+   * change re-runs nothing.
+   */
+  gene?: string;
 }
 export interface DiffexprGene {
   gene: string; nA: number; nB: number; meanA: number; meanB: number;
@@ -27,6 +33,8 @@ export interface DiffexprGene {
 }
 export interface DiffexprResult {
   profileType: string; log2: boolean;
+  /** the view's picked gene, ringed on the volcano */
+  gene?: string;
   /** the profile as the study names it, and its kind (cBioPortal's genetic_alteration_type: MRNA_EXPRESSION, PROTEIN_LEVEL, METHYLATION, …) */
   profileName?: string; profileKind?: string;
   /** what `effect` is: a difference of means on the compared scale */

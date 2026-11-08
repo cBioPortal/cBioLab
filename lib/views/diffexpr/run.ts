@@ -9,6 +9,7 @@ import { diffexprMethod } from "./method.ts";
 
 const DE_MIN_N = 3, DE_POINT_CAP = 1500, DE_PERMUTATIONS = 1000;
 const SET_NAME = /^[A-Z0-9_]{3,120}$/;
+const GENE = /^[A-Za-z0-9][A-Za-z0-9._@-]{0,39}$/;
 
 /** RNA-seq counts/RSEM/TPM are compared on log2(v + 1); z-scores, protein and methylation as stored. */
 export function defaultLog2(profileType: string): boolean {
@@ -31,6 +32,8 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
     const bad = setNames.filter((x) => !SET_NAME.test(x));
     if (bad.length) return refuse("diffexpr", ctx, "not an MSigDB set name: " + bad.slice(0, 3).join(", "));
   }
+  const gene = view.gene == null ? null : String(view.gene).trim();
+  if (gene != null && !GENE.test(gene)) return refuse("diffexpr", ctx, "gene is one gene symbol, like \"ESR1\"; got " + JSON.stringify(String(view.gene).slice(0, 40)));
   const log2 = view.log2 == null ? defaultLog2(profileType) : view.log2 === true;
   const empty = vNames.filter((n) => !cohorts[n].count);
   if (empty.length) return refuse("diffexpr", ctx, "nothing to compare: cohort " + empty.map((n) => "“" + n + "”").join(" and ") +
@@ -151,7 +154,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
       results: { genes: points.map((g) => ({ gene: g.gene, p: g.p, q: g.q })),
         sets: (gsea?.sets || []).map((x) => ({ name: x.name, es: x.es, nes: x.nes, p: x.p })) },
     }),
-    diffexpr: { profileType, ...(info ? { profileName: info.name, profileKind: info.type } : {}), log2, effectLabel, groups: [A, B], tested: tested.length, skipped, up, down,
+    diffexpr: { profileType, ...(gene ? { gene } : {}), ...(info ? { profileName: info.name, profileKind: info.type } : {}), log2, effectLabel, groups: [A, B], tested: tested.length, skipped, up, down,
       points, grid: { xMax, yMax, nx, ny, cells }, pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
       labels, ...(gsea ? { gsea } : {}), ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),

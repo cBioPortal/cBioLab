@@ -29,7 +29,7 @@ export function diffexprSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): string {
   const vw = side ? Math.round((W - GAP) * 0.5) : W;
 
   const out: string[] = [];
-  const vp = volcanoPanel(d, p, vw, {});
+  const vp = volcanoPanel(d, p, vw, { picked: d.gene });
   out.push(vp.svg);
   let bottom = vp.height;
   if (hasGsea) {
@@ -75,7 +75,8 @@ function volcanoPanel(d: DeResult, p: Pal, vw: number, o: { keyed?: boolean; sel
   const y0 = 2 + lg.height + 4;
   const sel = o.selected && o.selected.size ? o.selected : null;
   const vo = volcano(p, {
-    x0: 0, y0, width: vw, plotH: volcanoPlotH(vw), grid: d.grid, labels: d.labels, r: 2, keyed: o.keyed,
+    x0: 0, y0, width: vw, plotH: volcanoPlotH(vw), grid: d.grid, r: 2,
+    labels: o.picked && !d.labels.includes(o.picked) && d.points.some((g) => g.gene === o.picked) ? [...d.labels, o.picked] : d.labels, keyed: o.keyed,
     xTitle: d.effectLabel + " (" + A + " − " + B + ")", sides: ["higher in " + A, "higher in " + B],
     cellColor: (cls) => cls === 1 ? SERIES[0] : cls === 2 ? SERIES[1] : OTHER,
     pts: d.points.map((g) => ({ key: g.gene, x: g.effect, p: g.p, ring: o.picked === g.gene,

@@ -190,13 +190,22 @@ async function portal({ browser, ok, BASE }) {
       const body = page.locator("[data-test=diffexpr-body]");
       const heads = await body.locator(".pb-table thead th").allInnerTexts();
       const first = await body.locator(".pb-table tbody tr").first().innerText();
+      const placeholder = await body.locator("[data-test=diffexpr-box] .pb-placeholder").innerText();
       await body.locator(".pb-table tbody tr").first().click();
       await body.locator("[data-test=diffexpr-box] svg").waitFor({ timeout: 120000 });
       const box = await body.locator("[data-test=diffexpr-box]").innerText();
       ok("comparison: an expression tab lists its genes in a table, and a gene clicked there draws its values per group",
         ["Gene", "Cytoband", "μ in ER+", "μ in ER-", "σ in ER+", "σ in ER-", "Log2 Ratio", "p-Value", "q-Value", "Higher expression in"].every((h) => heads.some((x) => x.startsWith(h))) &&
-          /^AGR3\t7p21\.1/.test(first) && /AGR3 · p-Value/.test(box) && /ER\+ \(\d+\)/.test(box) && /ER- \(\d+\)/.test(box),
+          /^AGR3\t7p21\.1/.test(first) && /AGR3 · p-Value/.test(box) && /ER\+ \(\d+\)/.test(box) && /ER- \(\d+\)/.test(box) && /Click on a gene/.test(placeholder),
         heads.join(" | ") + " — " + first.replace(/\s+/g, " ") + " — " + box.replace(/\s+/g, " ").slice(0, 160));
+      // the picked gene is the view's: the link carries it, so opening it draws the same box plot
+      const again = await browser.newPage();
+      try {
+        await again.goto(page.url(), { waitUntil: "domcontentloaded" });
+        await again.locator("[data-test=diffexpr-box] svg").waitFor({ timeout: 240000 });
+        const meta = await again.locator("[data-test=diffexpr-box] .meta").innerText();
+        ok("comparison: the gene picked on an expression tab is kept in the link", /^AGR3 · p-Value/.test(meta), meta);
+      } finally { await again.close(); }
       await page.evaluate(() => window.scrollTo(0, 0));
       const vb = await body.locator("[data-test=diffexpr-volcano]").boundingBox();
       await page.mouse.move(vb.x + vb.width * 0.7, vb.y + vb.height * 0.15);
