@@ -144,7 +144,7 @@ function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
           <Volcano v={v} picked={pickedGene} selected={selected} onPick={setPicked} onSelect={setSelected} />
         </div>}
         <div className="pb-plot" data-test="diffexpr-box">
-          {!boxGene && <div className="pb-placeholder">Click on gene in the table to render this plot.</div>}
+          {!boxGene && <div className={two ? "pb-placeholder" : "pb-hint"}>Click on gene in the table to render this plot.</div>}
           {picked && <p className="meta">{picked.gene} · p-Value: {portalP(picked.p)} · q-Value: {portalP(picked.q)}</p>}
           {!picked && boxGene && <p className="meta">{boxGene} · not among the {d.points.length.toLocaleString()} genes listed</p>}
           {!plot && boxGene && <div className="loading-block"><span className="spinner" /> drawing {boxGene} per group…</div>}

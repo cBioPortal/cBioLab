@@ -34,6 +34,7 @@ title there.
   - [ ] A browser check: the kind is still `e2ePending`
 - [x] **Comparison → mRNA, Protein and DNA methylation tabs** — `diffexpr` laid out as the portal's tab: volcano and the clicked gene's box plot per group (a `plot` by cohort), then the gene table with the "High expression/methylation in" filter and "Significant only"; profiles picked as the portal picks them, 2 groups (PR #159)
   - [x] More than 2 groups: 3 to 10 compared by one-way ANOVA (p-values checked against cbioportal.org's), the table a mean and SD per group, no volcano, as the portal's
+    - [x] Where there is no volcano, the box plot's place before a gene is clicked is one line saying to click a gene; the portal leaves an empty 360px box there
   - [ ] Per-probe methylation (generic assay) as in the PanCancer Atlas studies
   - [ ] The table lists the 1,500 most significant genes; the portal lists every gene tested (the rest are on the volcano as density, not as points)
   - [ ] The Data Set picker's ⓘ profile description (the catalog carries no description)

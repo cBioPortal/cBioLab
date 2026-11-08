@@ -1586,6 +1586,8 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 /* where a plot is drawn once something is picked: the space it will take, and what to click */
 .pb-placeholder { display: flex; align-items: center; justify-content: center; min-height: 360px; height: 100%; padding: var(--s4);
   border: 1px dashed var(--line); border-radius: var(--r-md); text-align: center; font-size: var(--t-base); color: var(--ink); }
+/* the same instruction as one line, where no figure sits beside the plot to come */
+.pb-hint { margin-top: var(--s2); font-size: var(--t-base); color: var(--muted); }
 .ds-controls .spacer { flex: 1; }
 .ds-table .ds-dl a { color: var(--accent-ink); }
 .ds-table .ds-study { min-width: 20rem; }

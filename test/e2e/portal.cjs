@@ -233,10 +233,12 @@ async function portal({ browser, ok, BASE }) {
       const pTip = await body3.locator(".pb-table thead th", { hasText: "p-Value" }).first().evaluate((el) => (el.closest("[data-tip]") || el.querySelector("[data-tip]"))?.getAttribute("data-tip") || "");
       const first3 = await body3.locator(".pb-table tbody tr").first().innerText();
       const tabs3 = await page.getByRole("tab").allInnerTexts();
-      ok("comparison: with three groups the expression tabs test by ANOVA, a mean and SD per group and no volcano",
+      const hint3 = await body3.locator("[data-test=diffexpr-box]").evaluate((el) => ({ text: el.innerText, h: el.getBoundingClientRect().height }));
+      ok("comparison: with three groups the expression tabs test by ANOVA, a mean and SD per group, no volcano, and one line saying to click a gene",
         ["mRNA", "Protein"].every((t) => tabs3.includes(t)) && await body3.locator("[data-test=diffexpr-volcano]").count() === 0 &&
           ["μ in LumA", "μ in LumB", "μ in Basal", "σ in LumA", "σ in LumB", "σ in Basal", "p-Value", "q-Value", "Higher expression in"].every((h) => heads3.some((x) => x.startsWith(h))) &&
-          !heads3.some((x) => /Log2 Ratio|Mean Difference/.test(x)) && /ANOVA/.test(pTip) && /\t(LumA|LumB|Basal)$/.test(first3.trim()),
+          !heads3.some((x) => /Log2 Ratio|Mean Difference/.test(x)) && /ANOVA/.test(pTip) && /\t(LumA|LumB|Basal)$/.test(first3.trim()) &&
+          /Click on gene in the table to render this plot\./.test(hint3.text) && hint3.h < 80,
         tabs3.join(" | ") + " — " + heads3.join(" | ") + " — " + pTip + " — " + first3.replace(/\s+/g, " "));
     } catch (e) {
       ok("comparison: expression tabs", false, String(e.message).split("\n")[0].slice(0, 200));
