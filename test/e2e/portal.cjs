@@ -191,13 +191,15 @@ async function portal({ browser, ok, BASE }) {
       const heads = await body.locator(".pb-table thead th").allInnerTexts();
       const first = await body.locator(".pb-table tbody tr").first().innerText();
       const placeholder = await body.locator("[data-test=diffexpr-box] .pb-placeholder").innerText();
+      const settings = await page.locator(".viewcard .viewtb").first().innerText();
       await body.locator(".pb-table tbody tr").first().click();
       await body.locator("[data-test=diffexpr-box] svg").waitFor({ timeout: 120000 });
       const box = await body.locator("[data-test=diffexpr-box]").innerText();
       ok("comparison: an expression tab lists its genes in a table, and a gene clicked there draws its values per group",
         ["Gene", "Cytoband", "μ in ER+", "μ in ER-", "σ in ER+", "σ in ER-", "Log2 Ratio", "p-Value", "q-Value", "Higher expression in"].every((h) => heads.some((x) => x.startsWith(h))) &&
-          /^AGR3\t7p21\.1/.test(first) && /AGR3 · p-Value/.test(box) && /ER\+ \(\d+\)/.test(box) && /ER- \(\d+\)/.test(box) && /Click on a gene/.test(placeholder),
-        heads.join(" | ") + " — " + first.replace(/\s+/g, " ") + " — " + box.replace(/\s+/g, " ").slice(0, 160));
+          /^AGR3\t7p21\.1/.test(first) && /AGR3 · p-Value/.test(box) && /ER\+ \(\d+\)/.test(box) && /ER- \(\d+\)/.test(box) && /Click on gene in the table to render this plot\./.test(placeholder) &&
+          /data set/i.test(settings) && !/log2|enrichment/.test(settings),
+        heads.join(" | ") + " — " + first.replace(/\s+/g, " ") + " — " + box.replace(/\s+/g, " ").slice(0, 160) + " — " + settings.replace(/\s+/g, " "));
       // the picked gene is the view's: the link carries it, so opening it draws the same box plot
       const again = await browser.newPage();
       try {

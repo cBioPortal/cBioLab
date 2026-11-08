@@ -34,6 +34,16 @@ export const fmtShare = (f: number, decimals = 1): string => fmtPct(f * 100, dec
  * A p- or q-value's digits: two decimals at 0.1 and up, two significant figures down to 0.001,
  * then scientific; below the double-precision floor it is "<1e-300", never "0".
  */
+/**
+ * A p- or q-value as cBioPortal's enrichment tables write it (toConditionalPrecision(x, 3, 0.01)):
+ * from 1e-6 up to 0.01 in exponent form with three decimals ("1.235e-4"), otherwise to three
+ * significant digits ("0.0123", "1.23e-12", "0.00" for an underflowed zero).
+ */
+export function portalP(p: number): string {
+  if (!Number.isFinite(p)) return "–";
+  return 0.000001 <= p && p < 0.01 ? p.toExponential(3) : p.toPrecision(3);
+}
+
 export function pDigits(p: number): string {
   if (!Number.isFinite(p)) return "–";
   if (p <= 1e-300) return "<1e-300";

@@ -142,7 +142,8 @@ describe("diffexpr", () => {
   test("enrichment switched off draws the volcano alone", () => {
     const svg = viewToSvg({ ...v, diffexpr: { ...v.diffexpr!, gsea: undefined } })!;
     assert.ok(!svg.includes("gene-set enrichment"));
-  });  test("the page's volcano: each point keyed by its gene, a selection keeping its colour and the rest grey, the picked gene ringed", () => {
+  });
+  test("the page's volcano, as the portal's: blue at q < 0.05, grey otherwise, the selection orange, no names; the picked gene ringed", () => {
     const dv = v as never;
     const plain = diffexprVolcanoSvg(dv, { width: 480 });
     assert.ok(plain.includes('data-key="UP1"') && plain.includes('data-key="DN1"'));
@@ -150,8 +151,11 @@ describe("diffexpr", () => {
     const fills = (svg: string) => [...svg.matchAll(/<circle [^>]*fill="([^"]+)"[^>]*data-key="(\w+)"/g)].map((m) => m[2] + ":" + m[1]);
     const sel = diffexprVolcanoSvg(dv, { width: 480 }, { selected: new Set(["UP1"]), picked: "DN1" });
     const before = Object.fromEntries(fills(plain).map((x) => x.split(":"))), after = Object.fromEntries(fills(sel).map((x) => x.split(":")));
-    assert.equal(after.UP1, before.UP1, "the selected gene keeps its colour");
-    assert.notEqual(after.DN1, before.DN1, "an unselected gene is drawn grey");
+    assert.deepEqual(before, { UP1: "#58ACFA", DN1: "#58ACFA" }, "both are significant: the portal's blue, whichever way");
+    assert.deepEqual(after, { UP1: "#FE9929", DN1: "#58ACFA" }, "the selected gene orange, the rest as they were");
+    assert.ok(!plain.includes(">UP1<"), "no names on the points");
+    assert.ok(plain.includes("Log2 Ratio") && plain.includes("−log₁₀ p-Value") && plain.includes("← B") && plain.includes("&lt;A&gt; →"));
+    assert.ok(plain.includes("Gene: UP1\nLog2 Ratio: 2.00\np-Value: 1.00e-20\nq-Value: 1.00e-18"), "the portal's point tip");
     assert.equal((sel.match(/fill="none" stroke="[^"]+" stroke-width="[\d.]+"\/>/g) || []).length - (plain.match(/fill="none" stroke="[^"]+" stroke-width="[\d.]+"\/>/g) || []).length, 1, "one ring for the picked gene");
     assert.ok(plain.includes("&lt;A&gt;"), "cohort names are escaped");
   });

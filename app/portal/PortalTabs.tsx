@@ -158,7 +158,7 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
         // waiting from the render the edit lands in, not only once the effect has sent it
         const busy = !st || st.loading || st.sent !== sent;
         // vi and docJson name the view in the request it came from, which a table pages through
-        const mc = { vi: 0, spec, v: v || {}, busy, updating: busy, attrs: [], profiles: [], assays: [], catalog: catalog.profileCatalog || [], events: [], locked: tab?.chooser?.locks || [], fixedPatient,
+        const mc = { vi: 0, spec, v: v || {}, busy, updating: busy, attrs: [], profiles: [], assays: [], catalog: catalog.profileCatalog || [], events: [], locked: [...(tab?.chooser?.locks || []), ...(tab?.locks || [])], fixedPatient,
           patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
         const body = v && !v.error && v.kind === "hotspots" && v.hotspots
           ? <HotspotsBody v={v} hide={spec.hide as string[] | undefined} onHide={(h) => edit(vi, { ...spec, hide: h } as unknown as View)}

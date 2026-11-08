@@ -13,9 +13,9 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
   const names = Object.keys(linked.cohorts || {});
   const catalog = known?.profileCatalog || [];
   // the portal's expression tabs, each a diffexpr view on one profile: a t-test for two groups, an
-  // ANOVA for more; protein and methylation open as the portal shows them, without gene-set enrichment
+  // ANOVA for more; without gene-set enrichment, which the portal's tabs do not have
   const expression = !known ? [] : [
-    { title: "mRNA", profile: mrnaComparisonProfile(catalog), none: "no mRNA profile", extra: names.length === 2 ? {} : { geneSets: [] } },
+    { title: "mRNA", profile: mrnaComparisonProfile(catalog), none: "no mRNA profile", extra: { geneSets: [] } },
     { title: "Protein", profile: proteinProfile(catalog), none: "no protein profile", extra: { geneSets: [] } },
     { title: "DNA methylation", profile: methylationProfile(catalog), extra: { geneSets: [] },
       none: probeMethylation(catalog) ? "this study's methylation is per probe, a generic assay, which this page does not compare" : "no methylation profile" },
@@ -35,7 +35,9 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
     ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", attributes: clinical.slice(0, CLINICAL_SHOWN) })] }] : []),
     { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", measure }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna", measure }),
       v("Structural variants", { kind: "enrichment", alteration: "sv", measure })] },
-    ...(groupsOk ? expression.filter((e) => e.profile).map((e) => ({ title: e.title, views: [v(e.title, { kind: "diffexpr", profileType: e.profile, ...e.extra })] })) : []),
+    ...(groupsOk ? expression.filter((e) => e.profile).map((e) => ({ title: e.title, views: [v(e.title, { kind: "diffexpr", profileType: e.profile, ...e.extra })],
+      // the portal's tab offers the data set alone
+      locks: ["log2", "geneSets"] })) : []),
     ...assays.map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile })] })),
     { title: "Clinical Data", views: [v("Clinical data", { kind: "table" })] }
   ], left, { partial: !known });

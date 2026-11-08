@@ -33,6 +33,8 @@ export interface PageTab {
   title: string; views?: number[]; sub?: { title: string; views: number[] }[]; chooser?: TabChooser; link?: TabLink;
   /** a tab whose view is not built yet: what it will show, which the page says in its place */
   pending?: string;
+  /** view settings the portal's own tab does not offer, which the views' settings bars therefore leave out */
+  locks?: string[];
 }
 export interface PageLayout {
   doc: AnalysisDoc;
@@ -87,7 +89,7 @@ export function syncUrl(params: Record<string, string | null>) {
 }
 
 /** A page as written: its tabs, each with titled views (or sub-tabs of them). */
-export type TabSpec = { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[]; chooser?: TabChooser; link?: TabLink; pending?: string };
+export type TabSpec = { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[]; chooser?: TabChooser; link?: TabLink; pending?: string; locks?: string[] };
 
 /** The page's one document and the tabs' index maps, from the tabs as written. */
 export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left: string[], opts: { partial?: boolean } = {}): PageLayout {
@@ -101,7 +103,7 @@ export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left:
   });
   const tabs: PageTab[] = spec.map((t) => t.sub
     ? { title: t.title, sub: t.sub.map((s) => ({ title: s.title, views: place(t.title + " › " + s.title, s.views) })) }
-    : { title: t.title, views: place(t.title, t.views || []), ...(t.chooser ? { chooser: t.chooser } : {}), ...(t.link ? { link: t.link } : {}), ...(t.pending ? { pending: t.pending } : {}) });
+    : { title: t.title, views: place(t.title, t.views || []), ...(t.chooser ? { chooser: t.chooser } : {}), ...(t.link ? { link: t.link } : {}), ...(t.pending ? { pending: t.pending } : {}), ...(t.locks ? { locks: t.locks } : {}) });
   return { doc: { ...base, views }, tabs, titles, names, left, ...(opts.partial ? { partial: true } : {}) };
 }
 

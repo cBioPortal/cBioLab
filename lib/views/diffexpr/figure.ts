@@ -5,7 +5,7 @@
 import type { ViewResultOf, DrawnResultOf } from "../../types.ts";
 import {
   palette, frame, caption, label, textWidth, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight,
-  legend, seriesStyle, pDigits, esc, fmtInt, fmtNum, fmtP, fmtQ, FS, SW, SERIES, OTHER, type SvgOpts
+  legend, seriesStyle, pDigits, portalP, esc, PORTAL_ENRICHMENT, fmtInt, fmtNum, fmtP, fmtQ, FS, SW, SERIES, OTHER, type SvgOpts
 } from "../../svg-kit.ts";
 import { volcano, volcanoPlotH } from "../../figures/volcano.ts";
 
@@ -51,16 +51,30 @@ export function diffexprSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): string {
 }
 
 /**
- * The volcano alone, as the page draws it beside the gene's box plot: each point carries its gene
- * (data-key) so the page can pick one or drag over several. `selected` genes keep their colour and
- * the rest are drawn grey while a selection stands; `picked` is ringed.
+ * The volcano alone, as the page draws it beside the gene's box plot, as cBioPortal's tab draws
+ * it: blue at q < 0.05, grey otherwise, the dragged selection orange, no names; "Log2 Ratio"
+ * against −log₁₀ p-Value. Each point carries its gene (data-key) so the page can pick one or drag
+ * over several; `picked` is ringed. The genes past the listed ones are a density grid behind.
  */
 export function diffexprVolcanoSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts, pick: { selected?: Set<string> | null; picked?: string | null } = {}): string {
   const p = palette(o.theme), d = v.diffexpr;
   const want = o.width || 480, W = Math.max(MIN_PANEL, want);
-  const vp = volcanoPanel(d, p, W, { keyed: true, ...pick });
-  return frame(W, vp.height + 8, vp.svg, p.bg, W > want, "Volcano — " + d.profileType + " — " + d.groups[0] + " vs " + d.groups[1]);
+  const [A, B] = d.groups;
+  const sel = pick.selected && pick.selected.size ? pick.selected : null;
+  const C = PORTAL_ENRICHMENT;
+  const vo = volcano(p, {
+    x0: 0, y0: 2, width: W, plotH: volcanoPlotH(W), grid: d.grid!, r: 3, pointOpacity: 0.4, labels: [], keyed: true,
+    xTitle: "Log2 Ratio", pName: "p-Value", sides: [A, B],
+    cellColor: (cls) => cls ? C.significant : C.other,
+    pts: d.points.map((g) => ({ key: g.gene, x: g.effect!, p: g.p, ring: pick.picked === g.gene,
+      color: sel?.has(g.gene) ? C.selected : g.q < 0.05 ? C.significant : C.other,
+      tip: "Gene: " + g.gene + "\nLog2 Ratio: " + ratioText(g.effect!) + "\np-Value: " + portalP(g.p) + "\nq-Value: " + portalP(g.q) })),
+  });
+  return frame(W, 2 + vo.height + 8, vo.svg, p.bg, W > want, "Volcano — " + d.profileType + " — " + A + " vs " + B);
 }
+
+/** cBioPortal's two-decimal log ratio, past ±10 written as a bound */
+const ratioText = (x: number) => x < -10 ? "<-10" : x > 10 ? ">10" : x.toFixed(2);
 
 /** The gene-set panel alone, or null when the view ran no enrichment. */
 export function diffexprGseaSvg(v: DrawnResultOf<"diffexpr">, o: SvgOpts): string | null {

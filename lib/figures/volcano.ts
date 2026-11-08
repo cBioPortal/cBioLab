@@ -37,6 +37,8 @@ export function volcano(p: Pal, o: {
   pName?: string;
   /** each point carries its key as data-key, for a page that picks points on the drawing */
   keyed?: boolean;
+  /** the points' fill opacity (default 0.8) */
+  pointOpacity?: number;
 }): { svg: string; height: number; unplaced: string[] } {
   const g = o.grid, r = o.r ?? 2.6;
   const T = o.y0 + FS.small;
@@ -66,7 +68,7 @@ export function volcano(p: Pal, o: {
   }
   out.push(dens);
   const at = o.pts.map((d) => ({ d, x: X(d.x), y: Y(lp(d.p)) }));
-  out.push(at.map(({ d, x, y }) => `<circle cx="${r1(x)}" cy="${r1(y)}" r="${r}" fill="${d.color}" opacity="0.8"` +
+  out.push(at.map(({ d, x, y }) => `<circle cx="${r1(x)}" cy="${r1(y)}" r="${r}" fill="${d.color}" opacity="${o.pointOpacity ?? 0.8}"` +
     (o.keyed ? ` data-key="${esc(d.key)}"` : "") + `>` + (d.tip ? `<title>${esc(d.tip)}</title>` : "") + `</circle>`).join(""));
   out.push(at.filter((a) => a.d.ring).map(({ x, y }) =>
     `<circle cx="${r1(x)}" cy="${r1(y)}" r="${r + 2.5}" fill="none" stroke="${p.ink}" stroke-width="${SW.series}"/>`).join(""));

@@ -54,16 +54,18 @@ test("protein and methylation profiles are picked as the portal picks them: not 
   assert.equal(probeMethylation(BRCA_TCGA), false);
 });
 
-test("two groups: mRNA, Protein and DNA methylation tabs, each a diffexpr view; protein and methylation without enrichment", () => {
+test("two groups: mRNA, Protein and DNA methylation tabs, each a diffexpr view without enrichment, as the portal's", () => {
   const l = layout(2, BRCA_TCGA);
   assert.deepEqual(l.tabs.map((t) => t.title).filter((t) => /mRNA|Protein|methylation/.test(t)), ["mRNA", "Protein", "DNA methylation"]);
-  assert.deepEqual(tabOf(l, "mRNA"), { kind: "diffexpr", profileType: "rna_seq_v2_mrna" });
+  assert.deepEqual(tabOf(l, "mRNA"), { kind: "diffexpr", profileType: "rna_seq_v2_mrna", geneSets: [] });
   assert.deepEqual(tabOf(l, "Protein"), { kind: "diffexpr", profileType: "protein_quantification", geneSets: [] });
   assert.deepEqual(tabOf(l, "DNA methylation"), { kind: "diffexpr", profileType: "methylation_hm450", geneSets: [] });
   assert.ok(!l.left.some((x) => /mRNA|Protein|methylation/.test(x)), l.left.join("; "));
+  // the portal's tab offers the data set alone
+  for (const t of ["mRNA", "Protein", "DNA methylation"]) assert.deepEqual(l.tabs.find((x) => x.title === t)!.locks, ["log2", "geneSets"], t);
 });
 
-test("three groups: the same tabs, tested by ANOVA, and the mRNA tab without enrichment, which needs two", () => {
+test("three groups: the same tabs, tested by ANOVA", () => {
   const l = layout(3, BRCA_TCGA);
   assert.deepEqual(tabOf(l, "mRNA"), { kind: "diffexpr", profileType: "rna_seq_v2_mrna", geneSets: [] });
   assert.deepEqual(tabOf(l, "Protein"), { kind: "diffexpr", profileType: "protein_quantification", geneSets: [] });

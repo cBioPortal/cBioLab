@@ -17,7 +17,7 @@ import { useSidePlot } from "../side-plot.ts";
 import type { DrawnResultOf, ViewResultOf } from "../../../lib/types";
 import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 import { diffexprVolcanoSvg, diffexprGseaSvg } from "../../../lib/views/diffexpr/figure.ts";
-import { pDigits } from "../../../lib/chart/format.ts";
+import { portalP } from "../../../lib/chart/format.ts";
 import { seriesStyle } from "../../../lib/chart/style";
 import { TB } from "../../_ui/toolbar.ts";
 import { cn } from "../../../lib/cn";
@@ -25,11 +25,9 @@ import { cn } from "../../../lib/cn";
 type DeGene = NonNullable<ViewResultOf<"diffexpr">["diffexpr"]>["points"][number];
 type De = NonNullable<ViewResultOf<"diffexpr">["diffexpr"]>;
 
-/** the portal's two-decimal ratio, past ±10 written as a bound */
+/** the portal's two-decimal log ratio, past ±10 written as a bound */
 const ratio = (x: number) => x < -10 ? "<-10" : x > 10 ? ">10" : x.toFixed(2);
 const methylation = (d: De) => d.profileKind === "METHYLATION" || /methylation/i.test(d.profileType);
-/** values on a log2 scale, whose difference of means is a log2 ratio: logged here, or stored so (protein levels, LOG2-VALUE profiles) */
-const logScale = (d: De) => d.log2 || d.profileKind === "PROTEIN_LEVEL" || /log2/i.test(d.profileType);
 
 /**
  * The volcano, its points picked by click and selected by dragging a box over them, as the
@@ -120,24 +118,23 @@ function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
   const plot = useSidePlot(docJson, d.groups, boxGene ? { kind: "plot", unit: "sample", x: { source: "cohort" },
     y: { source: "profile", profile: d.profileType, gene: boxGene, ...(d.log2 ? { log: true } : {}) } } : null);
   const color = (g: string) => seriesStyle(Math.max(0, d.groups.indexOf(g))).color;
-  const scale = d.log2 ? "log2(v + 1) " : "";
-  const what = meth ? "methylation (beta value)" : d.profileKind === "PROTEIN_LEVEL" ? "protein level" : "expression";
-  const lr = logScale(d);
+  // the portal's column tips, word for word
+  const scale = meth ? "" : "log2 ";
   const cols: Col<DeGene>[] = [
     { key: "gene", label: "Gene", value: (g) => g.gene, render: (g) => <strong>{g.gene}</strong>, title: "Gene" },
     { key: "cytoband", label: "Cytoband", value: (g) => g.cytoband || null, title: "Cytoband" },
-    ...d.groups.map((name, i): Col<DeGene> => ({ key: "m" + i, label: "μ in " + name, num: true, title: "Mean " + scale + what + " of the listed gene in " + name,
+    ...d.groups.map((name, i): Col<DeGene> => ({ key: "m" + i, label: "μ in " + name, num: true, title: "Mean " + scale + word + " of the listed gene in " + name,
       value: (g) => g.mean[i], render: (g) => g.mean[i].toFixed(2) })),
-    ...d.groups.map((name, i): Col<DeGene> => ({ key: "s" + i, label: "σ in " + name, num: true, title: "Standard deviation of " + scale + what + " of the listed gene in " + name,
+    ...d.groups.map((name, i): Col<DeGene> => ({ key: "s" + i, label: "σ in " + name, num: true, title: "Standard deviation of " + scale + word + " of the listed gene in " + name,
       value: (g) => g.sd[i], render: (g) => g.sd[i].toFixed(2) })),
-    ...(two ? [{ key: "lr", label: lr ? "Log2 Ratio" : "Mean Difference", num: true, value: (g: DeGene) => g.effect ?? null, render: (g: DeGene) => ratio(g.effect ?? 0),
-      title: "Mean in " + A + " minus mean in " + B + (lr ? ", on log2 values: the log2 of the ratio of their (unlogged) means" : " (cBioPortal labels this Log2 Ratio; on " + d.profileType + "'s values it is a plain difference)") }] : []),
-    { key: "p", label: "p-Value", num: true, value: (g) => g.p, render: (g) => pDigits(g.p),
+    ...(two ? [{ key: "lr", label: "Log2 Ratio", num: true, value: (g: DeGene) => g.effect ?? null, render: (g: DeGene) => ratio(g.effect ?? 0),
+      title: "Log2 of ratio of " + (meth ? "" : "(unlogged) ") + "mean in " + A + " to " + (meth ? "" : "(unlogged) ") + "mean in " + B }] : []),
+    { key: "p", label: "p-Value", num: true, value: (g) => g.p, render: (g) => portalP(g.p),
       title: two ? "Derived from Welch's two-sided t-test" : "Derived from one-way ANOVA" },
-    { key: "q", label: "q-Value", num: true, value: (g) => g.q, render: (g) => <span style={{ fontWeight: g.q < 0.05 ? 700 : 400 }}>{pDigits(g.q)}</span>, title: "Derived from Benjamini-Hochberg procedure" },
+    { key: "q", label: "q-Value", num: true, value: (g) => g.q, render: (g) => <span style={{ fontWeight: g.q < 0.05 ? 700 : 400 }}>{portalP(g.q)}</span>, title: "Derived from Benjamini-Hochberg procedure" },
     { key: "in", label: "Higher " + word + " in", value: (g) => higherIn(g), render: (g) => <Badge text={higherIn(g)} color={g.q < 0.05 ? color(higherIn(g)) : null} />,
-      title: two ? (lr ? "Log ratio" : "Difference") + " > 0: enriched in " + A + "; ≤ 0: enriched in " + B + "; q-Value < 0.05: significant association"
-        : "The group with the highest mean " + word + "; coloured when q-Value < 0.05" },
+      title: two ? "Log ratio > 0: Enriched in " + A + "\nLog ratio <= 0: Enriched in " + B + "\nq-Value < 0.05: Significant association"
+        : "The group with the highest " + word + " frequency" },
   ];
   const gsea = d.gsea && d.gsea.sets.length ? (width: number) => diffexprGseaSvg(v, { width }) : null;
   return (
@@ -147,8 +144,8 @@ function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
           <Volcano v={v} picked={pickedGene} selected={selected} onPick={setPicked} onSelect={setSelected} />
         </div>}
         <div className="pb-plot" data-test="diffexpr-box">
-          {!boxGene && <div className="pb-placeholder">Click on a gene in the table{two ? " or on the volcano" : ""} to draw its values per group.</div>}
-          {picked && <p className="meta">{picked.gene} · p-Value: {pDigits(picked.p)} · q-Value: {pDigits(picked.q)}</p>}
+          {!boxGene && <div className="pb-placeholder">Click on gene in the table to render this plot.</div>}
+          {picked && <p className="meta">{picked.gene} · p-Value: {portalP(picked.p)} · q-Value: {portalP(picked.q)}</p>}
           {!picked && boxGene && <p className="meta">{boxGene} · not among the {d.points.length.toLocaleString()} genes listed</p>}
           {!plot && boxGene && <div className="loading-block"><span className="spinner" /> drawing {boxGene} per group…</div>}
           {plot?.error && <p className="note">{plot.error}</p>}
@@ -185,6 +182,7 @@ function dataSets(c: KindCardCtx, current: string): { profile: string; label: st
 function Controls({ c }: { c: KindCardCtx }) {
   const { spec, busy, patch } = c;
   const options = dataSets(c, spec.profileType || "");
+  const locked = c.locked || [];
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data set</span>
@@ -193,11 +191,11 @@ function Controls({ c }: { c: KindCardCtx }) {
             {options.map((o) => <option key={o.profile} value={o.profile}>{o.label}</option>)}
           </OptionSelect>
         </label>
-        <label className="chk" data-tip="compare log2(v + 1) instead of the stored value; on by default for a non-z-score RNA-seq profile">
+        {!locked.includes("log2") && <label className="chk" data-tip="compare log2(v + 1) instead of the stored value; on by default for a non-z-score RNA-seq profile">
           <Checkbox checked={c.v.diffexpr ? !!c.v.diffexpr.log2 : spec.log2 === true} disabled={busy}
             onCheckedChange={(on) => patch({ log2: (on === true) })} /> log2
-        </label>
-        {(!c.v.diffexpr || c.v.diffexpr.groups.length === 2) && <label className="chk" data-tip="preranked GSEA against the 50 MSigDB Hallmark sets; untick to draw the volcano alone">
+        </label>}
+        {!locked.includes("geneSets") && (!c.v.diffexpr || c.v.diffexpr.groups.length === 2) && <label className="chk" data-tip="preranked GSEA against the 50 MSigDB Hallmark sets; untick to draw the volcano alone">
           <Checkbox checked={!(Array.isArray(spec.geneSets) && spec.geneSets.length === 0)} disabled={busy}
             onCheckedChange={(on) => patch({ geneSets: (on === true) ? undefined : [] })} /> enrichment
         </label>}
