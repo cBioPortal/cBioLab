@@ -221,14 +221,21 @@ async function portal({ browser, ok, BASE }) {
         ["mRNA", "Protein", "DNA methylation"].every((t) => titles.includes(t)) &&
           /protein_quantification/.test(protein) && /10,509 genes/.test(protein) && /16,133 genes/.test(methylation),
         titles.join(" | ") + " — " + (protein.match(/[\d,]+ genes[^\n]*/) || [""])[0] + " / " + (methylation.match(/[\d,]+ genes[^\n]*/) || [""])[0]);
-      await page.goto(link({ "ER+": er("Positive"), "ER-": er("Negative"), "ER indeterminate": er("Indeterminate") }), { waitUntil: "domcontentloaded" });
-      await page.locator(".leftout").waitFor({ timeout: 240000 });
-      const three = await page.getByRole("tab").allInnerTexts();
-      await page.locator(".leftout").click();
-      const said = await page.getByRole("dialog").innerText();
-      ok("comparison: with three groups the expression tabs are left out, saying why",
-        !three.some((t) => /mRNA|Protein|methylation/.test(t)) && ["mRNA", "Protein", "DNA methylation"].every((t) => said.includes(t + " (compares exactly two groups, and 3 are compared")),
-        three.join(" | ") + " — " + said.replace(/\s+/g, " ").slice(0, 300));
+      // three groups: no volcano, a mean and SD per group, p from Welch's ANOVA, the group with the highest mean
+      const sub = (v) => ({ all: [{ kind: "clinical", attribute: "SUBTYPE", values: [v] }] });
+      await page.goto(BASE + "/portal/comparison?doc=" + Buffer.from(JSON.stringify({ study: "brca_tcga_pan_can_atlas_2018", views: [],
+        cohorts: { LumA: sub("BRCA_LumA"), LumB: sub("BRCA_LumB"), Basal: sub("BRCA_Basal") } })).toString("base64url") + "&tab=Protein", { waitUntil: "domcontentloaded" });
+      const body3 = page.locator("[data-test=diffexpr-body]");
+      await body3.locator(".pb-table tbody tr").first().waitFor({ timeout: 240000 });
+      const heads3 = await body3.locator(".pb-table thead th").allInnerTexts();
+      const pTip = await body3.locator(".pb-table thead th", { hasText: "p-Value" }).first().evaluate((el) => (el.closest("[data-tip]") || el.querySelector("[data-tip]"))?.getAttribute("data-tip") || "");
+      const first3 = await body3.locator(".pb-table tbody tr").first().innerText();
+      const tabs3 = await page.getByRole("tab").allInnerTexts();
+      ok("comparison: with three groups the expression tabs test by ANOVA, a mean and SD per group and no volcano",
+        ["mRNA", "Protein"].every((t) => tabs3.includes(t)) && await body3.locator("[data-test=diffexpr-volcano]").count() === 0 &&
+          ["μ in LumA", "μ in LumB", "μ in Basal", "σ in LumA", "σ in LumB", "σ in Basal", "p-Value", "q-Value", "Higher expression in"].every((h) => heads3.some((x) => x.startsWith(h))) &&
+          !heads3.some((x) => /Log2 Ratio|Mean Difference/.test(x)) && /ANOVA/.test(pTip) && /\t(LumA|LumB|Basal)$/.test(first3.trim()),
+        tabs3.join(" | ") + " — " + heads3.join(" | ") + " — " + pTip + " — " + first3.replace(/\s+/g, " "));
     } catch (e) {
       ok("comparison: expression tabs", false, String(e.message).split("\n")[0].slice(0, 200));
     }

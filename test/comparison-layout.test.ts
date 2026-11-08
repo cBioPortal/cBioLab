@@ -1,6 +1,6 @@
 // The Comparison page's tabs (app/portal/comparison-layout.ts): its expression tabs (mRNA, Protein,
-// DNA methylation) pick their profile as cBioPortal's group comparison does, and a tab the page
-// cannot show says why rather than going missing.
+// DNA methylation) pick their profile as cBioPortal's group comparison does, for 2 to 10 groups, and
+// a tab the page cannot show says why rather than going missing.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { comparisonLayout } from "../app/portal/comparison-layout.ts";
@@ -63,11 +63,19 @@ test("two groups: mRNA, Protein and DNA methylation tabs, each a diffexpr view; 
   assert.ok(!l.left.some((x) => /mRNA|Protein|methylation/.test(x)), l.left.join("; "));
 });
 
-test("more than two groups: no expression tab, and the page says why", () => {
+test("three groups: the same tabs, tested by ANOVA, and the mRNA tab without enrichment, which needs two", () => {
   const l = layout(3, BRCA_TCGA);
+  assert.deepEqual(tabOf(l, "mRNA"), { kind: "diffexpr", profileType: "rna_seq_v2_mrna", geneSets: [] });
+  assert.deepEqual(tabOf(l, "Protein"), { kind: "diffexpr", profileType: "protein_quantification", geneSets: [] });
+  assert.deepEqual(tabOf(l, "DNA methylation"), { kind: "diffexpr", profileType: "methylation_hm450", geneSets: [] });
+  assert.ok(!l.left.some((x) => /mRNA|Protein|methylation/.test(x)), l.left.join("; "));
+});
+
+test("more than ten groups: no expression tab, and the page says why", () => {
+  const l = layout(11, BRCA_TCGA);
   assert.ok(!l.tabs.some((t) => /mRNA|Protein|methylation/.test(t.title)));
   for (const t of ["mRNA", "Protein", "DNA methylation"])
-    assert.ok(l.left.some((x) => x.startsWith(t + " (compares exactly two groups, and 3 are compared; cBioPortal tests more than two with ANOVA")), t + ": " + l.left.join("; "));
+    assert.ok(l.left.includes(t + " (compares 2 to 10 groups, and 11 are compared)"), t + ": " + l.left.join("; "));
 });
 
 test("a study without a profile says so, and per-probe methylation is named as the reason", () => {

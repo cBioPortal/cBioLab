@@ -105,9 +105,9 @@ describe("diffexpr", () => {
     assert.equal(defaultLog2("rppa"), false);
     assert.equal(defaultLog2("methylation_hm450"), false);
   });
-  const g = (gene: string, effect: number, p: number, q: number) => ({ gene, nA: 10, nB: 10, meanA: effect, meanB: 0, sdA: 1, sdB: 1, effect, t: effect * 10, p, q });
+  const g = (gene: string, effect: number, p: number, q: number) => ({ gene, n: [10, 10], mean: [effect, 0], sd: [1, 1], effect, t: effect * 10, p, q });
   const v: ViewResult = { kind: "diffexpr", cohorts: ["<A>", "B"], caveat: "moments only",
-    diffexpr: { profileType: "z", log2: false, effectLabel: "difference in mean z-score", groups: ["<A>", "B"], tested: 3, skipped: 0, up: 1, down: 1,
+    diffexpr: { profileType: "z", log2: false, effectLabel: "difference in mean z-score", groups: ["<A>", "B"], test: "Welch's t-test", tested: 3, skipped: 0, significant: 2, up: 1, down: 1,
       points: [g("UP1", 2, 1e-20, 1e-18), g("DN1", -2, 1e-10, 1e-9)], grid: { xMax: 5, yMax: 25, nx: 90, ny: 60, cells: [[45, 1, 1, 0]] },
       pooledSignificant: 0, labels: ["UP1", "DN1"],
       gsea: { ranking: "t", permutations: 1000, skipped: [], sets: [{ name: "HALLMARK_E2F_TARGETS", size: 20, setSize: 20, es: 0.7, nes: 2.5, p: 0.001, q: 0.01,
@@ -124,6 +124,20 @@ describe("diffexpr", () => {
     const plain = viewToSvg(base)!, picked = viewToSvg({ ...base, diffexpr: { ...base.diffexpr, gene: "DN1" } })!;
     assert.ok(!plain.includes(">DN1<") && picked.includes(">DN1<"));
     assert.equal(rings(picked) - rings(plain), 2, "ringed as a named gene, and again as the picked one");
+  });
+  test("three cohorts: each cohort's mean of the top genes, a row per gene, no volcano; the picked gene ringed", () => {
+    const g3 = (gene: string, mean: number[], q: number) => ({ gene, n: [10, 10, 10], mean, sd: [1, 1, 1], f: 30, p: q / 10, q });
+    const v3 = { kind: "diffexpr", cohorts: ["<A>", "B", "C"], caveat: "Welch's ANOVA",
+      diffexpr: { profileType: "z", log2: false, effectLabel: "", groups: ["<A>", "B", "C"], test: "Welch's ANOVA", tested: 30, skipped: 0, significant: 2,
+        points: [g3("G1", [2, 0, -1], 1e-9), g3("G2", [0, 1, 0.5], 0.2)], pooledSignificant: 0, labels: ["G1", "G2"], gene: "G2" } } as unknown as ViewResult;
+    const svg = viewToSvg(v3)!;
+    assert.ok(svg.includes(">G1<") && svg.includes(">G2<"));
+    assert.ok(!svg.includes("−log₁₀ p"), "no volcano");
+    assert.equal((svg.match(/<circle [^>]*r="4"[^>]*><title>/g) || []).length, 6, "a dot per cohort per gene");
+    assert.ok(svg.includes("G1 in &lt;A&gt;: mean 2"), "each dot's tip, escaped");
+    assert.ok(svg.includes("the 2 most significant of 30 genes tested"));
+    assert.ok(/<rect x="4" y="[\d.]+" width="[\d.]+" height="16" rx="3" fill="none"/.test(svg), "the picked gene's row ringed");
+    assert.ok(svg.includes("Welch's ANOVA"));
   });
   test("enrichment switched off draws the volcano alone", () => {
     const svg = viewToSvg({ ...v, diffexpr: { ...v.diffexpr!, gsea: undefined } })!;

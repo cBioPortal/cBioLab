@@ -1,13 +1,14 @@
 // The diffexpr view's runner (lib/views/diffexpr/run.ts), driven with hand-made participants: two
 // cohorts compared gene by gene with Welch's t from per-cohort moments (n, Σv, Σv²), which add
-// across sites, BH q across genes, and preranked GSEA of the t ranking (lib/views/diffexpr/types.ts).
+// across sites, BH q across genes, and preranked GSEA of the t ranking; three or more by Welch's
+// ANOVA from the same moments (lib/views/diffexpr/types.ts).
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { defaultLog2, runDiffexpr } from "../lib/views/diffexpr/run.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewResult, ViewParticipation } from "../lib/types.ts";
 import type { DiffexprResult } from "../lib/views/diffexpr/types.ts";
-import { welchT, varianceFromMoments } from "../lib/stats.ts";
+import { welchT, welchAnovaTest, varianceFromMoments } from "../lib/stats.ts";
 import { PRIMARY } from "../lib/ch.ts";
 import { analysisText } from "../lib/result-text.ts";
 
@@ -68,9 +69,14 @@ describe("diffexpr: refusals", () => {
     assert.equal(r.kind, "diffexpr");
     return r.error;
   };
-  test("not exactly two cohorts", async () => {
-    assert.match(await err({}, ctx({ A: cohort({ s1: 5 }) }, { s1: site({}) })), /exactly two cohorts; this one draws 1 — add a second cohort/);
-    assert.match(await err({}, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }), C: cohort({ s1: 5 }) }, { s1: site({}) })), /draws 3 — name two/);
+  test("fewer than two cohorts, or more than ten", async () => {
+    assert.match(await err({}, ctx({ A: cohort({ s1: 5 }) }, { s1: site({}) })), /compares 2 to 10 cohorts; this one draws 1 — add a second cohort/);
+    const eleven = Object.fromEntries(Array.from({ length: 11 }, (_, i) => ["C" + i, cohort({ s1: 5 })]));
+    assert.match(await err({}, ctx(eleven, { s1: site({}) })), /draws 11 — name at most 10/);
+  });
+  test("gene-set enrichment asked of more than two cohorts", async () => {
+    const three = ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }), C: cohort({ s1: 5 }) }, { s1: site({}) });
+    assert.match(await err({ geneSets: ["HALLMARK_E2F_TARGETS"] }, three), /ranks genes by Welch's t between two cohorts, and this view compares 3 — set geneSets to \[\]/);
   });
   test("no profileType", async () => assert.match(await err({ profileType: "  " }), /needs profileType/));
   test("a picked gene that is not a gene symbol", async () => {
@@ -117,18 +123,21 @@ describe("diffexpr: the per-gene test", () => {
     assert.equal(d.skipped, 2);
     const up = d.points.find((g) => g.gene === "UP")!;
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-    assert.ok(Math.abs(up.effect - (mean(A.UP) - mean(B.UP))) < 1e-12);
-    assert.equal(up.nA, 5); assert.equal(up.nB, 5);
+    assert.ok(Math.abs(up.effect! - (mean(A.UP) - mean(B.UP))) < 1e-12);
+    assert.deepEqual(up.n, [5, 5]);
+    assert.ok(Math.abs(up.mean[0] - mean(A.UP)) < 1e-12 && Math.abs(up.mean[1] - mean(B.UP)) < 1e-12);
     const ma = moments("UP", A.UP), mb = moments("UP", B.UP);
     const w = welchT(5, mean(A.UP), varianceFromMoments(5, ma.sx, ma.sxx), 5, mean(B.UP), varianceFromMoments(5, mb.sx, mb.sxx));
     assert.equal(up.p, w.p);
-    assert.ok(up.t > 0);
+    assert.ok(up.t! > 0);
+    assert.equal(up.f, undefined);
+    assert.equal(d.test, "Welch's t-test");
     // each cohort's sample standard deviation, and the gene's cytoband where the warehouse has one
     const sd = (xs: number[]) => Math.sqrt(xs.reduce((a, x) => a + (x - mean(xs)) ** 2, 0) / (xs.length - 1));
-    assert.ok(Math.abs(up.sdA - sd(A.UP)) < 1e-12 && Math.abs(up.sdB - sd(B.UP)) < 1e-12);
+    assert.ok(Math.abs(up.sd[0] - sd(A.UP)) < 1e-12 && Math.abs(up.sd[1] - sd(B.UP)) < 1e-12);
     assert.equal(up.cytoband, "1p36.33");
     assert.equal(d.points.find((g) => g.gene === "SAME")!.cytoband, undefined);
-    assert.ok(de(r).points.find((g) => g.gene === "DOWN")!.effect < 0);
+    assert.ok(de(r).points.find((g) => g.gene === "DOWN")!.effect! < 0);
     // labels name both directions; z-scores are compared as stored
     assert.ok(d.labels.includes("UP") && d.labels.includes("DOWN"));
     assert.equal(d.log2, false);
@@ -137,7 +146,7 @@ describe("diffexpr: the per-gene test", () => {
     assert.match(r.caveat!, /3 genes tested, 2 left out \(fewer than 3 samples/);
     assert.match(r.caveat!, /Z-scores are standardised within each study/);
     // every tested gene is a point or a grid cell, never both, never neither
-    const inGrid = d.grid.cells.reduce((a, c) => a + c[2], 0);
+    const inGrid = d.grid!.cells.reduce((a, c) => a + c[2], 0);
     assert.equal(d.points.length + inGrid, d.tested);
   });
 
@@ -151,6 +160,37 @@ describe("diffexpr: the per-gene test", () => {
     assert.match(text("NOPE"), /picked: NOPE \(not among the genes listed\)/);
   });
 
+  test("three cohorts: Welch's ANOVA per gene from the same moments, no volcano and no enrichment", async () => {
+    const C = { UP: [1, 1.5, 0.5, 1.2], DOWN: [2, 2.5, 3, 2.2], SAME: [1, 2, 3], FEW: [1, 2, 3], FLAT: [2, 2, 2] };
+    const r = await run({ geneSets: undefined, gene: "UP" }, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }), C: cohort({ s1: 4 }) }, { s1: site({ A, B, C }) }));
+    const d = de(r);
+    assert.equal(r.error, undefined);
+    assert.deepEqual(d.groups, ["A", "B", "C"]);
+    assert.equal(d.test, "Welch's ANOVA");
+    assert.equal(d.tested, 3);
+    assert.equal(d.grid, undefined);
+    assert.equal(d.gsea, undefined, "no enrichment, though geneSets was left to its default");
+    assert.equal(d.up, undefined);
+    const up = d.points.find((g) => g.gene === "UP")!;
+    assert.deepEqual(up.n, [5, 5, 4]);
+    assert.equal(up.effect, undefined);
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const w = welchAnovaTest([A.UP, B.UP, C.UP].map((xs) => { const m = moments("UP", xs); return { n: xs.length, mean: mean(xs), variance: varianceFromMoments(xs.length, m.sx, m.sxx) }; }));
+    assert.equal(up.p, w.p);
+    assert.equal(up.f, w.f);
+    assert.equal(d.significant, d.points.filter((g) => g.q < 0.05).length);
+    for (let i = 1; i < d.points.length; i++) assert.ok(d.points[i - 1].p <= d.points[i].p);
+    assert.match(r.caveat!, /Welch's ANOVA per gene across the 3 cohorts/);
+    assert.match(r.caveat!, /cBioPortal's group comparison uses the classic one-way ANOVA/);
+    const text = analysisText({ study: "s", cohorts: {}, views: [] } as never, { cohorts: {}, involvedStudies: ["s"], stats: { ms: 1 }, views: [r] } as never).join("\n");
+    assert.match(text, /across A, B, C on mrna_zscores, Welch's ANOVA: 3 genes tested/);
+    assert.match(text, /UP F=[\d.]+, q=.* — highest in A; A 5\.90, B 0\.48, C 1\.05/);
+    assert.match(text, /picked: UP \(p=.*; A 5\.90/);
+    // the method's script recomputes the same test
+    assert.match(r.method!.python!, /anova_generic\(.*use_var="unequal", welch_correction=True\)/);
+    assert.ok(r.method!.steps.some((s) => s.title === "Welch's ANOVA per gene"));
+  });
+
   test("q is Benjamini–Hochberg over the tested genes, and up/down count the q < 0.05 genes by sign", async () => {
     const d = de(await run({ label: 0 }, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }) }, { s1: site({ A, B }) })));
     assert.deepEqual(d.labels, []);
@@ -159,8 +199,8 @@ describe("diffexpr: the per-gene test", () => {
     for (let i = 1; i < d.points.length; i++) assert.ok(d.points[i - 1].p <= d.points[i].p);
     for (const g of d.points) assert.ok(g.q >= g.p, g.gene);
     assert.ok(d.points.find((g) => g.gene === "SAME")!.q >= 0.05);
-    assert.equal(d.up + d.down, d.points.filter((g) => g.q < 0.05).length + d.pooledSignificant);
-    assert.equal(d.up, 1); assert.equal(d.down, 1);
+    assert.equal(d.up! + d.down!, d.points.filter((g) => g.q < 0.05).length + d.pooledSignificant);
+    assert.equal(d.up, 1); assert.equal(d.down, 1); assert.equal(d.significant, 2);
   });
 
   test("moments add across sites, so two studies' halves give the same test as one study holding both", async () => {
@@ -171,8 +211,8 @@ describe("diffexpr: the per-gene test", () => {
       { s1: site({ A: split(A, 0), B: split(B, 0) }), s2: site({ A: split(A, 1), B: split(B, 1) }) }));
     const two = de(r);
     const up1 = one.points.find((g) => g.gene === "UP")!, up2 = two.points.find((g) => g.gene === "UP")!;
-    assert.equal(up2.nA, 5);
-    assert.ok(Math.abs(up1.t - up2.t) < 1e-9);
+    assert.equal(up2.n[0], 5);
+    assert.ok(Math.abs(up1.t! - up2.t!) < 1e-9);
     assert.deepEqual(r.studies, ["s1", "s2"]);
     assert.match(r.caveat!, /pooled across 2 studies with no batch correction/);
   });
