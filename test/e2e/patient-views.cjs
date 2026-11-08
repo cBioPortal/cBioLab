@@ -1,4 +1,4 @@
-// The patient views: timeline, alterations and genomic evolution.
+// The patient views: timeline, alterations, genomic evolution and the genomic overview.
 const { misalignedControls } = require("./helpers.cjs");
 
 async function patientViews({ browser, ok, BASE }) {
@@ -211,6 +211,45 @@ async function patientViews({ browser, ok, BASE }) {
       ok("evolution: the genomic evolution view", false, String(e.message).split("\n")[0].slice(0, 200));
     }
     ok("evolution: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+
+  // The genomic overview (app/lab/genomic-overview.tsx), as the portal's patient view draws it in IGV: compact
+  // (no navigation bar) with a MUT and a CNA track, each sample's marker, mutation count, altered-genome share and
+  // gene panel beside its rows; a mutation row clicked in the alterations table zooms the full browser to its gene,
+  // and Reset view goes back and lets the row go. Known values: IM-GBM-28's 17 called mutations (4/5/4/4 by
+  // sample, all on IMPACT410), as cbioportal.org's API returns them.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1200 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const settled = () => page.waitForFunction(() => { const el = document.querySelector(".segigv"); return el && el.getAttribute("aria-busy") === "false"; }, null, { timeout: 240000 });
+    const state = () => page.evaluate(() => {
+      const r = document.querySelector('[data-testid="segments-igv"]').shadowRoot;
+      const nav = r && r.querySelector(".igv-navbar");
+      return { navbar: !!nav && getComputedStyle(nav).display !== "none", locus: r ? (r.querySelector(".igv-search-container input") || {}).value || "" : "",
+        canvases: r ? r.querySelectorAll("canvas").length : 0, cells: [...document.querySelectorAll(".segigv .absolute")].map((c) => c.textContent).join("|") };
+    });
+    try {
+      await page.goto(BASE + "/portal/patient?study=glioma_msk_2018&patient=IM-GBM-28", { waitUntil: "domcontentloaded" });
+      await page.locator(".segigv").first().waitFor({ state: "attached", timeout: 240000 });
+      await settled(); await page.waitForTimeout(1500);
+      let s = await state();
+      ok("overview: compact IGV with the sample columns", !s.navbar && s.canvases > 3 && s.cells.startsWith("1|2|3|4|1|2|3|4|4|5|4|4|") && /P1\|P1\|P1\|P1/.test(s.cells), JSON.stringify(s));
+      const row = page.locator("section.alt-table[aria-label='Mutations'] tbody tr", { hasText: "TP53" }).first();
+      await row.click();
+      await page.waitForTimeout(1000); await settled(); await page.waitForTimeout(1500);
+      s = await state();
+      ok("overview: a mutation row zooms the full browser to its gene", s.navbar && /^chr17:7,5/.test(s.locus) && (await row.getAttribute("aria-selected")) === "true", JSON.stringify(s));
+      await page.locator(".segigv button", { hasText: "Reset view" }).click();
+      await page.waitForTimeout(1000); await settled(); await page.waitForTimeout(1500);
+      s = await state();
+      ok("overview: Reset view goes back to compact and lets the row go", !s.navbar && (await row.getAttribute("aria-selected")) === "false", JSON.stringify(s));
+    } catch (e) {
+      ok("overview: the genomic overview", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("overview: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
 }

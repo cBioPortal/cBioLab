@@ -4,10 +4,12 @@
 // database would); the colour scale, the gene loci, the SQL and the figure are checked on their own.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { runSegments, parseRegion, SEGMENTS_ROWS_MAX, SEGMENTS_MAX } from "../lib/views/segments/run.ts";
-import { segmentSamplesRows, segmentRows, SEGMENT_CHROMS } from "../lib/views/segments/sql.ts";
+import { runSegments, parseRegion, SEGMENTS_ROWS_MAX, SEGMENTS_MAX, OVERVIEW_MUTATIONS_MAX } from "../lib/views/segments/run.ts";
+import { segmentSamplesRows, segmentRows, overviewMutationRows, overviewPanelRows, SEGMENT_CHROMS } from "../lib/views/segments/sql.ts";
 import { segmentsSvg } from "../lib/views/segments/figure.ts";
 import { segmentsKind } from "../lib/views/segments/kind.ts";
+import { igvLocus, igvSegFeatures, overviewTrackHeight, overviewSegFeatures, overviewMutFeatures, trackSamples, cnaAlteredPct, panelIcons, OVERVIEW_ROW } from "../lib/views/segments/igv.ts";
+import { regionSegs } from "../lib/views/segments/figure.ts";
 import { segmentColor } from "../lib/chart/style.ts";
 import { geneLocus, decodeLoci } from "../lib/gene-loci.ts";
 import { encodeLoci, spansOf } from "../scripts/gen-gene-loci.ts";
@@ -36,7 +38,7 @@ function answer(sql: string, segs: Seg[]): Record<string, unknown>[] {
   for (const s of segs) { const l = by.get(s.sid); if (l) l.push(s); else by.set(s.sid, [s]); }
   let rows = [...by.values()].map((list) => {
     const inside = list.filter(inR), w = inside.reduce((a, s) => a + bases(s), 0);
-    return { sid: list[0].sid, sample: list[0].sample, patient: list[0].patient, stype: list[0].stype, segs: inside.length,
+    return { sid: list[0].sid, sample: list[0].sample, patient: list[0].patient, stype: list[0].stype, segs: inside.length, allSegs: list.filter((s) => SEGMENT_CHROMS.includes(s.chrom)).length,
       score: w ? inside.reduce((a, s) => a + s.m * bases(s), 0) / w : null, other: list.filter((s) => !SEGMENT_CHROMS.includes(s.chrom)).length };
   });
   const segmented = rows.length, otherChrom = rows.reduce((a, r) => a + r.other, 0);
@@ -46,7 +48,10 @@ function answer(sql: string, segs: Seg[]): Record<string, unknown>[] {
   return rows.map((r) => ({ ...r, segmented, otherChrom }));
 }
 
-function local(segs: Seg[], opts: { build?: string; events?: PatientEvent[]; timeline?: boolean } = {}) {
+type Mut = { sid: number; sample: string; patient: string; stype: string; chrom: string; st: number; en: number; gene: string; change: string; mtype: string };
+type Panel = { sample: string; type: string; panel: string };
+
+function local(segs: Seg[], opts: { build?: string; events?: PatientEvent[]; timeline?: boolean; muts?: Mut[]; panels?: Panel[] } = {}) {
   const asked: string[] = [];
   return {
     asked,
@@ -56,7 +61,10 @@ function local(segs: Seg[], opts: { build?: string; events?: PatientEvent[]; tim
     viewMeta: async () => [{ build: opts.build ?? "hg19" }],
     viewRows: async (label: string, _def: unknown, build: (c: string, s: string, d: string) => string) => {
       asked.push(label);
-      return answer(build("SELECT '' AS pid, '' AS sid", "s1", "db"), segs);
+      const sql = build("SELECT '' AS pid, '' AS sid", "s1", "db");
+      if (/mutation_derived/.test(sql)) return (opts.muts ?? []).map(({ st, en, ...m }) => ({ ...m, st, en }));
+      if (/sample_to_gene_panel_derived/.test(sql)) return opts.panels ?? [];
+      return answer(sql, segs);
     },
     ...(opts.timeline === false ? {} : {
       patientTimeline: async (patient: string) => ({ study: "s1", patient, source: { label: "Local" },
@@ -192,6 +200,19 @@ describe("runSegments", () => {
     const lost = seg(await run({ cohorts: ["A"], gene: "ERBB2", sort: "lost" }, one().c));
     assert.deepEqual(lost.samples.map((x) => x.sample), ["S3", "S2", "S1"]);
   });
+  test("a zoom still carries each drawn sample's whole genome, for the browser to pan; the figure and text keep to the region", async () => {
+    const v = await run({ cohorts: ["A"], gene: "ERBB2" }, one().c);
+    const s = seg(v);
+    const s1 = s.samples.find((x) => x.sample === "S1")!;
+    assert.deepEqual(s1.segs, [0, 1000, 200000000, 0.3]);
+    assert.deepEqual(regionSegs(s, s1.segs), []);
+    assert.equal(s.segChroms[s1.segs[0]], "1");
+    assert.equal(igvLocus(s), "chr17:37843337-37885915");
+    assert.equal(igvLocus(seg(await run({ cohorts: ["A"] }, one().c))), "all");
+    const f = igvSegFeatures(s);
+    assert.deepEqual(f[0], { chr: "chr1", start: 999, end: 200000000, value: 0.3, sample: f[0].sample });
+    assert.equal(f.length, s.samples.reduce((n, x) => n + x.segs.length / 4, 0));
+  });
   test("the row limit draws the first rows and names how many it left out", async () => {
     const v = await run({ cohorts: ["A"], rows: 2 }, one().c);
     const s = seg(v);
@@ -207,6 +228,7 @@ describe("runSegments", () => {
     ];
     const v = await run({ cohorts: ["A"] }, ctx({ A: cohort({ s1: 2 }) }, { s1: local(P) }));
     assert.deepEqual(seg(v).samples.map((x) => [x.sample, x.mark?.label]), [["T-B", "1"], ["T-A", "2"]]);
+    assert.deepEqual(igvSegFeatures(seg(v)).map((f) => f.sample), ["1. T-B", "2. T-A"]);
     assert.match(v.caveat!, /collection order/);
     const noTl = await run({ cohorts: ["A"] }, ctx({ A: cohort({ s1: 2 }) }, { s1: local(P, { timeline: false }) }));
     assert.deepEqual(seg(noTl).samples.map((x) => x.sample), ["T-B", "T-A"]);
@@ -229,7 +251,7 @@ describe("runSegments", () => {
   });
   test("past the segment limit the figure is refused, naming it", async () => {
     const many: Seg[] = Array.from({ length: SEGMENTS_MAX + 1 }, (_, i) => ({ sid: 1, sample: "S", patient: "P", stype: "", chrom: "1", st: i * 10 + 1, en: i * 10 + 5, m: 0.5 }));
-    assert.match((await run({ cohorts: ["A"] }, ctx({ A: cohort({ s1: 1 }) }, { s1: local(many) }))).error || "", /past the 250,000 one figure draws/);
+    assert.match((await run({ cohorts: ["A"] }, ctx({ A: cohort({ s1: 1 }) }, { s1: local(many) }))).error || "", /past the 250,000 one view carries — lower rows/);
   });
   test("two studies: each study's order in turn; an aggregate-only one is named as left out", async () => {
     const c = ctx({ A: cohort({ s1: 4, s2: 2 }) }, { s1: local(COHORT), s2: aggregate() });
@@ -272,5 +294,86 @@ describe("segments figure and text", () => {
     assert.match(out[0], /S1: no segment in the region/);
     assert.equal(segmentsKind.title!(v as never), "Copy-number segments — ERBB2 (chr17:37,844,337-37,884,915)");
     assert.equal(segmentsKind.figure!({ ...v, segments: { ...seg(v), samples: [] } } as never, {}), null);
+  });
+});
+
+describe("the patient page's genomic overview (overview: true)", () => {
+  // one patient: T-A has segments and mutations, T-B segments only, T-C mutations only (no segments)
+  const P: Seg[] = [
+    { sid: 1, sample: "T-A", patient: "P", stype: "Primary", chrom: "1", st: 1, en: 1000000, m: 0.5 },
+    { sid: 1, sample: "T-A", patient: "P", stype: "Primary", chrom: "2", st: 1, en: 1000000, m: 0.05 },
+    { sid: 2, sample: "T-B", patient: "P", stype: "Metastasis", chrom: "1", st: 1, en: 40000, m: -1 },
+  ];
+  const M: Mut[] = [
+    { sid: 1, sample: "T-A", patient: "P", stype: "Primary", chrom: "17", st: 7577094, en: 7577094, gene: "TP53", change: "R282G", mtype: "Missense_Mutation" },
+    { sid: 3, sample: "T-C", patient: "P", stype: "Recurrence", chrom: "5", st: 1295228, en: 1295228, gene: "TERT", change: "Promoter", mtype: "5'Flank" },
+  ];
+  const PN: Panel[] = [
+    { sample: "T-A", type: "MUTATION_EXTENDED", panel: "IMPACT410" }, { sample: "T-A", type: "COPY_NUMBER_ALTERATION", panel: "WES" },
+    { sample: "T-C", type: "MUTATION_EXTENDED", panel: "IMPACT341" },
+  ];
+  const c = (muts = M, segs = P) => ctx({ A: cohort({ s1: 3 }) }, { s1: local(segs, { muts, panels: PN, timeline: false }) });
+
+  test("mutations ride along in row order; a sample with mutations but no segments gets a row; panels per sample", async () => {
+    const v = await run({ cohorts: ["A"], overview: true }, c());
+    const s = seg(v);
+    assert.deepEqual(s.samples.map((x) => [x.sample, x.segs.length / 4]), [["T-A", 2], ["T-B", 1], ["T-C", 0]]);
+    assert.deepEqual(s.mutations, [
+      { s: 0, chrom: "17", start: 7577094, end: 7577094, gene: "TP53", change: "R282G", type: "Missense_Mutation" },
+      { s: 2, chrom: "5", start: 1295228, end: 1295228, gene: "TERT", change: "Promoter", type: "5'Flank" }]);
+    assert.deepEqual(s.samples.map((x) => x.panels), [{ mutation: "IMPACT410", cna: "WES" }, {}, { mutation: "IMPACT341" }]);
+    assert.equal(s.noSegment, 1);
+    assert.match(v.caveat!, /each sample's 2 called mutations/);
+    assert.equal(v.method!.steps.at(-1)!.title, "Read the samples' mutations and gene panels");
+    // without overview: no mutations and no panels asked for
+    const plain = seg(await run({ cohorts: ["A"] }, c()));
+    assert.equal(plain.mutations, undefined); assert.equal(plain.samples[0].panels, undefined);
+  });
+  test("mutations alone are enough; neither is refused, naming both; a bad flag and too many mutations are refused", async () => {
+    const mutOnly = await run({ cohorts: ["A"], overview: true }, c(M, []));
+    assert.equal(seg(mutOnly).samples.length, 2);
+    assert.equal(seg(mutOnly).excluded, undefined, "a study drawn by its mutations is not named as left out");
+    assert.match((await run({ cohorts: ["A"], overview: true }, c([], []))).error || "", /has copy-number segments or mutations.*genomic overview/);
+    assert.match((await run({ cohorts: ["A"], overview: "yes" as never }, c())).error || "", /overview is true/);
+    const many = Array.from({ length: OVERVIEW_MUTATIONS_MAX + 1 }, () => M[0]);
+    assert.match((await run({ cohorts: ["A"], overview: true }, c(many))).error || "", /past the 50,000 one view carries/);
+  });
+  test("the SQL: called mutations only, the cohort's samples; panels for mutations and copy number", () => {
+    const m = overviewMutationRows("SELECT 1", "s1", "db");
+    assert.match(m, /molecularProfileId NOT LIKE '%uncalled%'/);
+    assert.match(m, /JOIN samp ON samp\.sample = m\.sampleId/);
+    assert.match(m, /multiIf\(m\.chr IN/);
+    assert.match(overviewPanelRows("SELECT 1", "s1", "db"), /alteration_type IN \('MUTATION_EXTENDED', 'COPY_NUMBER_ALTERATION'\)/);
+  });
+  test("IGV tracks as the portal builds them: heights, samples, features, popups", async () => {
+    const s = seg(await run({ cohorts: ["A"], overview: true }, c()));
+    assert.deepEqual([overviewTrackHeight(1), overviewTrackHeight(4), overviewTrackHeight(100)], [25, 4 * OVERVIEW_ROW, 600]);
+    assert.deepEqual(trackSamples(s, "cna"), ["T-A", "T-B"]);
+    assert.deepEqual(trackSamples(s, "mut"), ["T-A", "T-C"]);
+    const seg0 = overviewSegFeatures(s)[0];
+    assert.deepEqual({ ...seg0, popupData: undefined }, { chr: "chr1", start: 0, end: 1000000, value: 0.5, sample: "T-A", popupData: undefined });
+    assert.deepEqual(seg0.popupData(), [{ name: "Sample", value: "T-A" }, { name: "Mean CN log2 value", value: 0.5 }, { name: "Location", value: "chr1:1-1,000,000" }]);
+    const mut = overviewMutFeatures(s, (t) => t === "Missense_Mutation" ? "green" : "pink");
+    assert.deepEqual(mut.map((f) => [f.sample, f.chr, f.start, f.end, f.color]), [["T-A", "chr17", 7577093, 7577094, "green"], ["T-C", "chr5", 1295227, 1295228, "pink"]]);
+    assert.deepEqual(mut[0].popupData(), [{ name: "Sample", value: "T-A" }, { name: "Gene", value: "TP53" }, { name: "Protein Change", value: "R282G" },
+      { name: "Location", value: "chr17:7,577,094-7,577,094" }]);
+    assert.deepEqual(overviewMutFeatures({ samples: s.samples }, () => ""), []);
+  });
+  test("CNA altered share: segments of 50 kb or more at |mean| ≥ 0.2, over the measured genome", () => {
+    assert.equal(cnaAlteredPct([]), null);
+    // 1 Mb at 0.5 (altered), 1 Mb at 0.05 (not), 40 kb at -1 (too short)
+    const pct = cnaAlteredPct([0, 1, 1000001, 0.5, 1, 1, 1000001, 0.05, 0, 1, 40001, -1])!;
+    assert.equal(Math.round(pct * 1000) / 1000, Math.round(100 * 1000000 / 2040000 * 1000) / 1000);
+  });
+  test("gene panel badges: P1, P2 … in name order across both tracks, W for no panel; none for an all-whole-exome track", () => {
+    const icons = panelIcons([
+      { sample: "a", panels: { mutation: "IMPACT468", cna: "WES" } },
+      { sample: "b", panels: { mutation: "IMPACT341" } },
+      { sample: "c", panels: {} },
+    ]);
+    assert.deepEqual([...icons.mut].map(([id, i]) => [id, i.label, i.panel]), [["a", "P2", "IMPACT468"], ["b", "P1", "IMPACT341"], ["c", "W", null]]);
+    assert.equal(icons.cna.size, 0);
+    assert.equal(icons.show, true);
+    assert.equal(panelIcons([{ sample: "a", panels: { mutation: "WES", cna: "WGS" } }, { sample: "b" }]).show, false);
   });
 });

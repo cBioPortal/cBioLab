@@ -42,8 +42,8 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
     // Summary: the clinical timeline, then the genomic overview, then the patient's alteration tables
     { title: "Summary", views: [
       v("Clinical timeline", { kind: "timeline" }),
-      // the portal's genomic overview track: each of the patient's samples' copy-number segments along the genome
-      ...(data.held.includes("CNA") ? [v("Genomic overview", { kind: "segments" })] : []),
+      // the portal's genomic overview: the patient's samples' mutations and copy-number segments along the genome, in IGV
+      ...(data.held.includes("CNA") || data.held.includes("MUTATION") ? [v("Genomic overview", { kind: "segments", overview: true })] : []),
       // in sample mode, the sample's alterations alone, as the portal's sample view lists them
       ...(genomic ? [v("Genomic alterations", { kind: "alterations", ...(q.sample ? { samples: "cohort" } : {}) })] : []),
     ] },

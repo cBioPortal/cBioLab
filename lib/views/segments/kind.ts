@@ -1,6 +1,6 @@
 // The segments view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
-import { segmentsSvg } from "./figure.ts";
+import { segmentsSvg, regionSegs } from "./figure.ts";
 
 /** samples the results text names one by one; the figure draws every drawn row */
 const TEXT_SAMPLES = 40;
@@ -11,7 +11,7 @@ export const segmentsKind: ViewKindDef<"segments"> = {
   title: (v) => "Copy-number segments" + (v.segments ? " — " + v.segments.region.label : ""),
   text: (v, { out, caveatOf, noteOf }) => {
     const s = v.segments;
-    const segsIn = (x: typeof s.samples[number]) => x.segs.length / 4;
+    const segsIn = (x: typeof s.samples[number]) => regionSegs(s, x.segs).length / 4;
     out.push(`Copy-number segments (${s.build}, ${s.region.label}): ${s.samples.length.toLocaleString()} of ${s.segmented.toLocaleString()} samples with segments drawn` +
       (s.leftOut ? `, ${s.leftOut.toLocaleString()} left out by the row limit (${s.rowsLimit})` : "") + `; mean log2 ratio over the region per sample:\n` +
       s.samples.slice(0, TEXT_SAMPLES).map((x) => `  ${x.mark ? x.mark.label + ". " : ""}${x.sample}: ` +

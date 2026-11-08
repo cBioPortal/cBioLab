@@ -1,8 +1,10 @@
 "use client";
-// The segments view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
+// The segments view on the analysis page: its entry in the add menu, the view a new one starts from, and its card (igv.js, app/lab/segments-igv.tsx).
 import { DraftInput } from "./parts.tsx";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
+import { SegmentsIgv } from "../segments-igv.tsx";
+import { GenomicOverview } from "../genomic-overview.tsx";
 
 const CHROMS = [...Array.from({ length: 22 }, (_, i) => String(i + 1)), "X", "Y"];
 
@@ -59,4 +61,5 @@ export const segmentsUi: KindUi<"segments"> = {
     ? v.segments.region.label + " · " + v.segments.samples.length.toLocaleString() + " of " + v.segments.segmented.toLocaleString() + " samples with segments"
     : spec.gene ? "zoomed to " + spec.gene : spec.region ? String(spec.region) : "whole genome",
   Controls,
+  body: (c) => c.v.segments ? (c.v.segments.mutations ? <GenomicOverview s={c.v.segments} /> : <SegmentsIgv s={c.v.segments} />) : null,
 };

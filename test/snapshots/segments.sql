@@ -29,11 +29,11 @@ seg AS (
 )
 ,
 per AS (
-  SELECT sid, countIf(has(['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','X','Y'], chrom)) AS segs, countIf(NOT has(['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','X','Y'], chrom)) AS other,
+  SELECT sid, countIf(has(['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','X','Y'], chrom)) AS segs, countIf(has(['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','X','Y'], chrom)) AS allsegs, countIf(NOT has(['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','X','Y'], chrom)) AS other,
          sumIf(m * (en - st + 1), has(['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','X','Y'], chrom)) AS wsum, sumIf((en - st + 1), has(['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','X','Y'], chrom)) AS wlen
   FROM seg GROUP BY sid
 )
-SELECT p.sid AS sid, samp.sample AS sample, samp.patient AS patient, samp.stype AS stype, p.segs AS segs,
+SELECT p.sid AS sid, samp.sample AS sample, samp.patient AS patient, samp.stype AS stype, p.segs AS segs, p.allsegs AS allSegs,
        if(p.wlen > 0, p.wsum / p.wlen, NULL) AS score,
        count() OVER () AS segmented, sum(p.other) OVER () AS otherChrom
 FROM per p JOIN samp ON samp.sid = p.sid

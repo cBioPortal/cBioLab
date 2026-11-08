@@ -15,7 +15,7 @@ Copy-number segments (hg19, whole genome): 4 of 4 samples with segments drawn; m
         with segments: 4
         drawn: 4
         left out by the row limit: 0
-    - Read the drawn samples' segments: The segments:segments query above: the drawn samples' segments in the region, as stored (chromosome 23/24 and a "chr" prefix folded to X/Y). Each is drawn at its start and end, coloured by its mean on IGV's segment scale (white within ±0.1, red to +1.5, blue to −1.5).
-        segments drawn: 291
+    - Read the drawn samples' segments: The segments:segments query above: the drawn samples' segments over the whole genome (so the browser can zoom anywhere), as stored (chromosome 23/24 and a "chr" prefix folded to X/Y). Each is drawn at its start and end, coloured by its mean on IGV's segment scale (white within ±0.1, red to +1.5, blue to −1.5).
+        segments read: 291
         drawn samples with no segment in the region: 0
     A drawing of stored segments: each segment mean is drawn as the database holds it, and the only number computed (a row's mean over the region, for sort) is a base-weighted average in the query — so there is no script; the queries are the numbers.

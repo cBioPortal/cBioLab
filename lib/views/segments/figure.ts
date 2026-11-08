@@ -6,6 +6,7 @@ import {
 } from "../../svg-kit.ts";
 import type { DrawnResultOf } from "../../types.ts";
 import { chromLabels } from "../../figures/genome-axis.ts";
+import type { SegmentsResult } from "./types.ts";
 
 const PAD = 8, R = 10;
 /** the rows' height together, when there are many; a few rows are each ROW_MAX tall */
@@ -18,6 +19,16 @@ const MARK_R = 6;
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const fmtMb = (bp: number) => fmtNum(bp / 1e6, 7) + " Mb";
+
+/** a sample's segments inside the region drawn (all of them, for the whole genome), flat as `segs` */
+export function regionSegs(s: Pick<SegmentsResult, "region" | "segChroms">, segs: number[]): number[] {
+  const r = s.region;
+  if (r.chrom == null) return segs;
+  const out: number[] = [];
+  for (let k = 0; k < segs.length; k += 4)
+    if (s.segChroms[segs[k]] === r.chrom && segs[k + 2] >= r.start && segs[k + 1] <= r.end) out.push(segs[k], segs[k + 1], segs[k + 2], segs[k + 3]);
+  return out;
+}
 
 export function segmentsSvg(v: DrawnResultOf<"segments">, o: SvgOpts): string {
   const p = palette(o.theme), s = v.segments;
@@ -57,9 +68,10 @@ export function segmentsSvg(v: DrawnResultOf<"segments">, o: SvgOpts): string {
     y += 22;
   }
   const top = y, PH = rowH * n;
-  const segCount = s.samples.reduce((k, x) => k + x.segs.length / 4, 0);
+  const inRegion = s.samples.map((x) => regionSegs(s, x.segs));
+  const segCount = inRegion.reduce((k, x) => k + x.length / 4, 0);
   const tips = segCount <= SEG_TIPS_MAX;
-  const chromName = (c: number) => "chr" + s.chroms[c].c;
+  const chromName = (c: number) => "chr" + s.segChroms[c];
   /** without per-segment tips, every row's segments of one colour are one path */
   const byFill = new Map<string, string[]>();
 
@@ -80,8 +92,9 @@ export function segmentsSvg(v: DrawnResultOf<"segments">, o: SvgOpts): string {
       byFill.set(last.fill, list);
       last = null;
     };
-    for (let k = 0; k < smp.segs.length; k += 4) {
-      const c = smp.segs[k], st = smp.segs[k + 1], en = smp.segs[k + 2], m = smp.segs[k + 3];
+    const segs = inRegion[i];
+    for (let k = 0; k < segs.length; k += 4) {
+      const c = segs[k], st = segs[k + 1], en = segs[k + 2], m = segs[k + 3];
       const x0 = x(c, st), x1 = x(c, en);
       if (run && x0 - run[1] < 0.5) run[1] = Math.max(run[1], x1);
       else { if (run) covered.push(`M${r1(run[0])} ${r1(ry)}h${r1(Math.max(0.5, run[1] - run[0]))}v${rowH}h${r1(-Math.max(0.5, run[1] - run[0]))}z`); run = [x0, x1]; }

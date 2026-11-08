@@ -22,6 +22,21 @@ export interface SegmentsView {
    * the region drawn (covered bases weighted), highest / lowest first
    */
   sort?: "order" | "gained" | "lost";
+  /**
+   * the patient page's genomic overview, as the portal's patient view draws it: the samples'
+   * mutations as a track above the segments, each sample's gene panels, and a row for a sample with
+   * mutations but no segments
+   */
+  overview?: boolean;
+}
+
+/** One mutation on the overview's mutation track. */
+export interface SegmentsMutation {
+  /** index into `samples` */
+  s: number;
+  /** chromosome as the axis names it (1–22, X, Y, or as stored), and 1-based start and end */
+  chrom: string; start: number; end: number;
+  gene: string; change: string; type: string;
 }
 
 /** One sample's row. */
@@ -31,8 +46,10 @@ export interface SegmentsSample {
   score: number | null;
   /** for one patient's samples: their number and colour, as the patient's other views mark them */
   mark?: { label: string; color: string };
-  /** its segments in the region, flat: [chromosome index into `chroms`, start, end, mean] per segment */
+  /** its segments over the whole genome, flat: [chromosome index into `segChroms`, start, end, mean] per segment */
   segs: number[];
+  /** the overview's gene panels: the panel the sample's mutations and copy number were called on ('WES'/'WGS' or absent: whole exome/genome) */
+  panels?: { mutation?: string; cna?: string };
 }
 
 export interface SegmentsResult {
@@ -42,6 +59,8 @@ export interface SegmentsResult {
     gene?: { name: string; start: number; end: number } };
   /** the chromosomes along the axis, with their lengths (one, when zoomed) */
   chroms: { c: string; length: number }[];
+  /** the chromosomes a sample's `segs` index: 1–22, X, Y */
+  segChroms: string[];
   sort: "order" | "gained" | "lost";
   samples: SegmentsSample[];
   /** the cohort's samples, those with any segment, and how many of those were drawn */
@@ -52,6 +71,8 @@ export interface SegmentsResult {
   noSegment: number;
   /** segments on chromosomes the axis does not hold (not 1–22, X, Y), not drawn */
   otherChrom: number;
+  /** the overview's mutations (only with `overview`), in sample order */
+  mutations?: SegmentsMutation[];
   /** studies left out: aggregate-only or remote participants, or no segments */
   excluded?: { study: string; reason: string }[];
 }

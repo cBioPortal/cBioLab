@@ -2,7 +2,7 @@
 // a PatientSql that only PatientLevelResolver.viewRows runs (and neither is named *Sql, so the
 // boundary suite's aggregate sweep does not take them for aggregate builders).
 import { inCohortSamples, bareSampleId } from "../../cohort2.ts";
-import { sq } from "../../compiler.ts";
+import { sq, mutationStudySql } from "../../compiler.ts";
 import { patientSql, type PatientSql } from "../../sql-kinds.ts";
 import { GENOME_CHROMS } from "../../federation-views.ts";
 
@@ -54,7 +54,7 @@ const samplesCte = (cohortSql: string, study: string, db: string, extra = "") =>
 
 /**
  * The cohort's samples that have any segment, one row each, in the view's order and cut to its row
- * limit: the sample and patient ids, the sample's segments in the region, its mean over the region
+ * limit: the sample and patient ids, the sample's segments in the region and on the whole genome, its mean over the region
  * (weighted by covered bases; null when nothing reaches it) and its segments off the axis; with,
  * on every row, the totals before the cut — how many samples have segments and how many segments lie
  * off the axis.
@@ -65,11 +65,11 @@ export function segmentSamplesRows(cohortSql: string, study: string, db: string,
   return patientSql(
     samplesCte(cohortSql, study, db) + ",\n" +
     "per AS (\n" +
-    "  SELECT sid, countIf(" + r.cond + ") AS segs, countIf(NOT has(" + arr(SEGMENT_CHROMS) + ", chrom)) AS other,\n" +
+    "  SELECT sid, countIf(" + r.cond + ") AS segs, countIf(has(" + arr(SEGMENT_CHROMS) + ", chrom)) AS allsegs, countIf(NOT has(" + arr(SEGMENT_CHROMS) + ", chrom)) AS other,\n" +
     "         sumIf(m * " + r.bases + ", " + r.cond + ") AS wsum, sumIf(" + r.bases + ", " + r.cond + ") AS wlen\n" +
     "  FROM seg GROUP BY sid\n" +
     ")\n" +
-    "SELECT p.sid AS sid, samp.sample AS sample, samp.patient AS patient, samp.stype AS stype, p.segs AS segs,\n" +
+    "SELECT p.sid AS sid, samp.sample AS sample, samp.patient AS patient, samp.stype AS stype, p.segs AS segs, p.allsegs AS allSegs,\n" +
     "       if(p.wlen > 0, p.wsum / p.wlen, NULL) AS score,\n" +
     "       count() OVER () AS segmented, sum(p.other) OVER () AS otherChrom\n" +
     "FROM per p JOIN samp ON samp.sid = p.sid\n" +
@@ -86,4 +86,31 @@ export function segmentRows(cohortSql: string, study: string, db: string, o: Seg
     "SELECT sid, indexOf(" + arr(o.axis) + ", chrom) - 1 AS c, st, en, m FROM seg\n" +
     "WHERE " + r.cond + "\n" +
     "ORDER BY sid, c, st, en");
+}
+
+/**
+ * The genomic overview's mutations (the patient page): every called mutation of the cohort's
+ * samples, with its sample's internal id, patient and type (so a sample with mutations but no
+ * segments still gets a row), position, gene, protein change and mutation type — what the portal's
+ * patient view draws on its IGV mutation track.
+ */
+export function overviewMutationRows(cohortSql: string, study: string, db: string): PatientSql {
+  return patientSql(
+    samplesCte(cohortSql, study, db) +
+    "SELECT samp.sid AS sid, samp.sample AS sample, samp.patient AS patient, samp.stype AS stype,\n" +
+    "       " + CHROM.replace(/s\.chr/g, "m.chr") + " AS chrom, m.startPosition AS st, m.endPosition AS en,\n" +
+    "       m.`GENE.hugoGeneSymbol` AS gene, m.proteinChange AS change, m.mutationType AS mtype\n" +
+    "FROM " + db + ".mutation_derived m JOIN samp ON samp.sample = m.sampleId\n" +
+    "WHERE " + mutationStudySql(study) + " AND m.molecularProfileId NOT LIKE '%uncalled%'\n" +
+    "ORDER BY sid, chrom, st, gene");
+}
+
+/** Each of the cohort's samples' gene panels for mutations and for copy number ('WES' where none is recorded). */
+export function overviewPanelRows(cohortSql: string, study: string, db: string): PatientSql {
+  return patientSql(
+    samplesCte(cohortSql, study, db) +
+    "SELECT samp.sample AS sample, sp.alteration_type AS type, toString(sp.gene_panel_id) AS panel\n" +
+    "FROM " + db + ".sample_to_gene_panel_derived sp JOIN samp ON concat(" + sq(study + "_") + ", samp.sample) = sp.sample_unique_id\n" +
+    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type IN ('MUTATION_EXTENDED', 'COPY_NUMBER_ALTERATION')\n" +
+    "ORDER BY sample, type");
 }

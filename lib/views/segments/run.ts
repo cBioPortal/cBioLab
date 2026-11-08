@@ -1,5 +1,5 @@
 // Segments view: the cohort's samples as copy-number segment tracks — cBioPortal's CN Segments tab
-// (and the patient view's genomic overview), drawn without IGV.
+// (and the patient view's genomic overview), drawn in the browser by igv.js.
 import type { ViewResult } from "../../types.ts";
 import { hasPatientTimeline, hasViewAggregates, isPatientLevel, type PatientLevelCapable, type ViewAggregateCapable } from "../../federation.ts";
 import { studyGenomeSql, CHROM_LENGTHS } from "../../federation-views.ts";
@@ -7,15 +7,17 @@ import { geneLocus } from "../../gene-loci.ts";
 import { sampleMarks } from "../../timeline-tracks.ts";
 import type { ViewRun } from "../run.ts";
 import { plural, refuse } from "../shared.ts";
-import { segmentSamplesRows, segmentRows, SEGMENT_CHROMS, type SegmentRegion } from "./sql.ts";
-import type { SegmentsView, SegmentsResult, SegmentsSample } from "./types.ts";
+import { segmentSamplesRows, segmentRows, overviewMutationRows, overviewPanelRows, SEGMENT_CHROMS, type SegmentRegion } from "./sql.ts";
+import type { SegmentsView, SegmentsResult, SegmentsSample, SegmentsMutation } from "./types.ts";
 import { segmentsMethod } from "./method.ts";
 
 /** rows drawn when the view names none, and the most it may name */
 export const SEGMENTS_ROWS_DEFAULT = 300;
 export const SEGMENTS_ROWS_MAX = 2000;
-/** segments one figure draws at most: past it the view is refused, naming the limit */
+/** segments one result carries at most (the drawn samples' whole genomes): past it the view is refused, naming the limit */
 export const SEGMENTS_MAX = 250000;
+/** mutations one overview carries at most: past it the view is refused, naming the limit */
+export const OVERVIEW_MUTATIONS_MAX = 50000;
 /** IGV's flank either side of a gene it zooms to (igv.js `flanking`) */
 export const GENE_FLANK = 1000;
 const AXIS = SEGMENT_CHROMS;
@@ -46,6 +48,8 @@ export async function runSegments(view: SegmentsView, ctx: ViewRun): Promise<Vie
   if (!(Number.isInteger(rows) && rows >= 1 && rows <= SEGMENTS_ROWS_MAX)) return no("rows (sample rows drawn at most) is 1 to " + SEGMENTS_ROWS_MAX + "; got " + String(view.rows).slice(0, 20));
   const sort = view.sort ?? "order";
   if (sort !== "order" && sort !== "gained" && sort !== "lost") return no("sort is \"order\" (the study's sample order, the default), \"gained\" or \"lost\" (by the mean over the region drawn)");
+  if (view.overview != null && typeof view.overview !== "boolean") return no("overview is true (the patient page's genomic overview: mutations and gene panels too) or false");
+  const overview = view.overview === true;
   const name = vNames[0], def = doc.cohorts[name];
 
   // who may draw sample rows: a local patient-level participant (need: "patients" refuses the rest before this runs)
@@ -87,7 +91,7 @@ export async function runSegments(view: SegmentsView, ctx: ViewRun): Promise<Vie
   const chroms = axis.map((c) => ({ c, length: CHROM_LENGTHS[build][c] }));
 
   // each study's samples with segments, in the view's order, cut to the row limit
-  type Row = { study: string; sid: number; sample: string; patient: string; stype: string; segs: number; score: number | null };
+  type Row = { study: string; sid: number; sample: string; patient: string; stype: string; segs: number; allSegs: number; score: number | null };
   const perStudy = await Promise.all(studies.map(async (st) => {
     const got = await holders[st].viewRows("segments:samples:" + name, def, (c, s, d) => segmentSamplesRows(c, s, d, { ...where, sort, limit: rows }));
     return { st, got };
@@ -99,21 +103,54 @@ export async function runSegments(view: SegmentsView, ctx: ViewRun): Promise<Vie
     segmented += n; otherChrom += Number(got[0]?.otherChrom || 0);
     if (!n && (cohorts[name].perStudy[st]?.samples || 0) > 0) excluded.push({ study: st, reason: "no copy-number segments for its samples in this cohort" });
     for (const x of got) all.push({ study: st, sid: Number(x.sid), sample: String(x.sample), patient: String(x.patient), stype: String(x.stype ?? ""),
-      segs: Number(x.segs), score: x.score == null ? null : Number(x.score) });
+      segs: Number(x.segs), allSegs: Number(x.allSegs ?? x.segs), score: x.score == null ? null : Number(x.score) });
   }
   const cohortSamples = studies.reduce((n, st) => n + (cohorts[name].perStudy[st]?.samples || 0), 0);
-  if (!segmented) return no("no sample of this cohort has copy-number segments" +
-    (excluded.length ? " (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")" : "") + " — the portal hides its CN Segments tab for such a query");
+
+  // the overview: the samples' mutations and gene panels; a sample with mutations but no segments gets a row too
+  type MutRow = Omit<SegmentsMutation, "s"> & { study: string; sample: string };
+  const muts: MutRow[] = [];
+  const panels = new Map<string, NonNullable<SegmentsSample["panels"]>>();
+  if (overview) {
+    const got = await Promise.all(studies.map(async (st) => {
+      const [m, p] = await Promise.all([
+        holders[st].viewRows("segments:mutations:" + name, def, overviewMutationRows),
+        holders[st].viewRows("segments:panels:" + name, def, overviewPanelRows)]);
+      return { st, m, p };
+    }));
+    const have = new Set(all.map((r) => r.study + "\u0000" + r.sid));
+    for (const { st, m, p } of got) {
+      for (const x of m) {
+        const sid = Number(x.sid), k = st + "\u0000" + sid;
+        if (!have.has(k)) { have.add(k); all.push({ study: st, sid, sample: String(x.sample), patient: String(x.patient), stype: String(x.stype ?? ""), segs: 0, allSegs: 0, score: null }); }
+        muts.push({ study: st, sample: String(x.sample), chrom: String(x.chrom), start: Number(x.st), end: Number(x.en), gene: String(x.gene ?? ""), change: String(x.change ?? ""), type: String(x.mtype ?? "") });
+      }
+      for (const x of p) {
+        const k = st + "\u0000" + String(x.sample), cur = panels.get(k) || {};
+        if (x.type === "MUTATION_EXTENDED") cur.mutation = String(x.panel); else cur.cna = String(x.panel);
+        panels.set(k, cur);
+      }
+    }
+    // a study whose samples have mutations is drawn, segments or not
+    const drawnStudies = new Set(got.filter((g) => g.m.length).map((g) => g.st));
+    for (let i = excluded.length - 1; i >= 0; i--) if (drawnStudies.has(excluded[i].study) && /no copy-number segments/.test(excluded[i].reason)) excluded.splice(i, 1);
+    if (muts.length > OVERVIEW_MUTATIONS_MAX)
+      return no("this overview carries " + muts.length.toLocaleString("en-US") + " mutations, past the " + OVERVIEW_MUTATIONS_MAX.toLocaleString("en-US") + " one view carries");
+    if (sort === "order") all.sort((a, b) => studies.indexOf(a.study) - studies.indexOf(b.study) || a.sid - b.sid);
+  }
+  if (!segmented && !muts.length) return no("no sample of this cohort has copy-number segments" + (overview ? " or mutations" : "") +
+    (excluded.length ? " (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")" : "") +
+    (overview ? " — the portal leaves out its genomic overview for such a patient" : " — the portal hides its CN Segments tab for such a query"));
   // across studies: the studies in the view's order (each in its own order), or by the score
   const dir = sort === "lost" ? 1 : -1;
   if (sort !== "order") all.sort((a, b) => (a.score == null ? 1 : 0) - (b.score == null ? 1 : 0) || (a.score != null && b.score != null ? dir * (a.score - b.score) : 0) ||
     studies.indexOf(a.study) - studies.indexOf(b.study) || a.sid - b.sid);
   let drawn = all.slice(0, rows);
   // past the drawing limit: refused, naming it, rather than drawn in part
-  const segTotal = drawn.reduce((n, r) => n + r.segs, 0);
+  const segTotal = drawn.reduce((n, r) => n + r.allSegs, 0);
   if (segTotal > SEGMENTS_MAX)
     return no("this draws " + segTotal.toLocaleString("en-US") + " segments, past the " + SEGMENTS_MAX.toLocaleString("en-US") +
-      " one figure draws — lower rows (now " + rows + "), or zoom to a chromosome, region or gene");
+      " one view carries — lower rows (now " + rows + ")");
 
   // one patient's samples: numbered in collection order, as the patient's other views number them
   const marks = new Map<string, { label: string; color: string }>();
@@ -129,12 +166,12 @@ export async function runSegments(view: SegmentsView, ctx: ViewRun): Promise<Vie
     }
   }
 
-  // the drawn samples' segments in the region
+  // the drawn samples' segments over the whole genome, so the browser can zoom and pan anywhere
   const segsOf = new Map<string, number[]>();
   await Promise.all(studies.map(async (st) => {
     const sids = drawn.filter((r) => r.study === st).map((r) => r.sid);
     if (!sids.length) return;
-    const got = await holders[st].viewRows("segments:segments:" + name, def, (c, s, d) => segmentRows(c, s, d, where, sids));
+    const got = await holders[st].viewRows("segments:segments:" + name, def, (c, s, d) => segmentRows(c, s, d, { axis: SEGMENT_CHROMS }, sids));
     for (const x of got) {
       const k = st + "\u0000" + String(x.sid), list = segsOf.get(k) || [];
       list.push(Number(x.c), Number(x.st), Number(x.en), Math.round(Number(x.m) * 10000) / 10000);
@@ -143,17 +180,26 @@ export async function runSegments(view: SegmentsView, ctx: ViewRun): Promise<Vie
   }));
   const samples: SegmentsSample[] = drawn.map((r) => ({ study: r.study, patient: r.patient, sample: r.sample,
     score: r.score == null ? null : Math.round(r.score * 10000) / 10000,
-    ...(marks.has(r.sample) ? { mark: marks.get(r.sample)! } : {}), segs: segsOf.get(r.study + "\u0000" + r.sid) || [] }));
+    ...(marks.has(r.sample) ? { mark: marks.get(r.sample)! } : {}), segs: segsOf.get(r.study + "\u0000" + r.sid) || [],
+    ...(overview ? { panels: panels.get(r.study + "\u0000" + r.sample) || {} } : {}) }));
+  // the overview's mutations of the drawn samples, in row order
+  const rowOf = new Map(samples.map((x, i) => [x.study + "\u0000" + x.sample, i]));
+  const mutations: SegmentsMutation[] | undefined = overview ? muts.flatMap(({ study, sample, ...m }) => {
+    const s = rowOf.get(study + "\u0000" + sample);
+    return s == null ? [] : [{ s, ...m }];
+  }).sort((a, b) => a.s - b.s) : undefined;
   const leftOut = segmented - samples.length;
-  const drawnNoSeg = samples.filter((s) => !s.segs.length).length;
+  const drawnNoSeg = drawn.filter((r) => !r.segs).length;
   const multi = studies.length > 1;
-  const result: SegmentsResult = { build, region, chroms, sort, samples, cohortSamples, segmented, rowsLimit: rows, leftOut, noSegment: drawnNoSeg, otherChrom,
+  const result: SegmentsResult = { build, region, chroms, segChroms: SEGMENT_CHROMS, sort, samples, cohortSamples, segmented, rowsLimit: rows, leftOut, noSegment: drawnNoSeg, otherChrom,
+    ...(mutations ? { mutations } : {}),
     ...(excluded.length ? { excluded } : {}) };
   const order = sort === "gained" ? "highest mean over the region first" : sort === "lost" ? "lowest mean over the region first"
     : onePatient ? "the patient's samples in collection order (the numbers the patient's other views give them)" : "each study's own sample order, as the portal lists them";
   return {
     kind: "segments", cohorts: vNames, segments: result,
-    method: segmentsMethod({ build, region: region.label, sort, order, rows, cohortSamples, segmented, drawn: samples.length, leftOut, segments: segTotal, noSegment: drawnNoSeg, otherChrom, studies }),
+    method: segmentsMethod({ build, region: region.label, sort, order, rows, cohortSamples, segmented, drawn: samples.length, leftOut, segments: segTotal, noSegment: drawnNoSeg, otherChrom, studies,
+      ...(mutations ? { mutations: mutations.length } : {}) }),
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(multi ? { studies } : {}),
     caveat: "One row per sample, coloured by each segment's mean log2 copy-number ratio (" + build + ", " + region.label + "): white within ±0.1, " +
@@ -168,7 +214,8 @@ export async function runSegments(view: SegmentsView, ctx: ViewRun): Promise<Vie
       (otherChrom ? plural(otherChrom, "segment") + " on chromosomes other than 1–22, X and Y are not drawn. " : "") +
       "Log ratios are not purity- or ploidy-corrected" + (!region.chrom || region.chrom === "X" ? ", and chromosome X reads low in male samples against a female reference." : ".") +
       (multi ? " Samples of " + studies.length + " studies; overlap is not deduplicated." : "") +
-      (excluded.length ? " Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : ""),
+      (excluded.length ? " Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "") +
+      (mutations ? " Above the segments, each sample's " + plural(mutations.length, "called mutation") + ", coloured by protein impact as the portal colours them." : ""),
   };
 }
 

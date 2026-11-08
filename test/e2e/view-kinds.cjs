@@ -31,9 +31,11 @@ async function drawKind({ ctx, ok, BASE, encodeUrlJson, EXAMPLES }, kind) {
     const n = ex.doc.views.length;
     // every card is in, none waiting for its first result and none covered by "updating…"
     await page.waitForFunction((n) => document.querySelectorAll(".viewcard").length >= n &&
-      !document.querySelector(".viewcard.viewloading, .view-updating"), n, { timeout: 240000 });
+      !document.querySelector(".viewcard.viewloading, .view-updating, .viewcard .segigv[aria-busy=true]"), n, { timeout: 240000 });
     const cards = await page.locator(".viewcard").evaluateAll((cs) => cs.map((c) => {
-      const drawn = [...c.querySelectorAll("svg, canvas, table")].some((el) => { const r = el.getBoundingClientRect(); return r.width > 80 && r.height > 40; });
+      // a card's own drawing, and one inside a shadow root (igv.js draws the segments view there)
+      const els = [...c.querySelectorAll("svg, canvas, table"), ...[...c.querySelectorAll("*")].flatMap((el) => el.shadowRoot ? [...el.shadowRoot.querySelectorAll("svg, canvas, table")] : [])];
+      const drawn = els.some((el) => { const r = el.getBoundingClientRect(); return r.width > 80 && r.height > 40; });
       const err = c.querySelector("[role=alert].error");
       return { drawn, error: err ? err.textContent.trim().slice(0, 160) : null };
     }));
