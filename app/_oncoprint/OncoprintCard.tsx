@@ -8,7 +8,8 @@
 import React, { useState } from "react";
 import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 import OncoprintFigure, { type ColumnSelection } from "./OncoprintFigure.tsx";
-import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, sortKeyText } from "./view-display.ts";
+import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, sortKeyText, DRIVER_SCOPE } from "./view-display.ts";
+import { driversOf, withDrivers } from "../../lib/driver-settings.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import { heatmapTrackLabel, assayTrackLabel, STUDY_TRACK } from "../../lib/profile-names.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
@@ -26,6 +27,8 @@ import { OptionSelect } from "../_ui/choice.tsx";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
+import { DriverSettingsMenu } from "./DriverSettingsMenu.tsx";
+
 
 type V = Record<string, any>;
 
@@ -94,15 +97,6 @@ export const splitGeneTrack = (v: V, label: string): V => {
   }
   // the same gene may already be drawn on its own; expanding must not create two rows with one name
   return withGenes(v, out.filter((e, i) => typeof e !== "string" || out.indexOf(e) === i));
-};
-
-/** set or clear one display option on a view, keeping the document free of defaults */
-export const setDisplayKey = (v: V, key: string, value: unknown): V => {
-  const display = { ...(v.display || {}) };
-  if (value === undefined) delete display[key]; else display[key] = value;
-  const next = { ...v };
-  if (Object.keys(display).length) next.display = display; else delete next.display;
-  return next;
 };
 
 /**
@@ -262,7 +256,6 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
   const c = contract !== undefined ? contract : own;
   const [genesOpen, setGenesOpen] = useState(false);
   const edit = (next: V) => onView(next, true);
-  const disp = (view.display || {}) as V;
   return (
     <>
       <OncoprintFigure
@@ -288,14 +281,9 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
             onValueChange={(v) => { const n = { ...view }; if (v === "sample") n.unit = "sample"; else delete n.unit; edit(n); }}>
             <option value="patient">patients</option><option value="sample">samples</option>
           </OptionSelect></label>
-          <label className="tbfield" data-tip="driver calls come from the version-pinned OncoKB store">annotate <OptionSelect
-            value={disp.annotate || "oncokb"} disabled={busy}
-            onValueChange={(v) => edit(setDisplayKey(view, "annotate", v === "none" ? "none" : undefined))}>
-            <option value="oncokb">OncoKB</option><option value="none">none</option>
-          </OptionSelect></label>
-          <label className="chk tbchk" data-tip="drop alterations the annotation source does not call drivers — this changes the percentages too, so it re-runs">
-            <Checkbox checked={!!disp.hideVUS} disabled={busy}
-              onCheckedChange={(on) => edit(setDisplayKey(view, "hideVUS", on === true || undefined))} /> drivers only</label>
+          <DriverSettingsMenu drivers={driversOf(view)} busy={busy} scope={DRIVER_SCOPE}
+            report={c ? c.conventions?.customDrivers || { binary: false, tiers: [] } : null}
+            onChange={(d) => edit(withDrivers(view, d))} />
         </>}
         tracksMenu={<TracksMenu
           attrs={catalog.attrs} profiles={catalog.profiles} loading={catalog.loading}

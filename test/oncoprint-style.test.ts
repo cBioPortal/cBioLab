@@ -206,3 +206,28 @@ test("clinical values the portal reserves a colour for keep it, whatever the att
   assert.deepEqual([0, 1, 2, 3].map((i) => trackCategoryColor(os, i, STYLE)), ["#d95f02", "#1b9e77", "#1b9e77", "#1b9e77"], "case and spaces do not matter");
   assert.equal(trackCategoryColor(sex, 1, STYLE, { SEX: { Female: "#123456" } }), "#123456");
 });
+
+test("germline: a stripe over the mutation drawn, a legend entry when present, off with colorByGermline false", () => {
+  const B = STYLE.bits, G = STYLE.glyph.germline;
+  const code = B.MISSENSE | B.MUT_DRIVER | B.DRIVER | B.GERMLINE;
+  const layers = cellLayers(code, STYLE);
+  assert.deepEqual(layers[layers.length - 1], { color: G.color, band: G.band }, "the stripe is drawn last, over the glyph");
+  assert.equal(cellLayers(B.SV | B.GERMLINE, STYLE).some((l) => l.color === G.color && l.band === G.band), false, "no mutation drawn: no stripe");
+  const present = glyphPresence([{ kind: "gene", cells: [code, B.MISSENSE] }]);
+  assert.equal(present.germline, true);
+  assert.ok(geneLegend(STYLE, present).some((it) => it.label === "Germline Mutation" && it.kind === "germline"));
+  assert.ok(!geneLegend(STYLE, glyphPresence([{ kind: "gene", cells: [B.MISSENSE] }])).some((it) => it.kind === "germline"));
+  const plain = styleForDisplay(STYLE, { colorByGermline: false });
+  assert.equal(cellLayers(code, plain).length, layers.length - 1);
+  assert.ok(!geneLegend(plain, present).some((it) => it.kind === "germline"));
+});
+
+test("level of detail: a germline mark goes with the mutation classes it was drawn on", () => {
+  const B = STYLE.bits, D = B.MUT_DRIVER | B.DRIVER, gene = { kind: "gene" };
+  // a germline VUS beside a somatic driver: the bucket shows the driver, without the stripe
+  assert.deepEqual(bucketCodes(gene, [B.MISSENSE | B.GERMLINE, B.TRUNCATING | D], 0, 2, 1), [B.TRUNCATING | D]);
+  // a germline driver: kept
+  assert.deepEqual(bucketCodes(gene, [B.MISSENSE | D | B.GERMLINE, B.AMP], 0, 2, 1), [B.MISSENSE | D | B.GERMLINE | B.AMP]);
+  // VUS only: the germline VUS's mark stays
+  assert.deepEqual(bucketCodes(gene, [B.SPLICE | B.GERMLINE, 0], 0, 2, 1), [B.SPLICE | B.GERMLINE]);
+});

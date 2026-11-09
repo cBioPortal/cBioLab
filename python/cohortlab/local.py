@@ -61,14 +61,15 @@ def events_from_table(rows: Table) -> list[dict[str, Any]]:
         driver = re.fullmatch(r"(1|true|yes|driver)", _get(r, "driver", "Driver"), re.I) is not None
         if typ.endswith("_DRIVER"):
             driver, typ = True, typ[:-7]
-        if typ.endswith("_GERMLINE"):
+        germ = typ.endswith("_GERMLINE")
+        if germ:
             typ = typ[:-9]
         if typ.endswith("_DRIVER"):
             driver, typ = True, typ[:-7]
         m = _TYPE_MAP.get(typ)
         if m is None:
             raise ValueError(f"events: unknown type '{typ}' for {pid}/{gene} (accepted: {', '.join(_TYPE_MAP)}, optional _DRIVER suffix)")
-        out.append({"pid": pid, "gene": gene, "vt": m["vt"], "mt": m.get("mt"), "cna": m.get("cna"), "mv": _get(r, "alteration", "Alteration"), "driver": driver})
+        out.append({"pid": pid, "gene": gene, "vt": m["vt"], "mt": m.get("mt"), "cna": m.get("cna"), "mv": _get(r, "alteration", "Alteration"), "driver": driver, **({"germ": True} if germ else {})})
     return out
 
 
@@ -109,14 +110,52 @@ def parse_sort(spec: str | list[str] | None) -> list[dict[str, str]]:
     return [{"track": s[1:], "dir": "desc"} if s.startswith("-") else {"track": s, "dir": "asc"} for s in items]
 
 
-DISPLAY_KEYS = ("showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "hideVUS", "annotate", "whiteBackground", "style", "colors")
+DISPLAY_KEYS = ("showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground", "style", "colors")
 _GAP_MODES = ("none", "gaps", "pct", "pct-left")
 _LEGEND_MODES = ("all", "none")
 _ANNOTATE_MODES = ("oncokb", "none")
 
 
-def normalize_display(d: dict[str, Any] | None) -> dict[str, Any]:
-    """Viewing options with defaults filled in (port of normalizeDisplay in lib/oncoprint.ts)."""
+_DRIVER_KEYS = ("oncokb", "hotspots", "custom", "tiers", "hideVus", "hideGermline")
+
+
+def resolve_drivers(d: dict[str, Any] | None) -> dict[str, Any]:
+    """Driver settings with defaults filled in (port of resolveDrivers in lib/driver-settings.ts)."""
+    if d is not None and not isinstance(d, dict):
+        raise ValueError("drivers must be an object like {oncokb: true, hideVus: false}")
+    src = d or {}
+    for k in src:
+        if k not in _DRIVER_KEYS:
+            raise ValueError(f"drivers: unknown setting '{k[:40]}' (accepted: {', '.join(_DRIVER_KEYS)})")
+
+    def boolean(k: str, dflt: bool) -> bool:
+        v = src.get(k)
+        if v is None:
+            return dflt
+        if not isinstance(v, bool):
+            raise ValueError(f"drivers.{k} must be true or false")
+        return v
+
+    if boolean("hotspots", False):
+        raise ValueError("drivers.hotspots: Cancer Hotspots is not loaded in this warehouse, so no mutation can be called a hotspot")
+    tiers = src.get("tiers")
+    if tiers is not None:
+        if not isinstance(tiers, list) or any(not isinstance(t, str) or not t or len(t) > 100 for t in tiers):
+            raise ValueError('drivers.tiers is a list of cbp_driver_tiers values, e.g. ["Tier 1", "Tier 2"]')
+        if len(tiers) > 50:
+            raise ValueError(f"drivers.tiers takes at most 50 tiers; this names {len(tiers)}")
+        tiers = list(dict.fromkeys(tiers))
+    oncokb, custom = boolean("oncokb", True), boolean("custom", True)
+    annotated = oncokb or custom or tiers is None or len(tiers) > 0
+    return {"oncokb": oncokb, "custom": custom, "tiers": tiers, "annotated": annotated,
+            "hideVus": annotated and boolean("hideVus", False), "hideGermline": boolean("hideGermline", False)}
+
+
+def normalize_display(d: dict[str, Any] | None, drivers: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Viewing options with defaults filled in (port of normalizeDisplay in lib/oncoprint-assemble.ts).
+
+    The view's driver settings are resolved here too; display.annotate "none" and display.hideVUS
+    are their older spellings, read as defaults the settings override."""
     src = d or {}
     for k in src:
         if k not in DISPLAY_KEYS:
@@ -148,14 +187,24 @@ def normalize_display(d: dict[str, Any] | None) -> dict[str, Any]:
             for value, color in by_value.items():
                 if not isinstance(color, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
                     raise ValueError(f"display.colors['{track}']['{value}']: '{color}' is not a #rrggbb colour")
+    older: dict[str, Any] = {}
+    if one_of("annotate", _ANNOTATE_MODES, "oncokb") == "none":
+        older.update({"oncokb": False, "custom": False, "tiers": []})
+    if boolean("hideVUS", False):
+        older["hideVus"] = True
+    resolve_drivers(drivers)  # the settings as given are checked on their own, so an error names their own key
+    resolved = resolve_drivers({**older, **(drivers or {})})
     out: dict[str, Any] = {
         "showUnaltered": boolean("showUnaltered", True),
         "whitespace": boolean("whitespace", True),
         "gaps": one_of("gaps", _GAP_MODES, "none"),
         "clinicalLegends": one_of("clinicalLegends", _LEGEND_MODES, "all"),
         "colorByType": boolean("colorByType", True),
-        "hideVUS": boolean("hideVUS", False),
-        "annotate": one_of("annotate", _ANNOTATE_MODES, "oncokb"),
+        "colorByGermline": boolean("colorByGermline", True),
+        "hideVUS": resolved["hideVus"],
+        "annotate": "oncokb" if resolved["annotated"] else "none",
+        "hideGermline": resolved["hideGermline"],
+        "drivers": resolved,
         "whiteBackground": boolean("whiteBackground", False),
     }
     if src.get("style") is not None:
@@ -168,7 +217,7 @@ def normalize_display(d: dict[str, Any] | None) -> dict[str, Any]:
 def local_input(events: Table, clinical: Table | None = None, coverage: Table | None = None, genes: list[Any] | str | None = None,
                 group_by: str | None = None, patients: list[str] | None = None, sort: str | list[str] | None = None,
                 study: str | None = None, annotation_source: str | None = None, display: dict[str, Any] | None = None,
-                unit: str = "patient") -> dict[str, Any]:
+                unit: str = "patient", drivers: dict[str, Any] | None = None) -> dict[str, Any]:
     """Keyword arguments for `assemble_contract`, from local tables. Without coverage every column is covered for every gene."""
     ev = events_from_table(events)
     clin = clinical_from_table(clinical or [])
@@ -196,4 +245,4 @@ def local_input(events: Table, clinical: Table | None = None, coverage: Table | 
         groups = [{"name": "all", "pids": pids}]
     return dict(genes=gene_list, groups=groups, studies=[study or "local"], events=ev, coverage=cov,
                 is_driver=lambda r: bool(r.get("driver")), annotation_source=annotation_source or "driver flags from the input",
-                clinical=clin, heatmap=[], derived=[], sort=parse_sort(sort), line_gap=90, display=normalize_display(display), unit=unit)
+                clinical=clin, heatmap=[], derived=[], sort=parse_sort(sort), line_gap=90, display=normalize_display(display, drivers), unit=unit)

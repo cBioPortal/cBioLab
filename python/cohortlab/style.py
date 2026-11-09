@@ -41,6 +41,8 @@ def cell_layers(code: int, S: dict[str, Any] = STYLE) -> list[tuple[str, tuple[f
     for m in G["mutation"]["priority"]:
         if code & B[m["bit"]]:
             out.append((m["color"] if code & B["MUT_DRIVER"] else m["vus"], tuple(G["mutation"]["band"]), 0.0))
+            if code & B[G["germline"]["bit"]] and G["germline"]["show"]:
+                out.append((G["germline"]["color"], tuple(G["germline"]["band"]), 0.0))
             break
     return out
 
@@ -147,7 +149,7 @@ def glyph_presence(codes: Any, S: dict[str, Any] = STYLE) -> dict[str, Any]:
 
     `codes` may repeat; pass distinct ones (np.unique) for a large contract."""
     B, G = S["bits"], S["glyph"]
-    out = {"bits": 0, "mutDriver": 0, "mutVus": 0, "svDriver": False, "svVus": False}
+    out = {"bits": 0, "mutDriver": 0, "mutVus": 0, "svDriver": False, "svVus": False, "germline": False}
     for c in {int(x) for x in codes if int(x) > 0}:
         out["bits"] |= c
         if c & B[G["sv"]["bit"]]:
@@ -155,6 +157,8 @@ def glyph_presence(codes: Any, S: dict[str, Any] = STYLE) -> dict[str, Any]:
         for m in G["mutation"]["priority"]:
             if c & B[m["bit"]]:
                 out["mutDriver" if c & B["MUT_DRIVER"] else "mutVus"] |= B[m["bit"]]
+                if c & B[G["germline"]["bit"]]:
+                    out["germline"] = True
                 break
     return out
 
@@ -181,6 +185,8 @@ def gene_legend(S: dict[str, Any] = STYLE, present: dict[str, Any] | None = None
 
     for m in G["mutation"]["priority"]:
         pair(m, present is None or bool(present["mutDriver"] & B[m["bit"]]), present is None or bool(present["mutVus"] & B[m["bit"]]))
+    if G["germline"]["show"] and (present is None or present.get("germline")):
+        items.append((G["germline"]["label"], G["germline"]["color"], "germline"))
     pair(G["sv"], present is None or present["svDriver"], present is None or present["svVus"])
     items += [(o["label"], o["color"], "swatch") for o in G["cna"]["options"] if has(o["bit"])]
     items += [(o["label"], o["color"], "outline") for o in G["mrna"]["options"] if has(o["bit"])]
@@ -284,6 +290,8 @@ def style_for_display(S: dict[str, Any], display: dict[str, Any] | None) -> dict
     """The style a figure draws with, given its viewing options (port of styleForDisplay)."""
     d = display or {}
     out = S
+    if d.get("colorByGermline") is False:
+        out = {**out, "glyph": {**out["glyph"], "germline": {**out["glyph"]["germline"], "show": False}}}
     if d.get("colorByType") is False:
         one = out["glyph"]["mutation"]["single"]
         mut = {**out["glyph"]["mutation"], "priority": [{**m, "color": one["color"], "vus": one["vus"], "label": one["label"]}

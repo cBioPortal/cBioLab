@@ -6,6 +6,7 @@ import type { Clause, CohortDef, View } from "../../lib/types.ts";
 import { parseOql, OQL_PROFILE } from "../../lib/oql-parse.ts";
 import { ALTERATION_CELLS, cellLabel, pruneCodons } from "../../lib/lollipop.ts";
 import { arrange, type PageLayout } from "./page-doc.ts";
+import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
 
 const CLINICAL_SHOWN = 8;
 
@@ -133,6 +134,35 @@ export function linkMutations(vs: View[], changed: number): View[] {
 }
 
 /**
+ * The Results page's driver settings are the page's, as the portal's sliders menu is: a change made
+ * on one view that takes them (the oncoprint's menu, the plot's) is made on every other, so the
+ * tabs agree on what a driver is. The sources travel to every such view; what is hidden (VUS,
+ * germline) travels from an oncoprint, since a plot draws every mutation and offers no such
+ * filter. A plot follows only when it holds settings — the Results page's own Plots tab does.
+ * `prev` and `next` are the page's views before and after one edit.
+ */
+export function syncDrivers(prev: View[], next: View[]): View[] {
+  const takes = (v: View) => v.kind === "oncoprint" || v.kind === "plot";
+  const at = next.findIndex((v, i) => takes(v) && prev[i] && v.kind === prev[i].kind &&
+    JSON.stringify(driversOf(v as never) ?? null) !== JSON.stringify(driversOf(prev[i] as never) ?? null));
+  if (at < 0) return next;
+  const from = driversOf(next[at] as never) || {}, fromOncoprint = next[at].kind === "oncoprint";
+  return next.map((v, i) => {
+    if (i === at || !takes(v)) return v;
+    const own = driversOf(v as never) || {};
+    const merged = compactDrivers({ hideVus: own.hideVus, hideGermline: own.hideGermline,
+      ...(fromOncoprint ? { hideVus: from.hideVus, hideGermline: from.hideGermline } : {}),
+      oncokb: from.oncokb, custom: from.custom, tiers: from.tiers });
+    if (v.kind === "oncoprint") return withDrivers(v, merged);
+    const pv = v as unknown as { drivers?: DriverSettings };
+    if (pv.drivers == null) return v;
+    // a plot draws every mutation, so it keeps sources alone
+    const sources = compactDrivers({ oncokb: from.oncokb, custom: from.custom, tiers: from.tiers }) || {};
+    return { ...v, drivers: sources } as View;
+  });
+}
+
+/**
  * The queried patients with a structural variant in any queried gene (gene 1 or gene 2, as the
  * portal fetches them): the check behind the Structural Variants tab, sent beside the header's
  * count of Altered and Queried rather than as a request of its own.
@@ -206,7 +236,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     ...(genes.length >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, cohorts: queried })] }] : []),
     ...(plotY ? [{ title: "Plots", views: [v("Plot", { kind: "plot",
       x: expr ? (data.cna ? { source: "profile", profile: data.cna, gene: genes[0] } : { source: "alteration", gene: genes[0], by: "cna" }) : { source: "alteration", gene: genes[0], by: "mutationType" },
-      y: plotY, cohorts: queried, points: [{ cohort: "Altered" }, { rule: "outliers" }] })] }] : []),
+      y: plotY, cohorts: queried, points: [{ cohort: "Altered" }, { rule: "outliers" }], drivers: {} })] }] : []),
     // the portal's Mutations tab: one gene at a time, its lollipop over its mutation table
     { title: "Mutations", views: [v("Mutation diagram", { kind: "hotspots", genes: [genes[0]], cohorts: queried }),
         v("Mutation table", { kind: "mutations", gene: genes[0], cohorts: queried })],

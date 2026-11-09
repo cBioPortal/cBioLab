@@ -76,3 +76,7 @@ test("typed-array cells are read the same as plain ones", () => {
   const typed = contractToTsv(contract(["A", "B"], [{ kind: "gene", label: "KRAS", cells: Int32Array.from([BITS.AMP, 0]) }]));
   assert.equal(typed, plain);
 });
+
+test("a germline mutation is named in the tabular download", () => {
+  assert.equal(geneCellLabel(BITS.MISSENSE | BITS.GERMLINE), "Missense Mutation (unknown significance), Germline Mutation");
+});

@@ -59,16 +59,18 @@ export function aggregate(t: TrackShape, cells: ArrayLike<number>, order: ArrayL
     let best = 0; for (let i = 1; i < m; i++) if (scratch[i] > scratch[best]) best = i;
     return best;
   }
+  // a germline mark goes with the mutation classes it was drawn on: kept from the driver columns
+  // when the bucket shows those, else from the VUS columns
   let code = -1, drvMut = 0, vusMut = 0;
   for (let k = k0; k < k1; k++) {
     const c = cells[order ? order[k] : k];
     if (c === -1) continue;
     if (code === -1) code = 0;
     if (c <= 0) continue;
-    code |= c & ~MUT;
-    if (c & B.MUT_DRIVER) drvMut |= c & MUT; else vusMut |= c & MUT;
+    code |= c & ~(MUT | B.GERMLINE);
+    if (c & B.MUT_DRIVER) drvMut |= c & (MUT | B.GERMLINE); else vusMut |= c & (MUT | B.GERMLINE);
   }
-  return code === -1 ? -1 : code | (drvMut || vusMut);
+  return code === -1 ? -1 : code | (drvMut & MUT ? drvMut : vusMut);
 }
 
 /** Every bucket's code for one track over one group, the shape the conformance test compares. */

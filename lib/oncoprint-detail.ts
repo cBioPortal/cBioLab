@@ -6,7 +6,10 @@
 // the tooltip asks for one column and gets the specifics.
 import { chQueryRows, STUDY } from "./ch.ts";
 import { sq } from "./compiler.ts";
-import { buildAnnotationIndex } from "./annotation.ts";
+import { driverAnnotation } from "./annotation.ts";
+import { germlineCondSql } from "./driver-sql.ts";
+import { forData } from "./driver-settings.ts";
+import { normalizeDisplay } from "./oncoprint-assemble.ts";
 import type { OncoprintSpec } from "./views/oncoprint/types.ts";
 
 export interface ColumnDetail {
@@ -14,7 +17,13 @@ export interface ColumnDetail {
   study: string;
   unit: "patient" | "sample";
   /** one entry per alteration this column carries in the figure's genes */
-  alterations: { gene: string; kind: string; alteration: string; driver: boolean }[];
+  alterations: { gene: string; kind: string; alteration: string; driver: boolean;
+    /** the study's own driver call (cbp_driver) and its text, shown whatever the settings, as the portal does */
+    custom?: { call: string; annotation: string };
+    /** its tier (cbp_driver_tiers) and the tier's text */
+    tier?: { tier: string; annotation: string };
+    /** a germline mutation */
+    germline?: boolean }[];
   /** gene panels this column was assayed with, and which of the figure's genes they cover */
   panels: { panel: string; covers: string[] }[];
   /** the figure's genes no panel of this column covers */
@@ -48,11 +57,13 @@ export async function columnDetail(spec: OncoprintSpec, column: string): Promise
   const idCol = unit === "sample" ? "sample_unique_id" : "patient_unique_id";
 
   const ev = await chQueryRows(
-    "SELECT hugo_gene_symbol AS gene, variant_type AS vt, mutation_type AS mt, mutation_variant AS mv, cna_alteration AS cna\n" +
+    "SELECT hugo_gene_symbol AS gene, variant_type AS vt, mutation_type AS mt, mutation_variant AS mv, cna_alteration AS cna,\n" +
+    "       driver_filter AS df, driver_filter_annotation AS dfa, driver_tiers_filter AS dt, driver_tiers_filter_annotation AS dta, toUInt8(" + germlineCondSql() + ") AS germ\n" +
     "FROM " + db + ".genomic_event_derived\n" +
     "WHERE cancer_study_identifier = " + sq(study) + " AND " + idCol + " = " + uid + "\n" +
     "  AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")", conn);
-  const rows = ev.rows.map((r) => ({ pid: id, gene: r[0] as string, vt: r[1] as string, mt: r[2] as string, mv: r[3] as string, cna: r[4] as string }));
+  const rows = ev.rows.map((r) => ({ pid: id, gene: r[0] as string, vt: r[1] as string, mt: r[2] as string, mv: r[3] as string, cna: r[4] as string,
+    df: (r[5] as string) || "", dfa: (r[6] as string) || "", dt: (r[7] as string) || "", dta: (r[8] as string) || "", germ: Number(r[9]) === 1 }));
 
   const panelRows = await chQueryRows(
     "SELECT sp.gene_panel_id AS panel, groupUniqArray(pg.gene) AS covers\n" +
@@ -65,9 +76,11 @@ export async function columnDetail(spec: OncoprintSpec, column: string): Promise
   const panels = panelRows.rows.map((r) => ({ panel: String(r[0]), covers: ((r[1] as string[]) || []).filter(Boolean) }));
   const covered = new Set(panels.flatMap((p) => p.covers));
 
-  const annotation = spec.display?.annotate === "none"
-    ? { isDriver: () => false, source: "none — driver annotation turned off for this figure" }
-    : await buildAnnotationIndex(rows, genes, study);
+  // "every tier" is a source only where there is a tier (forData), judged here on this column's rows
+  const settings = forData(normalizeDisplay(spec.display, spec.drivers).drivers!, rows.some((r) => r.dt));
+  // a germline mutation the settings hide is not in the figure, so not in its tooltip
+  const shown = rows.filter((r) => !(settings.hideGermline && r.vt === "mutation" && r.germ));
+  const annotation = await driverAnnotation(settings, shown, genes, study);
 
   const label = (r: typeof rows[number]): { kind: string; alteration: string } => {
     if (r.vt === "mutation") return { kind: r.mt || "Mutation", alteration: r.mv || "" };
@@ -77,7 +90,12 @@ export async function columnDetail(spec: OncoprintSpec, column: string): Promise
   };
   return {
     column, study, unit,
-    alterations: rows.map((r) => ({ gene: r.gene, ...label(r), driver: annotation.isDriver(r) })),
+    alterations: shown.map((r) => ({ gene: r.gene, ...label(r), driver: annotation.isDriver(r),
+      ...(r.df && r.df.toLowerCase() !== "na" ? { custom: { call: r.df, annotation: r.dfa } } : {}),
+      ...(r.dt ? { tier: { tier: r.dt, annotation: r.dta } } : {}),
+      ...(r.germ ? { germline: true } : {}) }))
+      // hidden VUS are not drawn either
+      .filter((a) => !settings.hideVus || a.driver),
     panels,
     notProfiled: genes.filter((g) => !covered.has(g) && !rows.some((r) => r.gene === g)),
     annotation: annotation.source

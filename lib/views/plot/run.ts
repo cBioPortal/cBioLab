@@ -11,6 +11,7 @@ import { untimed, Untimed, type ViewRun, type DocView } from "../run.ts";
 import { resolveAxes } from "../../plot-profile.ts";
 import { assayEntitiesKnown } from "../shared.ts";
 import type { PlotView } from "./types.ts";
+import { resolveDrivers, type DriverSettings } from "../../driver-settings.ts";
 
 type BoxRow = { g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number };
 
@@ -487,6 +488,36 @@ async function runPlotByCohort(pv: PlotView, c: ViewRun): Promise<ViewResult | U
   };
 }
 
+type Axes = { x: PlotView["x"]; y: PlotView["y"]; colorBy?: PlotView["x"]; ringBy?: PlotView["x"] };
+/** an axis that tells Driver from VUS, or splits mutation types by it */
+const drivenAxis = (a: PlotView["x"] | undefined): boolean =>
+  !!a && a.source === "alteration" && "gene" in a && (a.by === "driver" || a.by === "mutationType");
+
+/**
+ * The view's driver sources, carried on each axis that calls drivers, so every participant
+ * computing the axis applies the same rule. Only the sources: hiding VUS or germline does not
+ * apply to a plot, as it does not on cBioPortal's Plots tab. An axis that names its own keeps
+ * them; a Driver-vs-VUS axis with none takes the defaults (lib/plot.ts).
+ */
+export function withDrivers(axes: Axes, drivers: DriverSettings | undefined): Axes {
+  resolveDrivers(drivers);
+  const sources: DriverSettings = {};
+  if (drivers?.oncokb === false) sources.oncokb = false;
+  if (drivers?.custom === false) sources.custom = false;
+  if (drivers?.tiers) sources.tiers = drivers.tiers;
+  const put = (a: PlotView["x"] | undefined) => a && drivers && drivenAxis(a) && !("drivers" in a && a.drivers)
+    ? { ...a, drivers: sources } as PlotView["x"] : a;
+  return { x: put(axes.x)!, y: put(axes.y)!, ...(axes.colorBy ? { colorBy: put(axes.colorBy) } : {}), ...(axes.ringBy ? { ringBy: put(axes.ringBy) } : {}) };
+}
+
+/** a caption line when the view's settings hide what a plot nonetheless draws */
+function driverNote(drivers: DriverSettings | undefined, spec: Axes): string {
+  if (!drivers || !(drivers.hideVus || drivers.hideGermline)) return "";
+  const hidden = [drivers.hideVus ? "mutations of unknown significance" : "", drivers.hideGermline ? "germline mutations" : ""].filter(Boolean).join(" and ");
+  return [spec.x, spec.y, spec.colorBy, spec.ringBy].some((a) => a && a.source === "alteration")
+    ? "The page's settings hide " + hidden + " elsewhere; this plot includes them, as cBioPortal's Plots tab does." : "";
+}
+
 export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;
   const pv = view as PlotView;
@@ -496,11 +527,12 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
   // a point is a sample unless the view asks for patients, as on cBioPortal's Plots tab
   const unit = pv.unit === "patient" ? "patient" as const : "sample" as const;
   // a profile axis is read as the studies describe the profile
-  let axes: { x: PlotView["x"]; y: PlotView["y"]; colorBy?: PlotView["x"]; ringBy?: PlotView["x"] };
+  let axes: Axes;
   try {
     const catalogs = await Promise.all(sites.map(async (st) => ({ study: st, catalog: (await c.studyProfiles(st)).catalog || [] })));
     axes = resolveAxes({ x: pv.x, y: pv.y, colorBy: pv.colorBy, ringBy: pv.ringBy }, catalogs);
     axes = await assayEntitiesKnown(c, axes, sites) as typeof axes;
+    axes = withDrivers(axes, pv.drivers);
   } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
   const spec = { x: axes.x, y: axes.y, unit,
     ...(axes.colorBy ? { colorBy: axes.colorBy } : {}), ...(axes.ringBy ? { ringBy: axes.ringBy } : {}) };
@@ -521,7 +553,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const pr: ViewResult = {
         kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), layerNote(ls, unit)].filter(Boolean).join(" ") || undefined
+        note: [coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined
       };
       return pr;
     } else {

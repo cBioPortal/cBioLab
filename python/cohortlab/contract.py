@@ -16,7 +16,7 @@ import numpy as np
 from .style import BITS, numeric_value  # the one bit definition, generated from lib/oncoprint-style.ts
 
 DEFAULT_DISPLAY: dict[str, Any] = {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all",
-                                   "colorByType": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False}
+                                   "colorByType": True, "colorByGermline": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False}
 NOT_PROFILED = -1
 _MAGIC = 0x4F504231  # "OPB1"
 
@@ -141,6 +141,8 @@ def gene_cell_label(code: int) -> str:
                       ("SPLICE", "Splice Mutation"), ("PROMOTER", "Promoter Mutation"), ("OTHER_MUT", "Other Mutation")):
         if code & BITS[bit]:
             parts.append(name + sig[bool(code & BITS["MUT_DRIVER"])])
+    if code & BITS["GERMLINE"]:
+        parts.append("Germline Mutation")
     if code & BITS["SV"]:
         parts.append("Structural Variant" + sig[bool(code & BITS["SV_DRIVER"])])
     if code & BITS["AMP"]:

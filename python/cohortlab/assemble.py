@@ -14,7 +14,7 @@ import numpy as np
 
 from .contract import BITS, DEFAULT_DISPLAY, NOT_PROFILED, Contract, Track
 from .gene_tracks import normalize_gene_tracks
-from .style import encode_numeric
+from .style import STYLE, encode_numeric
 
 
 def _round(x: float) -> int:
@@ -106,10 +106,16 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
     # gene's % does not count it, as cBioPortal's results view does. A merged row is profiled where any
     # member is, so it can still draw a call its gene's own row leaves out. Every call left out of a
     # row is counted, so the caption says so.
+    # A germline mutation is dropped like a VUS when the settings hide germline, and otherwise marks
+    # its cell GERMLINE when the mutation the cell shows (class drawn, at its driver call) is germline.
     hide_vus = bool((display or {}).get("hideVUS"))
+    hide_germ = bool((display or {}).get("hideGermline"))
     hidden_vus = 0
+    hidden_germ = 0
     off_panel = 0
     vus_mut: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+    germ_drv: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+    germ_vus: dict[int, tuple[np.ndarray, np.ndarray]] = {}
     for r in events:
         i = pid_index.get(r["pid"])
         if i is None:
@@ -132,11 +138,18 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             off_panel += 1
         if not covered:
             continue
+        mut = r["vt"] == "mutation"
+        germ = mut and bool(r.get("germ"))
+        if germ and hide_germ:
+            hidden_germ += 1
+            continue
         driver = is_driver(r)
         if hide_vus and not driver:
             hidden_vus += 1
             continue
-        mut = r["vt"] == "mutation"
+        if germ:
+            for cells in covered:
+                (germ_drv if driver else germ_vus).setdefault(id(cells), (cells, np.zeros(len(cells), dtype=np.uint16)))[1][i] |= bit
         if mut and not driver:
             # a VUS mutation's class joins the cell only where no driver mutation does (the portal's precedence)
             for cells in covered:
@@ -150,6 +163,16 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
     for cells, held in vus_mut.values():
         free = (held > 0) & ((cells & BITS["MUT_DRIVER"]) == 0)
         cells[free] |= held[free].astype(cells.dtype)
+    for key in set(germ_drv) | set(germ_vus):
+        cells = (germ_drv.get(key) or germ_vus[key])[0]
+        drv = germ_drv[key][1] if key in germ_drv else np.zeros(len(cells), dtype=np.uint16)
+        vus = germ_vus[key][1] if key in germ_vus else np.zeros(len(cells), dtype=np.uint16)
+        shown = np.zeros(len(cells), dtype=np.int64)
+        for m in STYLE["glyph"]["mutation"]["priority"]:
+            b = BITS[m["bit"]]
+            shown = np.where((shown == 0) & (cells > 0) & ((cells & b) != 0), b, shown)
+        germ = np.where((cells & BITS["MUT_DRIVER"]) != 0, drv, vus).astype(np.int64)
+        cells[(shown > 0) & ((germ & shown) != 0)] |= BITS["GERMLINE"]
 
     # ---- clinical tracks -------------------------------------------------
     clin: list[Track] = []
@@ -357,10 +380,18 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                                ("one patient; a patient's samples are collapsed (clinical: patient rows win, else one "
                                 "sample's value; heatmap: mean across samples; VAF: max)"),
                      "annotation": annotation_source, "lineGap": line_gap,
-                     "sort": [("-" if s.get("dir") == "desc" else "") + s["track"] for s in sort]},
+                     "sort": [("-" if s.get("dir") == "desc" else "") + s["track"] for s in sort],
+                     **_custom_driver_report(events)},
         display=dict(display) if display else dict(DEFAULT_DISPLAY),
-        stats={"nColumns": len(columns), "ms": 0, **({"hiddenVus": hidden_vus} if hide_vus else {}),
+        stats={"nColumns": len(columns), "ms": 0, **({"hiddenVus": hidden_vus} if hide_vus else {}), **({"hiddenGermline": hidden_germ} if hide_germ else {}),
                **({"offPanel": off_panel} if off_panel else {})})
+
+
+def _custom_driver_report(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """Port of customDriverReport: any cbp_driver value, and the sorted cbp_driver_tiers values."""
+    binary = any(e.get("df") for e in events)
+    tiers = sorted({e["dt"] for e in events if e.get("dt")})
+    return {"customDrivers": {"binary": binary, "tiers": tiers}} if binary or tiers else {}
 
 
 def _num(x: float) -> int | float:

@@ -397,6 +397,7 @@ export interface CompileCtx {
 }
 
 // ---------- analysis document ----------------------------------------------
+import type { ResolvedDrivers } from "./driver-settings.ts";
 import type { GeneTrackSpec } from "./gene-tracks.ts";
 import type { TableQuery, ColumnValues } from "./table-query.ts";
 export type { TableQuery, ColumnValues, ColumnFilter, TextFilterOp } from "./table-query.ts";
@@ -431,13 +432,15 @@ export interface DisplaySpec {
   clinicalLegends?: "all" | "none";
   /** colour each mutation class separately (default true); off draws them all as one */
   colorByType?: boolean;
+  /** mark a germline mutation with a white stripe (default true) — the portal's "Somatic vs Germline" */
+  colorByGermline?: boolean;
   /**
-   * Drop alterations the annotation source does not call drivers (default false). This changes
-   * the NUMBERS, not only the picture: the hidden alterations leave the altered fraction too,
-   * which is why it lives in the spec and the contract reports how many went.
+   * The older spelling of `drivers.hideVus` (the view's driver settings, lib/driver-settings.ts),
+   * still read. This changes the NUMBERS, not only the picture: the hidden alterations leave the
+   * altered fraction too, which is why it lives in the spec and the contract reports how many went.
    */
   hideVUS?: boolean;
-  /** driver calls: the pinned OncoKB store, or none at all (default "oncokb") */
+  /** the older spelling of driver sources: "none" is `drivers: {oncokb: false, custom: false, tiers: []}` */
   annotate?: "oncokb" | "none";
   /** unaltered cells drawn white rather than grey, for print (default false) */
   whiteBackground?: boolean;
@@ -446,8 +449,13 @@ export interface DisplaySpec {
   /** per-track, per-category colours: {trackLabel: {value: "#rrggbb"}} (Phase 1b) */
   colors?: Record<string, Record<string, string>>;
 }
+/**
+ * The viewing options a contract was drawn with. `hideVUS` and `annotate` are what the view's
+ * driver settings come to ("none" when no driver source is on), `hideGermline` theirs too, and
+ * `drivers` the settings in full.
+ */
 export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends" | "colorByType" | "hideVUS" | "annotate" | "whiteBackground">>
-  & Pick<DisplaySpec, "style" | "colors">;
+  & Pick<DisplaySpec, "style" | "colors" | "colorByGermline"> & { hideGermline?: boolean; drivers?: ResolvedDrivers };
 export interface IncidenceCurve {
   cohort: string;
   n: number; events: number; competing: number; censored: number;
@@ -819,6 +827,8 @@ export interface Contract {
     /** what one column is, and what was collapsed or expanded to make it */
     column?: string;
     annotation: string; lineGap: number; sort: string[];
+    /** the study's own driver calls among the figure's alterations: any cbp_driver value, and the cbp_driver_tiers values */
+    customDrivers?: { binary: boolean; tiers: string[] };
   };
   /** resolved viewing options — renderers read these, never their own defaults */
   display: ResolvedDisplay;
@@ -826,6 +836,8 @@ export interface Contract {
   stats: { nColumns: number; ms: number; queryMs?: number; assembleMs?: number;
     /** cells whose only alterations were of unknown significance, dropped by display.hideVUS */
     hiddenVus?: number;
+    /** germline mutations dropped by drivers.hideGermline; absent unless it is on */
+    hiddenGermline?: number;
     /** calls on a cell no panel covers (off-panel), not drawn: the cell stays not profiled; absent when none */
     offPanel?: number };
   /** the SQL this contract was built from, when the caller asked for provenance */

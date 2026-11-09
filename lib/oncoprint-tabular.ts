@@ -16,6 +16,7 @@ export function geneCellLabel(code: number): string {
   if (code & BITS.SPLICE) parts.push("Splice Mutation" + mut);
   if (code & BITS.PROMOTER) parts.push("Promoter Mutation" + mut);
   if (code & BITS.OTHER_MUT) parts.push("Other Mutation" + mut);
+  if (code & BITS.GERMLINE) parts.push("Germline Mutation");
   if (code & BITS.SV) parts.push("Structural Variant" + (code & BITS.SV_DRIVER ? " (putative driver)" : " (unknown significance)"));
   if (code & BITS.AMP) parts.push("Amplification");
   if (code & BITS.HOMDEL) parts.push("Deep Deletion");

@@ -58,7 +58,13 @@ title there.
   - [ ] NDEx
 - [ ] **Mutation annotation breadth** — CIViC, functional impact, gnomAD / ClinVar / dbSNP / SIGNAL columns, HGVSg/c, PTM tracks, the PDB 3D structure viewer, a transcript dropdown
 - [ ] **OQL coverage** — `GAIN`, `HETLOSS`, `CNA>=` (blocked by data: only high-level ±2 calls are loaded), `_GERMLINE` / `_SOMATIC` (blocked by the parser), per-track OQL inside merged oncoprint groups
-- [ ] **Driver-annotation settings** — custom driver and tier annotations, germline/somatic filtering and colouring, driver/VUS colouring on plots (refused today as "not supported yet")
+- [x] **Driver-annotation settings** — the view's `drivers` (OncoKB, the study's `cbp_driver` and `cbp_driver_tiers`, Show only drivers, Show only somatic) in the oncoprint's "mutations" menu, the germline stripe, Driver vs VUS and Driver/VUS mutation types on plots; one setting across the Results page's Oncoprint and Plots tabs (PR #168 open)
+  - [ ] The other Results tabs following the settings: Cancer Types Summary, Mutual Exclusivity, the Mutations tab's lollipop and table, Comparison/Survival's Altered and Unaltered groups, Download, Pathways, the header's altered count (the portal's apply to every tab but Plots, Co-expression and CN Segments)
+  - [ ] The menu as a page-level sliders button beside Modify query (ours sits in the oncoprint's toolbar, where the custom calls it lists are known)
+  - [ ] Hotspots as a source: no Cancer Hotspots data is loaded (offered disabled, refused in a document)
+  - [ ] "Show only profiled" (`hide_unprofiled_samples`) with its all/any radios
+  - [ ] OncoKB's germline rule (Pathogenic / Likely Pathogenic for a germline mutation): the store holds one call per alteration
+  - [ ] A plot's menu lists no tiers (a plot does not report its data's tiers); the plot tooltip's OncoKB and hotspot icons
 - [ ] **Oncoprint export** — PDF and tabular
 
 ## Lower — resources, tools and niche features
@@ -75,7 +81,9 @@ title there.
 
 - [ ] **Per-user, per-study access control** — the largest gap for any private instance; today a study is allowed or denied for the whole deployment (`STUDY_DENY`, `STUDY_ALLOW_RESTRICTED`)
 - [ ] **Data-governance switches** — an equivalent of `skin.hide_download_controls` and `download_custom_buttons_json`; and "Clear cache" restricted (open to every visitor today)
-- [ ] **Custom driver annotations** — `cbp_driver` / `cbp_driver_tiers` are imported but nothing uses them
+- [x] **Custom driver annotations** — `cbp_driver` / `cbp_driver_tiers` call drivers on the oncoprint and plots, and show in the oncoprint's tooltip (PR #168 open)
+  - [ ] The mutation table's Custom Driver and Custom Driver Tier columns
+  - [ ] The menu labels from deployment config (`oncoprint.custom_driver_annotation.*.menu_label`); ours are the portal's defaults
 - [ ] **Instance defaults** — deployment-level defaults for the oncoprint, clinical tracks, OncoKB/hotspot/VUS, table columns, survival display and query-page gene sets
 - [ ] **Branding and homepage curation** — blurb, footer, logos, priority studies, study tags, banners
 - [ ] **Authentication options** — SAML, LDAP, Keycloak roles, optional sign-in, data-access tokens (OIDC only today)

@@ -15,7 +15,8 @@ export const STYLE = {
     PROMOTER: 512,    // 5'Flank / promoter mutations, which the portal colours separately
     MRNA_HIGH: 1024, MRNA_LOW: 2048, PROT_HIGH: 4096, PROT_LOW: 8192,
     MUT_DRIVER: 16384, // the mutation classes in the cell are its driver mutations' (see the assembler)
-    SV_DRIVER: 32768   // the cell's structural variant is a driver
+    SV_DRIVER: 32768,  // the cell's structural variant is a driver
+    GERMLINE: 65536    // the mutation the cell shows is germline (the class and driver call drawn are a germline mutation's)
   },
   palette: {
     paper: "#ffffff", unaltered: "#bebebe", derived: "#0f86a1",
@@ -78,6 +79,8 @@ export const STYLE = {
     ],
     /** one colour for every class, used when a figure turns colour-by-type off */
     single: { color: "#008000", vus: "#53d400", label: "Mutation" } },
+    // a germline mutation: a thin white stripe across the mutation glyph (the portal's geneticrules.ts germline_rule_params)
+    germline: { bit: "GERMLINE", color: "#ffffff", band: [0.46, 0.54] as [number, number], label: "Germline Mutation", show: true },
     /** what a legend entry adds when a glyph's driver and VUS colours differ */
     driverLabels: { driver: " (putative driver)", vus: " (unknown significance)" },
     /** a numeric track drawn as bars (the portal's bar rule: green up from the bottom of the cell) */
@@ -143,7 +146,11 @@ export function cellLayers(code: number, S: Style): Layer[] {
   for (const o of G.mrna.options) if (code & B[o.bit]) { out.push({ color: o.color, band: G.mrna.band, stroke: G.mrna.stroke }); break; }
   for (const o of G.protein.options) if (code & B[o.bit]) out.push({ color: o.color, band: o.band });
   if (code & B[G.sv.bit]) out.push({ color: code & B.SV_DRIVER ? G.sv.color : G.sv.vus, band: G.sv.band });
-  for (const m of G.mutation.priority) if (code & B[m.bit]) { out.push({ color: code & B.MUT_DRIVER ? m.color : m.vus, band: G.mutation.band }); break; }
+  for (const m of G.mutation.priority) if (code & B[m.bit]) {
+    out.push({ color: code & B.MUT_DRIVER ? m.color : m.vus, band: G.mutation.band });
+    if (code & B[G.germline.bit] && G.germline.show) out.push({ color: G.germline.color, band: G.germline.band });
+    break;
+  }
   return out;
 }
 
@@ -279,7 +286,7 @@ export function trackTooltipLines(t: TrackSummary, columns: number, unit = "pati
   return lines;
 }
 
-export interface LegendItem { label: string; color: string; kind: "swatch" | "outline" | "notProfiled" }
+export interface LegendItem { label: string; color: string; kind: "swatch" | "outline" | "notProfiled" | "germline" }
 
 /**
  * What a figure's gene cells actually draw, for its legend: every bit present, and for the
@@ -287,10 +294,10 @@ export interface LegendItem { label: string; color: string; kind: "swatch" | "ou
  * entry is the one `cellLayers` picks by priority, not every class a cell carries, so a legend
  * never lists a colour the figure does not show.
  */
-export interface GlyphPresence { bits: number; mutDriver: number; mutVus: number; svDriver: boolean; svVus: boolean }
+export interface GlyphPresence { bits: number; mutDriver: number; mutVus: number; svDriver: boolean; svVus: boolean; germline?: boolean }
 export function glyphPresence(tracks: readonly { kind: string; cells: ArrayLike<number> }[], S: Style = STYLE): GlyphPresence {
   const B = S.bits as Record<string, number>;
-  const out: GlyphPresence = { bits: 0, mutDriver: 0, mutVus: 0, svDriver: false, svVus: false };
+  const out: GlyphPresence = { bits: 0, mutDriver: 0, mutVus: 0, svDriver: false, svVus: false, germline: false };
   // altered cells take a handful of distinct codes; look each one up once
   const seen = new Set<number>();
   for (const t of tracks) {
@@ -301,7 +308,11 @@ export function glyphPresence(tracks: readonly { kind: string; cells: ArrayLike<
   for (const c of seen) {
     out.bits |= c;
     if (c & B[S.glyph.sv.bit]) { if (c & B.SV_DRIVER) out.svDriver = true; else out.svVus = true; }
-    for (const m of S.glyph.mutation.priority) if (c & B[m.bit]) { if (c & B.MUT_DRIVER) out.mutDriver |= B[m.bit]; else out.mutVus |= B[m.bit]; break; }
+    for (const m of S.glyph.mutation.priority) if (c & B[m.bit]) {
+      if (c & B.MUT_DRIVER) out.mutDriver |= B[m.bit]; else out.mutVus |= B[m.bit];
+      if (c & B[S.glyph.germline.bit]) out.germline = true;
+      break;
+    }
   }
   return out;
 }
@@ -321,6 +332,7 @@ export function geneLegend(S: Style = STYLE, present?: GlyphPresence): LegendIte
   };
   const has = (bit: string): boolean => !present || (present.bits & B[bit]) !== 0;
   for (const m of G.mutation.priority) pair(m, !present || (present.mutDriver & B[m.bit]) !== 0, !present || (present.mutVus & B[m.bit]) !== 0);
+  if (G.germline.show && (!present || present.germline)) items.push({ label: G.germline.label, color: G.germline.color, kind: "germline" });
   pair(G.sv, !present || present.svDriver, !present || present.svVus);
   for (const o of G.cna.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "swatch" });
   for (const o of G.mrna.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "outline" });
@@ -416,10 +428,12 @@ export function trackCategoryColor(track: { label: string; categories?: string[]
  * - colour-by-type off: every mutation class takes the single colour pair and one label;
  * - annotation off: nothing is called a driver, so every glyph draws its driver colour and the
  *   legend has one entry per glyph — the portal's rule set without recurrence;
- * - white background: unaltered and not-profiled cells are white (not-profiled keeps its line).
+ * - white background: unaltered and not-profiled cells are white (not-profiled keeps its line);
+ * - somatic vs germline off: a germline mutation draws without its stripe, and the legend drops it.
  */
-export function styleForDisplay(S: Style, display?: { colorByType?: boolean; annotate?: string; whiteBackground?: boolean }): Style {
+export function styleForDisplay(S: Style, display?: { colorByType?: boolean; colorByGermline?: boolean; annotate?: string; whiteBackground?: boolean }): Style {
   let out = S;
+  if (display?.colorByGermline === false) out = { ...out, glyph: { ...out.glyph, germline: { ...out.glyph.germline, show: false } } };
   if (display?.colorByType === false) {
     const one = out.glyph.mutation.single;
     out = { ...out, glyph: { ...out.glyph, mutation: { ...out.glyph.mutation,

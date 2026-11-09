@@ -8,6 +8,7 @@
 //   clinical  patient  ATTR1  ATTR2 ...             attribute names may carry Oncoprinter's (number)/(string) suffix
 //   coverage  patient  genes                        comma-separated genes the patient's panel covers
 import { normalizeDisplay, type AssembleInput, type EventRow, type SortKey } from "./oncoprint-assemble.ts";
+import type { DriverSettings } from "./driver-settings.ts";
 import { geneSymbols, type GeneTrackSpec } from "./gene-tracks.ts";
 import type { DisplaySpec } from "./types.ts";
 import { CLINICAL_MISSING_VALUES } from "./event-names.ts";
@@ -53,11 +54,12 @@ export function eventsFromTable(rows: Table): LocalEvent[] {
     if (!pid || !gene || !type) continue;
     let driver = /^(1|true|yes|driver)$/i.test(String(r.driver ?? r.Driver ?? ""));
     if (type.endsWith("_DRIVER")) { driver = true; type = type.slice(0, -7); }
-    if (type.endsWith("_GERMLINE")) type = type.slice(0, -9);
+    const germ = type.endsWith("_GERMLINE");
+    if (germ) type = type.slice(0, -9);
     if (type.endsWith("_DRIVER")) { driver = true; type = type.slice(0, -7); }
     const m = TYPE_MAP[type];
     if (!m) throw new Error("events: unknown type '" + type + "' for " + pid + "/" + gene + " (accepted: " + Object.keys(TYPE_MAP).join(", ") + ", optional _DRIVER suffix)");
-    out.push({ pid, gene, vt: m.vt!, mt: m.mt, cna: m.cna, mv: r.alteration ?? r.Alteration, driver });
+    out.push({ pid, gene, vt: m.vt!, mt: m.mt, cna: m.cna, mv: r.alteration ?? r.Alteration, driver, ...(germ ? { germ: true } : {}) });
   }
   return out;
 }
@@ -109,6 +111,11 @@ export interface LocalOptions {
   annotationSource?: string;
   /** viewing options; validated and defaulted like any other spec */
   display?: DisplaySpec;
+  /**
+   * driver settings: the tables carry their own driver flags, so only what is left out applies
+   * here — hideVus, and hideGermline for a type marked _GERMLINE
+   */
+  drivers?: DriverSettings;
   /** what a column is; local tables decide for themselves what their rows are keyed by */
   unit?: "patient" | "sample";
 }
@@ -141,6 +148,6 @@ export function localInput(o: LocalOptions): AssembleInput {
   return {
     genes: geneList, groups, studies: [o.study || "local"], events, coverage,
     isDriver: (r) => !!(r as LocalEvent).driver, annotationSource: o.annotationSource || "driver flags from the input",
-    clinical, heatmap: [], derived: [], sort: parseSort(o.sort), lineGap: 90, display: normalizeDisplay(o.display), unit: o.unit
+    clinical, heatmap: [], derived: [], sort: parseSort(o.sort), lineGap: 90, display: normalizeDisplay(o.display, o.drivers), unit: o.unit
   };
 }

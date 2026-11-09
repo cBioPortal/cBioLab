@@ -9,11 +9,15 @@
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { STYLE, encodeNumeric } from "./oncoprint-style.ts";
+import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
 import type { Contract, Track, GroupRange, ResolvedDisplay, DisplaySpec } from "./types.ts";
 import type { ZReference, SortKeySpec } from "./views/oncoprint/types.ts";
 
 // gene-track cell bitmask: one definition, the style's
 export const BITS = STYLE.bits;
+const PRIORITY_BITS = STYLE.glyph.mutation.priority.map((m) => BITS[m.bit as keyof typeof BITS]);
+/** the mutation class bit a cell draws (the first by display priority), 0 for none */
+const shownMutation = (c: number): number => { for (const b of PRIORITY_BITS) if (c & b) return b; return 0; };
 export const NOT_PROFILED = -1;
 
 export function mutClassBit(mt: string | undefined): number {
@@ -29,7 +33,12 @@ export function mutClassBit(mt: string | undefined): number {
 }
 
 /** One genomic event: a mutation (vt "mutation", mt = mutation type), a structural variant, or a CNA call. */
-export interface EventRow { pid: string; gene: string; vt: string; mt?: string; mv?: string; cna?: string | number }
+/**
+ * One alteration of a column. `df` / `dt` are the study's own driver call and tier (cbp_driver,
+ * cbp_driver_tiers) and `germ` marks a germline mutation; rows from an older peer or a local file
+ * may lack them, which reads as no call and somatic.
+ */
+export interface EventRow { pid: string; gene: string; vt: string; mt?: string; mv?: string; cna?: string | number; df?: string | null; dt?: string | null; germ?: boolean | number | null }
 
 export interface SortKey { track: string; dir: "asc" | "desc" }
 
@@ -42,18 +51,22 @@ export function normalizeSort(sort: SortKeySpec[] | undefined): { track: string;
   });
 }
 
-const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "hideVUS", "annotate", "whiteBackground", "style", "colors"] as const;
+const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground", "style", "colors"] as const;
 const GAP_MODES = ["none", "gaps", "pct", "pct-left"] as const;
 const LEGEND_MODES = ["all", "none"] as const;
 const ANNOTATE_MODES = ["oncokb", "none"] as const;
 
-/** Viewing options with defaults filled in. Unknown keys and values are rejected, never ignored. */
-export function normalizeDisplay(d: DisplaySpec | undefined): ResolvedDisplay {
+/**
+ * Viewing options with defaults filled in. Unknown keys and values are rejected, never ignored.
+ * The view's driver settings (`drivers`) are resolved here too: `display.annotate: "none"` and
+ * `display.hideVUS` are their older spellings, read as defaults the settings override.
+ */
+export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: DriverSettings): ResolvedDisplay {
   const src = (d || {}) as Record<string, unknown>;
   for (const k of Object.keys(src))
     if (!(DISPLAY_KEYS as readonly string[]).includes(k))
       throw new Error("display: unknown option '" + k + "' (accepted: " + DISPLAY_KEYS.join(", ") + ")");
-  const bool = (k: "showUnaltered" | "whitespace" | "colorByType" | "hideVUS" | "whiteBackground", dflt: boolean): boolean => {
+  const bool = (k: "showUnaltered" | "whitespace" | "colorByType" | "colorByGermline" | "hideVUS" | "whiteBackground", dflt: boolean): boolean => {
     const v = src[k];
     if (v === undefined) return dflt;
     if (typeof v !== "boolean") throw new Error("display." + k + " must be true or false");
@@ -76,14 +89,23 @@ export function normalizeDisplay(d: DisplaySpec | undefined): ResolvedDisplay {
           throw new Error("display.colors['" + track + "']['" + value + "']: '" + String(color) + "' is not a #rrggbb colour");
     }
   }
+  const older: DriverSettings = {
+    ...(oneOf("annotate", ANNOTATE_MODES, "oncokb") === "none" ? { oncokb: false, custom: false, tiers: [] } : {}),
+    ...(bool("hideVUS", false) ? { hideVus: true } : {}),
+  };
+  resolveDrivers(driverSpec);   // the settings as given are checked on their own, so an error names their own key
+  const drivers = resolveDrivers({ ...older, ...(driverSpec || {}) });
   return {
     showUnaltered: bool("showUnaltered", true),
     whitespace: bool("whitespace", true),
     gaps: oneOf("gaps", GAP_MODES, "none"),
     clinicalLegends: oneOf("clinicalLegends", LEGEND_MODES, "all"),
     colorByType: bool("colorByType", true),
-    hideVUS: bool("hideVUS", false),
-    annotate: oneOf("annotate", ANNOTATE_MODES, "oncokb"),
+    colorByGermline: bool("colorByGermline", true),
+    hideVUS: drivers.hideVus,
+    annotate: drivers.annotated ? "oncokb" : "none",
+    hideGermline: drivers.hideGermline,
+    drivers,
     whiteBackground: bool("whiteBackground", false),
     ...(src.style !== undefined ? { style: src.style as Record<string, unknown> } : {}),
     ...(colors !== undefined ? { colors } : {})
@@ -153,6 +175,21 @@ export interface AssembleInput {
   clusterRank?: Map<string, number>;
 }
 
+/**
+ * What the figure's alterations carry of the study's own driver calls, for the settings menu to
+ * offer them (the portal's computeCustomDriverAnnotationReport): whether any has a cbp_driver
+ * value, and every cbp_driver_tiers value, sorted. Nothing when there is neither.
+ */
+function customDriverReport(events: readonly EventRow[]): { customDrivers?: { binary: boolean; tiers: string[] } } {
+  let binary = false;
+  const tiers = new Set<string>();
+  for (const r of events) {
+    if (r.df) binary = true;
+    if (r.dt) tiers.add(r.dt);
+  }
+  return binary || tiers.size ? { customDrivers: { binary, tiers: [...tiers].sort() } } : {};
+}
+
 export function assembleContract(input: AssembleInput): Contract {
   const t0 = Date.now();
   const PROF = !!process.env.ONCOPRINT_PROFILE;
@@ -207,9 +244,19 @@ export function assembleContract(input: AssembleInput): Contract {
   // results view does (altered AND sequenced over sequenced). A merged row is profiled where any
   // member is, so it can still draw a call its gene's own row leaves out. Every call left out of
   // a row is counted, so the caption says so.
-  const hideVus = !!input.display?.hideVUS;
-  let hiddenVus = 0, offPanel = 0;
+  //
+  // A germline mutation is dropped like a VUS when the settings hide germline, and otherwise marks
+  // its cell GERMLINE when the mutation the cell shows — the class drawn, at its driver call — is a
+  // germline one (the portal's disp_germ), so the stripe never sits on a somatic call's glyph.
+  const hideVus = !!input.display?.hideVUS, hideGerm = !!input.display?.hideGermline;
+  let hiddenVus = 0, hiddenGerm = 0, offPanel = 0;
   const vusMut = new Map<Int32Array, Uint16Array>();   // mutation class bits all sit below 1024
+  const germDrv = new Map<Int32Array, Uint16Array>(), germVus = new Map<Int32Array, Uint16Array>();
+  const mark = (m: Map<Int32Array, Uint16Array>, cells: Int32Array, i: number, bit: number): void => {
+    let held = m.get(cells);
+    if (!held) { held = new Uint16Array(cells.length); m.set(cells, held); }
+    held[i] |= bit;
+  };
   for (const r of events) {
     const i = pidIndex.get(r.pid);
     if (i === undefined) continue;
@@ -224,14 +271,13 @@ export function assembleContract(input: AssembleInput): Contract {
     const covered = rows.filter((cells) => cells[i] !== NOT_PROFILED);
     if (covered.length < rows.length) offPanel++;
     if (!covered.length) continue;
+    const germ = mut && !!r.germ;
+    if (germ && hideGerm) { hiddenGerm++; continue; }
     const driver = isDriver(r);
     if (hideVus && !driver) { hiddenVus++; continue; }
+    if (germ) for (const cells of covered) mark(driver ? germDrv : germVus, cells, i, bit);
     if (mut && !driver) {
-      for (const cells of covered) {
-        let held = vusMut.get(cells);
-        if (!held) { held = new Uint16Array(cells.length); vusMut.set(cells, held); }
-        held[i] |= bit;
-      }
+      for (const cells of covered) mark(vusMut, cells, i, bit);
       continue;
     }
     if (driver) bit |= BITS.DRIVER | (mut ? BITS.MUT_DRIVER : bit === BITS.SV ? BITS.SV_DRIVER : 0);
@@ -239,6 +285,15 @@ export function assembleContract(input: AssembleInput): Contract {
   }
   for (const [cells, held] of vusMut)
     for (let i = 0; i < cells.length; i++) if (held[i] && !(cells[i] & BITS.MUT_DRIVER)) cells[i] |= held[i];
+  for (const cells of new Set([...germDrv.keys(), ...germVus.keys()])) {
+    const drv = germDrv.get(cells), vus = germVus.get(cells);
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
+      if (c <= 0) continue;
+      const shown = shownMutation(c);
+      if (shown && ((c & BITS.MUT_DRIVER ? drv : vus)?.[i] ?? 0) & shown) cells[i] = c | BITS.GERMLINE;
+    }
+  }
 
   phase("gene cells");
 
@@ -542,8 +597,9 @@ export function assembleContract(input: AssembleInput): Contract {
         ? "one sample; a cohort selects patients, so every sample of a selected patient is drawn — including samples on which the cohort's own criterion was never measured. Patient-level clinical values repeat across that patient's samples."
         : "one patient; a patient's samples are collapsed (clinical: patient rows win, else one sample's value; heatmap: mean across samples; VAF: max)",
       annotation: input.annotationSource, lineGap,
-      sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track) },
+      sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track),
+      ...customDriverReport(events) },
     display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false },
-    stats: { nColumns: columns.length, ms: Date.now() - t0, ...(input.display?.hideVUS ? { hiddenVus } : {}), ...(offPanel ? { offPanel } : {}) }
+    stats: { nColumns: columns.length, ms: Date.now() - t0, ...(input.display?.hideVUS ? { hiddenVus } : {}), ...(hideGerm ? { hiddenGermline: hiddenGerm } : {}), ...(offPanel ? { offPanel } : {}) }
   };
 }

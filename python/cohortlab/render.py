@@ -59,13 +59,15 @@ def aggregate(track: Track, cells: np.ndarray, edges: np.ndarray) -> np.ndarray:
     # bucket has any (the portal's precedence), else from every column
     prof = cells != -1
     alt = np.where(cells > 0, cells, 0).astype(np.int64)
-    mut = alt & _MUT
+    # a germline mark goes with the mutation classes it was drawn on
+    mut_g = _MUT | BITS["GERMLINE"]
+    mut = alt & mut_g
     drv = (alt & BITS["MUT_DRIVER"]) != 0
-    code = np.bitwise_or.reduceat(alt & ~_MUT, starts)
+    code = np.bitwise_or.reduceat(alt & ~mut_g, starts)
     drv_mut = np.bitwise_or.reduceat(np.where(drv, mut, 0), starts)
     vus_mut = np.bitwise_or.reduceat(np.where(drv, 0, mut), starts)
     any_prof = np.add.reduceat(prof.astype(np.int64), starts) > 0
-    return np.where(any_prof, code | np.where(drv_mut > 0, drv_mut, vus_mut), -1)
+    return np.where(any_prof, code | np.where((drv_mut & _MUT) > 0, drv_mut, vus_mut), -1)
 
 
 def bucket_codes(c: Contract, buckets: int) -> list[dict[str, Any]]:

@@ -159,7 +159,7 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
       searchEntities(p.study || "", p.profile, "").then((r) => r.entities[0] && set({ source: "profile", profile: p.profile, entity: r.entities[0].entity }), () => {});
       return;
     }
-    set({ source: "profile", profile: p.profile, gene, ...(u === "mutation" ? { by: a.by === "mutated" ? "mutated" : "mutationType" } : {}) });
+    set({ source: "profile", profile: p.profile, gene, ...(u === "mutation" ? { by: a.by === "mutated" || a.by === "driver" ? a.by : "mutationType" } : {}) });
   };
   // the Data list: the profiles grouped under their type, in the study's own order
   const groups: { label: string; items: { value: string; label: string; disabled?: string }[] }[] = [];
@@ -221,11 +221,13 @@ export function AxisPicker({ side, axis, attrs, catalog, busy, loading, onChange
               ? set({ source: "alteration", oql: c.genes.map((g) => g + ": MUT").join(", "), by: "statement" })
               : set({ ...(a.source === "profile" ? a : { source: "profile", profile: current.profile }), gene: c.genes[0] || "" })} />)}
         {use === "mutation" && field("Plot mutations by",
-          <OptionSelect className={w} value={a.by === "mutated" ? "mutated" : "mutationType"} disabled={busy} ariaLabel={side + " mutations by"}
-            title="group the cases by their mutation's type, or by whether they have one"
+          <OptionSelect className={w} value={a.by === "mutated" || a.by === "driver" ? a.by : "mutationType"} disabled={busy} ariaLabel={side + " mutations by"}
+            title={a.by === "driver" ? "Driver when any of the case's mutations is a putative driver by the view's driver settings, else VUS"
+              : "group the cases by their mutation's type, by whether they have one, or by whether one is a putative driver"}
             onValueChange={(v) => set({ source: "profile", profile: current.profile, gene, by: v })}>
             <option value="mutationType">mutation type</option>
             <option value="mutated">mutated vs not</option>
+            <option value="driver">driver vs VUS</option>
           </OptionSelect>)}
       </>}
       {isOql && <>

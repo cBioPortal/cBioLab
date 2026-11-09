@@ -1,6 +1,7 @@
 // The oncoprint view's spec and result, added to lib/types.ts's maps by the declaration at the end.
 import type { SplitBy, DisplaySpec, CohortDef } from "../../types.ts";
 import type { GeneTrackSpec } from "../../gene-tracks.ts";
+import type { DriverSettings } from "../../driver-settings.ts";
 
 export interface HeatmapSpec {
   profileType: string; genes?: string[];
@@ -24,6 +25,8 @@ export interface OncoprintView {
   /** rows: a gene symbol, or {label?, genes} for one merged row over several genes */
   kind: "oncoprint"; genes: GeneTrackSpec[]; cohorts?: string[]; splitBy?: SplitBy;
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
+  /** which sources call a driver, and whether VUS or germline mutations are left out (lib/driver-settings.ts) */
+  drivers?: DriverSettings;
   /** what a column is (default "patient"); "sample" draws every sample of the cohort's patients */
   unit?: "patient" | "sample";
   /** mRNA / protein evidence drawn into the gene cells (see OncoprintSpec.overlays) */
@@ -40,6 +43,8 @@ export interface OncoprintSpec {
   study?: string; studies?: string[];
   /** rows: a gene symbol, or {label?, genes} for one merged row over several genes */
   genes: GeneTrackSpec[]; clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
+  /** the view's driver settings */
+  drivers?: DriverSettings;
   /** what a column is (default "patient") */
   unit?: "patient" | "sample";
   /**

@@ -3,7 +3,7 @@
 import type { KindDoc } from "../kind-doc.ts";
 
 export const oncoprintDoc: KindDoc = {
-  reference: `\`genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\\|"sample", display?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state`,
+  reference: `\`genes:[≤12 rows], clinical?:[≤8], heatmap?:[≤4], sort?:[≤4], unit?:"patient"\\|"sample", display?:{…}, drivers?:{…}, overlays?:[≤2], derivedCohorts?:[≤3], cohorts:[names]\` | render-contract oncoprint: columns are patients grouped by cohort (first matching cohort wins); NOT_PROFILED is a first-class cell state`,
   grammar: `{"kind":"oncoprint","genes":[...(max 12)],"clinical":["<attribute>", ...(max 8)]?,
  "heatmap":[{"profileType":"<profile>","genes":[...]?|"entities":[...]?}, ...(max 4)]?,
  "sort":["<track>"|"-<track>"|"genomic", ...(max 4)]?,"cohorts":[names?]}`,

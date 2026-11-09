@@ -1430,7 +1430,11 @@ profile lacks is refused with the closest it has. A patient-level assay's value 
 patient's samples. The engine runs a profile axis as the lower-level forms it resolves to, which a
 document may also give directly: \`{"source":"molecular","profileType","gene","discrete"?}\`,
 \`{"source":"assay","profileType","entity","categorical"?,"patientLevel"?}\` and
-\`{"source":"alteration","gene","by":"mutationType"|"mutated"|"cna"|"sv"}\`.
+\`{"source":"alteration","gene","by":"mutationType"|"mutated"|"driver"|"cna"|"sv"}\`. \`by: "driver"\` is the
+portal's "Driver vs VUS": Driver when any of the case's mutations is a putative driver by the view's
+\`drivers\` sources (OncoKB, the study's \`cbp_driver\` and \`cbp_driver_tiers\`), VUS when none is,
+Not mutated, Not profiled. A view that holds \`drivers\` also splits a mutation type into
+"Missense (Driver)" / "Missense (VUS)" and so on, as the portal's Plots tab colours them.
 
 number × number draws a **density scatter**, number × category a **box**, category × category a
 **contingency table**. Every statistic is computed where the rows are and is therefore exact over
@@ -1562,15 +1566,32 @@ all reproduce the same picture. Unknown keys are rejected loudly.
 | \`whitespace\` | \`true\` | gaps between columns once they are wide enough |
 | \`gaps\` | \`"none"\` | \`"gaps"\` / \`"pct"\` / \`"pct-left"\`: split each cohort into runs of the primary categorical sort key; the \`pct\` modes label each run with its altered % on its right or left |
 | \`colorByType\` | \`true\` | colour each mutation class separately; off draws them as one |
+| \`colorByGermline\` | \`true\` | mark a germline mutation with a white stripe through its glyph (the portal's Somatic vs Germline); off draws it like any other |
 | \`whiteBackground\` | \`false\` | white instead of grey for unaltered cells, for print |
 | \`clinicalLegends\` | \`"all"\` | \`"none"\` drops the category keys under the figure |
 | \`colors\` | — | \`{track: {value: "#rrggbb"}}\`, the portal's Edit Colors |
 | \`style\` | — | override any visual decision (palette, glyph bands, legend); validated against the style schema |
-| **\`hideVUS\`** | \`false\` | **changes the numbers**: drops alterations the annotation source does not call drivers, so the altered fraction is over drivers alone. The contract reports how many went |
-| **\`annotate\`** | \`"oncokb"\` | **changes the numbers**: \`"none"\` calls nothing a driver, so every driver percentage becomes 0 |
+| **\`hideVUS\`** | \`false\` | older spelling of \`drivers.hideVus\` (below), still read |
+| **\`annotate\`** | \`"oncokb"\` | older spelling: \`"none"\` is \`drivers: {oncokb: false, custom: false, tiers: []}\` |
 
-The last two are viewing options only in the sense that they live beside the others; they change
-what is counted, not how it is drawn, and the figure says so where it reports them.
+**Driver annotation** (\`drivers: {…}\`, beside \`display\` on an oncoprint or a plot) — cBioPortal's
+Results-page "Annotate Data" / "Filter Data" menu. An alteration is a putative driver when ANY source
+that is on calls it one; the settings **change the numbers** (the driver %, and what the filters
+leave out of the altered fraction). Unknown keys are rejected loudly.
+
+| key | default | what it does |
+| --- | --- | --- |
+| \`oncokb\` | \`true\` | the version-pinned OncoKB store (Oncogenic, Likely Oncogenic, Resistance) |
+| \`custom\` | \`true\` | the study's own calls: \`cbp_driver\` = \`Putative_Driver\` (a \`Putative_Passenger\` call does not overrule another source) |
+| \`tiers\` | every tier | the \`cbp_driver_tiers\` values that count as driver; \`[]\` none |
+| \`hotspots\` | \`false\` | refused when \`true\`: Cancer Hotspots is not loaded in this warehouse |
+| \`hideVus\` | \`false\` | leave out alterations no source calls a driver (the portal's "Show only drivers"); nothing to hide when every source is off |
+| \`hideGermline\` | \`false\` | leave out germline mutations, those whose mutation status says germline (the portal's "Show only somatic") |
+
+The contract reports what each filter left out (\`stats.hiddenVus\`, \`stats.hiddenGermline\`), what the
+calls came from (\`conventions.annotation\`), and which custom calls and tiers the drawn alterations
+carry (\`conventions.customDrivers\`). A plot uses the sources only: it draws every mutation, VUS and
+germline included, as cBioPortal's Plots tab does.
 
 **Oncoprint overlays** (\`overlays: [{kind, profileType, threshold?}]\`, ≤2): thresholded molecular
 evidence drawn INTO the gene cells rather than as tracks of their own — \`"mrna"\` as an outline,

@@ -64,3 +64,13 @@ test("clinicalLegends: 'none' drops the per-track keys and shrinks the canvas", 
   const h = (s: string) => Number(/height="(\d+)"/.exec(s)![1]);
   assert.ok(h(none) < h(all), "height drops with the keys: " + h(none) + " vs " + h(all));
 });
+
+test("germline: the legend draws the stripe, and the caption says how many hiding germline left out", () => {
+  const events = readFileSync(FIX + "events.tsv", "utf8").trimEnd() + "\nP05\tKRAS\tG13D\tMISSENSE_GERMLINE\n";
+  const make = (drivers?: { hideGermline: boolean }) => assembleContract(localInput({ events: parseTsv(events), coverage: parseTsv(readFileSync(FIX + "coverage.tsv", "utf8")), drivers }));
+  const shown = contractToSvg(make(), 900);
+  assert.match(shown, />Germline Mutation</);
+  const hidden = contractToSvg(make({ hideGermline: true }), 900);
+  assert.doesNotMatch(hidden, />Germline Mutation</);
+  assert.match(hidden, /1 germline mutation is hidden and not in the %/);
+});
