@@ -69,8 +69,18 @@ export interface GeneQueryDialogProps {
   mode: GeneQueryMode;
   /** the query as the page holds it */
   value: string;
-  /** the query applied: its text, as the reader left it, and what it says */
-  onApply: (text: string, check: QueryCheck) => void;
+  /**
+   * the query applied: its text, as the reader left it, and what it says. A promise holds the
+   * dialog open, its button saying so, until it settles: a string it resolves to is shown as what
+   * went wrong and the dialog stays open; anything else closes it
+   */
+  onApply: (text: string, check: QueryCheck) => void | Promise<string | void>;
+  /** more of the form, above the genes (the query page's profiles and case set) */
+  above?: React.ReactNode;
+  /** what the form above says stands between it and applying, each in words */
+  blockers?: string[];
+  /** the form above is still loading what it needs */
+  waiting?: boolean;
   /** the fewest and most distinct genes the place it is for takes */
   min?: number;
   max?: number;
@@ -293,26 +303,44 @@ export function GeneQueryEditor({ mode, value, onChange, onSubmit, min = 1, max 
   );
 }
 
-function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply, min = 1, max = 30, groups = false, applyLabel = "Apply" }: GeneQueryDialogProps) {
+function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply, min = 1, max = 30, groups = false, applyLabel = "Apply", above, blockers = [], waiting = false }: GeneQueryDialogProps) {
   const lists = useGeneLists();
   const [status, setStatus] = useState<GeneEditorStatus | null>(null);
-  const blocked = !status || status.blocked;
+  const [applying, setApplying] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const problems = [...blockers, ...(status?.problems || [])];
+  const blocked = !status || status.blocked || blockers.length > 0 || waiting || applying;
   const about = description ?? (mode === "oql" ? "One gene per line, optionally with what counts as altered in it (OQL)." : "Gene symbols separated by spaces" + (groups ? "; [A B] draws A and B as one row." : "."));
-  const apply = () => { if (!status || status.blocked) return; lists.remember(status.text, mode); onApply(status.text.trim(), status.check); onOpenChange(false); };
+  const apply = () => {
+    if (!status || blocked) return;
+    lists.remember(status.text, mode);
+    setFailed(null);
+    const r = onApply(status.text.trim(), status.check);
+    if (!(r instanceof Promise)) { onOpenChange(false); return; }
+    setApplying(true);
+    r.then((msg) => { if (typeof msg === "string") { setFailed(msg); setApplying(false); } else onOpenChange(false); },
+      (e) => { setFailed(String(e?.message || e)); setApplying(false); });
+  };
+  const why = applying ? applyLabel.toLowerCase() + "…" : waiting ? "waiting for the form to load" : status?.pending ? "waiting for the symbols to be checked" : problems.join("\n");
   return (
     <DialogContent data-tw className="gene-query-dialog top-[6vh] max-h-[88vh] translate-y-0 gap-4 overflow-y-auto sm:max-w-4xl" {...(about ? {} : { "aria-describedby": undefined })}>
       <DialogHeader>
         <DialogTitle className="text-lg">{title}</DialogTitle>
         {about && <DialogDescription className="text-md">{about}</DialogDescription>}
       </DialogHeader>
+      {above}
       <GeneQueryEditor mode={mode} value={value} min={min} max={max} groups={groups} onChange={setStatus} onSubmit={apply}
         sideClass="max-h-[max(10rem,calc(88vh-15rem))]" />
       <DialogFooter className="sticky -bottom-6 -mx-6 -mb-6 items-center gap-2 border-t bg-card px-6 py-3">
-        <span className="text-sm text-muted-foreground" data-tip={status?.problems.join("\n")}>
-          {status?.pending ? "checking symbols…" : status?.problems.length ? status.problems.length + " to fix" : ""}
-        </span>
+        {failed
+          ? <span role="alert" className="mr-auto text-sm text-destructive">{failed}</span>
+          : <span className="text-sm text-muted-foreground" data-tip={problems.join("\n")}>
+              {status?.pending ? "checking symbols…" : problems.length ? problems.length + " to fix" : ""}
+            </span>}
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-        <Button onClick={apply} disabled={blocked} data-tip={blocked ? (status?.pending ? "waiting for the symbols to be checked" : status?.problems.join("\n")) : applyLabel.toLowerCase() + " (⌘/Ctrl+Enter)"}>{applyLabel}</Button>
+        <Button onClick={apply} disabled={blocked} data-tip={blocked ? why : applyLabel.toLowerCase() + " (⌘/Ctrl+Enter)"}>
+          {applying && <span className="spinner" aria-hidden="true" />}{applyLabel}
+        </Button>
       </DialogFooter>
     </DialogContent>
   );

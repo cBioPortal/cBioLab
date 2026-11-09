@@ -9,7 +9,7 @@
 //   protein position range modifier on a mutation: (a-b) (a-) (-b), with * for fully contained,
 //   e.g. TRUNC_(1400-), MUT_(-500), (1-100*)_DRIVER, MUT=(712-979)_DRIVER.
 //   EXP/PROT with a threshold, e.g. EXP>2, PROT<=-1.5, on the study's mRNA / protein profile (its
-//   z-score profile where it has one).
+//   z-score profile where it has one), or on the profile `pins` names (the query page's choice).
 // Rejected with an explanation (not silently approximated): GAIN/HETLOSS (only high-level
 // CNA (+-2) is stored), EXP/PROT without a threshold, GERMLINE/SOMATIC (public studies are
 // germline-stripped).
@@ -140,6 +140,9 @@ export const driverAnnotationJoin = (pin: string, kind: "INNER" | "LEFT"): strin
 
 const DRIVER_JOIN = (pin: string): string => driverAnnotationJoin(pin, "INNER");
 
+/** the profile EXP and PROT read, by id without the study prefix, where the query names one */
+export interface OqlPins { EXP?: string; PROT?: string }
+
 // full OQL leaf -> SQL of matching patient stable ids (portal semantics: altered by ANY entry)
 export function oqlLeafSql(q: string, opts: { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string } = {}): string {
   return oqlCasesSql(q, { ...opts, unit: "patient" });
@@ -150,9 +153,9 @@ export function oqlLeafSql(q: string, opts: { oncokbPin?: string | null; profile
  * (that sample matches), each stripped of the study prefix. The cohort leaf asks for patients; a
  * plot axis asks in the plot's own unit.
  */
-export function oqlCasesSql(q: string, { oncokbPin, profiles, study = STUDY, db = DB, unit }:
-  { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string; unit: "patient" | "sample" }): string {
-  return oqlSelectSql(q, { oncokbPin, profiles, study, db, caseCol: unit === "sample" ? "sample_unique_id" : "patient_unique_id", events: false });
+export function oqlCasesSql(q: string, { oncokbPin, profiles, pins, study = STUDY, db = DB, unit }:
+  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study?: string; db?: string; unit: "patient" | "sample" }): string {
+  return oqlSelectSql(q, { oncokbPin, profiles, pins, study, db, caseCol: unit === "sample" ? "sample_unique_id" : "patient_unique_id", events: false });
 }
 
 /** an event row's label as the portal's download tab spells it: protein change, AMP / HOMDEL, the structural variant's event */
@@ -167,13 +170,33 @@ const EVENT_ORDER = "multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'c
  * info, or EXP / PROT HIGH or LOW). The same conditions as oqlCasesSql, row by row: a sample is in
  * oqlCasesSql's samples exactly when it has a row here. The rows name samples: patient-level SQL.
  */
-export function oqlEventsSql(q: string, { oncokbPin, profiles, study = STUDY, db = DB }:
-  { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string }): string {
-  return oqlSelectSql(q, { oncokbPin, profiles, study, db, caseCol: "sample_unique_id", events: true });
+export function oqlEventsSql(q: string, { oncokbPin, profiles, pins, study = STUDY, db = DB }:
+  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study?: string; db?: string }): string {
+  return oqlSelectSql(q, { oncokbPin, profiles, pins, study, db, caseCol: "sample_unique_id", events: true });
 }
 
-function oqlSelectSql(q: string, { oncokbPin, profiles, study, db, caseCol, events }:
-  { oncokbPin?: string | null; profiles?: string[]; study: string; db: string; caseCol: string; events: boolean }): string {
+/**
+ * The profile an EXP or PROT alteration reads: the one `pins` names, which must be one of the
+ * study's profiles of that kind, or else the study's z-score profile of that kind (its first
+ * profile of that kind when it has no z-scores).
+ */
+export function expressionProfileFor(type: "EXP" | "PROT", profiles: string[] | undefined, pins?: OqlPins): string {
+  const want = type === "EXP" ? /mrna|rna_seq/i : /protein|rppa/i;
+  const noun = type === "EXP" ? "mRNA" : "protein";
+  const pinned = pins?.[type];
+  if (pinned != null) {
+    if (typeof pinned !== "string" || !(profiles || []).includes(pinned) || !want.test(pinned))
+      throw new Error("OQL " + type + " is set to read the " + noun + " profile '" + String(pinned).slice(0, 80) + "', which this study does not have; its " + noun +
+        " profiles: " + ((profiles || []).filter((p) => want.test(p)).join(", ") || "none"));
+    return pinned;
+  }
+  const prof = (profiles || []).find(p => want.test(p) && /zscore/i.test(p)) || (profiles || []).find(p => want.test(p));
+  if (!prof) throw new Error("OQL " + type + " requires an " + noun + " profile; this study has: " + ((profiles || []).join(", ") || "none"));
+  return prof;
+}
+
+function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol, events }:
+  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study: string; db: string; caseCol: string; events: boolean }): string {
   const parsed = parseOql(q);
   const parts: string[] = [];
   // what each part selects: the case alone, distinct; or, for events, the case with the event's order and label
@@ -187,10 +210,7 @@ function oqlSelectSql(q: string, { oncokbPin, profiles, study, db, caseCol, even
     for (const spec of specs) {
       if (spec.driver && !oncokbPin) throw new Error("OQL DRIVER requires the OncoKB annotation store");
       if (spec.type === "EXP" || spec.type === "PROT") {
-        const want = spec.type === "EXP" ? /mrna|rna_seq/i : /protein|rppa/i;
-        const prof = (profiles || []).find(p => want.test(p) && /zscore/i.test(p)) || (profiles || []).find(p => want.test(p));
-        if (!prof) throw new Error("OQL " + spec.type + " requires an " + (spec.type === "EXP" ? "mRNA" : "protein") +
-          " profile; this study has: " + ((profiles || []).join(", ") || "none"));
+        const prof = expressionProfileFor(spec.type, profiles, pins);
         parts.push(
           head("sd", "4", sq(spec.type + (String(spec.op).startsWith(">") ? " HIGH" : " LOW"))) +
           "  FROM " + db + ".genetic_alteration_derived ga\n" +

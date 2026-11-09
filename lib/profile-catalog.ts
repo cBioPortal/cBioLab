@@ -19,6 +19,10 @@ export interface ProfileInfo {
   study?: string;
   /** the study's own order among its profiles */
   order: number;
+  /** the study's description of the profile (the query page's ⓘ; filled by the query options API) */
+  description?: string;
+  /** false when the study does not offer the profile on the query page (cBioPortal's show_profile_in_analysis_tab; filled by the query options API) */
+  analysis?: boolean;
 }
 
 /**

@@ -4,6 +4,7 @@
 // lib/table-query.ts (tables.ts), downloaded whole through POST /api/table naming the file.
 import type { ViewResult, TableRows } from "../../types.ts";
 import { parseOql, OQL_PROFILE } from "../../oql-parse.ts";
+import type { OqlPins } from "../../oql.ts";
 import { MAX_GENE_SYMBOLS } from "../../gene-tracks.ts";
 import { hasViewAggregates } from "../../federation.ts";
 import { inGeneticAlterationDerived, type ProfileInfo } from "../../profile-catalog.ts";
@@ -95,6 +96,13 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
   const checked = checkLines(view.oql);
   if (typeof checked === "string") return no(checked);
   const lines = checked.map((l) => ({ line: l.line, gene: l.gene }));
+  const pins: OqlPins = {};
+  for (const [k, t] of [["exp", "EXP"], ["prot", "PROT"]] as const) {
+    const v = view[k];
+    if (v == null) continue;
+    if (typeof v !== "string" || !/^[A-Za-z0-9._-]{1,120}$/.test(v)) return no(k + " names the profile the lines' " + t + " alterations read, by its id without the study prefix");
+    pins[t] = v;
+  }
   const genes = [...new Set(lines.map((l) => l.gene))];
   const size = pageSize(view.rows);
   if (!(size >= 1 && size <= TABLE_ROWS_MAX)) return no("rows (the page size of the case table) is 1 to " + TABLE_ROWS_MAX);
@@ -111,7 +119,7 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
     const held = heldTypes(catalogs[st]);
     const plan: LinePlan[] = checked.map((l) => ({ line: l.line, gene: l.gene,
       types: [...new Set(l.specs.flatMap((t) => OQL_PROFILE[t as keyof typeof OQL_PROFILE] || []))].filter((t) => held.includes(t)) }));
-    plans[st] = { lines: plan, opts: { study: st, db: ctx.resolvers[st].instance.conn.db, pin, profiles: profiles[st] } };
+    plans[st] = { lines: plan, opts: { study: st, db: ctx.resolvers[st].instance.conn.db, pin, profiles: profiles[st], pins } };
   }
   const planOf = (st: string) => plans[st];
   const unchecked = checked.filter((l) => l.specs.some((t) => t === "EXP" || t === "PROT")).map((l) => l.line);

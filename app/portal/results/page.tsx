@@ -27,6 +27,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../_ui/dial
 import { checkGeneQuery } from "../../../lib/gene-query.ts";
 import type { CohortDef } from "../../../lib/types.ts";
 import { resultsMaxStudies, crossStudyExpression, expressionAcross, isExpressionProfile, isExpressionType } from "../../../lib/results-settings.ts";
+import { useQueryOptionsData } from "../query-options.tsx";
+import { chosenQuery, legacyQueryParams } from "../../../lib/query-options.ts";
 
 const IDS_SHOWN = 3;
 
@@ -39,21 +41,27 @@ export default function ResultsPage() {
   const check = useMemo(() => checkGeneQuery(target.query, "oql"), [target.query]);
   const genes = check.genes;
   const queryError = check.error || check.entries.filter((e) => e.error).map((e) => e.text + ": " + e.error).join("; ") || null;
-  const oqlNarrows = check.entries.some((e) => e.meaning !== "any alteration");
   const tooMany = studiesProblem(studies.length, resultsMaxStudies(env));
-  const { basics, known, error } = useQueryKnown(tooMany ? [] : studies, filters);
+  // the query page's profiles and case set, when the link carries them: what they make of the query, and the clause every group keeps
+  const optionsData = useQueryOptionsData(target.options && !tooMany ? studies : []);
+  const chosen = useMemo(() => chosenQuery(target.options || null, optionsData.data, studies, check.entries.map((e) => e.text)), [target.options, optionsData.data, studies, check]);
+  // the profiles can write a bare gene's alterations out, which narrows Altered as an OQL entry does
+  const oqlNarrows = check.entries.some((e) => e.meaning !== "any alteration") || chosen.entries.some((e, i) => e !== check.entries[i]?.text);
+  const scope = useMemo(() => (chosen.clause ? [...filters, chosen.clause] : filters), [filters, chosen.clause]);
+  const { basics, known, error } = useQueryKnown(tooMany || chosen.waiting || chosen.error ? [] : studies, scope);
   const across = expressionAcross(studies, crossStudyExpression(env));
   // laid out in two steps: from the study list the tabs that need nothing else, so the oncoprint
   // starts at once; with the profiles and attributes Explore's facets give, the rest
   // whether the queried patients carry a structural variant in a queried gene: asked beside the header's count (below)
   const [svs, setSvs] = useState<boolean | null | undefined>(undefined);
-  const fresh = useMemo(() => basics && genes.length && genes.length <= RESULTS_MAX_GENES && !queryError
-    ? resultsLayout({ studies, filters, entries: check.entries.map((e) => e.text), genes }, known ? {
+  const asked = useMemo(() => ({ studies, filters: scope, entries: chosen.entries, genes, exp: chosen.exp, prot: chosen.prot }), [studies, scope, chosen, genes]);
+  const fresh = useMemo(() => basics && genes.length && genes.length <= RESULTS_MAX_GENES && !queryError && !chosen.waiting && !chosen.error
+    ? resultsLayout(asked, known ? {
         expr: expressionProfile(known.profileCatalog), cna: discreteCnaProfile(known.profileCatalog), clinical: known.clinical,
         numeric: known.attrs.filter((a) => a.kind === "num").map((a) => a.attribute), expressionAcross: across, held: known.held,
         assays: assayComparisonProfiles(known.profileCatalog), svs }
       : { expr: null, cna: null, clinical: [], numeric: [], expressionAcross: across, held: basics.held, partial: true, svs })
-    : null, [basics, known, studies, filters, check, genes, queryError, across, svs]);
+    : null, [basics, known, asked, chosen, genes, queryError, across, svs]);
   const page = usePageDoc(fresh);
   // the header's "altered in N of the queried": its own request, beside the tabs', so no tab waits for it
   const [altered, setAltered] = useState<{ altered: number; queried: number } | null>(null);
@@ -66,7 +74,7 @@ export default function ResultsPage() {
     if (!groups) return;
     const ctl = new AbortController();
     // the Structural Variants tab's check rides on the same request, as a third cohort counted beside these
-    const fused: Record<string, CohortDef> = svHeld ? { Fused: svCheckCohort({ studies, filters, entries: check.entries.map((e) => e.text), genes }) } : {};
+    const fused: Record<string, CohortDef> = svHeld ? { Fused: svCheckCohort(asked) } : {};
     api.analysis({ study: fresh!.doc.study, cohorts: { Altered: groups.Altered, Queried: groups.Queried, ...fused }, views: [] }, { signal: ctl.signal })
       .then((r) => r.json())
       .then((j) => {
@@ -88,8 +96,10 @@ export default function ResultsPage() {
   if (target.error || !studies.length || !genes.length) return flow(target.error);
   if (queryError) return flow("this query cannot be read — " + queryError);
   if (tooMany) return flow(tooMany);
+  if (chosen.error) return flow(chosen.error);
   if (genes.length > RESULTS_MAX_GENES) return shell(<p className="note">a results page takes at most {RESULTS_MAX_GENES} genes, the oncoprint&apos;s rows; this asks for {genes.length}</p>);
   if (error) return shell(<div className="error">{error}</div>);
+  if (optionsData.error) return shell(<div className="error">could not read the studies&apos; profiles and case sets: {optionsData.error}</div>);
   const ready = !!(page.layout && page.doc);
   const ids = studies.length <= IDS_SHOWN ? studies.join(", ") : studies.slice(0, IDS_SHOWN).join(", ") + " +" + (studies.length - IDS_SHOWN) + " more";
   // as cBioPortal does: no expression profiles to draw across studies its rule does not allow
@@ -108,13 +118,20 @@ export default function ResultsPage() {
           <CohortPills def={{ all: filters }} />
         </div>
       )}
+      {chosen.summary && (
+        <p className="mt-2.5 mb-0 flex flex-wrap gap-x-5 gap-y-1 text-sm" data-test="queryOptionsSummary">
+          <span><span className="font-semibold tracking-[0.12em] text-muted-foreground uppercase">Case set</span> {chosen.summary.caseSet}</span>
+          <span><span className="font-semibold tracking-[0.12em] text-muted-foreground uppercase">Profiles</span> {chosen.summary.profiles}</span>
+        </p>
+      )}
+      {chosen.notes.map((n) => <p key={n} className="mt-2.5 mb-0 text-sm text-muted-foreground">{n}</p>)}
       {oqlNarrows && (
         <p className="mt-2.5 mb-0 text-sm text-muted-foreground">
           The query&apos;s OQL decides who is Altered; the oncoprint and the gene tabs draw every alteration of {genes.length === 1 ? "its gene." : "its genes."}
         </p>
       )}
     </PortalSummary>
-    <QueryGenesDialog target={editingGenes ? { studies, filters, query: target.query, title: "Edit genes" } : null}
+    <QueryGenesDialog target={editingGenes ? { studies, filters, query: target.query, title: "Edit genes", options: target.options } : null} options={false}
       names={new Map(Object.entries(basics?.names || {}))} onClose={() => setEditingGenes(false)} />
     <Dialog open={modifying} onOpenChange={setModifying}>
       <DialogContent aria-describedby={undefined}
@@ -126,7 +143,8 @@ export default function ResultsPage() {
     {page.note && <p className="note">{page.note}</p>}
     {!ready
       ? <PortalLoading />
-      : <PortalTabs legacy={{ page: { page: "results", studies, entries: check.entries.map((e) => e.text), filters }, held: basics?.portal || null }} doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
+      : <PortalTabs legacy={{ page: { page: "results", studies, entries: check.entries.map((e) => e.text), filters,
+            query: legacyQueryParams(target.options || null, optionsData.data, studies, check.entries.map((e) => e.text)) }, held: basics?.portal || null }} doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
           catalog={{ attrs: known?.attrs || [], profiles, profileCatalog, loading: !known }} />}
   </>);
 }

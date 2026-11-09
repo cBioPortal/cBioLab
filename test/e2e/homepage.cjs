@@ -73,6 +73,66 @@ async function homepage({ browser, ok, BASE }) {
     await ctx.close();
   }
 
+  // The query dialog's profiles and case set, as cBioPortal's query page has them: the portal's
+  // default profiles and the case set that follows them, mRNA's radios and z-score threshold, a
+  // user-defined list whose unknown ids are refused in the portal's words, and the Results page
+  // naming what was chosen — its Modify query starting from the same choice.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1100 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    const name = "query dialog: genomic profiles and case set change what the Results page asks for";
+    try {
+      await page.goto(BASE + "/?studies=brca_tcga", { waitUntil: "domcontentloaded" });
+      await page.locator("button.querybygene:not([disabled])").waitFor({ timeout: 120000 });
+      await page.locator("button.querybygene").click();
+      const dlg = page.locator("[role=dialog].gene-query-dialog");
+      const panel = dlg.locator("[data-test=queryOptions]");
+      const caseSet = panel.locator("[data-test=caseSetSelector]");
+      await caseSet.filter({ hasText: /\(\d+\)/ }).waitFor({ timeout: 60000 });
+      const start = { mut: await panel.getByRole("checkbox", { name: "Mutations" }).isChecked(), cna: await panel.getByRole("checkbox", { name: /GISTIC/ }).isChecked(), set: await caseSet.innerText() };
+      await panel.getByRole("checkbox", { name: /GISTIC/ }).click();
+      const mutOnly = await caseSet.innerText();
+      await panel.getByRole("checkbox", { name: "mRNA Expression" }).click();
+      await panel.getByRole("radio", { name: /relative to diploid samples \(RNA Seq V2 RSEM\)/ }).click();
+      const z = await panel.getByLabel("mRNA z-score threshold").inputValue();
+      await panel.getByRole("checkbox", { name: "mRNA Expression" }).click();
+      await caseSet.click();
+      await page.getByLabel("filter case sets").fill("user");
+      await page.getByRole("option", { name: "User-defined Case List" }).click();
+      await panel.getByLabel("Enter case IDs").fill("TCGA-A1-A0SB-01 TCGA-A1-A0SD-01 NOT-A-SAMPLE");
+      await dlg.locator("textarea[aria-label='OQL query']").fill("TP53");
+      const submit = dlg.getByRole("button", { name: "Submit query" });
+      await page.waitForFunction(() => { const b = [...document.querySelectorAll("[role=dialog].gene-query-dialog button")].find((x) => x.textContent === "Submit query"); return b && !b.disabled; }, null, { timeout: 60000 });
+      await submit.click();
+      const alert = dlg.locator("[role=alert]");
+      await alert.waitFor({ timeout: 60000 });
+      const refused = await alert.innerText();
+      await panel.getByLabel("Enter case IDs").fill("TCGA-A1-A0SB-01 TCGA-A1-A0SD-01");
+      await submit.click();
+      await page.waitForURL(/\/portal\/results\?/, { timeout: 60000 });
+      const q = new URL(page.url()).searchParams;
+      const summary = page.locator("[data-test=queryOptionsSummary]");
+      await summary.waitFor({ timeout: 120000 });
+      await page.waitForFunction(() => /of 2 queried patients altered/.test(document.querySelector("main")?.innerText || ""), null, { timeout: 180000 });
+      const said = await summary.innerText();
+      await page.getByRole("button", { name: "Modify query" }).click();
+      await page.locator("[role=dialog].modifyquerydialog button.querybygene").click();
+      await page.waitForFunction(() => (document.querySelector("[data-test=CustomCaseSetInput]")?.value || "").includes("TCGA-A1-A0SD-01"), null, { timeout: 60000 });
+      const back = { set: await dlg.locator("[data-test=caseSetSelector]").innerText(), cna: await dlg.getByRole("checkbox", { name: /GISTIC/ }).isChecked() };
+      ok(name, start.mut && start.cna && /^Samples with mutation and CNA data \(963\)$/.test(start.set) && /^Samples with mutation data \(982\)$/.test(mutOnly) && z === "2.0" &&
+        refused === "Invalid sample for the selected cancer study: NOT-A-SAMPLE" &&
+        q.get("mut") === "mutations" && !q.has("cna") && q.get("case_set") === "-1" && q.get("cases_n") === "2" &&
+        /User-defined Case List \(2 samples\)/.test(said) && /Mutations/.test(said) && back.set === "User-defined Case List" && !back.cna,
+        JSON.stringify({ start, mutOnly, z, refused, link: q.toString(), said, back }));
+    } catch (e) {
+      ok(name, false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("query dialog options: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+
   // The homepage while its study list loads, checked by holding the request: a skeleton shaped like
   // the chooser, never "0 studies"; and a failed list says so and asks again.
   {

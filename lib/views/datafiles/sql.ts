@@ -2,7 +2,7 @@
 // (altered, and profiled for it), shared by the counts below and the patient-level tables
 // (tables.ts) so the frequencies and the files can never disagree; and the counts themselves.
 import { profiledCasesSql } from "../../cohort2.ts";
-import { oqlEventsSql } from "../../oql.ts";
+import { oqlEventsSql, type OqlPins } from "../../oql.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 export type DataType = "MUTATION" | "CNA" | "SV";
@@ -15,7 +15,7 @@ export interface LinePlan {
   types: DataType[];
 }
 /** What a study's SQL needs besides the lines: the OncoKB version (DRIVER) and its profiles (EXP / PROT). */
-export interface StudyOpts { study: string; db: string; pin: string | null; profiles: string[] }
+export interface StudyOpts { study: string; db: string; pin: string | null; profiles: string[]; pins?: OqlPins }
 
 /** The CTE name for one gene and data type's profiled samples, under prefix `p`. */
 const profiledName = (p: string, gene: string, type: DataType) => p + "_prof_" + gene.replace(/[^A-Za-z0-9]/g, "_") + "_" + type;
@@ -32,7 +32,7 @@ export function lineCtes(p: string, cohort: string, lines: LinePlan[], o: StudyO
   lines.forEach((l, k) => {
     out.push(p + "_e" + k + " AS (\n" +
       "  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev\n" +
-      "  FROM (" + oqlEventsSql(l.line, { oncokbPin: o.pin, profiles: o.profiles, study: o.study, db: o.db }) + ")\n" +
+      "  FROM (" + oqlEventsSql(l.line, { oncokbPin: o.pin, profiles: o.profiles, pins: o.pins, study: o.study, db: o.db }) + ")\n" +
       "  WHERE sid IN (SELECT sid FROM " + cohort + ")\n" +
       "  GROUP BY sid)");
   });

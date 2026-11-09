@@ -73,6 +73,17 @@ describe("the Results page on cBioPortal", () => {
     assert.equal(u.searchParams.get("case_set_id"), null);
     assert.match(u.search, /case_ids=a%3AS1%2Bb%3AS2/);
   });
+  test("the query page's profiles and case set travel as the portal's own parameters", () => {
+    const q = { params: [["profileFilter", "mutations,gistic"], ["case_set_id", "brca_tcga_sequenced"], ["Z_SCORE_THRESHOLD", "1.5"]] as [string, string][] };
+    const u = href(legacyLink({ ...results(["brca_tcga"], ["TP53"]), query: q }, {}, held("brca_tcga")));
+    assert.equal(u.searchParams.get("case_set_id"), "brca_tcga_sequenced");
+    assert.equal(u.searchParams.get("profileFilter"), "mutations,gistic");
+    assert.equal(u.searchParams.get("Z_SCORE_THRESHOLD"), "1.5");
+    assert.equal(legacyLink({ ...results(["s"], ["TP53"]), query: { why: "stored here" } }, {}, held("s")).tip, "stored here");
+    const both = legacyLink({ ...results(["s"], ["TP53"], [{ kind: "caseList", id: "sequenced" } as Clause]), query: q }, {}, held("s"));
+    assert.equal(both.href, null);
+    assert.match(both.tip, /filters and case set together/);
+  });
   test("filters the portal's link cannot say are refused, never dropped", () => {
     const refused = (fs: Clause[], studies = ["s"]) => {
       const l = legacyLink(results(studies, ["TP53"], fs), {}, held(...studies));

@@ -43,7 +43,11 @@ title there.
   - [ ] The Data Set picker's ⓘ profile description (the catalog carries no description)
   - [ ] Downloads: the volcano's and box plot's SVG/PNG/data buttons, the table's copy and download
 - [ ] **Comparison → Mutations tab** — the two-group lollipop
-- [ ] **Query-by-gene form controls** — genomic-profile choice with z-score thresholds, case-set selector, user-defined case lists, GSVA gene sets
+- [x] **Query-by-gene form controls** — the query dialog's "Select Genomic Profiles" (each kind's profiles as the study offers them, radios where it has several, each one's description on its ⓘ, the mRNA and protein z-score thresholds) and "Select Patient/Case Set" (the study's sample lists with their sizes, filtered as typed; several studies' mutation / copy-number categories; "User-defined Case List" by sample or patient id, refused in the portal's words when an id matches nothing), each changing the Results page's document: the profiles a bare gene's default alterations and the profile EXP / PROT read, the case set a clause every group keeps (#167)
+  - [ ] GSVA gene sets: the warehouse holds no GSVA scores (no GENESET_SCORE profile in any study, and the gene-set hierarchy tables are empty), and the importer does not load them
+  - [ ] The profile choice decides who is Altered (the header's count, Comparison/Survival, the Download tab's lists); the oncoprint and gene tabs still draw every alteration of the genes, where the portal leaves a deselected type's data out
+  - [ ] One of several mutation, structural-variant or copy-number profiles of a study (gbm_tcga_pub's two copy-number profiles) is refused: the engine reads all of them together
+  - [ ] mRNA and protein choices across several studies (the portal offers them only where cross-study expression is enabled, and refuses EXP / PROT there)
 - [x] **"Open in cBioPortal"** on every portal page (#158)
   - [ ] The Comparison page, which needs a session created on the portal first
 

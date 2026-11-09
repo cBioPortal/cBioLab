@@ -118,6 +118,24 @@ describe("caseList, genomicData and genericAssay leaves", () => {
   test("caseList refuses an id that is not one", () => {
     assert.throws(() => one({ kind: "caseList", id: "a list; drop" }), /caseList clause: bad list id/);
   });
+  test("caseList by category: the study's list of that category, the first by id; an id or a category, not both", () => {
+    const sql = one({ kind: "caseList", category: "all_cases_with_mutation_data" });
+    assert.match(sql, /sl\.list_id = \(SELECT sl\.list_id\n {2}FROM cbio\.sample_list sl[\s\S]*WHERE sl\.category = 'all_cases_with_mutation_data' AND cs\.cancer_study_identifier = 's1'\n {2}ORDER BY sl\.stable_id LIMIT 1\)/);
+    assert.match(one({ kind: "caseList", id: "sequenced" }), /sl\.stable_id = 's1_sequenced' AND cs\.cancer_study_identifier = 's1'/);
+    assert.throws(() => one({ kind: "caseList", id: "x", category: "all_cases_in_study" }), /a list id or a category, not both or neither/);
+    assert.throws(() => one({ kind: "caseList" }), /not both or neither/);
+    assert.throws(() => one({ kind: "caseList", category: "All Cases'; --" }), /bad category/);
+  });
+  test("an oql leaf's exp / prot name the profile EXP and PROT read", () => {
+    const c = { ...ctx, profiles: ["mrna_median_Zscores", "rna_seq_v2_mrna_median_Zscores", "rppa_Zscores"] };
+    assert.match(one({ kind: "oql", q: "TP53: EXP>=2" }, c), /ga\.profile_type = 'mrna_median_Zscores'/);
+    assert.match(one({ kind: "oql", q: "TP53: EXP>=2", exp: "rna_seq_v2_mrna_median_Zscores" }, c), /ga\.profile_type = 'rna_seq_v2_mrna_median_Zscores'/);
+    assert.match(one({ kind: "oql", q: "TP53: PROT<=-2", prot: "rppa_Zscores" }, c), /ga\.profile_type = 'rppa_Zscores' AND .* <= -2/);
+    assert.throws(() => one({ kind: "oql", q: "TP53: EXP>=2", exp: "gistic" }, c), /OQL EXP is set to read the mRNA profile 'gistic', which this study does not have; its mRNA profiles: mrna_median_Zscores, rna_seq_v2_mrna_median_Zscores/);
+    assert.throws(() => one({ kind: "oql", q: "TP53: EXP>=2", exp: "x y" }, c), /oql clause: exp names a profile by its id/);
+    // a pin no entry reads is harmless
+    assert.doesNotThrow(() => one({ kind: "oql", q: "TP53: MUT", prot: "rppa_Zscores" }, c));
+  });
   test("genomicData: values or a range of the gene's profile, checked against the study's profiles", () => {
     const sql = one({ kind: "genomicData", gene: "erbb2", profileType: "gistic", values: ["2", "-2"] });
     assert.match(sql, /hugo_gene_symbol = 'ERBB2' AND ga\.profile_type = 'gistic'/);
@@ -274,6 +292,8 @@ describe("readback", () => {
     assert.equal(text({ kind: "derived", metric: "lines", eventType: "Treatment", range: { gte: 2, lt: 4 } }), "lines of 'Treatment' ≥ 2 and < 4");
     assert.equal(text({ kind: "derived", metric: "followupMonths", range: { gte: 24 } }), "followupMonths ≥ 24 months");
     assert.equal(text({ kind: "caseList", id: "s1_sequenced" }), "in case list s1_sequenced");
+    assert.equal(text({ kind: "caseList", category: "all_cases_with_cna_data" }), "in each study's case list of category all_cases_with_cna_data");
+    assert.equal(text({ kind: "oql", q: "TP53: EXP>2", exp: "rna_seq_v2_mrna_median_Zscores", prot: "rppa_Zscores" }), "OQL[TP53: EXP>2] (EXP on rna_seq_v2_mrna_median_Zscores) (PROT on rppa_Zscores)");
     assert.equal(text({ kind: "split", part: "validation" }), "in the validation half (fixed held-out split)");
     assert.equal(text({ kind: "upload", dataset: "custom:mine" }), "with a row in upload mine");
     assert.equal(text({ kind: "genomicData", gene: "ERBB2", profileType: "mrna", range: { gt: 2 } }), 'ERBB2 mrna {"gt":2}');
