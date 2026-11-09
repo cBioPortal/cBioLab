@@ -43,7 +43,21 @@ service and opens that comparison (`lib/legacy-comparison.ts`; a new comparison 
   - [ ] The table lists the 1,500 most significant genes; the portal lists every gene tested (the rest are on the volcano as density, not as points)
   - [ ] The Data Set picker's ⓘ profile description (the catalog carries no description)
   - [ ] Downloads: the volcano's and box plot's SVG/PNG/data buttons, the table's copy and download
-- [ ] **Comparison → Mutations tab** — the two-group lollipop
+- [x] **Comparison → Mutations tab** — the two-group lollipop: the `mutcompare` view, the first group above the protein and the second below (codon axis on top, Pfam domains between), the y-axis % / # switch, the gene picker with the portal's "Highest Frequency" genes (ranked as the portal ranks them, by the higher mutated share), each group's Driver/VUS badges, a click on a stem filtering the table, the gene's Fisher line, and the table of protein changes with each group's patients and share, log2 ratio, p, q and "Enriched in" (with its filter and "Significant only"); shown for exactly two groups when the study has mutations (#166)
+  - [ ] The Top / Bottom Y-Axis Max sliders
+  - [x] Beside the lollipop as the portal has it: each group's badge selector (the Results tab's, shared: Driver/VUS totals, clickable type names, "only"), its middle line on the protein's centre; the transcript and its ids; the Legend toggle and the SVG/PNG download (the last two on the Results tab's lollipop too)
+  - [ ] The transcript drop-down offers only the canonical transcript: mutations are annotated on it alone, where the portal re-annotates them on a chosen one, live (Genome Nexus). The plan is a stored per-transcript table instead: [`TRANSCRIPT-ANNOTATION.md`](TRANSCRIPT-ANNOTATION.md)
+  - [ ] The driver-settings menu (the sliders button above the badges: OncoKB, hotspots, custom drivers)
+  - [ ] Cancer Hotspots as putative drivers: the portal's default counts a hotspot mutation as a driver, cBioLab only OncoKB (e.g. TP53 D208G, D281E in brca_tcga_pan_can_atlas_2018 Basal-like vs Luminal A)
+  - [ ] The lollipop's tracks (Cancer Hotspots, OncoKB, PTM, exons, topology, PDB); the table's copy and download
+  - [ ] The table's Co-occurrence Pattern column (a mini oncoprint of the groups' patients), and the Custom Driver, Custom Driver Tier and MS columns
+  - [ ] Each group's badges filter that group alone; ours hide a class in both groups at once
+  - [ ] The Fisher line for filtered or selected mutations (ours is for all of the gene's mutations)
+  - [ ] A stem's tooltip counts distinct patients and shows the other group's stem at that codon too; ours counts the stem's patient + change pairs, its own group only
+  - [ ] The gene picker's searchable dropdown of the 200 ranked genes (ours: a gene field and the ten pills; the result carries the 200)
+  - [ ] The ranking honours the page's driver and event-type settings (ours counts every called mutation)
+  - [ ] The overlap banner ("Samples (N) that overlap in the selected groups are excluded from sample-level analysis below.")
+  - [ ] A browser check: the kind is still `e2ePending`
 - [x] **Query-by-gene form controls** — the query dialog's "Select Genomic Profiles" (each kind's profiles as the study offers them, radios where it has several, each one's description on its ⓘ, the mRNA and protein z-score thresholds) and "Select Patient/Case Set" (the study's sample lists with their sizes, filtered as typed; several studies' mutation / copy-number categories; "User-defined Case List" by sample or patient id, refused in the portal's words when an id matches nothing), each changing the Results page's document: the profiles a bare gene's default alterations and the profile EXP / PROT read, the case set a clause every group keeps (#167)
   - [ ] GSVA gene sets: the warehouse holds no GSVA scores (no GENESET_SCORE profile in any study, and the gene-set hierarchy tables are empty), and the importer does not load them
   - [ ] The profile choice decides who is Altered (the header's count, Comparison/Survival, the Download tab's lists); the oncoprint and gene tabs still draw every alteration of the genes, where the portal leaves a deselected type's data out
@@ -56,7 +70,7 @@ service and opens that comparison (`lib/legacy-comparison.ts`; a new comparison 
 
 ## Medium — annotation depth and per-sample viewers
 
-- [ ] **Per-sample CN segments** — the `segments` view on Results → CN Segments and the Patient summary (PR #161 open)
+- [x] **Per-sample CN segments** — the `segments` view on Results → CN Segments and the Patient summary (#161)
   - [ ] Hide the tab when no queried sample has segments
   - [ ] Drag-to-zoom, and the `.seg` download
 - [x] **Pathways → PathwayMapper diagram and ranked pathway table** — the `pathwaymap` view on Results and Patient (#160)

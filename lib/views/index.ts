@@ -9,6 +9,7 @@ import { runLogistic } from "./logistic/run.ts";
 import { runCourse } from "./course/run.ts";
 import { runSequence } from "./sequence/run.ts";
 import { runHotspots } from "./hotspots/run.ts";
+import { runMutcompare } from "./mutcompare/run.ts";
 import { runPlot } from "./plot/run.ts";
 import { runCoexpression } from "./coexpression/run.ts";
 import { runClinical } from "./clinical/run.ts";
@@ -101,6 +102,7 @@ const RUNNERS: Record<ViewKind, ViewRunner> = {
   course: runCourse,
   sequence: runSequence,
   hotspots: runHotspots,
+  mutcompare: runMutcompare,
   plot: runPlot,
   coexpression: runCoexpression,
   clinical: runClinical,
