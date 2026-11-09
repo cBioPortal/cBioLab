@@ -1,12 +1,18 @@
 // The Results page's deployment settings: the study cap and cBioPortal's cross-study expression rule.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resultsMaxStudies, crossStudyExpression, expressionAcross, isExpressionProfile } from "../lib/results-settings.ts";
+import { resultsMaxStudies, queryProductLimit, crossStudyExpression, expressionAcross, isExpressionProfile } from "../lib/results-settings.ts";
 
 test("the study cap is 50 unless a positive whole number is set", () => {
   assert.equal(resultsMaxStudies({}), 50);
   assert.equal(resultsMaxStudies({ RESULTS_MAX_STUDIES: "12" }), 12);
   for (const bad of ["0", "-3", "2.5", "many"]) assert.equal(resultsMaxStudies({ RESULTS_MAX_STUDIES: bad }), 50, bad);
+});
+
+test("the gene × sample limit is cBioPortal's 1,000,000 unless a positive whole number is set", () => {
+  assert.equal(queryProductLimit({}), 1_000_000);
+  assert.equal(queryProductLimit({ QUERY_PRODUCT_LIMIT: "5000" }), 5000);
+  for (const bad of ["0", "-3", "2.5", "many"]) assert.equal(queryProductLimit({ QUERY_PRODUCT_LIMIT: bad }), 1_000_000, bad);
 });
 
 test("expression across studies follows cBioPortal: PanCancer Atlas only, by default", () => {

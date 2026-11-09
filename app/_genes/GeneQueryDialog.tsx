@@ -69,8 +69,18 @@ export interface GeneQueryDialogProps {
   mode: GeneQueryMode;
   /** the query as the page holds it */
   value: string;
-  /** the query applied: its text, as the reader left it, and what it says */
-  onApply: (text: string, check: QueryCheck) => void;
+  /**
+   * the query applied: its text, as the reader left it, and what it says. A promise holds the
+   * dialog open, its button saying so, until it settles: a string it resolves to is shown as what
+   * went wrong and the dialog stays open; anything else closes it
+   */
+  onApply: (text: string, check: QueryCheck) => void | Promise<string | void>;
+  /** more of the form, above the genes (the query page's profiles and case set) */
+  above?: React.ReactNode;
+  /** what the form above says stands between it and applying, each in words */
+  blockers?: string[];
+  /** the form above is still loading what it needs */
+  waiting?: boolean;
   /** the fewest and most distinct genes the place it is for takes */
   min?: number;
   max?: number;
@@ -293,28 +303,68 @@ export function GeneQueryEditor({ mode, value, onChange, onSubmit, min = 1, max 
   );
 }
 
-function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply, min = 1, max = 30, groups = false, applyLabel = "Apply" }: GeneQueryDialogProps) {
+function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply, min = 1, max = 30, groups = false, applyLabel = "Apply", above, blockers = [], waiting = false }: GeneQueryDialogProps) {
   const lists = useGeneLists();
   const [status, setStatus] = useState<GeneEditorStatus | null>(null);
-  const blocked = !status || status.blocked;
-  const about = description ?? (mode === "oql" ? "One gene per line, optionally with what counts as altered in it (OQL)." : "Gene symbols separated by spaces" + (groups ? "; [A B] draws A and B as one row." : "."));
-  const apply = () => { if (!status || status.blocked) return; lists.remember(status.text, mode); onApply(status.text.trim(), status.check); onOpenChange(false); };
+  const [applying, setApplying] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const problems = [...blockers, ...(status?.problems || [])];
+  const blocked = !status || status.blocked || blockers.length > 0 || waiting || applying;
+  const how = mode === "oql" ? "One gene per line, optionally with what counts as altered in it (OQL)." : "Gene symbols separated by spaces" + (groups ? "; [A B] draws A and B as one row." : ".");
+  // with the form above, the genes are its last step and say how to write them there
+  const about = above ? description || "" : description ?? how;
+  const apply = () => {
+    if (!status || blocked) return;
+    lists.remember(status.text, mode);
+    setFailed(null);
+    const r = onApply(status.text.trim(), status.check);
+    if (!(r instanceof Promise)) { onOpenChange(false); return; }
+    setApplying(true);
+    r.then((msg) => { if (typeof msg === "string") { setFailed(msg); setApplying(false); } else onOpenChange(false); },
+      (e) => { setFailed(String(e?.message || e)); setApplying(false); });
+  };
+  const why = applying ? applyLabel.toLowerCase() + "…" : waiting ? "waiting for the form to load" : status?.pending ? "waiting for the symbols to be checked" : problems.join("\n");
   return (
-    <DialogContent data-tw className="gene-query-dialog top-[6vh] max-h-[88vh] translate-y-0 gap-4 overflow-y-auto sm:max-w-4xl" {...(about ? {} : { "aria-describedby": undefined })}>
+    <DialogContent data-tw className={cn("gene-query-dialog top-[6vh] max-h-[88vh] translate-y-0 overflow-y-auto sm:max-w-4xl", above ? "gap-3" : "gap-4")} {...(about ? {} : { "aria-describedby": undefined })}>
       <DialogHeader>
         <DialogTitle className="text-lg">{title}</DialogTitle>
         {about && <DialogDescription className="text-md">{about}</DialogDescription>}
       </DialogHeader>
-      <GeneQueryEditor mode={mode} value={value} min={min} max={max} groups={groups} onChange={setStatus} onSubmit={apply}
-        sideClass="max-h-[max(10rem,calc(88vh-15rem))]" />
+      {above}
+      {(() => {
+        const editor = <GeneQueryEditor mode={mode} value={value} min={min} max={max} groups={groups} onChange={setStatus} onSubmit={apply}
+          sideClass="max-h-[max(10rem,calc(88vh-15rem))]" />;
+        // with the form above, the genes are its third step, in a well of their own like the others
+        return above ? <section className={cn(STEP_WELL, "gap-2")}><StepHeading n={3} label="Enter Genes:" hint={how} />{editor}</section> : editor;
+      })()}
       <DialogFooter className="sticky -bottom-6 -mx-6 -mb-6 items-center gap-2 border-t bg-card px-6 py-3">
-        <span className="text-sm text-muted-foreground" data-tip={status?.problems.join("\n")}>
-          {status?.pending ? "checking symbols…" : status?.problems.length ? status.problems.length + " to fix" : ""}
-        </span>
+        {failed
+          ? <span role="alert" className="mr-auto text-sm text-destructive">{failed}</span>
+          : <span className="text-sm text-muted-foreground" data-tip={problems.join("\n")}>
+              {status?.pending ? "checking symbols…" : problems.length ? problems.length + " to fix" : ""}
+            </span>}
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-        <Button onClick={apply} disabled={blocked} data-tip={blocked ? (status?.pending ? "waiting for the symbols to be checked" : status?.problems.join("\n")) : applyLabel.toLowerCase() + " (⌘/Ctrl+Enter)"}>{applyLabel}</Button>
+        <Button onClick={apply} disabled={blocked} data-tip={blocked ? why : applyLabel.toLowerCase() + " (⌘/Ctrl+Enter)"}>
+          {applying && <span className="spinner" aria-hidden="true" />}{applyLabel}
+        </Button>
       </DialogFooter>
     </DialogContent>
+  );
+}
+
+/** a step of the query form: a well of its own, so the steps read apart */
+export const STEP_WELL = "flex flex-col gap-1.5 rounded-lg border bg-[var(--page)] px-3.5 py-3";
+
+/** a numbered step of the query form: its number, its label, a spinner while it loads, a hint under it */
+export function StepHeading({ n, label, loading, hint, aside }: { n: number; label: string; loading?: boolean; hint?: string; aside?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5" data-test={"queryStep" + n}>
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground" aria-hidden="true">{n}</span>
+      <h3 className="m-0 text-md font-semibold">{label}</h3>
+      {loading && <span className="spinner" aria-label="loading" />}
+      {hint && <span className="text-sm text-muted-foreground">{hint}</span>}
+      {aside && <span className="ml-auto text-sm">{aside}</span>}
+    </div>
   );
 }
 

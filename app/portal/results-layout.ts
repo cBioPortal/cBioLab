@@ -15,10 +15,15 @@ export interface ResultsQuery {
   studies: string[];
   /** Explore's filters, which every group keeps */
   filters: Clause[];
-  /** the gene query, one OQL entry each */
+  /** the gene query, one OQL entry each, as the query page's profiles resolve it (lib/query-options.ts resolveQuery) */
   entries: string[];
   /** its genes, in order */
   genes: string[];
+  /** the profiles the query's EXP and PROT alterations read (the query page's mRNA and protein choice), when it names them */
+  exp?: string;
+  prot?: string;
+  /** several studies: exp / prot apply to each study holding that profile */
+  ifHeld?: boolean;
 }
 
 /** What the queried studies hold, as far as the page's tabs need it. */
@@ -83,7 +88,7 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"]): { coh
   const profiled = [...byType].map(([type, genes]) => ({ kind: "profiled", type, genes }) as Clause);
   // the query as one OQL clause — its ";" is "or" between entries (up to 30), where an `any` group
   // of one clause per line would stop at 8
-  const query = { kind: "oql", q: q.entries.join("; ") };
+  const query = { kind: "oql", q: q.entries.join("; "), ...pinsOf(q) };
   const def = (all: Clause[]) => ({ ...scope, all: [...q.filters, ...all] }) as CohortDef;
   return {
     // Altered and Unaltered first: the comparison's figures draw them in the first two series colours, and the page's swatches follow this order
@@ -95,6 +100,9 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"]): { coh
     unchecked,
   };
 }
+
+/** the query's EXP / PROT profile choice, as an oql clause and the Download tab carry it */
+const pinsOf = (q: ResultsQuery) => ({ ...(q.exp ? { exp: q.exp } : {}), ...(q.prot ? { prot: q.prot } : {}), ...(q.ifHeld && (q.exp || q.prot) ? { ifHeld: true } : {}) });
 
 /**
  * The Mutations tab's lollipop and its table, kept in step as the portal keeps them. The grid's
@@ -229,6 +237,6 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     // the portal's PathwayMapper tab: the pathway holding most of the queried genes, each gene's altered %
     { title: "Pathways", views: [v("Pathways", { kind: "pathwaymap", genes, cohorts: queried })] },
     // the portal's Download tab, after Pathways, last as there: the files of the queried samples for the query's lines
-    { title: "Download", views: [v("Download", { kind: "datafiles", oql: q.entries, cohorts: queried })] }
+    { title: "Download", views: [v("Download", { kind: "datafiles", oql: q.entries, ...pinsOf(q), cohorts: queried })] }
   ], left, { partial: data.partial || (svHeld && data.svs === undefined) });
 }

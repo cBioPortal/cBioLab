@@ -26,12 +26,12 @@ const analyzeHref = (id: string): string => "/lab?" + new URLSearchParams({ tab:
 /** Explore on one study with Custom data → Add data open (the lab reads `custom=add`) */
 const addDataHref = (id: string): string => "/lab?" + new URLSearchParams({ tab: "explore", study: id, custom: "add" }).toString();
 
-export function QueryFlow({ initial, onStudies, queryTitle, explore = true, className }: {
+const sameStudies = (a: string[], b: string[]) => a.length === b.length && a.every((s) => b.includes(s));
+
+export function QueryFlow({ initial, onStudies, explore = true, className }: {
   initial: ResultsTarget;
   /** offer "Explore selected studies" beside "Query by gene" */
   explore?: boolean;
-  /** the gene dialog's title when "Query by gene" opens it (the homepage's own wording) */
-  queryTitle?: string;
   /** the selection as it changes, for a page that keeps it in its URL */
   onStudies?: (ids: string[]) => void;
   className?: string;
@@ -63,7 +63,7 @@ export function QueryFlow({ initial, onStudies, queryTitle, explore = true, clas
         actions={(id) => <StudyRowActions id={id} acts={{
           explore: { title: "explore " + id + " — its summary, on its own", href: exploreHref([id]) },
           analyze: { title: "start an analysis of all of " + id, href: analyzeHref(id) },
-          query: { title: "query genes in " + id + " alone", onClick: () => setAsking({ studies: [id], filters: [] }) },
+          query: { title: "query " + id + " alone", onClick: () => setAsking({ studies: [id], filters: [] }) },
           addData: { title: "explore " + id + " and add custom data to it", href: addDataHref(id) },
         }} />} />
       {/* the count on the left, the two ways on centred on the bar (a third, empty column balances the count) */}
@@ -71,7 +71,9 @@ export function QueryFlow({ initial, onStudies, queryTitle, explore = true, clas
         <span className="justify-self-center sm:justify-self-start"><SelectionStats studies={studies} selected={chosen} loading={loading} /></span>
         <div className="flex flex-wrap justify-center gap-2.5">
           <Button className="querybygene" disabled={!!queryWhy} data-tip={queryWhy || "enter genes to query in the selected studies"}
-            onClick={() => setAsking({ studies: chosen, filters, query: initial.query, title: queryTitle })}><Dna />Query by gene</Button>
+            onClick={() => setAsking({ studies: chosen, filters, query: initial.query,
+              // the page's own profiles and case set, while it is the same studies being queried
+              options: sameStudies(chosen, initial.studies) ? initial.options : undefined })}><Dna />Query by gene</Button>
           {explore && <Button variant="outline" className="exploreselected" disabled={!chosen.length} asChild={!!chosen.length}
             data-tip={chosen.length ? "open the selected studies' summary in Explore" + (filters.length ? " (the filters do not carry over)" : "") : "select at least one study"}>
             {chosen.length ? <a href={exploreHref(chosen)}><LayoutDashboard />Explore selected studies</a> : <><LayoutDashboard />Explore selected studies</>}

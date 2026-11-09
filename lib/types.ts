@@ -20,7 +20,12 @@ export interface ChResult<R = ChRow> {
 export type ClinicalRange = { gt?: number; gte?: number; lt?: number; lte?: number };
 export type ClinicalOp = "=" | "!=" | ">" | ">=" | "<" | "<=";
 
-export interface OqlLeaf { kind: "oql"; q: string }
+/**
+ * Genomic status in cBioPortal OQL. `exp` / `prot` name the profile (its id without the study
+ * prefix) that the query's EXP / PROT alterations read — the query page's mRNA and protein profile
+ * choice; without them, the study's z-score profile of that kind.
+ */
+export interface OqlLeaf { kind: "oql"; q: string; exp?: string; prot?: string; ifHeld?: boolean }
 export interface ClinicalLeaf {
   kind: "clinical";
   /** matched at the level the study records it: a sample attribute selects the matching samples,
@@ -122,7 +127,13 @@ export interface ProfiledLeaf {
    */
   genes?: string[];
 }
-export interface CaseListLeaf { kind: "caseList"; id: string }
+/**
+ * One of the study's own sample lists: by `id` (a bare id gets the study prefix), or by `category`
+ * (cBioPortal's sample-list category, e.g. all_cases_with_mutation_data) — the study's list of that
+ * category, the first by id, as the portal resolves a multi-study query's case set. A study with no
+ * list of that category contributes no samples.
+ */
+export interface CaseListLeaf { kind: "caseList"; id?: string; category?: string }
 export interface GenomicDataLeaf {
   kind: "genomicData"; gene: string; profileType: string;
   range?: ClinicalRange; values?: (string | number)[];
