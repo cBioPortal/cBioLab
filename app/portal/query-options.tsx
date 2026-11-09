@@ -63,7 +63,7 @@ export function useQueryOptionsData(studies: string[]): { data: Loaded | null; e
 /** a section of the form: its label, as the portal's SectionHeader, beside what it holds */
 function Section({ n, label, loading, aside, children }: { n: number; label: string; loading?: boolean; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-1.5">
+    <section className="flex flex-col gap-1 border-t pt-2.5 first:border-t-0 first:pt-0">
       <StepHeading n={n} label={label} loading={loading} aside={aside} />
       <div className="min-w-0 pl-7">{children}</div>
     </section>
@@ -136,9 +136,9 @@ export function QueryOptionsPanel({ studies, filtered, initial, exploreHref, onC
     setProfiles((p) => { const next = { ...(p || {}) }; if (profile) next[kind] = profile; else delete next[kind]; return next; });
 
   return (
-    <div className="flex flex-col gap-4" data-test="queryOptions">
+    <div className="flex flex-col gap-2.5 [&_label]:m-0" data-test="queryOptions">
       <Section n={1} label="Select Genomic Profiles:" loading={loading}>
-        <div className="flex flex-col gap-1.5" data-test="molecularProfileSelector">
+        <div className="flex flex-col gap-0.5" data-test="molecularProfileSelector">
           {error && <p className="m-0 text-sm text-destructive">could not read the studies&apos; profiles: {error}</p>}
           {data && !groups.length && <strong className="text-md">No studies selected</strong>}
           {groups.map(({ kind, profiles: ps }) => {
@@ -148,7 +148,7 @@ export function QueryOptionsPanel({ studies, filtered, initial, exploreHref, onC
               // across studies the choice is a data type: each study's profile of that kind
               const names = [...new Set(ps.map((p) => p.name))];
               return (
-                <label key={kind.key} className="flex items-center gap-2 text-md">
+                <label key={kind.key} className="flex min-h-6 items-center gap-2 text-md leading-tight">
                   <Checkbox checked={on} onCheckedChange={(c) => choose(kind.key, c === true ? EVERY_STUDY : null)} data-test={kind.type} aria-label={kind.label} />
                   <span>{names.length === 1 && kind.key !== "sv" ? names[0] : kind.label}</span>
                   <InfoButton aria-label={"about " + kind.label}
@@ -158,17 +158,17 @@ export function QueryOptionsPanel({ studies, filtered, initial, exploreHref, onC
             }
             const one = ps.length === 1;
             return (
-              <div key={kind.key} className="flex flex-col gap-1">
+              <div key={kind.key} className="flex flex-col gap-0.5">
                 {one ? (
                   <ProfileToggle profile={ps[0]} label={kind.key === "sv" ? kind.label : ps[0].name} checked={on} kind={kind.type}
                     onChange={(c) => choose(kind.key, c ? ps[0].profile : null)} />
                 ) : (
                   <>
-                    <label className="flex items-center gap-2 text-md font-semibold">
+                    <label className="flex min-h-6 items-center gap-2 text-md leading-tight font-semibold">
                       <Checkbox checked={on} onCheckedChange={(c) => choose(kind.key, c === true ? ps[0].profile : null)} data-test={kind.type} aria-label={kind.label} />
                       <span>{kind.label}. Select one of the profiles below:</span>
                     </label>
-                    <div className="ml-6 flex flex-col gap-1" role="radiogroup" aria-label={kind.label + " profile"}>
+                    <div className="ml-6 flex flex-col gap-0.5" role="radiogroup" aria-label={kind.label + " profile"}>
                       {ps.map((p) => <ProfileToggle key={p.profile} profile={p} label={p.name} checked={value === p.profile} kind={kind.type} radio
                         onChange={(c) => { if (c) choose(kind.key, p.profile); }} />)}
                     </div>
@@ -188,7 +188,7 @@ export function QueryOptionsPanel({ studies, filtered, initial, exploreHref, onC
       </Section>
       <Section n={2} label="Select Patient/Case Set:" loading={loading}
         aside={<a href={exploreHref} target="_blank" rel="noreferrer" className="text-sm">To build your own case set, try out our enhanced Study View.</a>}>
-        <div className="flex flex-col gap-2" data-test="CaseSetSelector">
+        <div className="flex flex-col gap-1.5" data-test="CaseSetSelector">
           <CaseSetPicker options={options} value={caseSet} onChange={setPicked} loading={loading} />
           {caseSet === CUSTOM_CASE_SET && (
             <div className="flex flex-col gap-1.5">
@@ -220,7 +220,7 @@ export function QueryOptionsPanel({ studies, filtered, initial, exploreHref, onC
 /** one profile's checkbox or radio, its name, and its description on the ⓘ (the portal's ProfileToggle) */
 function ProfileToggle({ profile, label, checked, kind, radio, onChange }: { profile: ProfileInfo; label: string; checked: boolean; kind: string; radio?: boolean; onChange: (c: boolean) => void }) {
   return (
-    <label className="flex items-center gap-2 text-md">
+    <label className="flex min-h-6 items-center gap-2 text-md leading-tight">
       {radio
         ? <input type="radio" checked={checked} onChange={(e) => onChange(e.target.checked)} data-test={kind} aria-label={label} />
         : <Checkbox checked={checked} onCheckedChange={(c) => onChange(c === true)} data-test={kind} aria-label={label} />}

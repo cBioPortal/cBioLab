@@ -325,13 +325,13 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
   };
   const why = applying ? applyLabel.toLowerCase() + "…" : waiting ? "waiting for the form to load" : status?.pending ? "waiting for the symbols to be checked" : problems.join("\n");
   return (
-    <DialogContent data-tw className="gene-query-dialog top-[6vh] max-h-[88vh] translate-y-0 gap-4 overflow-y-auto sm:max-w-4xl" {...(about ? {} : { "aria-describedby": undefined })}>
+    <DialogContent data-tw className={cn("gene-query-dialog top-[6vh] max-h-[88vh] translate-y-0 overflow-y-auto sm:max-w-4xl", above ? "gap-3" : "gap-4")} {...(about ? {} : { "aria-describedby": undefined })}>
       <DialogHeader>
         <DialogTitle className="text-lg">{title}</DialogTitle>
         {about && <DialogDescription className="text-md">{about}</DialogDescription>}
       </DialogHeader>
       {above}
-      {above && <StepHeading n={3} label="Enter Genes:" hint={how} />}
+      {above && <div className="-mb-1 border-t pt-2.5"><StepHeading n={3} label="Enter Genes:" hint={how} /></div>}
       <GeneQueryEditor mode={mode} value={value} min={min} max={max} groups={groups} onChange={setStatus} onSubmit={apply}
         sideClass="max-h-[max(10rem,calc(88vh-15rem))]" />
       <DialogFooter className="sticky -bottom-6 -mx-6 -mb-6 items-center gap-2 border-t bg-card px-6 py-3">
@@ -352,14 +352,12 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
 /** a numbered step of the query form: its number, its label, a spinner while it loads, a hint under it */
 export function StepHeading({ n, label, loading, hint, aside }: { n: number; label: string; loading?: boolean; hint?: string; aside?: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5" data-test={"queryStep" + n}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground" aria-hidden="true">{n}</span>
-        <h3 className="m-0 text-md font-semibold">{label}</h3>
-        {loading && <span className="spinner" aria-label="loading" />}
-        {aside && <span className="ml-auto">{aside}</span>}
-      </div>
-      {hint && <p className="m-0 pl-7 text-sm text-muted-foreground">{hint}</p>}
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5" data-test={"queryStep" + n}>
+      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground" aria-hidden="true">{n}</span>
+      <h3 className="m-0 text-md font-semibold">{label}</h3>
+      {loading && <span className="spinner" aria-label="loading" />}
+      {hint && <span className="text-sm text-muted-foreground">{hint}</span>}
+      {aside && <span className="ml-auto text-sm">{aside}</span>}
     </div>
   );
 }
