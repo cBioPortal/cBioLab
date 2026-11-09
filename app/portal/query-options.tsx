@@ -16,7 +16,7 @@ import { InfoButton } from "../_ui/info-button";
 import { FIELD } from "../_ui/toolbar.ts";
 import { usePublicEnv } from "../_env/public-env-context.tsx";
 import { crossStudyExpression, expressionAcross } from "../../lib/results-settings.ts";
-import { StepHeading } from "../_genes/GeneQueryDialog.tsx";
+import { StepHeading, STEP_WELL } from "../_genes/GeneQueryDialog.tsx";
 import { cn } from "../../lib/cn";
 import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 import {
@@ -63,7 +63,7 @@ export function useQueryOptionsData(studies: string[]): { data: Loaded | null; e
 /** a section of the form: its label, as the portal's SectionHeader, beside what it holds */
 function Section({ n, label, loading, aside, children }: { n: number; label: string; loading?: boolean; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-1 border-t pt-2.5 first:border-t-0 first:pt-0">
+    <section className={STEP_WELL}>
       <StepHeading n={n} label={label} loading={loading} aside={aside} />
       <div className="min-w-0 pl-7">{children}</div>
     </section>

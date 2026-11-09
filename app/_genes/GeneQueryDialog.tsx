@@ -331,9 +331,12 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
         {about && <DialogDescription className="text-md">{about}</DialogDescription>}
       </DialogHeader>
       {above}
-      {above && <div className="-mb-1 border-t pt-2.5"><StepHeading n={3} label="Enter Genes:" hint={how} /></div>}
-      <GeneQueryEditor mode={mode} value={value} min={min} max={max} groups={groups} onChange={setStatus} onSubmit={apply}
-        sideClass="max-h-[max(10rem,calc(88vh-15rem))]" />
+      {(() => {
+        const editor = <GeneQueryEditor mode={mode} value={value} min={min} max={max} groups={groups} onChange={setStatus} onSubmit={apply}
+          sideClass="max-h-[max(10rem,calc(88vh-15rem))]" />;
+        // with the form above, the genes are its third step, in a well of their own like the others
+        return above ? <section className={cn(STEP_WELL, "gap-2")}><StepHeading n={3} label="Enter Genes:" hint={how} />{editor}</section> : editor;
+      })()}
       <DialogFooter className="sticky -bottom-6 -mx-6 -mb-6 items-center gap-2 border-t bg-card px-6 py-3">
         {failed
           ? <span role="alert" className="mr-auto text-sm text-destructive">{failed}</span>
@@ -348,6 +351,9 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
     </DialogContent>
   );
 }
+
+/** a step of the query form: a well of its own, so the steps read apart */
+export const STEP_WELL = "flex flex-col gap-1.5 rounded-lg border bg-[var(--page)] px-3.5 py-3";
 
 /** a numbered step of the query form: its number, its label, a spinner while it loads, a hint under it */
 export function StepHeading({ n, label, loading, hint, aside }: { n: number; label: string; loading?: boolean; hint?: string; aside?: React.ReactNode }) {
