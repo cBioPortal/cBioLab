@@ -2,7 +2,7 @@
 // buttons save one (getGroupParameters, ComparisonSession), and the link to it (GroupComparisonTabs).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { comparisonSession, comparisonHref, legacyComparisonState, SESSION_MAX_GROUPS, SESSION_MAX_SAMPLES } from "../lib/legacy-comparison.ts";
+import { comparisonSession, comparisonHref, sessionServiceUrl, legacyComparisonState, SESSION_MAX_GROUPS, SESSION_MAX_SAMPLES } from "../lib/legacy-comparison.ts";
 
 test("a session holds each group's samples of the one study, in the page's order", () => {
   const s = comparisonSession("brca", [{ name: "Basal", samples: ["S2", "S1", "S1"] }, { name: "LumA", samples: ["S3"] }]);
@@ -22,6 +22,10 @@ test("a session is refused, not cut: no groups, an empty group, too many groups 
   assert.throws(() => comparisonSession("brca", Array.from({ length: SESSION_MAX_GROUPS + 1 }, (_, i) => ({ name: "g" + i, samples: ["x"] }))), /at most 20/);
   const many = Array.from({ length: SESSION_MAX_SAMPLES + 1 }, (_, i) => "s" + i);
   assert.throws(() => comparisonSession("brca", [{ name: "A", samples: many }]), /at most 100000/);
+});
+
+test("the browser saves the session to the portal's session service", () => {
+  assert.equal(sessionServiceUrl("https://www.cbioportal.org/"), "https://www.cbioportal.org/api/session/comparison_session");
 });
 
 test("the link opens the tab like the page's open one, or the first", () => {
