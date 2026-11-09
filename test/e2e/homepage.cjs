@@ -164,6 +164,48 @@ async function homepage({ browser, ok, BASE }) {
     } catch (e) {
       ok(across, false, String(e.message).split("\n")[0].slice(0, 200));
     }
+    // The dialog's layout: three numbered steps in the portal's order, each in a well of its own (a
+    // tone apart from the dialog's, none overlapping the next), the profile rows close together. And
+    // studies of different reference genomes (brca_tcga hg19 + aml_target_gdc hg38, neither PanCancer):
+    // the portal's warning word for word in the dialog and on the Results page, and no mRNA or protein
+    const layout = "query dialog: three steps in wells; hg19 + hg38 studies are warned of, and offer no mRNA";
+    try {
+      await page.goto(BASE + "/?studies=brca_tcga,aml_target_gdc", { waitUntil: "domcontentloaded" });
+      await page.locator("button.querybygene:not([disabled])").waitFor({ timeout: 120000 });
+      const dlg = page.locator("[role=dialog].gene-query-dialog");
+      for (let i = 0; i < 10 && !(await dlg.count()); i++) { await page.locator("button.querybygene").click(); await page.waitForTimeout(1000); }
+      const panel = dlg.locator("[data-test=queryOptions]");
+      await panel.locator("[data-test=caseSetSelector]").filter({ hasText: /\(\d+\)/ }).waitFor({ timeout: 60000 });
+      const shape = await dlg.evaluate((d) => {
+        const steps = [...d.querySelectorAll("[data-test^=queryStep]")];
+        const wells = steps.map((s) => s.closest("section"));
+        const tone = (e) => getComputedStyle(e).backgroundColor;
+        const boxes = wells.map((w) => w && w.getBoundingClientRect());
+        const rows = [...d.querySelectorAll("[data-test=molecularProfileSelector] label")].map((l) => l.getBoundingClientRect().top);
+        return {
+          labels: steps.map((s) => s.querySelector("h3")?.textContent),
+          numbers: steps.map((s) => s.firstElementChild?.textContent),
+          walled: wells.every((w) => w && tone(w) !== tone(d)),
+          apart: boxes.every((b, i) => b && (i === 0 || boxes[i - 1].bottom <= b.top)),
+          pitch: Math.max(0, ...rows.slice(1).map((t, i) => t - rows[i])),
+          kinds: [...d.querySelectorAll("[data-test=molecularProfileSelector] [data-test]")].map((x) => x.getAttribute("data-test")),
+        };
+      });
+      const notes = await panel.locator(":scope > p").allInnerTexts();
+      const WARN = "You are combining studies with molecular data based on both GRCh37/hg19 and GRCh38/hg38. This is not fully supported yet. Please double check your findings";
+      await dlg.locator("textarea[aria-label='OQL query']").fill("TP53");
+      await page.waitForFunction(() => { const b = [...document.querySelectorAll("[role=dialog].gene-query-dialog button")].find((x) => x.textContent === "Submit query"); return b && !b.disabled; }, null, { timeout: 60000 });
+      await dlg.getByRole("button", { name: "Submit query" }).click();
+      await page.waitForURL(/\/portal\/results\?/, { timeout: 60000 });
+      await page.locator("[data-test=queryOptionsSummary]").waitFor({ timeout: 120000 });
+      const results = await page.locator("main").innerText();
+      ok(layout, JSON.stringify(shape.labels) === JSON.stringify(["Select Genomic Profiles:", "Select Patient/Case Set:", "Enter Genes:"]) &&
+        shape.numbers.join("") === "123" && shape.walled && shape.apart && shape.pitch > 0 && shape.pitch <= 30 &&
+        !shape.kinds.includes("MRNA_EXPRESSION") && !shape.kinds.includes("PROTEIN_LEVEL") && notes.includes(WARN) && results.includes(WARN),
+        JSON.stringify({ ...shape, notes, results: results.includes(WARN) }));
+    } catch (e) {
+      ok(layout, false, String(e.message).split("\n")[0].slice(0, 200));
+    }
     ok("query dialog options: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
