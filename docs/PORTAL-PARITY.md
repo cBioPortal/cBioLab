@@ -18,7 +18,8 @@ the data is already in the warehouse.
 - cBioLab's invariants (CLAUDE.md) win where they conflict with legacy behaviour, and the PR says so.
 
 Every portal page also has an "Open in cBioPortal" button (`lib/legacy-link.ts`). A new tab adds its
-title there.
+title there. On the Comparison page the button saves the page's groups to cbioportal.org's session
+service and opens that comparison (`lib/legacy-comparison.ts`; a new comparison tab adds its title there).
 
 ## High — daily-use features, data already loaded
 
