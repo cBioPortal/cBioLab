@@ -47,7 +47,9 @@ title there.
   - [ ] GSVA gene sets: the warehouse holds no GSVA scores (no GENESET_SCORE profile in any study, and the gene-set hierarchy tables are empty), and the importer does not load them
   - [ ] The profile choice decides who is Altered (the header's count, Comparison/Survival, the Download tab's lists); the oncoprint and gene tabs still draw every alteration of the genes, where the portal leaves a deselected type's data out
   - [ ] One of several mutation, structural-variant or copy-number profiles of a study (gbm_tcga_pub's two copy-number profiles) is refused: the engine reads all of them together
-  - [ ] mRNA and protein choices across several studies (the portal offers them only where cross-study expression is enabled, and refuses EXP / PROT there)
+  - [x] Several studies follow the portal's rules: mRNA and protein offered only where `CROSS_STUDY_EXPRESSION` lets expression be compared (its `enable_cross_study_expression`; PanCancer Atlas studies by default), the chosen profile read in each study holding it (the oql clause's `ifHeld`); an EXP / PROT typed into the genes refused in its words; the gene × sample limit (`QUERY_PRODUCT_LIMIT`, its `query_product_limit`, 1,000,000) refused in its words in the dialog and on the Results page; and the hg19 / hg38 warning, word for word
+    - [ ] The hg19 / hg38 warning is said in the dialog and the Results header; the portal also marks each selected study in the study list
+    - [ ] Across studies a mutation, structural-variant or copy-number choice is a data type; the portal groups profiles by their id without the study and offers radios where that gives several
 - [x] **"Open in cBioPortal"** on every portal page (#158)
   - [ ] The Comparison page, which needs a session created on the portal first
 

@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import {
   selectableProfiles, defaultProfiles, defaultOptions, defaultOql, effectiveKinds, kindsInQuery, readThreshold, resolveQuery,
   heldKinds, defaultCaseSet, caseSetOptions, multiCaseSetCount, studiesWithoutCaseSet, caseSetClause, caseSetProblem, profilesProblem,
-  parseCaseIds, optionsProblem, writeOptions, readOptions, completeOptions, chosenQuery, legacyQueryParams, EVERY_STUDY, CUSTOM_CASE_SET, type CaseSetInfo, type QueryOptions,
+  parseCaseIds, optionsProblem, writeOptions, readOptions, completeOptions, chosenQuery, legacyQueryParams, caseSetSampleCount, queryLimitProblem, mixedGenomes, MIXED_GENOME_WARNING, EVERY_STUDY, CUSTOM_CASE_SET, type CaseSetInfo, type QueryOptions,
 } from "../lib/query-options.ts";
 import type { ProfileInfo } from "../lib/profile-catalog.ts";
 
@@ -103,9 +103,69 @@ describe("the query the options ask for", () => {
     assert.match(resolveQuery(opts({ meth: "methylation_hm450" }), ["TP53"], 1, held).error!, /give TP53 no alterations/);
     assert.match(resolveQuery(opts({ mut: "*" }), ["TP53"], 1, held).error!, /for several studies/);
     assert.match(resolveQuery(opts({ mut: "mutations" }), ["TP53"], 2, held).error!, /chooses data types/);
-    assert.match(resolveQuery(opts({ mrna: "*" }), ["TP53"], 2, held).error!, /does not filter by mRNA expression/);
+    // mRNA / protein across studies: only where the deployment lets expression be compared, and by one profile id
+    assert.match(resolveQuery(opts({ mrna: "rna_seq_v2_mrna_median_Zscores" }), ["TP53"], 2, held).error!, /^Expression data cannot be compared across the selected studies: untick mRNA expression$/);
+    assert.match(resolveQuery(opts({ mrna: "*" }), ["TP53"], 2, held, true).error!, /mRNA expression names one profile/);
     // methylation alone with an explicit entry is fine: nothing bare needs a default
     assert.equal(resolveQuery(opts({ meth: "methylation_hm450" }), ["TP53: MUT"], 1, held).error, undefined);
+  });
+});
+
+describe("several studies (the portal's cross-study query)", () => {
+  const several = new Set(["mut", "cna", "mrna", "prot"] as const);
+  test("mRNA and protein, where expression may be compared, are read in each study holding the profile", () => {
+    const r = resolveQuery(opts({ mut: "*", cna: "*", mrna: "rna_seq_v2_mrna_median_all_sample_Zscores" }), ["TP53", "KRAS: MUT"], 2, several, true);
+    assert.deepEqual(r, { entries: ["TP53: MUT AMP HOMDEL EXP>=2 EXP<=-2", "KRAS: MUT"], exp: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true });
+    const p = resolveQuery(opts({ prot: "rppa_Zscores" }, { rppaZ: "1" }), ["TP53"], 3, several, true);
+    assert.deepEqual(p, { entries: ["TP53: PROT>=1 PROT<=-1"], prot: "rppa_Zscores", ifHeld: true });
+    // one study never reads the pin leniently
+    assert.equal(resolveQuery(opts({ mrna: "rna_seq_v2_mrna_median_Zscores" }), ["TP53"], 1, several).ifHeld, undefined);
+  });
+  test("an EXP or PROT typed into the query is refused in the portal's words, even where the choice is allowed", () => {
+    assert.equal(resolveQuery(opts({ mut: "*" }), ["TP53: EXP>2"], 2, several, true).error,
+      "Expression filtering in the gene list (the EXP command) is not supported when doing cross cancer queries.");
+    assert.equal(resolveQuery(opts({ mut: "*" }), ["TP53: PROT<-1"], 2, several, false).error,
+      "Protein level filtering in the gene list (the PROT command) is not supported when doing cross cancer queries.");
+    // one study takes them
+    assert.equal(resolveQuery(opts({ mut: "mutations" }), ["TP53: EXP>2"], 1, several).error, undefined);
+  });
+  test("the Results page reads the same rule, with the deployment's answer", () => {
+    const data = { profiles: [], caseSets: [] };
+    const o = opts({ mut: "*", mrna: "rna_seq_v2_mrna_median_all_sample_Zscores" }, { caseSet: "all" });
+    assert.match(chosenQuery(o, data, ["a", "b"], ["TP53"]).error!, /cannot be compared/);
+    const c = chosenQuery(o, data, ["a", "b"], ["TP53"], true);
+    assert.equal(c.error, undefined);
+    assert.equal(c.ifHeld, true);
+    assert.equal(c.exp, "rna_seq_v2_mrna_median_all_sample_Zscores");
+  });
+});
+
+describe("the size limit and the reference-genome warning", () => {
+  test("genes × the case set's samples past the limit is refused in the portal's words", () => {
+    assert.equal(queryLimitProblem(12, 1000, 1_000_000), null);
+    assert.equal(queryLimitProblem(10, 100_000, 1_000_000), null); // at the limit is allowed, as the portal's ">"
+    assert.equal(queryLimitProblem(5, null, 10), null);
+    assert.equal(queryLimitProblem(3, 400, 1000),
+      "Please limit your queries to 2 genes or fewer. Queries are limited by gene and sample count. The product of the query's gene and sample count must be less than 1000. You have selected 400 samples, so you can have no more than 2 genes in your query.");
+  });
+  test("the case set's samples, as approxSampleCount counts them", () => {
+    const lists = [list("a_all", "all_cases_in_study", 10, "a"), list("a_sequenced", "all_cases_with_mutation_data", 7, "a"), list("b_all", "all_cases_in_study", 5, "b")];
+    assert.equal(caseSetSampleCount(opts({}, { caseSet: "a_sequenced" }), ["a"], lists), 7);
+    assert.equal(caseSetSampleCount(opts({}, { caseSet: "all" }), ["a", "b"], lists), 15);
+    assert.equal(caseSetSampleCount(opts({}, { caseSet: "w_mut" }), ["a", "b"], lists), 7);
+    assert.equal(caseSetSampleCount(opts({}, { caseSet: "-1" }), ["a"], lists, 3), 3);
+    assert.equal(caseSetSampleCount(opts({}, { caseSet: "-1", cases: { set: "x", level: "sample", n: 4 } }), ["a"], lists), 4);
+    assert.equal(caseSetSampleCount(opts({}, { caseSet: "nope" }), ["a"], lists), null);
+  });
+  test("studies of different reference genomes are warned of, never refused", () => {
+    assert.equal(mixedGenomes({ a: "hg19", b: "GRCh37" }, ["a", "b"]), false);
+    assert.equal(mixedGenomes({ a: "hg19", b: "hg38" }, ["a", "b"]), true);
+    assert.equal(mixedGenomes({ a: "hg19", b: "hg38" }, ["a"]), false);
+    assert.equal(mixedGenomes(undefined, ["a", "b"]), false);
+    const o = opts({ mut: "*" }, { caseSet: "all" });
+    const c = chosenQuery(o, { profiles: [], caseSets: [], builds: { a: "hg19", b: "hg38" } }, ["a", "b"], ["TP53"]);
+    assert.equal(c.error, undefined);
+    assert.ok(c.notes.includes(MIXED_GENOME_WARNING));
   });
 });
 

@@ -14,10 +14,13 @@ import { Textarea } from "../_ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "../_ui/popover";
 import { InfoButton } from "../_ui/info-button";
 import { FIELD } from "../_ui/toolbar.ts";
+import { usePublicEnv } from "../_env/public-env-context.tsx";
+import { crossStudyExpression, expressionAcross } from "../../lib/results-settings.ts";
+import { StepHeading } from "../_genes/GeneQueryDialog.tsx";
 import { cn } from "../../lib/cn";
 import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 import {
-  selectableProfiles, defaultProfiles, defaultCaseSet, caseSetOptions, profilesProblem, optionsProblem, caseSetProblem, parseCaseIds, studiesWithoutCaseSet,
+  selectableProfiles, defaultProfiles, defaultCaseSet, heldKinds, caseSetSampleCount, mixedGenomes, MIXED_GENOME_WARNING, caseSetOptions, profilesProblem, optionsProblem, caseSetProblem, parseCaseIds, studiesWithoutCaseSet,
   EVERY_STUDY, CUSTOM_CASE_SET, DEFAULT_Z, type ProfileKind, type QueryOptions, type QueryOptionsData,
 } from "../../lib/query-options.ts";
 
@@ -30,7 +33,15 @@ export interface QueryOptionsStatus {
   customIds?: { ids: string[]; level: "sample" | "patient" };
   /** said beside the choice, never a reason to refuse it */
   notes: string[];
+  /** the kinds the studies hold, and whether expression may be compared across them: what resolveQuery needs to check the genes on submit */
+  held: ProfileKind[];
+  expression: boolean;
+  /** the samples the case set holds (caseSetSampleCount), for the size limit on submit; null when not known */
+  samples: number | null;
 }
+
+/** mRNA and protein: a profile chosen by id even across studies, where the other kinds are a data type */
+const isExpressionKind = (k: ProfileKind) => k === "mrna" || k === "prot";
 
 type Loaded = QueryOptionsData & { unavailable: { study: string; why: string }[] };
 
@@ -50,15 +61,12 @@ export function useQueryOptionsData(studies: string[]): { data: Loaded | null; e
 }
 
 /** a section of the form: its label, as the portal's SectionHeader, beside what it holds */
-function Section({ label, loading, aside, children }: { label: string; loading?: boolean; aside?: React.ReactNode; children: React.ReactNode }) {
+function Section({ n, label, loading, aside, children }: { n: number; label: string; loading?: boolean; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="grid gap-x-4 gap-y-1.5 sm:grid-cols-[13rem_minmax(0,1fr)]">
-      <div className="flex flex-col gap-1">
-        <span className="flex items-center gap-2 text-md font-semibold">{label}{loading && <span className="spinner" aria-label="loading" />}</span>
-        {aside}
-      </div>
-      <div className="min-w-0">{children}</div>
-    </div>
+    <section className="flex flex-col gap-1.5">
+      <StepHeading n={n} label={label} loading={loading} aside={aside} />
+      <div className="min-w-0 pl-7">{children}</div>
+    </section>
   );
 }
 
@@ -74,7 +82,9 @@ export function QueryOptionsPanel({ studies, filtered, initial, exploreHref, onC
 }) {
   const { data, error, loading } = useQueryOptionsData(studies);
   const several = studies.length > 1;
-  const groups = useMemo(() => (data ? selectableProfiles(data.profiles).filter((g) => !several || (g.kind.key !== "mrna" && g.kind.key !== "prot")) : []), [data, several]);
+  // across studies mRNA and protein are offered only where the deployment lets expression be compared (MolecularProfileSelector's allowExpressionCrossStudy)
+  const expression = expressionAcross(studies, crossStudyExpression(usePublicEnv()));
+  const groups = useMemo(() => (data ? selectableProfiles(data.profiles).filter((g) => expression || !isExpressionKind(g.kind.key)) : []), [data, expression]);
   // the choice: the page's own when modifying, else the portal's defaults once the profiles are known
   const [profiles, setProfiles] = useState<QueryOptions["profiles"] | null>(initial ? initial.profiles : null);
   const [z, setZ] = useState(initial?.z || DEFAULT_Z);
@@ -102,7 +112,7 @@ export function QueryOptionsPanel({ studies, filtered, initial, exploreHref, onC
   const parsed = useMemo(() => (caseSet === CUSTOM_CASE_SET ? parseCaseIds(idsText, studies, level) : null), [caseSet, idsText, studies, level]);
 
   const status = useMemo((): QueryOptionsStatus => {
-    if (!data || !profiles) return { options: null, problems: error ? ["could not read the studies' profiles and case sets: " + error] : [], pending: !error, notes: [] };
+    if (!data || !profiles) return { options: null, problems: error ? ["could not read the studies' profiles and case sets: " + error] : [], pending: !error, notes: [], held: [], expression, samples: null };
     const o: QueryOptions = { profiles, z, rppaZ, caseSet };
     const problems = [profilesProblem(o), optionsProblem(o, data.profiles, studies.length)];
     if (caseSet === CUSTOM_CASE_SET) {
@@ -111,12 +121,14 @@ export function QueryOptionsPanel({ studies, filtered, initial, exploreHref, onC
     } else problems.push(caseSetProblem(o, studies));
     const without = several ? studiesWithoutCaseSet(caseSet, studies, lists) : [];
     const notes = [
+      mixedGenomes(data.builds, studies) ? MIXED_GENOME_WARNING : null,
       without.length ? "the case set leaves out " + without.join(", ") + ", which " + (without.length === 1 ? "has" : "have") + " no such sample list" : null,
       ...data.unavailable.map((u) => u.why),
     ].filter(Boolean) as string[];
-    return { options: o, problems: problems.filter(Boolean) as string[], pending: idsLoading, notes,
+    return { options: o, problems: problems.filter(Boolean) as string[], pending: idsLoading, notes, held: [...heldKinds(data.profiles)], expression,
+      samples: caseSetSampleCount(o, studies, lists, parsed && "ids" in parsed ? Math.max(1, parsed.ids.length) : undefined),
       ...(parsed && "ids" in parsed && parsed.ids.length ? { customIds: { ids: parsed.ids, level } } : {}) };
-  }, [data, error, profiles, z, rppaZ, caseSet, parsed, level, several, studies, lists, idsLoading]);
+  }, [data, error, profiles, z, rppaZ, caseSet, parsed, level, several, studies, lists, idsLoading, expression]);
   const sent = useRef("");
   useEffect(() => { const k = JSON.stringify(status); if (k !== sent.current) { sent.current = k; onChange(status); } }, [status, onChange]);
 
@@ -124,15 +136,15 @@ export function QueryOptionsPanel({ studies, filtered, initial, exploreHref, onC
     setProfiles((p) => { const next = { ...(p || {}) }; if (profile) next[kind] = profile; else delete next[kind]; return next; });
 
   return (
-    <div className="flex flex-col gap-4 rounded-md border bg-paper px-3.5 py-3" data-test="queryOptions">
-      <Section label="Select Genomic Profiles:" loading={loading}>
+    <div className="flex flex-col gap-4" data-test="queryOptions">
+      <Section n={1} label="Select Genomic Profiles:" loading={loading}>
         <div className="flex flex-col gap-1.5" data-test="molecularProfileSelector">
           {error && <p className="m-0 text-sm text-destructive">could not read the studies&apos; profiles: {error}</p>}
           {data && !groups.length && <strong className="text-md">No studies selected</strong>}
           {groups.map(({ kind, profiles: ps }) => {
             const value = profiles?.[kind.key];
             const on = !!value;
-            if (several) {
+            if (several && !isExpressionKind(kind.key)) {
               // across studies the choice is a data type: each study's profile of that kind
               const names = [...new Set(ps.map((p) => p.name))];
               return (
@@ -174,7 +186,7 @@ export function QueryOptionsPanel({ studies, filtered, initial, exploreHref, onC
           })}
         </div>
       </Section>
-      <Section label="Select Patient/Case Set:" loading={loading}
+      <Section n={2} label="Select Patient/Case Set:" loading={loading}
         aside={<a href={exploreHref} target="_blank" rel="noreferrer" className="text-sm">To build your own case set, try out our enhanced Study View.</a>}>
         <div className="flex flex-col gap-2" data-test="CaseSetSelector">
           <CaseSetPicker options={options} value={caseSet} onChange={setPicked} loading={loading} />

@@ -176,5 +176,11 @@ describe("the query page's choices in the document", () => {
     const dl = (l.doc.views || []).find((v) => (v as { kind: string }).kind === "datafiles") as unknown as { exp?: string; oql: string[] };
     assert.equal(dl.exp, "rna_seq_v2_mrna_median_Zscores");
     assert.deepEqual(dl.oql, ["TP53: MUT EXP>=2 EXP<=-2"]);
+    // several studies: the pin applies to each study holding the profile, in the clause and the Download tab alike
+    const m = layout({ studies: ["a", "b"], filters: [], entries: ["TP53: MUT EXP>=2 EXP<=-2"], genes: ["TP53"], exp: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true },
+      { expr: null, cna: null, clinical: [], numeric: [], expressionAcross: true, held: { every: ["MUTATION", "CNA"], some: [] }, svs: false });
+    assert.deepEqual((m.doc.cohorts as Record<string, { all: Clause[] }>).Altered.all[0], { kind: "oql", q: "TP53: MUT EXP>=2 EXP<=-2", exp: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true });
+    const mdl = (m.doc.views || []).find((v) => (v as { kind: string }).kind === "datafiles") as unknown as { ifHeld?: boolean };
+    assert.equal(mdl.ifHeld, true);
   });
 });

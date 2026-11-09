@@ -61,6 +61,8 @@ export interface QueryOptionsData {
   profiles: ProfileInfo[];
   /** each study's sample lists */
   caseSets: CaseSetInfo[];
+  /** each study's reference genome, as its metadata names it (hg19, hg38, mm10); a peer's is not known here */
+  builds?: Record<string, string>;
 }
 
 // ---- profiles --------------------------------------------------------------------------------
@@ -156,9 +158,11 @@ export function readThreshold(text: string): number | null {
 export interface ResolvedQuery {
   /** each entry with a bare gene given the default alterations (unchanged when the defaults are "any alteration") */
   entries: string[];
-  /** the profiles EXP and PROT read (one study), for the oql clause's exp / prot */
+  /** the profiles EXP and PROT read, for the oql clause's exp / prot */
   exp?: string;
   prot?: string;
+  /** several studies: exp / prot apply to each study holding that profile (the oql clause's ifHeld) */
+  ifHeld?: boolean;
   /** why the options cannot be used, in the portal's words where it has them */
   error?: string;
 }
@@ -167,10 +171,14 @@ export interface ResolvedQuery {
  * The query the options ask for. A bare gene's default is "any alteration" (the engine's ANY:
  * mutations, structural variants, high-level copy number) when the effective kinds are every one
  * of those the studies hold and nothing else; otherwise the entry is written out with
- * defaultOql's alterations. The mRNA and protein choices are one study's (the portal offers them
- * only for one); several studies' are refused.
+ * defaultOql's alterations. Across several studies the mutation, structural-variant, copy-number
+ * and methylation choices are data types (EVERY_STUDY); mRNA and protein are a profile id read in
+ * each study holding it, offered only where `expression` says expression data may be compared
+ * across these studies (lib/results-settings.ts, the portal's enable_cross_study_expression); and
+ * an EXP or PROT typed into the query is refused in the portal's words, as its query page does,
+ * even where the mRNA / protein choice itself is allowed.
  */
-export function resolveQuery(o: QueryOptions | null, entries: string[], studies: number, held: Set<ProfileKind>): ResolvedQuery {
+export function resolveQuery(o: QueryOptions | null, entries: string[], studies: number, held: Set<ProfileKind>, expression = false): ResolvedQuery {
   if (!o) return { entries };
   const chosen = (Object.keys(o.profiles) as ProfileKind[]).filter((k) => o.profiles[k]);
   // a link that names no profile asks for the defaults: any alteration (the dialog itself refuses an empty choice)
@@ -178,10 +186,15 @@ export function resolveQuery(o: QueryOptions | null, entries: string[], studies:
   const several = chosen.filter((k) => o.profiles[k] === EVERY_STUDY);
   if (studies === 1 && several.length) return { entries, error: "a profile choice of \"each study's\" is for several studies; this query has one" };
   if (studies > 1) {
-    const one = chosen.filter((k) => o.profiles[k] !== EVERY_STUDY);
+    const expr: ProfileKind[] = chosen.filter((k) => k === "mrna" || k === "prot");
+    const one = chosen.filter((k) => !expr.includes(k) && o.profiles[k] !== EVERY_STUDY);
     if (one.length) return { entries, error: "a query across several studies chooses data types, not one study's profiles (" + one.map((k) => o.profiles[k]).join(", ") + ")" };
-    const bad = chosen.filter((k) => k === "mrna" || k === "prot");
-    if (bad.length) return { entries, error: "a query across several studies does not filter by " + bad.map(kindLabel).join(" or ") + " (cBioPortal refuses EXP and PROT across studies too)" };
+    if (expr.length && !expression) return { entries, error: "Expression data cannot be compared across the selected studies: untick " + expr.map(kindLabel).join(" and ") };
+    const every = expr.filter((k) => o.profiles[k] === EVERY_STUDY);
+    if (every.length) return { entries, error: "across several studies " + every.map(kindLabel).join(" and ") + " name" + (every.length === 1 ? "s" : "") + " one profile, read in each study holding it" };
+    const typed = kindsInQuery(entries);
+    if (typed.has("mrna")) return { entries, error: "Expression filtering in the gene list (the EXP command) is not supported when doing cross cancer queries." };
+    if (typed.has("prot")) return { entries, error: "Protein level filtering in the gene list (the PROT command) is not supported when doing cross cancer queries." };
   }
   const z = readThreshold(o.z), rppaZ = readThreshold(o.rppaZ);
   if (o.profiles.mrna && z == null) return { entries, error: "the mRNA z-score threshold must be a number of 0 or more; it is \"" + o.z + "\"" };
@@ -189,7 +202,8 @@ export function resolveQuery(o: QueryOptions | null, entries: string[], studies:
   const kinds = effectiveKinds(o, entries, studies, held);
   const any = ["mut", "sv", "cna"].filter((k) => held.has(k as ProfileKind));
   const isAny = [...kinds].every((k) => k === "mut" || k === "sv" || k === "cna" || k === "meth") && any.every((k) => kinds.has(k as ProfileKind));
-  const out: ResolvedQuery = { entries, ...(o.profiles.mrna && studies === 1 ? { exp: o.profiles.mrna } : {}), ...(o.profiles.prot && studies === 1 ? { prot: o.profiles.prot } : {}) };
+  const out: ResolvedQuery = { entries, ...(o.profiles.mrna ? { exp: o.profiles.mrna } : {}), ...(o.profiles.prot ? { prot: o.profiles.prot } : {}),
+    ...(studies > 1 && (o.profiles.mrna || o.profiles.prot) ? { ifHeld: true } : {}) };
   if (isAny) return out;
   const def = defaultOql(kinds, z ?? 2, rppaZ ?? 2);
   const bare = entries.filter(isBare);
@@ -267,6 +281,40 @@ export function multiCaseSetCount(id: string, studies: string[], lists: CaseSetI
   const c = MULTI_CASE_SETS.find((x) => x.id === id);
   if (!c) return 0;
   return studies.reduce((n, s) => n + (listOfCategory(s, c.category, lists)?.samples || 0), 0);
+}
+
+/**
+ * How many samples the case set holds, as the portal approximates it for its size limit
+ * (approxSampleCount): a user-defined list's ids, counted as typed (`typed`, or the stored set's
+ * size); one study's list its size; several studies' category each study's list of it, added.
+ * Null when it is not known.
+ */
+export function caseSetSampleCount(o: QueryOptions, studies: string[], lists: CaseSetInfo[], typed?: number): number | null {
+  if (o.caseSet === CUSTOM_CASE_SET) return typed ?? o.cases?.n ?? null;
+  if (studies.length > 1) return MULTI_CASE_SETS.some((c) => c.id === o.caseSet) ? multiCaseSetCount(o.caseSet, studies, lists) : null;
+  return lists.find((l) => l.id === o.caseSet)?.samples ?? null;
+}
+
+/**
+ * The portal's limit on a query's size (query_product_limit): its genes times its samples past
+ * `limit` is refused, in the portal's words — its submit error, then its explanation under the gene box.
+ */
+export function queryLimitProblem(genes: number, samples: number | null, limit: number): string | null {
+  if (!samples || genes * samples <= limit) return null;
+  const n = Math.floor(limit / samples);
+  return "Please limit your queries to " + n + " genes or fewer. Queries are limited by gene and sample count. The product of the query's gene and sample count must be less than " +
+    limit + ". You have selected " + samples + " samples, so you can have no more than " + n + " genes in your query.";
+}
+
+/** the portal's warning on studies of different reference genomes (isMixedReferenceGenome), word for word */
+export const MIXED_GENOME_WARNING = "You are combining studies with molecular data based on both GRCh37/hg19 and GRCh38/hg38. This is not fully supported yet. Please double check your findings";
+
+const GENOME_ALIAS: Record<string, string> = { grch37: "hg19", hg19: "hg19", grch38: "hg38", hg38: "hg38", grcm38: "mm10", mm10: "mm10" };
+
+/** whether the studies' reference genomes differ: not all hg19, all hg38, or all mm10 (a study whose genome is not known is left out) */
+export function mixedGenomes(builds: Record<string, string> | undefined, studies: string[]): boolean {
+  const seen = new Set(studies.map((s) => builds?.[s]).filter(Boolean).map((b) => GENOME_ALIAS[b!.toLowerCase()] || b!.toLowerCase()));
+  return seen.size > 1;
 }
 
 /** the studies a multi-study case set leaves out entirely, having no list of its category */
@@ -403,6 +451,7 @@ export interface ChosenQuery {
   entries: string[];
   exp?: string;
   prot?: string;
+  ifHeld?: boolean;
   /** the case set as a clause every group keeps, or null */
   clause: Clause | null;
   /** the header's case set and profiles, in words */
@@ -411,15 +460,19 @@ export interface ChosenQuery {
   notes: string[];
 }
 
-/** a link's options read against what the studies hold (the query options API's answer); null options: the query as typed, every case */
-export function chosenQuery(o: QueryOptions | null, data: (QueryOptionsData & { unavailable?: { study: string; why: string }[] }) | null, studies: string[], typed: string[]): ChosenQuery {
+/**
+ * A link's options read against what the studies hold (the query options API's answer); null
+ * options: the query as typed, every case. `expression`: whether expression data may be compared
+ * across these studies (resolveQuery).
+ */
+export function chosenQuery(o: QueryOptions | null, data: (QueryOptionsData & { unavailable?: { study: string; why: string }[] }) | null, studies: string[], typed: string[], expression = false): ChosenQuery {
   const none: ChosenQuery = { waiting: false, entries: typed, clause: null, summary: null, notes: [] };
   if (!o) return none;
   if (!data) return { ...none, waiting: true };
   const full = completeOptions(o, data.profiles, studies);
   const problem = caseSetProblem(full, studies) || optionsProblem(full, data.profiles, studies.length);
   if (problem) return { ...none, error: problem };
-  const r = resolveQuery(full, typed, studies.length, heldKinds(data.profiles));
+  const r = resolveQuery(full, typed, studies.length, heldKinds(data.profiles), expression);
   if (r.error) return { ...none, error: r.error };
   const groups = selectableProfiles(data.profiles);
   const named = PROFILE_KINDS.filter((k) => full.profiles[k.key]).map((k) => {
@@ -434,10 +487,11 @@ export function chosenQuery(o: QueryOptions | null, data: (QueryOptionsData & { 
     : option ? option.label : full.caseSet;
   const without = studies.length > 1 ? studiesWithoutCaseSet(full.caseSet, studies, data.caseSets) : [];
   return {
-    waiting: false, entries: r.entries, exp: r.exp, prot: r.prot,
+    waiting: false, entries: r.entries, exp: r.exp, prot: r.prot, ...(r.ifHeld ? { ifHeld: true } : {}),
     clause: caseSetClause(full, studies),
     summary: { caseSet, profiles: named.join(", ") },
     notes: [
+      mixedGenomes(data.builds, studies) ? MIXED_GENOME_WARNING : null,
       without.length ? "The case set leaves out " + without.join(", ") + ", which " + (without.length === 1 ? "has" : "have") + " no sample list of its kind." : null,
       r.entries.some((e, i) => e !== typed[i]) ? "With these profiles a gene without alterations of its own stands for " + r.entries.find((e, i) => e !== typed[i])!.split(":")[1].trim() + "." : null,
       ...(data.unavailable || []).map((u) => u.why),

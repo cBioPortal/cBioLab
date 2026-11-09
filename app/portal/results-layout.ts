@@ -22,6 +22,8 @@ export interface ResultsQuery {
   /** the profiles the query's EXP and PROT alterations read (the query page's mRNA and protein choice), when it names them */
   exp?: string;
   prot?: string;
+  /** several studies: exp / prot apply to each study holding that profile */
+  ifHeld?: boolean;
 }
 
 /** What the queried studies hold, as far as the page's tabs need it. */
@@ -100,7 +102,7 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"]): { coh
 }
 
 /** the query's EXP / PROT profile choice, as an oql clause and the Download tab carry it */
-const pinsOf = (q: ResultsQuery) => ({ ...(q.exp ? { exp: q.exp } : {}), ...(q.prot ? { prot: q.prot } : {}) });
+const pinsOf = (q: ResultsQuery) => ({ ...(q.exp ? { exp: q.exp } : {}), ...(q.prot ? { prot: q.prot } : {}), ...(q.ifHeld && (q.exp || q.prot) ? { ifHeld: true } : {}) });
 
 /**
  * The Mutations tab's lollipop and its table, kept in step as the portal keeps them. The grid's

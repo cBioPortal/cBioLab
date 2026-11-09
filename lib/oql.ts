@@ -141,7 +141,12 @@ export const driverAnnotationJoin = (pin: string, kind: "INNER" | "LEFT"): strin
 const DRIVER_JOIN = (pin: string): string => driverAnnotationJoin(pin, "INNER");
 
 /** the profile EXP and PROT read, by id without the study prefix, where the query names one */
-export interface OqlPins { EXP?: string; PROT?: string }
+/**
+ * The profiles EXP and PROT read (ids without the study prefix). `ifHeld`: a study without the
+ * named profile has no EXP / PROT alterations, instead of being refused (the portal's query across
+ * studies, whose expression choice applies to each study holding that profile).
+ */
+export interface OqlPins { EXP?: string; PROT?: string; ifHeld?: boolean }
 
 // full OQL leaf -> SQL of matching patient stable ids (portal semantics: altered by ANY entry)
 export function oqlLeafSql(q: string, opts: { oncokbPin?: string | null; profiles?: string[]; study?: string; db?: string } = {}): string {
@@ -185,6 +190,8 @@ export function expressionProfileFor(type: "EXP" | "PROT", profiles: string[] | 
   const noun = type === "EXP" ? "mRNA" : "protein";
   const pinned = pins?.[type];
   if (pinned != null) {
+    // a profile the study lacks matches no row: nothing of this study is altered by it
+    if (pins?.ifHeld && typeof pinned === "string" && want.test(pinned) && !(profiles || []).includes(pinned)) return pinned;
     if (typeof pinned !== "string" || !(profiles || []).includes(pinned) || !want.test(pinned))
       throw new Error("OQL " + type + " is set to read the " + noun + " profile '" + String(pinned).slice(0, 80) + "', which this study does not have; its " + noun +
         " profiles: " + ((profiles || []).filter((p) => want.test(p)).join(", ") || "none"));

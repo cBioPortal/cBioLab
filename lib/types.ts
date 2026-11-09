@@ -25,7 +25,7 @@ export type ClinicalOp = "=" | "!=" | ">" | ">=" | "<" | "<=";
  * prefix) that the query's EXP / PROT alterations read — the query page's mRNA and protein profile
  * choice; without them, the study's z-score profile of that kind.
  */
-export interface OqlLeaf { kind: "oql"; q: string; exp?: string; prot?: string }
+export interface OqlLeaf { kind: "oql"; q: string; exp?: string; prot?: string; ifHeld?: boolean }
 export interface ClinicalLeaf {
   kind: "clinical";
   /** matched at the level the study records it: a sample attribute selects the matching samples,

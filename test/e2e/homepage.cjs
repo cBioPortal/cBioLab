@@ -62,8 +62,8 @@ async function homepage({ browser, ok, BASE }) {
       const pencilGenes = await dlg.locator("textarea").inputValue(), pencilTitle = await dlg.getByRole("heading").first().innerText();
       ok(name, res.status() === 200 && landed === "/" &&
         empty.disabled && /select at least one study/.test(empty.why || "") && byType < all && byData < all && picked >= 1 &&
-        /^\/lab\?tab=explore&study=/.test(explore || "") && /^Query genes in /.test(rowTitle) && rowTicked === 0 &&
-        title === "Select genes to query:" && q.get("study") === "coadread_tcga_pub" && q.get("genes") === "KRAS: MUT\nBRAF" && again === "KRAS: MUT\nBRAF" &&
+        /^\/lab\?tab=explore&study=/.test(explore || "") && /^Query Breast/.test(rowTitle) && rowTicked === 0 &&
+        /^Query Colorectal/.test(title) && q.get("study") === "coadread_tcga_pub" && q.get("genes") === "KRAS: MUT\nBRAF" && again === "KRAS: MUT\nBRAF" &&
         modifyExplore === 0 && pencilGenes === "KRAS: MUT\nBRAF" && pencilTitle === "Edit genes",
         JSON.stringify({ status: res.status(), landed, empty, rows: [all, byType, byData], picked, explore, rowTitle, rowTicked, title, results: [q.get("study"), q.get("genes")], again, modifyExplore, pencilGenes, pencilTitle }));
     } catch (e) {
@@ -128,6 +128,41 @@ async function homepage({ browser, ok, BASE }) {
         JSON.stringify({ start, mutOnly, z, refused, link: q.toString(), said, back }));
     } catch (e) {
       ok(name, false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    // several PanCancer Atlas studies: mRNA is offered (CROSS_STUDY_EXPRESSION's default), each study reading the chosen
+    // profile where it holds it; an EXP typed into the genes is refused in the portal's words. 49 of 128 is cbioportal.org's
+    // count for this query (acc holds no ref_normal profile, so only chol's expression counts)
+    const across = "query dialog: mRNA across PanCancer studies, read where each study holds the profile; a typed EXP refused";
+    try {
+      await page.goto(BASE + "/?studies=acc_tcga_pan_can_atlas_2018,chol_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+      await page.locator("button.querybygene:not([disabled])").waitFor({ timeout: 120000 });
+      const dlg = page.locator("[role=dialog].gene-query-dialog");
+      // a click before the page answers clicks opens nothing: ask again until the dialog is up
+      for (let i = 0; i < 10 && !(await dlg.count()); i++) { await page.locator("button.querybygene").click(); await page.waitForTimeout(1000); }
+      const panel = dlg.locator("[data-test=queryOptions]");
+      await panel.getByRole("checkbox", { name: "mRNA Expression" }).waitFor({ timeout: 60000 });
+      await panel.getByRole("radio", { name: /relative to normal samples/ }).click();
+      const submit = dlg.getByRole("button", { name: "Submit query" });
+      const ready = () => page.waitForFunction(() => { const b = [...document.querySelectorAll("[role=dialog].gene-query-dialog button")].find((x) => x.textContent === "Submit query"); return b && !b.disabled; }, null, { timeout: 60000 });
+      await dlg.locator("textarea[aria-label='OQL query']").fill("TP53: EXP>2");
+      await ready();
+      await submit.click();
+      const alert = dlg.locator("[role=alert]");
+      await alert.waitFor({ timeout: 60000 });
+      const refused = await alert.innerText();
+      await dlg.locator("textarea[aria-label='OQL query']").fill("TP53");
+      await ready();
+      await submit.click();
+      await page.waitForURL(/\/portal\/results\?/, { timeout: 60000 });
+      const q = new URL(page.url()).searchParams;
+      await page.waitForFunction(() => /of 128 queried patients altered/.test(document.querySelector("main")?.innerText || ""), null, { timeout: 180000 });
+      const main = await page.locator("main").innerText();
+      const count = (main.match(/(\d+) \([\d.]+%\)\s*of 128 queried patients altered/) || [])[1];
+      ok(across, refused === "Expression filtering in the gene list (the EXP command) is not supported when doing cross cancer queries." &&
+        q.get("mrna") === "rna_seq_v2_mrna_median_all_sample_ref_normal_Zscores" && q.get("case_set") === "all" && count === "49",
+        JSON.stringify({ refused, link: q.toString(), count }));
+    } catch (e) {
+      ok(across, false, String(e.message).split("\n")[0].slice(0, 200));
     }
     ok("query dialog options: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();

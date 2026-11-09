@@ -136,6 +136,17 @@ describe("caseList, genomicData and genericAssay leaves", () => {
     // a pin no entry reads is harmless
     assert.doesNotThrow(() => one({ kind: "oql", q: "TP53: MUT", prot: "rppa_Zscores" }, c));
   });
+  test("ifHeld: a study without the pinned profile has no EXP / PROT alterations instead of being refused", () => {
+    const c = { ...ctx, profiles: ["mutations", "mrna_median_Zscores"] };
+    const sql = one({ kind: "oql", q: "TP53: MUT EXP>=2", exp: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true }, c);
+    // the pinned id is read as named, which matches none of this study's rows
+    assert.match(sql, /ga\.profile_type = 'rna_seq_v2_mrna_median_all_sample_Zscores'/);
+    assert.match(sql, /MUT|mutation/i);
+    // still a profile of the right kind, and still checked for shape
+    assert.throws(() => one({ kind: "oql", q: "TP53: EXP>=2", exp: "gistic", ifHeld: true }, c), /OQL EXP is set to read the mRNA profile 'gistic'/);
+    assert.throws(() => one({ kind: "oql", q: "TP53: EXP>=2", exp: "rna_seq_v2_mrna_median_Zscores", ifHeld: "yes" } as never, c), /ifHeld is true or left out/);
+    assert.throws(() => one({ kind: "oql", q: "TP53: EXP>=2", ifHeld: true }, c), /name exp or prot/);
+  });
   test("genomicData: values or a range of the gene's profile, checked against the study's profiles", () => {
     const sql = one({ kind: "genomicData", gene: "erbb2", profileType: "gistic", values: ["2", "-2"] });
     assert.match(sql, /hugo_gene_symbol = 'ERBB2' AND ga\.profile_type = 'gistic'/);
@@ -294,6 +305,8 @@ describe("readback", () => {
     assert.equal(text({ kind: "caseList", id: "s1_sequenced" }), "in case list s1_sequenced");
     assert.equal(text({ kind: "caseList", category: "all_cases_with_cna_data" }), "in each study's case list of category all_cases_with_cna_data");
     assert.equal(text({ kind: "oql", q: "TP53: EXP>2", exp: "rna_seq_v2_mrna_median_Zscores", prot: "rppa_Zscores" }), "OQL[TP53: EXP>2] (EXP on rna_seq_v2_mrna_median_Zscores) (PROT on rppa_Zscores)");
+    assert.equal(text({ kind: "oql", q: "TP53: EXP>2", exp: "rna_seq_v2_mrna_median_Zscores", ifHeld: true }),
+      "OQL[TP53: EXP>2] (EXP on rna_seq_v2_mrna_median_Zscores) (in each study holding it; none in a study without it)");
     assert.equal(text({ kind: "split", part: "validation" }), "in the validation half (fixed held-out split)");
     assert.equal(text({ kind: "upload", dataset: "custom:mine" }), "with a row in upload mine");
     assert.equal(text({ kind: "genomicData", gene: "ERBB2", profileType: "mrna", range: { gt: 2 } }), 'ERBB2 mrna {"gt":2}');

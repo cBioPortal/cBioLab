@@ -103,6 +103,11 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
     if (typeof v !== "string" || !/^[A-Za-z0-9._-]{1,120}$/.test(v)) return no(k + " names the profile the lines' " + t + " alterations read, by its id without the study prefix");
     pins[t] = v;
   }
+  if (view.ifHeld != null) {
+    if (view.ifHeld !== true) return no("ifHeld is true or left out");
+    if (!pins.EXP && !pins.PROT) return no("ifHeld says how exp / prot apply to a study without that profile; name exp or prot");
+    pins.ifHeld = true;
+  }
   const genes = [...new Set(lines.map((l) => l.gene))];
   const size = pageSize(view.rows);
   if (!(size >= 1 && size <= TABLE_ROWS_MAX)) return no("rows (the page size of the case table) is 1 to " + TABLE_ROWS_MAX);

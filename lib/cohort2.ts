@@ -569,6 +569,11 @@ function oqlPins(leaf: OqlLeaf): OqlPins | undefined {
     if (typeof v !== "string" || !/^[A-Za-z0-9._-]{1,120}$/.test(v)) throw new Error("oql clause: " + k + " names a profile by its id without the study prefix");
     pins[t] = v;
   }
+  if (leaf.ifHeld != null) {
+    if (leaf.ifHeld !== true) throw new Error("oql clause: ifHeld is true or left out");
+    if (!pins.EXP && !pins.PROT) throw new Error("oql clause: ifHeld says how exp / prot apply to a study without that profile; name exp or prot");
+    pins.ifHeld = true;
+  }
   return pins.EXP || pins.PROT ? pins : undefined;
 }
 
@@ -663,7 +668,8 @@ export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin,
 
 // ---- plain-language readback --------------------------------------------
 function leafText(leaf: any): string {
-  if (leaf.kind === "oql") return "OQL[" + leaf.q + "]" + (leaf.exp ? " (EXP on " + leaf.exp + ")" : "") + (leaf.prot ? " (PROT on " + leaf.prot + ")" : "");
+  if (leaf.kind === "oql") return "OQL[" + leaf.q + "]" + (leaf.exp ? " (EXP on " + leaf.exp + ")" : "") + (leaf.prot ? " (PROT on " + leaf.prot + ")" : "") +
+    (leaf.ifHeld ? " (in each study holding it; none in a study without it)" : "");
   if (leaf.kind === "alteration") {
     const t = leaf.types && leaf.types.length && leaf.types.length < 3 ? " (" + leaf.types.join("/") + ")" : "";
     return leaf.gene + (leaf.driver === "driverOnly" ? " driver-altered" : " altered") + t;

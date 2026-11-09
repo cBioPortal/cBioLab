@@ -310,7 +310,9 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
   const [failed, setFailed] = useState<string | null>(null);
   const problems = [...blockers, ...(status?.problems || [])];
   const blocked = !status || status.blocked || blockers.length > 0 || waiting || applying;
-  const about = description ?? (mode === "oql" ? "One gene per line, optionally with what counts as altered in it (OQL)." : "Gene symbols separated by spaces" + (groups ? "; [A B] draws A and B as one row." : "."));
+  const how = mode === "oql" ? "One gene per line, optionally with what counts as altered in it (OQL)." : "Gene symbols separated by spaces" + (groups ? "; [A B] draws A and B as one row." : ".");
+  // with the form above, the genes are its last step and say how to write them there
+  const about = above ? description || "" : description ?? how;
   const apply = () => {
     if (!status || blocked) return;
     lists.remember(status.text, mode);
@@ -329,6 +331,7 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
         {about && <DialogDescription className="text-md">{about}</DialogDescription>}
       </DialogHeader>
       {above}
+      {above && <StepHeading n={3} label="Enter Genes:" hint={how} />}
       <GeneQueryEditor mode={mode} value={value} min={min} max={max} groups={groups} onChange={setStatus} onSubmit={apply}
         sideClass="max-h-[max(10rem,calc(88vh-15rem))]" />
       <DialogFooter className="sticky -bottom-6 -mx-6 -mb-6 items-center gap-2 border-t bg-card px-6 py-3">
@@ -343,6 +346,21 @@ function GeneQueryBody({ onOpenChange, title, description, mode, value, onApply,
         </Button>
       </DialogFooter>
     </DialogContent>
+  );
+}
+
+/** a numbered step of the query form: its number, its label, a spinner while it loads, a hint under it */
+export function StepHeading({ n, label, loading, hint, aside }: { n: number; label: string; loading?: boolean; hint?: string; aside?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5" data-test={"queryStep" + n}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground" aria-hidden="true">{n}</span>
+        <h3 className="m-0 text-md font-semibold">{label}</h3>
+        {loading && <span className="spinner" aria-label="loading" />}
+        {aside && <span className="ml-auto">{aside}</span>}
+      </div>
+      {hint && <p className="m-0 pl-7 text-sm text-muted-foreground">{hint}</p>}
+    </div>
   );
 }
 

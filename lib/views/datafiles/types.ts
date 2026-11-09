@@ -18,6 +18,8 @@ export interface DatafilesView extends TableQuery {
   /** the profile the lines' EXP / PROT alterations read (an id without the study prefix), as an `oql` cohort clause's `exp` / `prot` */
   exp?: string;
   prot?: string;
+  /** as an `oql` clause's: a study without the exp / prot profile has no EXP / PROT alterations */
+  ifHeld?: boolean;
   /** rows per page of the case table (default 25, at most 1000) */
   rows?: number;
 }

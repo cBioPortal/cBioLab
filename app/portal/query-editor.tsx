@@ -7,8 +7,10 @@ import { useCallback, useState } from "react";
 import { GeneQueryDialog } from "../_genes/GeneQueryDialog.tsx";
 import type { Clause } from "../../lib/types";
 import { encodeParam, decodeParam } from "./page-doc.ts";
-import { readOptions, writeOptions, CUSTOM_CASE_SET, type QueryOptions } from "../../lib/query-options.ts";
+import { readOptions, writeOptions, resolveQuery, queryLimitProblem, CUSTOM_CASE_SET, type QueryOptions } from "../../lib/query-options.ts";
 import { QueryOptionsPanel, type QueryOptionsStatus } from "./query-options.tsx";
+import { usePublicEnv } from "../_env/public-env-context.tsx";
+import { queryProductLimit } from "../../lib/results-settings.ts";
 
 /** the most genes a Results page takes: the oncoprint's rows */
 export const RESULTS_MAX_GENES = 12;
@@ -71,7 +73,7 @@ async function saveCaseIds(studies: string[], ids: string[], level: "sample" | "
  * (`options: false`), keeping the page's choice.
  */
 export function QueryGenesDialog({ target, names, onClose, options = true }: {
-  /** what to query; `query` is the text the dialog starts from (the Results page's own, when modifying); `title` replaces "Query genes in …" */
+  /** what to query; `query` is the text the dialog starts from (the Results page's own, when modifying); `title` replaces "Query …" */
   target: (Omit<ResultsTarget, "query"> & { query?: string; title?: string }) | null;
   /** study names by id, for the title */
   names: Map<string, string>;
@@ -85,12 +87,18 @@ export function QueryGenesDialog({ target, names, onClose, options = true }: {
   const what = n === 1 ? names.get(target!.studies[0]) || target!.studies[0] : n + " studies";
   const narrowed = target?.filters.length ? "The query keeps the " + target.filters.length + " filter" + (target.filters.length === 1 ? "" : "s") + " on them." : "";
   const exploreHref = target ? "/lab?" + new URLSearchParams({ tab: "explore", study: target.studies.join(",") }).toString() : "/lab";
-  const submit = async (text: string): Promise<string | void> => {
+  const limit = queryProductLimit(usePublicEnv());
+  const submit = async (text: string, entries: string[], genes: number): Promise<string | void> => {
     if (!target) return;
     let picked: QueryOptions | null | undefined = target.options;
     if (options) {
       if (!chosen?.options) return "the profiles and case sets are still loading";
       picked = chosen.options;
+      // what the Results page would refuse of these genes with this choice (the portal's submitError), said before leaving
+      const r = resolveQuery(picked, entries, target.studies.length, new Set(chosen.held), chosen.expression);
+      if (r.error) return r.error;
+      const big = queryLimitProblem(genes, chosen.samples, limit);
+      if (big) return big;
       if (picked.caseSet === CUSTOM_CASE_SET) {
         if (!chosen.customIds) return "Please enter at least one ID in your custom case set.";
         const saved = await saveCaseIds(target.studies, chosen.customIds.ids, chosen.customIds.level);
@@ -104,11 +112,11 @@ export function QueryGenesDialog({ target, names, onClose, options = true }: {
   };
   return (
     <GeneQueryDialog open={!!target} onOpenChange={(o) => { if (!o) { setChosen(null); onClose(); } }} mode="oql" value={target?.query || ""} max={RESULTS_MAX_GENES}
-      title={target?.title || "Query genes in " + what} applyLabel="Submit query"
+      title={target?.title || "Query " + what} applyLabel="Submit query"
       description={narrowed}
       above={options && target ? <QueryOptionsPanel studies={target.studies} filtered={target.filters.length > 0} initial={target.options || null}
         exploreHref={exploreHref} onChange={onOptions} /> : undefined}
       blockers={options ? chosen?.problems || [] : []} waiting={options && (!chosen || chosen.pending)}
-      onApply={(text) => submit(text)} />
+      onApply={(text, c) => submit(text, c.entries.map((e) => e.text), c.genes.length)} />
   );
 }

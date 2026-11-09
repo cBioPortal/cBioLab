@@ -31,6 +31,13 @@ export function profileNotesSql(db: string, studies: string[]): string {
     "WHERE cs.cancer_study_identifier IN (" + studies.map(sq).join(", ") + ")";
 }
 
+/** each study's reference genome, by name (hg19, hg38, mm10): metadata only */
+export function buildsSql(db: string, studies: string[]): string {
+  return "SELECT cs.cancer_study_identifier AS study, rg.name AS build FROM " + db + ".cancer_study cs\n" +
+    "JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
+    "WHERE cs.cancer_study_identifier IN (" + studies.map(sq).join(", ") + ")";
+}
+
 /** the query page's choices for these studies; `unavailable` names a study whose sample lists cannot be read here, and why */
 export async function queryOptionsFor(studies: string[]): Promise<QueryOptionsData & { unavailable: { study: string; why: string }[] }> {
   const ids = [...new Set(studies)];
@@ -53,10 +60,11 @@ export async function queryOptionsFor(studies: string[]): Promise<QueryOptionsDa
     byConn.get(k)!.studies.push(s);
   }
   const conns = [...byConn.values()];
-  const [profiles, lists, notes] = await Promise.all([
+  const [profiles, lists, notes, builds] = await Promise.all([
     studyProfilesMany(ids),
     Promise.all(conns.map(({ conn, studies: ss }) => chQuery(caseSetsSql(conn.db, ss), conn))),
     Promise.all(conns.map(({ conn, studies: ss }) => chQuery(profileNotesSql(conn.db, ss), conn))),
+    Promise.all(conns.map(({ conn, studies: ss }) => chQuery(buildsSql(conn.db, ss), conn))),
   ]);
   const noteOf = new Map(notes.flatMap((r) => r.data.map((x) => [x.study + "|" + x.profile, { description: String(x.description), shown: Number(x.shown) === 1 }] as const)));
   const caseSets: CaseSetInfo[] = lists.flatMap((r) => r.data.map((x) => ({
@@ -68,6 +76,7 @@ export async function queryOptionsFor(studies: string[]): Promise<QueryOptionsDa
       return { ...p, study: s, ...(n?.description ? { description: n.description } : {}), ...(n && !n.shown ? { analysis: false } : {}) };
     })),
     caseSets,
+    builds: Object.fromEntries(builds.flatMap((r) => r.data.map((x) => [String(x.study), String(x.build)] as const))),
     unavailable: [...peers].map((s) => ({ study: s, why: s + " is held by a federation peer, whose sample lists this deployment cannot read" })),
   };
 }

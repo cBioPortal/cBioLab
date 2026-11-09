@@ -18,7 +18,7 @@ export function HomePage() {
   return <>
     <SiteHeader page="choose studies, then explore them or query them by gene" current="studies" />
     <main className="analysis-main">
-      <QueryFlow initial={{ studies, filters: [], query: "" }} onStudies={writeStudies} queryTitle="Select genes to query:" />
+      <QueryFlow initial={{ studies, filters: [], query: "" }} onStudies={writeStudies} />
     </main>
   </>;
 }

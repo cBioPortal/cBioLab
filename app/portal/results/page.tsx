@@ -26,9 +26,9 @@ import { QueryFlow } from "../../_home/query-flow.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../_ui/dialog";
 import { checkGeneQuery } from "../../../lib/gene-query.ts";
 import type { CohortDef } from "../../../lib/types.ts";
-import { resultsMaxStudies, crossStudyExpression, expressionAcross, isExpressionProfile, isExpressionType } from "../../../lib/results-settings.ts";
+import { resultsMaxStudies, queryProductLimit, crossStudyExpression, expressionAcross, isExpressionProfile, isExpressionType } from "../../../lib/results-settings.ts";
 import { useQueryOptionsData } from "../query-options.tsx";
-import { chosenQuery, legacyQueryParams } from "../../../lib/query-options.ts";
+import { chosenQuery, legacyQueryParams, queryLimitProblem } from "../../../lib/query-options.ts";
 
 const IDS_SHOWN = 3;
 
@@ -44,17 +44,17 @@ export default function ResultsPage() {
   const tooMany = studiesProblem(studies.length, resultsMaxStudies(env));
   // the query page's profiles and case set, when the link carries them: what they make of the query, and the clause every group keeps
   const optionsData = useQueryOptionsData(target.options && !tooMany ? studies : []);
-  const chosen = useMemo(() => chosenQuery(target.options || null, optionsData.data, studies, check.entries.map((e) => e.text)), [target.options, optionsData.data, studies, check]);
+  const across = expressionAcross(studies, crossStudyExpression(env));
+  const chosen = useMemo(() => chosenQuery(target.options || null, optionsData.data, studies, check.entries.map((e) => e.text), across), [target.options, optionsData.data, studies, check, across]);
   // the profiles can write a bare gene's alterations out, which narrows Altered as an OQL entry does
   const oqlNarrows = check.entries.some((e) => e.meaning !== "any alteration") || chosen.entries.some((e, i) => e !== check.entries[i]?.text);
   const scope = useMemo(() => (chosen.clause ? [...filters, chosen.clause] : filters), [filters, chosen.clause]);
   const { basics, known, error } = useQueryKnown(tooMany || chosen.waiting || chosen.error ? [] : studies, scope);
-  const across = expressionAcross(studies, crossStudyExpression(env));
   // laid out in two steps: from the study list the tabs that need nothing else, so the oncoprint
   // starts at once; with the profiles and attributes Explore's facets give, the rest
   // whether the queried patients carry a structural variant in a queried gene: asked beside the header's count (below)
   const [svs, setSvs] = useState<boolean | null | undefined>(undefined);
-  const asked = useMemo(() => ({ studies, filters: scope, entries: chosen.entries, genes, exp: chosen.exp, prot: chosen.prot }), [studies, scope, chosen, genes]);
+  const asked = useMemo(() => ({ studies, filters: scope, entries: chosen.entries, genes, exp: chosen.exp, prot: chosen.prot, ifHeld: chosen.ifHeld }), [studies, scope, chosen, genes]);
   const fresh = useMemo(() => basics && genes.length && genes.length <= RESULTS_MAX_GENES && !queryError && !chosen.waiting && !chosen.error
     ? resultsLayout(asked, known ? {
         expr: expressionProfile(known.profileCatalog), cna: discreteCnaProfile(known.profileCatalog), clinical: known.clinical,
@@ -99,6 +99,9 @@ export default function ResultsPage() {
   if (chosen.error) return flow(chosen.error);
   if (genes.length > RESULTS_MAX_GENES) return shell(<p className="note">a results page takes at most {RESULTS_MAX_GENES} genes, the oncoprint&apos;s rows; this asks for {genes.length}</p>);
   if (error) return shell(<div className="error">{error}</div>);
+  // the portal's size limit, checked again here for a link past it (ResultsViewPage's queryExceedsLimit): no tabs
+  const big = known ? queryLimitProblem(genes.length, known.samples, queryProductLimit(env)) : null;
+  if (big) return shell(<div className="error" role="alert">{big}</div>);
   if (optionsData.error) return shell(<div className="error">could not read the studies&apos; profiles and case sets: {optionsData.error}</div>);
   const ready = !!(page.layout && page.doc);
   const ids = studies.length <= IDS_SHOWN ? studies.join(", ") : studies.slice(0, IDS_SHOWN).join(", ") + " +" + (studies.length - IDS_SHOWN) + " more";
