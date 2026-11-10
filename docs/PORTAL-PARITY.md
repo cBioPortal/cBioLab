@@ -52,7 +52,7 @@ service and opens that comparison (`lib/legacy-comparison.ts`; a new comparison 
     - [ ] The hg19 / hg38 warning is said in the dialog and the Results header; the portal also marks each selected study in the study list
     - [ ] Across studies a mutation, structural-variant or copy-number choice is a data type; the portal groups profiles by their id without the study and offers radios where that gives several
 - [x] **"Open in cBioPortal"** on every portal page (#158)
-  - [ ] The Comparison page, which needs a session created on the portal first
+  - [x] The Comparison page: the page's groups saved from the browser as a portal comparison session, then opened (#169, #170)
 
 ## Medium — annotation depth and per-sample viewers
 

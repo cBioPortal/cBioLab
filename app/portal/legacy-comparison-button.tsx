@@ -1,13 +1,15 @@
 "use client";
-// "Open in cBioPortal" on the Comparison page: saves the page's groups as a cBioPortal comparison
-// session (lib/legacy-comparison.ts) and opens it in a new browser tab. Looks like LegacyLinkButton.
+// "Open in cBioPortal" on the Comparison page: the server builds the page's groups as a cBioPortal
+// comparison session (lib/legacy-comparison.ts), this browser saves it to the portal's session service
+// (a session a server saves is not found by the portal's readers), and a new browser tab opens it.
+// Looks like LegacyLinkButton.
 import { useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "../_ui/button";
 import { TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 import type { PortalHold } from "../../lib/legacy-link.ts";
-import { legacyComparisonState } from "../../lib/legacy-comparison.ts";
+import { legacyComparisonState, sessionServiceUrl, comparisonHref } from "../../lib/legacy-comparison.ts";
 
 export function LegacyComparisonButton({ study, cohorts, tab, held, className }: {
   study: string; cohorts: Record<string, unknown>; tab?: string; held: Record<string, PortalHold> | null; className?: string;
@@ -27,10 +29,15 @@ export function LegacyComparisonButton({ study, cohorts, tab, held, className }:
     if (win) win.opener = null;
     setBusy(true); setError(null);
     try {
-      const r = await fetch("/api/legacy-comparison", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ study, cohorts, tab }) });
-      const j = await r.json() as { href?: string; error?: string };
-      if (!j.href) throw new Error(j.error || "no link came back");
-      if (win) win.location.href = j.href; else window.open(j.href, "_blank", "noopener");
+      const r = await fetch("/api/legacy-comparison", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ study, cohorts }) });
+      const j = await r.json() as { portal?: string; session?: unknown; error?: string };
+      if (!j.portal || !j.session) throw new Error(j.error || "no session came back");
+      const saved = await fetch(sessionServiceUrl(j.portal), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(j.session) });
+      if (!saved.ok) throw new Error("cBioPortal's session service answered " + saved.status);
+      const { id } = await saved.json() as { id?: string };
+      if (!id) throw new Error("cBioPortal's session service returned no id");
+      const href = comparisonHref(j.portal, id, tab);
+      if (win) win.location.href = href; else window.open(href, "_blank", "noopener");
     } catch (e) {
       win?.close();
       setError(String((e as Error)?.message || e));

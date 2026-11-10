@@ -2,8 +2,9 @@
 // groups from a session saved to its session service, so the link is made by saving one: the page's
 // cohorts as their samples, as the portal's own "Compare" buttons save them
 // (ComparisonGroupClient.addComparisonSession, getGroupParameters), then
-// /comparison/<tab>?comparisonId=<id>. Pure and browser-safe; app/api/legacy-comparison saves the
-// session, server-side, so no sample id reaches the browser.
+// /comparison/<tab>?comparisonId=<id>. Pure and browser-safe. app/api/legacy-comparison builds the
+// session on the server; the reader's browser saves it (sessionServiceUrl). cbioportal.org keeps
+// sessions saved by a server apart from those its readers' browsers read, where they are not found.
 //
 // Self-contained so it can be deleted when parity checking ends: this file, its test, that route,
 // app/portal/legacy-comparison-button.tsx, and the one line in app/portal/PortalTabs.tsx that draws it;
@@ -39,6 +40,9 @@ export function comparisonSession(study: string, groups: { name: string; samples
   };
 }
 
+/** where the portal's session service saves a comparison session (the browser posts there; it allows any origin) */
+export const sessionServiceUrl = (portal: string): string => portal.replace(/\/+$/, "") + "/api/session/comparison_session";
+
 /** the saved session's page on the portal, on the tab like this page's open one when it has one */
 export function comparisonHref(portal: string, id: string, tab?: string): string {
   const path = tab && COMPARISON_TABS[tab];
@@ -54,5 +58,5 @@ export function legacyComparisonState(study: string, cohorts: string[], tab: str
   if (!cohorts.length) return { ok: false, tip: "no groups to compare" };
   const site = h.portal.replace(/^https?:\/\//, "");
   const where = tab && COMPARISON_TABS[tab] ? "on its " + tab + " tab" : "on its first tab" + (tab ? " — cBioPortal has no tab like “" + tab + "”" : "");
-  return { ok: true, tip: "save these " + cohorts.length + " groups to " + site + "'s session service (their sample ids, which it already holds) and open the comparison there, " + where };
+  return { ok: true, tip: "save these " + cohorts.length + " groups to " + site + "'s session service from this browser (their sample ids, which it already holds) and open the comparison there, " + where };
 }
