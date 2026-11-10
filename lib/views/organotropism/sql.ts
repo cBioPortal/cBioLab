@@ -1,7 +1,7 @@
 // The organotropism view's SQL: what its runner (run.ts) asks each participant's database for.
 import { pidOf, orgAttr, incidenceCountsSql, type EnrichAlteration, geneList, ENRICH_PANEL_TYPE, enrichEventCond } from "../../federation-views.ts";
 import { clinicalTable } from "../../custom-data.ts";
-import { sq } from "../../compiler.ts";
+import { sq, genomicStudySql } from "../../compiler.ts";
 import { foldedEqualsSql, clinicalValueFoldSql, nameFoldSql } from "../../event-names.ts";
 import { driverJoin } from "../../federation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
@@ -241,7 +241,7 @@ function orgGeneCtes(study: string, db: string, g: OrgGenes): string {
     "alt AS (\n" +
     "  SELECT DISTINCT " + gPid + " AS pid, g.hugo_gene_symbol AS gene\n" +
     "  FROM " + db + ".genomic_event_derived g\n" + (g.driverPin ? driverJoin(g.driverPin) : "") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND " + enrichEventCond(g.alteration) + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND " + enrichEventCond(g.alteration) + "\n" +
     (list ? "    AND g.hugo_gene_symbol IN (" + list + ")\n" : "") + (g.driverPin ? "    AND ann.is_driver\n" : "") +
     "    AND " + inCohortSamples(gSid) + "\n" +
     ")"

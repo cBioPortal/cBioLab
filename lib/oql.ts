@@ -14,7 +14,7 @@
 // CNA (+-2) is stored), EXP/PROT without a threshold, GERMLINE/SOMATIC (public studies are
 // germline-stripped).
 import { DB, STUDY } from "./ch.ts";
-import { mutationStudySql, sq } from "./compiler.ts";
+import { mutationStudySql, sq, genomicStudySql } from "./compiler.ts";
 
 export { parseOql } from "./oql-parse.ts";
 export type { OqlSpecType, OqlRange, OqlSpec, OqlEntry } from "./oql-parse.ts";
@@ -231,7 +231,7 @@ function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol
         head("g", spec.range ? "1" : EVENT_ORDER, spec.range ? "g.mutation_variant" : EVENT_LABEL) +
         "  FROM " + (spec.range ? mutationsWithPositions(db, study, gene) : db + ".genomic_event_derived g\n") +
         (spec.driver ? DRIVER_JOIN(oncokbPin!) : "") +
-        "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
+        "  WHERE " + (spec.range ? "g.cancer_study_identifier = " + sq(study) : genomicStudySql(study, "g")) + "\n" +
         "    AND g.hugo_gene_symbol = " + sq(gene) + "\n" +
         "    AND " + specCond(spec)
       );
@@ -241,7 +241,7 @@ function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol
     parts.unshift(
       head("g", EVENT_ORDER, EVENT_LABEL) +
       "  FROM " + db + ".genomic_event_derived g\n" +
-      "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
+      "  WHERE " + genomicStudySql(study, "g") + "\n" +
       "    AND g.hugo_gene_symbol IN (" + [...new Set(plain.map((x) => x.gene))].map(sq).join(", ") + ")\n" +
       "    AND (" + plain.map((x) => "(g.hugo_gene_symbol = " + sq(x.gene) + " AND " + x.cond + ")").join("\n      OR ") + ")");
   return parts.map(p => "(" + p + ")").join("\nUNION DISTINCT\n");

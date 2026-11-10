@@ -99,7 +99,7 @@ panels AS (
 mut AS (
   SELECT replaceOne(g.patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, groupUniqArray(g.hugo_gene_symbol) AS genes
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_impact_50k_2026' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_impact_50k_2026_') AND g.cancer_study_identifier = 'msk_impact_50k_2026' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND replaceOne(g.sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
   GROUP BY pid
 ),
@@ -154,7 +154,7 @@ panels AS (
 mut AS (
   SELECT replaceOne(g.patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, groupUniqArray(g.hugo_gene_symbol) AS genes
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_impact_50k_2026' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_impact_50k_2026_') AND g.cancer_study_identifier = 'msk_impact_50k_2026' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND replaceOne(g.sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
   GROUP BY pid
 ),

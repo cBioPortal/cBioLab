@@ -4,7 +4,7 @@
 // participant that may not disclose patients has none. Every table holds one row per sample of the
 // cohort (or of an altered / unaltered list), its status against the query read from the same CTEs
 // as the view's counts (sql.ts), so a file and the frequencies cannot disagree.
-import { sq, mutationStudySql } from "../../compiler.ts";
+import { sq, genomicStudySql, mutationStudySql } from "../../compiler.ts";
 import { inCohortSamples, profiledCasesSql } from "../../cohort2.ts";
 import type { TablePart } from "../../mutation-table.ts";
 import type { QueryColumn, RowSource } from "../../table-query.ts";
@@ -108,7 +108,7 @@ function matrixValues(f: MatrixFile, study: string, db: string, genes: string[],
     missing: "WT", type: "MUTATION" };
   if (f.kind === "sv") return {
     values: "SELECT " + bare + " AS sid, hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupUniqArray(sv_event_info)), ', ') AS val\n" +
-      "    FROM " + db + ".genomic_event_derived WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'structural_variant'\n" +
+      "    FROM " + db + ".genomic_event_derived WHERE " + genomicStudySql(study) + " AND variant_type = 'structural_variant'\n" +
       "      AND hugo_gene_symbol IN " + inGenes + " AND " + inCohortSamples(bare, cohort) + " GROUP BY sid, gene",
     missing: "NA", type: "SV" };
   return {

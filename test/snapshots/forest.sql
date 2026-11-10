@@ -31,7 +31,7 @@ FROM snapshot_db.sample_derived sd
 LEFT JOIN (
      SELECT sample_unique_id, mutation_type, variant_type, cna_alteration
      FROM snapshot_db.genomic_event_derived
-     WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND hugo_gene_symbol IN ('TP53')
+     WHERE startsWith(genetic_profile_stable_id, 'msk_impact_50k_2026_') AND cancer_study_identifier = 'msk_impact_50k_2026' AND hugo_gene_symbol IN ('TP53')
        AND mutation_status != 'UNCALLED'
 ) g ON g.sample_unique_id = sd.sample_unique_id
 WHERE sd.cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sd.sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
@@ -87,7 +87,7 @@ FROM snapshot_db.sample_derived sd
 LEFT JOIN (
      SELECT sample_unique_id, mutation_type, variant_type, cna_alteration
      FROM snapshot_db.genomic_event_derived
-     WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND hugo_gene_symbol IN ('TP53')
+     WHERE startsWith(genetic_profile_stable_id, 'msk_impact_50k_2026_') AND cancer_study_identifier = 'msk_impact_50k_2026' AND hugo_gene_symbol IN ('TP53')
        AND mutation_status != 'UNCALLED'
 ) g ON g.sample_unique_id = sd.sample_unique_id
 WHERE sd.cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sd.sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)

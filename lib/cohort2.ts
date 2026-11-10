@@ -18,7 +18,7 @@
 // renderable as a sentence. Back-compat: the v1 flat event
 // shape {a, b?, rel, ...} is accepted anywhere a definition is expected.
 import { DB, STUDY } from "./ch.ts";
-import { compileCohort, mutationStudySql, sq, LINE_TYPE } from "./compiler.ts";
+import { compileCohort, mutationStudySql, sq, genomicStudySql, LINE_TYPE } from "./compiler.ts";
 import { oqlCasesSql, type OqlPins } from "./oql.ts";
 import { clinicalValueFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
@@ -226,7 +226,7 @@ export function derivedMetricSql(metric: DerivedMetric, study: string, db: strin
   // alteredGenes — high-level CNA only, matching the rest of the engine
   return "SELECT " + PID("patient_unique_id", study) + " AS pid, uniqExact(hugo_gene_symbol) AS v\n" +
     "  FROM " + db + ".genomic_event_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
+    "  WHERE " + genomicStudySql(study) + "\n" +
     "    AND (variant_type != 'cna' OR abs(cna_alteration) >= 2)\n" +
     "  GROUP BY pid";
 }

@@ -1,6 +1,6 @@
 // The pathways view's SQL: what its runner (run.ts) asks each participant's database for.
 // pathways: is ANY gene of a set altered?
-import { sq } from "../../compiler.ts";
+import { sq, genomicStudySql } from "../../compiler.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 import { inCohortSamples, bareSampleId } from "../../cohort2.ts";
@@ -27,7 +27,7 @@ export function geneSetCountsSql(cohortSql: string, sets: { name: string; genes:
     (pin ? "         max(ann.is_driver) AS is_driver\n" : "         0 AS is_driver\n") +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (pin ? driverJoin(pin) : "") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + "\n" +
     "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
     "    AND " + inCohortSamples(sid) + "\n" +
     "  GROUP BY gene, sid\n" +

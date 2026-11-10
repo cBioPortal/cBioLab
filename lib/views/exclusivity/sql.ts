@@ -1,5 +1,5 @@
 // The exclusivity view's SQL: what its runner (run.ts) asks each participant's database for.
-import { sq } from "../../compiler.ts";
+import { sq, genomicStudySql } from "../../compiler.ts";
 import { inCohortSamples, bareSampleId } from "../../cohort2.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
@@ -68,7 +68,7 @@ function exclusivityCtes(cohortSql: string, study: string, db: string, stratifyB
     (driver && pin ? driverJoin(pin) : "") +
     "  INNER JOIN sp ON sp.suid = g.sample_unique_id\n" +
     "  INNER JOIN cov ON cov.sig = sp.sig AND cov.gene = g.hugo_gene_symbol\n" +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND " + ALTERED_COND + (driver ? (pin ? " AND ann.is_driver" : " AND 0") : "") + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND " + ALTERED_COND + (driver ? (pin ? " AND ann.is_driver" : " AND 0") : "") + "\n" +
     "    AND g.sample_unique_id IN (SELECT suid FROM sp)\n" +
     "),\n" +
     "strat AS (\n" +

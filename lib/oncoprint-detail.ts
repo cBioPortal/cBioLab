@@ -5,7 +5,7 @@
 // information almost none of which is ever read. This is the other half of that bargain:
 // the tooltip asks for one column and gets the specifics.
 import { chQueryRows, STUDY } from "./ch.ts";
-import { sq } from "./compiler.ts";
+import { sq, genomicStudySql } from "./compiler.ts";
 import { buildAnnotationIndex } from "./annotation.ts";
 import type { OncoprintSpec } from "./views/oncoprint/types.ts";
 
@@ -50,7 +50,7 @@ export async function columnDetail(spec: OncoprintSpec, column: string): Promise
   const ev = await chQueryRows(
     "SELECT hugo_gene_symbol AS gene, variant_type AS vt, mutation_type AS mt, mutation_variant AS mv, cna_alteration AS cna\n" +
     "FROM " + db + ".genomic_event_derived\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + " AND " + idCol + " = " + uid + "\n" +
+    "WHERE " + genomicStudySql(study) + " AND " + idCol + " = " + uid + "\n" +
     "  AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")", conn);
   const rows = ev.rows.map((r) => ({ pid: id, gene: r[0] as string, vt: r[1] as string, mt: r[2] as string, mv: r[3] as string, cna: r[4] as string }));
 

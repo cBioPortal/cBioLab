@@ -2,7 +2,7 @@
 import { pidOf } from "../../federation-views.ts";
 import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
 import { clinicalTable } from "../../custom-data.ts";
-import { sq } from "../../compiler.ts";
+import { sq, genomicStudySql } from "../../compiler.ts";
 import { annotationMatchSql } from "../../oql.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
@@ -99,7 +99,7 @@ function actionCtes(cohortSql: string, study: string, db: string, pin: string): 
     "      FROM oncokb_annotation.variant_annotation\n" +
     "      WHERE oncokb_version = " + sq(pin) + " AND (highest_sensitive_level != '' OR highest_resistance_level != '')) ann\n" +
     "    ON " + annotationMatchSql("ann", "g") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + "\n" +
     "    AND ((g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED') OR (g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2) OR g.variant_type = 'structural_variant')\n" +
     "    AND g.sample_unique_id IN (SELECT sid FROM seq)\n" +
     "  GROUP BY sid\n" +

@@ -5,7 +5,7 @@
 // participant, aggregate-only included, can answer.
 import { survivalMonthsSql, survivalEventSql, endpointRowsSql, endpointValueSql } from "./survival-sql.ts";
 import { osCte } from "./survival-queries.ts";
-import { sq } from "./compiler.ts";
+import { sq, genomicStudySql } from "./compiler.ts";
 import { ALTERED_COND, driverJoin, inCohortClinical } from "./federation.ts";
 import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql, foldedInSql } from "./event-names.ts";
 import { clinicalTable } from "./custom-data.ts";
@@ -76,7 +76,7 @@ export function sideCountsTail(study: string, db: string, genes: string[] | null
     "  FROM " + db + ".genomic_event_derived g\n" +
     (pin && measure === "driver" ? driverJoin(pin) : "") +
     "  INNER JOIN ps ON ps.suid = g.sample_unique_id\n" +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + (scan ? "" : " AND g.hugo_gene_symbol IN (" + geneList + ")") + " AND " + ALTERED_COND + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + (scan ? "" : " AND g.hugo_gene_symbol IN (" + geneList + ")") + " AND " + ALTERED_COND + "\n" +
     // narrows the events before the annotation join rather than after it
     "    AND g.sample_unique_id IN (SELECT suid FROM ps)" + (exclude ? " AND " + exclude : "") + "\n" +
     "  GROUP BY gene, pid, side\n" +
@@ -285,7 +285,7 @@ export function enrichAlteredSql(cohortSql: string, study: string, db: string, a
     "SELECT g.hugo_gene_symbol AS gene, uniqExact(g.sample_unique_id) AS altered\n" +
     "FROM " + db + ".genomic_event_derived g\n" +
     (driver && pin ? driverJoin(pin) : "") +
-    "WHERE g.cancer_study_identifier = " + sq(study) + " AND " + enrichEventCond(alteration) + "\n" +
+    "WHERE " + genomicStudySql(study, "g") + " AND " + enrichEventCond(alteration) + "\n" +
     "  AND " + inCohortSamples(sid) + (driver && pin ? " AND ann.is_driver" : "") + "\n" +
     "GROUP BY gene"
   ));
@@ -432,7 +432,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     "  SELECT " + pidOf("g.patient_unique_id", study) + " AS pid, groupUniqArray(g.hugo_gene_symbol) AS genes\n" +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (driverPin ? driverJoin(driverPin) : "") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND " + ALTERED_COND + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND g.variant_type = 'mutation' AND " + ALTERED_COND + "\n" +
     (driverPin ? "    AND ann.is_driver = 1\n" : "") +
     "    AND " + inCohortSamples(bareSampleId("g.sample_unique_id", study)) + "\n" +
     "  GROUP BY pid\n" +

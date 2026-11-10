@@ -1,7 +1,7 @@
 // The germline view's SQL: what its runner (run.ts) asks each participant's database for.
 import { survivalMonthsSql, survivalEventSql } from "../../survival-sql.ts";
 import { pidOf, geneList } from "../../federation-views.ts";
-import { sq } from "../../compiler.ts";
+import { sq, genomicStudySql } from "../../compiler.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 import { inCohortSamples, inCohortPatients, bareSampleId } from "../../cohort2.ts";
@@ -12,7 +12,7 @@ export function germCarriersSql(cohortSql: string, study: string, db: string): A
   return aggregateSql("WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT g.hugo_gene_symbol AS gene, uniqExact(" + gPid + ") AS carriers\n" +
     "FROM " + db + ".genomic_event_derived g\n" +
-    "WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND " + GERMLINE + "\n" +
+    "WHERE " + genomicStudySql(study, "g") + " AND g.variant_type = 'mutation' AND " + GERMLINE + "\n" +
     "  AND " + inCohortSamples(gSid) + "\n" +
     "GROUP BY gene ORDER BY carriers DESC, gene LIMIT 500");
 }
@@ -77,7 +77,7 @@ function germCtes(cohortSql: string, study: string, db: string, genes: string[])
   const gPid = pidOf("g.patient_unique_id", study), gSid = bareSampleId("g.sample_unique_id", study), list = geneList(genes);
   const calls = (name: string, cond: string) => name + " AS (\n" +
     "  SELECT DISTINCT " + gPid + " AS pid, g.hugo_gene_symbol AS gene FROM " + db + ".genomic_event_derived g\n" +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.hugo_gene_symbol IN (" + list + ") AND " + cond + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND g.hugo_gene_symbol IN (" + list + ") AND " + cond + "\n" +
     "    AND " + inCohortSamples(gSid) + "\n" +
     ")";
   return "WITH cohort AS (" + cohortSql + "),\n" +

@@ -43,7 +43,7 @@ FROM snapshot_db.sample_derived sd
 LEFT JOIN (
      SELECT sample_unique_id, mutation_type, variant_type, cna_alteration
      FROM snapshot_db.genomic_event_derived
-     WHERE cancer_study_identifier = 'crc_apc_impact_2020' AND hugo_gene_symbol IN ('TP53','KRAS','PIK3CA')
+     WHERE startsWith(genetic_profile_stable_id, 'crc_apc_impact_2020_') AND cancer_study_identifier = 'crc_apc_impact_2020' AND hugo_gene_symbol IN ('TP53','KRAS','PIK3CA')
        AND mutation_status != 'UNCALLED'
 ) g ON g.sample_unique_id = sd.sample_unique_id
 WHERE sd.cancer_study_identifier = 'crc_apc_impact_2020' AND replaceOne(sd.sample_unique_id, 'crc_apc_impact_2020_', '') IN (SELECT sid FROM cohort)
@@ -95,7 +95,7 @@ FROM snapshot_db.sample_derived sd
 LEFT JOIN (
      SELECT sample_unique_id, mutation_type, variant_type, cna_alteration
      FROM snapshot_db.genomic_event_derived
-     WHERE cancer_study_identifier = 'crc_apc_impact_2020' AND hugo_gene_symbol IN ('TP53','KRAS','PIK3CA')
+     WHERE startsWith(genetic_profile_stable_id, 'crc_apc_impact_2020_') AND cancer_study_identifier = 'crc_apc_impact_2020' AND hugo_gene_symbol IN ('TP53','KRAS','PIK3CA')
        AND mutation_status != 'UNCALLED'
 ) g ON g.sample_unique_id = sd.sample_unique_id
 WHERE sd.cancer_study_identifier = 'crc_apc_impact_2020' AND replaceOne(sd.sample_unique_id, 'crc_apc_impact_2020_', '') IN (SELECT sid FROM cohort)
