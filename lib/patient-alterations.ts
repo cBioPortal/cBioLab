@@ -3,7 +3,7 @@
 // choose from. Every row names a patient, so — like the mutation table — the queries live here,
 // outside lib/federation*.ts's aggregate builders, and run only through PatientLevelResolver's
 // rows* methods: a participant that may not disclose a patient has no such method.
-import { mutationStudySql, sq } from "./compiler.ts";
+import { mutationStudySql, sq, genomicStudySql } from "./compiler.ts";
 import type { QueryColumn, RowSource } from "./table-query.ts";
 import type { TablePart } from "./mutation-table.ts";
 import { patientSamplesSql } from "./patient-timeline.ts";
@@ -113,7 +113,7 @@ const labels = (p: TablePart, patient: string) => sq(p.cohort) + " AS cohort, " 
  * patient's sample order), then codon.
  */
 export function patientMutationsSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient"): RowSource {
-  const st = sq(p.study), pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
+  const pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
   return {
     with: "WITH " + cohortCte(p, samples) + "m AS (\n" +
       "  SELECT sampleId AS sid, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,\n" +
@@ -129,10 +129,10 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       "),\n" +
       (pin ? oncokbCte(pin, "MUTATION", "SELECT gene FROM g") : "") +
       "cn AS (SELECT hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupUniqArray(if(cna_alteration > 0, 'AMP', 'HOMDEL'))), ', ') AS copy\n" +
-      "  FROM " + db + ".genomic_event_derived WHERE cancer_study_identifier = " + st + " AND patient_unique_id = " + uid + "\n" +
+      "  FROM " + db + ".genomic_event_derived WHERE " + genomicStudySql(p.study) + " AND patient_unique_id = " + uid + "\n" +
       "    AND variant_type = 'cna' AND abs(cna_alteration) >= 2 AND hugo_gene_symbol IN (SELECT gene FROM g)" + onlyCohort("replaceOne(sample_unique_id, " + pre + ", '')", samples) + " GROUP BY gene),\n" +
       "fa AS (SELECT hugo_gene_symbol AS gene, uniqExact(sample_unique_id) AS n FROM " + db + ".genomic_event_derived\n" +
-      "  WHERE cancer_study_identifier = " + st + " AND variant_type = 'mutation' AND genetic_profile_stable_id NOT LIKE '%uncalled%'\n" +
+      "  WHERE " + genomicStudySql(p.study) + " AND variant_type = 'mutation' AND genetic_profile_stable_id NOT LIKE '%uncalled%'\n" +
       "    AND hugo_gene_symbol IN (SELECT gene FROM g) GROUP BY gene),\n" +
       profiledCte("fp", db, p.study, "MUTATION_EXTENDED", "SELECT gene FROM g") +
       "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
@@ -158,17 +158,17 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
  * genes with a driver call first, then by gene, then by the first sample carrying the call (`order`).
  */
 export function patientCnaSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient"): RowSource {
-  const st = sq(p.study), pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
+  const pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
   return {
     with: "WITH " + cohortCte(p, samples) + "c AS (\n" +
       "  SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, hugo_gene_symbol AS gene, cna_alteration AS alt, cna_cytoband AS cytoband\n" +
       "  FROM " + db + ".genomic_event_derived\n" +
-      "  WHERE cancer_study_identifier = " + st + " AND patient_unique_id = " + uid + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2" + onlyCohort("replaceOne(sample_unique_id, " + pre + ", '')", samples) + "\n" +
+      "  WHERE " + genomicStudySql(p.study) + " AND patient_unique_id = " + uid + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2" + onlyCohort("replaceOne(sample_unique_id, " + pre + ", '')", samples) + "\n" +
       "),\n" +
       "g AS (SELECT gene, alt, any(cytoband) AS cytoband, " + sampleCols(order) + " FROM c GROUP BY gene, alt),\n" +
       (pin ? oncokbCte(pin, "CNA", "SELECT gene FROM g") : "") +
       "fa AS (SELECT hugo_gene_symbol AS gene, cna_alteration AS alt, uniqExact(sample_unique_id) AS n FROM " + db + ".genomic_event_derived\n" +
-      "  WHERE cancer_study_identifier = " + st + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2 AND hugo_gene_symbol IN (SELECT gene FROM g)\n" +
+      "  WHERE " + genomicStudySql(p.study) + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2 AND hugo_gene_symbol IN (SELECT gene FROM g)\n" +
       "  GROUP BY gene, alt),\n" +
       profiledCte("fp", db, p.study, "COPY_NUMBER_ALTERATION", "SELECT gene FROM g") +
       "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
@@ -276,7 +276,7 @@ export function alterationPatientRowSource(parts: AlterationPart[], db: string, 
       "),\n" +
       "cn" + i + " AS (\n" +
       "  SELECT replaceOne(patient_unique_id, " + pre + ", '') AS pid, uniqExact(hugo_gene_symbol, cna_alteration) AS n FROM " + db + ".genomic_event_derived\n" +
-      "  WHERE cancer_study_identifier = " + st + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2\n" +
+      "  WHERE " + genomicStudySql(p.study) + " AND variant_type = 'cna' AND abs(cna_alteration) >= 2\n" +
       "    AND " + inCohortPatients("replaceOne(patient_unique_id, " + pre + ", '')", "c" + i) + onlyCohort("replaceOne(sample_unique_id, " + pre + ", '')", samples, "c" + i) + "\n" +
       "  GROUP BY pid\n" +
       "),\n" +

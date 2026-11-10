@@ -1,7 +1,7 @@
 // The adjusted view's SQL: what its runner (run.ts) asks each participant's database for.
 // adjusted: each gene's alteration between two cohorts, by logistic regression on covariates
 import { pidOf } from "../../federation-views.ts";
-import { sq } from "../../compiler.ts";
+import { sq, genomicStudySql } from "../../compiler.ts";
 import { driverJoin } from "../../federation.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { patientSql, type PatientSql } from "../../sql-kinds.ts";
@@ -38,7 +38,7 @@ export function adjustedRowsSql(cohortSql: string, study: string, db: string, o:
     "  SELECT " + gPid + " AS pid, groupUniqArray(g.hugo_gene_symbol) AS genes\n" +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (driverPin ? driverJoin(driverPin) : "") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'\n" +
     (driverPin ? "    AND ann.is_driver = 1\n" : "") +
     "    AND " + inCohortSamples(gSid) + "\n" +
     "  GROUP BY pid\n" +

@@ -1,7 +1,7 @@
 // The cancertypes view's SQL: what its runner (run.ts) asks each participant's database for.
 // cancertypes: a gene list's alteration frequency per group of samples
 import { inCohortSamples, bareSampleId } from "../../cohort2.ts";
-import { sq } from "../../compiler.ts";
+import { sq, genomicStudySql } from "../../compiler.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
@@ -39,7 +39,7 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     "                 g.variant_type = 'cna', 'homdel', 'sv') AS t\n" +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (drv ? driverJoin(pin) : "") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
     "    AND g.sample_unique_id IN (SELECT suid FROM samp)" + (drv ? " AND ann.is_driver" : "") + "\n" +
     "  GROUP BY suid, gene, t\n" +
     "),\n" +

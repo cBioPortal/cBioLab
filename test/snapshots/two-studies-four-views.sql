@@ -4,7 +4,7 @@
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 
@@ -16,7 +16,7 @@
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 
@@ -29,7 +29,7 @@ EXCEPT DISTINCT
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 INTERSECT DISTINCT
@@ -52,7 +52,7 @@ EXCEPT DISTINCT
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 INTERSECT DISTINCT
@@ -72,7 +72,7 @@ EXCEPT DISTINCT
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 INTERSECT DISTINCT
@@ -92,7 +92,7 @@ altered AS (
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype
@@ -133,7 +133,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
 altered AS (
@@ -145,7 +145,7 @@ altered AS (
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype
@@ -189,7 +189,7 @@ EXCEPT DISTINCT
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 INTERSECT DISTINCT
@@ -209,7 +209,7 @@ altered AS (
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_met_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype
@@ -250,7 +250,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pi
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
 altered AS (
@@ -262,7 +262,7 @@ altered AS (
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('KRAS','PIK3CA','APC','EGFR','CDKN2A') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_met_2021_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype
@@ -306,7 +306,7 @@ EXCEPT DISTINCT
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 INTERSECT DISTINCT
@@ -337,7 +337,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
 os AS (
@@ -363,7 +363,7 @@ EXCEPT DISTINCT
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 INTERSECT DISTINCT
@@ -394,7 +394,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pi
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
 os AS (
@@ -420,7 +420,7 @@ EXCEPT DISTINCT
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 INTERSECT DISTINCT
@@ -451,7 +451,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
 os AS (
@@ -477,7 +477,7 @@ EXCEPT DISTINCT
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 INTERSECT DISTINCT
@@ -508,7 +508,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pi
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
 os AS (
@@ -534,7 +534,7 @@ EXCEPT DISTINCT
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 INTERSECT DISTINCT
@@ -563,7 +563,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))
 SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx
@@ -587,7 +587,7 @@ EXCEPT DISTINCT
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
 INTERSECT DISTINCT
@@ -616,7 +616,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pi
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))
 SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx
@@ -637,13 +637,13 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
 altered AS (
   SELECT DISTINCT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS sid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_chord_2024'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53','KRAS','PIK3CA','APC') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 ),
@@ -675,13 +675,13 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pi
   WHERE cancer_study_identifier = 'msk_met_2021'
     AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
 altered AS (
   SELECT DISTINCT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS sid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_met_2021'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53','KRAS','PIK3CA','APC') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'msk_met_2021_', '') IN (SELECT sid FROM cohort)
 ),

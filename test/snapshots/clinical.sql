@@ -4,7 +4,7 @@
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
+  WHERE startsWith(g.genetic_profile_stable_id, 'crc_apc_impact_2020_') AND g.cancer_study_identifier = 'crc_apc_impact_2020'
     AND g.hugo_gene_symbol IN ('APC')
     AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
@@ -26,7 +26,7 @@ INTERSECT DISTINCT
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
+  WHERE startsWith(g.genetic_profile_stable_id, 'crc_apc_impact_2020_') AND g.cancer_study_identifier = 'crc_apc_impact_2020'
     AND g.hugo_gene_symbol IN ('APC')
     AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
@@ -47,7 +47,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', ''
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
+  WHERE startsWith(g.genetic_profile_stable_id, 'crc_apc_impact_2020_') AND g.cancer_study_identifier = 'crc_apc_impact_2020'
     AND g.hugo_gene_symbol IN ('APC')
     AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
@@ -83,7 +83,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', ''
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
+  WHERE startsWith(g.genetic_profile_stable_id, 'crc_apc_impact_2020_') AND g.cancer_study_identifier = 'crc_apc_impact_2020'
     AND g.hugo_gene_symbol IN ('APC')
     AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
@@ -119,7 +119,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', ''
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
+  WHERE startsWith(g.genetic_profile_stable_id, 'crc_apc_impact_2020_') AND g.cancer_study_identifier = 'crc_apc_impact_2020'
     AND g.hugo_gene_symbol IN ('APC')
     AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT
@@ -152,7 +152,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', ''
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
     AND replaceOne(sample_unique_id, 'crc_apc_impact_2020_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'crc_apc_impact_2020_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'crc_apc_impact_2020'
+  WHERE startsWith(g.genetic_profile_stable_id, 'crc_apc_impact_2020_') AND g.cancer_study_identifier = 'crc_apc_impact_2020'
     AND g.hugo_gene_symbol IN ('APC')
     AND ((g.hugo_gene_symbol = 'APC' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
 INTERSECT DISTINCT

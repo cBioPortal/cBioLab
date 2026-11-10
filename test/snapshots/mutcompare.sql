@@ -206,7 +206,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_Basal')))))))
 SELECT g.hugo_gene_symbol AS gene, uniqExact(g.sample_unique_id) AS altered
 FROM snapshot_db.genomic_event_derived g
-WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
   AND replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 GROUP BY gene
 
@@ -224,7 +224,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_LumA')))))))
 SELECT g.hugo_gene_symbol AS gene, uniqExact(g.sample_unique_id) AS altered
 FROM snapshot_db.genomic_event_derived g
-WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
   AND replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 GROUP BY gene
 

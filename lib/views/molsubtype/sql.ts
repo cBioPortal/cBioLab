@@ -3,7 +3,7 @@ import { survivalMonthsSql, survivalEventSql } from "../../survival-sql.ts";
 import { pidOf, orgAttr } from "../../federation-views.ts";
 import { finiteSql } from "../../sql-number.ts";
 import { clinicalTable } from "../../custom-data.ts";
-import { sq } from "../../compiler.ts";
+import { sq, genomicStudySql } from "../../compiler.ts";
 import { clinicalValueFoldSql } from "../../event-names.ts";
 import { driverJoin } from "../../federation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
@@ -108,7 +108,7 @@ function molEndometrialCtes(cohortSql: string, study: string, db: string, o: Mol
     "         max(g.hugo_gene_symbol = 'POLE' AND g.mutation_variant IN (" + hot + ")) AS pole_hot,\n" +
     "         max(g.hugo_gene_symbol = 'TP53' AND " + (o.p53Pin ? "ann.is_driver" : "g.mutation_type IN (" + MOL_TP53_CLASSES.map(sq).join(", ") + ")") + ") AS p53\n" +
     "  FROM " + db + ".genomic_event_derived g\n" + (o.p53Pin ? driverJoin(o.p53Pin) : "") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'\n" +
     "    AND lowerUTF8(g.mutation_status) != 'germline' AND NOT g.off_panel AND g.hugo_gene_symbol IN ('POLE', 'TP53')\n" +
     "    AND " + inCohortSamples(gSid) + "\n" +
     "  GROUP BY pid\n" +

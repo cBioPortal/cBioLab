@@ -33,7 +33,7 @@ altered AS (
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'sarcoma_msk_2022'
+  WHERE startsWith(g.genetic_profile_stable_id, 'sarcoma_msk_2022_') AND g.cancer_study_identifier = 'sarcoma_msk_2022'
     AND g.hugo_gene_symbol IN ('MDM2','TP53') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'sarcoma_msk_2022_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype

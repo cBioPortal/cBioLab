@@ -1,7 +1,7 @@
 // The drivernegative view's SQL: what its runner (run.ts) asks each participant's database for.
 import { type EnrichAlteration, pidOf, enrichEventCond, geneList, ENRICH_PANEL_TYPE } from "../../federation-views.ts";
 import { driverJoin } from "../../federation.ts";
-import { sq } from "../../compiler.ts";
+import { sq, genomicStudySql } from "../../compiler.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 import { inCohortSamples, bareSampleId } from "../../cohort2.ts";
 
@@ -19,7 +19,7 @@ export function dnegAlteredSql(cohortSql: string, study: string, db: string, pin
     "SELECT g.hugo_gene_symbol AS gene, grp.g AS grp, uniqExact(" + gPid + ") AS altered\n" +
     "FROM " + db + ".genomic_event_derived g\n" + (driverOnly ? driverJoin(pin) : "") +
     "  INNER JOIN grp ON grp.pid = " + gPid + "\n" +
-    "WHERE g.cancer_study_identifier = " + sq(study) + " AND " + enrichEventCond(alteration) + "\n" +
+    "WHERE " + genomicStudySql(study, "g") + " AND " + enrichEventCond(alteration) + "\n" +
     "  AND g.hugo_gene_symbol NOT IN (" + geneList(drivers) + ") AND grp.g IN ('positive', 'negative')" + (driverOnly ? " AND ann.is_driver" : "") + "\n" +
     "  AND " + inCohortSamples(gSid) + "\n" +
     "GROUP BY gene, grp"
@@ -69,7 +69,7 @@ function dnegCtes(cohortSql: string, study: string, db: string, pin: string, dri
     "drv AS (\n" +
     "  SELECT DISTINCT " + gPid + " AS pid\n" +
     "  FROM " + db + ".genomic_event_derived g\n" + driverJoin(pin) +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.hugo_gene_symbol IN (" + list + ") AND ann.is_driver\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND g.hugo_gene_symbol IN (" + list + ") AND ann.is_driver\n" +
     "    AND ((g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED') OR (g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2) OR g.variant_type = 'structural_variant')\n" +
     "    AND " + inCohortSamples(gSid) + "\n" +
     "),\n" +

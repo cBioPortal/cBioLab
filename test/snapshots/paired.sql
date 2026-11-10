@@ -25,7 +25,7 @@ alt AS (
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
   INNER JOIN ps ON ps.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'msk_impact_50k_2026' AND g.hugo_gene_symbol IN ('TP53','KRAS','PIK3CA','ESR1','AR','CDKN2A','MYC','TERT') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_impact_50k_2026_') AND g.cancer_study_identifier = 'msk_impact_50k_2026' AND g.hugo_gene_symbol IN ('TP53','KRAS','PIK3CA','ESR1','AR','CDKN2A','MYC','TERT') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps)
   GROUP BY gene, pid, side
 ),

@@ -53,7 +53,7 @@ alt AS (
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
   INNER JOIN ps ON ps.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'blca_cornell_2016' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
+  WHERE startsWith(g.genetic_profile_stable_id, 'blca_cornell_2016_') AND g.cancer_study_identifier = 'blca_cornell_2016' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps)
   GROUP BY gene, pid, side
   HAVING hit > 0
@@ -97,7 +97,7 @@ alt AS (
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
   INNER JOIN ps ON ps.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'brca_dldccc_2022' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
+  WHERE startsWith(g.genetic_profile_stable_id, 'brca_dldccc_2022_') AND g.cancer_study_identifier = 'brca_dldccc_2022' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps)
   GROUP BY gene, pid, side
   HAVING hit > 0
@@ -141,7 +141,7 @@ alt AS (
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
   INNER JOIN ps ON ps.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'breast_alpelisib_2020' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
+  WHERE startsWith(g.genetic_profile_stable_id, 'breast_alpelisib_2020_') AND g.cancer_study_identifier = 'breast_alpelisib_2020' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps)
   GROUP BY gene, pid, side
   HAVING hit > 0
@@ -185,7 +185,7 @@ alt AS (
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
   INNER JOIN ps ON ps.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'egc_msk_2017' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
+  WHERE startsWith(g.genetic_profile_stable_id, 'egc_msk_2017_') AND g.cancer_study_identifier = 'egc_msk_2017' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps)
   GROUP BY gene, pid, side
   HAVING hit > 0
@@ -229,7 +229,7 @@ alt AS (
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
   INNER JOIN ps ON ps.suid = g.sample_unique_id
-  WHERE g.cancer_study_identifier = 'egc_trap_ccr_msk_2023' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
+  WHERE startsWith(g.genetic_profile_stable_id, 'egc_trap_ccr_msk_2023_') AND g.cancer_study_identifier = 'egc_trap_ccr_msk_2023' AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM ps)
   GROUP BY gene, pid, side
   HAVING hit > 0

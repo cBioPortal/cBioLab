@@ -2,7 +2,7 @@
 // draft cohort so every count narrows as clauses are added (study-view-style feedback).
 // Everything returned is designed to be clickable into a DSL clause.
 import { chQuery, PRIMARY, ensureChContext, registerChExternal, type ChConn } from "./ch.ts";
-import { sq } from "./compiler.ts";
+import { sq, genomicStudySql } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { driverEventSql } from "./oql.ts";
@@ -537,7 +537,7 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET, 
   ): Promise<{ rows: GeneTableRow[]; total: number }> => {
     const isCna = variantType === "cna";
     const where =
-      "WHERE " + studyIn(studies) + "\n" +
+      "WHERE " + genomicStudySql(studies) + "\n" +
       "  AND variant_type = " + sq(variantType) +
       // the portal excludes uncalled mutations: they exist only to show read support
       (variantType === "mutation" ? "\n  AND mutation_status != 'UNCALLED'" : "") +
@@ -778,7 +778,7 @@ async function geneStateFacets(opts: {
           "           AND (gene_panel_id = 'WES' OR gene_panel_id IN (\n" +
           "             SELECT gene_panel_id FROM " + db + ".gene_panel_to_gene_derived WHERE gene = " + sq(gene) + ")))) AS in_panel\n" +
           "FROM " + db + ".genomic_event_derived\n" +
-          "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'mutation'\n" +
+          "WHERE " + genomicStudySql(study) + " AND variant_type = 'mutation'\n" +
           "  AND mutation_status != 'UNCALLED' AND hugo_gene_symbol = " + sq(gene) + driver + cond, conn)
       ]);
       const profiled = Number(prof.data[0]?.n || 0);
@@ -801,7 +801,7 @@ async function geneStateFacets(opts: {
         chQuery<ChRow>(
           "SELECT cna_alteration AS c, uniqExact(sample_unique_id) AS n\n" +
           "FROM " + db + ".genomic_event_derived\n" +
-          "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'cna'\n" +
+          "WHERE " + genomicStudySql(study) + " AND variant_type = 'cna'\n" +
           "  AND abs(cna_alteration) >= 2 AND hugo_gene_symbol = " + sq(gene) + driver +
           panelPred(gene, "COPY_NUMBER_ALTERATION") + cond + "\n" +
           "GROUP BY c", conn),
@@ -812,7 +812,7 @@ async function geneStateFacets(opts: {
         // was caught — the facet said 152,241 and the click selected 152,242.
         chQuery<ChRow>(
           "SELECT uniqExact(sample_unique_id) AS n FROM " + db + ".genomic_event_derived\n" +
-          "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'cna'\n" +
+          "WHERE " + genomicStudySql(study) + " AND variant_type = 'cna'\n" +
           "  AND abs(cna_alteration) >= 2 AND hugo_gene_symbol = " + sq(gene) + driver +
           panelPred(gene, "COPY_NUMBER_ALTERATION") + cond, conn)
       ]);
@@ -1043,14 +1043,23 @@ async function prefetchFacets(opts: {
       "WHERE cancer_study_identifier IN " + IN + " AND attribute_value != ''" + inClinical(set, ownersIn(db, studies)) +
       (attrAllow.length ? "\n  AND attribute_name IN (" + attrAllow.map(sq).join(",") + ")" : "") + "\n" +
       "GROUP BY s, type, a ORDER BY np DESC LIMIT 250 BY s", conn),
-    chQuery<ChRow>(
-      "SELECT cs.cancer_study_identifier AS s, ce.event_type AS t, uniqExact(ce.patient_id) AS n\n" +
-      "FROM " + db + ".clinical_event ce\n" +
-      "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
-      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
-      "WHERE cs.cancer_study_identifier IN " + IN +
-      (set.patients ? "\n  AND concat(cs.cancer_study_identifier, '_', p.stable_id) IN " + set.patients : "") + "\n" +
-      "GROUP BY s, t ORDER BY n DESC", conn),
+    chQuery<ChRow>(studies.length === 1
+      // one study: pick its patients first and filter the events by id, with no join over the
+      // whole event table — half the CPU of the join below
+      ? "SELECT " + sq(studies[0]) + " AS s, ce.event_type AS t, uniqExact(ce.patient_id) AS n\n" +
+        "FROM " + db + ".clinical_event ce\n" +
+        "WHERE ce.patient_id IN (SELECT p.internal_id FROM " + db + ".patient p\n" +
+        "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+        "  WHERE cs.cancer_study_identifier = " + sq(studies[0]) +
+        (set.patients ? "\n    AND concat(cs.cancer_study_identifier, '_', p.stable_id) IN " + set.patients : "") + ")\n" +
+        "GROUP BY t ORDER BY n DESC"
+      : "SELECT cs.cancer_study_identifier AS s, ce.event_type AS t, uniqExact(ce.patient_id) AS n\n" +
+        "FROM " + db + ".clinical_event ce\n" +
+        "JOIN " + db + ".patient p ON p.internal_id = ce.patient_id\n" +
+        "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
+        "WHERE cs.cancer_study_identifier IN " + IN +
+        (set.patients ? "\n  AND concat(cs.cancer_study_identifier, '_', p.stable_id) IN " + set.patients : "") + "\n" +
+        "GROUP BY s, t ORDER BY n DESC", conn),
     chQuery<ChRow>(
       "SELECT sd.cancer_study_identifier AS s, replaceOne(gp.stable_id, concat(sd.cancer_study_identifier, '_'), '') AS profile,\n" +
       "       any(gp.name) AS label, gp.genetic_alteration_type AS atype, uniqExact(sp.sample_id) AS n\n" +
