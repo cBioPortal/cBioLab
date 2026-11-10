@@ -1,6 +1,6 @@
 {
- "ranAt": "2026-10-23T15:56:26.513Z",
- "commit": "94670e5",
+ "ranAt": "2026-11-10T22:42:34.294Z",
+ "commit": "0a02e89e",
  "reference": "https://www.cbioportal.org (public API)",
  "studies": [
   "brca_tcga",
@@ -11,8 +11,8 @@
   "blca_mskcc_solit_2014",
   "utuc_mskcc_2015 + msk_impact_2017 + blca_tcga_pan_can_atlas_2018"
  ],
- "total": 619,
- "agree": 619,
+ "total": 794,
+ "agree": 794,
  "checks": [
   {
    "study": "brca_tcga",
@@ -737,9 +737,9 @@
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "copy number",
-   "what": "EGFR amplified",
-   "ours": "96/96/2840",
-   "portal": "96/96/2840",
+   "what": "EGFR amplified (profiled: each sample once; the study view counts 2840, once per profile)",
+   "ours": "96/96/2621",
+   "portal": "96/96/2621",
    "agree": true
   },
   {
@@ -801,17 +801,17 @@
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "copy number",
-   "what": "MET amplified",
-   "ours": "42/42/2840",
-   "portal": "42/42/2840",
+   "what": "MET amplified (profiled: each sample once; the study view counts 2840, once per profile)",
+   "ours": "42/42/2621",
+   "portal": "42/42/2621",
    "agree": true
   },
   {
    "study": "nsclc_ctdx_msk_2022",
    "group": "copy number",
-   "what": "ERBB2 amplified",
-   "ours": "33/33/2840",
-   "portal": "33/33/2840",
+   "what": "ERBB2 amplified (profiled: each sample once; the study view counts 2840, once per profile)",
+   "ours": "33/33/2621",
+   "portal": "33/33/2621",
    "agree": true
   },
   {
@@ -3321,121 +3321,121 @@
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "CCND1 amplified",
-   "ours": "9/9/218",
-   "portal": "9/9/218",
+   "what": "CCND1 amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "9/9/109",
+   "portal": "9/9/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "CDKN2A deleted",
-   "ours": "8/8/218",
-   "portal": "8/8/218",
+   "what": "CDKN2A deleted (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "8/8/109",
+   "portal": "8/8/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "E2F3 amplified",
-   "ours": "5/5/218",
-   "portal": "5/5/218",
+   "what": "E2F3 amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "5/5/109",
+   "portal": "5/5/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "MDM2 amplified",
-   "ours": "5/5/218",
-   "portal": "5/5/218",
+   "what": "MDM2 amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "5/5/109",
+   "portal": "5/5/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "CDKN2B deleted",
-   "ours": "4/4/218",
-   "portal": "4/4/218",
+   "what": "CDKN2B deleted (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "4/4/109",
+   "portal": "4/4/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "RAF1 amplified",
-   "ours": "4/4/218",
-   "portal": "4/4/218",
+   "what": "RAF1 amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "4/4/109",
+   "portal": "4/4/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "ERBB2 amplified",
-   "ours": "3/3/218",
-   "portal": "3/3/218",
+   "what": "ERBB2 amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "3/3/109",
+   "portal": "3/3/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "MYC amplified",
-   "ours": "3/3/218",
-   "portal": "3/3/218",
+   "what": "MYC amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "3/3/109",
+   "portal": "3/3/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "CDK4 amplified",
-   "ours": "2/2/218",
-   "portal": "2/2/218",
+   "what": "CDK4 amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "2/2/109",
+   "portal": "2/2/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "DDR2 amplified",
-   "ours": "2/2/218",
-   "portal": "2/2/218",
+   "what": "DDR2 amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "2/2/109",
+   "portal": "2/2/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "EPHA3 amplified",
-   "ours": "2/2/218",
-   "portal": "2/2/218",
+   "what": "EPHA3 amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "2/2/109",
+   "portal": "2/2/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "HMGA2 amplified",
-   "ours": "2/2/218",
-   "portal": "2/2/218",
+   "what": "HMGA2 amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "2/2/109",
+   "portal": "2/2/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "MET amplified",
-   "ours": "2/2/218",
-   "portal": "2/2/218",
+   "what": "MET amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "2/2/109",
+   "portal": "2/2/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "MYCL amplified",
-   "ours": "2/2/218",
-   "portal": "2/2/218",
+   "what": "MYCL amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "2/2/109",
+   "portal": "2/2/109",
    "agree": true
   },
   {
    "study": "blca_mskcc_solit_2014",
    "group": "copy number",
-   "what": "CCNE1 amplified",
-   "ours": "1/1/218",
-   "portal": "1/1/218",
+   "what": "CCNE1 amplified (profiled: each sample once; the study view counts 218, once per profile)",
+   "ours": "1/1/109",
+   "portal": "1/1/109",
    "agree": true
   },
   {
@@ -4940,6 +4940,1406 @@
    "what": "every row of the table (500, 176 with off-panel calls)",
    "ours": "all agree",
    "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "selection",
+   "what": "patients (the cohort)",
+   "ours": "7809",
+   "portal": "7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "selection",
+   "what": "samples (the cohort)",
+   "ours": "7809",
+   "portal": "7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "selection",
+   "what": "samples (Explore)",
+   "ours": "7809",
+   "portal": "7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (Explore)",
+   "what": "every row of the table (500)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "copy number (Explore)",
+   "what": "every row of the table (500)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "TP53",
+   "ours": "4005/7809",
+   "portal": "4005/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "KRAS",
+   "ours": "2183/7809",
+   "portal": "2183/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "EGFR",
+   "ours": "1890/7809",
+   "portal": "1890/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "KEAP1",
+   "ours": "1033/7809",
+   "portal": "1033/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "STK11",
+   "ours": "1013/7809",
+   "portal": "1013/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "RBM10",
+   "ours": "786/7809",
+   "portal": "786/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "PTPRD",
+   "ours": "640/7809",
+   "portal": "640/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "KMT2D",
+   "ours": "621/7809",
+   "portal": "621/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "NF1",
+   "ours": "600/7809",
+   "portal": "600/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "SMARCA4",
+   "ours": "578/7809",
+   "portal": "578/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "FAT1",
+   "ours": "552/7809",
+   "portal": "552/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "CDKN2A",
+   "ours": "543/7809",
+   "portal": "543/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "ATM",
+   "ours": "540/7809",
+   "portal": "540/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "PTPRT",
+   "ours": "538/7809",
+   "portal": "538/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer",
+   "group": "mutations (views)",
+   "what": "ARID1A",
+   "ours": "526/7809",
+   "portal": "526/7809",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "selection",
+   "what": "patients (the cohort)",
+   "ours": "6047",
+   "portal": "6047",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "selection",
+   "what": "samples (the cohort)",
+   "ours": "6213",
+   "portal": "6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "selection",
+   "what": "samples (Explore)",
+   "ours": "6213",
+   "portal": "6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (Explore)",
+   "what": "every row of the table (413)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "copy number (Explore)",
+   "what": "every row of the table (500)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "TP53",
+   "ours": "2425/6213",
+   "portal": "2425/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "TERT",
+   "ours": "948/6213",
+   "portal": "948/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "KRAS",
+   "ours": "947/6213",
+   "portal": "947/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "PIK3CA",
+   "ours": "711/6213",
+   "portal": "711/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "APC",
+   "ours": "560/6213",
+   "portal": "560/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "ARID1A",
+   "ours": "496/6213",
+   "portal": "496/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "KMT2D",
+   "ours": "482/6213",
+   "portal": "482/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "PTEN",
+   "ours": "398/6213",
+   "portal": "398/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "EGFR",
+   "ours": "389/6213",
+   "portal": "389/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "KMT2C",
+   "ours": "325/6213",
+   "portal": "325/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "ATRX",
+   "ours": "323/6213",
+   "portal": "323/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "NF1",
+   "ours": "321/6213",
+   "portal": "321/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "FAT1",
+   "ours": "312/6213",
+   "portal": "312/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "ATM",
+   "ours": "298/6213",
+   "portal": "298/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Primary",
+   "group": "mutations (views)",
+   "what": "RB1",
+   "ours": "278/6213",
+   "portal": "278/6213",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "selection",
+   "what": "patients (the cohort)",
+   "ours": "2490",
+   "portal": "2490",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "selection",
+   "what": "samples (the cohort)",
+   "ours": "2604",
+   "portal": "2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "selection",
+   "what": "samples (Explore)",
+   "ours": "2604",
+   "portal": "2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (Explore)",
+   "what": "every row of the table (407)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "copy number (Explore)",
+   "what": "every row of the table (500)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "TP53",
+   "ours": "1207/2604",
+   "portal": "1207/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "PIK3CA",
+   "ours": "479/2604",
+   "portal": "479/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "KRAS",
+   "ours": "379/2604",
+   "portal": "379/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "APC",
+   "ours": "263/2604",
+   "portal": "263/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "ARID1A",
+   "ours": "230/2604",
+   "portal": "230/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "TERT",
+   "ours": "220/2604",
+   "portal": "220/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "KMT2D",
+   "ours": "188/2604",
+   "portal": "188/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "KMT2C",
+   "ours": "171/2604",
+   "portal": "171/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "CDH1",
+   "ours": "155/2604",
+   "portal": "155/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "PTEN",
+   "ours": "153/2604",
+   "portal": "153/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "EGFR",
+   "ours": "149/2604",
+   "portal": "149/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "FAT1",
+   "ours": "143/2604",
+   "portal": "143/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "NF1",
+   "ours": "142/2604",
+   "portal": "142/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "BRAF",
+   "ours": "137/2604",
+   "portal": "137/2604",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · SAMPLE_TYPE = Metastasis · SEX = Female",
+   "group": "mutations (views)",
+   "what": "ESR1",
+   "ours": "130/2604",
+   "portal": "130/2604",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "selection",
+   "what": "patients (the cohort)",
+   "ours": "157",
+   "portal": "157",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "selection",
+   "what": "samples (the cohort)",
+   "ours": "279",
+   "portal": "279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "selection",
+   "what": "samples (Explore)",
+   "ours": "279",
+   "portal": "279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (Explore)",
+   "what": "every row of the table (500)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "copy number (Explore)",
+   "what": "every row of the table (0)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "TP53",
+   "ours": "117/279",
+   "portal": "117/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "TTN",
+   "ours": "89/279",
+   "portal": "89/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "PTEN",
+   "ours": "86/279",
+   "portal": "86/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "EGFR",
+   "ours": "66/279",
+   "portal": "66/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "MUC16",
+   "ours": "64/279",
+   "portal": "64/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "NF1",
+   "ours": "62/279",
+   "portal": "62/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "RYR2",
+   "ours": "48/279",
+   "portal": "48/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "IDH1",
+   "ours": "45/279",
+   "portal": "45/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "FLG",
+   "ours": "44/279",
+   "portal": "44/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "ATRX",
+   "ours": "41/279",
+   "portal": "41/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "MUC17",
+   "ours": "40/279",
+   "portal": "40/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "ADGRV1",
+   "ours": "39/279",
+   "portal": "39/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "PKHD1",
+   "ours": "39/279",
+   "portal": "39/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "OBSCN",
+   "ours": "38/279",
+   "portal": "38/279",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019 · GRADE = IV",
+   "group": "mutations (views)",
+   "what": "AHNAK2",
+   "ours": "37/279",
+   "portal": "37/279",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "selection",
+   "what": "patients (the cohort)",
+   "ours": "4336",
+   "portal": "4336",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "selection",
+   "what": "samples (the cohort)",
+   "ours": "4538",
+   "portal": "4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "selection",
+   "what": "samples (Explore)",
+   "ours": "4538",
+   "portal": "4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (Explore)",
+   "what": "every row of the table (412)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "copy number (Explore)",
+   "what": "every row of the table (500)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "TP53",
+   "ours": "4538/4538",
+   "portal": "4538/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "KRAS",
+   "ours": "845/4538",
+   "portal": "845/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "APC",
+   "ours": "742/4538",
+   "portal": "742/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "PIK3CA",
+   "ours": "578/4538",
+   "portal": "578/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "TERT",
+   "ours": "506/4538",
+   "portal": "506/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "KMT2D",
+   "ours": "439/4538",
+   "portal": "439/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "RB1",
+   "ours": "377/4538",
+   "portal": "377/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "ARID1A",
+   "ours": "372/4538",
+   "portal": "372/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "EGFR",
+   "ours": "357/4538",
+   "portal": "357/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "FAT1",
+   "ours": "342/4538",
+   "portal": "342/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "CDKN2A",
+   "ours": "333/4538",
+   "portal": "333/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "NF1",
+   "ours": "312/4538",
+   "portal": "312/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "ATRX",
+   "ours": "304/4538",
+   "portal": "304/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "KMT2C",
+   "ours": "295/4538",
+   "portal": "295/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_impact_2017 · OQL \"TP53: MUT\"",
+   "group": "mutations (views)",
+   "what": "PTEN",
+   "ours": "288/4538",
+   "portal": "288/4538",
+   "agree": true
+  },
+  {
+   "study": "msk_chord_2024",
+   "group": "mutations (views, off-panel)",
+   "what": "RTEL1-TNFRSF6B",
+   "ours": "0/0",
+   "portal": "0/0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "mutations (views, off-panel)",
+   "what": "PTEN",
+   "ours": "52/1257",
+   "portal": "52/1257",
+   "agree": true
+  },
+  {
+   "study": "pancan_pcawg_2020 + lihc_tcga · GRADE = G3",
+   "group": "selection",
+   "what": "samples in pancan_pcawg_2020",
+   "ours": "75",
+   "portal": "75",
+   "agree": true
+  },
+  {
+   "study": "pancan_pcawg_2020 + lihc_tcga · GRADE = G3",
+   "group": "selection",
+   "what": "samples in lihc_tcga",
+   "ours": "125",
+   "portal": "125",
+   "agree": true
+  },
+  {
+   "study": "pancan_pcawg_2020 + lihc_tcga · GRADE = G3",
+   "group": "selection",
+   "what": "patients (Explore)",
+   "ours": "199",
+   "portal": "199",
+   "agree": true
+  },
+  {
+   "study": "pancan_pcawg_2020 + lihc_tcga · GRADE = G3",
+   "group": "selection",
+   "what": "samples (Explore)",
+   "ours": "200",
+   "portal": "200",
+   "agree": true
+  },
+  {
+   "study": "pancan_pcawg_2020 + lihc_tcga · GRADE = G3",
+   "group": "mutations (Explore)",
+   "what": "every row of the table (500)",
+   "ours": "all agree",
+   "portal": "all agree",
+   "agree": true
+  },
+  {
+   "study": "hgsoc_tcga_gdc",
+   "group": "survival",
+   "what": "patients in the OS curve",
+   "ours": "574",
+   "portal": "574",
+   "agree": true
+  },
+  {
+   "study": "hgsoc_tcga_gdc",
+   "group": "survival",
+   "what": "deaths in the OS curve",
+   "ours": "345",
+   "portal": "345",
+   "agree": true
+  },
+  {
+   "study": "hgsoc_tcga_gdc",
+   "group": "survival",
+   "what": "patients left out: a time but no status",
+   "ours": "1",
+   "portal": "1",
+   "agree": true
+  },
+  {
+   "study": "aml_ohsu_2022",
+   "group": "survival",
+   "what": "patients in the OS curve",
+   "ours": "773",
+   "portal": "773",
+   "agree": true
+  },
+  {
+   "study": "aml_ohsu_2022",
+   "group": "survival",
+   "what": "deaths in the OS curve",
+   "ours": "468",
+   "portal": "468",
+   "agree": true
+  },
+  {
+   "study": "aml_ohsu_2022",
+   "group": "survival",
+   "what": "patients left out: a time but no status",
+   "ours": "31",
+   "portal": "31",
+   "agree": true
+  },
+  {
+   "study": "brca_mbcproject_wagle_2017",
+   "group": "selection (missing spellings)",
+   "what": "samples with DX_PERCENT_PR = NA",
+   "ours": "83",
+   "portal": "83",
+   "agree": true
+  },
+  {
+   "study": "prostate_pcbm_swiss_2019",
+   "group": "selection (missing spellings)",
+   "what": "samples with CGA = NA",
+   "ours": "159",
+   "portal": "159",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018 · TUMOR_TISSUE_SITE = Breast",
+   "group": "clinical (drafted attribute)",
+   "what": "TUMOR_TISSUE_SITE = Breast",
+   "ours": "1084",
+   "portal": "1084",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018 · TUMOR_TISSUE_SITE = Breast",
+   "group": "clinical (drafted attribute)",
+   "what": "TUMOR_TISSUE_SITE = Lung",
+   "ours": "514",
+   "portal": "514",
+   "agree": true
+  },
+  {
+   "study": "hgsoc_tcga_gdc",
+   "group": "clinical (patients who own a sample)",
+   "what": "OS_STATUS = 1:DECEASED",
+   "ours": "345",
+   "portal": "345",
+   "agree": true
+  },
+  {
+   "study": "hgsoc_tcga_gdc",
+   "group": "clinical (patients who own a sample)",
+   "what": "OS_STATUS = NA",
+   "ours": "12",
+   "portal": "12",
+   "agree": true
+  },
+  {
+   "study": "hgsoc_tcga_gdc",
+   "group": "clinical (patients who own a sample)",
+   "what": "OS_STATUS = 0:LIVING",
+   "ours": "231",
+   "portal": "231",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019",
+   "group": "generic assay (samples)",
+   "what": "1p_status = Gain",
+   "ours": "13",
+   "portal": "13",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019",
+   "group": "generic assay (samples)",
+   "what": "1p_status = Loss",
+   "ours": "46",
+   "portal": "46",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019",
+   "group": "generic assay (samples)",
+   "what": "1p_status = Unchanged",
+   "ours": "228",
+   "portal": "228",
+   "agree": true
+  },
+  {
+   "study": "difg_glass_2019",
+   "group": "generic assay (samples)",
+   "what": "1p_status = NA",
+   "ours": "157",
+   "portal": "157",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number (profiled once per sample)",
+   "what": "CDKN2A deleted",
+   "ours": "1476",
+   "portal": "1476",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number (profiled once per sample)",
+   "what": "TERT amplified",
+   "ours": "1476",
+   "portal": "1476",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number (profiled once per sample)",
+   "what": "EGFR amplified",
+   "ours": "2621",
+   "portal": "2621",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number (profiled once per sample)",
+   "what": "MDM2 amplified",
+   "ours": "1173",
+   "portal": "1173",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "copy number (profiled once per sample)",
+   "what": "MYC amplified",
+   "ours": "1476",
+   "portal": "1476",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "selection (values recorded as a bound)",
+   "what": "samples with AGE_AT_SEQ_REPORTED_YEARS {\"gt\":89}",
+   "ours": "12",
+   "portal": "12",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "selection (values recorded as a bound)",
+   "what": "samples with AGE_AT_SEQ_REPORTED_YEARS {\"gt\":80,\"lte\":95}",
+   "ours": "93",
+   "portal": "93",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "MUTATION_COUNT (bars, NA)",
+   "ours": "<=(,10]=73 (10,20]=112 (20,30]=230 (30,40]=162 (40,50]=100 (50,60]=85 (60,70]=63 (70,80]=34 (80,90]=35 (90,100]=25 (100,110]=13 (110,120]=15 >(120,]=119 NA=18",
+   "portal": "<=(,10]=73 (10,20]=112 (20,30]=230 (30,40]=162 (40,50]=100 (50,60]=85 (60,70]=63 (70,80]=34 (80,90]=35 (90,100]=25 (100,110]=13 (110,120]=15 >(120,]=119 NA=18",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "FRACTION_GENOME_ALTERED (bars, NA)",
+   "ours": "<=(,0.05]=97 (0.05,0.1]=97 (0.1,0.15]=126 (0.15,0.2]=107 (0.2,0.25]=105 (0.25,0.3]=68 (0.3,0.35]=78 (0.35,0.4]=77 (0.4,0.45]=63 (0.45,0.5]=60 (0.5,0.55]=48 (0.55,0.6]=39 (0.6,0.65]=36 (0.65,0.7]=26 (0.7,0.75]=16 (0.75,0.8]=9 (0.8,0.85]=3 (0.85,0.9]=5 >(0.9,]=8 NA=16",
+   "portal": "<=(,0.05]=97 (0.05,0.1]=97 (0.1,0.15]=126 (0.15,0.2]=107 (0.2,0.25]=105 (0.25,0.3]=68 (0.3,0.35]=78 (0.35,0.4]=77 (0.4,0.45]=63 (0.45,0.5]=60 (0.5,0.55]=48 (0.55,0.6]=39 (0.6,0.65]=36 (0.65,0.7]=26 (0.7,0.75]=16 (0.75,0.8]=9 (0.8,0.85]=3 (0.85,0.9]=5 >(0.9,]=8 NA=16",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "MSI_SENSOR_SCORE (bars, NA)",
+   "ours": "<=(,0.1]=436 (0.1,0.2]=117 (0.2,0.3]=119 (0.3,0.4]=72 (0.4,0.5]=48 (0.5,0.6]=40 (0.6,0.7]=34 (0.7,0.8]=33 (0.8,0.9]=23 (0.9,1]=30 (1,1.1]=17 (1.1,1.2]=14 (1.2,1.3]=18 >(1.3,]=74 NA=9",
+   "portal": "<=(,0.1]=436 (0.1,0.2]=117 (0.2,0.3]=119 (0.3,0.4]=72 (0.4,0.5]=48 (0.5,0.6]=40 (0.6,0.7]=34 (0.7,0.8]=33 (0.8,0.9]=23 (0.9,1]=30 (1,1.1]=17 (1.1,1.2]=14 (1.2,1.3]=18 >(1.3,]=74 NA=9",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "MSI_SCORE_MANTIS (bars, NA)",
+   "ours": "<=(,0.22]=1 (0.22,0.23]=0 (0.23,0.24]=3 (0.24,0.25]=12 (0.25,0.26]=62 (0.26,0.27]=99 (0.27,0.28]=116 (0.28,0.29]=128 (0.29,0.3]=133 (0.3,0.31]=105 (0.31,0.32]=100 (0.32,0.33]=89 (0.33,0.34]=72 (0.34,0.35]=43 (0.35,0.36]=29 (0.36,0.37]=12 (0.37,0.38]=7 >(0.38,]=23 NA=50",
+   "portal": "<=(,0.22]=1 (0.22,0.23]=0 (0.23,0.24]=3 (0.24,0.25]=12 (0.25,0.26]=62 (0.26,0.27]=99 (0.27,0.28]=116 (0.28,0.29]=128 (0.29,0.3]=133 (0.3,0.31]=105 (0.31,0.32]=100 (0.32,0.33]=89 (0.33,0.34]=72 (0.34,0.35]=43 (0.35,0.36]=29 (0.36,0.37]=12 (0.37,0.38]=7 >(0.38,]=23 NA=50",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "AGE (bars, NA)",
+   "ours": "<=(,30]=12 (30,35]=22 (35,40]=63 (40,45]=89 (45,50]=142 (50,55]=140 (55,60]=131 (60,65]=170 (65,70]=108 (70,75]=78 (75,80]=75 (80,85]=32 (85,90]=22 NA=0",
+   "portal": "<=(,30]=12 (30,35]=22 (35,40]=63 (40,45]=89 (45,50]=142 (50,55]=140 (55,60]=131 (60,65]=170 (65,70]=108 (70,75]=78 (75,80]=75 (80,85]=32 (85,90]=22 NA=0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "DAYS_TO_INITIAL_PATHOLOGIC_DIAGNOSIS (bars, NA)",
+   "ours": "(0,0]=1084 NA=0",
+   "portal": "(0,0]=1084 NA=0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "OS_MONTHS (bars, NA)",
+   "ours": "<=(,10]=138 (10,20]=270 (20,30]=166 (30,40]=127 (40,50]=70 (50,60]=64 (60,70]=45 (70,80]=50 (80,90]=36 (90,100]=31 (100,110]=31 >(110,]=56 NA=0",
+   "portal": "<=(,10]=138 (10,20]=270 (20,30]=166 (30,40]=127 (40,50]=70 (50,60]=64 (60,70]=45 (70,80]=50 (80,90]=36 (90,100]=31 (100,110]=31 >(110,]=56 NA=0",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "DSS_MONTHS (bars, NA)",
+   "ours": "<=(,10]=138 (10,20]=270 (20,30]=165 (30,40]=127 (40,50]=69 (50,60]=64 (60,70]=45 (70,80]=50 (80,90]=36 (90,100]=31 (100,110]=31 >(110,]=56 NA=2",
+   "portal": "<=(,10]=138 (10,20]=270 (20,30]=165 (30,40]=127 (40,50]=69 (50,60]=64 (60,70]=45 (70,80]=50 (80,90]=36 (90,100]=31 (100,110]=31 >(110,]=56 NA=2",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "PFS_MONTHS (bars, NA)",
+   "ours": "<=(,10]=156 (10,20]=277 (20,30]=163 (30,40]=126 (40,50]=74 (50,60]=65 (60,70]=40 (70,80]=46 (80,90]=36 (90,100]=30 >(100,]=69 NA=2",
+   "portal": "<=(,10]=156 (10,20]=277 (20,30]=163 (30,40]=126 (40,50]=74 (50,60]=65 (60,70]=40 (70,80]=46 (80,90]=36 (90,100]=30 >(100,]=69 NA=2",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "TBL_SCORE (bars, NA)",
+   "ours": "<=(,25]=267 (25,50]=138 (50,75]=118 (75,100]=82 (100,125]=66 (125,150]=66 (150,175]=51 (175,200]=46 (200,225]=36 (225,250]=39 (250,275]=37 (275,300]=21 (300,325]=15 (325,350]=19 (350,375]=8 (375,400]=15 (400,425]=10 >(425,]=48 NA=2",
+   "portal": "<=(,25]=267 (25,50]=138 (50,75]=118 (75,100]=82 (100,125]=66 (125,150]=66 (150,175]=51 (175,200]=46 (200,225]=36 (225,250]=39 (250,275]=37 (275,300]=21 (300,325]=15 (325,350]=19 (350,375]=8 (375,400]=15 (400,425]=10 >(425,]=48 NA=2",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "BUFFA_HYPOXIA_SCORE (bars, NA)",
+   "ours": "<=(,-45]=10 (-45,-40]=41 (-40,-35]=100 (-35,-30]=73 (-30,-25]=118 (-25,-20]=77 (-20,-15]=97 (-15,-10]=77 (-10,-5]=103 (-5,0]=46 (0,5]=65 (5,10]=50 (10,15]=60 (15,20]=40 (20,25]=46 (25,30]=28 (30,35]=26 (35,40]=11 (40,45]=9 >(45,]=2 NA=5",
+   "portal": "<=(,-45]=10 (-45,-40]=41 (-40,-35]=100 (-35,-30]=73 (-30,-25]=118 (-25,-20]=77 (-20,-15]=97 (-15,-10]=77 (-10,-5]=103 (-5,0]=46 (0,5]=65 (5,10]=50 (10,15]=60 (15,20]=40 (20,25]=46 (25,30]=28 (30,35]=26 (35,40]=11 (40,45]=9 >(45,]=2 NA=5",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "RAGNUM_HYPOXIA_SCORE (bars, NA)",
+   "ours": "<=(,-20]=34 (-20,-15]=80 (-15,-10]=144 (-10,-5]=80 (-5,0]=111 (0,5]=117 (5,10]=175 (10,15]=147 (15,20]=154 (20,25]=28 (25,30]=9 NA=5",
+   "portal": "<=(,-20]=34 (-20,-15]=80 (-15,-10]=144 (-10,-5]=80 (-5,0]=111 (0,5]=117 (5,10]=175 (10,15]=147 (15,20]=154 (20,25]=28 (25,30]=9 NA=5",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "WINTER_HYPOXIA_SCORE (bars, NA)",
+   "ours": "<=(,-70]=1 (-70,-60]=4 (-60,-50]=8 (-50,-40]=69 (-40,-30]=158 (-30,-20]=191 (-20,-10]=192 (-10,0]=154 (0,10]=132 (10,20]=89 (20,30]=49 (30,40]=21 >(40,]=11 NA=5",
+   "portal": "<=(,-70]=1 (-70,-60]=4 (-60,-50]=8 (-50,-40]=69 (-40,-30]=158 (-30,-20]=191 (-20,-10]=192 (-10,0]=154 (0,10]=132 (10,20]=89 (20,30]=49 (30,40]=21 >(40,]=11 NA=5",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "DAYS_TO_BIRTH (bars, NA)",
+   "ours": "(-100000,-31622]=22 (-31622,-10000]=1044 (-10000,-3162]=3 NA=15",
+   "portal": "(-100000,-31622]=22 (-31622,-10000]=1044 (-10000,-3162]=3 NA=15",
+   "agree": true
+  },
+  {
+   "study": "prostate_pcbm_swiss_2019",
+   "group": "histogram",
+   "what": "MUTATION_COUNT (bars, NA)",
+   "ours": "<=(,20]=4 (20,40]=36 (40,60]=41 (60,80]=4 (80,100]=10 (100,120]=14 (120,140]=8 (140,160]=10 (160,180]=11 (180,200]=5 (200,220]=4 (220,240]=2 (240,260]=3 (260,280]=2 (280,300]=0 (300,320]=0 >(320,]=14 NA=0",
+   "portal": "<=(,20]=4 (20,40]=36 (40,60]=41 (60,80]=4 (80,100]=10 (100,120]=14 (120,140]=8 (140,160]=10 (160,180]=11 (180,200]=5 (200,220]=4 (220,240]=2 (240,260]=3 (260,280]=2 (280,300]=0 (300,320]=0 >(320,]=14 NA=0",
+   "agree": true
+  },
+  {
+   "study": "prostate_pcbm_swiss_2019",
+   "group": "histogram",
+   "what": "PLOIDY (bars, NA)",
+   "ours": "<=(,1.25]=1 (1.25,1.5]=0 (1.5,1.75]=1 (1.75,2]=30 (2,2.25]=52 (2.25,2.5]=6 (2.5,2.75]=4 (2.75,3]=5 (3,3.25]=8 (3.25,3.5]=14 (3.5,3.75]=9 (3.75,4]=5 (4,4.25]=12 (4.25,4.5]=10 (4.5,4.75]=4 (4.75,5]=2 (5,5.25]=3 (5.25,5.5]=0 (5.5,5.75]=0 >(5.75,]=2 NA=0",
+   "portal": "<=(,1.25]=1 (1.25,1.5]=0 (1.5,1.75]=1 (1.75,2]=30 (2,2.25]=52 (2.25,2.5]=6 (2.5,2.75]=4 (2.75,3]=5 (3,3.25]=8 (3.25,3.5]=14 (3.5,3.75]=9 (3.75,4]=5 (4,4.25]=12 (4.25,4.5]=10 (4.5,4.75]=4 (4.75,5]=2 (5,5.25]=3 (5.25,5.5]=0 (5.5,5.75]=0 >(5.75,]=2 NA=0",
+   "agree": true
+  },
+  {
+   "study": "prostate_pcbm_swiss_2019",
+   "group": "histogram",
+   "what": "TIME_POINT (bars, NA)",
+   "ours": "(1,1]=142 (2,2]=19 (3,3]=3 (4,4]=3 (5,5]=1 NA=0",
+   "portal": "(1,1]=142 (2,2]=19 (3,3]=3 (4,4]=3 (5,5]=1 NA=0",
+   "agree": true
+  },
+  {
+   "study": "prostate_pcbm_swiss_2019",
+   "group": "histogram",
+   "what": "TMB_NONSYNONYMOUS (bars, NA)",
+   "ours": "<=(,1]=16 (1,2]=65 (2,3]=12 (3,4]=16 (4,5]=11 (5,6]=18 (6,7]=8 (7,8]=3 (8,9]=4 (9,10]=1 (10,11]=0 >(11,]=14 NA=0",
+   "portal": "<=(,1]=16 (1,2]=65 (2,3]=12 (3,4]=16 (4,5]=11 (5,6]=18 (6,7]=8 (7,8]=3 (8,9]=4 (9,10]=1 (10,11]=0 >(11,]=14 NA=0",
+   "agree": true
+  },
+  {
+   "study": "prostate_pcbm_swiss_2019",
+   "group": "histogram",
+   "what": "GLEASON_PR (bars, NA)",
+   "ours": "(3,3]=4 (4,4]=50 (5,5]=99 NA=15",
+   "portal": "(3,3]=4 (4,4]=50 (5,5]=99 NA=15",
+   "agree": true
+  },
+  {
+   "study": "prostate_pcbm_swiss_2019",
+   "group": "histogram",
+   "what": "GLEASON_SE (bars, NA)",
+   "ours": "(3,3]=4 (4,4]=43 (5,5]=106 NA=15",
+   "portal": "(3,3]=4 (4,4]=43 (5,5]=106 NA=15",
+   "agree": true
+  },
+  {
+   "study": "prostate_pcbm_swiss_2019",
+   "group": "histogram",
+   "what": "ISUP (bars, NA)",
+   "ours": "(1,1]=3 (2,2]=1 (3,3]=1 (4,4]=24 (5,5]=124 NA=15",
+   "portal": "(1,1]=3 (2,2]=1 (3,3]=1 (4,4]=24 (5,5]=124 NA=15",
+   "agree": true
+  },
+  {
+   "study": "prostate_pcbm_swiss_2019",
+   "group": "histogram",
+   "what": "GLEASON_SU (bars, NA)",
+   "ours": "(6,6]=3 (7,7]=2 (8,8]=11 (9,9]=18 (10,10]=23 NA=111",
+   "portal": "(6,6]=3 (7,7]=2 (8,8]=11 (9,9]=18 (10,10]=23 NA=111",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "histogram",
+   "what": "MUTATION_COUNT (bars, NA)",
+   "ours": "<=(,2]=871 (3,3]=277 (4,4]=184 (5,5]=131 (6,6]=95 (7,7]=91 (8,8]=62 (9,9]=53 (10,10]=29 (11,11]=29 (12,12]=22 >(12,]=117 NA=660",
+   "portal": "<=(,2]=871 (3,3]=277 (4,4]=184 (5,5]=131 (6,6]=95 (7,7]=91 (8,8]=62 (9,9]=53 (10,10]=29 (11,11]=29 (12,12]=22 >(12,]=117 NA=660",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "histogram",
+   "what": "FRACTION_GENOME_ALTERED (bars, NA)",
+   "ours": "<=(,0.05]=328 (0.05,0.1]=108 (0.1,0.15]=73 (0.15,0.2]=53 (0.2,0.25]=58 (0.25,0.3]=61 (0.3,0.35]=59 (0.35,0.4]=41 (0.4,0.45]=27 (0.45,0.5]=38 (0.5,0.55]=29 (0.55,0.6]=27 (0.6,0.65]=21 (0.65,0.7]=15 (0.7,0.75]=7 >(0.75,]=8 NA=1668",
+   "portal": "<=(,0.05]=328 (0.05,0.1]=108 (0.1,0.15]=73 (0.15,0.2]=53 (0.2,0.25]=58 (0.25,0.3]=61 (0.3,0.35]=59 (0.35,0.4]=41 (0.4,0.45]=27 (0.45,0.5]=38 (0.5,0.55]=29 (0.55,0.6]=27 (0.6,0.65]=21 (0.65,0.7]=15 (0.7,0.75]=7 >(0.75,]=8 NA=1668",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "histogram",
+   "what": "METABOLIC_TUMOR_VOL (bars, NA)",
+   "ours": "<=(,0]=1 (0,3]=1 (3,10]=2 (10,31]=8 (31,100]=23 (100,316]=41 (316,1000]=33 (1000,3162]=15 (3162,10000]=4 NA=999",
+   "portal": "<=(,0]=1 (0,3]=1 (3,10]=2 (10,31]=8 (31,100]=23 (100,316]=41 (316,1000]=33 (1000,3162]=15 (3162,10000]=4 NA=999",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "histogram",
+   "what": "TMB_NONSYNONYMOUS (bars, NA)",
+   "ours": "<=(,1]=166 (1,2]=80 (2,3]=164 (3,4]=98 (4,5]=92 (5,6]=128 (6,7]=127 (7,8]=52 (8,9]=87 (9,10]=26 (10,11]=23 (11,12]=51 (12,13]=29 (13,14]=30 (14,15]=6 (15,16]=4 (16,17]=20 >(17,]=74 NA=1364",
+   "portal": "<=(,1]=166 (1,2]=80 (2,3]=164 (3,4]=98 (4,5]=92 (5,6]=128 (6,7]=127 (7,8]=52 (8,9]=87 (9,10]=26 (10,11]=23 (11,12]=51 (12,13]=29 (13,14]=30 (14,15]=6 (15,16]=4 (16,17]=20 >(17,]=74 NA=1364",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "histogram",
+   "what": "MSI_SCORE (bars, NA)",
+   "ours": "<=(,-0.8]=318 (-0.8,-0.6]=0 (-0.6,-0.4]=0 (-0.4,-0.2]=0 (-0.2,0]=292 (0,0.2]=211 (0.2,0.4]=102 (0.4,0.6]=50 (0.6,0.8]=48 (0.8,1]=43 (1,1.2]=28 (1.2,1.4]=21 (1.4,1.6]=19 (1.6,1.8]=8 (1.8,2]=13 (2,2.2]=18 (2.2,2.4]=8 >(2.4,]=52 NA=1390",
+   "portal": "<=(,-0.8]=318 (-0.8,-0.6]=0 (-0.6,-0.4]=0 (-0.4,-0.2]=0 (-0.2,0]=292 (0,0.2]=211 (0.2,0.4]=102 (0.4,0.6]=50 (0.6,0.8]=48 (0.8,1]=43 (1,1.2]=28 (1.2,1.4]=21 (1.4,1.6]=19 (1.6,1.8]=8 (1.8,2]=13 (2,2.2]=18 (2.2,2.4]=8 >(2.4,]=52 NA=1390",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "histogram",
+   "what": "OS_MONTHS (bars, NA)",
+   "ours": "<=(,5]=288 (5,10]=127 (10,15]=120 (15,20]=100 (20,25]=87 (25,30]=93 (30,35]=65 (35,40]=62 (40,45]=40 (45,50]=33 (50,55]=30 (55,60]=18 (60,65]=13 (65,70]=14 >(70,]=37 NA=0",
+   "portal": "<=(,5]=288 (5,10]=127 (10,15]=120 (15,20]=100 (20,25]=87 (25,30]=93 (30,35]=65 (35,40]=62 (40,45]=40 (45,50]=33 (50,55]=30 (55,60]=18 (60,65]=13 (65,70]=14 >(70,]=37 NA=0",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "histogram",
+   "what": "AGE_AT_SEQ_REPORTED_YEARS (bars, NA)",
+   "ours": "<=(,40]=27 (40,45]=18 (45,50]=44 (50,55]=75 (55,60]=105 (60,65]=146 (65,70]=147 (70,75]=170 (75,80]=107 (80,85]=68 (85,90]=25 >(90,]=10 NA=1679",
+   "portal": "<=(,40]=27 (40,45]=18 (45,50]=44 (50,55]=75 (55,60]=105 (60,65]=146 (65,70]=147 (70,75]=170 (75,80]=107 (80,85]=68 (85,90]=25 >(90,]=10 NA=1679",
+   "agree": true
+  },
+  {
+   "study": "nsclc_ctdx_msk_2022",
+   "group": "histogram",
+   "what": "AGE_CURRENT (bars, NA)",
+   "ours": "<=(,40]=16 (40,45]=11 (45,50]=34 (50,55]=54 (55,60]=79 (60,65]=98 (65,70]=126 (70,75]=135 (75,80]=89 (80,85]=66 (85,90]=37 NA=382",
+   "portal": "<=(,40]=16 (40,45]=11 (45,50]=34 (50,55]=54 (55,60]=79 (60,65]=98 (65,70]=126 (70,75]=135 (75,80]=89 (80,85]=66 (85,90]=37 NA=382",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "MUTATION_COUNT (bars, NA)",
+   "ours": "<=(,20]=206 (20,40]=437 (40,60]=229 (60,80]=129 (80,100]=89 (100,120]=60 (120,140]=69 (140,160]=38 (160,180]=31 (180,200]=30 (200,220]=27 (220,240]=23 (240,260]=17 (260,280]=25 (280,300]=16 >(300,]=206 NA=18",
+   "portal": "<=(,20]=206 (20,40]=437 (40,60]=229 (60,80]=129 (80,100]=89 (100,120]=60 (120,140]=69 (140,160]=38 (160,180]=31 (180,200]=30 (200,220]=27 (220,240]=23 (240,260]=17 (260,280]=25 (280,300]=16 >(300,]=206 NA=18",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "FRACTION_GENOME_ALTERED (bars, NA)",
+   "ours": "<=(,0.05]=171 (0.05,0.1]=146 (0.1,0.15]=169 (0.15,0.2]=155 (0.2,0.25]=152 (0.25,0.3]=108 (0.3,0.35]=121 (0.35,0.4]=107 (0.4,0.45]=98 (0.45,0.5]=84 (0.5,0.55]=64 (0.55,0.6]=59 (0.6,0.65]=48 (0.65,0.7]=39 (0.7,0.75]=20 (0.75,0.8]=10 (0.8,0.85]=4 >(0.85,]=13 NA=82",
+   "portal": "<=(,0.05]=171 (0.05,0.1]=146 (0.1,0.15]=169 (0.15,0.2]=155 (0.2,0.25]=152 (0.25,0.3]=108 (0.3,0.35]=121 (0.35,0.4]=107 (0.4,0.45]=98 (0.45,0.5]=84 (0.5,0.55]=64 (0.55,0.6]=59 (0.6,0.65]=48 (0.65,0.7]=39 (0.7,0.75]=20 (0.75,0.8]=10 (0.8,0.85]=4 >(0.85,]=13 NA=82",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "MSI_SENSOR_SCORE (bars, NA)",
+   "ours": "<=(,0.05]=712 (0.05,0.1]=152 (0.1,0.15]=70 (0.15,0.2]=85 (0.2,0.25]=83 (0.25,0.3]=69 (0.3,0.35]=57 (0.35,0.4]=35 (0.4,0.45]=35 (0.45,0.5]=26 (0.5,0.55]=27 (0.55,0.6]=19 (0.6,0.65]=23 (0.65,0.7]=16 (0.7,0.75]=19 (0.75,0.8]=17 (0.8,0.85]=13 >(0.85,]=182 NA=10",
+   "portal": "<=(,0.05]=712 (0.05,0.1]=152 (0.1,0.15]=70 (0.15,0.2]=85 (0.2,0.25]=83 (0.25,0.3]=69 (0.3,0.35]=57 (0.35,0.4]=35 (0.4,0.45]=35 (0.45,0.5]=26 (0.5,0.55]=27 (0.55,0.6]=19 (0.6,0.65]=23 (0.65,0.7]=16 (0.7,0.75]=19 (0.75,0.8]=17 (0.8,0.85]=13 >(0.85,]=182 NA=10",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "MSI_SCORE_MANTIS (bars, NA)",
+   "ours": "<=(,0.23]=1 (0.23,0.24]=3 (0.24,0.25]=12 (0.25,0.26]=63 (0.26,0.27]=104 (0.27,0.28]=160 (0.28,0.29]=176 (0.29,0.3]=213 (0.3,0.31]=213 (0.31,0.32]=180 (0.32,0.33]=174 (0.33,0.34]=124 (0.34,0.35]=76 (0.35,0.36]=49 (0.36,0.37]=17 (0.37,0.38]=7 >(0.38,]=26 NA=52",
+   "portal": "<=(,0.23]=1 (0.23,0.24]=3 (0.24,0.25]=12 (0.25,0.26]=63 (0.26,0.27]=104 (0.27,0.28]=160 (0.28,0.29]=176 (0.29,0.3]=213 (0.3,0.31]=213 (0.31,0.32]=180 (0.32,0.33]=174 (0.33,0.34]=124 (0.34,0.35]=76 (0.35,0.36]=49 (0.36,0.37]=17 (0.37,0.38]=7 >(0.38,]=26 NA=52",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "TMB_NONSYNONYMOUS (bars, NA)",
+   "ours": "<=(,1]=429 (1,2]=414 (2,3]=193 (3,4]=102 (4,5]=94 (5,6]=43 (6,7]=40 (7,8]=37 (8,9]=28 (9,10]=29 >(10,]=223 NA=18",
+   "portal": "<=(,1]=429 (1,2]=414 (2,3]=193 (3,4]=102 (4,5]=94 (5,6]=43 (6,7]=40 (7,8]=37 (8,9]=28 (9,10]=29 >(10,]=223 NA=18",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "TBL_SCORE (bars, NA)",
+   "ours": "<=(,20]=289 (20,40]=198 (40,60]=173 (60,80]=140 (80,100]=115 (100,120]=89 (120,140]=83 (140,160]=65 (160,180]=65 (180,200]=52 (200,220]=47 (220,240]=49 (240,260]=40 (260,280]=33 (280,300]=24 (300,320]=20 (320,340]=15 (340,360]=12 (360,380]=8 >(380,]=78 NA=55",
+   "portal": "<=(,20]=289 (20,40]=198 (40,60]=173 (60,80]=140 (80,100]=115 (100,120]=89 (120,140]=83 (140,160]=65 (160,180]=65 (180,200]=52 (200,220]=47 (220,240]=49 (240,260]=40 (260,280]=33 (280,300]=24 (300,320]=20 (320,340]=15 (340,360]=12 (360,380]=8 >(380,]=78 NA=55",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "BUFFA_HYPOXIA_SCORE (bars, NA)",
+   "ours": "<=(,-45]=13 (-45,-40]=50 (-40,-35]=134 (-35,-30]=99 (-30,-25]=145 (-25,-20]=98 (-20,-15]=139 (-15,-10]=93 (-10,-5]=145 (-5,0]=76 (0,5]=108 (5,10]=75 (10,15]=103 (15,20]=73 (20,25]=91 (25,30]=57 (30,35]=57 (35,40]=19 (40,45]=12 >(45,]=2 NA=61",
+   "portal": "<=(,-45]=13 (-45,-40]=50 (-40,-35]=134 (-35,-30]=99 (-30,-25]=145 (-25,-20]=98 (-20,-15]=139 (-15,-10]=93 (-10,-5]=145 (-5,0]=76 (0,5]=108 (5,10]=75 (10,15]=103 (15,20]=73 (20,25]=91 (25,30]=57 (30,35]=57 (35,40]=19 (40,45]=12 >(45,]=2 NA=61",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "OS_MONTHS (bars, NA)",
+   "ours": "<=(,5]=123 (5,10]=108 (10,15]=200 (15,20]=207 (20,25]=168 (25,30]=108 (30,35]=99 (35,40]=85 (40,45]=66 (45,50]=41 (50,55]=51 (55,60]=31 (60,65]=33 (65,70]=24 (70,75]=35 (75,80]=26 (80,85]=19 (85,90]=28 (90,95]=13 >(95,]=124 NA=61",
+   "portal": "<=(,5]=123 (5,10]=108 (10,15]=200 (15,20]=207 (20,25]=168 (25,30]=108 (30,35]=99 (35,40]=85 (40,45]=66 (45,50]=41 (50,55]=51 (55,60]=31 (60,65]=33 (65,70]=24 (70,75]=35 (75,80]=26 (80,85]=19 (85,90]=28 (90,95]=13 >(95,]=124 NA=61",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "RAGNUM_HYPOXIA_SCORE (bars, NA)",
+   "ours": "<=(,-25]=1 (-25,-20]=57 (-20,-15]=132 (-15,-10]=220 (-10,-5]=115 (-5,0]=152 (0,5]=160 (5,10]=239 (10,15]=191 (15,20]=241 (20,25]=61 (25,30]=20 NA=61",
+   "portal": "<=(,-25]=1 (-25,-20]=57 (-20,-15]=132 (-15,-10]=220 (-10,-5]=115 (-5,0]=152 (0,5]=160 (5,10]=239 (10,15]=191 (15,20]=241 (20,25]=61 (25,30]=20 NA=61",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "WINTER_HYPOXIA_SCORE (bars, NA)",
+   "ours": "<=(,-70]=1 (-70,-60]=4 (-60,-50]=15 (-50,-40]=88 (-40,-30]=193 (-30,-20]=240 (-20,-10]=252 (-10,0]=217 (0,10]=203 (10,20]=147 (20,30]=125 (30,40]=62 (40,50]=28 (50,60]=11 >(60,]=3 NA=61",
+   "portal": "<=(,-70]=1 (-70,-60]=4 (-60,-50]=15 (-50,-40]=88 (-40,-30]=193 (-30,-20]=240 (-20,-10]=252 (-10,0]=217 (0,10]=203 (10,20]=147 (20,30]=125 (30,40]=62 (40,50]=28 (50,60]=11 >(60,]=3 NA=61",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "DSS_MONTHS (bars, NA)",
+   "ours": "<=(,5]=123 (5,10]=108 (10,15]=200 (15,20]=207 (20,25]=168 (25,30]=107 (30,35]=99 (35,40]=85 (40,45]=65 (45,50]=41 (50,55]=51 (55,60]=31 (60,65]=33 (65,70]=24 (70,75]=35 (75,80]=26 (80,85]=19 (85,90]=28 (90,95]=13 >(95,]=124 NA=63",
+   "portal": "<=(,5]=123 (5,10]=108 (10,15]=200 (15,20]=207 (20,25]=168 (25,30]=107 (30,35]=99 (35,40]=85 (40,45]=65 (45,50]=41 (50,55]=51 (55,60]=31 (60,65]=33 (65,70]=24 (70,75]=35 (75,80]=26 (80,85]=19 (85,90]=28 (90,95]=13 >(95,]=124 NA=63",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "PFS_MONTHS (bars, NA)",
+   "ours": "<=(,5]=144 (5,10]=149 (10,15]=218 (15,20]=214 (20,25]=160 (25,30]=95 (30,35]=85 (35,40]=82 (40,45]=60 (45,50]=41 (50,55]=49 (55,60]=31 (60,65]=26 (65,70]=22 (70,75]=33 (75,80]=22 (80,85]=19 >(85,]=137 NA=63",
+   "portal": "<=(,5]=144 (5,10]=149 (10,15]=218 (15,20]=214 (20,25]=160 (25,30]=95 (30,35]=85 (35,40]=82 (40,45]=60 (45,50]=41 (50,55]=49 (55,60]=31 (60,65]=26 (65,70]=22 (70,75]=33 (75,80]=22 (80,85]=19 >(85,]=137 NA=63",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "AGE (bars, NA)",
+   "ours": "<=(,30]=12 (30,35]=23 (35,40]=67 (40,45]=104 (45,50]=160 (50,55]=182 (55,60]=210 (60,65]=251 (65,70]=197 (70,75]=168 (75,80]=125 (80,85]=54 (85,90]=26 NA=71",
+   "portal": "<=(,30]=12 (30,35]=23 (35,40]=67 (40,45]=104 (45,50]=160 (50,55]=182 (55,60]=210 (60,65]=251 (65,70]=197 (70,75]=168 (75,80]=125 (80,85]=54 (85,90]=26 NA=71",
+   "agree": true
+  },
+  {
+   "study": "brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018",
+   "group": "histogram",
+   "what": "DAYS_TO_INITIAL_PATHOLOGIC_DIAGNOSIS (bars, NA)",
+   "ours": "(0,0]=1579 NA=71",
+   "portal": "(0,0]=1579 NA=71",
    "agree": true
   },
   {
