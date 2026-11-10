@@ -38,6 +38,8 @@ export function withSortKeys<V extends { sort?: unknown }>(v: V, keys: string[])
 export function dataPart(v: Record<string, unknown>): Record<string, unknown> {
   // the lollipop's alteration grid and its selected codons are applied in the browser, from the whole result
   if (v.kind === "hotspots") { const { hide, codons, ...rest } = v; void hide; void codons; return rest; }
+  // the two-group lollipop's axis, alteration badges and selected codons likewise
+  if (v.kind === "mutcompare") { const { hide, positions, axis, ...rest } = v; void hide; void positions; void axis; return rest; }
   // the timeline's folded tracks and its gap cuts are drawn in the browser, from the whole result
   if (v.kind === "timeline") { const { collapsed, expandGaps, ...rest } = v; void collapsed; void expandGaps; return rest; }
   // the risk model's volcano labels are chosen in the browser, from the whole result

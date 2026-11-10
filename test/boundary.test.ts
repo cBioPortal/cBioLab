@@ -526,6 +526,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "enrichAlteredSql:cna-any": () => aggregates.enrichAlteredSql(cohortSql, "x", "db", "cna", null, false),
     "enrichPanelProfiledSql": () => aggregates.enrichPanelProfiledSql(cohortSql, "x", "db", "amp"),
     "enrichWesSql": () => aggregates.enrichWesSql(cohortSql, "x", "db", "sv"),
+    // mutcompare: the cohort's patients profiled for one gene, filtered by sample in a subquery; one count leaves
+    "mutcompareProfiledSql": () => aggregates.mutcompareProfiledSql(cohortSql, "x", "db", "TP53"),
     // assays: per-entity moments or value counts; the rows CTE holds values, never ids, and stays inside
     "assayMomentsSql": () => aggregates.assayMomentsSql(cohortSql, "x", "db", "mutational_signatures_contribution_v2"),
     "assayValueCountsSql": () => aggregates.assayValueCountsSql(cohortSql, "x", "db", "armlevel_cna"),

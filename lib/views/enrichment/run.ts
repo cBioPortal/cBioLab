@@ -1,11 +1,10 @@
 // Enrichment view: every gene's alteration frequency, compared between cohorts
 import type { ViewResult, ViewResultOf } from "../../types.ts";
-import { type EnrichAlteration } from "../../federation-views.ts";
+import { type EnrichAlteration, enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql } from "../../federation-views.ts";
 import { fisherExact, chiSquareTest, benjaminiHochberg } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, cytobands, answering, refuse, niceCeil, askEachSite } from "../shared.ts";
 import type { EnrichmentView, EnrichmentGene } from "./types.ts";
-import { enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql } from "./sql.ts";
 import { enrichmentMethod } from "./method.ts";
 
 const ENRICH_ROWS = 300;

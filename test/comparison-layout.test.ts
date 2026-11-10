@@ -106,3 +106,18 @@ test("before the profiles are known, no expression tab and nothing said about th
   assert.ok(!l.tabs.some((t) => /mRNA|Protein|methylation/.test(t.title)));
   assert.deepEqual(l.left, []);
 });
+
+test("the Mutations tab: the two-group lollipop after Genomic Alterations, for exactly two groups and a study with mutations", () => {
+  const two = layout(2, BRCA_TCGA);
+  const titles = two.tabs.map((t) => t.title);
+  assert.equal(titles.indexOf("Mutations"), titles.indexOf("Genomic Alterations") + 1, "where the portal puts it");
+  assert.equal(tabOf(two, "Mutations").kind, "mutcompare");
+  assert.ok(!two.left.some((l) => l.startsWith("Mutations")));
+  const three = layout(3, BRCA_TCGA);
+  assert.ok(!three.tabs.some((t) => t.title === "Mutations"));
+  assert.ok(three.left.includes("Mutations (compares exactly 2 groups, and 3 are compared)"));
+  const none = layout(2, PANCAN);
+  assert.ok(!none.tabs.some((t) => t.title === "Mutations"));
+  assert.ok(none.left.includes("Mutations (no mutation profile)"));
+  assert.ok(!layout(2, null).tabs.some((t) => t.title === "Mutations"), "not before the study's profiles are known");
+});

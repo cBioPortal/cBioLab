@@ -37,6 +37,7 @@ import { segmentsKind } from "./segments/kind.ts";
 import { germlineKind } from "./germline/kind.ts";
 import { hlaKind } from "./hla/kind.ts";
 import { hotspotsKind } from "./hotspots/kind.ts";
+import { mutcompareKind } from "./mutcompare/kind.ts";
 import { incidenceKind } from "./incidence/kind.ts";
 import { instabilityKind } from "./instability/kind.ts";
 import { labsKind } from "./labs/kind.ts";
@@ -95,6 +96,7 @@ export const KINDS: { [K in ViewKind]: ViewKindDef<K> } = {
   germline: germlineKind,
   hla: hlaKind,
   hotspots: hotspotsKind,
+  mutcompare: mutcompareKind,
   incidence: incidenceKind,
   instability: instabilityKind,
   labs: labsKind,

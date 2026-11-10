@@ -35,6 +35,7 @@ import { segmentsUi } from "./segments.tsx";
 import { germlineUi } from "./germline.tsx";
 import { hlaUi } from "./hla.tsx";
 import { hotspotsUi } from "./hotspots.tsx";
+import { mutcompareUi } from "./mutcompare.tsx";
 import { incidenceUi } from "./incidence.tsx";
 import { instabilityUi } from "./instability.tsx";
 import { labsUi } from "./labs.tsx";
@@ -66,6 +67,7 @@ export const KIND_UI: { [K in ViewKind]: KindUi<K> } = {
   logistic: logisticUi,
   oncoprint: oncoprintUi,
   hotspots: hotspotsUi,
+  mutcompare: mutcompareUi,
   plot: plotUi,
   cooccurrence: cooccurrenceUi,
   clinical: clinicalUi,
