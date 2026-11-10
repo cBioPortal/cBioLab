@@ -18,7 +18,7 @@ the data is already in the warehouse.
 - cBioLab's invariants (CLAUDE.md) win where they conflict with legacy behaviour, and the PR says so.
 
 The legacy behaviour to check against is written up per tab in [`legacy-spec/`](legacy-spec/)
-(so far: [OncoPrint](legacy-spec/01-oncoprint.md)). Each requirement has an ID (`ONC-SO-3`); a parity
+(Results, Study, Patient and Comparison pages; index in [`legacy-spec/README.md`](legacy-spec/README.md)). Each requirement has an ID (`ONC-SO-3`); a parity
 PR cites the IDs it covers and the ones it leaves out.
 
 Every portal page also has an "Open in cBioPortal" button (`lib/legacy-link.ts`). A new tab adds its

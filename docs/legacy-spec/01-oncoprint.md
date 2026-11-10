@@ -220,7 +220,7 @@ Seen: Clinical 64 · Heatmap 6 · Arm-level CNA 1 · Genetic Ancestry 1 · Methy
   - "Study of origin" if multi-study.
   - "# Samples per Patient" if #samples > #patients.
 
-**ONC-LY-4 Track info, genetic tracks** — % altered; see ST-M1 for the method.
+**ONC-LY-4 Track info, genetic tracks** — % altered; see ONC-STM-1 for the method.
 - Display: "<1%" for values above 0 and under 1, otherwise an integer %.
 - "N/P" when nothing is profiled.
 - "*" suffix when only some cases are profiled.
@@ -283,7 +283,7 @@ All glyphs stack in one cell, in this z-order:
   - `EXP≥±z`
   - `PROT≥±z`
   - `FUSION`
-- **ONC-GL-5 Driver** = OncoKB oncogenic OR hotspot OR custom binary OR selected custom tier (each source only if enabled). Definitions in ST-M11.
+- **ONC-GL-5 Driver** = OncoKB oncogenic OR hotspot OR custom binary OR selected custom tier (each source only if enabled). Definitions in ONC-STM-11.
 - **ONC-GL-6 Legend** lists only the categories present in the data.
 
 ---
@@ -299,7 +299,7 @@ All glyphs stack in one cell, in this z-order:
 | ONC-TT-5 | Heatmap mRNA/protein | blue → black → red, −3…3 | "Expression Heatmap" |
 | ONC-TT-6 | Heatmap methylation | blue → white → red, 0…1 | "Methylation Heatmap" |
 | ONC-TT-7 | Heatmap VAF | `[241,242,181]`→`[19,80,88]`, 0…1; null "Not mutated/no VAF data" | "VAF Heatmap" |
-| ONC-TT-8 | GA heatmap (LIMIT-VALUE) | diverging around the profile pivot (blue/red), reversed if sortOrder DESC; threshold values (">8") are meant to be categories but are dropped as NaN (legacy bug, ST-M7) | profile name |
+| ONC-TT-8 | GA heatmap (LIMIT-VALUE) | diverging around the profile pivot (blue/red), reversed if sortOrder DESC; threshold values (">8") are meant to be categories but are dropped as NaN (legacy bug, ONC-STM-7) | profile name |
 | ONC-TT-9 | GA bar / stacked composition / stacked absolute | bars; one stacked track per profile, entity colors from a 20-color palette; composition = share of total, absolute = sum scaled to the global max | profile name |
 | ONC-TT-10 | GA categorical | categorical, "Mixed" | profile name |
 | ONC-TT-11 | GSVA | PiYG gradient −1…1 | "Gene Set Heatmap" |
@@ -488,7 +488,7 @@ Every number the tab displays, with how it is computed.
 "Filtered cases" = all queried cases, minus unprofiled ones when Show only profiled (RV-2) is on.
 Paths are relative to cbioportal-frontend; oncoprintjs = `packages/oncoprintjs/src/js/`.
 
-**ST-M1 Per-track % altered** (`OncoprintUtils.ts:857-960`, `ResultsViewPageStore.ts:2311`)
+**ONC-STM-1 Per-track % altered** (`OncoprintUtils.ts:857-960`, `ResultsViewPageStore.ts:2311`)
 - Numerator: cases that are both altered and profiled. Altered = at least one OQL-matched event after the driver/VUS and germline filters.
 - Denominator: filtered cases profiled for the gene in at least one selected profile.
   - Profiled = the gene-panel entry says profiled, and either the panel contains the gene or there is no panel (whole-exome / whole-profile).
@@ -498,19 +498,19 @@ Paths are relative to cbioportal-frontend; oncoprintjs = `packages/oncoprintjs/s
 - "N/P" when the denominator is 0.
 - "*" when 0 < profiled < filtered cases. The tooltip then reads "* = not all samples are profiled".
 
-**ST-M2 Header "Queried genes are altered in X (Y%) of queried patients/samples"** (`QuerySummaryUtils.tsx:30-70`)
+**ONC-STM-2 Header "Queried genes are altered in X (Y%) of queried patients/samples"** (`QuerySummaryUtils.tsx:30-70`)
 - Numerator: filtered cases with an OQL-matched alteration in any queried gene. A patient counts if any of its samples does.
-- Denominator: **all filtered cases**, not profiled-only (unlike ST-M1).
+- Denominator: **all filtered cases**, not profiled-only (unlike ONC-STM-1).
 - Shows separate patient and sample lines when #samples ≠ #patients. Independent of the OncoPrint sample/patient toggle.
 - Format: exactly 0 → "0%"; under 1 → "<1%"; otherwise rounded.
 
-**ST-M3 Gap % labels** (Show Gaps (w/%); `OncoprintUtils.ts:1200-1288`)
-- Per segment × genetic track: altered ÷ (profiled ∩ segment), with ST-M1's definitions.
+**ONC-STM-3 Gap % labels** (Show Gaps (w/%); `OncoprintUtils.ts:1200-1288`)
+- Per segment × genetic track: altered ÷ (profiled ∩ segment), with ONC-STM-1's definitions.
 - Segments come from the first gap-enabled clinical track only.
 - Label: integer or "<1%". Tooltip: "X% (altered / profiled = a / b)".
 - Legacy bug: shows "NaN%" when the segment has no profiled cases.
 
-**ST-M4 Tracks-menu "Freq"** (`TracksMenu.tsx:242-256`)
+**ONC-STM-4 Tracks-menu "Freq"** (`TracksMenu.tsx:242-256`)
 - Formula: 100 × (samples with a value) ÷ **all queried samples**, not filtered. Server attributes use backend per-attribute counts summed across studies.
 - Special attributes:
   - Study of origin, # Samples per Patient, Profiled-in: always 100%.
@@ -518,7 +518,7 @@ Paths are relative to cbioportal-frontend; oncoprintjs = `packages/oncoprintjs/s
   - Groups: % of samples in the group.
 - Format: 1 decimal; "99.9%" for values from 99.9 up to (not including) 100; "<0.1%" below 0.1; "0%" disables the row.
 
-**ST-M5 Clinical numeric tracks** (`DataUtils.ts:661-700`, `oncoprintruleset.ts:810-905`)
+**ONC-STM-5 Clinical numeric tracks** (`DataUtils.ts:661-700`, `oncoprintruleset.ts:810-905`)
 
 *Patient-mode aggregation*
 - Mean of the parseable values (NaN dropped).
@@ -538,13 +538,13 @@ Paths are relative to cbioportal-frontend; oncoprintjs = `packages/oncoprintjs/s
 
 *Legend:* min and max to 2 decimals.
 
-**ST-M6 Mutation spectrum** (backend `MutationSpectrumServiceImpl`; `DataUtils.ts:711-744`)
+**ONC-STM-6 Mutation spectrum** (backend `MutationSpectrumServiceImpl`; `DataUtils.ts:711-744`)
 - Per sample: counts of single-base substitutions across **all mutations in the study's mutation profile** (all genes; no type or driver filter).
 - Collapsed to the pyrimidine strand: C>A includes G>T, C>G includes G>C, C>T includes G>A, T>A includes A>T, T>C includes A>G, T>G includes A>C.
 - Patient mode: the counts are summed. All zero → NA.
 - Each bar is normalized to its own total (composition). The tooltip shows raw counts for the first case under the cursor.
 
-**ST-M7 Heatmap and generic-assay values** (`OncoprintUtils.ts:316-540, 713-797, 1912-2280`; `DataUtils.ts:385-500`)
+**ONC-STM-7 Heatmap and generic-assay values** (`OncoprintUtils.ts:316-540, 713-797, 1912-2280`; `DataUtils.ts:385-500`)
 
 *mRNA / protein / methylation / GSVA*
 - Raw profile value.
@@ -575,13 +575,13 @@ Paths are relative to cbioportal-frontend; oncoprintjs = `packages/oncoprintjs/s
 - Height = case total ÷ the track's max total.
 - The "absolute" option is hidden if every per-sample total is ≤ 1.01 (fraction-like data).
 
-**ST-M8 Tooltip numbers** (`TooltipUtils.ts:96-368`)
+**ONC-STM-8 Tooltip numbers** (`TooltipUtils.ts:96-368`)
 - Multiple columns under the cursor (zoomed out): the **arithmetic mean** of the already-aggregated column values, shown as "x.xx (average of n values)". Trailing ".00" stripped for clinical values.
 - Stacked: per-category mean, shown as integers if all are whole, otherwise to 4 decimals.
 - String clinical: per-value sample counts. A patient contributes its per-sample counts.
 - Genetic: "(n)" counts per alteration and per profiled status.
 
-**ST-M9 Heatmap clustering** (`oncoprintmodel.ts:2297`, `workers/clustering-worker.ts`)
+**ONC-STM-9 Heatmap clustering** (`oncoprintmodel.ts:2297`, `workers/clustering-worker.ts`)
 - Method: agglomerative hierarchical clustering (`tayden-clusterfck`), **average linkage**, distance = **1 − Spearman ρ**. ρ = Pearson correlation of fractional ranks (`jStat.rank`, `jStat.corrcoeff`).
 - Both columns (cases) and rows (the group's top-level tracks) are clustered.
 - Input: `profile_data` of the group's outer-level tracks; patient mode uses the patient-aggregated values.
@@ -592,13 +592,13 @@ Paths are relative to cbioportal-frontend; oncoprintjs = `packages/oncoprintjs/s
 - No imputation. Legacy quirk: null ranks as 0, tied with real zeros, and undefined ranks highest.
 - A one-track group is a plain ascending sort, with null/NaN last.
 
-**ST-M10 Gene-set expansion correlation** (backend `GenesetCorrelationServiceImpl.java:203-245`)
+**ONC-STM-10 Gene-set expansion correlation** (backend `GenesetCorrelationServiceImpl.java:203-245`)
 - Method: **Spearman** (Apache `SpearmansCorrelation`) between gene-set scores and the linked raw expression profile, over the query's sample list (unfiltered).
 - NaN pairs are dropped. Fewer than 2 pairs → 0.
 - The frontend requests threshold 0, so only ρ ≥ 0 is kept. Sorted descending; each "Show/More genes" click adds the next 5.
 - Display: `toFixed(2)` as track info. Legacy bug: the track-info formatter turns e.g. 0.85 into "<1" and NaN into "N/P".
 
-**ST-M11 Driver / VUS definition** (`ResultsViewPageStoreUtils.ts:141-289`)
+**ONC-STM-11 Driver / VUS definition** (`ResultsViewPageStoreUtils.ts:141-289`)
 - Driver if any enabled source says so:
   - **OncoKB**: Oncogenic, Likely Oncogenic or Resistance. Predicted Oncogenic does not count. Germline: Pathogenic or Likely Pathogenic.
   - **Hotspot**: Cancer Hotspots *linear* hotspot via Genome Nexus (single residue, in-frame indel, or splice). 3D hotspots are not used.
@@ -606,12 +606,12 @@ Paths are relative to cbioportal-frontend; oncoprintjs = `packages/oncoprintjs/s
   - **Custom tier**: any selected tier.
 - CNAs are drivers only via OncoKB or custom annotations, never hotspots.
 
-**ST-M12 Default OQL thresholds** (`ResultsViewPageStore.ts:307-363`; `oqlfilter.ts:1005-1045`)
+**ONC-STM-12 Default OQL thresholds** (`ResultsViewPageStore.ts:307-363`; `oqlfilter.ts:1005-1045`)
 - `Z_SCORE_THRESHOLD` and `RPPA_SCORE_THRESHOLD` both default to 2.
 - Default OQL: `EXP>=2 EXP<=-2` and `PROT>=2 PROT<=-2`, added only when that profile type is selected.
 - Comparison is inclusive, on the raw value of the selected profile.
 
-**ST-M13 Initial zoom** (`oncoprintmodel.ts:835-919`)
+**ONC-STM-13 Initial zoom** (`oncoprintmodel.ts:835-919`)
 - zoom = (viewport width − gaps × gap size) ÷ (number of columns spanned × column width), clamped to [0, 1].
 - The span runs from the leftmost to the rightmost altered column. No altered cases → 1.
 - The % box shows round(100 × zoom).
