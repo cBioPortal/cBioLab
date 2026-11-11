@@ -44,6 +44,8 @@ These files describe how the legacy cBioPortal behaves, one file per page or tab
 | [40-patient-summary](40-patient-summary.md) | Patient View shell + Summary | `PAT-` | |
 | [41-patient-tabs](41-patient-tabs.md) | Patient View › other tabs | `PTB-` | |
 
+**Audit results.** Scorecards for cBioLab against every file (2026-11-11) are in [`parity/`](parity/README.md).
+
 ## How to use it for a parity check
 
 1. Open the file for the cBioLab page you are checking.
