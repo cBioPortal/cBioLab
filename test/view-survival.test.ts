@@ -245,6 +245,19 @@ describe("survival: options", () => {
     assert.match(v.caveat!, /a median of 4 months after the anchor \(90th percentile 8, longest 10\)/);
   });
 
+  test("rows standing for several patients: the entry quantiles and the count past a cutoff are read per patient", async () => {
+    // Entries 0 ×3, 2 ×5, 7 ×2 (10 patients): sorted 0,0,0,2,2,2,2,2,7,7; index ⌊q·9⌋ → median 4 → 2,
+    // p90 8 → 7, max 9 → 7. Past the 6-month cutoff: the rows at 9 (n 5) and 12 (n 2) → 7 patients.
+    const rows: SurvivalCount[] = [{ months: 3, event: 1, n: 3, entry: 0 }, { months: 9, event: 0, n: 5, entry: 2 }, { months: 12, event: 1, n: 2, entry: 7 }];
+    const v = unwrap(await runSurvival({ kind: "survival", cutoffMonths: 6, anchor: { eventType: "Diagnosis" } } as never,
+      ctx({ A: { s1: 12 } }, { A: { s1: rows } }))) as Out;
+    assert.deepEqual(v.entryMonths, { median: 2, p90: 7, max: 7 });
+    assert.match(v.caveat!, /\(7 patients still under observation past this point\)/);
+    assert.equal(v.curves[0].n, 8);
+    assert.equal(v.curves[0].unobserved, 2);
+    assert.equal(v.curves[0].missing, 2);
+  });
+
   test("an anchor by event type alone defaults to the FIRST occurrence; without entries no distribution is given", async () => {
     const seen: unknown[][] = [];
     const v = unwrap(await runSurvival({ kind: "survival", anchor: { eventType: "Diagnosis" } } as never,
