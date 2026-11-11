@@ -25,10 +25,10 @@ function storedKeys(src: AnnotationSource, version: string, within: string): str
     " WHERE " + src.versionColumn + " = " + sq(version) + " AND (" + cols.map((c) => "toString(" + c + ")").join(", ") + ") IN (" + within + ")";
 }
 
-/** The keys `space` holds that the store does not hold for `version`. */
+/** The keys `space` holds that the store does not hold for `version`, with whatever else `space` says of each. */
 function missingSql(src: AnnotationSource, version: string, space: string): string {
   const cols = src.keyColumns.join(", ");
-  return "SELECT " + cols + " FROM (" + space + ") w\nLEFT ANTI JOIN (" + storedKeys(src, version, space) + ") s USING (" + cols + ")";
+  return "SELECT w.* FROM (" + space + ") w\nLEFT ANTI JOIN (" + storedKeys(src, version, space) + ") s USING (" + cols + ")";
 }
 
 async function countOf(conn: WriteConn, src: AnnotationSource, sql: string): Promise<number> {

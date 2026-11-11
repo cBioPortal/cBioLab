@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { fakeCh, type FakeCh } from "@cbiolab/clickhouse/testing";
 import { MAX_CONSECUTIVE_FAILURES, pendingKeys, syncKeys, syncStudies, warehouseStudies, ensureStore } from "../src/sync.ts";
 import { oncokbSource } from "../src/sources/oncokb.ts";
+import { genomeNexusSource, genomeNexusGrch38Source } from "../src/sources/genome-nexus.ts";
 import { annotationSource, annotationStoreDdl, missingNeeds, syncConn } from "../src/index.ts";
 
 const realFetch = globalThis.fetch;
@@ -156,9 +157,14 @@ test("verify re-asks the service for sampled stored keys and lists every disagre
 test("the store is created by its own statements, idempotently", async () => {
   ch = fakeCh();
   await ensureStore(ch.conn, oncokbSource);
-  assert.deepEqual(ch.statements, annotationStoreDdl(), "the database, the shared log and OncoKB's table");
-  assert.deepEqual(ch.statements.map((s) => /^CREATE (DATABASE|TABLE) IF NOT EXISTS (\S+)/.exec(s)?.[2]),
-    ["annotation", "annotation.sync_run", "annotation.oncokb"]);
+  const made = () => ch!.statements.map((s) => /^CREATE (DATABASE|TABLE) IF NOT EXISTS (\S+)/.exec(s)?.[2]);
+  assert.deepEqual(made(), ["annotation", "annotation.sync_run", "annotation.oncokb"], "the database, the shared log and OncoKB's table");
+  ch.clear();
+  await ensureStore(ch.conn, genomeNexusSource);
+  assert.deepEqual(made(), ["annotation", "annotation.sync_run", "annotation.variant"], "a public source's: the shared table");
+  // a new local database gets every store once, the shared table though two sources write it
+  assert.deepEqual(annotationStoreDdl().map((s) => /IF NOT EXISTS (\S+)/.exec(s)?.[1]),
+    ["annotation", "annotation.sync_run", "annotation.oncokb", "annotation.variant"]);
 });
 
 test("a sync writes as the source's own writer, or as the local instance; never silently as the app", () => {
@@ -174,5 +180,6 @@ test("a sync writes as the source's own writer, or as the local instance; never 
 
 test("an unknown source is refused, naming the ones there are", () => {
   assert.equal(annotationSource("oncokb"), oncokbSource);
-  assert.throws(() => annotationSource("civic"), /no annotation source 'civic' \(sources: oncokb\)/);
+  assert.equal(annotationSource("genome_nexus_grch38"), genomeNexusGrch38Source);
+  assert.throws(() => annotationSource("civic"), /no annotation source 'civic' \(sources: oncokb, genome_nexus, genome_nexus_grch38\)/);
 });

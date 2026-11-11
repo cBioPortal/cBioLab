@@ -28,6 +28,11 @@ export interface AnnotationSource {
   keyColumns: string[];
   /** CREATE statements for `table`, idempotent (the database and sync_run are store.ts's) */
   ddl: string[];
+  /**
+   * whose writer the sync writes as: `<WRITER>_WRITER_USER` / `_PASSWORD` (default `<writer>_writer`).
+   * Default the source's own id — a licensed source has a writer of its own; public sources share `annotation`.
+   */
+  writer?: string;
   /** environment variables a sync of this source cannot run without (a licence token) */
   needs: string[];
   /** keys per request to the outside service, and the pause between requests */
@@ -35,7 +40,8 @@ export interface AnnotationSource {
   batchDelayMs: number;
   /**
    * A SELECT returning the distinct keys (`keyColumns`, as Strings) of one study, or of every study
-   * when `study` is null, from the warehouse database `portalDb`.
+   * when `study` is null, from the warehouse database `portalDb`. It may return more columns, which
+   * reach `annotate` with each key (Genome Nexus: the genes the variant is listed under).
    */
   keySpace(portalDb: string, study: string | null): string;
   /** The source's current release, asked of the service. */

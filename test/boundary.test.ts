@@ -213,7 +213,7 @@ describe("remote peers: nothing identifying leaves before the network is touched
       assert.equal(name in (federation as Record<string, unknown>), false, name + " returns ids and must not sit among the aggregate builders");
     const part = [{ cohort: "c", study: "x", cohortSql: "SELECT '' AS pid" }];
     assert.match(pageSql(clinicalRowSource(part, "db", "sample", [{ id: "AGE", name: "Age", per: "patient", numeric: true }]), {}, [], 10, 0), /AS patient, replaceOne\(u\.suid/);
-    assert.match(pageSql(mutationRowSource(part, "db", "KRAS", "v7.5"), {}, [], 10, 0), /m\.sid AS sid/);
+    assert.match(pageSql(mutationRowSource(part, "db", "KRAS", "v7.5", { hg19: "2.2.3-vep116-clinvar20260208", hg38: null }), {}, [], 10, 0), /m\.sid AS sid/);
     assert.match(pageSql(svRowSource(part, "db", ["ALK"], "v7.5"), {}, [], 10, 0), /s\.sid AS sid/);
     // the alterations view's list and its three tables name one patient and their samples
     assert.match(pageSql(alterationPatientRowSource(part.map((p) => ({ ...p, source: "s" })), "db"), {}, [], 10, 0), /c\.pid AS patient/);

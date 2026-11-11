@@ -288,6 +288,14 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] The table download (COE-2.9)
   - [ ] The tab for protein-only studies (ours needs an MRNA_EXPRESSION profile) (COE-0.1)
 - [ ] **Mutation annotation breadth** — CIViC, functional impact, gnomAD / ClinVar / dbSNP / SIGNAL columns, HGVSg/c, PTM tracks, the PDB 3D structure viewer, a transcript dropdown
+  - [x] HGVSg, HGVSc, ClinVar and SIGNAL columns on the mutation table, Genome Nexus read from the offline store (#179)
+  - [ ] ClinVar's header sorts descending first, as the portal's does; the HGVSg tooltip's Genome Nexus logo
+  - [ ] gnomAD and dbSNP columns
+  - [ ] Functional impact (SIFT, PolyPhen-2, MutationAssessor)
+  - [ ] CIViC
+  - [ ] The transcript dropdown, with the lollipop's transcripts and Pfam domains read from the store instead of Genome Nexus live
+  - [ ] PTM tracks
+  - [ ] The PDB 3D structure panel
 - [ ] **OQL coverage** — `GAIN`, `HETLOSS`, `CNA>=` (blocked by data: only high-level ±2 calls are loaded), `_GERMLINE` / `_SOMATIC` (blocked by the parser), per-track OQL inside merged oncoprint groups. Parity audit: on the Results page a merged `[BRAF NRAS]` is refused as "bad gene entry '[BRAF'" ([01-oncoprint](legacy-spec/parity/01-oncoprint.md), [03-mutual-exclusivity](legacy-spec/parity/03-mutual-exclusivity.md))
 - [x] **Driver-annotation settings** — the view's `drivers` (OncoKB, the study's `cbp_driver` and `cbp_driver_tiers`, Show only drivers, Show only somatic) in the oncoprint's "mutations" menu, the germline stripe, Driver vs VUS and Driver/VUS mutation types on plots; one setting across the Results page's Oncoprint and Plots tabs (#168)
   - [ ] The other Results tabs following the settings: Cancer Types Summary, Mutual Exclusivity, the Mutations tab's lollipop and table, Comparison/Survival's Altered and Unaltered groups, Download, Pathways, the header's altered count (the portal's apply to every tab but Plots, Co-expression and CN Segments)

@@ -483,13 +483,13 @@ export interface IncidenceCurve {
  */
 export interface TableRows<V> {
   /** every column the table holds, in download order; each row's values align with these */
-  columns: { id: string; name: string; numeric: boolean }[];
+  columns: { id: string; name: string; numeric: boolean; tip?: string }[];
   /** the ids shown, in order, and those shown when the query names none */
   shown: string[]; defaults: string[];
   /** the view's search, filters and sort as applied (columns as given) */
   query: TableQuery;
   /** one page of the query's single order; values align with `columns` */
-  rows: { cohort: string; study: string; patient: string; sample: string; values: V[] }[];
+  rows: { cohort: string; study: string; patient: string; sample: string; values: V[]; detail?: Record<string, unknown> }[];
   /** where this page starts in that order, and the page size the view asks for */
   offset: number; pageSize: number;
   /** per cohort and study: rows the query keeps (`total`) and every row (`all`) — what the download pages through */

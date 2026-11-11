@@ -454,7 +454,8 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                 return (
                   <th key={c.id} className={c.numeric ? "num" : undefined} aria-sort={sorted ? (q.sort!.desc ? "descending" : "ascending") : "none"}>
                     <span className="dt-th">
-                      <button type="button" className="dt-sort" onClick={() => sortBy(c)} data-tip="sort the whole table by this column, across every page">
+                      <button type="button" className="dt-sort" onClick={() => sortBy(c)}
+                        data-tip={(c.tip ? c.tip + " — click to " : "") + "sort the whole table by this column, across every page"}>
                         {c.name}{sorted ? (q.sort!.desc ? " ▾" : " ▴") : ""}
                       </button>
                       <span className="dt-anchor">
