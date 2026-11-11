@@ -8,6 +8,7 @@ import { exec, execScript, insertRaw, query, type WriteConn } from "./ch-write.t
 import { GeneResolver } from "./genes.ts";
 import { LAB_TABLES, LEGACY_BASE_TABLES, createLabTables, createViews, derivedTypes, viewPrefix, type SchemaMode } from "./lab-schema.ts";
 import { importGenePanel } from "./panels.ts";
+import { annotationStoreDdl } from "../annotation-sync/index.ts";
 
 // cBioPortal/cbioportal master on 2026-10-27; the schema, seeds and derived-table SQL are read
 // from this commit so the local database is exactly the one that SQL was written for
@@ -38,21 +39,6 @@ const STUDY_COUNT_COLUMNS = ["sample_count", "mutation_sample_count", "cna_sampl
   "rna_seq_sample_count", "mrna_microarray_sample_count", "mrna_expression_sample_count", "rppa_sample_count",
   "mass_spectrometry_sample_count", "mirna_sample_count", "treatment_patient_count"];
 
-// The OncoKB annotation store the app reads (lib/annotation.ts). Local mode has no OncoKB
-// licence, so it is created empty: OncoKB-dependent filters then match nothing instead of failing.
-const ONCOKB_DDL = [
-  "CREATE DATABASE IF NOT EXISTS oncokb_annotation",
-  "CREATE TABLE IF NOT EXISTS oncokb_annotation.sync_run (run_id String, started_at DateTime, finished_at Nullable(DateTime), " +
-    "oncokb_version LowCardinality(String), study LowCardinality(String), variants_total UInt32, already_stored UInt32, " +
-    "annotated_new UInt32, failed UInt32, note String) ENGINE = MergeTree ORDER BY started_at",
-  "CREATE TABLE IF NOT EXISTS oncokb_annotation.variant_annotation (oncokb_version LowCardinality(String), " +
-    "alteration_type Enum8('MUTATION' = 1, 'CNA' = 2, 'SV' = 3), hugo_gene_symbol LowCardinality(String), alteration String, " +
-    "oncogenicity LowCardinality(String), mutation_effect LowCardinality(String), highest_sensitive_level LowCardinality(String), " +
-    "highest_resistance_level LowCardinality(String), is_driver Bool MATERIALIZED oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance'), " +
-    "api_version LowCardinality(String), resolved_at DateTime DEFAULT now()) ENGINE = ReplacingMergeTree(resolved_at) " +
-    "PARTITION BY oncokb_version ORDER BY (oncokb_version, alteration_type, hugo_gene_symbol, alteration)"
-];
-
 export type Log = (msg: string) => void;
 
 async function isSetUp(conn: WriteConn): Promise<boolean> {
@@ -74,7 +60,9 @@ export async function setupDatabase(conn: WriteConn, dataDir: string, log: Log):
   }
   for (const c of STUDY_COUNT_COLUMNS) await exec(conn, "ALTER TABLE cancer_study ADD COLUMN IF NOT EXISTS " + c + " UInt32 DEFAULT 0");
   await exec(conn, "ALTER TABLE cancer_study ADD COLUMN IF NOT EXISTS resource_sample_counts Map(String, UInt32)");
-  for (const st of ONCOKB_DDL) await exec(conn, st);
+  // every annotation source's store, empty: local mode has no OncoKB licence, so OncoKB-dependent
+  // filters match nothing rather than fail; `npm run annotate` fills a store (docs/ANNOTATION.md)
+  for (const st of annotationStoreDdl()) await exec(conn, st);
   await loadReferencePanels(conn, dataDir, log);
   await exec(conn, "CREATE TABLE cbiolab_setup (commit String, at DateTime DEFAULT now()) ENGINE = MergeTree ORDER BY tuple()");
   await exec(conn, "INSERT INTO cbiolab_setup (commit) VALUES ('" + CBIOPORTAL_COMMIT + "')");

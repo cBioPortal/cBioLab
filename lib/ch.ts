@@ -67,6 +67,19 @@ export const PRIMARY: ChConn = {
   get label() { return setting("CLICKHOUSE_LABEL") || "primary"; }
 };
 
+/**
+ * A writer on the primary warehouse for an offline job that may INSERT where the app may not — the
+ * annotation sync (lib/annotation-sync/): `<PREFIX>_WRITER_USER` (default `<prefix>_writer`) and
+ * `<PREFIX>_WRITER_PASSWORD`, on CLICKHOUSE_URL and CLICKHOUSE_DB. Refuses, naming what is unset.
+ */
+export function writerConn(prefix: string, label: string, env: Record<string, string | undefined> = process.env): ChConn {
+  const p = prefix.toUpperCase();
+  const missing = ["CLICKHOUSE_URL", "CLICKHOUSE_DB", p + "_WRITER_PASSWORD"].filter((k) => !env[k]);
+  if (missing.length) throw new Error("a " + label + " needs " + missing.join(", "));
+  return { id: prefix + "-writer", url: env.CLICKHOUSE_URL!, user: env[p + "_WRITER_USER"] || prefix + "_writer",
+    password: env[p + "_WRITER_PASSWORD"]!, db: clean(env.CLICKHOUSE_DB), label };
+}
+
 /** Secondary instance, present only when CLICKHOUSE2_* is configured. */
 export function secondary(): ChConn | null {
   if (!process.env.CLICKHOUSE2_URL) return null;

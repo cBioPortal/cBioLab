@@ -37,6 +37,9 @@ for the area you are changing first. The parts most changes touch:
   and the app; `lib/importer/` turns a study folder into cBioPortal's base tables by the legacy
   importer's rules, then runs cBioPortal's own `populate_derived_tables.sql`; `/import` and
   `/api/import` exist only with `CBIOLAB_LOCAL=1`. [`docs/LOCAL.md`](docs/LOCAL.md).
+- **Annotation** — **the app never calls an annotation service at run time.** Every annotation is
+  resolved offline into a version-pinned store (`lib/annotation-sync/`, `npm run annotate`) and read
+  from there at a pin. [`docs/ANNOTATION.md`](docs/ANNOTATION.md).
 - **Agents** — WebMCP tools `lib/webmcp.ts` / `app/lab/agent-tools.ts`; MCP server `mcp/tools.ts`.
   **Federation is not MCP**: peers talk through `lib/federation-api.ts` at `/api/federation/v1/<op>`;
   never register a federation op as an MCP tool. **The chat sidebar is the app's only model call and

@@ -3,7 +3,7 @@
 // Interface: buildAnnotationIndex(eventRows, genes) -> { isDriver(row), source }
 //
 // Primary backend: the version-pinned OncoKB store (oncokb_annotation.variant_annotation,
-// populated by cBioPortal/oncokb-annotation-pipeline). Reads go through the app's own
+// filled offline by `npm run annotate -- oncokb`, lib/annotation-sync/). Reads go through the app's own
 // ClickHouse identity — being "licensed" IS having SELECT on that database, so if the
 // grant is revoked (or the store is empty) this degrades to the rule-based MOCK below,
 // clearly labeled as such. Pin a specific release with ONCOKB_PIN; default is the

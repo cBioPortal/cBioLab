@@ -46,6 +46,8 @@ flowchart TB
         CH[("ClickHouse<br/>cBioPortal derived tables<br/>one or two databases")]
         OKB[("oncokb_annotation<br/>separate DB · version-pinned<br/>license = GRANT boundary")]
     end
+    SYNC["Annotation sync — offline, npm run annotate<br/>lib/annotation-sync/ · one file per source<br/>the only caller of annotation services"]
+    SYNC -- "diff · batch · append at a release" --> OKB
     RES --> CH
     RES -- "DRIVER joins the pin" --> OKB
 
@@ -118,6 +120,11 @@ no longer match the kind folders and the maps keyed by `ViewKind`.
   | `{not:leaf}`; leaf kinds: `oql`, `clinical`, `event` (v1 timeline sub-DSL), `patients`,
   `profiled`, `caseList`, `genomicData`, `genericAssay` (+deprecated `alteration`→OQL).
 - **`lib/oql.ts`** — the honest OQL subset; `DRIVER` joins the version-pinned OncoKB store.
+- **Annotation stores** ([ANNOTATION.md](ANNOTATION.md)) — **the app never calls an annotation
+  service.** `lib/annotation-sync/` (`npm run annotate`) resolves the warehouse's distinct keys
+  against each source offline and appends them to that source's own version-pinned database,
+  logging every run in its `sync_run`; the app reads the store at a pin (`lib/annotation.ts`). A
+  source is a file in `lib/annotation-sync/sources/`; the diff, batching and audit are shared.
 - **`lib/compiler.ts`** — v1 timeline/event sub-DSL (BEFORE/DURING/NOT_FOLLOWED_BY,
   observability guard, priorGuard, derived treatment lines).
 - **`lib/analysis.ts`** — `runAnalysis(doc)`: evaluates cohorts (per-study; cross-study

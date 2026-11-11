@@ -5,6 +5,7 @@
     "dev": "next dev",
     "local": "node scripts/local.ts",
     "import": "node scripts/import-study.ts",
+    "annotate": "node scripts/annotate.ts",
     "peer-db": "node --env-file-if-exists=.env.local scripts/peer-db.ts",
     "build": "next build",
     "start": "next start -p 3000",
