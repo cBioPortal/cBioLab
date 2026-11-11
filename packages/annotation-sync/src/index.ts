@@ -2,6 +2,9 @@
 import { envConn, writerConn, type Conn } from "@cbiolab/clickhouse";
 import type { AnnotationSource } from "./source.ts";
 import { oncokbSource } from "./sources/oncokb.ts";
+import { STORE_DDL } from "./store.ts";
+
+export { ANNOTATION_DB, SYNC_RUN_TABLE } from "./store.ts";
 
 export const ANNOTATION_SOURCES: AnnotationSource[] = [oncokbSource];
 
@@ -11,9 +14,9 @@ export function annotationSource(id: string): AnnotationSource {
   return s;
 }
 
-/** Every source's CREATE statements, for a new local database (lib/importer/setup.ts): its stores exist, empty. */
+/** The annotation database's CREATE statements, every source's included, for a new local database (packages/importer/src/setup.ts): it exists, empty. */
 export function annotationStoreDdl(): string[] {
-  return ANNOTATION_SOURCES.flatMap((s) => s.ddl);
+  return [...STORE_DDL, ...ANNOTATION_SOURCES.flatMap((s) => s.ddl)];
 }
 
 /**

@@ -28,7 +28,7 @@ altered AS (
   SELECT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'sarcoma_msk_2022_', '') AS sid, g.variant_type AS vtype,
          max(ann.is_driver) AS is_driver
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')

@@ -38,7 +38,7 @@ describe("the OncoKB driver condition", () => {
   test("matches an event on the store's own keys, the same ones the driver join uses", () => {
     const sql = driverEventSql("v7.5", "g");
     assert.match(sql, /^\(g\.hugo_gene_symbol, multiIf\(g\.variant_type = 'mutation', 'MUTATION'/);
-    assert.match(sql, /IN \(\n\s+SELECT hugo_gene_symbol, alteration_type, alteration FROM oncokb_annotation\.variant_annotation/);
+    assert.match(sql, /IN \(\n\s+SELECT hugo_gene_symbol, alteration_type, alteration FROM annotation\.oncokb/);
     assert.match(sql, /oncokb_version = 'v7\.5' AND is_driver\)$/);
     const join = annotationMatchSql("ann", "g");
     for (const key of ["'MUTATION'", "'CNA'", "'SV'", "'AMPLIFICATION'", "'DELETION'", "'Fusion'", "g.mutation_variant"])
@@ -54,7 +54,7 @@ describe("gene tables", () => {
   test("counting every alteration sends no driver condition", async () => {
     await geneTables({ studies: [STUDY], db: "cbio_a", conn: PRIMARY });
     assert.ok(sent.length > 0);
-    assert.ok(sent.every((q) => !/oncokb_annotation/.test(q)), "no statement reads the OncoKB store");
+    assert.ok(sent.every((q) => !/annotation\.oncokb/.test(q)), "no statement reads the OncoKB store");
   });
   test("drivers only narrows every event read, and no denominator", async () => {
     answer = (q) => /AS altered/.test(q) && /variant_type = 'mutation'/.test(q)
@@ -64,7 +64,7 @@ describe("gene tables", () => {
     assert.equal(eventReads().length, 6, "altered and distinct-gene reads for mutations, CNA and SVs");
     for (const q of eventReads()) assert.ok(q.includes(driverEventSql("v7.5")), "event read without the driver condition:\n" + q);
     assert.ok(panelReads().length > 0);
-    for (const q of panelReads()) assert.doesNotMatch(q, /oncokb_annotation/, "a denominator must not depend on driver status");
+    for (const q of panelReads()) assert.doesNotMatch(q, /annotation\.oncokb/, "a denominator must not depend on driver status");
     assert.deepEqual((r.mutatedGenes || []).map((g) => [g.gene, g.altered, g.profiled, g.freqPct]), [["KRAS", 168, 566, 29.7]]);
   });
 });
@@ -93,7 +93,7 @@ describe("Explore", () => {
     assert.equal(r.drivers, undefined);
     assert.deepEqual((r.geneFacets || []).flatMap((f) => f.states.map((s) => s.label)),
       ["Mutated", "Not mutated", "Not profiled", "Amplified", "Deleted", "Diploid", "Not profiled"]);
-    assert.ok(sent.every((q) => !/oncokb_annotation\.variant_annotation/.test(q)));
+    assert.ok(sent.every((q) => !/annotation\.oncokb/.test(q)));
   });
 });
 

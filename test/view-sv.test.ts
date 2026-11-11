@@ -127,7 +127,7 @@ test("without a pin the annotation is empty and the caveat says so", async () =>
   const r = local();
   const v = await run({}, ctx({ s1: r }, { pin: null }));
   assert.match(v.caveat!, /No OncoKB version is pinned here/);
-  assert.doesNotMatch(r.sql.find((s) => s.includes("structural_variant sv"))!, /oncokb_annotation/);
+  assert.doesNotMatch(r.sql.find((s) => s.includes("structural_variant sv"))!, /annotation\.oncokb/);
   assert.throws(() => svRowSource([], "db", ["ALK"], null), /at least one part/);
   assert.throws(() => svRowSource([{ cohort: "c", study: "s", cohortSql: "SELECT 1" }], "db", [], null), /at least one gene/);
 });

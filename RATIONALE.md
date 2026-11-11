@@ -89,7 +89,7 @@ optional, additive experiment on top — the load-bearing path never depends on 
 ## The shape of the system
 
 Every surface reads and writes the same document; the engine owns all semantics; data access is
-read-only with the licensed annotation store isolated behind its own database grant; and the
+read-only with the annotation stores in a database of their own, the licensed one behind its own table grant; and the
 DSL's documentation, agent grammar, and MCP self-description all render from one source module.
 The diagrams of how the parts fit, and the map of the code behind them, are in
 [`docs/ARCHITECTURE.md`](https://github.com/cBioPortal/cBioLab/blob/master/docs/ARCHITECTURE.md).
@@ -351,7 +351,7 @@ practical argument for building two federation modes rather than trusting one: t
 
 The honest remainder, unchanged in kind from the original plan:
 
-1. **OncoKB store replication.** `DRIVER` still joins `oncokb_annotation` on the primary
+1. **OncoKB store replication.** `DRIVER` still joins `annotation.oncokb` on the primary
    connection only; a genuinely multi-instance deployment needs the (small, ≈135k-variant,
    already-idempotent) sync pipeline replicated per instance, with a loud label when pins
    diverge across the federation rather than one assumed pin.

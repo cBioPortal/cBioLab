@@ -1,6 +1,6 @@
 // The offline annotation sync (@cbiolab/annotation-sync): a source's keys are diffed against its store
 // for the release, resolved in batches against the service, appended pinned to that release, and
-// every run is logged in the source's sync_run. ClickHouse is @cbiolab/clickhouse/testing; OncoKB is a
+// every run is logged in the shared annotation.sync_run. ClickHouse is @cbiolab/clickhouse/testing; OncoKB is a
 // stubbed fetch, so nothing leaves the machine.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -67,15 +67,14 @@ test("only the keys the store lacks for the release are asked for, in batches, a
   assert.deepEqual(asked[0].body, [{ gene: { hugoSymbol: "KRAS" }, alteration: "G12D" }]);
   assert.deepEqual(asked[1].body, [{ gene: { hugoSymbol: "ERBB2" }, copyNameAlterationType: "AMPLIFICATION" }]);
 
-  const rows = ch.rows("variant_annotation");
+  const rows = ch.rows("oncokb");
   assert.equal(rows.length, 3);
   assert.deepEqual(rows.find((x) => x.alteration === "R175H"), { oncokb_version: "v9.9", alteration_type: "MUTATION", hugo_gene_symbol: "TP53",
     alteration: "R175H", oncogenicity: "Oncogenic", mutation_effect: "Gain-of-function", highest_sensitive_level: "LEVEL_1",
     highest_resistance_level: "", api_version: "v1.5" });
 
   const [run] = ch.rows("sync_run");
-  assert.equal(run.study, "a_study");
-  assert.equal(run.oncokb_version, "v9.9");
+  assert.deepEqual([run.source, run.version, run.study], ["oncokb", "v9.9", "a_study"]);
   assert.deepEqual([run.variants_total, run.already_stored, run.annotated_new, run.failed, run.note], [5, 2, 3, 0, "complete"]);
 });
 
@@ -85,7 +84,7 @@ test("a study with nothing left to annotate asks the service nothing, and still 
   const r = await syncKeys(ch.conn, src, RELEASE, "a_study", () => {});
   assert.deepEqual(r, { total: 4, alreadyStored: 4, done: 0, failed: 0, aborted: false });
   assert.equal(asked.length, 0);
-  assert.equal(ch.rows("variant_annotation").length, 0);
+  assert.equal(ch.rows("oncokb").length, 0);
   assert.equal(ch.rows("sync_run")[0].note, "complete");
 });
 
@@ -157,9 +156,9 @@ test("verify re-asks the service for sampled stored keys and lists every disagre
 test("the store is created by its own statements, idempotently", async () => {
   ch = fakeCh();
   await ensureStore(ch.conn, oncokbSource);
-  assert.deepEqual(ch.statements, oncokbSource.ddl);
-  assert.ok(oncokbSource.ddl.every((s) => /IF NOT EXISTS/.test(s)));
-  assert.deepEqual(annotationStoreDdl(), oncokbSource.ddl);
+  assert.deepEqual(ch.statements, annotationStoreDdl(), "the database, the shared log and OncoKB's table");
+  assert.deepEqual(ch.statements.map((s) => /^CREATE (DATABASE|TABLE) IF NOT EXISTS (\S+)/.exec(s)?.[2]),
+    ["annotation", "annotation.sync_run", "annotation.oncokb"]);
 });
 
 test("a sync writes as the source's own writer, or as the local instance; never silently as the app", () => {

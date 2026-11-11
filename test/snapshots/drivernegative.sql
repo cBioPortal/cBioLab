@@ -53,7 +53,7 @@ cov AS (
 drv AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
@@ -107,7 +107,7 @@ cov AS (
 drv AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
@@ -155,7 +155,7 @@ cov AS (
 drv AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')

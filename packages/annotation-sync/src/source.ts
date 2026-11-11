@@ -17,15 +17,16 @@ export interface AnnotationSource {
   id: string;
   /** how results name it */
   label: string;
-  /** its own database: a licence is a GRANT on it, and the portal import never writes there */
-  db: string;
-  /** the annotation table in `db` */
+  /**
+   * its table in the annotation database (store.ts), `annotation.<name>`: a licensed source's alone,
+   * so a licence is a GRANT on that table; public sources may share one
+   */
   table: string;
-  /** the column in `table` and in `db`.sync_run holding the release */
+  /** the column in `table` holding the release */
   versionColumn: string;
   /** the columns of `table` that identify one annotated key; the warehouse query returns these */
   keyColumns: string[];
-  /** CREATE statements for `db`, `table` and `db`.sync_run, idempotent */
+  /** CREATE statements for `table`, idempotent (the database and sync_run are store.ts's) */
   ddl: string[];
   /** environment variables a sync of this source cannot run without (a licence token) */
   needs: string[];

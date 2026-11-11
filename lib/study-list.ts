@@ -3,6 +3,7 @@
 // the peers in FEDERATION_PEERS, which serve theirs through the federation API's `studies` op.
 import { chQuery, type ChConn } from "./ch.ts";
 import { isRestrictedStudy } from "./federation.ts";
+import { syncedStudiesSql } from "./annotation-store.ts";
 
 export type StudyRow = {
   id: string; name: string; cancerType: string;
@@ -45,7 +46,7 @@ export async function studiesFor(conn: ChConn): Promise<StudyRow[]> {
   // OncoKB coverage is a property of the annotation store, not of this instance
   let oncokb = new Set<string>();
   try {
-    const ok = await q("SELECT DISTINCT study FROM oncokb_annotation.sync_run WHERE annotated_new > 0 OR already_stored > 0");
+    const ok = await q(syncedStudiesSql("oncokb"));
     oncokb = new Set(ok.data.map((x) => x.study));
   } catch { /* store not granted here */ }
 

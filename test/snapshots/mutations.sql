@@ -14,7 +14,7 @@
 
 -- view 0 mutations: mutations:counts · msk_chord_2024
 WITH ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
-  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
+  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
   GROUP BY alteration),
 c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
@@ -57,7 +57,7 @@ SELECT cohort, study, countIf((match(ifNull(toString(proteinChange), ''), '^G1[2
 
 -- view 0 mutations: mutations:rows · msk_chord_2024
 WITH ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
-  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
+  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
   GROUP BY alteration),
 c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'

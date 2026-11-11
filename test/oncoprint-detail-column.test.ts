@@ -64,7 +64,7 @@ describe("a column's detail", () => {
   const withData = (panelRows: Row[] = [{ panel: "IMPACT468", covers: ["TP53", "KRAS", "EGFR", ""] }]) => {
     answer = (q) => /genomic_event_derived/.test(q) ? ROWS
       : /sample_to_gene_panel_derived sp/.test(q) ? panelRows
-      : /variant_annotation/.test(q) ? [{ t: "MUTATION", gene: "TP53", alteration: "R175H", is_driver: 1 }, { t: "CNA", gene: "KRAS", alteration: "AMPLIFICATION", is_driver: 1 },
+      : /annotation\.oncokb/.test(q) ? [{ t: "MUTATION", gene: "TP53", alteration: "R175H", is_driver: 1 }, { t: "CNA", gene: "KRAS", alteration: "AMPLIFICATION", is_driver: 1 },
         { t: "CNA", gene: "CDKN2A", alteration: "DELETION", is_driver: 1 }, { t: "SV", gene: "ALK", alteration: "Fusion", is_driver: 1 }]
       : /sync_run/.test(q) ? [{ study: "s1" }] : [];
   };
@@ -123,7 +123,7 @@ describe("a column's detail", () => {
     const d = await columnDetail({ study: "s1", genes: ["TP53"], display: { annotate: "none" } } as never, "P1");
     assert.equal(d.alterations.every((a) => a.driver === false), true);
     assert.match(d.annotation, /^none — driver annotation turned off/);
-    assert.equal(sent.some((q) => /variant_annotation/.test(q)), false);
+    assert.equal(sent.some((q) => /annotation\.oncokb/.test(q)), false);
   });
 
   test("genes are upper-cased, invalid symbols dropped, at most 12 asked for", async () => {

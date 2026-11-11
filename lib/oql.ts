@@ -21,6 +21,7 @@ export type { OqlSpecType, OqlRange, OqlSpec, OqlEntry } from "./oql-parse.ts";
 import type { OqlRange, OqlSpec } from "./oql-parse.ts";
 import { parseOql } from "./oql-parse.ts";
 import { finiteSql } from "./sql-number.ts";
+import { ONCOKB_TABLE } from "./annotation-store.ts";
 
 /**
  * A mutation's class as cBioPortal's OQL sees it — cbioportal-frontend's getMutationSubType and
@@ -128,13 +129,13 @@ const storeAlteration = (g: string): string =>
 export const driverEventSql = (pin: string, g = ""): string => {
   const c = g ? g + "." : "";
   return "(" + c + "hugo_gene_symbol, " + storeAlterationType(c) + ", " + storeAlteration(c) + ") IN (\n" +
-    "    SELECT hugo_gene_symbol, alteration_type, alteration FROM oncokb_annotation.variant_annotation\n" +
+    "    SELECT hugo_gene_symbol, alteration_type, alteration FROM " + ONCOKB_TABLE + "\n" +
     "    WHERE oncokb_version = " + sq(pin) + " AND is_driver)";
 };
 
 /** The store's driver rows at the pin, joined to each event `g` (`kind`: INNER or LEFT). */
 export const driverAnnotationJoin = (pin: string, kind: "INNER" | "LEFT"): string =>
-  "  " + kind + " JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation\n" +
+  "  " + kind + " JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM " + ONCOKB_TABLE + "\n" +
   "      WHERE oncokb_version = " + sq(pin) + " AND is_driver) ann\n" +
   "    ON " + annotationMatchSql("ann", "g");
 

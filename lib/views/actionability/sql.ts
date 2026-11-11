@@ -5,6 +5,7 @@ import { clinicalTable } from "../../custom-data.ts";
 import { sq, genomicStudySql } from "../../compiler.ts";
 import { annotationMatchSql } from "../../oql.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
+import { ONCOKB_TABLE } from "../../annotation-store.ts";
 
 /**
  * Per group (a clinical attribute's value per patient — "Multiple" when their in-cohort samples
@@ -65,7 +66,7 @@ export function actionConcordanceSql(cohortSql: string, study: string, db: strin
 
 /** The alteration types the store holds a therapeutic level for at `pin` (reference data, no cohort). */
 export function actionStoreTypesSql(_study: string, _db: string, pin: string): AggregateSql {
-  return aggregateSql("SELECT toString(alteration_type) AS type, count() AS n FROM oncokb_annotation.variant_annotation\n" +
+  return aggregateSql("SELECT toString(alteration_type) AS type, count() AS n FROM " + ONCOKB_TABLE + "\n" +
     "WHERE oncokb_version = " + sq(pin) + " AND (highest_sensitive_level != '' OR highest_resistance_level != '')\nGROUP BY type");
 }
 
@@ -96,7 +97,7 @@ function actionCtes(cohortSql: string, study: string, db: string, pin: string): 
     "  FROM " + db + ".genomic_event_derived g\n" +
     // the store's rows with a level at the pin only — a few thousand of its millions — matched as driverJoin matches
     "  INNER JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, highest_sensitive_level, highest_resistance_level\n" +
-    "      FROM oncokb_annotation.variant_annotation\n" +
+    "      FROM " + ONCOKB_TABLE + "\n" +
     "      WHERE oncokb_version = " + sq(pin) + " AND (highest_sensitive_level != '' OR highest_resistance_level != '')) ann\n" +
     "    ON " + annotationMatchSql("ann", "g") +
     "  WHERE " + genomicStudySql(study, "g") + "\n" +

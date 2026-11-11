@@ -73,7 +73,7 @@ describe("the alterations view's tables", () => {
     assert.match(alterationSource("mutations", part, "P-1", "db", null, order).with, /arraySort\(x -> if\(indexOf\(\['P-1-T03', 'P-1-T01'\], x\)/);
   });
   test("OncoKB joins only when a version is pinned, by protein change or by AMPLIFICATION / DELETION", () => {
-    assert.doesNotMatch(alterationSource("mutations", part, "P-1", "db", null, []).with, /oncokb_annotation/);
+    assert.doesNotMatch(alterationSource("mutations", part, "P-1", "db", null, []).with, /annotation\.oncokb/);
     assert.match(alterationSource("mutations", part, "P-1", "db", "v7.5", []).with, /alteration_type = 'MUTATION'[\s\S]*ann\.alteration = g\.proteinChange/);
     assert.match(alterationSource("cna", part, "P-1", "db", "v7.5", []).with, /alteration_type = 'CNA'[\s\S]*'AMPLIFICATION', 'DELETION'/);
   });

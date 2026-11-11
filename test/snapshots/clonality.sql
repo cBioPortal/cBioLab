@@ -61,7 +61,7 @@ calls AS (
   FROM snapshot_db.allele_specific_copy_number a
   JOIN snapshot_db.mutation_event me ON me.mutation_event_id = a.mutation_event_id
   JOIN snapshot_db.gene g ON g.entrez_gene_id = me.entrez_gene_id
-  INNER JOIN oncokb_annotation.variant_annotation ann ON ann.oncokb_version = 'v7.5' AND ann.is_driver
+  INNER JOIN annotation.oncokb ann ON ann.oncokb_version = 'v7.5' AND ann.is_driver
     AND ann.hugo_gene_symbol = g.hugo_gene_symbol AND ann.alteration_type = 'MUTATION' AND ann.alteration = me.protein_change
   WHERE a.genetic_profile_id IN (SELECT id FROM prof) AND a.sample_id IN (SELECT sid FROM samp)
     AND g.hugo_gene_symbol IN ('TP53','KRAS','APC','PIK3CA','SMAD4','CDH1','GATA3')
@@ -112,7 +112,7 @@ calls AS (
   FROM snapshot_db.allele_specific_copy_number a
   JOIN snapshot_db.mutation_event me ON me.mutation_event_id = a.mutation_event_id
   JOIN snapshot_db.gene g ON g.entrez_gene_id = me.entrez_gene_id
-  INNER JOIN oncokb_annotation.variant_annotation ann ON ann.oncokb_version = 'v7.5' AND ann.is_driver
+  INNER JOIN annotation.oncokb ann ON ann.oncokb_version = 'v7.5' AND ann.is_driver
     AND ann.hugo_gene_symbol = g.hugo_gene_symbol AND ann.alteration_type = 'MUTATION' AND ann.alteration = me.protein_change
   WHERE a.genetic_profile_id IN (SELECT id FROM prof) AND a.sample_id IN (SELECT sid FROM samp)
     AND g.hugo_gene_symbol IN ('TP53','KRAS','APC','PIK3CA','SMAD4','CDH1','GATA3')

@@ -73,8 +73,9 @@ test("a new database gets cBioPortal's schema and seeds, the app's columns and s
   for (const c of ["sample_count", "mutation_sample_count", "cna_sample_count", "rna_seq_sample_count", "treatment_patient_count"])
     assert.ok(st.some((s) => s.startsWith("ALTER TABLE cancer_study ADD COLUMN IF NOT EXISTS " + c + " ")), c);
   // an empty OncoKB store: local mode has no licence
-  assert.ok(st.includes("CREATE DATABASE IF NOT EXISTS oncokb_annotation"));
-  assert.ok(st.some((s) => s.startsWith("CREATE TABLE IF NOT EXISTS oncokb_annotation.variant_annotation")));
+  assert.ok(st.includes("CREATE DATABASE IF NOT EXISTS annotation"));
+  assert.ok(st.some((s) => s.startsWith("CREATE TABLE IF NOT EXISTS annotation.sync_run")));
+  assert.ok(st.some((s) => s.startsWith("CREATE TABLE IF NOT EXISTS annotation.oncokb")));
   assert.ok(!ch.tables().some((t) => t.startsWith("oncokb")), "and nothing put in it");
 
   // datahub's gene panels: the one whose genes resolve is imported, the other named in the log
