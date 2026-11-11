@@ -1,21 +1,14 @@
-// A stand-in ClickHouse for the importer's tests: a connection whose requests never leave the
+// A stand-in ClickHouse for the offline tools' tests: a connection whose requests never leave the
 // process. Every statement is recorded; each INSERT's JSONEachRow rows are kept by table; a SELECT
 // is answered by the first `answer` whose pattern it matches, and otherwise with no rows (the id
-// allocator's `SELECT greatest(...)` gets 0, so ids start at 1). lib/importer/ writes through
-// lib/ch.ts's `chWrite`, which calls fetch, so this replaces fetch for the fake connection's URL only.
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type { ChConn } from "../../lib/ch.ts";
-import { GeneResolver, type Gene } from "../../lib/importer/genes.ts";
-import { ImportContext, type Progress } from "../../lib/importer/context.ts";
-import type { SchemaMode } from "../../lib/importer/lab-schema.ts";
-import type { DataFile, DataKind, Meta } from "../../lib/importer/study.ts";
+// allocator's `SELECT greatest(...)` gets 0, so ids start at 1). The client calls fetch, so this
+// replaces fetch for the fake connection's URL only and passes every other request on.
+import type { Conn } from "./index.ts";
 
 type Rows = Record<string, unknown>[];
 
 export interface FakeCh {
-  conn: ChConn;
+  conn: Conn;
   /** every statement sent, in order (an INSERT's text without its rows) */
   statements: string[];
   /** the rows inserted into `table`, in order, across every INSERT into it */
@@ -33,7 +26,7 @@ export interface FakeCh {
 const URL_BASE = "http://fake-clickhouse.test";
 
 export function fakeCh(): FakeCh {
-  const conn: ChConn = { id: "fake", url: URL_BASE, user: "u", password: "p", db: "fake" } as ChConn;
+  const conn: Conn = { id: "fake", url: URL_BASE, user: "u", password: "p", db: "fake" };
   const statements: string[] = [];
   const inserted = new Map<string, Rows>();
   const answers: [RegExp, Rows | ((sql: string) => Rows)][] = [];
@@ -70,35 +63,3 @@ export function fakeCh(): FakeCh {
 }
 
 const jsonRows = (rows: Rows) => new Response(rows.map((r) => JSON.stringify(r)).join("\n"));
-
-/** A gene table for GeneResolver: [entrez, hugo, aliases?]; entity ids are the entrez ids. */
-export function genes(list: [number, string, string[]?][]): GeneResolver {
-  const gs: Gene[] = list.map(([entrez, hugo]) => ({ entrez, hugo, type: "protein-coding", entityId: entrez }));
-  return GeneResolver.fromRows(gs, list.flatMap(([entrez, , aliases]) => (aliases ?? []).map((alias) => ({ entrez, alias }))));
-}
-
-/** An import context on the fake connection, with its ids loaded (they start at 1). */
-export async function importContext(ch: FakeCh, opts: { genes?: GeneResolver; studyId?: string; mode?: SchemaMode; progress?: Progress } = {}): Promise<ImportContext> {
-  const ctx = new ImportContext(ch.conn, opts.genes ?? genes([]), opts.studyId ?? "test_study", opts.progress ?? (() => {}), opts.mode ?? "legacy");
-  await ctx.loadIds();
-  return ctx;
-}
-
-/** A data file in a fresh temp folder, as readStudyFolder would describe it. */
-export function dataFile(kind: DataKind, text: string, meta: Meta = {}, name = "data_" + kind + ".txt"): DataFile {
-  const dir = mkdtempSync(join(tmpdir(), "importer-test-"));
-  const file = join(dir, name);
-  writeFileSync(file, text);
-  return { kind, meta, metaFile: null, file };
-}
-
-/** A temp folder holding `files` (name → text), for readStudyFolder and importStudy. */
-export function studyDir(files: Record<string, string>): string {
-  const dir = mkdtempSync(join(tmpdir(), "importer-study-"));
-  for (const [name, text] of Object.entries(files)) {
-    const path = join(dir, name);
-    if (name.includes("/")) mkdirSync(path.slice(0, path.lastIndexOf("/")), { recursive: true });
-    writeFileSync(path, text);
-  }
-  return dir;
-}

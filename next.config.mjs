@@ -35,6 +35,8 @@ const nextConfig = (phase) => ({
   allowedDevOrigins: (process.env.ALLOWED_DEV_ORIGINS || "").split(",").map((h) => h.trim()).filter(Boolean),
   // lib/db.ts's in-process Postgres loads its WebAssembly and extensions from its own package files
   serverExternalPackages: ["@electric-sql/pglite"],
+  // the workspace packages ship TypeScript source (packages/)
+  transpilePackages: ["@cbiolab/clickhouse", "@cbiolab/importer", "@cbiolab/annotation-sync"],
   // `next dev` otherwise appends its own section to CLAUDE.md on every start
   agentRules: false,
   // ship the bundled font (and its dir) inside the serverless function for the MCP route,

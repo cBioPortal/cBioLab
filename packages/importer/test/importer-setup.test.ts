@@ -8,9 +8,9 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fakeCh, type FakeCh } from "./support/fake-ch.ts";
-import { CBIOPORTAL_COMMIT, applySchemaMode, derivedTablesSql, schemaMode, setupDatabase } from "../lib/importer/setup.ts";
-import { LAB_TABLES, LEGACY_BASE_TABLES } from "../lib/importer/lab-schema.ts";
+import { fakeCh, type FakeCh } from "./support.ts";
+import { CBIOPORTAL_COMMIT, applySchemaMode, derivedTablesSql, schemaMode, setupDatabase } from "../src/setup.ts";
+import { LAB_TABLES, LEGACY_BASE_TABLES } from "../src/lab-schema.ts";
 
 const realFetch = globalThis.fetch;
 let ch: FakeCh | null = null;

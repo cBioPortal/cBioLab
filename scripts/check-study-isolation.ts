@@ -1,5 +1,5 @@
 // Finds queries about one study that read other studies' rows, in a database in the new schema
-// (lib/importer/lab-schema.ts). Every lab_ table is partitioned by study, so ClickHouse's query
+// (packages/importer/src/lab-schema.ts). Every lab_ table is partitioned by study, so ClickHouse's query
 // log says which studies' partitions each query read: a query that names one study and reads
 // another's partition scans data that cannot be in its answer, and gets slower with every study
 // added, however small its own study is. Typical causes: a view that computes a join key per row
@@ -9,7 +9,7 @@
 //
 // Run the app's queries first (the gallery: scripts/check-schema-modes.ts; pages in a browser),
 // then this over the same time window. It needs query_log on (ClickHouse's <query_log> setting).
-// Reads CLICKHOUSE_* from ~/.cbiolab/local.env, as scripts/import-study.ts does.
+// Reads CLICKHOUSE_* from ~/.cbiolab/local.env, as the import command (packages/importer/bin/import-study.ts) does.
 import os from "node:os";
 import path from "node:path";
 

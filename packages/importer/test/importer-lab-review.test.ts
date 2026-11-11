@@ -5,11 +5,11 @@
 // drops the copy. ClickHouse is test/support/fake-ch.ts, answering as a database in a given state.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { fakeCh, type FakeCh } from "./support/fake-ch.ts";
-import { LAB_TABLES } from "../lib/importer/lab-schema.ts";
+import { fakeCh, type FakeCh } from "./support.ts";
+import { LAB_TABLES } from "../src/lab-schema.ts";
 import {
   approveReview, changedSince, copyColumns, diffReview, latestReview, latestVersion, rejectReview, startReview, studyExists, undoApproval, type Review,
-} from "../lib/importer/lab-review.ts";
+} from "../src/lab-review.ts";
 
 let ch: FakeCh | null = null;
 afterEach(() => { ch?.restore(); ch = null; });

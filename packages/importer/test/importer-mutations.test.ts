@@ -4,15 +4,15 @@
 // code: a case the importer gets wrong is kept as a `todo` naming the rule it breaks.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fakeCh, genes, importContext, dataFile } from "./support/fake-ch.ts";
-import type { ImportContext, FileReport } from "../lib/importer/context.ts";
-import type { Meta } from "../lib/importer/study.ts";
+import { fakeCh, genes, importContext, dataFile } from "./support.ts";
+import type { ImportContext, FileReport } from "../src/context.ts";
+import type { Meta } from "../src/study.ts";
 import {
   alleleCounts, annotateProteinChange, filteredClassification, filteredStatus, importMutations, mafChromosome,
   proteinChange, proteinPositions, tumorAllele, type CountColumns
-} from "../lib/importer/mutations.ts";
-import { mutationKeyword } from "../lib/importer/mutation-keyword.ts";
-import { importStructuralVariants } from "../lib/importer/other.ts";
+} from "../src/mutations.ts";
+import { mutationKeyword } from "../src/mutation-keyword.ts";
+import { importStructuralVariants } from "../src/other.ts";
 
 type Rows = Record<string, unknown>[];
 type Cells = Record<string, string>;

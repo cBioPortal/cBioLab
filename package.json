@@ -1,10 +1,14 @@
 {
   "name": "cbio-lab",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "local": "node scripts/local.ts",
-    "import": "node scripts/import-study.ts",
+    "import": "node packages/importer/bin/import-study.ts",
+    "annotate": "node packages/annotation-sync/bin/annotate.ts",
     "peer-db": "node --env-file-if-exists=.env.local scripts/peer-db.ts",
     "build": "next build",
     "start": "next start -p 3000",
@@ -15,7 +19,7 @@
     "docs:counts": "UPDATE_COUNTS=1 node --env-file=.env.local scripts/check-dsl-doc.ts",
     "check:methods": "node --env-file=.env.local scripts/check-method-scripts.ts",
     "check:examples": "node --env-file=.env.local scripts/check-examples.ts",
-    "test": "CH_RUN_CACHE= node --test \"test/**/*.test.ts\"",
+    "test": "CH_RUN_CACHE= node --test \"test/**/*.test.ts\" \"packages/*/test/**/*.test.ts\"",
     "lint": "eslint . && knip && npm run lint:py",
     "lint:py": "python/.venv/bin/ruff check python",
     "report:dupes": "jscpd",
@@ -48,6 +52,8 @@
     "@ai-sdk/anthropic": "^4.0.79",
     "@ai-sdk/react": "^4.0.143",
     "@aws-sdk/credential-provider-node": "^3.972.86",
+    "@cbiolab/clickhouse": "*",
+    "@cbiolab/importer": "*",
     "@electric-sql/pglite": "^0.5.8",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@tanstack/react-query": "^5.104.1",

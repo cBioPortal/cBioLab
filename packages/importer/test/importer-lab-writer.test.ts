@@ -6,9 +6,9 @@
 // ClickHouse is the stand-in of test/support/fake-ch.ts.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { fakeCh, type FakeCh } from "./support/fake-ch.ts";
-import { LabWriter, type LabStudyContext } from "../lib/importer/lab-writer.ts";
-import type { Gene } from "../lib/importer/genes.ts";
+import { fakeCh, type FakeCh } from "./support.ts";
+import { LabWriter, type LabStudyContext } from "../src/lab-writer.ts";
+import type { Gene } from "../src/genes.ts";
 
 let ch: FakeCh | null = null;
 afterEach(() => { ch?.restore(); ch = null; });

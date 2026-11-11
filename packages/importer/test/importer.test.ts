@@ -6,14 +6,14 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { filteredClassification, filteredStatus, mafChromosome, proteinChange, proteinPositions, tumorAllele } from "../lib/importer/mutations.ts";
-import { mutationKeyword } from "../lib/importer/mutation-keyword.ts";
-import { isMissing, survivalValue } from "../lib/importer/clinical.ts";
-import { cnaEventValue } from "../lib/importer/matrix.ts";
-import { fractionGenomeAltered } from "../lib/importer/other.ts";
-import { isNormalBarcode, sampleId, tcgaPatient } from "../lib/importer/context.ts";
-import { GeneResolver } from "../lib/importer/genes.ts";
-import { parseMeta, readStudyFolder } from "../lib/importer/study.ts";
+import { filteredClassification, filteredStatus, mafChromosome, proteinChange, proteinPositions, tumorAllele } from "../src/mutations.ts";
+import { mutationKeyword } from "../src/mutation-keyword.ts";
+import { isMissing, survivalValue } from "../src/clinical.ts";
+import { cnaEventValue } from "../src/matrix.ts";
+import { fractionGenomeAltered } from "../src/other.ts";
+import { isNormalBarcode, sampleId, tcgaPatient } from "../src/context.ts";
+import { GeneResolver } from "../src/genes.ts";
+import { parseMeta, readStudyFolder } from "../src/study.ts";
 
 test("default classification filter: prefix, case-insensitive, 5'Flank kept for TERT only", () => {
   for (const vc of ["Silent", "silent", "Intron", "3'UTR", "3'Flank", "5'UTR", "IGR"]) assert.equal(filteredClassification(vc, 1, null), true, vc);

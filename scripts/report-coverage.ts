@@ -16,14 +16,16 @@ const root = join(import.meta.dirname, "..");
 const outDir = join(root, "quality-report");
 mkdirSync(outDir, { recursive: true });
 const lcovPath = join(outDir, "coverage.lcov");
-const AREAS = ["lib", "app", "mcp"];
+const AREAS = ["lib", "app", "mcp", "packages"];
+/** an area's measured files: a package's source, not its tests or its command */
+const AREA_GLOB: Record<string, string> = { packages: "packages/*/src/**" };
 
 const run = spawnSync(process.execPath, [
   "--test", "--experimental-test-coverage",
-  ...AREAS.map((a) => "--test-coverage-include=" + a + "/**"),
+  ...AREAS.map((a) => "--test-coverage-include=" + (AREA_GLOB[a] ?? a + "/**")),
   "--test-reporter=dot", "--test-reporter-destination=stdout",
   "--test-reporter=lcov", "--test-reporter-destination=" + lcovPath,
-  "test/**/*.test.ts",
+  "test/**/*.test.ts", "packages/*/test/**/*.test.ts",
 ], { cwd: root, stdio: ["ignore", "inherit", "inherit"] });
 
 interface Counts { LF: number; LH: number; BRF: number; BRH: number; FNF: number; FNH: number }
@@ -49,7 +51,7 @@ const md: string[] = ["## Unit-test coverage", "",
   "| area | lines | branches | functions | files loaded |", "|---|---|---|---|---|"];
 const neverLoaded: string[] = [];
 for (const area of [...AREAS, "lib/views", "lib/figures"]) {
-  const all = walk(area);
+  const all = walk(area).filter((f) => area !== "packages" || /^packages\/[^/]+\/src\//.test(f));
   const loaded = all.filter((f) => files.has(f));
   if (AREAS.includes(area)) neverLoaded.push(...all.filter((f) => !files.has(f) && !isTypeOnly(join(root, f))));
   md.push(row(area, sum(loaded.map((f) => files.get(f)!)), " " + loaded.length + " of " + all.length + " |"));

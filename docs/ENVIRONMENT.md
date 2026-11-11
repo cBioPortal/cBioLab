@@ -20,6 +20,7 @@ optional.
 | `STUDY_ID` | `msk_chord_2024` | the study a document without one, and the legacy single-study endpoints, use |
 | `PORTAL_URL` | `https://www.cbioportal.org` | the cBioPortal that study and patient links open, and the portal pages' "Open in cBioPortal" button (`lib/legacy-link.ts`): it is taken to serve the primary connection's studies, so the button is enabled only for those |
 | `ONCOKB_PIN` | the store's newest release | the OncoKB release to annotate with, e.g. `v7.5`; every result echoes the one used |
+| `ONCOKB_TOKEN`, `ONCOKB_WRITER_USER` (`oncokb_writer`), `ONCOKB_WRITER_PASSWORD`, `ONCOKB_BASE`, `ONCOKB_BATCH_SIZE`, `ONCOKB_BATCH_DELAY_MS` | — | `npm run annotate -- oncokb` only, never the app: the OncoKB API token and the store's writer ([ANNOTATION.md](ANNOTATION.md)) |
 | `GENOME_NEXUS_URL` | `https://www.genomenexus.org` | the Genome Nexus server the lollipop view asks for protein length and Pfam domains (a gene symbol only) |
 | `STUDY_DENY` | — | study ids to exclude entirely, comma-separated |
 | `STUDY_ALLOW_RESTRICTED` | — | `1`: also serve studies named `…-consortium` or `private`, which are otherwise never routed. Only for a deployment entitled to them |

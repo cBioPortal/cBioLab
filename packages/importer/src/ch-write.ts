@@ -1,12 +1,15 @@
-// The importer's statements and bulk inserts, against the LOCAL database `npm run local` starts.
-// Every one goes through lib/ch.ts's `chWrite` (the one way to ClickHouse, with its checks) on the
-// primary connection, and only when the launcher has said this instance owns that database.
-import { chWrite, PRIMARY, type ChConn } from "../ch.ts";
+// The importer's statements and bulk inserts, against the LOCAL database `npm run local` starts, on
+// @cbiolab/clickhouse, and only when the launcher has said this instance owns that database. Run
+// from the app (local mode's import page), the connection is the app's own (lib/import-conn.ts),
+// whose statements go through lib/ch.ts.
+import { envConn, exec, insertRaw, query, send, sq, type Conn, type Row } from "@cbiolab/clickhouse";
 
-export type WriteConn = ChConn;
+export type WriteConn = Conn;
+export { exec, insertRaw, query, sq, type Row };
 
+/** The local database, as the environment names it: what the command-line import writes to. */
 export function localConn(): WriteConn {
-  return PRIMARY;
+  return envConn();
 }
 
 /** Local mode is the only place the importer may write: the launcher sets CBIOLAB_LOCAL=1. */
@@ -16,28 +19,6 @@ export function importEnabled(): boolean {
 
 export function assertLocal(): void {
   if (!importEnabled()) throw new Error("Importing is only available in local mode (npm run local)");
-}
-
-/**
- * Runs one statement and returns once its effect is in place: OPTIMIZE, ALTER and DELETE wait for
- * their merge or mutation on every replica (ClickHouse Cloud defaults to returning before them).
- */
-const WAIT = { alter_sync: "2", mutations_sync: "2", lightweight_deletes_sync: "2" };
-
-export async function exec(conn: WriteConn, sql: string, settings: Record<string, string> = {}): Promise<void> {
-  await chWrite(sql, conn, undefined, { ...WAIT, ...settings });
-}
-
-/** Sends `body` (rows in `format`) to `INSERT INTO table`. */
-export async function insertRaw(conn: WriteConn, table: string, format: string, body: BodyInit): Promise<void> {
-  await chWrite("INSERT INTO " + table + " FORMAT " + format, conn, body,
-    { input_format_skip_unknown_fields: "0", date_time_input_format: "best_effort" });
-}
-
-/** Rows of a SELECT as objects. */
-export async function query<R = Record<string, unknown>>(conn: WriteConn, sql: string): Promise<R[]> {
-  const text = await chWrite(sql + "\nFORMAT JSONEachRow", conn, undefined, { output_format_json_quote_64bit_integers: "0" });
-  return text.split("\n").filter(Boolean).map((l) => JSON.parse(l) as R);
 }
 
 /** A file's statements, split on `;` at line ends; `--` comment lines dropped. */
@@ -51,8 +32,6 @@ export async function execScript(conn: WriteConn, script: string, settings: Reco
   const statements = splitStatements(script);
   for (const st of statements) await exec(conn, st, settings);
 }
-
-export type Row = Record<string, string | number | boolean | null | undefined>;
 
 /**
  * Buffers rows for one table and sends them as JSONEachRow in batches, so a 500k-row MAF is a few
@@ -79,7 +58,7 @@ export class Inserter {
     const body = this.rows.join("\n");
     this.rows = [];
     this.bytes = 0;
-    if (this.statement) await chWrite(this.statement + " FORMAT JSONEachRow", this.conn, body, { input_format_skip_unknown_fields: "0" });
+    if (this.statement) await send(this.conn, this.statement + " FORMAT JSONEachRow", body, { input_format_skip_unknown_fields: "0" });
     else await insertRaw(this.conn, this.table, "JSONEachRow", body);
   }
 }
@@ -90,5 +69,3 @@ export async function insertAll(conn: WriteConn, table: string, rows: Iterable<R
   await ins.flush();
   return ins.count;
 }
-
-export const sq = (s: string): string => "'" + s.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";

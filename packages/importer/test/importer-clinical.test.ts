@@ -4,13 +4,13 @@
 // records a place where the importer and the notes disagree.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dataFile, fakeCh, genes, importContext, studyDir, type FakeCh } from "./support/fake-ch.ts";
-import { importClinicalPatients, importClinicalSamples } from "../lib/importer/clinical.ts";
-import { importGenePanelMatrix, importSegments, importTimeline, type SegmentTotals } from "../lib/importer/other.ts";
-import { importGenePanel } from "../lib/importer/panels.ts";
-import { readStudyFolder } from "../lib/importer/study.ts";
-import { importStudy } from "../lib/importer/import-study.ts";
-import type { ImportContext } from "../lib/importer/context.ts";
+import { dataFile, fakeCh, genes, importContext, studyDir, type FakeCh } from "./support.ts";
+import { importClinicalPatients, importClinicalSamples } from "../src/clinical.ts";
+import { importGenePanelMatrix, importSegments, importTimeline, type SegmentTotals } from "../src/other.ts";
+import { importGenePanel } from "../src/panels.ts";
+import { readStudyFolder } from "../src/study.ts";
+import { importStudy } from "../src/import-study.ts";
+import type { ImportContext } from "../src/context.ts";
 
 type Row = Record<string, unknown>;
 

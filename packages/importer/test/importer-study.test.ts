@@ -7,8 +7,8 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fakeCh, studyDir, type FakeCh } from "./support/fake-ch.ts";
-import { deleteStudy, importStudy, rebuildDerived, removeStudy } from "../lib/importer/import-study.ts";
+import { fakeCh, studyDir, type FakeCh } from "./support.ts";
+import { deleteStudy, importStudy, rebuildDerived, removeStudy } from "../src/import-study.ts";
 
 let ch: FakeCh | null = null;
 afterEach(() => { ch?.restore(); ch = null; });

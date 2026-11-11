@@ -5,9 +5,9 @@
 // ClickHouse is test/support/fake-ch.ts, answering as a small study.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { fakeCh, type FakeCh } from "./support/fake-ch.ts";
-import { LAB_TABLES, columnsOf } from "../lib/importer/lab-schema.ts";
-import { GENES, applyEdit, continuousProfiles, planEdit, rng } from "../lib/importer/lab-edits.ts";
+import { fakeCh, type FakeCh } from "./support.ts";
+import { LAB_TABLES, columnsOf } from "../src/lab-schema.ts";
+import { GENES, applyEdit, continuousProfiles, planEdit, rng } from "../src/lab-edits.ts";
 
 let ch: FakeCh | null = null;
 afterEach(() => { ch?.restore(); ch = null; });

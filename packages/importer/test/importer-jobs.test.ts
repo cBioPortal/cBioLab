@@ -5,10 +5,10 @@
 // script prints, chosen by its first argument.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { dataDir, job, runningJob, startJob, type Job } from "../lib/importer/jobs.ts";
+import { dataDir, job, runningJob, startJob, type Job } from "../src/jobs.ts";
 
 const STAND_IN = `
 const args = process.argv.slice(2);
@@ -40,8 +40,11 @@ if (mode === "ok") {
 const cwd = process.cwd();
 before(() => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "importer-jobs-"));
-  mkdirSync(path.join(dir, "scripts"));
-  writeFileSync(path.join(dir, "scripts", "import-study.ts"), STAND_IN);
+  // where an app that has the package installed finds the command: a link to the package, as npm workspaces make
+  mkdirSync(path.join(dir, "pkg", "bin"), { recursive: true });
+  writeFileSync(path.join(dir, "pkg", "bin", "import-study.ts"), STAND_IN);
+  mkdirSync(path.join(dir, "node_modules", "@cbiolab"), { recursive: true });
+  symlinkSync(path.join(dir, "pkg"), path.join(dir, "node_modules", "@cbiolab", "importer"));
   process.chdir(dir);
 });
 after(() => { process.chdir(cwd); });

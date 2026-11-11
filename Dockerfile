@@ -6,6 +6,8 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY package.json package-lock.json ./
+# the workspace packages (packages/*) are installed, as links, with everything else
+COPY packages ./packages
 RUN npm ci --no-audit --no-fund
 
 COPY . .

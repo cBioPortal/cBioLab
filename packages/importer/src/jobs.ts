@@ -1,4 +1,4 @@
-// Import jobs for the import page. Each import runs `scripts/import-study.ts --json` in its own
+// Import jobs for the import page. Each import runs this package's `bin/import-study.ts --json` in its own
 // process (its own memory, so a large MAF never shares the web server's heap) and its progress
 // lines are kept here for the page to poll. One import at a time: every import rebuilds the
 // derived tables of the whole database, so two at once would rebuild over each other.
@@ -40,14 +40,22 @@ export function runningJob(): Job | null {
   return state.running;
 }
 
-/** Starts `scripts/import-study.ts` with these arguments; throws if an import is already running. */
+/**
+ * The import command, as the app that runs it has the package installed: under its working
+ * folder's node_modules, a link Node follows to the package's own files.
+ */
+export function importScript(cwd: string = process.cwd()): string {
+  return path.join(cwd, "node_modules", "@cbiolab", "importer", "bin", "import-study.ts");
+}
+
+/** Starts the import command with these arguments; throws if an import is already running. */
 export function startJob(source: string, args: string[]): Job {
   const running = state.running;
   if (running) throw new Error("An import is already running (" + running.source + "); wait for it to finish");
   const j: Job = { id: randomUUID(), source, state: "running", events: [], startedAt: Date.now() };
   jobs.set(j.id, j);
   state.running = j;
-  const child = spawn(process.execPath, ["--max-old-space-size=4096", path.join(process.cwd(), "scripts", "import-study.ts"), ...args, "--json"],
+  const child = spawn(process.execPath, ["--max-old-space-size=4096", importScript(), ...args, "--json"],
     { cwd: process.cwd(), env: process.env, stdio: ["ignore", "pipe", "pipe"] });
   const stderr: string[] = [];
   child.stderr.on("data", (d: Buffer) => { stderr.push(d.toString()); if (stderr.length > 50) stderr.shift(); });

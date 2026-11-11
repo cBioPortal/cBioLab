@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { ErrorAlert } from "../_ui/error-alert.tsx";
-import type { Job } from "../../lib/importer/jobs.ts";
+import type { Job } from "@cbiolab/importer/jobs";
 import type { LocalStudy } from "../api/import/route.ts";
 
 interface Picked { file: File; path: string }

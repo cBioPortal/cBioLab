@@ -21,9 +21,9 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { CBIOPORTAL_COMMIT, setupDatabase } from "../lib/importer/setup.ts";
-import { exec, insertAll, query, sq, type WriteConn } from "../lib/importer/ch-write.ts";
-import { importStudy } from "../lib/importer/import-study.ts";
+import { CBIOPORTAL_COMMIT, setupDatabase } from "@cbiolab/importer/setup";
+import { exec, insertAll, query, sq, type WriteConn } from "@cbiolab/importer/ch-write";
+import { importStudy } from "@cbiolab/importer/import-study";
 import { clickhouseBinary, clickhouseConfig, exists, ping, startClickhouse, waitFor, writeUsers, type ClickhouseServer } from "./clickhouse-local.ts";
 
 const args = process.argv.slice(2);

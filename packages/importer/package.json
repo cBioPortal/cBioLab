@@ -1,0 +1,27 @@
+{
+  "name": "@cbiolab/importer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Imports a cBioPortal study folder into ClickHouse by the legacy importer's rules",
+  "type": "module",
+  "exports": {
+    "./ch-write": "./src/ch-write.ts",
+    "./datahub": "./src/datahub.ts",
+    "./import-study": "./src/import-study.ts",
+    "./jobs": "./src/jobs.ts",
+    "./lab-edits": "./src/lab-edits.ts",
+    "./lab-review": "./src/lab-review.ts",
+    "./lab-schema": "./src/lab-schema.ts",
+    "./setup": "./src/setup.ts"
+  },
+  "bin": {
+    "cbiolab-import": "./bin/import-study.ts"
+  },
+  "dependencies": {
+    "@cbiolab/clickhouse": "*",
+    "@cbiolab/annotation-sync": "*"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

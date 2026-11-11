@@ -5,10 +5,10 @@
 // tables an interrupted import left. ClickHouse is test/support/fake-ch.ts.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { fakeCh, type FakeCh } from "./support/fake-ch.ts";
+import { fakeCh, type FakeCh } from "./support.ts";
 import {
   LAB_TABLES, TABLE_IDS, baseViews, columnsOf, compactStudy, createLabTables, createViews, derivedTypes, dropStaleStages, nativeDerived, studyParts,
-} from "../lib/importer/lab-schema.ts";
+} from "../src/lab-schema.ts";
 
 let ch: FakeCh | null = null;
 afterEach(() => { ch?.restore(); ch = null; });

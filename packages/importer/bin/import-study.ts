@@ -18,7 +18,7 @@
 // for the page and writes to ~/.cbiolab/local.env for `npm run import` in another terminal.
 import os from "node:os";
 import path from "node:path";
-import type { SchemaMode } from "../lib/importer/lab-schema.ts";
+import type { SchemaMode } from "../src/lab-schema.ts";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");
@@ -27,12 +27,12 @@ const target = args.find((a, i) => !a.startsWith("--") && !["--id", "--delete", 
 const dataDir = process.env.CBIOLAB_DATA || path.join(os.homedir(), ".cbiolab");
 // run from a terminal: reach the database `npm run local` started
 if (process.env.CBIOLAB_LOCAL !== "1") { try { process.loadEnvFile(path.join(dataDir, "local.env")); } catch { /* not running */ } }
-// imported after the environment is complete: lib/ch.ts reads its connection when it loads
-const { assertLocal, localConn } = await import("../lib/importer/ch-write.ts");
-const { fetchDatahubStudy } = await import("../lib/importer/datahub.ts");
-const { deleteStudy, importStudy, rebuildDerived } = await import("../lib/importer/import-study.ts");
-const { applySchemaMode } = await import("../lib/importer/setup.ts");
-const { SCHEMA_MODES } = await import("../lib/importer/lab-schema.ts");
+// imported after the environment is complete: some modules read their settings when they load
+const { assertLocal, localConn } = await import("../src/ch-write.ts");
+const { fetchDatahubStudy } = await import("../src/datahub.ts");
+const { deleteStudy, importStudy, rebuildDerived } = await import("../src/import-study.ts");
+const { applySchemaMode } = await import("../src/setup.ts");
+const { SCHEMA_MODES } = await import("../src/lab-schema.ts");
 
 const emit = (o: Record<string, unknown>) => {
   if (json) process.stdout.write(JSON.stringify(o) + "\n");

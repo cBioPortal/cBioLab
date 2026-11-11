@@ -4,11 +4,11 @@
 // skipped and which samples count as profiled. Expected values come from the notes, not the code.
 import { afterEach, beforeEach, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { dataFile, fakeCh, genes, importContext, studyDir, type FakeCh } from "./support/fake-ch.ts";
-import { importStudy } from "../lib/importer/import-study.ts";
-import { GeneResolver, type Gene } from "../lib/importer/genes.ts";
-import type { ImportContext, Profile } from "../lib/importer/context.ts";
-import { importDiscreteLong, importMatrix, phosphoResidue } from "../lib/importer/matrix.ts";
+import { dataFile, fakeCh, genes, importContext, studyDir, type FakeCh } from "./support.ts";
+import { importStudy } from "../src/import-study.ts";
+import { GeneResolver, type Gene } from "../src/genes.ts";
+import type { ImportContext, Profile } from "../src/context.ts";
+import { importDiscreteLong, importMatrix, phosphoResidue } from "../src/matrix.ts";
 
 const CNA_META = { genetic_alteration_type: "COPY_NUMBER_ALTERATION", datatype: "DISCRETE", stable_id: "gistic" };
 const LONG_META = { genetic_alteration_type: "COPY_NUMBER_ALTERATION", datatype: "DISCRETE_LONG", stable_id: "cna_long" };
