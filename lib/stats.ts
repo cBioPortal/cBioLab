@@ -474,23 +474,27 @@ function stratumTerms(a: SurvPoint[], b: SurvPoint[]): { o1: number; e1: number;
   const B = b.filter(ok).slice().sort((x, y) => x.t - y.t);
   const riskA = riskSweep(A), riskB = riskSweep(B);
   let i = 0, j = 0;
-  let o1 = 0, e1 = 0, v = 0, o2 = 0;
+  const acc = { o1: 0, e1: 0, v: 0, o2: 0 };
   while (i < A.length || j < B.length) {
     const t = Math.min(i < A.length ? A[i].t : Infinity, j < B.length ? B[j].t : Infinity);
     let d1 = 0, d2 = 0;
     while (i < A.length && A[i].t === t) { if (A[i].event) d1++; i++; }
     while (j < B.length && B[j].t === t) { if (B[j].event) d2++; j++; }
     // risk sets honour delayed entry: a subject not yet observable is not at risk
-    const n1 = riskA(t), n2 = riskB(t);
-    const d = d1 + d2, n = n1 + n2;
-    if (d > 0 && n > 1) {
-      o1 += d1; o2 += d2;
-      e1 += (d * n1) / n;
-      // hypergeometric variance; zero when every at-risk subject fails at t
-      v += (d * n1 * n2 * (n - d)) / (n * n * (n - 1));
-    }
+    addTime2(acc, d1, d2, riskA(t), riskB(t));
   }
-  return { o1, e1, v, o2 };
+  return acc;
+}
+
+/** One time's contribution to a two-group stratum: d1, d2 deaths among n1, n2 at risk. */
+function addTime2(acc: { o1: number; e1: number; v: number; o2: number }, d1: number, d2: number, n1: number, n2: number) {
+  const d = d1 + d2, n = n1 + n2;
+  if (d > 0 && n > 1) {
+    acc.o1 += d1; acc.o2 += d2;
+    acc.e1 += (d * n1) / n;
+    // hypergeometric variance; zero when every at-risk subject fails at t
+    acc.v += (d * n1 * n2 * (n - d)) / (n * n * (n - 1));
+  }
 }
 
 /**
@@ -499,9 +503,13 @@ function stratumTerms(a: SurvPoint[], b: SurvPoint[]): { o1: number; e1: number;
  * is exactly why a federated caller can compute it from per-site aggregates.
  */
 export function logRank(strata: { a: SurvPoint[]; b: SurvPoint[] }[]): LogRank {
+  return logRankOf(strata.map((s) => stratumTerms(s.a, s.b)));
+}
+
+/** The two-group statistic from each stratum's (o1, e1, v, o2). */
+function logRankOf(terms: { o1: number; e1: number; v: number; o2: number }[]): LogRank {
   let O1 = 0, E1 = 0, V = 0, O2 = 0, used = 0;
-  for (const s of strata) {
-    const { o1, e1, v, o2 } = stratumTerms(s.a, s.b);
+  for (const { o1, e1, v, o2 } of terms) {
     if (o1 + o2 === 0) continue;                 // a stratum with no events says nothing
     O1 += o1; E1 += e1; V += v; O2 += o2; used++;
   }
@@ -531,27 +539,31 @@ function stratumTermsK(groups: SurvPoint[][]): { o: number[]; e: number[]; v: nu
   const G = groups.map((g) => g.filter(ok).slice().sort((x, y) => x.t - y.t));
   const risk = G.map((g) => riskSweep(g));
   const idx = zeros(k);
-  const o = zeros(k), e = zeros(k), v = zerosMat(k);
-  let events = 0;
+  const acc = { o: zeros(k), e: zeros(k), v: zerosMat(k), events: 0 };
   const allTimes = [...new Set(G.flatMap((g) => g.map((d) => d.t)))].sort((a, b) => a - b);
   for (const t of allTimes) {
     const d = zeros(k);
     for (let i = 0; i < k; i++)
       while (idx[i] < G[i].length && G[i][idx[i]].t === t) { if (G[i][idx[i]].event) d[i]++; idx[i]++; }
-    const n = G.map((_, i) => risk[i](t));
-    const dTotal = d.reduce((a, b) => a + b, 0), nTotal = n.reduce((a, b) => a + b, 0);
-    if (dTotal > 0 && nTotal > 1) {
-      events += dTotal;
-      const w = (dTotal * (nTotal - dTotal)) / (nTotal - 1); // hypergeometric weight, this time
-      const p = n.map((ni) => ni / nTotal);
-      for (let i = 0; i < k; i++) {
-        o[i] += d[i];
-        e[i] += (dTotal * n[i]) / nTotal;
-        for (let l = 0; l < k; l++) v[i][l] += w * ((i === l ? p[i] : 0) - p[i] * p[l]);
-      }
+    addTimeK(acc, d, G.map((_, i) => risk[i](t)));
+  }
+  return acc;
+}
+
+/** One time's contribution to a k-group stratum: d[i] deaths among n[i] at risk in group i. */
+function addTimeK(acc: { o: number[]; e: number[]; v: number[][]; events: number }, d: number[], n: number[]) {
+  const k = d.length;
+  const dTotal = d.reduce((a, b) => a + b, 0), nTotal = n.reduce((a, b) => a + b, 0);
+  if (dTotal > 0 && nTotal > 1) {
+    acc.events += dTotal;
+    const w = (dTotal * (nTotal - dTotal)) / (nTotal - 1); // hypergeometric weight, this time
+    const p = n.map((ni) => ni / nTotal);
+    for (let i = 0; i < k; i++) {
+      acc.o[i] += d[i];
+      acc.e[i] += (dTotal * n[i]) / nTotal;
+      for (let l = 0; l < k; l++) acc.v[i][l] += w * ((i === l ? p[i] : 0) - p[i] * p[l]);
     }
   }
-  return { o, e, v, events };
 }
 
 /**
@@ -567,10 +579,16 @@ function stratumTermsK(groups: SurvPoint[][]): { o: number[]; e: number[]; v: nu
  * all-zero row — it would make the covariance matrix singular and says nothing anyway.
  */
 export function logRankK(strata: { groups: SurvPoint[][] }[]): LogRankK {
+  return logRankKOf(strata, (g) => g.length, stratumTermsK);
+}
+
+/** The k-group statistic, given how many subjects a group holds and one stratum's terms. */
+function logRankKOf<T>(strata: { groups: T[][] }[], size: (g: T[]) => number,
+  termsOf: (groups: T[][]) => { o: number[]; e: number[]; v: number[][]; events: number }): LogRankK {
   const k0 = strata[0]?.groups.length || 0;
   if (strata.some((s) => s.groups.length !== k0))
     throw new Error("logRankK: every stratum must name the same number of groups");
-  const present = Array.from({ length: k0 }, (_, i) => strata.some((s) => s.groups[i].length > 0));
+  const present = Array.from({ length: k0 }, (_, i) => strata.some((s) => size(s.groups[i]) > 0));
   const keep = present.map((p, i) => p ? i : -1).filter((i) => i >= 0);
   const k = keep.length;
   if (k < 2) return { chi2: 0, p: 1, df: 0, observed: [], expected: [], groups: k, strata: 0 };
@@ -579,7 +597,7 @@ export function logRankK(strata: { groups: SurvPoint[][] }[]): LogRankK {
   let used = 0;
   for (const s of strata) {
     const g = keep.map((i) => s.groups[i]);
-    const { o, e, v, events } = stratumTermsK(g);
+    const { o, e, v, events } = termsOf(g);
     if (!events) continue;
     for (let i = 0; i < k; i++) { E[i] += e[i]; O[i] += o[i]; }
     for (let i = 0; i < k; i++) for (let l = 0; l < k; l++) V[i][l] += v[i][l];
@@ -603,6 +621,128 @@ export function logRankK(strata: { groups: SurvPoint[][] }[]): LogRankK {
     observed: O, expected: E.map((x) => Math.round(x * 10) / 10),
     groups: k, strata: used
   };
+}
+
+// ---------------------------------------------------------------------------
+// Survival over grouped rows.
+//
+// A survival count query returns one row per distinct (t, event, entry) with the number of subjects
+// who share it. Kaplan–Meier and the log-rank tests only ever read, at each distinct time, how many
+// died, how many were censored and how many were at risk, so they are computed here from the rows
+// directly, in time proportional to the number of rows rather than subjects. Each function returns
+// exactly what its per-subject counterpart above returns on the rows expanded to one SurvRecord per
+// subject; test/survival-counts.test.ts holds them equal.
+// ---------------------------------------------------------------------------
+
+/** `n` subjects sharing one follow-up: time `t`, `event`, and delayed `entry` as in SurvRecord. */
+export interface SurvCount extends SurvRecord { n: number }
+
+/** How many subjects the rows stand for. */
+export function survSubjects(rows: SurvCount[]): number {
+  let k = 0;
+  for (const r of rows) k += r.n;
+  return k;
+}
+
+/** The rows ever at risk (see `observable`), in time order. */
+function observableCounts(rows: SurvCount[]): SurvCount[] {
+  return rows.filter(r => r.n > 0 && observable(r)).sort((x, y) => x.t - y.t);
+}
+
+/** riskSweep over rows: subjects entered strictly before `t`, less those who left strictly before it. */
+function riskSweepCounts(rows: SurvCount[]) {
+  const entries = rows.map(r => [r.entry == null ? -Infinity : r.entry, r.n]).sort((a, b) => a[0] - b[0]);
+  const exits = rows.map(r => [r.t, r.n]).sort((a, b) => a[0] - b[0]);
+  let ei = 0, xi = 0, entered = 0, exited = 0;
+  return (t: number) => {
+    while (ei < entries.length && entries[ei][0] < t) { entered += entries[ei][1]; ei++; }
+    while (xi < exits.length && exits[xi][0] < t) { exited += exits[xi][1]; xi++; }
+    return entered - exited;
+  };
+}
+
+/** Time-ordered rows folded to one entry per distinct time, with the deaths there. */
+function deathsByTime(sorted: SurvCount[]): { t: number; d: number }[] {
+  const out: { t: number; d: number }[] = [];
+  let i = 0;
+  while (i < sorted.length) {
+    const t = sorted[i].t;
+    let d = 0;
+    while (i < sorted.length && sorted[i].t === t) { if (sorted[i].event) d += sorted[i].n; i++; }
+    out.push({ t, d });
+  }
+  return out;
+}
+
+/** applyCutoff over rows. */
+export function applyCutoffCounts(rows: SurvCount[], cutoff: number): SurvCount[] {
+  return rows.map(r => r.t > cutoff ? { t: cutoff, event: 0, entry: r.entry, n: r.n } : r);
+}
+
+/** kaplanMeier over rows. */
+export function kaplanMeierCounts(rows: SurvCount[]): Omit<KmCurve, "cohort"> {
+  const usable = rows.filter(r => Number.isFinite(r.t) && r.t >= 0);
+  const clean = observableCounts(usable);
+  const n0 = survSubjects(clean), unobserved = survSubjects(usable) - n0;
+  const atRiskAt = riskSweepCounts(clean);
+  let s = 1, events = 0;
+  let median: number | null = null;
+  const points: KmPoint[] = [{ t: 0, s: 1 }];
+  for (const { t, d } of deathsByTime(clean)) {
+    const atRisk = atRiskAt(t);
+    if (d > 0 && atRisk > 0) {
+      s *= 1 - d / atRisk;
+      points.push({ t, s: Math.round(s * 10000) / 10000 });
+      if (median === null && s <= 0.5) median = t;
+      events += d;
+    }
+  }
+  const riskAt = riskSweepCounts(clean);
+  const last = clean.length ? Math.floor(clean[clean.length - 1].t) : -1;
+  const atRisk: number[] = [];
+  for (let m = 0; m <= last; m++) atRisk.push(riskAt(m));
+  return { points, median, n: n0, events, atRisk, ...(unobserved ? { unobserved } : {}) };
+}
+
+/** Every group's deaths and number at risk at each distinct time any of the groups has, in order. */
+function* jointTimes(groups: SurvCount[][]): Generator<{ d: number[]; n: number[] }> {
+  const k = groups.length;
+  const clean = groups.map(observableCounts);
+  const G = clean.map(deathsByTime), risk = clean.map(riskSweepCounts);
+  const idx = zeros(k);
+  for (;;) {
+    let t = Infinity;
+    for (let i = 0; i < k; i++) if (idx[i] < G[i].length && G[i][idx[i]].t < t) t = G[i][idx[i]].t;
+    if (t === Infinity) return;
+    const d = zeros(k);
+    for (let i = 0; i < k; i++) if (idx[i] < G[i].length && G[i][idx[i]].t === t) d[i] = G[i][idx[i]++].d;
+    yield { d, n: risk.map((r) => r(t)) };
+  }
+}
+
+/** stratumTerms over rows. */
+function stratumTermsCounts(a: SurvCount[], b: SurvCount[]): { o1: number; e1: number; v: number; o2: number } {
+  const acc = { o1: 0, e1: 0, v: 0, o2: 0 };
+  for (const { d: [d1, d2], n: [n1, n2] } of jointTimes([a, b])) addTime2(acc, d1, d2, n1, n2);
+  return acc;
+}
+
+/** stratumTermsK over rows. */
+function stratumTermsKCounts(groups: SurvCount[][]): { o: number[]; e: number[]; v: number[][]; events: number } {
+  const k = groups.length;
+  const acc = { o: zeros(k), e: zeros(k), v: zerosMat(k), events: 0 };
+  for (const { d, n } of jointTimes(groups)) addTimeK(acc, d, n);
+  return acc;
+}
+
+/** logRank over rows. */
+export function logRankCounts(strata: { a: SurvCount[]; b: SurvCount[] }[]): LogRank {
+  return logRankOf(strata.map((s) => stratumTermsCounts(s.a, s.b)));
+}
+
+/** logRankK over rows. */
+export function logRankKCounts(strata: { groups: SurvCount[][] }[]): LogRankK {
+  return logRankKOf(strata, survSubjects, stratumTermsKCounts);
 }
 
 // ---------------------------------------------------------------------------

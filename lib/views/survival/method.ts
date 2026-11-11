@@ -47,7 +47,7 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
   }
   steps.push({
     kind: "statistic", title: "Estimate survival by Kaplan–Meier",
-    detail: "The product-limit estimator, one curve per cohort, pooled over its studies" +
+    detail: "The product-limit estimator, one curve per cohort, pooled over its studies, computed from the count rows directly: at each distinct time, the deaths and the number at risk are sums of the rows' patient counts" +
       (t.anchor ? ", with delayed entry: re-anchored to " + t.anchor + ", a patient is at risk only from the time the study could first observe them" : "") +
       (t.cohorts.some((c) => c.unobserved) ? ". A patient whose follow-up ends at or before their entry was never at risk and is left out: " +
         t.cohorts.filter((c) => c.unobserved).map((c) => c.name + " " + c.unobserved!.toLocaleString("en-US")).join(", ") : "") +
@@ -119,9 +119,9 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
   ].join("\n") + "\n";
   return {
     steps,
-    implementation: { functions: ["kaplanMeier", ...(t.test.kind === "logrank" ? ["logRank"] : t.test.kind === "logrankK" ? ["logRankK"] : [])],
+    implementation: { functions: ["kaplanMeierCounts", ...(t.test.kind === "logrank" ? ["logRankCounts"] : t.test.kind === "logrankK" ? ["logRankKCounts"] : [])],
       file: "lib/stats.ts", commit: BUILD_COMMIT },
-    verification: "Kaplan–Meier matches " + VERIFIED.km.library + " " + VERIFIED.km.version + " " + VERIFIED.km.fn +
+    verification: "The count-row functions return exactly what kaplanMeier, logRank and logRankK return on the same rows expanded to one record per patient (test/survival-counts.test.ts). Kaplan–Meier matches " + VERIFIED.km.library + " " + VERIFIED.km.version + " " + VERIFIED.km.fn +
       " (curves are reported to 4 decimals); the log-rank matches " + VERIFIED.logrank.library + " " + VERIFIED.logrank.version + " " +
       VERIFIED.logrank.fn + " to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).",
     python: withResult(python),

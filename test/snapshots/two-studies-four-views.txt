@@ -40,14 +40,14 @@ CAVEAT (tell the user): Left out of the survival analysis (OS_MONTHS / OS_STATUS
         count rows: 4,441
     - Count patients by time and status [TP53 wt · msk_met_2021] (13,033 → 12,976 rows): The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. 57 cohort patients had no OS_MONTHS value.
         count rows: 3,444
-    - Estimate survival by Kaplan–Meier: The product-limit estimator, one curve per cohort, pooled over its studies. The median is the first time the curve is at or below 0.5.
+    - Estimate survival by Kaplan–Meier: The product-limit estimator, one curve per cohort, pooled over its studies, computed from the count rows directly: at each distinct time, the deaths and the number at risk are sums of the rows' patient counts. The median is the first time the curve is at or below 0.5.
         TP53 mut: 25,498 patients, 12,607 events, median 30.6 months
         TP53 wt: 24,618 patients, 8,609 events, median 68.4 months
     - Two-group log-rank test, stratified by study: At each event time, every cohort's observed events against its share of the risk set, with the hypergeometric variance; χ² on 1 df. Each study is its own stratum — compared only against itself — and the strata are summed, so a difference in case mix between studies cannot pass for a difference between cohorts.
         χ² / df / p: 1596.4994 / 1 / <1e-300
         strata with events: 2
         pooled, for contrast: χ² 1558.0453, p <1e-300
-    Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).
+    The count-row functions return exactly what kaplanMeier, logRank and logRankK return on the same rows expanded to one record per patient (test/survival-counts.test.ts). Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).
 
 Clinical comparison across cohorts:
   FRACTION_GENOME_ALTERED [sample, num]: TP53 mut mean 0.22 sd 0.20 (n=25,490) | TP53 wt mean 0.15 sd 0.17 (n=24,612)  Welch t p=<1e-300 q=<1e-300
