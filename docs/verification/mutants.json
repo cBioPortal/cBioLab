@@ -1,8 +1,8 @@
 {
- "ranAt": "2026-10-23T16:05:45.477Z",
- "commit": "94670e5",
- "total": 18,
- "caught": 18,
+ "ranAt": "2026-11-10T22:49:45.510Z",
+ "commit": "0a02e89e",
+ "total": 30,
+ "caught": 30,
  "mutants": [
   {
    "id": "km-censored-as-death",
@@ -21,7 +21,7 @@
    "file": "lib/stats.ts",
    "guard": "unit",
    "caught": true,
-   "failures": 26,
+   "failures": 25,
    "evidence": "not ok 1 - with no competing event, cumulative incidence is exactly 1 − Kaplan–Meier, delayed entry included"
   },
   {
@@ -81,8 +81,8 @@
    "file": "lib/cohort2.ts",
    "guard": "cohort-logic",
    "caught": true,
-   "failures": 14,
-   "evidence": "FAIL [msk_chord_2024] \"A and B\" is exactly the patients in both A and B  (A and B: engine 19,032, expected 6,241 (12791 extra, 0 missing))"
+   "failures": 16,
+   "evidence": "FAIL [msk_chord_2024] \"A and B\" is exactly the samples in both A and B  (A and B: engine 19,077, expected 6,245 (12832 extra, 0 missing))"
   },
   {
    "id": "or-as-and",
@@ -91,8 +91,137 @@
    "file": "lib/cohort2.ts",
    "guard": "cohort-logic",
    "caught": true,
-   "failures": 10,
-   "evidence": "FAIL [msk_chord_2024] \"A or B\" is exactly the patients in either  (A or B: engine 6,241, expected 19,032 (0 extra, 12791 missing))"
+   "failures": 12,
+   "evidence": "FAIL [msk_chord_2024] \"A or B\" is exactly the samples in either  (A or B: engine 6,245, expected 19,077 (0 extra, 12832 missing))"
+  },
+  {
+   "id": "clinical-values-unfolded",
+   "layer": "cohorts",
+   "effect": "A cohort picked by a clinical value (\"female\", or a facet's \"Female \") misses every patient whose recorded value differs in case or spacing, though the facet that offered the value counted them.",
+   "file": "lib/cohort2.ts",
+   "guard": "cohort-logic",
+   "caught": true,
+   "failures": 6,
+   "evidence": "FAIL [msk_chord_2024] each test condition picks out a real, partial group of samples  (13,124, 0 and 3,372 of 25,040 samples)"
+  },
+  {
+   "id": "sample-clause-takes-whole-patient",
+   "layer": "cohorts",
+   "effect": "A cohort picked by a sample-level condition (non-small cell lung cancer, an alteration) also holds every other sample of those patients — their colorectal or breast samples — so sample counts and gene frequencies count samples the condition never matched.",
+   "file": "lib/cohort2.ts",
+   "guard": "cohort-logic",
+   "caught": true,
+   "failures": 4,
+   "evidence": "FAIL [brca_tcga] each leaf alone selects exactly the samples the raw rows say it should  ({\"kind\":\"oql\",\"q\":\"PIK3CA: MUT\"}: engine 320, expected 319 (1 extra, 0 missing); {\"kind\":\"oql\",\"q\":\"TP53: MUT\"}: engine 303, expected 301 (2 extra, 0 "
+  },
+  {
+   "id": "gene-counts-whole-patient",
+   "layer": "counts",
+   "effect": "A view's gene frequencies count an alteration found in any sample of a cohort's patients, so a mutation seen only in a patient's colorectal sample is counted toward their lung cancer cohort.",
+   "file": "lib/federation.ts",
+   "guard": "portal-parity",
+   "caught": true,
+   "failures": 68,
+   "evidence": "FAIL msk_chord_2024 · CANCER_TYPE = Non-Small Cell Lung Cancer mutations (views): TP53  ours 4034/7838 / cBioPortal 4005/7809"
+  },
+  {
+   "id": "gene-counts-off-panel",
+   "layer": "counts",
+   "effect": "A view's gene frequencies count a call in a gene the sample's panel does not cover, and count that sample as profiled, so a gene on no panel reads 100% mutated.",
+   "file": "lib/federation.ts",
+   "guard": "portal-parity",
+   "history": "Shipped until 2026-10: msk_chord_2024 RTEL1-TNFRSF6B read 126/126 in the compare view; cBioPortal profiles none.",
+   "caught": true,
+   "failures": 2,
+   "evidence": "FAIL msk_chord_2024 mutations (views, off-panel): RTEL1-TNFRSF6B  ours 126/126 / cBioPortal 0/0"
+  },
+  {
+   "id": "survival-missing-status-censored",
+   "layer": "statistics",
+   "effect": "A patient with a survival time but no survival status enters every survival curve as censored at that time, instead of being left out as cBioPortal leaves them out.",
+   "file": "lib/survival-sql.ts",
+   "guard": "portal-parity",
+   "history": "Shipped until 2026-10: 1,995 patients in 24 studies (hgsoc_tcga_gdc OS read 575 patients; the portal draws 574).",
+   "caught": true,
+   "failures": 2,
+   "evidence": "FAIL hgsoc_tcga_gdc survival: patients in the OS curve  ours 575 / cBioPortal 574"
+  },
+  {
+   "id": "clinical-missing-spelling-is-a-value",
+   "layer": "cohorts",
+   "effect": "A clinical value written \"N/A\" or \"nan\" counts as a recorded value: it gets its own facet bar, and filtering the attribute to NA misses its samples.",
+   "file": "lib/event-names.ts",
+   "guard": "portal-parity",
+   "history": "Shipped until 2026-10: 5,166 \"N/A\" values in 26 studies, 1,054 \"nan\" in 4 (brca_mbcproject_wagle_2017 DX_PERCENT_PR = NA selected 0 samples; the portal 83).",
+   "caught": true,
+   "failures": 6,
+   "evidence": "FAIL brca_mbcproject_wagle_2017 selection (missing spellings): samples with DX_PERCENT_PR = NA  ours 0 / cBioPortal 83"
+  },
+  {
+   "id": "explore-drafted-facet-drops-study",
+   "layer": "counts",
+   "effect": "A multi-study Explore facet for a drafted attribute leaves out every study in which the draft selects no one, so the reader cannot see or add those studies' values.",
+   "file": "lib/explore.ts",
+   "guard": "portal-parity",
+   "history": "Shipped until 2026-10: TUMOR_TISSUE_SITE = Breast over breast + lung TCGA PanCan showed Breast 1,084 only; the portal also Lung 514.",
+   "caught": true,
+   "failures": 1,
+   "evidence": "FAIL brca_tcga_pan_can_atlas_2018 + luad_tcga_pan_can_atlas_2018 · TUMOR_TISSUE_SITE = Breast clinical (drafted attribute): TUMOR_TISSUE_SITE = Lung  ours absent / cBioPortal 514"
+  },
+  {
+   "id": "explore-counts-sampleless-patients",
+   "layer": "counts",
+   "effect": "With no filter, Explore's patient-level charts count patient records that own no sample, which the portal and every filtered page leave out.",
+   "file": "lib/explore.ts",
+   "guard": "portal-parity",
+   "history": "Shipped until 2026-10: 2,984 sampleless patients in 34 studies (hgsoc_tcga_gdc OS_STATUS read 349 / 236 / NA 3; the portal 345 / 231 / NA 12).",
+   "caught": true,
+   "failures": 3,
+   "evidence": "FAIL hgsoc_tcga_gdc clinical (patients who own a sample): OS_STATUS = 1:DECEASED  ours 349 / cBioPortal 345"
+  },
+  {
+   "id": "assay-chart-counts-patients",
+   "layer": "counts",
+   "effect": "Explore's generic-assay charts count patients instead of samples, so a patient with several samples counts once, under each of their values, and the chart disagrees with the portal and with the page's other sample-level charts.",
+   "file": "lib/explore.ts",
+   "guard": "portal-parity",
+   "history": "Shipped until 2026-10: difg_glass_2019 1p_status read Unchanged 145 / Loss 27 / Gain 10; the portal 228 / 46 / 13.",
+   "caught": true,
+   "failures": 4,
+   "evidence": "FAIL difg_glass_2019 generic assay (samples): 1p_status = Gain  ours 10 / cBioPortal 13"
+  },
+  {
+   "id": "explore-profiled-once-per-panel",
+   "layer": "counts",
+   "effect": "Explore counts a sample on two panels of one alteration type (whole-exome beside a panel, or two copy-number profiles) once per panel, so its frequencies differ from the views' for the same gene.",
+   "file": "lib/explore.ts",
+   "guard": "portal-parity",
+   "history": "Shipped until 2026-10, copying the portal's study view: nsclc_ctdx_msk_2022 EGFR copy number 2,840 profiled in a 2,621-sample study.",
+   "caught": true,
+   "failures": 19,
+   "evidence": "FAIL nsclc_ctdx_msk_2022 copy number: EGFR amplified (profiled: each sample once; the study view counts 2840, once per profile)  ours 96/96/2840 / cBioPortal 96/96/2621"
+  },
+  {
+   "id": "bounded-value-never-selected",
+   "layer": "cohorts",
+   "effect": "A clinical value recorded as a bound (a de-identified age \">90\", a lab limit \"<0.5\") is selected by no range, so \"age > 89\" leaves out the oldest patients.",
+   "file": "lib/cohort2.ts",
+   "guard": "portal-parity",
+   "history": "Shipped until 2026-10: 1,805 such values in 22 studies (nsclc_ctdx_msk_2022 AGE_AT_SEQ_REPORTED_YEARS > 89 selected 2 samples; the portal 12, ten of them recorded as \">90\").",
+   "caught": true,
+   "failures": 1,
+   "evidence": "FAIL nsclc_ctdx_msk_2022 selection (values recorded as a bound): samples with AGE_AT_SEQ_REPORTED_YEARS {\"gt\":89}  ours 2 / cBioPortal 12"
+  },
+  {
+   "id": "histogram-edge-goes-up",
+   "layer": "counts",
+   "effect": "A numeric value exactly on a histogram edge is counted in the bar above it, not the bar (start, end] that ends there.",
+   "file": "lib/data-binner.ts",
+   "guard": "portal-parity",
+   "history": "Shipped until 2026-10, through floating-point bin arithmetic: brca_tcga_pan_can_atlas_2018 MSI_SENSOR_SCORE (0.3, 0.4] read 69 where the portal draws 72.",
+   "caught": true,
+   "failures": 28,
+   "evidence": "FAIL brca_tcga_pan_can_atlas_2018 histogram: MUTATION_COUNT (bars, NA)  ours <=(,10]=69 (10,20]=101 (20,30]=230 (30,40]=162 (40,50]=105 (50,60]=89 (60,70]=64 (70,80]=34 (80,90]=37 (90,100]=26 (100,110]=14 (110,120]=16 >(120,]=119 NA=18 / cB"
   },
   {
    "id": "split-arms-overlap",
@@ -102,7 +231,7 @@
    "guard": "cohort-logic",
    "caught": true,
    "failures": 4,
-   "evidence": "FAIL [msk_chord_2024] the engine reports that the split's children add up to the parent  (0 + 916 + 2,194 + 7,809 = 10,919 of 7,809)"
+   "evidence": "FAIL [msk_chord_2024] the engine reports that the split's children's samples add up to the parent's  (0 + 916 + 2,183 + 7,809 = 10,908 of 7,809 samples)"
   },
   {
    "id": "denominator-ignores-panel",
@@ -111,7 +240,7 @@
    "file": "lib/explore.ts",
    "guard": "portal-parity",
    "caught": true,
-   "failures": 97,
+   "failures": 109,
    "evidence": "FAIL nsclc_ctdx_msk_2022 mutations: PTEN  ours 77/52/2621 / cBioPortal 77/52/1257"
   },
   {
@@ -132,7 +261,7 @@
    "file": "lib/oql.ts",
    "guard": "portal-parity",
    "caught": true,
-   "failures": 13,
+   "failures": 33,
    "evidence": "FAIL brca_tcga cohort: patients with a PIK3CA mutation (OQL \"PIK3CA: MUT\")  ours 352 / cBioPortal 317"
   },
   {
@@ -170,7 +299,7 @@
    "id": "table1-denominator-ignores-panel",
    "layer": "counts",
    "effect": "A risk group's mutation rate in Table 1 divides by every patient in the group, counting those whose panel never covered the gene as unmutated, so the rate reads too low.",
-   "file": "lib/views/riskmodel-table1.ts",
+   "file": "lib/views/riskmodel/table1.ts",
    "guard": "unit",
    "caught": true,
    "failures": 2,
@@ -180,7 +309,7 @@
    "id": "table1-model-rows-in-fdr",
    "layer": "statistics",
    "effect": "Table 1's q-values are corrected together with the rows the model was built from, whose tiny p-values are guaranteed, so every other row looks more significant than it is.",
-   "file": "lib/views/riskmodel-table1.ts",
+   "file": "lib/views/riskmodel/table1.ts",
    "guard": "unit",
    "caught": true,
    "failures": 1,
