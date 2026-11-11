@@ -474,23 +474,27 @@ function stratumTerms(a: SurvPoint[], b: SurvPoint[]): { o1: number; e1: number;
   const B = b.filter(ok).slice().sort((x, y) => x.t - y.t);
   const riskA = riskSweep(A), riskB = riskSweep(B);
   let i = 0, j = 0;
-  let o1 = 0, e1 = 0, v = 0, o2 = 0;
+  const acc = { o1: 0, e1: 0, v: 0, o2: 0 };
   while (i < A.length || j < B.length) {
     const t = Math.min(i < A.length ? A[i].t : Infinity, j < B.length ? B[j].t : Infinity);
     let d1 = 0, d2 = 0;
     while (i < A.length && A[i].t === t) { if (A[i].event) d1++; i++; }
     while (j < B.length && B[j].t === t) { if (B[j].event) d2++; j++; }
     // risk sets honour delayed entry: a subject not yet observable is not at risk
-    const n1 = riskA(t), n2 = riskB(t);
-    const d = d1 + d2, n = n1 + n2;
-    if (d > 0 && n > 1) {
-      o1 += d1; o2 += d2;
-      e1 += (d * n1) / n;
-      // hypergeometric variance; zero when every at-risk subject fails at t
-      v += (d * n1 * n2 * (n - d)) / (n * n * (n - 1));
-    }
+    addTime2(acc, d1, d2, riskA(t), riskB(t));
   }
-  return { o1, e1, v, o2 };
+  return acc;
+}
+
+/** One time's contribution to a two-group stratum: d1, d2 deaths among n1, n2 at risk. */
+function addTime2(acc: { o1: number; e1: number; v: number; o2: number }, d1: number, d2: number, n1: number, n2: number) {
+  const d = d1 + d2, n = n1 + n2;
+  if (d > 0 && n > 1) {
+    acc.o1 += d1; acc.o2 += d2;
+    acc.e1 += (d * n1) / n;
+    // hypergeometric variance; zero when every at-risk subject fails at t
+    acc.v += (d * n1 * n2 * (n - d)) / (n * n * (n - 1));
+  }
 }
 
 /**
@@ -535,27 +539,31 @@ function stratumTermsK(groups: SurvPoint[][]): { o: number[]; e: number[]; v: nu
   const G = groups.map((g) => g.filter(ok).slice().sort((x, y) => x.t - y.t));
   const risk = G.map((g) => riskSweep(g));
   const idx = zeros(k);
-  const o = zeros(k), e = zeros(k), v = zerosMat(k);
-  let events = 0;
+  const acc = { o: zeros(k), e: zeros(k), v: zerosMat(k), events: 0 };
   const allTimes = [...new Set(G.flatMap((g) => g.map((d) => d.t)))].sort((a, b) => a - b);
   for (const t of allTimes) {
     const d = zeros(k);
     for (let i = 0; i < k; i++)
       while (idx[i] < G[i].length && G[i][idx[i]].t === t) { if (G[i][idx[i]].event) d[i]++; idx[i]++; }
-    const n = G.map((_, i) => risk[i](t));
-    const dTotal = d.reduce((a, b) => a + b, 0), nTotal = n.reduce((a, b) => a + b, 0);
-    if (dTotal > 0 && nTotal > 1) {
-      events += dTotal;
-      const w = (dTotal * (nTotal - dTotal)) / (nTotal - 1); // hypergeometric weight, this time
-      const p = n.map((ni) => ni / nTotal);
-      for (let i = 0; i < k; i++) {
-        o[i] += d[i];
-        e[i] += (dTotal * n[i]) / nTotal;
-        for (let l = 0; l < k; l++) v[i][l] += w * ((i === l ? p[i] : 0) - p[i] * p[l]);
-      }
+    addTimeK(acc, d, G.map((_, i) => risk[i](t)));
+  }
+  return acc;
+}
+
+/** One time's contribution to a k-group stratum: d[i] deaths among n[i] at risk in group i. */
+function addTimeK(acc: { o: number[]; e: number[]; v: number[][]; events: number }, d: number[], n: number[]) {
+  const k = d.length;
+  const dTotal = d.reduce((a, b) => a + b, 0), nTotal = n.reduce((a, b) => a + b, 0);
+  if (dTotal > 0 && nTotal > 1) {
+    acc.events += dTotal;
+    const w = (dTotal * (nTotal - dTotal)) / (nTotal - 1); // hypergeometric weight, this time
+    const p = n.map((ni) => ni / nTotal);
+    for (let i = 0; i < k; i++) {
+      acc.o[i] += d[i];
+      acc.e[i] += (dTotal * n[i]) / nTotal;
+      for (let l = 0; l < k; l++) acc.v[i][l] += w * ((i === l ? p[i] : 0) - p[i] * p[l]);
     }
   }
-  return { o, e, v, events };
 }
 
 /**
@@ -714,37 +722,17 @@ function* jointTimes(groups: SurvCount[][]): Generator<{ d: number[]; n: number[
 
 /** stratumTerms over rows. */
 function stratumTermsCounts(a: SurvCount[], b: SurvCount[]): { o1: number; e1: number; v: number; o2: number } {
-  let o1 = 0, e1 = 0, v = 0, o2 = 0;
-  for (const { d: [d1, d2], n: [n1, n2] } of jointTimes([a, b])) {
-    const d = d1 + d2, n = n1 + n2;
-    if (d > 0 && n > 1) {
-      o1 += d1; o2 += d2;
-      e1 += (d * n1) / n;
-      v += (d * n1 * n2 * (n - d)) / (n * n * (n - 1));
-    }
-  }
-  return { o1, e1, v, o2 };
+  const acc = { o1: 0, e1: 0, v: 0, o2: 0 };
+  for (const { d: [d1, d2], n: [n1, n2] } of jointTimes([a, b])) addTime2(acc, d1, d2, n1, n2);
+  return acc;
 }
 
 /** stratumTermsK over rows. */
 function stratumTermsKCounts(groups: SurvCount[][]): { o: number[]; e: number[]; v: number[][]; events: number } {
   const k = groups.length;
-  const o = zeros(k), e = zeros(k), v = zerosMat(k);
-  let events = 0;
-  for (const { d, n } of jointTimes(groups)) {
-    const dTotal = d.reduce((a, b) => a + b, 0), nTotal = n.reduce((a, b) => a + b, 0);
-    if (dTotal > 0 && nTotal > 1) {
-      events += dTotal;
-      const w = (dTotal * (nTotal - dTotal)) / (nTotal - 1);
-      const p = n.map((ni) => ni / nTotal);
-      for (let i = 0; i < k; i++) {
-        o[i] += d[i];
-        e[i] += (dTotal * n[i]) / nTotal;
-        for (let l = 0; l < k; l++) v[i][l] += w * ((i === l ? p[i] : 0) - p[i] * p[l]);
-      }
-    }
-  }
-  return { o, e, v, events };
+  const acc = { o: zeros(k), e: zeros(k), v: zerosMat(k), events: 0 };
+  for (const { d, n } of jointTimes(groups)) addTimeK(acc, d, n);
+  return acc;
 }
 
 /** logRank over rows. */
