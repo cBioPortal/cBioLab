@@ -18,15 +18,15 @@ so the work can be picked up later. Written November 2026.
 
 ## The goal: no live annotation
 
-cBioLab already does this for OncoKB. `cBioPortal/oncokb-annotation-pipeline` writes
-`oncokb_annotation.variant_annotation` (7.06M rows in November 2026, versioned, with a
+cBioLab already does this for OncoKB. The offline sync (`packages/annotation-sync/`,
+`docs/ANNOTATION.md`) writes `annotation.oncokb` (7.06M rows in November 2026, versioned, with a
 `sync_run` log). The app only reads it and echoes the version it read (invariant 2). Transcripts
-would follow the same pattern.
+would follow the same pattern, as a public source in the shared `annotation.variant` table.
 
 ## What would be stored
 
-1. **Each variant on every protein-coding transcript of its gene**, e.g.
-   `transcript_annotation.variant_consequence`. Keyed by variant (`chr`, start, end, ref, alt)
+1. **Each variant on every protein-coding transcript of its gene**, as rows of
+   `annotation.variant` (`docs/ANNOTATION.md`). Keyed by variant (`chr`, start, end, ref, alt)
    and transcript, holding the protein change, protein start/end, consequence, and HGVSp. No
    sample or patient ids, so the table is not patient-level data (`docs/DATA-BOUNDARY.md`).
    Sorted by transcript (or gene) first, so one gene on one transcript is a range read, not a

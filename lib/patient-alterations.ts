@@ -8,6 +8,7 @@ import type { QueryColumn, RowSource } from "./table-query.ts";
 import type { TablePart } from "./mutation-table.ts";
 import { patientSamplesSql } from "./patient-timeline.ts";
 import { inCohortPatients, inCohortSamples } from "./cohort2.ts";
+import { ONCOKB_TABLE } from "./annotation-store.ts";
 
 /** The view's three tables, in the portal's order. */
 export const ALTERATION_TABLES = ["mutations", "cna", "sv"] as const;
@@ -83,7 +84,7 @@ function profiledCte(name: string, db: string, study: string, alterationType: st
 /** OncoKB's calls at `pin` for one alteration type and the genes `genesFrom` names. */
 function oncokbCte(pin: string, type: "MUTATION" | "CNA", genesFrom: string): string {
   return "ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver\n" +
-    "  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = " + sq(pin) + " AND alteration_type = '" + type + "' AND hugo_gene_symbol IN (" + genesFrom + ")\n" +
+    "  FROM " + ONCOKB_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = '" + type + "' AND hugo_gene_symbol IN (" + genesFrom + ")\n" +
     "  GROUP BY gene, alteration),\n";
 }
 const annSelect = (pin: string | null) => pin

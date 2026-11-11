@@ -65,7 +65,7 @@ with a dev server that owns `.next`. The import page and `/api/import` exist onl
 writes to it.
 
 Every annotation source's store is created empty ([ANNOTATION.md](ANNOTATION.md)). OncoKB is
-licensed, so the local `oncokb_annotation` store stays empty unless you have a token: OncoKB-dependent
+licensed, so the local `annotation.oncokb` table stays empty unless you have a token: OncoKB-dependent
 filters match nothing, and driver calls come only from a study's own `cbp_driver*` columns. With
 `ONCOKB_TOKEN` set, `npm run annotate -- oncokb --all` (while `npm run local` runs) fills it.
 

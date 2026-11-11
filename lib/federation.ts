@@ -64,6 +64,7 @@ import { driverAnnotationJoin } from "./oql.ts";
 import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type CohortSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
+import { ONCOKB_TABLE } from "./annotation-store.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -527,7 +528,7 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
   // with no pin there is no annotation to split drivers from VUS, and cBioPortal then colours
   // everything as a driver; the report says which happened
   const driver = pin
-    ? "if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM oncokb_annotation.variant_annotation\n" +
+    ? "if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM " + ONCOKB_TABLE + "\n" +
       "        WHERE oncokb_version = " + sq(pin) + " AND is_driver AND alteration_type = 'MUTATION'), 1, 0)"
     : "1";
   return (

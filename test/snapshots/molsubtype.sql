@@ -22,7 +22,7 @@ mut AS (
          max(g.hugo_gene_symbol = 'POLE' AND g.mutation_variant IN ('P286R', 'S297F', 'F367S', 'F367V', 'V411L', 'L424I', 'L424V', 'P436R', 'M444K', 'A456P', 'S459F', 'M295R', 'D368Y')) AS pole_hot,
          max(g.hugo_gene_symbol = 'TP53' AND ann.is_driver) AS p53
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
@@ -85,7 +85,7 @@ mut AS (
          max(g.hugo_gene_symbol = 'POLE' AND g.mutation_variant IN ('P286R', 'S297F', 'F367S', 'F367V', 'V411L', 'L424I', 'L424V', 'P436R', 'M444K', 'A456P', 'S459F', 'M295R', 'D368Y')) AS pole_hot,
          max(g.hugo_gene_symbol = 'TP53' AND ann.is_driver) AS p53
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')

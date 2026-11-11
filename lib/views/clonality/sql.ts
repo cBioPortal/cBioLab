@@ -5,6 +5,7 @@ import { clinicalValueFoldSql } from "../../event-names.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { finiteSql } from "../../sql-number.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
+import { ONCOKB_TABLE } from "../../annotation-store.ts";
 
 /**
  * Per gene, over the cohort's mutation CALLS that carry a FACETS estimate (a call is one mutation
@@ -30,7 +31,7 @@ export function clonalityGenesSql(cohortSql: string, study: string, db: string, 
     "  JOIN " + db + ".mutation_event me ON me.mutation_event_id = a.mutation_event_id\n" +
     "  JOIN " + db + ".gene g ON g.entrez_gene_id = me.entrez_gene_id\n" +
     (drv
-      ? "  INNER JOIN oncokb_annotation.variant_annotation ann ON ann.oncokb_version = " + sq(pin) + " AND ann.is_driver\n" +
+      ? "  INNER JOIN " + ONCOKB_TABLE + " ann ON ann.oncokb_version = " + sq(pin) + " AND ann.is_driver\n" +
         "    AND ann.hugo_gene_symbol = g.hugo_gene_symbol AND ann.alteration_type = 'MUTATION' AND ann.alteration = me.protein_change\n"
       : "") +
     "  WHERE a.genetic_profile_id IN (SELECT id FROM prof) AND a.sample_id IN (SELECT sid FROM samp)\n" +

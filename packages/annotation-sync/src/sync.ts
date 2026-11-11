@@ -2,10 +2,11 @@
 // and appends them to that source's version-pinned store. Idempotent and resumable — the keys still
 // to annotate are the study's key space minus what the store already holds for this release,
 // computed in ClickHouse — so re-running, or a key shared by several studies, never asks twice.
-// Every run leaves a row in the source's `sync_run`, which the app reads to say which studies a
+// Every run leaves a row in the shared `annotation.sync_run` (store.ts), which the app reads to say which studies a
 // release covers (lib/annotation.ts).
 import { exec, insertRows, query, sq, type Conn as WriteConn, type Row } from "@cbiolab/clickhouse";
 import type { AnnotationSource, Release } from "./source.ts";
+import { STORE_DDL, SYNC_RUN_TABLE } from "./store.ts";
 
 /** Stops a run when this many batches in a row fail: a token or rate problem, not a data problem. */
 export const MAX_CONSECUTIVE_FAILURES = 10;
@@ -20,7 +21,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** The key columns, as Strings, of what `src` stores for `version` (an Enum key compares with the warehouse's String). */
 function storedKeys(src: AnnotationSource, version: string, within: string): string {
   const cols = src.keyColumns;
-  return "SELECT " + cols.map((c) => "toString(" + c + ") AS " + c).join(", ") + " FROM " + src.db + "." + src.table +
+  return "SELECT " + cols.map((c) => "toString(" + c + ") AS " + c).join(", ") + " FROM " + src.table +
     " WHERE " + src.versionColumn + " = " + sq(version) + " AND (" + cols.map((c) => "toString(" + c + ")").join(", ") + ") IN (" + within + ")";
 }
 
@@ -43,9 +44,9 @@ export async function pendingKeys(conn: WriteConn, src: AnnotationSource, versio
 }
 
 
-/** Creates the source's database and tables if they are missing. */
+/** Creates the annotation database, sync_run and the source's table, where they are missing. */
 export async function ensureStore(conn: WriteConn, src: AnnotationSource): Promise<void> {
-  for (const st of src.ddl) await exec(conn, st);
+  for (const st of [...STORE_DDL, ...src.ddl]) await exec(conn, st);
 }
 
 /** Annotates one study's pending keys and records the run. */
@@ -61,7 +62,7 @@ export async function syncKeys(conn: WriteConn, src: AnnotationSource, release: 
     const batch = todo.slice(i, i + src.batchSize);
     try {
       const rows = await src.annotate(batch);
-      await insertRows(conn, src.db + "." + src.table, rows.map((r) => ({ [src.versionColumn]: release.version, ...r, ...release.extra })));
+      await insertRows(conn, src.table, rows.map((r) => ({ [src.versionColumn]: release.version, ...r, ...release.extra })));
       done += batch.length;
       inARow = 0;
     } catch (e) {
@@ -73,9 +74,9 @@ export async function syncKeys(conn: WriteConn, src: AnnotationSource, release: 
     if (i + src.batchSize < todo.length && src.batchDelayMs) await sleep(src.batchDelayMs);
   }
 
-  await insertRows(conn, src.db + ".sync_run", [{
+  await insertRows(conn, SYNC_RUN_TABLE, [{
     run_id: "run_" + Date.now().toString(36), started_at: startedAt, finished_at: now(),
-    [src.versionColumn]: release.version, study,
+    source: src.id, version: release.version, study,
     variants_total: total, already_stored: alreadyStored, annotated_new: done, failed,
     note: aborted ? `aborted after ${MAX_CONSECUTIVE_FAILURES} consecutive batch failures — re-run to resume`
       : failed ? "partial — re-run to resume" : "complete"
@@ -107,9 +108,9 @@ export async function syncStudies(conn: WriteConn, src: AnnotationSource, releas
   const startedAt = now();
   const space = src.keySpace(conn.db, null);
   const total = await countOf(conn, src, space), missing = await countOf(conn, src, missingSql(src, release.version, space));
-  await insertRows(conn, src.db + ".sync_run", [{
+  await insertRows(conn, SYNC_RUN_TABLE, [{
     run_id: "run_" + Date.now().toString(36), started_at: startedAt, finished_at: now(),
-    [src.versionColumn]: release.version, study: "__portal__",
+    source: src.id, version: release.version, study: "__portal__",
     variants_total: total, already_stored: total - missing, annotated_new: done, failed,
     note: aborted ? "aborted — re-run to resume" : missing ? `incomplete: ${missing} keys still missing` : "complete"
   }]);

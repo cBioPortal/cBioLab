@@ -7,6 +7,7 @@ import type { QueryColumn, RowSource } from "./table-query.ts";
 import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS } from "./lollipop.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
+import { ONCOKB_TABLE } from "./annotation-store.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean }
 
@@ -108,7 +109,7 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
   return "WITH " +
     (pin
       ? "ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver\n" +
-        "  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
+        "  FROM " + ONCOKB_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
         "  GROUP BY alteration),\n"
       : "") +
     built.map((b) => b.ctes).join("") +

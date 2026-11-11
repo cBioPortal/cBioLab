@@ -208,7 +208,7 @@ WITH c AS (
 ),
 g AS (SELECT gene, alt, any(cytoband) AS cytoband, arrayStringConcat(arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid))) AS so FROM c GROUP BY gene, alt),
 ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
-  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = 'v7.5' AND alteration_type = 'CNA' AND hugo_gene_symbol IN (SELECT gene FROM g)
+  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'CNA' AND hugo_gene_symbol IN (SELECT gene FROM g)
   GROUP BY gene, alteration),
 fa AS (SELECT hugo_gene_symbol AS gene, cna_alteration AS alt, uniqExact(sample_unique_id) AS n FROM snapshot_db.genomic_event_derived
   WHERE startsWith(genetic_profile_stable_id, 'msk_chord_2024_') AND cancer_study_identifier = 'msk_chord_2024' AND variant_type = 'cna' AND abs(cna_alteration) >= 2 AND hugo_gene_symbol IN (SELECT gene FROM g)
@@ -233,7 +233,7 @@ WITH c AS (
 ),
 g AS (SELECT gene, alt, any(cytoband) AS cytoband, arrayStringConcat(arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid))) AS so FROM c GROUP BY gene, alt),
 ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
-  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = 'v7.5' AND alteration_type = 'CNA' AND hugo_gene_symbol IN (SELECT gene FROM g)
+  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'CNA' AND hugo_gene_symbol IN (SELECT gene FROM g)
   GROUP BY gene, alteration),
 fa AS (SELECT hugo_gene_symbol AS gene, cna_alteration AS alt, uniqExact(sample_unique_id) AS n FROM snapshot_db.genomic_event_derived
   WHERE startsWith(genetic_profile_stable_id, 'msk_chord_2024_') AND cancer_study_identifier = 'msk_chord_2024' AND variant_type = 'cna' AND abs(cna_alteration) >= 2 AND hugo_gene_symbol IN (SELECT gene FROM g)
@@ -314,7 +314,7 @@ g AS (
   FROM m GROUP BY gene, proteinChange, mutationType, variantType, chr, start, end, ref, var
 ),
 ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
-  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN (SELECT gene FROM g)
+  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN (SELECT gene FROM g)
   GROUP BY gene, alteration),
 cn AS (SELECT hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupUniqArray(if(cna_alteration > 0, 'AMP', 'HOMDEL'))), ', ') AS copy
   FROM snapshot_db.genomic_event_derived WHERE startsWith(genetic_profile_stable_id, 'msk_chord_2024_') AND cancer_study_identifier = 'msk_chord_2024' AND patient_unique_id = 'msk_chord_2024_P-0000012'
@@ -350,7 +350,7 @@ g AS (
   FROM m GROUP BY gene, proteinChange, mutationType, variantType, chr, start, end, ref, var
 ),
 ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
-  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN (SELECT gene FROM g)
+  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN (SELECT gene FROM g)
   GROUP BY gene, alteration),
 cn AS (SELECT hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupUniqArray(if(cna_alteration > 0, 'AMP', 'HOMDEL'))), ', ') AS copy
   FROM snapshot_db.genomic_event_derived WHERE startsWith(genetic_profile_stable_id, 'msk_chord_2024_') AND cancer_study_identifier = 'msk_chord_2024' AND patient_unique_id = 'msk_chord_2024_P-0000012'

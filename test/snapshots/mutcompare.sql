@@ -39,7 +39,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_Basal'))))))),
      m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,
-                  patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM oncokb_annotation.variant_annotation
+                  patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM annotation.oncokb
         WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION'), 1, 0) AS driver
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'brca_tcga_pan_can_atlas_2018_') AND studyId = 'brca_tcga_pan_can_atlas_2018' AND `GENE.hugoGeneSymbol` IN ('TP53')
@@ -62,7 +62,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_LumA'))))))),
      m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,
-                  patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM oncokb_annotation.variant_annotation
+                  patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM annotation.oncokb
         WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION'), 1, 0) AS driver
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'brca_tcga_pan_can_atlas_2018_') AND studyId = 'brca_tcga_pan_can_atlas_2018' AND `GENE.hugoGeneSymbol` IN ('TP53')
@@ -159,7 +159,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_Basal'))))))),
      m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,
-                  patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM oncokb_annotation.variant_annotation
+                  patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM annotation.oncokb
         WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION'), 1, 0) AS driver
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'brca_tcga_pan_can_atlas_2018_') AND studyId = 'brca_tcga_pan_can_atlas_2018' AND `GENE.hugoGeneSymbol` IN ('TP53')
@@ -182,7 +182,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_LumA'))))))),
      m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,
-                  patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM oncokb_annotation.variant_annotation
+                  patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM annotation.oncokb
         WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION'), 1, 0) AS driver
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'brca_tcga_pan_can_atlas_2018_') AND studyId = 'brca_tcga_pan_can_atlas_2018' AND `GENE.hugoGeneSymbol` IN ('TP53')
