@@ -1,4 +1,4 @@
-// The import page's API, in local mode only (`npm run local`; lib/importer/ch-write.ts).
+// The import page's API, in local mode only (`npm run local`; packages/importer/src/ch-write.ts).
 //
 //   GET                  this instance's studies and the import running now, if any
 //   GET ?job=<id>        one import's progress and result
@@ -10,9 +10,10 @@ import { randomUUID } from "node:crypto";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { connection } from "next/server";
-import { importEnabled, localConn, query } from "../../../lib/importer/ch-write.ts";
-import { validStudyId } from "../../../lib/importer/datahub.ts";
-import { dataDir, job, runningJob, startJob } from "../../../lib/importer/jobs.ts";
+import { importEnabled, query } from "@cbiolab/importer/ch-write";
+import { importConn } from "../../../lib/import-conn.ts";
+import { validStudyId } from "@cbiolab/importer/datahub";
+import { dataDir, job, runningJob, startJob } from "@cbiolab/importer/jobs";
 
 const notLocal = () => Response.json({ error: "Importing is only available when cBioLab runs locally (npm run local)" }, { status: 404 });
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
@@ -20,7 +21,7 @@ const bad = (error: string, status = 400) => Response.json({ error }, { status }
 export interface LocalStudy { id: string; name: string; patients: number; samples: number; importedAt: string }
 
 async function localStudies(): Promise<LocalStudy[]> {
-  const rows = await query<{ id: string; name: string; patients: number; samples: number; at: string }>(localConn(),
+  const rows = await query<{ id: string; name: string; patients: number; samples: number; at: string }>(importConn(),
     "SELECT cs.cancer_study_identifier AS id, cs.name AS name, toString(cs.import_date) AS at,\n" +
     "  (SELECT count() FROM patient p WHERE p.cancer_study_id = cs.cancer_study_id) AS patients,\n" +
     "  cs.sample_count AS samples\n" +

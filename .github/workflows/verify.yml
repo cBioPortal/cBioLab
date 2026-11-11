@@ -116,13 +116,13 @@ jobs:
       - run: npm ci
 
       # the peer database's ClickHouse release and cBioPortal's schema and reference files, at the
-      # versions scripts/clickhouse-local.ts and lib/importer/setup.ts pin (scripts/gate.sh starts it)
+      # versions scripts/clickhouse-local.ts and packages/importer/src/setup.ts pin (scripts/gate.sh starts it)
       - &peer-db-pins
         name: Versions the peer database pins
         id: pins
         run: |
           echo "clickhouse=$(sed -n 's/^export const CLICKHOUSE_VERSION = "\(.*\)";$/\1/p' scripts/clickhouse-local.ts)" >> "$GITHUB_OUTPUT"
-          echo "cbioportal=$(sed -n 's/^export const CBIOPORTAL_COMMIT = "\(.*\)";$/\1/p' lib/importer/setup.ts)" >> "$GITHUB_OUTPUT"
+          echo "cbioportal=$(sed -n 's/^export const CBIOPORTAL_COMMIT = "\(.*\)";$/\1/p' packages/importer/src/setup.ts)" >> "$GITHUB_OUTPUT"
 
       - &peer-db-binary
         name: Cache the ClickHouse binary

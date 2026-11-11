@@ -9,7 +9,7 @@
 //   npm run local                          http://127.0.0.1:3120
 //   npm run local -- --port 3200 --no-open
 //   npm run local -- --import datahub:acc_tcga   import a study before the app starts
-//   npm run local -- --schema both         where imports write (lib/importer/lab-schema.ts): legacy
+//   npm run local -- --schema both         where imports write (packages/importer/src/lab-schema.ts): legacy
 //                                          (cBioPortal's tables, the default), new (the lab_ tables,
 //                                          shown to the app through views), or both
 //
@@ -20,9 +20,9 @@ import { createWriteStream } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { applySchemaMode, schemaMode, setupDatabase } from "../lib/importer/setup.ts";
-import { SCHEMA_MODES, type SchemaMode } from "../lib/importer/lab-schema.ts";
-import type { WriteConn } from "../lib/importer/ch-write.ts";
+import { applySchemaMode, schemaMode, setupDatabase } from "@cbiolab/importer/setup";
+import { SCHEMA_MODES, type SchemaMode } from "@cbiolab/importer/lab-schema";
+import type { WriteConn } from "@cbiolab/importer/ch-write";
 import { clickhouseBinary, clickhouseConfig, ping, startClickhouse, waitFor, writeUsers, type ClickhouseServer } from "./clickhouse-local.ts";
 
 const args = process.argv.slice(2);
@@ -81,7 +81,7 @@ async function main(): Promise<void> {
   const pre = opt("--import", "");
   if (pre) {
     say("Importing " + pre);
-    const imp = spawn(process.execPath, [path.join(repo, "scripts", "import-study.ts"), pre], { cwd: repo, env, stdio: "inherit" });
+    const imp = spawn(process.execPath, [path.join(repo, "packages", "importer", "bin", "import-study.ts"), pre], { cwd: repo, env, stdio: "inherit" });
     const code = await new Promise<number | null>((r) => imp.on("exit", r));
     if (code) say("The import of " + pre + " failed; the app starts anyway");
   }

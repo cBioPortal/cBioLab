@@ -11,8 +11,8 @@ import { Choice } from "../../_ui/choice";
 import { ErrorAlert } from "../../_ui/error-alert.tsx";
 import { CHIP, FIELD, TB } from "../../_ui/toolbar.ts";
 import { cn } from "../../../lib/cn";
-import type { EditKind, EditParams, EditPlan, EditResult } from "../../../lib/importer/lab-edits.ts";
-import type { Changes, ReviewDiff } from "../../../lib/importer/lab-review.ts";
+import type { EditKind, EditParams, EditPlan, EditResult } from "@cbiolab/importer/lab-edits";
+import type { Changes, ReviewDiff } from "@cbiolab/importer/lab-review";
 import type { StudyCounts, StudyState } from "../../api/import/updates/route.ts";
 
 interface Entry { at: string; what: string; detail: string; seconds: number; failed?: boolean }

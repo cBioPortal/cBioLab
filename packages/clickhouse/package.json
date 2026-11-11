@@ -1,0 +1,9 @@
+{
+  "name": "@cbiolab/clickhouse",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The ClickHouse HTTP client the offline tools share: one request per statement",
+  "type": "module",
+  "exports": { ".": "./src/index.ts", "./testing": "./src/testing.ts" },
+  "engines": { "node": ">=22.18" }
+}

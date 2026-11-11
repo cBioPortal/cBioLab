@@ -35,7 +35,7 @@ Each source has its own database, written by a sync and read by the app:
 ```
 npm run annotate -- oncokb --study msk_chord_2024   # one study
 npm run annotate -- oncokb --all                    # every study, then the portal-wide row
-npm run annotate -- oncokb --verify 300             # re-ask the service for 300 stored keys
+npm run annotate -- oncokb --verify 300 --release v7.5   # re-ask the service for 300 keys stored for v7.5
 npm run annotate -- oncokb --all --create           # also create the store, as a user allowed to
 ```
 
@@ -53,7 +53,7 @@ to it when their pin does (`ONCOKB_PIN`, or the newest release in the store).
 ## Setting up a store on a shared warehouse (administrator, once)
 
 ```sql
--- the store: the source's own statements (lib/annotation-sync/sources/<source>.ts `ddl`),
+-- the store: the source's own statements (packages/annotation-sync/src/sources/<source>.ts `ddl`),
 -- or `npm run annotate -- <source> --create` as a user allowed to create them
 
 -- its writer: the only identity that can fill it; it reads the warehouse and writes nowhere else
@@ -68,7 +68,11 @@ GRANT SELECT ON oncokb_annotation.* TO cohort_lab_ro;
 
 ## The code
 
-`lib/annotation-sync/` is to annotation what `lib/importer/` is to study data:
+The sync is a package of its own, `@cbiolab/annotation-sync` (`packages/annotation-sync/`), as the
+importer is (`@cbiolab/importer`): both are tools run against a database, not parts of the app, and
+both reach ClickHouse through `@cbiolab/clickhouse`, a client of their own. **The app never imports
+the sync** — `test/boundary.test.ts` fails if `app/`, `lib/` or `mcp/` does — which is how "no
+annotation service at run time" is held. In `src/`:
 
 - `source.ts` — what a source is: its database, table, version column and key columns, its
   `CREATE` statements, the warehouse query for its keys, how it reads the service's release and
@@ -76,8 +80,8 @@ GRANT SELECT ON oncokb_annotation.* TO cohort_lab_ro;
 - `sync.ts` — the source-independent part: the diff, the batches, the failure rule, `sync_run`.
 - `sources/<source>.ts` — one file per source. `sources/oncokb.ts` holds the OncoKB client.
 - `index.ts` — the list of sources, the writer connection, and every store's `CREATE` statements,
-  which a new local database runs (`lib/importer/setup.ts`), so its stores exist, empty.
-- `scripts/annotate.ts` — the command.
+  which a new local database runs (`packages/importer/src/setup.ts`), so its stores exist, empty.
+- `bin/annotate.ts` — the command (`npm run annotate`), and the package's `cbiolab-annotate`.
 
 Readers: `lib/annotation.ts` (the pin, which studies are synced, the driver index) and the SQL that
 joins the OncoKB store at the pin (`lib/oql.ts`'s `DRIVER`, the mutation and SV tables, the
@@ -85,10 +89,10 @@ actionability and clonality views).
 
 ### Adding a source
 
-1. A file in `lib/annotation-sync/sources/` exporting an `AnnotationSource`, listed in
+1. A file in `packages/annotation-sync/src/sources/` exporting an `AnnotationSource`, listed in
    `ANNOTATION_SOURCES`. Its database is its own; a licensed source's especially.
-2. Unit tests against `test/support/fake-ch.ts` and a stubbed service, as
-   `test/annotation-sync.test.ts` does for OncoKB.
+2. Unit tests against the stand-in ClickHouse (`@cbiolab/clickhouse/testing`) and a stubbed
+   service, as `packages/annotation-sync/test/annotation-sync.test.ts` does for OncoKB.
 3. The readers: whatever joins the store does so at a pin, the pin is echoed in the result's
    sources, and a study the release does not cover is said to be missing (invariant 2).
 

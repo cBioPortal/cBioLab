@@ -1,11 +1,11 @@
 // The unit-test coverage rules, run after `npm run report:coverage` (which writes the lcov this reads):
 // `npm run check:coverage`. Fails on any of:
 //
-// 1. Changed lines poorly covered. Of the lines in lib/ and mcp/ changed since the merge base with
+// 1. Changed lines poorly covered. Of the lines in lib/, mcp/ and packages/*/src/ changed since the merge base with
 //    COVERAGE_BASE (default origin/master; the working tree counts), at least PATCH_LINES% of the
 //    executable ones and PATCH_BRANCHES% of the branches on them must run under `npm test`. A patch
 //    with fewer than MIN_COUNTED of either is too small to hold to a percentage.
-// 2. A new file in lib/ or mcp/ that no unit test loads. Node leaves such a file out of its totals
+// 2. A new file in lib/, mcp/ or packages/*/src/ that no unit test loads. Node leaves such a file out of its totals
 //    altogether, so it would never show up in rule 1. A file that holds only types never runs, and
 //    is left out.
 // 3. An area's branch or function coverage below its floor in test/fixtures/coverage-floor.json, by
@@ -23,8 +23,8 @@ const root = join(import.meta.dirname, "..");
 const lcovPath = join(root, "quality-report", "coverage.lcov");
 const floorPath = join(root, "test", "fixtures", "coverage-floor.json");
 const PATCH_LINES = 80, PATCH_BRANCHES = 70, MIN_COUNTED = 10, FLOOR_SLACK = 0.25;
-const PATCH_SCOPE = (f: string) => /^(lib|mcp)\/.*\.tsx?$/.test(f) && !f.endsWith(".d.ts") && !/^lib\/views\/[^/]+\/doc\.ts$/.test(f);
-const AREAS = ["lib", "app", "mcp"];
+const PATCH_SCOPE = (f: string) => /^(lib|mcp|packages\/[^/]+\/src)\/.*\.tsx?$/.test(f) && !f.endsWith(".d.ts") && !/^lib\/views\/[^/]+\/doc\.ts$/.test(f);
+const AREAS = ["lib", "app", "mcp", "packages"];
 
 if (!existsSync(lcovPath)) { console.error("no " + relative(root, lcovPath) + ": run `npm run report:coverage` first"); process.exit(2); }
 
@@ -59,7 +59,7 @@ try { mergeBase = git("merge-base", "HEAD", base).trim(); } catch { out.push("No
 if (mergeBase) {
   const changed = new Map<string, Set<number>>();
   let file = "";
-  for (const l of git("diff", "-U0", "--no-color", "--no-ext-diff", mergeBase, "--", "lib", "mcp").split("\n")) {
+  for (const l of git("diff", "-U0", "--no-color", "--no-ext-diff", mergeBase, "--", "lib", "mcp", "packages").split("\n")) {
     if (l.startsWith("+++ ")) { file = l.startsWith("+++ b/") ? l.slice(6) : ""; continue; }
     const m = /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/.exec(l);
     if (!m || !file || !PATCH_SCOPE(file)) continue;
@@ -68,8 +68,8 @@ if (mergeBase) {
     for (let i = start; i < start + n; i++) set.add(i);
     changed.set(file, set);
   }
-  const added = new Set(git("diff", "--name-only", "--diff-filter=A", mergeBase, "--", "lib", "mcp").split("\n").filter(PATCH_SCOPE));
-  for (const f of git("ls-files", "--others", "--exclude-standard", "--", "lib", "mcp").split("\n").filter(PATCH_SCOPE)) {
+  const added = new Set(git("diff", "--name-only", "--diff-filter=A", mergeBase, "--", "lib", "mcp", "packages").split("\n").filter(PATCH_SCOPE));
+  for (const f of git("ls-files", "--others", "--exclude-standard", "--", "lib", "mcp", "packages").split("\n").filter(PATCH_SCOPE)) {
     added.add(f);
     changed.set(f, new Set(readFileSync(join(root, f), "utf8").split("\n").map((_, i) => i + 1)));
   }
@@ -89,7 +89,7 @@ if (mergeBase) {
     lh += flh; ln += fln; bh += fbh; bn += fbn;
     if (fln) rows.push("| " + f + " | " + flh + "/" + fln + " | " + fbh + "/" + fbn + " | " + ranges(missed) + " |");
   }
-  out.push("### Changed lines (lib/, mcp/) since " + base + " (" + mergeBase.slice(0, 9) + ")", "",
+  out.push("### Changed lines (lib/, mcp/, packages/*/src/) since " + base + " (" + mergeBase.slice(0, 9) + ")", "",
     "Lines " + lh + "/" + ln + " (" + fmt(pct(lh, ln)) + ", needs " + PATCH_LINES + "%), branches " + bh + "/" + bn + " (" + fmt(pct(bh, bn)) + ", needs " + PATCH_BRANCHES + "%).", "");
   if (ln >= MIN_COUNTED && pct(lh, ln) < PATCH_LINES) failures.push("changed lines covered " + fmt(pct(lh, ln)) + " < " + PATCH_LINES + "%");
   if (bn >= MIN_COUNTED && pct(bh, bn) < PATCH_BRANCHES) failures.push("branches on changed lines covered " + fmt(pct(bh, bn)) + " < " + PATCH_BRANCHES + "%");

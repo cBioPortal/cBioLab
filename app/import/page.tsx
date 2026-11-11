@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { SiteHeader } from "../_ui/site-header.tsx";
 import { PublicEnv } from "../_env/public-env.tsx";
-import { importEnabled } from "../../lib/importer/ch-write.ts";
+import { importEnabled } from "@cbiolab/importer/ch-write";
 import { ImportClient } from "./import-client.tsx";
 
 export const metadata = { title: "Import data — cbio-lab" };
