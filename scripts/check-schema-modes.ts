@@ -1,6 +1,6 @@
 // Runs the gallery examples against two local databases and compares what the engine answers:
 // the same studies imported in `legacy` mode (cBioPortal's tables) and in `new` mode (the lab_
-// tables behind views with cBioPortal's names; lib/importer/lab-schema.ts). Only examples whose
+// tables behind views with cBioPortal's names; packages/importer/src/lab-schema.ts). Only examples whose
 // studies are in both are run. Equal answers mean the app's SQL needs no change for the new schema.
 //
 //   node scripts/check-schema-modes.ts cbioportal cbioportal_new

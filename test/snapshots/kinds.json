@@ -1,5 +1,6 @@
 {
   "cardOrder": [
+    "mutcompare",
     "attrition",
     "genome",
     "segments",
@@ -2661,6 +2662,64 @@
       "sub": "TP53 · every mutation call",
       "title": "Mutation table (one gene)"
     },
+    "mutcompare": {
+      "added": {
+        "cohorts": [],
+        "kind": "mutcompare"
+      },
+      "addedBareStudy": {
+        "cohorts": [],
+        "kind": "mutcompare"
+      },
+      "addedWithTwoCohorts": {
+        "cohorts": [],
+        "kind": "mutcompare"
+      },
+      "card": {
+        "defaults": {
+          "kind": "mutcompare"
+        },
+        "defaultsBareStudy": {
+          "kind": "mutcompare"
+        },
+        "label": "Mutations compared (two-group lollipop)",
+        "maxCohorts": 2,
+        "minCohorts": 2,
+        "title": "Mutations",
+        "why": null,
+        "whyBareStudy": null
+      },
+      "drawsOwnHead": {
+        "error": true,
+        "withData": true
+      },
+      "drawsOwnWaiting": false,
+      "emptyHint": "It compares exactly 2 cohorts.",
+      "figureTitle": "Mutations compared — A vs B",
+      "headTitle": "Mutations",
+      "help": {
+        "text": "Compares where one gene's mutations fall in two groups of patients. The first group's mutations are drawn above the protein and the second group's below it, so a spot mutated much more often in one group stands out. The table lists every protein change with how many patients in each group carry it, and whether the difference between the groups is more than chance.",
+        "title": "What is this?"
+      },
+      "isNew": false,
+      "maxCohorts": 2,
+      "menu": {
+        "label": "Mutations compared (two-group lollipop)",
+        "loading": false,
+        "why": null
+      },
+      "menuAggregateOnly": {
+        "why": null
+      },
+      "menuBareStudy": {
+        "loading": false,
+        "why": null
+      },
+      "need": null,
+      "preview": null,
+      "sub": "highest-frequency gene · two cohorts mirrored about the protein, and every protein change tested",
+      "title": "Mutations compared (two-group lollipop)"
+    },
     "oncoprint": {
       "added": {
         "cohorts": [
@@ -3996,6 +4055,7 @@
     "logistic",
     "oncoprint",
     "hotspots",
+    "mutcompare",
     "plot",
     "cooccurrence",
     "clinical",

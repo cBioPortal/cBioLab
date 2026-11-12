@@ -21,9 +21,9 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { CBIOPORTAL_COMMIT, setupDatabase } from "../lib/importer/setup.ts";
-import { exec, insertAll, query, sq, type WriteConn } from "../lib/importer/ch-write.ts";
-import { importStudy } from "../lib/importer/import-study.ts";
+import { CBIOPORTAL_COMMIT, setupDatabase } from "@cbiolab/importer/setup";
+import { exec, insertAll, query, sq, type WriteConn } from "@cbiolab/importer/ch-write";
+import { importStudy } from "@cbiolab/importer/import-study";
 import { clickhouseBinary, clickhouseConfig, exists, ping, startClickhouse, waitFor, writeUsers, type ClickhouseServer } from "./clickhouse-local.ts";
 
 const args = process.argv.slice(2);
@@ -85,12 +85,12 @@ async function seedOncokb(conn: WriteConn): Promise<void> {
   const rows = lines.map((l) => Object.fromEntries(l.split("\t").map((v, i) => [cols[i], v])));
   const pin = await appPin();
   const versions = [...new Set([pin, "fixture"].filter((v): v is string => !!v))];
-  const db = { ...conn, db: "oncokb_annotation" };
+  const db = { ...conn, db: "annotation" };
   for (const v of versions) {
-    const n = await query<{ n: number }>(db, "SELECT count() AS n FROM variant_annotation FINAL WHERE oncokb_version = " + sq(v));
+    const n = await query<{ n: number }>(db, "SELECT count() AS n FROM oncokb FINAL WHERE oncokb_version = " + sq(v));
     if (Number(n[0]?.n) === rows.length) continue;
-    await exec(db, "ALTER TABLE variant_annotation DELETE WHERE oncokb_version = " + sq(v));
-    await insertAll(db, "variant_annotation", rows.map((r) => ({ ...r, oncokb_version: v, api_version: "fixture" })));
+    await exec(db, "ALTER TABLE oncokb DELETE WHERE oncokb_version = " + sq(v));
+    await insertAll(db, "oncokb", rows.map((r) => ({ ...r, oncokb_version: v, api_version: "fixture" })));
     say("OncoKB calls for the fixture's variants stored under " + v);
   }
   if (!pin) say("no primary warehouse to read the app's OncoKB pin from; its calls are stored under \"fixture\" only");

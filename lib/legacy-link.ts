@@ -10,7 +10,9 @@ import { assayTypeOfGroup } from "./profile-catalog.ts";
 
 /** a page's state, less its open tab */
 export type LegacyPage =
-  | { page: "results"; studies: string[]; entries: string[]; filters: Clause[] }
+  | { page: "results"; studies: string[]; entries: string[]; filters: Clause[];
+      /** the query page's profiles and case set as the portal's parameters (lib/query-options.ts legacyQueryParams), or why they cannot be said; absent for a page without them */
+      query?: { params: [string, string][] } | { why: string } | null }
   | { page: "patient"; study: string; patient?: string; sample?: string }
   | { page: "comparison"; study: string };
 
@@ -124,7 +126,11 @@ export function legacyLink(p: LegacyPage, where: LegacyWhere, held: Record<strin
       tip: "open this " + (p.sample ? "sample" : "patient") + " on cBioPortal (" + site + "), " + opens(asked, tab, !!PATIENT_TABS[asked || ""]) };
   }
 
-  const c = cases(studies, p.filters);
+  if (p.query && "why" in p.query) return no(p.query.why);
+  const chosen = p.query ? p.query.params : null;
+  // a case set the page chose is the link's own, unless filters narrow it further
+  if (chosen && p.filters.length) return no("this page's filters and case set together are not something cBioPortal's Results link can say");
+  const c = chosen ? { params: chosen } : cases(studies, p.filters);
   if ("why" in c) return no(c.why);
   const asked = where.tab;
   const tab = (asked && RESULTS_TABS[asked]) || RESULTS_DEFAULT;

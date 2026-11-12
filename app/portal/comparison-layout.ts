@@ -22,11 +22,15 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
       none: probeMethylation(catalog) ? null : "no methylation profile" },
   ];
   const groupsOk = names.length >= 2 && names.length <= EXPRESSION_MAX_GROUPS;
+  // the portal's Mutations tab: shown when a study has a mutation profile, drawing exactly two groups
+  const mutationProfile = catalog.some((p) => p.type === "MUTATION_EXTENDED");
+  const mutationsOk = mutationProfile && names.length === 2;
   const assays = known ? assayComparisonProfiles(catalog) : [];
   const clinical = known?.clinical || [];
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
   const measure = drivers ? "driver" : "any";
   const left = !known ? [] : [!clinical.length && "Clinical (no attributes)",
+    !mutationProfile ? "Mutations (no mutation profile)" : !mutationsOk && "Mutations (compares exactly 2 groups, and " + names.length + (names.length === 1 ? " is" : " are") + " compared)",
     ...expression.filter((e) => (!e.profile && e.none) || (e.profile && !groupsOk)).map((e) => e.title + " (" + (!e.profile ? e.none
       : "compares 2 to " + EXPRESSION_MAX_GROUPS + " groups, and " + names.length + (names.length === 1 ? " is" : " are") + " compared") + ")"),
     !assays.length && "Generic Assays (no generic-assay profile)"].filter(Boolean) as string[];
@@ -36,6 +40,7 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
     ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", attributes: clinical.slice(0, CLINICAL_SHOWN) })] }] : []),
     { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", measure }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna", measure }),
       v("Structural variants", { kind: "enrichment", alteration: "sv", measure })] },
+    ...(mutationsOk ? [{ title: "Mutations", views: [v("Mutations", { kind: "mutcompare" })] }] : []),
     ...(groupsOk ? expression.filter((e) => e.profile).map((e) => ({ title: e.title, views: [v(e.title, { kind: "diffexpr", profileType: e.profile, ...e.extra })],
       // the portal's tab offers the data set alone
       locks: ["log2", "geneSets"] })) : []),

@@ -6,7 +6,7 @@ The map of the code: what each part does, where it lives, and the one place each
 ## The shape of the system
 
 Every surface reads and writes the same document; the engine owns all semantics; the warehouse is
-read-only, with the licensed annotation store isolated behind its own database grant; what people
+read-only, with the annotation stores in a database of their own and the licensed one behind its own table grant; what people
 keep lives in a separate, writable Postgres; another instance is reached through the federation
 API, never MCP; and the DSL's documentation, agent grammar and MCP self-description all render
 from one source module.
@@ -44,8 +44,10 @@ flowchart TB
 
     subgraph DATA["Warehouse — read-only, lib/ch.ts"]
         CH[("ClickHouse<br/>cBioPortal derived tables<br/>one or two databases")]
-        OKB[("oncokb_annotation<br/>separate DB · version-pinned<br/>license = GRANT boundary")]
+        OKB[("annotation DB · version-pinned<br/>oncokb (license = table GRANT)<br/>variant (public sources) · sync_run")]
     end
+    SYNC["Annotation sync — offline, npm run annotate<br/>packages/annotation-sync/ · one file per source<br/>the only caller of annotation services"]
+    SYNC -- "diff · batch · append at a release" --> OKB
     RES --> CH
     RES -- "DRIVER joins the pin" --> OKB
 
@@ -118,6 +120,21 @@ no longer match the kind folders and the maps keyed by `ViewKind`.
   | `{not:leaf}`; leaf kinds: `oql`, `clinical`, `event` (v1 timeline sub-DSL), `patients`,
   `profiled`, `caseList`, `genomicData`, `genericAssay` (+deprecated `alteration`→OQL).
 - **`lib/oql.ts`** — the honest OQL subset; `DRIVER` joins the version-pinned OncoKB store.
+- **Packages** (`packages/`, npm workspaces; root `package.json` `workspaces`) — what is run against a
+  database rather than served: `@cbiolab/importer` (a study folder into cBioPortal's tables, [LOCAL.md](LOCAL.md)),
+  `@cbiolab/annotation-sync` (the annotation stores, below) and `@cbiolab/clickhouse`, the HTTP client the
+  two share. Each ships TypeScript source (`exports` point at `src/*.ts`; Node strips types, Next
+  transpiles them through `transpilePackages`), has its command in `bin/` and its tests in `test/`
+  (`npm test` runs them; coverage counts `packages/*/src/` as an area of its own). The app's way to
+  ClickHouse stays `lib/ch.ts`: a package's client sends through a connection's `send` when one is
+  given, and `lib/import-conn.ts` gives local mode's import page one that calls `chWrite`. The app
+  never imports the annotation sync, and the importer only under `app/import/` and `app/api/import/`
+  — `test/boundary.test.ts` holds both.
+- **Annotation stores** ([ANNOTATION.md](ANNOTATION.md)) — **the app never calls an annotation
+  service.** `packages/annotation-sync/` (`npm run annotate`) resolves the warehouse's distinct keys
+  against each source offline and appends them to that source's own version-pinned database,
+  logging every run in `annotation.sync_run`; the app reads the store at a pin (`lib/annotation.ts`). A
+  source is a file in `packages/annotation-sync/src/sources/`; the diff, batching and audit are shared.
 - **`lib/compiler.ts`** — v1 timeline/event sub-DSL (BEFORE/DURING/NOT_FOLLOWED_BY,
   observability guard, priorGuard, derived treatment lines).
 - **`lib/analysis.ts`** — `runAnalysis(doc)`: evaluates cohorts (per-study; cross-study

@@ -5,7 +5,7 @@
 // Contract: sorted columns, typed cells (bitmask for gene tracks, NOT_PROFILED = -1),
 //   panel-aware track frequencies, group ranges. The renderer does zero data logic.
 import { chQuery, chQueryRows, DB, STUDY, PRIMARY, ensureChContext, registerChExternal, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
-import { compileCohort, mutationStudySql, sq } from "./compiler.ts";
+import { compileCohort, mutationStudySql, sq, genomicStudySql } from "./compiler.ts";
 import type { CohortDef, Contract, ChRow } from "./types.ts";
 
 // Internal-only: analysis.js passes an evaluated cohort's SQL as a subquery via this
@@ -137,7 +137,7 @@ export function genomicEventsSql(genes: string[], study: string = STUDY, db: str
     // the study's own driver call and tier, and whether the mutation is germline (lib/driver-settings.ts)
     "       driver_filter AS df, driver_tiers_filter AS dt, toUInt8(" + germlineCondSql() + ") AS germ\n" +
     "FROM " + db + ".genomic_event_derived\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
+    "WHERE " + genomicStudySql(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND mutation_status != 'UNCALLED'" + // read support, not a call (lib/oql.ts specCond)
     fromColumnSamples("sample_unique_id", study, samples);
 }

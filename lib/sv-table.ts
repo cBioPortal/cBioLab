@@ -8,6 +8,7 @@ import type { QueryColumn, RowSource } from "./table-query.ts";
 import type { TablePart } from "./mutation-table.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
+import { ONCOKB_TABLE } from "./annotation-store.ts";
 
 const str = (x: string) => "ifNull(toString(" + x + "), '')";
 const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
@@ -100,7 +101,7 @@ function allRows(parts: TablePart[], db: string, genes: string[], pin: string | 
     (pin
       // the store keys a structural variant by gene, as alteration 'Fusion' (lib/oql.ts's storeAlteration)
       ? "ann AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, toUInt8(max(is_driver)) AS driver\n" +
-        "  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'SV' AND alteration = 'Fusion'\n" +
+        "  FROM " + ONCOKB_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'SV' AND alteration = 'Fusion'\n" +
         "  GROUP BY gene),\n"
       : "") +
     built.map((b) => b.ctes).join("") +

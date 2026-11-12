@@ -1,7 +1,7 @@
 {
   "note": "Expected cohort counts for every example in lib/dsl-reference.ts, asserted by npm run docs:check. Regenerate with `npm run docs:counts` ONLY after reviewing why a number moved.",
   "oncokbPin": "v7.5",
-  "generated": "2026-10-28",
+  "generated": "2026-11-09",
   "examples": {
     "Lung adenocarcinoma: a four-view workup": {
       "EGFR-mutant NSCLC": 1890,
@@ -207,6 +207,17 @@
       "NSCLC high-TMB": 69,
       "NSCLC low-TMB": 281
     },
+    "Custom data: a curated biopsy site on every sample": {
+      "all patients": 93,
+      "CNS met": 8
+    },
+    "Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)": {
+      "all patients": 42
+    },
+    "TP53 mutations in basal-like against luminal A breast cancer": {
+      "Basal-like": 171,
+      "Luminal A": 499
+    },
     "Cohort attrition: which criterion removed whom": {
       "LUAD KRAS G12C, immunotherapy": 279,
       "LUAD KRAS wild-type": 3984
@@ -247,6 +258,9 @@
     "ctDNA against tissue: what a blood test sees of the tumour, and what detecting it says": {
       "all patients": 1127
     },
+    "ctDNA with clonal haematopoiesis filtered out: MSK-ACCESS plasma against tissue": {
+      "all patients": 617
+    },
     "Mutual exclusivity that accounts for each tumour's burden (DISCOVER)": {
       "NSCLC": 1567
     },
@@ -254,9 +268,6 @@
       "Colorectal": 4993,
       "Breast": 5803,
       "Pancreatic": 2729
-    },
-    "ctDNA with clonal haematopoiesis filtered out: MSK-ACCESS plasma against tissue": {
-      "all patients": 617
     },
     "Clonality, LOH and genome doubling from FACETS": {
       "Colorectal": 4993,
@@ -267,21 +278,6 @@
       "Breast": 5368,
       "Colorectal": 5543
     },
-    "Real-world PFS on immunotherapy in lung cancer, by KRAS status": {
-      "NSCLC, KRAS mutant": 2183,
-      "NSCLC, KRAS wild-type": 5551
-    },
-    "From progression to death in colorectal cancer, by stage": {
-      "Colorectal, stage 1-3": 3171,
-      "Colorectal, stage 4": 2372
-    },
-    "Months of life gained on immunotherapy with a high tumour mutational burden, with landmarks": {
-      "TMB < 10": 1201,
-      "TMB ≥ 10": 460
-    },
-    "Which mutations change survival on immunotherapy in lung cancer?": {
-      "NSCLC": 7809
-    },
     "A tumour mutational burden cut-point for survival on immunotherapy": {
       "all patients": 1661
     },
@@ -291,9 +287,20 @@
     "HLA class I homozygosity and survival on checkpoint blockade in melanoma": {
       "melanoma on checkpoint blockade": 212
     },
-    "PSA response to hormone therapy, by TP53 status": {
-      "Prostate, TP53 mutant": 837,
-      "Prostate, TP53 wild-type": 2297
+    "Which mutations change survival on immunotherapy in lung cancer?": {
+      "NSCLC": 7809
+    },
+    "Months of life gained on immunotherapy with a high tumour mutational burden, with landmarks": {
+      "TMB < 10": 1201,
+      "TMB ≥ 10": 460
+    },
+    "From progression to death in colorectal cancer, by stage": {
+      "Colorectal, stage 1-3": 3171,
+      "Colorectal, stage 4": 2372
+    },
+    "Real-world PFS on immunotherapy in lung cancer, by KRAS status": {
+      "NSCLC, KRAS mutant": 2183,
+      "NSCLC, KRAS wild-type": 5551
     },
     "A survival risk model from mutated genes in lung cancer": {
       "NSCLC": 7809
@@ -302,21 +309,9 @@
       "NSCLC (MSK-IMPACT 2017)": 1567,
       "NSCLC (MSK-CHORD)": 7809
     },
-    "Custom data: a curated biopsy site on every sample": {
-      "all patients": 93,
-      "CNS met": 8
-    },
-    "Custom data: single-cell features of ovarian tumours (MSK SPECTRUM)": {
-      "all patients": 42
-    },
-    "Composition: T and NK cell states by mutational signature (MSK SPECTRUM)": {
-      "HRD-Dup": 16,
-      "HRD-Del": 6,
-      "FBI": 14
-    },
-    "Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)": {
-      "Conventional adenoma": 28,
-      "Serrated polyp": 18
+    "PSA response to hormone therapy, by TP53 status": {
+      "Prostate, TP53 mutant": 837,
+      "Prostate, TP53 wild-type": 2297
     },
     "Cancer types summary: RAS genes across 50,000 tumours": {
       "all patients": 48179
@@ -335,8 +330,20 @@
       "Melanoma": 1706,
       "Non-small cell lung": 6633
     },
-    "Co-expression: the genes that rise and fall with ESR1": {
-      "all patients": 1084
+    "Composition: T and NK cell states by mutational signature (MSK SPECTRUM)": {
+      "HRD-Dup": 16,
+      "HRD-Del": 6,
+      "FBI": 14
+    },
+    "Composition: adenomas and serrated polyps, from a generic single-cell summary (HTAN Vanderbilt)": {
+      "Conventional adenoma": 28,
+      "Serrated polyp": 18
+    },
+    "KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first": {
+      "Colorectal": 5543
+    },
+    "ALK, ROS1 and RET structural variants in MSK-IMPACT": {
+      "MSK-IMPACT": 10336
     },
     "Clinical data: every pancreatic cancer sample, oldest patients first": {
       "Pancreatic": 3109
@@ -356,11 +363,8 @@
     "A melanoma's mutational signatures: UV light behind nine in ten of its mutations": {
       "Melanoma": 107
     },
-    "KRAS codon 12/13 mutations in colorectal cancer, clonal-looking calls first": {
-      "Colorectal": 5543
-    },
-    "ALK, ROS1 and RET structural variants in MSK-IMPACT": {
-      "MSK-IMPACT": 10336
+    "Co-expression: the genes that rise and fall with ESR1": {
+      "all patients": 1084
     }
   }
 }

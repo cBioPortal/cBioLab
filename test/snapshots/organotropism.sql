@@ -55,12 +55,12 @@ prof AS (
 alt AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid, g.hugo_gene_symbol AS gene
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND g.hugo_gene_symbol IN ('EGFR', 'KRAS', 'TP53', 'STK11', 'KEAP1', 'SMARCA4')
     AND ann.is_driver
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
@@ -118,12 +118,12 @@ prof AS (
 alt AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid, g.hugo_gene_symbol AS gene
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
@@ -156,12 +156,12 @@ prof AS (
 alt AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid, g.hugo_gene_symbol AS gene
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
@@ -251,12 +251,12 @@ prof AS (
 alt AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid, g.hugo_gene_symbol AS gene
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
@@ -289,12 +289,12 @@ prof AS (
 alt AS (
   SELECT DISTINCT replaceOne(g.patient_unique_id, 'msk_chord_2024_', '') AS pid, g.hugo_gene_symbol AS gene
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND g.hugo_gene_symbol IN ('EGFR')
     AND ann.is_driver
     AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)

@@ -1,4 +1,4 @@
-// Benchmark of the schema modes (lib/importer/lab-schema.ts) at a realistic number of studies:
+// Benchmark of the schema modes (packages/importer/src/lab-schema.ts) at a realistic number of studies:
 // the same queries timed on cBioPortal's tables, on the labv_ views over the lab_ tables, and on
 // the lab_ tables read directly, with and without FINAL (what reading only each row's latest
 // version costs).
@@ -27,7 +27,7 @@ const opt = (name: string, dflt: string) => { const i = args.indexOf(name); retu
 const dataDir = process.env.CBIOLAB_DATA || path.join(os.homedir(), ".cbiolab");
 if (!process.env.CLICKHOUSE_URL) { try { process.loadEnvFile(path.join(dataDir, "local.env")); } catch { /* not running */ } }
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const importer = path.join(repo, "scripts", "import-study.ts");
+const importer = path.join(repo, "packages", "importer", "bin", "import-study.ts");
 const run = (label: string, ...a: string[]) => {
   const t0 = performance.now();
   execFileSync(process.execPath, [importer, ...a], { stdio: "inherit", env: { ...process.env, CBIOLAB_LOCAL: "1" } });

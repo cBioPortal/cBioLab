@@ -14,9 +14,9 @@ CAVEAT (tell the user): PFS_1L from each study's own baseline (left truncation a
         count rows: 28
     - Count patients by time and status [MSS · ucec_msk_2018] (148 → 148 rows): The survivalCounts:PFS_1L query above: patients grouped by identical PFS_MONTHS_FIRST_LINE_TX, event, returned as counts — no patient identifier leaves the database. Event: PROGRESSION_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.
         count rows: 138
-    - Estimate survival by Kaplan–Meier: The product-limit estimator, one curve per cohort, pooled over its studies. The median is the first time the curve is at or below 0.5.
+    - Estimate survival by Kaplan–Meier: The product-limit estimator, one curve per cohort, pooled over its studies, computed from the count rows directly: at each distinct time, the deaths and the number at risk are sums of the rows' patient counts. The median is the first time the curve is at or below 0.5.
         MSI-H: 28 patients, 23 events, median 18.4 months
         MSS: 148 patients, 142 events, median 15.3 months
     - Two-group log-rank test: At each event time, every cohort's observed events against its share of the risk set, with the hypergeometric variance; χ² on 1 df.
         χ² / df / p: 0.3942 / 1 / 0.530
-    Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).
+    The count-row functions return exactly what kaplanMeier, logRank and logRankK return on the same rows expanded to one record per patient (test/survival-counts.test.ts). Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).

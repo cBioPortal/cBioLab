@@ -995,3 +995,53 @@ differential expression, and the Node-bound views above. Co-expression's read of
 `rna_seq_v2_mrna`, 141M rows read in 0.12s — and its time is in what follows: averaging per
 (sample, gene) took 4.1s and 2.1 GB on its own, then the join to the reference gene and two `rank()`
 windows over 22M rows.
+
+# Reading one study's genomic events (November 2026)
+
+`genomic_event_derived` (50M rows) is sorted by `genetic_profile_stable_id` before
+`cancer_study_identifier`, so a filter on the study alone lets ClickHouse skip only part of the
+table: a 5-gene query on msk_chord_2024 read 4.86M rows. Every query on it now goes through
+`genomicStudySql` (`lib/compiler.ts`), which adds the study's profile prefix as `mutationStudySql`
+already did for `mutation_derived` — 0.29M rows, CPU 0.11s → 0.04s, same answer. Several studies
+(pooled Explore) take an OR of prefixes, which prunes as well. The prefix can also match a sibling
+study (`brca_tcga_` ↔ `brca_tcga_pub_…`); the study column still decides which rows count, and every
+profile in the public and GENIE warehouses starts with its study's id (the importer adds it when a
+meta file omits it). The OQL range path reads `mutation_derived` and keeps its own filter.
+
+Explore's per-study event-type counts joined all of `clinical_event` (3.2M rows) to patients and
+studies before filtering; for one study it now filters the events by that study's patient ids with
+no join — CPU 0.35s → 0.17s, memory 133 → 84 MB.
+
+Measured page by page against a dedicated ClickHouse service (`scripts/portal-bench/measure.cjs`:
+real browser, query log filtered to the lab's user, uncached, median of 3):
+
+| page | DB CPU before → after | rows read before → after |
+|---|---|---|
+| Explore (study view) | 4.25s → 3.46s | 58.8M → 31.3M |
+| Results › OncoPrint | 3.87s → 2.91s | 63.7M → 22.5M |
+| Results › Plots | 3.06s → 2.12s | 64.4M → 23.2M |
+| Comparison › Survival | 4.21s → 3.14s | 73.1M → 27.4M |
+| Comparison › Clinical | 4.20s → 3.18s | 73.6M → 27.8M |
+| Comparison › Genomic Alterations | 5.70s → 3.87s | 111.3M → 38.0M |
+| **all six** | **25.3s → 18.7s (−26%)** | **445M → 170M** |
+
+The same pages on cbioportal.org's backend (7.2.3, ClickHouse mode, no cache) cost 4.1–15.3s each,
+45s for the six. Verified: the view snapshots recorded again — only queries and answers changed,
+plus results that moved with the warehouse reload of 2026-11-02 (two-studies-plot: two more
+patients with SEX) and float sums' last digits (diffexpr, two-studies-four-views).
+
+Head-to-head with cbioportal 7.2.3 on the same service, both uncached, the six pages summed
+(medians of 3; `scripts/portal-bench/results/2026-11-10T02-21-24-094Z.jsonl`):
+
+| | cbioportal | cBioLab | ratio |
+|---|---|---|---|
+| DB CPU | 47.6s | 20.4s | 2.3× |
+| DB memory (each query's peak, summed) | 27.0 GiB | 10.3 GiB | 2.6× |
+| DB bytes read | 16.4 GiB | 3.1 GiB | 5× |
+| server CPU | 119s | 15s | 8× |
+| server peak memory (highest page) | 1.02 GiB | 0.64 GiB | 1.6× |
+
+Every page costs less on cBioLab. cbioportal's JVM grows over a run (1.4 GiB in one round).
+
+Still open: on Genomic Alterations the altered/unaltered cohort query (0.54s, 12M rows) runs twice,
+from two requests sent at once, and the result cache does not share a query that is still running.

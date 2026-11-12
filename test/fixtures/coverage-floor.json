@@ -10,5 +10,9 @@
   "mcp": {
     "branches": 94.2,
     "functions": 94.87
+  },
+  "packages": {
+    "branches": 91.8,
+    "functions": 97.94
   }
 }

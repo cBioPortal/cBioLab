@@ -5,7 +5,7 @@
 // participant, aggregate-only included, can answer.
 import { survivalMonthsSql, survivalEventSql, endpointRowsSql, endpointValueSql } from "./survival-sql.ts";
 import { osCte } from "./survival-queries.ts";
-import { sq } from "./compiler.ts";
+import { sq, genomicStudySql } from "./compiler.ts";
 import { ALTERED_COND, driverJoin, inCohortClinical } from "./federation.ts";
 import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql, foldedInSql } from "./event-names.ts";
 import { clinicalTable } from "./custom-data.ts";
@@ -76,7 +76,7 @@ export function sideCountsTail(study: string, db: string, genes: string[] | null
     "  FROM " + db + ".genomic_event_derived g\n" +
     (pin && measure === "driver" ? driverJoin(pin) : "") +
     "  INNER JOIN ps ON ps.suid = g.sample_unique_id\n" +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + (scan ? "" : " AND g.hugo_gene_symbol IN (" + geneList + ")") + " AND " + ALTERED_COND + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + (scan ? "" : " AND g.hugo_gene_symbol IN (" + geneList + ")") + " AND " + ALTERED_COND + "\n" +
     // narrows the events before the annotation join rather than after it
     "    AND g.sample_unique_id IN (SELECT suid FROM ps)" + (exclude ? " AND " + exclude : "") + "\n" +
     "  GROUP BY gene, pid, side\n" +
@@ -276,6 +276,53 @@ export const enrichEventCond = (a: EnrichAlteration): string => "NOT g.off_panel
   : a === "homdel" ? "g.variant_type = 'cna' AND g.cna_alteration <= -2"
   : "g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2");
 
+/** Per gene: the cohort's samples with that alteration type in it (uncalled mutations excluded, as the
+ *  portal's gene tables exclude them; high-level copy number only). Counts only. */
+export function enrichAlteredSql(cohortSql: string, study: string, db: string, alteration: EnrichAlteration, pin: string | null, driver: boolean): AggregateSql {
+  const sid = bareSampleId("g.sample_unique_id", study);
+  return aggregateSql((
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT g.hugo_gene_symbol AS gene, uniqExact(g.sample_unique_id) AS altered\n" +
+    "FROM " + db + ".genomic_event_derived g\n" +
+    (driver && pin ? driverJoin(pin) : "") +
+    "WHERE " + genomicStudySql(study, "g") + " AND " + enrichEventCond(alteration) + "\n" +
+    "  AND " + inCohortSamples(sid) + (driver && pin ? " AND ann.is_driver" : "") + "\n" +
+    "GROUP BY gene"
+  ));
+}
+
+/** Per gene: the cohort's samples on a (non-WES) panel covering it for that alteration type — samples
+ *  are counted per panel first and the panels then joined to their genes, Explore's own construction
+ *  (distinct samples, never rows: a study with two CNA profiles lists each sample twice). */
+export function enrichPanelProfiledSql(cohortSql: string, study: string, db: string, alteration: EnrichAlteration): AggregateSql {
+  const covSid = bareSampleId("sp.sample_unique_id", study);
+  return aggregateSql((
+    "WITH cohort AS (" + cohortSql + "),\n" +
+    "pc AS (\n" +
+    "  SELECT sp.gene_panel_id AS panel, uniqExact(sp.sample_unique_id) AS n\n" +
+    "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = " + sq(ENRICH_PANEL_TYPE[alteration]) + "\n" +
+    "    AND sp.gene_panel_id != 'WES' AND " + inCohortSamples(covSid) + "\n" +
+    "  GROUP BY panel\n" +
+    ")\n" +
+    "SELECT gptg.gene AS gene, sum(pc.n) AS profiled\n" +
+    "FROM " + db + ".gene_panel_to_gene_derived gptg INNER JOIN pc ON pc.panel = gptg.gene_panel_id\n" +
+    "GROUP BY gene"
+  ));
+}
+
+/** The cohort's whole-exome samples for that alteration type: profiled for every gene, so one number. */
+export function enrichWesSql(cohortSql: string, study: string, db: string, alteration: EnrichAlteration): AggregateSql {
+  const covSid = bareSampleId("sp.sample_unique_id", study);
+  return aggregateSql((
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT uniqExact(sp.sample_unique_id) AS n\n" +
+    "FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = " + sq(ENRICH_PANEL_TYPE[alteration]) + "\n" +
+    "  AND sp.gene_panel_id = 'WES' AND " + inCohortSamples(covSid)
+  ));
+}
+
 // ---------------------------------------------------------------------------
 // assays: a generic-assay profile's every entity, compared between cohorts
 
@@ -385,7 +432,7 @@ export function riskmodelRowsSql(cohortSql: string, study: string, db: string, o
     "  SELECT " + pidOf("g.patient_unique_id", study) + " AS pid, groupUniqArray(g.hugo_gene_symbol) AS genes\n" +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (driverPin ? driverJoin(driverPin) : "") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation' AND " + ALTERED_COND + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND g.variant_type = 'mutation' AND " + ALTERED_COND + "\n" +
     (driverPin ? "    AND ann.is_driver = 1\n" : "") +
     "    AND " + inCohortSamples(bareSampleId("g.sample_unique_id", study)) + "\n" +
     "  GROUP BY pid\n" +

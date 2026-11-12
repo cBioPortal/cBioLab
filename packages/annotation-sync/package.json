@@ -1,0 +1,19 @@
+{
+  "name": "@cbiolab/annotation-sync",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Resolves the warehouse's variants against annotation services, offline, into version-pinned ClickHouse stores",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "cbiolab-annotate": "./bin/annotate.ts"
+  },
+  "dependencies": {
+    "@cbiolab/clickhouse": "*"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

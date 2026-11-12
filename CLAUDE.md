@@ -34,9 +34,17 @@ for the area you are changing first. The parts most changes touch:
   `sql.ts`; **don't add a method per view to the resolver interfaces in `lib/federation.ts`**.
 - **Table views** supply a `RowSource`; `lib/table-query.ts` does the rest. Never build these per view.
 - **Local mode and the importer** — `npm run local` (`scripts/local.ts`) starts a private ClickHouse
-  and the app; `lib/importer/` turns a study folder into cBioPortal's base tables by the legacy
+  and the app; `packages/importer/` turns a study folder into cBioPortal's base tables by the legacy
   importer's rules, then runs cBioPortal's own `populate_derived_tables.sql`; `/import` and
   `/api/import` exist only with `CBIOLAB_LOCAL=1`. [`docs/LOCAL.md`](docs/LOCAL.md).
+- **Annotation** — **the app never calls an annotation service at run time.** Every annotation is
+  resolved offline into a version-pinned store (`packages/annotation-sync/`, `npm run annotate`) and read
+  from there at a pin. [`docs/ANNOTATION.md`](docs/ANNOTATION.md).
+- **Packages** (`packages/`, npm workspaces) — the tools run against a database rather than parts of
+  the app: `@cbiolab/importer`, `@cbiolab/annotation-sync`, and `@cbiolab/clickhouse`, their own
+  ClickHouse client. The app imports the importer only for local mode's import page, handing it
+  `lib/import-conn.ts` (statements through `lib/ch.ts`), and never the annotation sync
+  (`test/boundary.test.ts`). Each package keeps its tests in its own `test/`.
 - **Agents** — WebMCP tools `lib/webmcp.ts` / `app/lab/agent-tools.ts`; MCP server `mcp/tools.ts`.
   **Federation is not MCP**: peers talk through `lib/federation-api.ts` at `/api/federation/v1/<op>`;
   never register a federation op as an MCP tool. **The chat sidebar is the app's only model call and
@@ -50,6 +58,7 @@ Other docs: [`DOMAIN.md`](docs/DOMAIN.md) (what the domain's words mean),
 this project is "fast"), [`ENVIRONMENT.md`](docs/ENVIRONMENT.md) (settings),
 [`SESSIONS.md`](docs/SESSIONS.md) (several working copies on one machine),
 [`PORTAL-PARITY.md`](docs/PORTAL-PARITY.md) (what cBioLab still lacks from cBioPortal — a PR that closes a gap ticks it there),
+[`legacy-spec/`](docs/legacy-spec/) (the legacy portal's behaviour per tab — every control, mode and statistic's method, with IDs a parity check cites),
 [`LINKS.md`](docs/LINKS.md) (Copy link and stored links `?s=`, a page's address past its limit, stored id lists read by id and
 withdrawn by their owner — before changing how a page reads or writes its URL).
 

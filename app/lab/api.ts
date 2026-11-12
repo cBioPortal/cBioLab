@@ -82,6 +82,8 @@ export const api = {
 
   /** One study's timeline vocabulary and declared survival endpoints. */
   catalog: (study: string, opts: Opts = {}) => fetch("/api/catalog?study=" + encodeURIComponent(study), { signal: opts.signal }),
+  /** the query page's choices for these studies: their profiles and sample lists (lib/query-options-server.ts) */
+  queryOptions: (studies: string[], opts: Opts = {}) => fetch("/api/query-options?studies=" + encodeURIComponent(studies.join(",")), { signal: opts.signal }),
 
   /** Saved cohorts and analyses (lib/artifacts.ts): everything the signed-in reader may see, by kind. */
   artifacts: {

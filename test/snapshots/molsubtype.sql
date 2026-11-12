@@ -22,12 +22,12 @@ mut AS (
          max(g.hugo_gene_symbol = 'POLE' AND g.mutation_variant IN ('P286R', 'S297F', 'F367S', 'F367V', 'V411L', 'L424I', 'L424V', 'P436R', 'M444K', 'A456P', 'S459F', 'M295R', 'D368Y')) AS pole_hot,
          max(g.hugo_gene_symbol = 'TP53' AND ann.is_driver) AS p53
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+  WHERE startsWith(g.genetic_profile_stable_id, 'ucec_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND lowerUTF8(g.mutation_status) != 'germline' AND NOT g.off_panel AND g.hugo_gene_symbol IN ('POLE', 'TP53')
     AND replaceOne(g.sample_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
   GROUP BY pid
@@ -85,12 +85,12 @@ mut AS (
          max(g.hugo_gene_symbol = 'POLE' AND g.mutation_variant IN ('P286R', 'S297F', 'F367S', 'F367V', 'V411L', 'L424I', 'L424V', 'P436R', 'M444K', 'A456P', 'S459F', 'M295R', 'D368Y')) AS pole_hot,
          max(g.hugo_gene_symbol = 'TP53' AND ann.is_driver) AS p53
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+  WHERE startsWith(g.genetic_profile_stable_id, 'ucec_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'ucec_tcga_pan_can_atlas_2018' AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
     AND lowerUTF8(g.mutation_status) != 'germline' AND NOT g.off_panel AND g.hugo_gene_symbol IN ('POLE', 'TP53')
     AND replaceOne(g.sample_unique_id, 'ucec_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
   GROUP BY pid

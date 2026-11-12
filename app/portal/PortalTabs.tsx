@@ -23,6 +23,7 @@ import { PlotControls } from "../lab/plot-controls.tsx";
 import { cn } from "../../lib/cn";
 import { legacyLink, type LegacyPage, type PortalHold } from "../../lib/legacy-link.ts";
 import { LegacyLinkButton } from "./portal-chrome.tsx";
+import { LegacyComparisonButton } from "./legacy-comparison-button.tsx";
 
 type Patch = Record<string, unknown>;
 
@@ -114,7 +115,7 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
           {waiting && <span data-tw className="skeleton my-auto block h-5 w-28" role="status" aria-label={"laying out " + open} />}
         </TabsList>
       </Tabs>
-      <LegacyLinkButton link={link} className="mb-1.5" />
+      {legacy.page.page === "comparison" ? <LegacyComparisonButton study={legacy.page.study} cohorts={doc.cohorts || {}} tab={tab?.title ?? mainTitle} held={legacy.held} className="mb-1.5" /> : <LegacyLinkButton link={link} className="mb-1.5" />}
       </div>
       {waiting && <div className="card viewcard viewloading" aria-busy="true"><div className="vhead"><span data-tw className="skeleton block h-[34px] w-56" /></div><div className="skeleton skeleton-view" /></div>}
       {(tab?.sub || chooser) && (

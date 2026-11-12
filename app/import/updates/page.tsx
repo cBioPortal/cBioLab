@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { SiteHeader } from "../../_ui/site-header.tsx";
 import { PublicEnv } from "../../_env/public-env.tsx";
-import { importEnabled } from "../../../lib/importer/ch-write.ts";
+import { importEnabled } from "@cbiolab/importer/ch-write";
 import { UpdatesClient } from "./updates-client.tsx";
 
 export const metadata = { title: "Study updates — cbio-lab" };

@@ -526,6 +526,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "enrichAlteredSql:cna-any": () => aggregates.enrichAlteredSql(cohortSql, "x", "db", "cna", null, false),
     "enrichPanelProfiledSql": () => aggregates.enrichPanelProfiledSql(cohortSql, "x", "db", "amp"),
     "enrichWesSql": () => aggregates.enrichWesSql(cohortSql, "x", "db", "sv"),
+    // mutcompare: the cohort's patients profiled for one gene, filtered by sample in a subquery; one count leaves
+    "mutcompareProfiledSql": () => aggregates.mutcompareProfiledSql(cohortSql, "x", "db", "TP53"),
     // assays: per-entity moments or value counts; the rows CTE holds values, never ids, and stays inside
     "assayMomentsSql": () => aggregates.assayMomentsSql(cohortSql, "x", "db", "mutational_signatures_contribution_v2"),
     "assayValueCountsSql": () => aggregates.assayValueCountsSql(cohortSql, "x", "db", "armlevel_cna"),
@@ -930,6 +932,25 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     // no query runs without a connection's password, so a module that reads one, or the settings, talks to ClickHouse itself
     const reach = files.filter((f) => f !== "lib/ch.ts" && /CLICKHOUSE2?_(URL|USER|PASSWORD)|\.password\b/.test(readFileSync(f, "utf8")));
     assert.deepEqual(reach, [], "these reach ClickHouse's address or credentials themselves");
+  });
+
+  // The offline tools are packages (packages/) with a ClickHouse client of their own. The app may use
+  // the importer only for local mode's import page, handing it lib/import-conn.ts's connection, whose
+  // statements go through lib/ch.ts; it never uses the annotation sync, because no annotation service
+  // is called at run time (docs/ANNOTATION.md); and it takes only types from the client package.
+  test("the app reaches the offline packages only where it may: the import page, never the annotation sync", () => {
+    const files: string[] = [];
+    const walk = (d: string) => { for (const f of readdirSync(d)) { const p = d + "/" + f; if (statSync(p).isDirectory()) walk(p); else if (/\.(ts|tsx|mjs|js)$/.test(f)) files.push(p); } };
+    for (const d of ["app", "lib", "mcp"]) walk(d);
+    const src = new Map(files.map((f) => [f, readFileSync(f, "utf8")]));
+    const using = (re: RegExp) => files.filter((f) => re.test(src.get(f)!));
+    assert.deepEqual(using(/["']@cbiolab\/annotation-sync/), [], "the app calls no annotation service; a store is filled offline");
+    const importer = using(/["']@cbiolab\/importer/);
+    assert.ok(importer.length, "the import page uses the importer");
+    assert.deepEqual(importer.filter((f) => !/^app\/(api\/)?import\//.test(f)), [], "only local mode's import page uses the importer");
+    assert.deepEqual(using(/^import (?!type )[^;]*["']@cbiolab\/clickhouse/m), [], "the app takes only types from the offline tools' client");
+    for (const f of using(/importEnabled\(\)/).filter((f) => f.startsWith("app/api/")))
+      assert.ok(!/\blocalConn\(/.test(src.get(f)!), f + " writes through lib/import-conn.ts, not the package's own connection");
   });
 
   // A coordinator that holds none of a peer's databases learns its studies and their catalogs

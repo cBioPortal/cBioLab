@@ -1,11 +1,11 @@
-// The file-shaped schema's rules (lib/importer/lab-schema.ts): every row of every lab_ table names
+// The file-shaped schema's rules (packages/importer/src/lab-schema.ts): every row of every lab_ table names
 // its study, which is what per-study access control filters on, and the compatibility views are
 // built from cBioPortal's own derived-table SQL by renaming tables, never by editing it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LAB_TABLES, baseViews, columnsOf, convert, derivedSelects, labTableDdl, nativeDerived, renameTables } from "../lib/importer/lab-schema.ts";
-import { copyColumns, isReviewId, reviewId } from "../lib/importer/lab-review.ts";
-import { rng } from "../lib/importer/lab-edits.ts";
+import { LAB_TABLES, baseViews, columnsOf, convert, derivedSelects, labTableDdl, nativeDerived, renameTables } from "@cbiolab/importer/lab-schema";
+import { copyColumns, isReviewId, reviewId } from "@cbiolab/importer/lab-review";
+import { rng } from "@cbiolab/importer/lab-edits";
 import { LAB_STUDY_TABLES, studyScope } from "../lib/ch.ts";
 
 test("every lab_ table has a study_id column and sorts by it first", () => {

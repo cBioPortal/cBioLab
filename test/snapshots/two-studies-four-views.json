@@ -944,7 +944,7 @@
           {
             "kind": "statistic",
             "title": "Estimate survival by Kaplan–Meier",
-            "detail": "The product-limit estimator, one curve per cohort, pooled over its studies. The median is the first time the curve is at or below 0.5.",
+            "detail": "The product-limit estimator, one curve per cohort, pooled over its studies, computed from the count rows directly: at each distinct time, the deaths and the number at risk are sums of the rows' patient counts. The median is the first time the curve is at or below 0.5.",
             "params": [
               [
                 "TP53 mut",
@@ -978,13 +978,13 @@
         ],
         "implementation": {
           "functions": [
-            "kaplanMeier",
-            "logRank"
+            "kaplanMeierCounts",
+            "logRankCounts"
           ],
           "file": "lib/stats.ts",
           "commit": null
         },
-        "verification": "Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).",
+        "verification": "The count-row functions return exactly what kaplanMeier, logRank and logRankK return on the same rows expanded to one record per patient (test/survival-counts.test.ts). Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).",
         "check": {
           "km:TP53 mut:n": {
             "v": 25498,
@@ -1078,7 +1078,7 @@
           "attribute": "TMB_NONSYNONYMOUS",
           "per": "sample",
           "kind": "num",
-          "q": 2.4704440628041033e-40,
+          "q": 2.4704440628240886e-40,
           "cells": [
             {
               "cohort": "TP53 mut",
@@ -1108,7 +1108,7 @@
           "test": "Welch t",
           "statistic": 13.3074,
           "df": 48181.75,
-          "p": 2.4704440628041033e-40
+          "p": 2.4704440628240886e-40
         },
         {
           "attribute": "CURRENT_AGE_DEID",
@@ -1219,10 +1219,10 @@
         "verification": "χ² matches scipy 1.18.1 chi2_contingency; Welch's t scipy ttest_ind(equal_var=False) and Welch's ANOVA statsmodels 0.15.0 anova_generic from the same moments; Mann–Whitney, Kruskal–Wallis and quantiles scipy/numpy on the expanded distribution; Benjamini–Hochberg statsmodels multipletests — all to a relative 1e-6 (test/tables-golden.test.ts, test/moments-golden.test.ts).",
         "check": {
           "clinical:TMB_NONSYNONYMOUS:p": {
-            "v": 2.4704440628041033e-40
+            "v": 2.4704440628240886e-40
           },
           "clinical:TMB_NONSYNONYMOUS:q": {
-            "v": 2.4704440628041033e-40
+            "v": 2.4704440628240886e-40
           },
           "clinical:FRACTION_GENOME_ALTERED:p": {
             "v": 0

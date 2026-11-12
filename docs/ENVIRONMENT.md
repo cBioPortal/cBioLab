@@ -20,6 +20,7 @@ optional.
 | `STUDY_ID` | `msk_chord_2024` | the study a document without one, and the legacy single-study endpoints, use |
 | `PORTAL_URL` | `https://www.cbioportal.org` | the cBioPortal that study and patient links open, and the portal pages' "Open in cBioPortal" button (`lib/legacy-link.ts`): it is taken to serve the primary connection's studies, so the button is enabled only for those |
 | `ONCOKB_PIN` | the store's newest release | the OncoKB release to annotate with, e.g. `v7.5`; every result echoes the one used |
+| `ONCOKB_TOKEN`, `ONCOKB_WRITER_USER` (`oncokb_writer`), `ONCOKB_WRITER_PASSWORD`, `ONCOKB_BASE`, `ONCOKB_BATCH_SIZE`, `ONCOKB_BATCH_DELAY_MS` | — | `npm run annotate -- oncokb` only, never the app: the OncoKB API token and the store's writer ([ANNOTATION.md](ANNOTATION.md)) |
 | `GENOME_NEXUS_URL` | `https://www.genomenexus.org` | the Genome Nexus server the lollipop view asks for protein length and Pfam domains (a gene symbol only) |
 | `STUDY_DENY` | — | study ids to exclude entirely, comma-separated |
 | `STUDY_ALLOW_RESTRICTED` | — | `1`: also serve studies named `…-consortium` or `private`, which are otherwise never routed. Only for a deployment entitled to them |
@@ -125,9 +126,10 @@ see the security notes below.
 | `APP_BASE_URL` | `https://cohort-lab.vercel.app` (MCP links), the request's origin (notebooks) | this site's public address, in the links MCP results and exported notebooks carry. Set it on any deployment not at that address |
 | `EXAMPLES_URL` | — | on an instance whose database is not the public warehouse, a deployment that holds the gallery's studies (e.g. `https://cbiolab.vercel.app`): the Examples tab opens each example there, after saying the reader is leaving, instead of running it here |
 | `RESULTS_MAX_STUDIES` | `50` | the most studies one gene query (the Results page) covers; Explore's "Query genes…" and the page refuse more, naming the limit |
-| `CROSS_STUDY_EXPRESSION` | `pancan` | when expression data (mRNA, microRNA, protein) may be compared across studies on the Results page, as cBioPortal's `enable_cross_study_expression`: `pancan` (every study a TCGA PanCancer Atlas study), `all` or `none`. Elsewhere Plots offers no expression axes and Co-expression covers one study only |
+| `QUERY_PRODUCT_LIMIT` | `1000000` | the most genes × samples one gene query covers, as cBioPortal's `query_product_limit`: the query dialog refuses a query past it ("Please limit your queries to N genes or fewer.", N the limit ÷ the case set's samples), and so does the Results page for a link past it |
+| `CROSS_STUDY_EXPRESSION` | `pancan` | when expression data (mRNA, microRNA, protein) may be compared across studies on the Results page and chosen across studies in the query dialog's profiles, as cBioPortal's `enable_cross_study_expression`: `pancan` (every study a TCGA PanCancer Atlas study), `all` or `none`. Elsewhere Plots offers no expression axes and Co-expression covers one study only |
 | `LINK_URL_MAX` | `8000` | the query-string length (characters) past which a page stops writing its long URL parameters into its address, holds them in the tab's history and says so, offering Copy link ([LINKS.md](LINKS.md)); below 64 it is ignored |
-| `PUBLIC_ENV` | `EXAMPLES_URL,RESULTS_MAX_STUDIES,CROSS_STUDY_EXPRESSION,CBIOLAB_LOCAL,LINK_URL_MAX` | the variables written into the page for the browser, comma-separated. Read per request, so one image serves every deployment; a name that looks like a secret (`PASSWORD`, `SECRET`, `KEY`, `TOKEN`, `CREDENTIAL`) is refused |
+| `PUBLIC_ENV` | `EXAMPLES_URL,RESULTS_MAX_STUDIES,CROSS_STUDY_EXPRESSION,QUERY_PRODUCT_LIMIT,CBIOLAB_LOCAL,LINK_URL_MAX` | the variables written into the page for the browser, comma-separated. Read per request, so one image serves every deployment; a name that looks like a secret (`PASSWORD`, `SECRET`, `KEY`, `TOKEN`, `CREDENTIAL`) is refused |
 
 ## The assistant (chat sidebar)
 

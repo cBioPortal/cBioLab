@@ -5,7 +5,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runDatafiles, checkLines, heldTypes, fileList, frequencies } from "../lib/views/datafiles/run.ts";
-import { datafilesCountsSql, lineProfiled, type LinePlan } from "../lib/views/datafiles/sql.ts";
+import { datafilesCountsSql, lineProfiled, lineCtes, type LinePlan } from "../lib/views/datafiles/sql.ts";
 import { statusRowSource, matrixRowSource, statusColumns, lineColumns } from "../lib/views/datafiles/tables.ts";
 import { datafilesKind } from "../lib/views/datafiles/kind.ts";
 import { oqlCasesSql, oqlEventsSql } from "../lib/oql.ts";
@@ -219,6 +219,26 @@ describe("runDatafiles", () => {
     assert.equal(d.files.find((f) => f.id === "sv")!.rows, 2);
     assert.equal(d.files.find((f) => f.id === "mutations")!.studies, undefined);
     assert.match(String(v.caveat), /counts added across studies[\s\S]*TP53: 1 altered sample outside its panel's coverage/);
+  });
+  test("exp / prot name the profile an expression line reads; a malformed one is refused", async () => {
+    const sql = lineCtes("p", "cohort", [{ line: "TP53: EXP>2", gene: "TP53", types: [] }],
+      { study: "s1", db: "c1", pin: null, profiles: ["mrna_median_Zscores", "rna_seq_v2_mrna_median_Zscores"], pins: { EXP: "rna_seq_v2_mrna_median_Zscores" } });
+    assert.match(sql, /ga\.profile_type = 'rna_seq_v2_mrna_median_Zscores'/);
+    const r1 = local("c1", () => [], { n: 1, altered: 0, unaltered: 1 });
+    assert.match(String((await run({ oql: ["TP53: EXP>2"], exp: "not a profile" }, ctx({ Q: cohort({ s1: 1 }) }, { s1: r1 }))).error),
+      /exp names the profile the lines' EXP alterations read/);
+    const ok = await run({ oql: ["TP53: EXP>2"], exp: "rna_seq_v2_mrna_median_Zscores" }, ctx({ Q: cohort({ s1: 1 }) }, { s1: r1 },
+      { studyProfiles: async () => ({ profiles: ["rna_seq_v2_mrna_median_Zscores"], gaProfiles: [], catalog: BRCA }) }));
+    assert.equal(ok.error, undefined);
+    // ifHeld: a study without the profile is let through (its lines' EXP matches nothing there)
+    const lenient = lineCtes("p", "cohort", [{ line: "TP53: EXP>2", gene: "TP53", types: [] }],
+      { study: "s1", db: "c1", pin: null, profiles: ["mrna_median_Zscores"], pins: { EXP: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true } });
+    assert.match(lenient, /ga\.profile_type = 'rna_seq_v2_mrna_median_all_sample_Zscores'/);
+    const held = await run({ oql: ["TP53: EXP>2"], exp: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true }, ctx({ Q: cohort({ s1: 1 }) }, { s1: r1 },
+      { studyProfiles: async () => ({ profiles: ["mrna_median_Zscores"], gaProfiles: [], catalog: BRCA }) }));
+    assert.equal(held.error, undefined);
+    assert.match(String((await run({ oql: ["TP53: EXP>2"], exp: "rna_seq_v2_mrna_median_Zscores", ifHeld: 1 } as never, ctx({ Q: cohort({ s1: 1 }) }, { s1: r1 }))).error), /ifHeld is true or left out/);
+    assert.match(String((await run({ oql: ["TP53: EXP>2"], ifHeld: true }, ctx({ Q: cohort({ s1: 1 }) }, { s1: r1 }))).error), /name exp or prot/);
   });
   test("an expression line is named as unchecked for profiling", async () => {
     const r1 = local("c1", () => [], { n: 1, altered: 0, unaltered: 1 });

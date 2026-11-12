@@ -22,7 +22,7 @@
 import { survivalCountsSql, anchoredSurvivalSql, coxRowsSql, survivalEndpointsSql } from "./survival-queries.ts";
 import { chQuery, DB, PRIMARY, connections, loopbackOnlyConn, isAbortError, LoopbackDirectError, withChContext, registerChExternal, hasChExternal, inChContext, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { createHash } from "node:crypto";
-import { mutationStudySql, sq } from "./compiler.ts";
+import { mutationStudySql, sq, genomicStudySql } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
 import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql, inCohortSamples, inCohortPatients, bareSampleId } from "./cohort2.ts";
@@ -64,6 +64,7 @@ import { driverAnnotationJoin } from "./oql.ts";
 import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type CohortSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
+import { ONCOKB_TABLE } from "./annotation-store.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -354,7 +355,7 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
     (pin ? "         max(ann.is_driver) AS is_driver\n" : "         0 AS is_driver\n") +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (pin ? driverJoin(pin) : "") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + "\n" +
     "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
     "    AND " + inCohortSamples(sid) + "\n" +
     "  GROUP BY gene, sid, vtype\n" +
@@ -418,7 +419,7 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
     "altered AS (\n" +
     "  SELECT DISTINCT g.hugo_gene_symbol AS gene, " + sid + " AS sid\n" +
     "  FROM " + db + ".genomic_event_derived g\n" +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + "\n" +
     "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
     "    AND " + inCohortSamples(sid) + "\n" +
     "),\n" +
@@ -504,7 +505,7 @@ export function variantCountsSql(cohortSql: string, genes: string[], study: stri
     "       toUInt32OrNull(extract(mutation_variant, '([0-9]+)')) AS pos,\n" +
     "       uniqExact(patient_unique_id) AS n\n" +
     "FROM " + db + ".genomic_event_derived\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'mutation'\n" +
+    "WHERE " + genomicStudySql(study) + " AND variant_type = 'mutation'\n" +
     "  AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND mutation_variant != ''\n" +
     "  AND " + inCohortSamples(sid) + "\n" +
@@ -527,7 +528,7 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
   // with no pin there is no annotation to split drivers from VUS, and cBioPortal then colours
   // everything as a driver; the report says which happened
   const driver = pin
-    ? "if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM oncokb_annotation.variant_annotation\n" +
+    ? "if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM " + ONCOKB_TABLE + "\n" +
       "        WHERE oncokb_version = " + sq(pin) + " AND is_driver AND alteration_type = 'MUTATION'), 1, 0)"
     : "1";
   return (
@@ -584,7 +585,7 @@ export function geneMutationTotalsSql(cohortSql: string, genes: string[], study:
     "SELECT hugo_gene_symbol AS gene, uniqExact(patient_unique_id) AS n,\n" +
     "       uniqExact(mutation_variant) AS distinct_variants\n" +
     "FROM " + db + ".genomic_event_derived\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + " AND variant_type = 'mutation'\n" +
+    "WHERE " + genomicStudySql(study) + " AND variant_type = 'mutation'\n" +
     "  AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND mutation_variant != ''\n" +
     "  AND " + inCohortSamples(sid) + "\n" +

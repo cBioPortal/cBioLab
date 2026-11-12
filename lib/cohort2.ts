@@ -18,8 +18,8 @@
 // renderable as a sentence. Back-compat: the v1 flat event
 // shape {a, b?, rel, ...} is accepted anywhere a definition is expected.
 import { DB, STUDY } from "./ch.ts";
-import { compileCohort, mutationStudySql, sq, LINE_TYPE } from "./compiler.ts";
-import { oqlCasesSql } from "./oql.ts";
+import { compileCohort, mutationStudySql, sq, genomicStudySql, LINE_TYPE } from "./compiler.ts";
+import { oqlCasesSql, type OqlPins } from "./oql.ts";
 import { clinicalValueFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
 import { activeCustomData, clinicalTable } from "./custom-data.ts";
@@ -28,7 +28,7 @@ import { idSetTable, idSetIfLoaded, ID_SET_UUID } from "./id-sets.ts";
 import { lockClause } from "./cohort-lock.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
-  ProfiledLeaf, CaseListLeaf, GenomicDataLeaf, GenericAssayLeaf,
+  ProfiledLeaf, CaseListLeaf, OqlLeaf, GenomicDataLeaf, GenericAssayLeaf,
   SampleListLeaf, PatientListLeaf, SplitLeaf, UploadLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
 } from "./types.ts";
 import { finiteSql, boundedNumberSql } from "./sql-number.ts";
@@ -226,7 +226,7 @@ export function derivedMetricSql(metric: DerivedMetric, study: string, db: strin
   // alteredGenes — high-level CNA only, matching the rest of the engine
   return "SELECT " + PID("patient_unique_id", study) + " AS pid, uniqExact(hugo_gene_symbol) AS v\n" +
     "  FROM " + db + ".genomic_event_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
+    "  WHERE " + genomicStudySql(study) + "\n" +
     "    AND (variant_type != 'cna' OR abs(cna_alteration) >= 2)\n" +
     "  GROUP BY pid";
 }
@@ -344,17 +344,27 @@ function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): LeafIds {
 }
 
 function caseListLeafSql(leaf: CaseListLeaf, ctx: Ctx): LeafIds {
-  let id = String(leaf.id || "").trim();
-  if (!/^[A-Za-z0-9._-]{1,120}$/.test(id)) throw new Error("caseList clause: bad list id");
-  if (!id.startsWith(ctx.study + "_")) id = ctx.study + "_" + id; // accept 'sequenced' shorthand
+  if ((leaf.id == null) === (leaf.category == null)) throw new Error("caseList clause takes a list id or a category, not both or neither");
   // only this study's lists: a sibling study's id also starts with this one's, and TCGA patient
   // ids are shared across TCGA studies, so its list would read as plausible members
-  return ofSamples("SELECT DISTINCT s.stable_id AS sid\n" +
-    "  FROM " + dbOf(ctx) + ".sample_list sl\n" +
-    "  JOIN " + dbOf(ctx) + ".cancer_study cs ON cs.cancer_study_id = sl.cancer_study_id\n" +
+  const from = "  FROM " + dbOf(ctx) + ".sample_list sl\n" +
+    "  JOIN " + dbOf(ctx) + ".cancer_study cs ON cs.cancer_study_id = sl.cancer_study_id\n";
+  let which: string;
+  if (leaf.category != null) {
+    const cat = String(leaf.category).trim();
+    if (!/^[a-z0-9_]{1,80}$/.test(cat)) throw new Error("caseList clause: bad category (cBioPortal's sample-list categories, e.g. all_cases_with_mutation_data)");
+    which = "sl.list_id = (SELECT sl.list_id\n" + from +
+      "  WHERE sl.category = " + sq(cat) + " AND cs.cancer_study_identifier = " + sq(ctx.study) + "\n  ORDER BY sl.stable_id LIMIT 1)";
+  } else {
+    let id = String(leaf.id || "").trim();
+    if (!/^[A-Za-z0-9._-]{1,120}$/.test(id)) throw new Error("caseList clause: bad list id");
+    if (!id.startsWith(ctx.study + "_")) id = ctx.study + "_" + id; // accept 'sequenced' shorthand
+    which = "sl.stable_id = " + sq(id);
+  }
+  return ofSamples("SELECT DISTINCT s.stable_id AS sid\n" + from +
     "  JOIN " + dbOf(ctx) + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
     "  JOIN " + dbOf(ctx) + ".sample s ON s.internal_id = sll.sample_id\n" +
-    "  WHERE sl.stable_id = " + sq(id) + " AND cs.cancer_study_identifier = " + sq(ctx.study));
+    "  WHERE " + which + " AND cs.cancer_study_identifier = " + sq(ctx.study));
 }
 
 function numRangeConds(range: ClinicalRange | undefined, expr: string): string[] {
@@ -550,6 +560,23 @@ function splitLeafSql(leaf: SplitLeaf, ctx: Ctx): LeafIds {
     "    AND " + splitBucketSql(pid, ctx.study) + " = " + bucket);
 }
 
+/** an OQL leaf's EXP / PROT profile choice, checked for shape (oqlCasesSql checks the study has them) */
+function oqlPins(leaf: OqlLeaf): OqlPins | undefined {
+  const pins: OqlPins = {};
+  for (const [k, t] of [["exp", "EXP"], ["prot", "PROT"]] as const) {
+    const v = leaf[k];
+    if (v == null) continue;
+    if (typeof v !== "string" || !/^[A-Za-z0-9._-]{1,120}$/.test(v)) throw new Error("oql clause: " + k + " names a profile by its id without the study prefix");
+    pins[t] = v;
+  }
+  if (leaf.ifHeld != null) {
+    if (leaf.ifHeld !== true) throw new Error("oql clause: ifHeld is true or left out");
+    if (!pins.EXP && !pins.PROT) throw new Error("oql clause: ifHeld says how exp / prot apply to a study without that profile; name exp or prot");
+    pins.ifHeld = true;
+  }
+  return pins.EXP || pins.PROT ? pins : undefined;
+}
+
 /** A leaf as rows (pid, sid) of the study's samples. */
 function leafSql(leaf: Leaf, ctx: Ctx): string {
   return leafSamplesSql(leafIds(leaf, ctx), ctx);
@@ -557,7 +584,7 @@ function leafSql(leaf: Leaf, ctx: Ctx): string {
 
 function leafIds(leaf: Leaf, ctx: Ctx): LeafIds {
   // an alteration is called per sample
-  const oql = (q: string) => ofSamples(oqlCasesSql(q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, study: ctx.study, db: dbOf(ctx), unit: "sample" }));
+  const oql = (q: string, pins?: OqlPins) => ofSamples(oqlCasesSql(q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, pins, study: ctx.study, db: dbOf(ctx), unit: "sample" }));
   // v1 flat event shape without kind
   if (!("kind" in leaf)) {
     if (leaf.a && leaf.rel) return eventLeafSql(leaf, ctx);
@@ -565,7 +592,7 @@ function leafIds(leaf: Leaf, ctx: Ctx): LeafIds {
   }
   // one case per Leaf kind: a kind added to the Leaf union without a case here is a type error
   switch (leaf.kind) {
-    case "oql": return oql(leaf.q);
+    case "oql": return oql(leaf.q, oqlPins(leaf));
     case "alteration": return oql(alterationToOql(leaf)); // deprecated alias
     case "clinical": return clinicalLeafSql(leaf, ctx);
     case "profiled": return profiledLeafSql(leaf, ctx);
@@ -641,7 +668,8 @@ export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin,
 
 // ---- plain-language readback --------------------------------------------
 function leafText(leaf: any): string {
-  if (leaf.kind === "oql") return "OQL[" + leaf.q + "]";
+  if (leaf.kind === "oql") return "OQL[" + leaf.q + "]" + (leaf.exp ? " (EXP on " + leaf.exp + ")" : "") + (leaf.prot ? " (PROT on " + leaf.prot + ")" : "") +
+    (leaf.ifHeld ? " (in each study holding it; none in a study without it)" : "");
   if (leaf.kind === "alteration") {
     const t = leaf.types && leaf.types.length && leaf.types.length < 3 ? " (" + leaf.types.join("/") + ")" : "";
     return leaf.gene + (leaf.driver === "driverOnly" ? " driver-altered" : " altered") + t;
@@ -666,7 +694,7 @@ function leafText(leaf: any): string {
     const of = (leaf as any).eventType ? " of '" + (leaf as any).eventType + "'" : "";
     return m + of + " " + parts.join(" and ") + unit;
   }
-  if (leaf.kind === "caseList") return "in case list " + leaf.id;
+  if (leaf.kind === "caseList") return leaf.category != null ? "in each study's case list of category " + leaf.category : "in case list " + leaf.id;
   if (leaf.kind === "split") return "in the " + leaf.part + " half (fixed held-out split)";
   if (leaf.kind === "upload") return "with a row in upload " + String(leaf.dataset).slice("custom:".length);
   if (leaf.kind === "genomicData") return leaf.gene + " " + leaf.profileType + " " + JSON.stringify(leaf.range || leaf.values);

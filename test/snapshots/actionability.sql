@@ -18,12 +18,12 @@ lv AS (
          min(multiIf(ann.highest_resistance_level = 'LEVEL_R1', 1, ann.highest_resistance_level = 'LEVEL_R2', 2, 9)) AS r
   FROM snapshot_db.genomic_event_derived g
   INNER JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, highest_sensitive_level, highest_resistance_level
-      FROM oncokb_annotation.variant_annotation
+      FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND (highest_sensitive_level != '' OR highest_resistance_level != '')) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_impact_50k_2026'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_impact_50k_2026_') AND g.cancer_study_identifier = 'msk_impact_50k_2026'
     AND ((g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED') OR (g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2) OR g.variant_type = 'structural_variant')
     AND g.sample_unique_id IN (SELECT sid FROM seq)
   GROUP BY sid
@@ -59,12 +59,12 @@ lv AS (
          min(multiIf(ann.highest_resistance_level = 'LEVEL_R1', 1, ann.highest_resistance_level = 'LEVEL_R2', 2, 9)) AS r
   FROM snapshot_db.genomic_event_derived g
   INNER JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, highest_sensitive_level, highest_resistance_level
-      FROM oncokb_annotation.variant_annotation
+      FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND (highest_sensitive_level != '' OR highest_resistance_level != '')) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'msk_impact_50k_2026'
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_impact_50k_2026_') AND g.cancer_study_identifier = 'msk_impact_50k_2026'
     AND ((g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED') OR (g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2) OR g.variant_type = 'structural_variant')
     AND g.sample_unique_id IN (SELECT sid FROM seq)
   GROUP BY sid
@@ -87,6 +87,6 @@ FROM pl LEFT JOIN grp ON grp.pid = pl.pid
 GROUP BY grp, level, resistance
 
 -- view 0 actionability: actionability:store · msk_impact_50k_2026
-SELECT toString(alteration_type) AS type, count() AS n FROM oncokb_annotation.variant_annotation
+SELECT toString(alteration_type) AS type, count() AS n FROM annotation.oncokb
 WHERE oncokb_version = 'v7.5' AND (highest_sensitive_level != '' OR highest_resistance_level != '')
 GROUP BY type

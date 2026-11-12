@@ -2,7 +2,7 @@
 import { survivalMonthsSql, survivalEventSql } from "../../survival-sql.ts";
 import { sideCountsTail, pidOf } from "../../federation-views.ts";
 import { clinicalTable } from "../../custom-data.ts";
-import { mutationStudySql, sq } from "../../compiler.ts";
+import { mutationStudySql, sq, genomicStudySql } from "../../compiler.ts";
 import { clinicalValueFoldSql, foldedEqualsSql, foldedInSql } from "../../event-names.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
@@ -164,7 +164,7 @@ function ctdnaChCte(study: string, db: string, ch: NonNullable<CtdnaSides["ch"]>
     "         " + (normal ? "max(ifNull(nm.loaded, 0) = 1)" : "toUInt8(0)") + " AS has_normal\n" +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (normal ? "  LEFT JOIN nm ON nm.suid = g.sample_unique_id AND nm.gene = g.hugo_gene_symbol AND nm.mv = g.mutation_variant\n" : "") +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND g.variant_type = 'mutation'\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND g.variant_type = 'mutation'\n" +
     "    AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b')\n" +
     "  GROUP BY suid, gene, mv\n" +
     ")"
@@ -183,7 +183,7 @@ function ctdnaDetectedCte(study: string, db: string, pin: string | null, measure
     "  SELECT DISTINCT s.pid AS pid FROM " + db + ".genomic_event_derived g\n" +
     (pin && measure === "driver" ? driverJoin(pin) : "") +
     "  INNER JOIN sides s ON s.suid = g.sample_unique_id\n" +
-    "  WHERE g.cancer_study_identifier = " + sq(study) + " AND s.side = 'b' AND " + ALTERED_COND + "\n" +
+    "  WHERE " + genomicStudySql(study, "g") + " AND s.side = 'b' AND " + ALTERED_COND + "\n" +
     "    AND g.sample_unique_id IN (SELECT suid FROM sides WHERE side = 'b')" + (pin && measure === "driver" ? " AND ann.is_driver" : measure === "driver" ? " AND 0" : "") +
     (exclude ? " AND " + exclude : "") + "\n" +
     ")"

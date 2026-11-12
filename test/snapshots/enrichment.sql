@@ -92,7 +92,7 @@ EXCEPT DISTINCT
     AND attribute_name = 'MSI_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Instable'))))))))
 SELECT g.hugo_gene_symbol AS gene, uniqExact(g.sample_unique_id) AS altered
 FROM snapshot_db.genomic_event_derived g
-WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
   AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 GROUP BY gene
 
@@ -125,7 +125,7 @@ EXCEPT DISTINCT
     AND attribute_name = 'MSI_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Instable'))))))))
 SELECT g.hugo_gene_symbol AS gene, uniqExact(g.sample_unique_id) AS altered
 FROM snapshot_db.genomic_event_derived g
-WHERE g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
   AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 GROUP BY gene
 

@@ -32,7 +32,7 @@ export interface ChConn {
   study?: string;
 }
 
-/** The tables of the file-shaped schema (lib/importer/lab-schema.ts LAB_TABLES), each partitioned by study_id. */
+/** The tables of the file-shaped schema (packages/importer/src/lab-schema.ts LAB_TABLES), each partitioned by study_id. */
 export const LAB_STUDY_TABLES = ["lab_study", "lab_patient", "lab_sample", "lab_clinical", "lab_clinical_attribute", "lab_profile",
   "lab_sample_profile", "lab_profile_value", "lab_cna_event", "lab_mutation", "lab_structural_variant", "lab_segment",
   "lab_timeline_event", "lab_case_list", "lab_case_list_sample"];
@@ -370,7 +370,7 @@ async function postToDatabase(conn: ChConn, query: string, externals: ChStatemen
 }
 
 /**
- * A statement that writes, for local mode's importer (lib/importer/) and nothing else: the app's
+ * A statement that writes, for local mode's importer (lib/import-conn.ts) and nothing else: the app's
  * reads go through `post`. Sent with `body` as its data (an INSERT's rows) when there is one, to
  * the connection's database, and through the same loopback check as every read. Not queued with
  * the reads, and never retried: a write sent twice is not the same as a write sent once.

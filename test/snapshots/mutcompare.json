@@ -1,0 +1,1884 @@
+{
+  "study": "brca_tcga_pan_can_atlas_2018",
+  "cohorts": {
+    "Basal-like": {
+      "count": 171,
+      "samples": 171,
+      "text": "SUBTYPE in [BRCA_Basal]",
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018"
+      ]
+    },
+    "Luminal A": {
+      "count": 499,
+      "samples": 499,
+      "text": "SUBTYPE in [BRCA_LumA]",
+      "studies": [
+        "brca_tcga_pan_can_atlas_2018"
+      ]
+    }
+  },
+  "views": [
+    {
+      "kind": "mutcompare",
+      "cohorts": [
+        "Basal-like",
+        "Luminal A"
+      ],
+      "mutcompare": {
+        "gene": "TP53",
+        "ranking": [
+          {
+            "gene": "TP53",
+            "pct": 89.47368421052632
+          },
+          {
+            "gene": "PIK3CA",
+            "pct": 47.49498997995992
+          },
+          {
+            "gene": "TTN",
+            "pct": 23.976608187134502
+          },
+          {
+            "gene": "CDH1",
+            "pct": 21.8436873747495
+          },
+          {
+            "gene": "GATA3",
+            "pct": 15.430861723446894
+          },
+          {
+            "gene": "MAP3K1",
+            "pct": 14.228456913827655
+          },
+          {
+            "gene": "MUC16",
+            "pct": 12.280701754385966
+          },
+          {
+            "gene": "KMT2C",
+            "pct": 11.823647294589179
+          },
+          {
+            "gene": "USH2A",
+            "pct": 9.941520467836257
+          },
+          {
+            "gene": "SPTA1",
+            "pct": 9.35672514619883
+          },
+          {
+            "gene": "SYNE1",
+            "pct": 9.35672514619883
+          },
+          {
+            "gene": "FAT3",
+            "pct": 8.771929824561404
+          },
+          {
+            "gene": "FLG",
+            "pct": 8.771929824561404
+          },
+          {
+            "gene": "CSMD3",
+            "pct": 8.187134502923977
+          },
+          {
+            "gene": "RYR2",
+            "pct": 8.187134502923977
+          },
+          {
+            "gene": "BRCA1",
+            "pct": 7.60233918128655
+          },
+          {
+            "gene": "MUC4",
+            "pct": 7.60233918128655
+          },
+          {
+            "gene": "DNAH17",
+            "pct": 7.017543859649122
+          },
+          {
+            "gene": "MUC17",
+            "pct": 7.017543859649122
+          },
+          {
+            "gene": "OBSCN",
+            "pct": 7.017543859649122
+          },
+          {
+            "…": "180 more",
+            "sha256": "059b88db579a88be"
+          }
+        ],
+        "groups": [
+          {
+            "name": "Basal-like",
+            "profiled": 171,
+            "mutated": 153,
+            "lollipop": {
+              "gene": "TP53",
+              "mutated": 153,
+              "mutations": 159,
+              "positions": [
+                {
+                  "pos": 52,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "Q52*",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Nonsense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 56,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "E56*",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Nonsense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 76,
+                  "n": 2,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "P77Cfs*73",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    },
+                    {
+                      "change": "P77Gfs*65",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Del",
+                      "driver": true,
+                      "rows": 1
+                    },
+                    {
+                      "mtype": "Frame_Shift_Ins",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 85,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "A86Cfs*63",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Ins",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 90,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "S90Pfs*33",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Del",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 91,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "W91*",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Nonsense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 107,
+                  "n": 2,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "Y107Cfs*16",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    },
+                    {
+                      "change": "Y107D",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Del",
+                      "driver": true,
+                      "rows": 1
+                    },
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 108,
+                  "n": 2,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "G108Ffs*40",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    },
+                    {
+                      "change": "G108Vfs*15",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Del",
+                      "driver": true,
+                      "rows": 2
+                    }
+                  ]
+                },
+                {
+                  "pos": 109,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "R110Sfs*14",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Ins",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 111,
+                  "n": 2,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "L111P",
+                      "n": 2,
+                      "rows": 2,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 2
+                    }
+                  ]
+                },
+                {
+                  "pos": 114,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "L114*",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Nonsense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 117,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "T118Dfs*31",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Ins",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 122,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "V122Dfs*26",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Del",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 125,
+                  "n": 3,
+                  "color": "#e5802b",
+                  "impact": "splice",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "X125_splice",
+                      "n": 3,
+                      "rows": 3,
+                      "driver": true,
+                      "impact": "splice"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Splice_Site",
+                      "driver": true,
+                      "rows": 2
+                    },
+                    {
+                      "mtype": "Splice_Region",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 126,
+                  "n": 2,
+                  "color": "#e5802b",
+                  "impact": "splice",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "X126_splice",
+                      "n": 2,
+                      "rows": 2,
+                      "driver": true,
+                      "impact": "splice"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Splice_Site",
+                      "driver": true,
+                      "rows": 2
+                    }
+                  ]
+                },
+                {
+                  "pos": 127,
+                  "n": 2,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "S127P",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    },
+                    {
+                      "change": "S127Y",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 2
+                    }
+                  ]
+                },
+                {
+                  "pos": 132,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "K132T",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 133,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "M133K",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 135,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "C135R",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 136,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "Q136E",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "…": "60 more",
+                  "sha256": "5d4f1c4f8ba1e740"
+                }
+              ],
+              "domains": [
+                {
+                  "accession": "PF08563",
+                  "name": "P53_TAD",
+                  "start": 6,
+                  "end": 29,
+                  "color": "#2dcf00"
+                },
+                {
+                  "accession": "PF00870",
+                  "name": "P53",
+                  "start": 95,
+                  "end": 288,
+                  "color": "#ff5353"
+                },
+                {
+                  "accession": "PF07710",
+                  "name": "P53_tetramer",
+                  "start": 318,
+                  "end": 358,
+                  "color": "#5b5bff"
+                }
+              ],
+              "topChanges": [
+                {
+                  "change": "R175H",
+                  "pos": 175,
+                  "n": 9,
+                  "pct": 5.9
+                },
+                {
+                  "change": "R273H",
+                  "pos": 273,
+                  "n": 7,
+                  "pct": 4.6
+                },
+                {
+                  "change": "R196*",
+                  "pos": 196,
+                  "n": 6,
+                  "pct": 3.9
+                },
+                {
+                  "change": "R342*",
+                  "pos": 342,
+                  "n": 6,
+                  "pct": 3.9
+                },
+                {
+                  "change": "I195T",
+                  "pos": 195,
+                  "n": 5,
+                  "pct": 3.3
+                },
+                {
+                  "change": "Y220C",
+                  "pos": 220,
+                  "n": 5,
+                  "pct": 3.3
+                },
+                {
+                  "change": "X225_splice",
+                  "pos": 225,
+                  "n": 5,
+                  "pct": 3.3
+                },
+                {
+                  "change": "X125_splice",
+                  "pos": 125,
+                  "n": 3,
+                  "pct": 2
+                },
+                {
+                  "change": "R213*",
+                  "pos": 213,
+                  "n": 3,
+                  "pct": 2
+                },
+                {
+                  "change": "R248Q",
+                  "pos": 248,
+                  "n": 3,
+                  "pct": 2
+                }
+              ],
+              "proteinLength": 393,
+              "lengthSource": "genome-nexus",
+              "transcript": "ENST00000269305",
+              "unpositioned": 0,
+              "withheld": 0,
+              "label": {
+                "pos": 175,
+                "text": "R175H"
+              },
+              "somaticSamples": 153,
+              "cohortSamples": 171,
+              "tally": {
+                "missense": {
+                  "driver": 81,
+                  "vus": 1
+                },
+                "truncating": {
+                  "driver": 60,
+                  "vus": 0
+                },
+                "inframe": {
+                  "driver": 2,
+                  "vus": 0
+                },
+                "splice": {
+                  "driver": 15,
+                  "vus": 0
+                },
+                "fusion": {
+                  "driver": 0,
+                  "vus": 0
+                },
+                "other": {
+                  "driver": 0,
+                  "vus": 0
+                }
+              },
+              "ids": {
+                "refseq": "NM_000546",
+                "ccds": "CCDS11118",
+                "uniprotAccession": "P04637",
+                "uniprotName": "P53_HUMAN",
+                "ensembl": "ENST00000269305.4"
+              }
+            }
+          },
+          {
+            "name": "Luminal A",
+            "profiled": 499,
+            "mutated": 53,
+            "lollipop": {
+              "gene": "TP53",
+              "mutated": 53,
+              "mutations": 53,
+              "positions": [
+                {
+                  "pos": 11,
+                  "n": 1,
+                  "color": "#53D400",
+                  "impact": "missense",
+                  "driver": false,
+                  "changes": [
+                    {
+                      "change": "E11K",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": false,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": false,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 27,
+                  "n": 1,
+                  "color": "#53D400",
+                  "impact": "missense",
+                  "driver": false,
+                  "changes": [
+                    {
+                      "change": "P27S",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": false,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": false,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 110,
+                  "n": 2,
+                  "color": "#993404",
+                  "impact": "inframe",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "R110Vfs*13",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    },
+                    {
+                      "change": "R110del",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "inframe"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "In_Frame_Del",
+                      "driver": true,
+                      "rows": 1
+                    },
+                    {
+                      "mtype": "Frame_Shift_Del",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 111,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "L111Q",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 126,
+                  "n": 3,
+                  "color": "#e5802b",
+                  "impact": "splice",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "X126_splice",
+                      "n": 2,
+                      "rows": 2,
+                      "driver": true,
+                      "impact": "splice"
+                    },
+                    {
+                      "change": "Y126C",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Splice_Site",
+                      "driver": true,
+                      "rows": 2
+                    },
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 130,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "L130V",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 132,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "K132N",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 135,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "C135W",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 138,
+                  "n": 1,
+                  "color": "#993404",
+                  "impact": "inframe",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "K139_P142del",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "inframe"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "In_Frame_Del",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 144,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "Q144*",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Nonsense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 157,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "V157G",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 158,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "R158G",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 165,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "Q165Afs*6",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Del",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 169,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "M169I",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 174,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "R174Sfs*73",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Del",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 175,
+                  "n": 4,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "R175H",
+                      "n": 4,
+                      "rows": 4,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 4
+                    }
+                  ]
+                },
+                {
+                  "pos": 179,
+                  "n": 1,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "H179R",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 193,
+                  "n": 3,
+                  "color": "#008000",
+                  "impact": "missense",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "H193R",
+                      "n": 3,
+                      "rows": 3,
+                      "driver": true,
+                      "impact": "missense"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Missense_Mutation",
+                      "driver": true,
+                      "rows": 3
+                    }
+                  ]
+                },
+                {
+                  "pos": 196,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "R196*",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Nonsense_Mutation",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "pos": 209,
+                  "n": 1,
+                  "color": "#000000",
+                  "impact": "truncating",
+                  "driver": true,
+                  "changes": [
+                    {
+                      "change": "R209Kfs*6",
+                      "n": 1,
+                      "rows": 1,
+                      "driver": true,
+                      "impact": "truncating"
+                    }
+                  ],
+                  "types": [
+                    {
+                      "mtype": "Frame_Shift_Del",
+                      "driver": true,
+                      "rows": 1
+                    }
+                  ]
+                },
+                {
+                  "…": "22 more",
+                  "sha256": "b045486542f074a6"
+                }
+              ],
+              "domains": [
+                {
+                  "accession": "PF08563",
+                  "name": "P53_TAD",
+                  "start": 6,
+                  "end": 29,
+                  "color": "#2dcf00"
+                },
+                {
+                  "accession": "PF00870",
+                  "name": "P53",
+                  "start": 95,
+                  "end": 288,
+                  "color": "#ff5353"
+                },
+                {
+                  "accession": "PF07710",
+                  "name": "P53_tetramer",
+                  "start": 318,
+                  "end": 358,
+                  "color": "#5b5bff"
+                }
+              ],
+              "topChanges": [
+                {
+                  "change": "R175H",
+                  "pos": 175,
+                  "n": 4,
+                  "pct": 7.5
+                },
+                {
+                  "change": "H193R",
+                  "pos": 193,
+                  "n": 3,
+                  "pct": 5.7
+                },
+                {
+                  "change": "X126_splice",
+                  "pos": 126,
+                  "n": 2,
+                  "pct": 3.8
+                },
+                {
+                  "change": "G245D",
+                  "pos": 245,
+                  "n": 2,
+                  "pct": 3.8
+                },
+                {
+                  "change": "R273H",
+                  "pos": 273,
+                  "n": 2,
+                  "pct": 3.8
+                },
+                {
+                  "change": "R306*",
+                  "pos": 306,
+                  "n": 2,
+                  "pct": 3.8
+                },
+                {
+                  "change": "E11K",
+                  "pos": 11,
+                  "n": 1,
+                  "pct": 1.9
+                },
+                {
+                  "change": "P27S",
+                  "pos": 27,
+                  "n": 1,
+                  "pct": 1.9
+                },
+                {
+                  "change": "R110Vfs*13",
+                  "pos": 110,
+                  "n": 1,
+                  "pct": 1.9
+                },
+                {
+                  "change": "R110del",
+                  "pos": 110,
+                  "n": 1,
+                  "pct": 1.9
+                }
+              ],
+              "proteinLength": 393,
+              "lengthSource": "genome-nexus",
+              "transcript": "ENST00000269305",
+              "unpositioned": 0,
+              "withheld": 0,
+              "label": {
+                "pos": 175,
+                "text": "R175H"
+              },
+              "somaticSamples": 53,
+              "cohortSamples": 499,
+              "tally": {
+                "missense": {
+                  "driver": 32,
+                  "vus": 3
+                },
+                "truncating": {
+                  "driver": 12,
+                  "vus": 0
+                },
+                "inframe": {
+                  "driver": 2,
+                  "vus": 0
+                },
+                "splice": {
+                  "driver": 4,
+                  "vus": 0
+                },
+                "fusion": {
+                  "driver": 0,
+                  "vus": 0
+                },
+                "other": {
+                  "driver": 0,
+                  "vus": 0
+                }
+              },
+              "ids": {
+                "refseq": "NM_000546",
+                "ccds": "CCDS11118",
+                "uniprotAccession": "P04637",
+                "uniprotName": "P53_HUMAN",
+                "ensembl": "ENST00000269305.4"
+              }
+            }
+          }
+        ],
+        "rows": [
+          {
+            "change": "R342*",
+            "pos": 342,
+            "impact": "truncating",
+            "driver": true,
+            "n": [
+              6,
+              0
+            ],
+            "pct": [
+              3.508771929824561,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.0002586821643527017,
+            "q": 0.026873114275130432,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "R175H",
+            "pos": 175,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              9,
+              4
+            ],
+            "pct": [
+              5.2631578947368425,
+              0.8016032064128257
+            ],
+            "log2Ratio": 2.714968491893675,
+            "p": 0.0010359472807029608,
+            "q": 0.026873114275130432,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "I195T",
+            "pos": 195,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              5,
+              0
+            ],
+            "pct": [
+              2.9239766081871346,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.0010362869837030955,
+            "q": 0.026873114275130432,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "X225_splice",
+            "pos": 225,
+            "impact": "splice",
+            "driver": true,
+            "n": [
+              5,
+              0
+            ],
+            "pct": [
+              2.9239766081871346,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.0010362869837030955,
+            "q": 0.026873114275130432,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "Y220C",
+            "pos": 220,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              5,
+              0
+            ],
+            "pct": [
+              2.9239766081871346,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.0010362869837030955,
+            "q": 0.026873114275130432,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "R273H",
+            "pos": 273,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              7,
+              2
+            ],
+            "pct": [
+              4.093567251461988,
+              0.40080160320641284
+            ],
+            "log2Ratio": 3.3523984125089665,
+            "p": 0.0014220013398980305,
+            "q": 0.026873114275130432,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "R196*",
+            "pos": 196,
+            "impact": "truncating",
+            "driver": true,
+            "n": [
+              6,
+              1
+            ],
+            "pct": [
+              3.508771929824561,
+              0.20040080160320642
+            ],
+            "log2Ratio": 4.130005991172519,
+            "p": 0.0014250893933781292,
+            "q": 0.026873114275130432,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "R248Q",
+            "pos": 248,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              3,
+              0
+            ],
+            "pct": [
+              1.7543859649122806,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.016407951114699535,
+            "q": 0.21658495471403386,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "X125_splice",
+            "pos": 125,
+            "impact": "splice",
+            "driver": true,
+            "n": [
+              3,
+              0
+            ],
+            "pct": [
+              1.7543859649122806,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.016407951114699535,
+            "q": 0.21658495471403386,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "X331_splice",
+            "pos": 331,
+            "impact": "splice",
+            "driver": true,
+            "n": [
+              3,
+              0
+            ],
+            "pct": [
+              1.7543859649122806,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.016407951114699535,
+            "q": 0.21658495471403386,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "R213*",
+            "pos": 213,
+            "impact": "truncating",
+            "driver": true,
+            "n": [
+              3,
+              1
+            ],
+            "pct": [
+              1.7543859649122806,
+              0.20040080160320642
+            ],
+            "log2Ratio": 3.130005991172519,
+            "p": 0.053233592522088626,
+            "q": 0.3473149715338145,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "R282W",
+            "pos": 282,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              3,
+              1
+            ],
+            "pct": [
+              1.7543859649122806,
+              0.20040080160320642
+            ],
+            "log2Ratio": 3.130005991172519,
+            "p": 0.053233592522088626,
+            "q": 0.3473149715338145,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "C176F",
+            "pos": 176,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              2,
+              0
+            ],
+            "pct": [
+              1.1695906432748537,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.06485509671375993,
+            "q": 0.3473149715338145,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "L111P",
+            "pos": 111,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              2,
+              0
+            ],
+            "pct": [
+              1.1695906432748537,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.06485509671375993,
+            "q": 0.3473149715338145,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "N239*",
+            "pos": 238,
+            "impact": "truncating",
+            "driver": true,
+            "n": [
+              2,
+              0
+            ],
+            "pct": [
+              1.1695906432748537,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.06485509671375993,
+            "q": 0.3473149715338145,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "V216M",
+            "pos": 216,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              2,
+              0
+            ],
+            "pct": [
+              1.1695906432748537,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.06485509671375993,
+            "q": 0.3473149715338145,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "Y163C",
+            "pos": 163,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              2,
+              0
+            ],
+            "pct": [
+              1.1695906432748537,
+              0
+            ],
+            "log2Ratio": null,
+            "p": 0.06485509671375993,
+            "q": 0.3473149715338145,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "H179R",
+            "pos": 179,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              2,
+              1
+            ],
+            "pct": [
+              1.1695906432748537,
+              0.20040080160320642
+            ],
+            "log2Ratio": 2.545043490451363,
+            "p": 0.16174938791177657,
+            "q": 0.3473149715338145,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "R209Kfs*6",
+            "pos": 209,
+            "impact": "truncating",
+            "driver": true,
+            "n": [
+              2,
+              1
+            ],
+            "pct": [
+              1.1695906432748537,
+              0.20040080160320642
+            ],
+            "log2Ratio": 2.545043490451363,
+            "p": 0.16174938791177657,
+            "q": 0.3473149715338145,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "change": "R248W",
+            "pos": 248,
+            "impact": "missense",
+            "driver": true,
+            "n": [
+              2,
+              1
+            ],
+            "pct": [
+              1.1695906432748537,
+              0.20040080160320642
+            ],
+            "log2Ratio": 2.545043490451363,
+            "p": 0.16174938791177657,
+            "q": 0.3473149715338145,
+            "enrichedIn": "Basal-like"
+          },
+          {
+            "…": "112 more",
+            "sha256": "ffe4369726bc8a6c"
+          }
+        ],
+        "geneP": 1.104258195563521e-82,
+        "axis": "percent",
+        "annotated": true
+      },
+      "participation": {
+        "studies": [
+          {
+            "study": "brca_tcga_pan_can_atlas_2018",
+            "mode": "patient-level",
+            "instance": "primary",
+            "source": 0
+          }
+        ],
+        "requiresPatientLevel": false,
+        "aggregateOnly": []
+      },
+      "caveat": "Every share is of the cohort's patients with a sample profiled for TP53 (a panel listing it, or whole-exome): 171 in “Basal-like”, 499 in “Luminal A”. Each protein change counts the patients carrying it in one of the cohort's samples; uncalled mutations are left out, VUS and germline mutations kept, as on the portal. p is a two-sided Fisher's exact test of carriers against the rest of the profiled patients, per change; q is Benjamini–Hochberg across the 132 changes listed. A stem's height is the distinct patient + protein change pairs at that codon, as a share of the profiled patients, as the portal draws it. The gene picker ranks genes by their higher share of mutated samples over profiled samples in the two cohorts, as the portal's does. Driver = OncoKB oncogenic (v7.5). ",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Rank genes by their higher mutated share",
+            "detail": "The mutcompare:mutated / panels / wes queries above: per gene, the cohort's samples with a called mutation, and the samples profiled for it (a panel listing it, or whole-exome). Genes are ordered by the higher of the two cohorts' shares, as the portal's gene picker orders them."
+          },
+          {
+            "kind": "fetch",
+            "title": "Count each protein change's patients in TP53",
+            "detail": "The lollipop queries above, once per cohort: per (codon, protein change), the distinct patients carrying it in one of the cohort's samples; and the cohort's patients profiled for TP53 (mutcompare:profiled).",
+            "params": [
+              [
+                "Basal-like profiled patients",
+                "171"
+              ],
+              [
+                "Luminal A profiled patients",
+                "499"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Fisher's exact test per protein change, then Benjamini–Hochberg",
+            "detail": "Carriers against the rest of the profiled patients, two-sided, per change; q across the changes listed. The log ratio is log2 of the first cohort's share over the second's."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "fisherExact",
+            "benjaminiHochberg"
+          ],
+          "file": "lib/stats.ts",
+          "commit": null
+        },
+        "verification": "Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels multipletests, to a relative 1e-6 (test/tables-golden.test.ts).",
+        "check": {
+          "mutcompare:gene:p": {
+            "v": 1.104258195563521e-82
+          },
+          "mutcompare:R342*:p": {
+            "v": 0.0002586821643527017
+          },
+          "mutcompare:R342*:q": {
+            "v": 0.026873114275130432
+          },
+          "mutcompare:R175H:p": {
+            "v": 0.0010359472807029608
+          },
+          "mutcompare:R175H:q": {
+            "v": 0.026873114275130432
+          },
+          "mutcompare:I195T:p": {
+            "v": 0.0010362869837030955
+          },
+          "mutcompare:I195T:q": {
+            "v": 0.026873114275130432
+          },
+          "mutcompare:X225_splice:p": {
+            "v": 0.0010362869837030955
+          },
+          "mutcompare:X225_splice:q": {
+            "v": 0.026873114275130432
+          },
+          "mutcompare:Y220C:p": {
+            "v": 0.0010362869837030955
+          },
+          "mutcompare:Y220C:q": {
+            "v": 0.026873114275130432
+          },
+          "mutcompare:R273H:p": {
+            "v": 0.0014220013398980305
+          },
+          "mutcompare:R273H:q": {
+            "v": 0.026873114275130432
+          },
+          "mutcompare:R196*:p": {
+            "v": 0.0014250893933781292
+          },
+          "mutcompare:R196*:q": {
+            "v": 0.026873114275130432
+          },
+          "mutcompare:R248Q:p": {
+            "v": 0.016407951114699535
+          },
+          "mutcompare:R248Q:q": {
+            "v": 0.21658495471403386
+          },
+          "mutcompare:X125_splice:p": {
+            "v": 0.016407951114699535
+          },
+          "mutcompare:X125_splice:q": {
+            "v": 0.21658495471403386
+          },
+          "mutcompare:X331_splice:p": {
+            "v": 0.016407951114699535
+          },
+          "…": {
+            "more": 61,
+            "sha256": "642f0606e9a0d5d3"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -11,6 +11,15 @@ export function resultsMaxStudies(env: Record<string, string | undefined>): numb
   return Number.isInteger(n) && n > 0 ? n : RESULTS_MAX_STUDIES_DEFAULT;
 }
 
+/** QUERY_PRODUCT_LIMIT unset: the most genes × samples one gene query covers (cBioPortal's query_product_limit default) */
+export const QUERY_PRODUCT_LIMIT_DEFAULT = 1_000_000;
+
+/** QUERY_PRODUCT_LIMIT, a positive whole number; anything else is the default */
+export function queryProductLimit(env: Record<string, string | undefined>): number {
+  const n = Number(env.QUERY_PRODUCT_LIMIT);
+  return Number.isInteger(n) && n > 0 ? n : QUERY_PRODUCT_LIMIT_DEFAULT;
+}
+
 /**
  * When expression data may be compared across studies — cBioPortal's `enable_cross_study_expression`:
  * "all", "none", or "pancan" (every study a TCGA PanCancer Atlas study, whose expression is

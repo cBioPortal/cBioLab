@@ -28,12 +28,12 @@ altered AS (
   SELECT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'sarcoma_msk_2022_', '') AS sid, g.variant_type AS vtype,
          max(ann.is_driver) AS is_driver
   FROM snapshot_db.genomic_event_derived g
-  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM oncokb_annotation.variant_annotation
+  LEFT JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM annotation.oncokb
       WHERE oncokb_version = 'v7.5' AND is_driver) ann
     ON ann.hugo_gene_symbol = g.hugo_gene_symbol
    AND ann.alteration_type = multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', '')
    AND ann.alteration = multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')
-  WHERE g.cancer_study_identifier = 'sarcoma_msk_2022'
+  WHERE startsWith(g.genetic_profile_stable_id, 'sarcoma_msk_2022_') AND g.cancer_study_identifier = 'sarcoma_msk_2022'
     AND g.hugo_gene_symbol IN ('MDM2','TP53') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND replaceOne(g.sample_unique_id, 'sarcoma_msk_2022_', '') IN (SELECT sid FROM cohort)
   GROUP BY gene, sid, vtype

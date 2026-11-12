@@ -2,8 +2,8 @@
 //
 // Interface: buildAnnotationIndex(eventRows, genes) -> { isDriver(row), source }
 //
-// Primary backend: the version-pinned OncoKB store (oncokb_annotation.variant_annotation,
-// populated by cBioPortal/oncokb-annotation-pipeline). Reads go through the app's own
+// Primary backend: the version-pinned OncoKB store (annotation.oncokb, lib/annotation-store.ts,
+// filled offline by `npm run annotate -- oncokb`, packages/annotation-sync/). Reads go through the app's own
 // ClickHouse identity — being "licensed" IS having SELECT on that database, so if the
 // grant is revoked (or the store is empty) this degrades to the rule-based MOCK below,
 // clearly labeled as such. Pin a specific release with ONCOKB_PIN; default is the
@@ -12,6 +12,7 @@ import { chQuery, isAbortError} from "./ch.ts";
 import type { ChRow } from "./types.ts";
 import { isDriverEvent, driverSourceText, type DriverFields, type ResolvedDrivers } from "./driver-settings.ts";
 import { sq } from "./compiler.ts";
+import { ONCOKB_TABLE, syncedStudiesSql } from "./annotation-store.ts";
 
 /**
  * The store's most recent release, or the ONCOKB_PIN override. Cached: it is asked for once
@@ -23,7 +24,7 @@ export async function oncokbPin(): Promise<string | null> {
   if (pinCache && Date.now() - pinCache.at < 5 * 60_000) return pinCache.pin;
   try {
     const r = await chQuery(
-      `SELECT oncokb_version FROM ${ANNOT_DB}.variant_annotation GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1`);
+      `SELECT oncokb_version FROM ${ONCOKB_TABLE} GROUP BY oncokb_version ORDER BY max(resolved_at) DESC LIMIT 1`);
     pinCache = { at: Date.now(), pin: (r.data[0] as { oncokb_version?: string })?.oncokb_version || null };
   } catch (e) {
     // A cancelled query is not an answer: caching a null pin here would refuse every
@@ -70,13 +71,12 @@ function mockIndex(eventRows: EvRow[]): AnnotationIndex {
   return { isDriver, source: MOCK_SOURCE };
 }
 
-const ANNOT_DB = "oncokb_annotation";
 
 let _syncedStudies: string[] | null = null;
 async function syncedStudies(): Promise<string[]> {
   if (_syncedStudies) return _syncedStudies;
   try {
-    const r = await chQuery("SELECT DISTINCT study FROM oncokb_annotation.sync_run WHERE annotated_new > 0 OR already_stored > 0");
+    const r = await chQuery(syncedStudiesSql("oncokb"));
     _syncedStudies = (r.data as ChRow[]).map(x => x.study);
   } catch (e) {
     // This cache has no TTL, so swallowing a cancellation here would convince the process
@@ -99,7 +99,7 @@ export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], 
     if (!pin) throw new Error("annotation store is empty");
     const rows = await chQuery(
       `SELECT alteration_type AS t, hugo_gene_symbol AS gene, alteration, max(is_driver) AS is_driver
-       FROM ${ANNOT_DB}.variant_annotation
+       FROM ${ONCOKB_TABLE}
        WHERE oncokb_version = ${sq(pin)} AND hugo_gene_symbol IN (${genes.map(sq).join(",")})
        GROUP BY t, gene, alteration`);
     // Nested by gene rather than one set of "type|gene|alteration" keys: isDriver runs once per

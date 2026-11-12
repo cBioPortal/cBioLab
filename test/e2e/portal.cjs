@@ -268,7 +268,7 @@ async function portal({ browser, ok, BASE }) {
     await ctx.close();
   }
   // "Open in cBioPortal": the same page and tab on the legacy portal, following the open tab; on the
-  // Comparison page, which needs a portal session, disabled and saying why.
+  // Comparison page, the page's groups saved as a portal session and opened.
   {
     const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
     const page = await ctx.newPage();
@@ -290,9 +290,20 @@ async function portal({ browser, ok, BASE }) {
           /^https?:\/\/[^/]+\/results\/comparison\/survival\?/.test(second.href || ""), first.href + " → " + second.href);
       await page.goto(BASE + "/portal/comparison?doc=" + Buffer.from(JSON.stringify({ study: "brca_tcga", views: [], cohorts: {
         Male: { all: [{ kind: "clinical", attribute: "SEX", values: ["Male"] }] }, Female: { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }] } } })).toString("base64url"), { waitUntil: "domcontentloaded" });
-      await page.locator(".legacylink[data-tip*='session']").waitFor({ timeout: 240000 });
+      // the server builds the session (app/api/legacy-comparison) and the browser saves it; both stubbed here so a run writes nothing to cbioportal.org
+      let sent = null, saved = null;
+      await page.route("**/api/legacy-comparison", (r) => { sent = r.request().postDataJSON(); return r.fulfill({ json: { portal: "https://www.cbioportal.org", session: { groups: [], origin: ["brca_tcga"] } } }); });
+      await ctx.route("https://www.cbioportal.org/**", (r) => {
+        if (r.request().method() === "POST") { saved = r.request().postDataJSON(); return r.fulfill({ json: { id: "e2e" }, headers: { "access-control-allow-origin": "*" } }); }
+        return r.fulfill({ body: "stub" });
+      });
+      await page.locator("button.legacylink[data-tip*='session service']:not([aria-disabled])").waitFor({ timeout: 240000 });
       const cmp = await legacy();
-      ok("portal: on the Comparison page Open in cBioPortal is disabled, saying why", cmp.off === "true" && !cmp.href, cmp.tip);
+      const [tab] = await Promise.all([ctx.waitForEvent("page"), page.locator("button.legacylink").click()]);
+      await tab.waitForURL(/comparisonId=e2e/, { timeout: 60000 });
+      ok("portal: on the Comparison page Open in cBioPortal saves the groups as a portal session from the browser and opens it",
+        /on its Overlap tab/.test(cmp.tip || "") && sent?.study === "brca_tcga" && Object.keys(sent?.cohorts || {}).join() === "Male,Female"
+          && saved?.origin?.[0] === "brca_tcga" && /\/comparison\/overlap\?comparisonId=e2e$/.test(tab.url()) && await tab.evaluate(() => window.opener === null), cmp.tip + " · sent " + JSON.stringify(sent)?.slice(0, 120));
     } catch (e) {
       ok("portal: Open in cBioPortal", false, String(e.message).split("\n")[0].slice(0, 200));
     }

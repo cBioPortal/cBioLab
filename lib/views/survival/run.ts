@@ -1,8 +1,8 @@
 // Survival view: Kaplan-Meier curves pooled exactly from each participant's id-free
-// (months, event, n) counts, with log-rank tests.
-import { kaplanMeier, logRank, logRankK, applyCutoff, toIncidence } from "../../stats.ts";
+// (months, event, n) counts, with log-rank tests, all computed from those grouped rows directly.
+import { kaplanMeierCounts, logRankCounts, logRankKCounts, applyCutoffCounts, survSubjects, toIncidence, type SurvCount } from "../../stats.ts";
 import type { ViewResult, LogRank, LogRankK } from "../../types.ts";
-import { expandSurvivalCounts, type SurvivalCount, type EndpointColumns } from "../../federation.ts";
+import type { SurvivalCount, EndpointColumns } from "../../federation.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { ATTR_NAME, askEachSite } from "../shared.ts";
 import type { SurvivalView } from "./types.ts";
@@ -104,14 +104,17 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
         error: "no participating study has data in " + columnsLabel + "." + endpointHelp });
     }
   }
-  const pointsFor = (n: string, st?: string) => {
-    const data = expandSurvivalCounts(
-      st ? (perSite.get(n)!.get(st) || []) : [...perSite.get(n)!.values()].flat());
-    return cutoffMonths != null ? applyCutoff(data, cutoffMonths) : data;
+  // The rows stay grouped all the way through: the curve, the risk table and the tests read only
+  // deaths, censorings and the number at risk at each distinct time, which the rows already give.
+  const rowsOf = (rows: SurvivalCount[]): SurvCount[] =>
+    rows.map((r) => r.entry == null ? { t: r.months, event: r.event, n: r.n } : { t: r.months, event: r.event, entry: r.entry, n: r.n });
+  const countsFor = (n: string, st?: string) => {
+    const rows = rowsOf(st ? (perSite.get(n)!.get(st) || []) : [...perSite.get(n)!.values()].flat());
+    return cutoffMonths != null ? applyCutoffCounts(rows, cutoffMonths) : rows;
   };
   const curvesRaw = vNames.map((n) => {
-    const data = pointsFor(n);
-    return { cohort: n, ...kaplanMeier(data), missing: cohorts[n].count - data.length };
+    const rows = countsFor(n);
+    return { cohort: n, ...kaplanMeierCounts(rows), missing: cohorts[n].count - survSubjects(rows) };
   });
   const curves = display === "incidence" ? curvesRaw.map((c) => toIncidence(c)) : curvesRaw;
   // Two cohorts is the case the 2-arm log-rank test is defined for, matching the compare
@@ -132,18 +135,18 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
   if (thinArms.length === 0 && vNames.length === 2) {
     const [A, B] = vNames;
     const sites = [...new Set([...perSite.get(A)!.keys(), ...perSite.get(B)!.keys()])];
-    const pooledTest = logRank([{ a: pointsFor(A), b: pointsFor(B) }]);
+    const pooledTest = logRankCounts([{ a: countsFor(A), b: countsFor(B) }]);
     if (sites.length > 1) {
-      logrank = logRank(sites.map((st) => ({ a: pointsFor(A, st), b: pointsFor(B, st) })));
+      logrank = logRankCounts(sites.map((st) => ({ a: countsFor(A, st), b: countsFor(B, st) })));
       logrankPooled = pooledTest;   // shown for contrast: the two can disagree
     } else {
       logrank = pooledTest;
     }
   } else if (thinArms.length === 0 && vNames.length >= 3) {
     const sites = [...new Set(vNames.flatMap((n) => [...perSite.get(n)!.keys()]))];
-    const pooledTest = logRankK([{ groups: vNames.map((n) => pointsFor(n)) }]);
+    const pooledTest = logRankKCounts([{ groups: vNames.map((n) => countsFor(n)) }]);
     if (sites.length > 1) {
-      logrankK = logRankK(sites.map((st) => ({ groups: vNames.map((n) => pointsFor(n, st)) })));
+      logrankK = logRankKCounts(sites.map((st) => ({ groups: vNames.map((n) => countsFor(n, st)) })));
       logrankKPooled = pooledTest;
     } else {
       logrankK = pooledTest;
@@ -154,20 +157,28 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
   // study that records prior unrelated cancers can sit decades back.
   let entryMonths: { median: number; p90: number; max: number } | undefined;
   if (anchor) {
-    const es: number[] = [];
+    // entry times in order, each standing for its row's n patients; a quantile is the entry of the
+    // patient at that rank
+    const es: [number, number][] = [];
     for (const byStudy of perSite.values())
       for (const rows of byStudy.values())
-        for (const r of rows) if (r.entry != null) for (let i = 0; i < r.n; i++) es.push(r.entry);
-    if (es.length) {
-      es.sort((x, y) => x - y);
-      const at = (q: number) => Math.round(es[Math.floor(q * (es.length - 1))] * 10) / 10;
+        for (const r of rows) if (r.entry != null && r.n > 0) es.push([r.entry, r.n]);
+    const total = es.reduce((k, [, n]) => k + n, 0);
+    if (total) {
+      es.sort((x, y) => x[0] - y[0]);
+      const at = (q: number) => {
+        const rank = Math.floor(q * (total - 1));
+        let seen = 0, i = 0;
+        while (seen + es[i][1] <= rank) seen += es[i++][1];
+        return Math.round(es[i][0] * 10) / 10;
+      };
       entryMonths = { median: at(0.5), p90: at(0.9), max: at(1) };
     }
   }
   const unobservedTotal = curvesRaw.reduce((sum, c) => sum + (c.unobserved || 0), 0);
   const beyondCutoff = cutoffMonths != null
-    ? vNames.reduce((sum, n) => sum + expandSurvivalCounts([...perSite.get(n)!.values()].flat())
-        .filter((r) => r.t > cutoffMonths!).length, 0)
+    ? vNames.reduce((sum, n) => sum + survSubjects(rowsOf([...perSite.get(n)!.values()].flat())
+        .filter((r) => r.t > cutoffMonths!)), 0)
     : 0;
   return { kind: "survival", cohorts: vNames, curves, endpoint,
     ...(entryMonths ? { entryMonths } : {}),

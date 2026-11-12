@@ -66,7 +66,7 @@ function warehouse(q: string): Row[] {
   if (/generic_assay_data_derived g/.test(q)) return [{ pid: "P1", gene: "SBS1", v: 0.4 }, { pid: "P2", gene: "SBS1", v: 0.1 }];
   if (/genetic_alteration_derived ga/.test(q)) return [{ pid: "P1", gene: "TP53", v: 2.5 }, { pid: "P2", gene: "TP53", v: -2.5 }, { pid: "P3", gene: "TP53", v: 0.2 }, { pid: "P2", gene: "KRAS", v: 1 }];
   if (/max\(tumorAltCount/.test(q)) return [{ pid: "P1", gene: "TP53", v: 0.42 }];
-  if (/variant_annotation/.test(q)) return [{ t: "MUTATION", gene: "TP53", alteration: "R175H", is_driver: 1 }];
+  if (/annotation\.oncokb/.test(q)) return [{ t: "MUTATION", gene: "TP53", alteration: "R175H", is_driver: 1 }];
   if (/sync_run/.test(q)) return [{ study: "s1" }];
   return [];
 }

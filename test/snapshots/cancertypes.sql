@@ -21,7 +21,7 @@ alt AS (
          multiIf(g.variant_type = 'mutation', 'mutation', g.variant_type = 'cna' AND g.cna_alteration >= 2, 'amp',
                  g.variant_type = 'cna', 'homdel', 'sv') AS t
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'msk_impact_50k_2026' AND g.hugo_gene_symbol IN ('KRAS','NRAS','HRAS') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_impact_50k_2026_') AND g.cancer_study_identifier = 'msk_impact_50k_2026' AND g.hugo_gene_symbol IN ('KRAS','NRAS','HRAS') AND ((g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2) AND NOT g.off_panel)
     AND g.sample_unique_id IN (SELECT suid FROM samp)
   GROUP BY suid, gene, t
 ),

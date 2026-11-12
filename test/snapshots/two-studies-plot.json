@@ -574,7 +574,7 @@
       "kind": "plot",
       "plot": {
         "shape": "box",
-        "n": 996,
+        "n": 998,
         "x": {
           "label": "SEX",
           "kind": "cat"
@@ -597,14 +597,14 @@
           },
           {
             "g": "Male",
-            "n": 594,
+            "n": 596,
             "lo": 0,
             "hi": 53.36666667,
-            "q1": 4.387598204329966,
-            "median": 7.345566778835017,
-            "q3": 12.602132434124579,
+            "q1": 4.390883668969799,
+            "median": 7.326230425189597,
+            "q3": 12.577125280302013,
             "loWhisker": 0,
-            "hiWhisker": 24.923933778816497
+            "hiWhisker": 24.856487697300334
           }
         ],
         "overlay": "points",
@@ -711,17 +711,17 @@
             "v": 1.033333333
           },
           {
-            "…": "976 more",
-            "sha256": "178485cca72f6fe3"
+            "…": "978 more",
+            "sha256": "c22b06322f3105d3"
           }
         ],
         "pointSet": {
           "rule": "all",
-          "drawn": 996
+          "drawn": 998
         },
         "coverage": {
           "total": 1053,
-          "nx": 999,
+          "nx": 1001,
           "ny": 1050,
           "multi": 0
         },
@@ -870,7 +870,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "996 of 1,053 patients have a value on both axes (54 have no SEX; 3 have no TMB_NONSYNONYMOUS); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Counts and extremes per group sum exactly; the quartiles are a size-weighted approximation across sites (it can shift where an outlier bar falls, never a count). Point layers — “KRAS mut”: 175 patients, 164 patients drawn as points. The statistics are over the whole plotted cohort."
+      "note": "998 of 1,053 patients have a value on both axes (52 have no SEX; 3 have no TMB_NONSYNONYMOUS); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Counts and extremes per group sum exactly; the quartiles are a size-weighted approximation across sites (it can shift where an outlier bar falls, never a count). Point layers — “KRAS mut”: 175 patients, 164 patients drawn as points. The statistics are over the whole plotted cohort."
     }
   ]
 }

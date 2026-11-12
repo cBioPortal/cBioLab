@@ -1,5 +1,5 @@
 // The study-updates page's API (/import/updates), in local mode only, on a database in the new
-// schema: example updates to a study (lib/importer/lab-edits.ts), reviews (lib/importer/lab-review.ts),
+// schema: example updates to a study (packages/importer/src/lab-edits.ts), reviews (packages/importer/src/lab-review.ts),
 // merging a study's partitions, and timing queries on a study.
 //
 //   GET                       the database's studies (review copies apart)
@@ -7,13 +7,14 @@
 //   POST { action, study, … } plan | apply | review-start | review-diff | review-approve | review-reject
 //                             | review-undo | merge | time
 import { connection } from "next/server";
-import { importEnabled, localConn, query, sq, type WriteConn } from "../../../../lib/importer/ch-write.ts";
-import { applyEdit, continuousProfiles, planEdit, type EditParams } from "../../../../lib/importer/lab-edits.ts";
-import { approveReview, diffReview, isReviewId, latestReview, latestVersion, rejectReview, reviewId, startReview, studyExists, undoApproval } from "../../../../lib/importer/lab-review.ts";
-import { compactStudy, studyParts } from "../../../../lib/importer/lab-schema.ts";
-import { schemaMode } from "../../../../lib/importer/setup.ts";
-import { runningJob } from "../../../../lib/importer/jobs.ts";
-import { validStudyId } from "../../../../lib/importer/datahub.ts";
+import { importEnabled, query, sq, type WriteConn } from "@cbiolab/importer/ch-write";
+import { importConn } from "../../../../lib/import-conn.ts";
+import { applyEdit, continuousProfiles, planEdit, type EditParams } from "@cbiolab/importer/lab-edits";
+import { approveReview, diffReview, isReviewId, latestReview, latestVersion, rejectReview, reviewId, startReview, studyExists, undoApproval } from "@cbiolab/importer/lab-review";
+import { compactStudy, studyParts } from "@cbiolab/importer/lab-schema";
+import { schemaMode } from "@cbiolab/importer/setup";
+import { runningJob } from "@cbiolab/importer/jobs";
+import { validStudyId } from "@cbiolab/importer/datahub";
 
 const bad = (error: string, status = 400) => Response.json({ error }, { status });
 
@@ -79,7 +80,7 @@ async function timeQueries(conn: WriteConn, study: string): Promise<{ query: str
 
 async function guard(): Promise<Response | WriteConn> {
   if (!importEnabled()) return bad("Study updates are only available when cBioLab runs locally (npm run local)", 404);
-  const conn = localConn();
+  const conn = importConn();
   const mode = await schemaMode(conn);
   if (mode !== "new") return bad(`Study updates need a database in the new schema; this one is ${mode} (npm run import -- --schema new)`, 409);
   return conn;

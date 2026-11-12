@@ -223,7 +223,7 @@ test("germline: a stripe over the mutation drawn, a legend entry when present, o
 });
 
 test("level of detail: a germline mark goes with the mutation classes it was drawn on", () => {
-  const B = STYLE.bits, D = B.MUT_DRIVER | B.DRIVER, gene = { kind: "gene" };
+  const B = STYLE.bits, D = B.MUT_DRIVER | B.DRIVER, gene = { kind: "gene" as const };
   // a germline VUS beside a somatic driver: the bucket shows the driver, without the stripe
   assert.deepEqual(bucketCodes(gene, [B.MISSENSE | B.GERMLINE, B.TRUNCATING | D], 0, 2, 1), [B.TRUNCATING | D]);
   // a germline driver: kept

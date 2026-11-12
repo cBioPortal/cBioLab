@@ -49,28 +49,30 @@ apart: [`TESTING.md`](TESTING.md).) ClickHouse listens on
 127.0.0.1 only, with a generated password (`~/.cbiolab/clickhouse/password`).
 
 The database is **cBioPortal's own ClickHouse schema**, created from `schema.sql` and the seed
-tables at a pinned commit of `cBioPortal/cbioportal` (`lib/importer/setup.ts`). The importer
-(`lib/importer/`) writes cBioPortal's base tables, applying the legacy importer's rules, and then
+tables at a pinned commit of `cBioPortal/cbioportal` (`packages/importer/src/setup.ts`). The importer
+(`packages/importer/`) writes cBioPortal's base tables, applying the legacy importer's rules, and then
 runs cBioPortal's own `populate_derived_tables.sql` unchanged, so the `*_derived` tables every view
 reads are built by exactly the SQL that builds them for cbioportal.org. Each rule that decides
-whether a row is stored is a named function with a test (`test/importer.test.ts`); the rules
+whether a row is stored is a named function with a test (`packages/importer/test/importer.test.ts`); the rules
 themselves, with the legacy source lines they copy, were audited in the import session's notes.
 
-Imports run in their own process (`scripts/import-study.ts --json`, started by
-`lib/importer/jobs.ts`) so a large MAF never shares the web server's memory, one at a time (each
+Imports run in their own process (`packages/importer/bin/import-study.ts --json`, started by
+`packages/importer/src/jobs.ts`) so a large MAF never shares the web server's memory, one at a time (each
 rebuilds the derived tables). The app runs as `next dev` with `RESULT_CACHE=off` (a cached answer
 would outlive the data under it) and its build output in `.next-local`, so it can share a checkout
 with a dev server that owns `.next`. The import page and `/api/import` exist only when
 `CBIOLAB_LOCAL=1`, which only the launcher sets: a deployment reading a shared warehouse never
 writes to it.
 
-OncoKB is licensed, so the local `oncokb_annotation` store is empty: OncoKB-dependent filters
-match nothing, and driver calls come only from a study's own `cbp_driver*` columns.
+Every annotation source's store is created empty ([ANNOTATION.md](ANNOTATION.md)). OncoKB is
+licensed, so the local `annotation.oncokb` table stays empty unless you have a token: OncoKB-dependent
+filters match nothing, and driver calls come only from a study's own `cbp_driver*` columns. With
+`ONCOKB_TOKEN` set, `npm run annotate -- oncokb --all` (while `npm run local` runs) fills it.
 
 ## Schema modes: cBioPortal's tables, the file-shaped tables, or both
 
 `npm run local -- --schema <mode>` (or `npm run import -- --schema <mode>`) sets where imports
-write; `lib/importer/lab-schema.ts` has the details.
+write; `packages/importer/src/lab-schema.ts` has the details.
 
 - **legacy** (the default) — cBioPortal's tables, then its derived-table SQL, as above.
 - **new** — the file-shaped `lab_` tables only: one per kind of study file, long form, keyed by the
@@ -117,7 +119,7 @@ there. Importing into `new` takes about as long as before denormalizing (msk_cho
 against 218 s; acc_tcga: 30–34 s either way).
 
 The importer applies cBioPortal's rules once: it produces rows for cBioPortal's tables, and
-`lib/importer/lab-writer.ts` turns each into its `lab_` row. Rows are written denormalized — each
+`packages/importer/src/lab-writer.ts` turns each into its `lab_` row. Rows are written denormalized — each
 carries what a query would otherwise join for: the gene's symbol, the sample's patient and panel,
 whether the gene is on that panel, the cytoband; clinical rows form the full grid of samples (or
 patients) by attributes, with `''` where the file has no value; copy-number events are kept in
@@ -141,8 +143,8 @@ leaves every `lab_` table as a fresh import of the edited study would.
 ## Live updates and reviews
 
 `/import/updates` (new-mode databases) changes an imported study the ways a live portal does, so
-the machinery can be tried and its costs seen; `lib/importer/lab-edits.ts` and
-`lib/importer/lab-review.ts` do the work.
+the machinery can be tried and its costs seen; `packages/importer/src/lab-edits.ts` and
+`packages/importer/src/lab-review.ts` do the work.
 
 - **Updates** are written as new row versions, visible to the next query. The page generates
   them: new samples (copies of existing samples, with their clinical values, profiles, case lists
@@ -196,7 +198,7 @@ Running the legacy importer, in short:
    clone's root, where its scripts look for it); `pip install -r requirements.txt` in a venv.
 2. Start ClickHouse **24.5** (`clickhouse/clickhouse-server:24.5` in Docker; its JDBC driver fails
    silently against newer servers), create database `cbioportal`, and load the same `schema.sql`
-   and seed parquets that `lib/importer/setup.ts` pins.
+   and seed parquets that `packages/importer/src/setup.ts` pins.
 3. `PORTAL_HOME` names a folder holding `application.properties` (`spring.datasource.url=
    jdbc:clickhouse://127.0.0.1:<http port>/cbioportal`, user, password). Load the datahub gene
    panels with `org.mskcc.cbio.portal.scripts.ImportGenePanel --data <file>`, then each study with

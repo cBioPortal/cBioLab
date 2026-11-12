@@ -8,6 +8,7 @@ import { compareDoc } from "./compare/doc.ts";
 import { clinicalDoc } from "./clinical/doc.ts";
 import { cooccurrenceDoc } from "./cooccurrence/doc.ts";
 import { hotspotsDoc } from "./hotspots/doc.ts";
+import { mutcompareDoc } from "./mutcompare/doc.ts";
 import { coexpressionDoc } from "./coexpression/doc.ts";
 import { survivalDoc } from "./survival/doc.ts";
 import { coxDoc } from "./cox/doc.ts";
@@ -64,6 +65,7 @@ export const KIND_DOCS: Record<ViewKind, KindDoc> = {
   clinical: clinicalDoc,
   cooccurrence: cooccurrenceDoc,
   hotspots: hotspotsDoc,
+  mutcompare: mutcompareDoc,
   coexpression: coexpressionDoc,
   survival: survivalDoc,
   cox: coxDoc,

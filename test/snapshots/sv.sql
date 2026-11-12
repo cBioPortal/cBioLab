@@ -5,7 +5,7 @@ SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(
 
 -- view 0 sv: sv:counts · msk_impact_2017
 WITH ann AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, toUInt8(max(is_driver)) AS driver
-  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
+  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
   GROUP BY gene),
 c0 AS (SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_2017_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_2017'),
@@ -83,7 +83,7 @@ FROM marks GROUP BY gene ORDER BY gene
 
 -- view 0 sv: sv:rows · msk_impact_2017
 WITH ann AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, toUInt8(max(is_driver)) AS driver
-  FROM oncokb_annotation.variant_annotation WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
+  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
   GROUP BY gene),
 c0 AS (SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_2017_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_2017'),

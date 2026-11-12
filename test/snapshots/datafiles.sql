@@ -22,7 +22,7 @@ d0_e0 AS (
   SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev
   FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
+  WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
   WHERE sid IN (SELECT sid FROM c0)
@@ -31,7 +31,7 @@ d0_e1 AS (
   SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev
   FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
+  WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('PIK3CA')
     AND ((g.hugo_gene_symbol = 'PIK3CA' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
   WHERE sid IN (SELECT sid FROM c0)
@@ -40,7 +40,7 @@ d0_e2 AS (
   SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev
   FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
+  WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('GATA3')
     AND ((g.hugo_gene_symbol = 'GATA3' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
   WHERE sid IN (SELECT sid FROM c0)
@@ -129,7 +129,7 @@ d0_e0 AS (
   SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev
   FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
+  WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
   WHERE sid IN (SELECT sid FROM c0)
@@ -138,7 +138,7 @@ d0_e1 AS (
   SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev
   FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
+  WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('PIK3CA')
     AND ((g.hugo_gene_symbol = 'PIK3CA' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
   WHERE sid IN (SELECT sid FROM c0)
@@ -147,7 +147,7 @@ d0_e2 AS (
   SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev
   FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
+  WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('GATA3')
     AND ((g.hugo_gene_symbol = 'GATA3' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
   WHERE sid IN (SELECT sid FROM c0)
@@ -239,7 +239,7 @@ d_e0 AS (
   SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev
   FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
+  WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
   WHERE sid IN (SELECT sid FROM cohort)
@@ -248,7 +248,7 @@ d_e1 AS (
   SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev
   FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
+  WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('PIK3CA')
     AND ((g.hugo_gene_symbol = 'PIK3CA' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
   WHERE sid IN (SELECT sid FROM cohort)
@@ -257,7 +257,7 @@ d_e2 AS (
   SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev
   FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev
   FROM snapshot_db.genomic_event_derived g
-  WHERE g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
+  WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('GATA3')
     AND ((g.hugo_gene_symbol = 'GATA3' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
   WHERE sid IN (SELECT sid FROM cohort)

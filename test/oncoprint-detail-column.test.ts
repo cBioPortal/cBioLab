@@ -64,7 +64,7 @@ describe("a column's detail", () => {
   const withData = (panelRows: Row[] = [{ panel: "IMPACT468", covers: ["TP53", "KRAS", "EGFR", ""] }]) => {
     answer = (q) => /genomic_event_derived/.test(q) ? ROWS
       : /sample_to_gene_panel_derived sp/.test(q) ? panelRows
-      : /variant_annotation/.test(q) ? [{ t: "MUTATION", gene: "TP53", alteration: "R175H", is_driver: 1 }, { t: "CNA", gene: "KRAS", alteration: "AMPLIFICATION", is_driver: 1 },
+      : /annotation\.oncokb/.test(q) ? [{ t: "MUTATION", gene: "TP53", alteration: "R175H", is_driver: 1 }, { t: "CNA", gene: "KRAS", alteration: "AMPLIFICATION", is_driver: 1 },
         { t: "CNA", gene: "CDKN2A", alteration: "DELETION", is_driver: 1 }, { t: "SV", gene: "ALK", alteration: "Fusion", is_driver: 1 }]
       : /sync_run/.test(q) ? [{ study: "s1" }] : [];
   };
@@ -123,7 +123,7 @@ describe("a column's detail", () => {
     const d = await columnDetail({ study: "s1", genes: ["TP53"], display: { annotate: "none" } } as never, "P1");
     assert.equal(d.alterations.every((a) => a.driver === false), true);
     assert.match(d.annotation, /^none — no driver source is switched on/);
-    assert.equal(sent.some((q) => /variant_annotation/.test(q)), false);
+    assert.equal(sent.some((q) => /annotation\.oncokb/.test(q)), false);
   });
 
   test("the study's own call, tier and germline status ride with each alteration; the settings decide what is a driver and what is shown", async () => {
@@ -132,7 +132,7 @@ describe("a column's detail", () => {
       { gene: "TP53", vt: "mutation", mt: "Nonsense_Mutation", mv: "Q100*", cna: "", df: "Putative_Driver", dfa: "", dt: "Tier 1", dta: "known", germ: 1 },
       { gene: "TP53", vt: "mutation", mt: "Missense_Mutation", mv: "A1V", cna: "", df: "", dfa: "", dt: "Tier 3", dta: "", germ: 0 },
     ];
-    answer = (q) => /genomic_event_derived/.test(q) ? CUSTOM : /variant_annotation/.test(q) ? [{ t: "MUTATION", gene: "TP53", alteration: "R175H", is_driver: 1 }]
+    answer = (q) => /genomic_event_derived/.test(q) ? CUSTOM : /annotation\.oncokb/.test(q) ? [{ t: "MUTATION", gene: "TP53", alteration: "R175H", is_driver: 1 }]
       : /sync_run/.test(q) ? [{ study: "s1" }] : [];
     const d = await columnDetail({ study: "s1", genes: ["TP53"], drivers: { tiers: ["Tier 1"] } } as never, "P1");
     assert.match(events()[0], /driver_filter AS df, driver_filter_annotation AS dfa, driver_tiers_filter AS dt/);

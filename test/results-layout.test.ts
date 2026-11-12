@@ -1,10 +1,10 @@
 // The Results page's groups and tabs (app/portal/results-layout.ts): Unaltered is the profiled
 // patients the query does not match, profiled only for data every queried study holds; the
 // expression tabs follow cBioPortal's cross-study rule.
-import { test } from "node:test";
+import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { resultsGroups, resultsLayout, linkMutations, svCheckCohort } from "../app/portal/results-layout.ts";
-import type { View } from "../lib/types.ts";
+import type { View, Clause } from "../lib/types.ts";
 
 const ALL3 = { every: ["MUTATION", "CNA", "SV"] as const, some: [] as never[] };
 const q = (studies: string[], entries: string[], filters: any[] = []) => ({ studies, filters, entries, genes: [...new Set(entries.map((e) => e.split(":")[0].trim()))] });
@@ -162,4 +162,25 @@ test("CN Segments: every queried sample's segments zoomed to the first gene, a c
   assert.equal(ch.value(whole as View[]), "Whole genome");
   assert.equal((ch.apply(whole as View[], "MYC") as any[])[0].gene, "MYC");
   assert.equal(whole[1], vs[1], "the frequency view is left as it is");
+});
+
+describe("the query page's choices in the document", () => {
+  test("the mRNA / protein profile reaches the Altered clause and the Download tab; the case set is every group's", () => {
+    const layout = resultsLayout;
+    const caseSet = { kind: "caseList", id: "s_sequenced" } as Clause;
+    const l = layout({ studies: ["s"], filters: [caseSet], entries: ["TP53: MUT EXP>=2 EXP<=-2"], genes: ["TP53"], exp: "rna_seq_v2_mrna_median_Zscores" },
+      { expr: null, cna: null, clinical: [], numeric: [], expressionAcross: true, held: { every: ["MUTATION", "CNA"], some: [] }, svs: false });
+    const groups = l.doc.cohorts as Record<string, { all: Clause[] }>;
+    for (const g of ["Altered", "Unaltered", "Queried"]) assert.deepEqual(groups[g].all[0], caseSet, g);
+    assert.deepEqual(groups.Altered.all[1], { kind: "oql", q: "TP53: MUT EXP>=2 EXP<=-2", exp: "rna_seq_v2_mrna_median_Zscores" });
+    const dl = (l.doc.views || []).find((v) => (v as { kind: string }).kind === "datafiles") as unknown as { exp?: string; oql: string[] };
+    assert.equal(dl.exp, "rna_seq_v2_mrna_median_Zscores");
+    assert.deepEqual(dl.oql, ["TP53: MUT EXP>=2 EXP<=-2"]);
+    // several studies: the pin applies to each study holding the profile, in the clause and the Download tab alike
+    const m = layout({ studies: ["a", "b"], filters: [], entries: ["TP53: MUT EXP>=2 EXP<=-2"], genes: ["TP53"], exp: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true },
+      { expr: null, cna: null, clinical: [], numeric: [], expressionAcross: true, held: { every: ["MUTATION", "CNA"], some: [] }, svs: false });
+    assert.deepEqual((m.doc.cohorts as Record<string, { all: Clause[] }>).Altered.all[0], { kind: "oql", q: "TP53: MUT EXP>=2 EXP<=-2", exp: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true });
+    const mdl = (m.doc.views || []).find((v) => (v as { kind: string }).kind === "datafiles") as unknown as { ifHeld?: boolean };
+    assert.equal(mdl.ifHeld, true);
+  });
 });
