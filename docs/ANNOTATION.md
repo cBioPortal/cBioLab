@@ -67,6 +67,14 @@ calls included) a first full sync takes about two days; later ones ask only for 
   one query — and asks the service for the rest in polite batches. Re-running, or a key shared by
   several studies, never asks twice. Ten failed batches in a row stop the run (a token or rate
   problem, not a data problem).
+- **Few, large writes.** Every INSERT makes a part ClickHouse later has to merge, so the sync holds
+  what the service returns and writes it every `ANNOTATION_INSERT_ROWS` rows (20,000) or
+  `ANNOTATION_INSERT_SECONDS` (300), whichever comes first, and at the end; `--all` holds across
+  studies. A full Genome Nexus sync is about 450 inserts, not one per 200-variant batch. A run's
+  `sync_run` row is written after the rows it counts. A sync that stops loses only what it held, which
+  the next run asks for again; a failed write stops the sync. A release no one reads any more is
+  removed with `ALTER TABLE … DROP PARTITION (source, version)`, which drops files without a merge,
+  never with `ALTER TABLE … DELETE`, which rewrites parts.
 - **Audited.** Every run appends a row to `annotation.sync_run` (its `source`): study, release, keys in the
   study, already stored, annotated now, failed, and a note (`complete`, `partial — re-run to resume`,
   `aborted …`). `--all` adds a `__portal__` row saying how much of every study's key space is

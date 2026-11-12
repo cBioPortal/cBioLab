@@ -134,6 +134,8 @@ test("a sync writes the shared table, keyed by source, pinned to the release, as
   const diff = ch.statements.find((s) => /LEFT ANTI JOIN/.test(s) && !/uniqExact/.test(s))!;
   assert.match(diff, /FROM annotation\.variant WHERE version = '2\.2\.3-vep116-clinvar20260208' AND \(toString\(source\), toString\(chr\)/, "the diff is within this source's rows");
   assert.match(diff, /^SELECT w\.\* FROM \(SELECT 'genome_nexus' AS source/, "the key space's genes come along with each key");
+  // the stored side is compared on the key alone: the key space's extra column would not match the key's six
+  assert.match(diff, /toString\(variant_allele\)\) IN \(SELECT source, chr, start_position, end_position, reference_allele, variant_allele FROM \(SELECT 'genome_nexus' AS source/);
   assert.match(String(ch.rows("variant")[0].data), /"canonical":\{"TP53":"ENST-TP53"\}/);
   const [row] = ch.rows("variant");
   assert.equal(row.source, "genome_nexus");
