@@ -140,6 +140,10 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] The mutation spectrum track (ONC-TT-3, ONC-STM-6)
   - [ ] Heatmaps: expression blue→black→red (ours blue→white→red), methylation fixed to [0, 1], VAF yellow→teal (ours blue), a patient's value max |x| (ours the mean) (ONC-TT-5…7, ONC-TT-12, ONC-STM-7)
   - [ ] Clustering: average linkage on 1 − Spearman, rows and columns (ours Ward on Euclidean over per-gene z-scores, NaN → mean, columns only, ≤4,000 columns) (ONC-SO-4, ONC-TM-5, ONC-STM-9)
+    - Measured ([spike](spikes/oncoprint-clustering.md)). Legacy's own library takes 20–34 s at 4k columns and fails past ~8–10k: 25k would need ~8 GB. Clustering the distinct column patterns instead is exact and fast: msk_chord_2024 CNA (25,040 columns) → 7,689 with data → 602 patterns, 0.33 s. Plan:
+      - legacy's method over distinct rank patterns, weighted by count, with all-null/0 columns placed last;
+      - cap ~8,000 distinct patterns, not 4,000 raw columns;
+      - past the cap, cluster a 2,000-pattern sample and place the rest by nearest neighbour, marked approximate in the caption and method record.
 - [ ] **Results → Mutations tab** — lollipop and table against the portal's ([05-mutations](legacy-spec/parity/05-mutations.md))
   - [ ] Fusions as "A-B Fusion" mutations: Q2 TMPRSS2 4 rows vs 240, 0.8 % vs 41.5 %, Fusion badges 0/0 vs 207/29; ERG shows nothing (the portal 220 fusions) (MUT-0-4, MUT-MD-11, MUT-STM-1, MUT-STM-4, SV-STM-5; [06-structural-variants](legacy-spec/parity/06-structural-variants.md))
   - [ ] Table defaults: Copy # and Allele Freq (T) shown; Mutation Type as the portal's coloured label (ours `Missense_Mutation`); sorted by Annotation ↓ (KRAS: G12C first; ours "drivers, then codon", A11_G12dup first) (MUT-COL-38, MUT-COL-11, MUT-COL-T1, MUT-TB-9, MUT-STM-10)
@@ -178,6 +182,11 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Default charts as the portal picks them: priorities from its config table, then coverage. Q1 shows 8 of the portal's 17 clinical charts; Sex, Race, Ethnicity, Subtype, T/M stage, Aneuploidy and the DFS/DSS/PFS KM are hidden (STS-LY-7, STS-LY-8, STS-MD-1; see bugs)
   - [ ] Categorical % of every patient, NA its own slice or row (Race White 48.0 % of 594, NA 232; ours 78.7 % of 362) (STS-PIE-9, STS-TBL-1, STS-STM-1, STS-STM-3, STS-MD-9)
   - [ ] Numeric bins fixed for the study, and a chart freed of its own filter (Q2 MSI MANTIS 0.01-wide bars; ours 0.02, recomputed on the filtered cohort) (STS-BAR-1, STS-STM-2, STS-STM-8, STS-MD-6; see bugs)
+    - Measured ([spike](spikes/explore-filter-parity.md)). Re-running Explore once per filtered chart doubles a click (msk_chord_2024 + genie_public at 4 filters: 3.0 → 6.3 s). Instead:
+      - per drafted numeric attribute, its value counts without its own clause, in parallel (≈0 ms added);
+      - bin edges from the unfiltered distribution, cached per study set and attribute;
+      - then one scan per connection, with each sample's bitmask of the filters it passes, counting every chart with `uniqExactIf`. That is exact (0 mismatches) and CPU-neutral, and estimated 1.5 → ~0.55 s on msk_chord_2024 at 4 filters.
+      - Today's click is already 2–5× faster than cbioportal.org's on the same filters.
   - [ ] The bar chart's menu: Custom Bins, Quartiles, Median, Generate, Log Scale, Show NA; the default MSI custom bins (MANTIS 468/22/67) (STS-BAR-1, STS-BAR-6…8, STS-HD-5)
   - [ ] Gene tables: every gene (ours 500 of 18,275), column sort, "(N profiled samples)" in the title, the OncoKB cancer-gene icon and filter, MutSig / GISTIC q, gene-panel tooltip, a gene click queues a query; SV sorted by # SV (ours Union only, SV by # altered) (STS-GT-2, STS-GT-3, STS-GT-5…9)
   - [ ] Chart kinds: treatment tables, the GA frequency table (arm-level CNA by default), mutation-type counts, variant annotations, X-vs-Y density and violin, gene-specific violin, continuous gene bar (STS-OT-3…6, STS-VI-1…8, STS-GS-4, STS-SC-1)
