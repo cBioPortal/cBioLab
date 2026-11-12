@@ -1,6 +1,7 @@
 // The predictive view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { predictiveSvg } from "./figure.ts";
+import { fmtCI95, fmtRatio } from "../../chart/format.ts";
 
 export const predictiveKind: ViewKindDef<"predictive"> = {
   kind: "predictive",
@@ -8,7 +9,7 @@ export const predictiveKind: ViewKindDef<"predictive"> = {
   title: (v) => "Predictive biomarkers" + (v.predictive ? " — gene × " + v.predictive.exposure : ""),
   text: (v, { out, pFmt, caveatOf, noteOf }) => {
     const m = v.predictive;
-    const eff = (e: { hr: number; ciLow: number; ciHigh: number; p: number } | null) => e ? `HR ${e.hr.toFixed(2)} (95% CI ${e.ciLow.toFixed(2)}-${e.ciHigh.toFixed(2)}, ${pFmt(e.p)})` : "n/a";
+    const eff = (e: { hr: number; ciLow: number; ciHigh: number; p: number } | null) => e ? `HR ${fmtRatio(e.hr)} (${fmtCI95(e.ciLow, e.ciHigh)}, ${pFmt(e.p)})` : "n/a";
     out.push(`Predictive biomarkers: gene x ${m.exposure} on ${m.endpoint} (Cox per gene; ${m.n.toLocaleString()} patients, ${m.exposed.toLocaleString()} exposed, ${m.events.toLocaleString()} events` +
       (m.covariates.length ? `; adjusted for ${m.covariates.join(", ")}` : "") + `):\n` +
       m.genes.map((g) => `  ${g.gene}: mutated ${g.mutatedExposed}/${g.exposed} exposed, ${g.mutatedUnexposed}/${g.unexposed} unexposed; ` +

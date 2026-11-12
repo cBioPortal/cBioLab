@@ -1,16 +1,17 @@
 // The hla view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { hlaSvg } from "./figure.ts";
+import { fmtCI95, fmtMonths, fmtRatio, fmtShare } from "../../chart/format.ts";
 
 export const hlaKind: ViewKindDef<"hla"> = {
   kind: "hla",
   figure: (v, o) => v.hla.panels.some((pn) => pn.typed || pn.lohEvaluated) ? hlaSvg(v, o) : null,
   title: (v) => "HLA class I genotype and " + (v.hla ? v.hla.endpoint : "OS"),
   text: (v, { out, pFmt, caveatOf, noteOf }) => {
-    const m = v.hla, pc = (a: number, b: number) => b ? (100 * a / b).toFixed(1) + "%" : "—";
-    const hr = (h: { hr: number; ciLow: number; ciHigh: number; p: number; n: number } | null) => h ? `HR ${h.hr.toFixed(2)} (95% CI ${h.ciLow.toFixed(2)}-${h.ciHigh.toFixed(2)}, p=${pFmt(h.p)}, n=${h.n})` : "n/a";
+    const m = v.hla, pc = (a: number, b: number) => fmtShare(a / b);
+    const hr = (h: { hr: number; ciLow: number; ciHigh: number; p: number; n: number } | null) => h ? `HR ${fmtRatio(h.hr)} (${fmtCI95(h.ciLow, h.ciHigh)}, p=${pFmt(h.p)}, n=${h.n})` : "n/a";
     const split = (name: string, s: (typeof m.panels)[number]["byLoh"], why?: string) => s
-      ? `\n    ${m.endpoint} by ${name}: ` + s.curves.map((c) => `${c.label} n=${c.n}, ${c.events} events, median ${c.median == null ? "not reached" : c.median.toFixed(1) + "mo"}`).join("; ") +
+      ? `\n    ${m.endpoint} by ${name}: ` + s.curves.map((c) => `${c.label} n=${c.n}, ${c.events} events, median ${c.median == null ? "not reached" : fmtMonths(c.median)}`).join("; ") +
         (s.logrank ? `; log-rank p=${pFmt(s.logrank.p)}` : "") + `; ${hr(s.hr)}` + (m.covariates.length ? `; adjusted for ${m.covariates.join(", ")} ${hr(s.adjusted)}` : "")
       : `\n    ${m.endpoint} by ${name} not drawn: ${why || "no data"}`;
     out.push(`HLA class I genotype (alleles compared at ${m.resolution === "full" ? "full" : m.resolution + "-field"} resolution) and HLA LOH:\n` +

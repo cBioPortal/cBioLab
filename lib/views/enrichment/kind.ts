@@ -1,6 +1,7 @@
 // The enrichment view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { enrichmentSvg } from "./figure.ts";
+import { fmtNum } from "../../chart/format.ts";
 
 export const enrichmentKind: ViewKindDef<"enrichment"> = {
   kind: "enrichment",
@@ -10,7 +11,7 @@ export const enrichmentKind: ViewKindDef<"enrichment"> = {
     const en = v.enrichment;
     out.push(`Alteration enrichment (${en.alteration}${en.measure === "driver" ? ", drivers only" : ""}; ${en.test}, BH q over ${en.tested.toLocaleString()} genes; ${en.significant} at q<0.05):\n` +
       en.rows.slice(0, 40).map((g) => `  ${g.gene}: ` + g.cells.map((c) => `${c.cohort} ${c.pct == null ? "—" : c.pct + "%"} (${c.altered}/${c.profiled})`).join(" | ") +
-        (g.log2Ratio != null && g.log2Ratio !== undefined ? `, log2 ratio ${g.log2Ratio.toFixed(2)}` : "") + `, q=${pFmt(g.q)}, enriched in ${g.enrichedIn}`).join("\n") +
+        (g.log2Ratio != null && g.log2Ratio !== undefined ? `, log2 ratio ${fmtNum(g.log2Ratio)}` : "") + `, q=${pFmt(g.q)}, enriched in ${g.enrichedIn}`).join("\n") +
       (en.rows.length > 40 ? `\n  … ${en.tested - 40} more genes tested` : "") + caveatOf(v) + noteOf(v));
   },
   help: {

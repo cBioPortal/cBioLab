@@ -15,6 +15,7 @@ import type { ViewParticipation, ViewResult } from "../lib/types.ts";
 import type { TableQuery, RowSource } from "../lib/table-query.ts";
 import type { ProfileInfo } from "../lib/profile-catalog.ts";
 import type { DatafilesView, DatafilesResult } from "../lib/views/datafiles/types.ts";
+import { kindText } from "./support/kind-text.ts";
 
 const p = (profile: string, type: string, datatype: string, order = 0): ProfileInfo => ({ profile, type, datatype, name: profile + " name", order });
 const BRCA: ProfileInfo[] = [p("mutations", "MUTATION_EXTENDED", "MAF"), p("gistic", "COPY_NUMBER_ALTERATION", "DISCRETE", 1), p("log2CNA", "COPY_NUMBER_ALTERATION", "LOG2-VALUE", 2),
@@ -173,8 +174,7 @@ describe("runDatafiles", () => {
     assert.ok(v.method && v.method.steps.length === 4);
     assert.deepEqual(r1.asked.sort(), ["datafiles:cases:counts", "datafiles:cases:rows", "datafiles:counts"]);
     // the results text names every file and frequency
-    const out: string[] = [];
-    datafilesKind.text!(v as never, { out, pFmt: String, caveatOf: () => "", noteOf: () => "", plotUnit: () => "", methodOf: () => "" });
+    const out = kindText(datafilesKind, v);
     assert.match(out[0], /Mutations \(OQL is not in effect\) \(3 rows\)[\s\S]*TP53 1 of 2 profiled \(50%\)/);
     assert.equal(datafilesKind.title!(v as never), "Downloadable data files for TP53, KRAS: MUT");
     assert.equal(pagedTable(v), d);

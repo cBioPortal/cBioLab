@@ -8,6 +8,8 @@ import { Untimed, type ViewRun, type EvaluatedCohort } from "../lib/views/run.ts
 import type { ViewResult, ViewParticipation } from "../lib/types.ts";
 import type { AttrStats } from "../lib/federation.ts";
 import type { ClinicalRow } from "../lib/views/clinical/types.ts";
+import { kindText } from "./support/kind-text.ts";
+import { clinicalKind } from "../lib/views/clinical/kind.ts";
 
 /** a numeric attribute's description from its values, with the complete histogram */
 function num(attribute: string, xs: number[], per: "patient" | "sample" = "patient"): AttrStats {
@@ -213,4 +215,9 @@ describe("clinical: q-values across attributes", () => {
     near(rows[1].q, rows[1].p!);
     near(rows[0].q, 2 * rows[0].p!, 1e-9);
   });
+});
+
+test("a numeric attribute with no mean and no spread", () => {
+  const [t] = kindText(clinicalKind, { clinical: [{ attribute: "AGE", per: "patient", kind: "num", cells: [{ cohort: "A", mean: null, sd: null, n: 0 }] }] });
+  assert.ok(t.includes("AGE [patient, num]: A mean — (n=0)"), t);
 });

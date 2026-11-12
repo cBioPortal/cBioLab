@@ -4,10 +4,10 @@ Cohorts:
 - IM-GBM-28: 1 patients — in a list of 1 patient
 
 Copy-number segments (hg19, whole genome): 4 of 4 samples with segments drawn; mean log2 ratio over the region per sample:
-  1. Patient-28-T1: +0.10 (137 segments)
-  2. Patient-28-T3: -0.04 (58 segments)
-  3. Patient-28-T2: -0.01 (63 segments)
-  4. Patient-28-CSF: -0.00 (33 segments)
+  1. Patient-28-T1: +0.096 (137 segments)
+  2. Patient-28-T3: −0.0372 (58 segments)
+  3. Patient-28-T2: −0.0104 (63 segments)
+  4. Patient-28-CSF: −0.0026 (33 segments)
   CAVEAT (tell the user): One row per sample, coloured by each segment's mean log2 copy-number ratio (hg19, whole genome): white within ±0.1, deepening to red at +1.5 and blue at −1.5 and beyond (IGV's segment scale, as the portal draws it); grey where no segment of the sample reaches. All 4 samples with segments are drawn. Rows: the patient's samples in collection order (the numbers the patient's other views give them). Log ratios are not purity- or ploidy-corrected, and chromosome X reads low in male samples against a female reference.
   METHOD:
     - List the cohort's samples with segments: The segments:samples query above, per study: every sample of the cohort with any copy-number segment (finite segment mean), its segments in the region drawn (whole genome, hg19), and its mean log2 ratio over that region — each segment's mean weighted by the bases of it inside the region. Ordered the patient's samples in collection order (the numbers the patient's other views give them), and cut to the row limit (300).

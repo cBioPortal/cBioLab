@@ -1,6 +1,7 @@
 // The exclusivity view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { exclusivitySvg } from "./figure.ts";
+import { fmtNum } from "../../chart/format.ts";
 
 export const exclusivityKind: ViewKindDef<"exclusivity"> = {
   kind: "exclusivity",
@@ -11,7 +12,7 @@ export const exclusivityKind: ViewKindDef<"exclusivity"> = {
     out.push(`Mutual exclusivity (DISCOVER background over ${ex.samples.toLocaleString()} samples and ${ex.matrixGenes} genes${ex.stratifyBy ? `, within ${ex.strata.length} ${ex.stratifyBy} strata` : ""}; ` +
       `${ex.measure === "driver" ? "OncoKB oncogenic" : "any alteration"}; fit ${ex.converged ? "converged" : "NOT converged"} in ${ex.iterations} rounds) in ${ex.cohort}:\n` +
       ex.pairs.map((x) => `  ${x.a}/${x.b}: both ${x.both} of ${x.profiled} profiled, ${x.expected} expected; DISCOVER exclusivity q=${pFmt(x.qExclusive)}, co-occurrence q=${pFmt(x.qCooccur)}` +
-        `${x.exact ? "" : " (normal approx.)"}; Fisher q=${pFmt(x.fisherQ)}${x.log2Odds != null ? `, log2 OR ${x.log2Odds.toFixed(2)}` : ""}`).join("\n") +
+        `${x.exact ? "" : " (normal approx.)"}; Fisher q=${pFmt(x.fisherQ)}${x.log2Odds != null ? `, log2 OR ${fmtNum(x.log2Odds)}` : ""}`).join("\n") +
       (ex.unassessable.length ? `\n  not assessable: ${ex.unassessable.join(", ")}` : "") +
       caveatOf(v) + noteOf(v));
   },

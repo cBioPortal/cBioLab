@@ -4,7 +4,7 @@ Cohorts:
 - all patients: 471 patients — all samples in the study
 
 Logistic regression (n=470, 27 with the outcome):
-  APC mutation status: Mutated vs Not mutated: OR 0.28 (95% CI 0.13-0.63) p=0.0018
+  APC mutation status: Mutated vs Not mutated: OR 0.28 (95% CI 0.13–0.63) p=0.0018
   CAVEAT (tell the user): Logistic regression on 470 patients, 27 with MSI_TYPE = Instable (1 term). Every other observed value of MSI_TYPE (Do not report, Indeterminate, Stable) was treated as “not event.” 1 patient from patient-level participants lacked the outcome or a covariate and were excluded. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers.
   METHOD:
     - Fetch one row per patient [crc_apc_impact_2020] (471 → 470 rows): The logisticRows query above. Patients with a value for MSI_TYPE and for every covariate are kept. 1 cohort patient had no row.

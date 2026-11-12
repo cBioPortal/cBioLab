@@ -1,6 +1,7 @@
 // The logistic view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { logisticSvg } from "./figure.ts";
+import { fmtEstimateCI } from "../../chart/format.ts";
 
 export const logisticKind: ViewKindDef<"logistic"> = {
   kind: "logistic",
@@ -9,8 +10,8 @@ export const logisticKind: ViewKindDef<"logistic"> = {
   text: (v, { out, pFmt, caveatOf }) => {
     out.push(`Logistic regression (n=${v.logistic.n.toLocaleString()}, ${v.logistic.events.toLocaleString()} with the outcome):\n` +
       v.logistic.coefficients.map((c) =>
-        `  ${c.label}${c.reference ? " vs " + c.reference : ""}: OR ${c.or.toFixed(2)} ` +
-        `(95% CI ${c.ciLow.toFixed(2)}-${c.ciHigh.toFixed(2)}) p=${pFmt(c.p)}`).join("\n") +
+        `  ${c.label}${c.reference ? " vs " + c.reference : ""}: OR ${fmtEstimateCI(c.or, c.ciLow, c.ciHigh)} ` +
+        `p=${pFmt(c.p)}`).join("\n") +
       caveatOf(v));
   },
   help: {

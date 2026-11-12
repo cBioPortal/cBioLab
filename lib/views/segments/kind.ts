@@ -1,6 +1,7 @@
 // The segments view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { segmentsSvg, regionSegs } from "./figure.ts";
+import { fmtNum } from "../../chart/format.ts";
 
 /** samples the results text names one by one; the figure draws every drawn row */
 const TEXT_SAMPLES = 40;
@@ -15,7 +16,7 @@ export const segmentsKind: ViewKindDef<"segments"> = {
     out.push(`Copy-number segments (${s.build}, ${s.region.label}): ${s.samples.length.toLocaleString()} of ${s.segmented.toLocaleString()} samples with segments drawn` +
       (s.leftOut ? `, ${s.leftOut.toLocaleString()} left out by the row limit (${s.rowsLimit})` : "") + `; mean log2 ratio over the region per sample:\n` +
       s.samples.slice(0, TEXT_SAMPLES).map((x) => `  ${x.mark ? x.mark.label + ". " : ""}${x.sample}: ` +
-        (x.score == null ? "no segment in the region" : (x.score >= 0 ? "+" : "") + x.score.toFixed(2) + " (" + segsIn(x) + " segment" + (segsIn(x) === 1 ? "" : "s") + ")")).join("\n") +
+        (x.score == null ? "no segment in the region" : (x.score >= 0 ? "+" : "") + fmtNum(x.score) + " (" + segsIn(x) + " segment" + (segsIn(x) === 1 ? "" : "s") + ")")).join("\n") +
       (s.samples.length > TEXT_SAMPLES ? `\n  … ${s.samples.length - TEXT_SAMPLES} more drawn (the figure draws all of them)` : "") +
       caveatOf(v) + noteOf(v));
   },

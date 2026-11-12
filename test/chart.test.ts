@@ -2,7 +2,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalSig2, portalPct } from "../lib/chart/format.ts";
+import { fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths } from "../lib/chart/format.ts";
+
+test("an estimate and its 95% interval read alike in every view", () => {
+  assert.equal(fmtCI95(1.0123, 1.5), "95% CI 1.01–1.50");
+  assert.equal(fmtEstimateCI(1.234, 1.0123, 1.5), "1.23 (95% CI 1.01–1.50)");
+  assert.equal(fmtEstimateCI(250, 0.004, 1234), "250 (95% CI 0.004–1,234)", "outside 0.01–100 a ratio keeps two significant digits");
+  assert.equal(fmtCI95(0.101, 0.145, fmtShare), "95% CI 10.1%–14.5%", "the ends take the estimate's own format");
+  // the shapes the text summaries lean on
+  assert.deepEqual([fmtShare(3 / 0), fmtShare(NaN), fmtShare(0), fmtShare(0.4567, 0)], ["–", "–", "0%", "46%"]);
+  assert.deepEqual([fmtMonths(12.34), fmtMonths(1234.5)], ["12.3 mo", "1,234.5 mo"]);
+});
 import { linear, log, symlog } from "../lib/chart/scale.ts";
 import { axisBottom, bandLabels, leftAxisWidth } from "../lib/chart/axis.ts";
 import { legend } from "../lib/chart/legend.ts";

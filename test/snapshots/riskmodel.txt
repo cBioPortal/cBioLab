@@ -5,11 +5,11 @@ Cohorts:
 
 Risk model (elastic-net Cox, 5 held-out splits, alpha 0.5, seed 1; 7,809 patients, 3,975 events, 300 candidate genes):
   held-out C-index 0.618 (IQR 0.615–0.619)
-  risk score on OncoCast's 0–10 scale (0 and 10 the lowest and highest held-out score; raw -0.497 to 1.277)
+  risk score on OncoCast's 0–10 scale (0 and 10 the lowest and highest held-out score; raw −0.497 to 1.28)
   risk groups (held-out scores, equal quantiles):
-    Low risk (score 0–2.8): n=2352, 894 events, median 68.2mo, 12-month 85%, 36-month 66%
-    Intermediate risk (score 2.8–4.6): n=2167, 1145 events, median 36.9mo, 12-month 76%, 36-month 51%, HR vs lowest 1.58 (95% CI 1.45–1.73, 8.1e-25)
-    High risk (score 4.6–10): n=2260, 1430 events, median 20.3mo, 12-month 62%, 36-month 39%, HR vs lowest 2.25 (95% CI 2.07–2.45, 2.3e-80)
+    Low risk (score 0–2.8): n=2352, 894 events, median 68.2 mo, 12-month 85%, 36-month 66%
+    Intermediate risk (score 2.8–4.6): n=2167, 1145 events, median 36.9 mo, 12-month 76%, 36-month 51%, HR vs lowest 1.58 (95% CI 1.45–1.73, 8.1e-25)
+    High risk (score 4.6–10): n=2260, 1430 events, median 20.3 mo, 12-month 62%, 36-month 39%, HR vs lowest 2.25 (95% CI 2.07–2.45, 2.3e-80)
   log-rank p=1.5e-82
   risk score alone: HR 1.40 per SD (95% CI 1.35–1.44, 5.1e-95)
   genes kept most often: TGFBR2 100% HR 1.47, TP53 100% HR 1.38, KEAP1 100% HR 1.38, SMARCA4 100% HR 1.27, STK11 100% HR 1.23, NFE2L2 100% HR 1.19, PTEN 100% HR 1.15, CDK12 100% HR 0.87, CDK8 100% HR 0.91, DNMT3A 100% HR 0.91, EGFR 100% HR 0.92, EP300 100% HR 1.08, PTPRD 100% HR 0.92, EPHA3 100% HR 0.92, MED12 100% HR 0.95

@@ -1,6 +1,7 @@
 // The cutpoint view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { cutpointSvg } from "./figure.ts";
+import { fmtEstimateCI, fmtMonths, fmtRatio } from "../../chart/format.ts";
 
 export const cutpointKind: ViewKindDef<"cutpoint"> = {
   kind: "cutpoint",
@@ -8,12 +9,12 @@ export const cutpointKind: ViewKindDef<"cutpoint"> = {
   title: (v) => "Cut-point" + (v.cutpoint ? " — " + v.cutpoint.attribute + " on " + v.cutpoint.endpoint : ""),
   text: (v, { out, pFmt, caveatOf, noteOf }) => {
     const m = v.cutpoint;
-    const side = (s: { n: number; events: number; median: number | null }) => `n=${s.n}, ${s.events} events, median ${s.median == null ? "not reached" : s.median.toFixed(1) + "mo"}`;
+    const side = (s: { n: number; events: number; median: number | null }) => `n=${s.n}, ${s.events} events, median ${s.median == null ? "not reached" : fmtMonths(s.median)}`;
     out.push(`Cut-point of ${m.attribute} on ${m.endpoint} (maximally selected log-rank, ${m.candidates.length} candidate cuts between the 10th and 90th percentiles; ${m.n.toLocaleString()} patients, ${m.events.toLocaleString()} events):\n` +
-      `  best cut ${m.attribute} > ${m.cut}: high ${side(m.high)}; low ${side(m.low)}` + (m.hr ? `; HR ${m.hr.hr.toFixed(2)} (95% CI ${m.hr.ciLow.toFixed(2)}-${m.hr.ciHigh.toFixed(2)})` : "") + "\n" +
+      `  best cut ${m.attribute} > ${m.cut}: high ${side(m.high)}; low ${side(m.low)}` + (m.hr ? `; HR ${fmtEstimateCI(m.hr.hr, m.hr.ciLow, m.hr.ciHigh)}` : "") + "\n" +
       `  corrected p=${pFmt(m.permP)} (${m.permutations} permutations, seed ${m.seed}); naive log-rank p=${pFmt(m.naiveP)}, which ignores the search` +
       (m.strata ? "\n  per " + m.strata.attribute + ":\n" + m.strata.rows.map((s) => `    ${s.stratum}: n=${s.n}, cut ${s.cut}, high ${s.high.n}, ` +
-        (s.hr ? `HR ${s.hr.hr.toFixed(2)}, ` : "") + `corrected p=${pFmt(s.permP)}, naive p=${pFmt(s.naiveP)}`).join("\n") : "") +
+        (s.hr ? `HR ${fmtRatio(s.hr.hr)}, ` : "") + `corrected p=${pFmt(s.permP)}, naive p=${pFmt(s.naiveP)}`).join("\n") : "") +
       caveatOf(v) + noteOf(v));
   },
   help: {

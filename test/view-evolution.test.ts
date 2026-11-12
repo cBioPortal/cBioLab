@@ -15,6 +15,7 @@ import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult, PatientEvent } from "../lib/types.ts";
 import type { TableQuery, RowSource } from "../lib/table-query.ts";
 import type { EvolutionView, EvolutionResult, EvolutionMutation } from "../lib/views/evolution/types.ts";
+import { kindText } from "./support/kind-text.ts";
 
 type Row = Record<string, unknown>;
 type Tables = (table: string, src: RowSource) => Row[];
@@ -238,8 +239,7 @@ describe("evolution: the patient drawn", () => {
 
   test("the results text lists each drawn mutation by sample, and the table", async () => {
     const v = await run({}, one());
-    const out: string[] = [];
-    evolutionKind.text!(v as never, { out, pFmt: String, caveatOf: () => "", noteOf: () => "", plotUnit: () => "", methodOf: () => "" });
+    const out = kindText(evolutionKind, v);
     assert.match(out[0], /P1 \(s1\); samples in order: 1 = T1 \(Primary\), day 0; 2 = T2 \(Metastasis\), day 300; 3 = T3 \(Recurrence\), day 700, not sequenced for mutations/);
     assert.match(out[0], /TP53 R273H: 1 VAF 0\.50 \(50 of 100 reads\); 2 VAF 0\.25 \(25 of 100 reads\); 3 not profiled/);
     assert.match(out[0], /EGFR L858R: 1 not found \(0 of 100 reads\); 2 VAF 0\.40 \(40 of 100 reads\); 3 uncalled, VAF 0\.05 \(5 of 100 reads\)/);

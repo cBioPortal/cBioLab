@@ -4,7 +4,7 @@ Cohorts:
 - all patients: 1,661 patients — all samples in the study
 
 Cut-point of TMB_NONSYNONYMOUS on OS (maximally selected log-rank, 73 candidate cuts between the 10th and 90th percentiles; 1,661 patients, 832 events):
-  best cut TMB_NONSYNONYMOUS > 14.4190189078: high n=322, 100 events, median 47.0mo; low n=1339, 732 events, median 15.0mo; HR 0.45 (95% CI 0.36-0.55)
+  best cut TMB_NONSYNONYMOUS > 14.4190189078: high n=322, 100 events, median 47 mo; low n=1339, 732 events, median 15 mo; HR 0.45 (95% CI 0.36–0.55)
   corrected p=0.0010 (1000 permutations, seed 1); naive log-rank p=9.5e-15, which ignores the search
   per CANCER_TYPE:
     Non-Small Cell Lung Cancer: n=350, cut 18.5956742547, high 44, HR 0.33, corrected p=0.0010, naive p=2.7e-5

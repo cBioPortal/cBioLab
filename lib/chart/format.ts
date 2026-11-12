@@ -79,6 +79,13 @@ export const fmtQ = (q: number): string => fmtP(q, "q");
 /** a ratio (hazard, odds): two decimals, so an estimate and its interval line up */
 export const fmtRatio = (r: number): string => Number.isFinite(r) && r >= 0.01 && r < 100 ? r.toFixed(2) : fmtNum(r, 2);
 
+/** a 95% confidence interval, each end in the estimate's own format: "95% CI 1.01–1.50" */
+export const fmtCI95 = (lo: number, hi: number, f: (n: number) => string = fmtRatio): string => "95% CI " + f(lo) + "–" + f(hi);
+
+/** an estimate with its 95% interval: "1.23 (95% CI 1.01–1.50)" */
+export const fmtEstimateCI = (est: number, lo: number, hi: number, f: (n: number) => string = fmtRatio): string =>
+  f(est) + " (" + fmtCI95(lo, hi, f) + ")";
+
 /** months, to one decimal: "37.2 mo" */
 export const fmtMonths = (m: number): string => (Math.round(m * 10) / 10).toLocaleString("en-US") + " mo";
 

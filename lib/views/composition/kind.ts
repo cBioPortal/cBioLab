@@ -1,6 +1,7 @@
 // The composition view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { compositionSvg } from "./figure.ts";
+import { fmtNum, fmtShare } from "../../chart/format.ts";
 
 export const compositionKind: ViewKindDef<"composition"> = {
   kind: "composition",
@@ -8,12 +9,12 @@ export const compositionKind: ViewKindDef<"composition"> = {
   title: (v) => "Composition" + (v.composition ? " — " + v.composition.sourceName : ""),
   text: (v, { out, pFmt, caveatOf, noteOf }) => {
     const cm = v.composition;
-    const fmt = (x: number) => cm.normalize ? (100 * x).toFixed(1) + "%" : x.toPrecision(3);
+    const fmt = (x: number) => cm.normalize ? fmtShare(x) : fmtNum(x);
     out.push(`Composition of ${cm.sourceName} (${cm.parts.length} parts${cm.normalize ? ", shares of each " + cm.unit.replace(/s$/, "") + "'s total" : ""}; ` +
       `each cohort against the others by Welch's t, BH q over ${cm.tested} comparisons; ${cm.significant} at q<0.05):\n` +
-      cm.groups.map((g) => `  ${g.cohort} (n=${g.n}${g.entropy ? ", entropy " + g.entropy.mean.toFixed(2) : ""}): ` +
+      cm.groups.map((g) => `  ${g.cohort} (n=${g.n}${g.entropy ? ", entropy " + fmtNum(g.entropy.mean) : ""}): ` +
         cm.parts.map((pt) => { const c = cm.cells.find((x) => x.cohort === g.cohort && x.part === pt.id)!;
-          return `${pt.name} ${fmt(c.mean)}` + (c.q != null ? ` (log2 ${c.log2!.toFixed(2)}, q=${pFmt(c.q)})` : ""); }).join(", ")).join("\n") +
+          return `${pt.name} ${fmt(c.mean)}` + (c.q != null ? ` (log2 ${fmtNum(c.log2!)}, q=${pFmt(c.q)})` : ""); }).join(", ")).join("\n") +
       caveatOf(v) + noteOf(v));
   },
   help: {

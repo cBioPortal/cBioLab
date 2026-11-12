@@ -4,20 +4,20 @@ Cohorts:
 - all samples: 1,084 patients — all samples in the study
 
 Plot (box): ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM) by ERBB2: Putative copy-number alterations from GISTIC — 1,068 samples.
-  Shallow deletion: median -0.66 (IQR -0.95–-0.41, whiskers -1.77–0.35, n=260)
-  Diploid: median -0.12 (IQR -0.42–0.15, whiskers -1.27–1.01, n=480)
-  Gain: median 0.16 (IQR -0.23–0.41, whiskers -1.20–1.38, n=206)
-  Amplification: median 2.33 (IQR 1.45–2.81, whiskers -0.60–3.72, n=122)
+  Shallow deletion: median −0.659 (IQR −0.951–−0.408, whiskers −1.77–0.351, n=260)
+  Diploid: median −0.118 (IQR −0.419–0.152, whiskers −1.27–1.01, n=480)
+  Gain: median 0.159 (IQR −0.23–0.415, whiskers −1.2–1.38, n=206)
+  Amplification: median 2.33 (IQR 1.45–2.81, whiskers −0.599–3.72, n=122)
   Values are drawn as individual points.
   1,068 of 1,084 samples have a value on both axes (14 have no ERBB2: Putative copy-number alterations from GISTIC; 2 have no ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)); only those are drawn. Point layers — outliers: 41 values beyond the whiskers. The statistics are over the whole plotted cohort.
 
 Plot (box): FRACTION_GENOME_ALTERED by TP53 mutation type — 1,068 samples.
-  Not mutated: median 0.19 (IQR 0.10–0.35, whiskers 0.00–0.71, n=706)
-  Missense: median 0.38 (IQR 0.26–0.52, whiskers 0.00–0.91, n=209)
-  Truncating: median 0.47 (IQR 0.30–0.62, whiskers 0.00–0.95, n=102)
-  Splice: median 0.47 (IQR 0.24–0.54, whiskers 0.00–0.83, n=24)
-  Not profiled: median 0.11 (IQR 0.01–0.17, whiskers 0.00–0.41, n=18)
-  Inframe: median 0.27 (IQR 0.25–0.48, whiskers 0.25–0.56, n=5)
-  Multiple: median 0.63 (IQR 0.46–0.65, whiskers 0.18–0.65, n=4)
+  Not mutated: median 0.195 (IQR 0.105–0.346, whiskers 0–0.708, n=706)
+  Missense: median 0.38 (IQR 0.262–0.522, whiskers 0–0.912, n=209)
+  Truncating: median 0.466 (IQR 0.298–0.618, whiskers 0.0002–0.947, n=102)
+  Splice: median 0.468 (IQR 0.237–0.538, whiskers 0.0027–0.833, n=24)
+  Not profiled: median 0.106 (IQR 0.0052–0.168, whiskers 0–0.411, n=18)
+  Inframe: median 0.274 (IQR 0.255–0.481, whiskers 0.249–0.56, n=5)
+  Multiple: median 0.628 (IQR 0.462–0.651, whiskers 0.179–0.651, n=4)
   Values are drawn as individual points.
   1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: 16 values beyond the whiskers. The statistics are over the whole plotted cohort.

@@ -1,13 +1,14 @@
 // The actionability view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { actionabilitySvg } from "./figure.ts";
+import { fmtShare } from "../../chart/format.ts";
 
 export const actionabilityKind: ViewKindDef<"actionability"> = {
   kind: "actionability",
   figure: (v, o) => v.actionability.panels.some((pn) => pn.sequenced) ? actionabilitySvg(v, o) : null,
   title: (v) => "Clinical actionability" + (v.actionability ? " — OncoKB " + v.actionability.pin + (v.actionability.groupBy ? " by " + v.actionability.groupBy : "") : ""),
   text: (v, { out, caveatOf, noteOf }) => {
-    const a = v.actionability, pct = (k: number, d: number) => d ? (100 * k / d).toFixed(1) + "%" : "–";
+    const a = v.actionability, pct = (k: number, d: number) => fmtShare(k / d);
     const line = (label: string, g: { sequenced: number; levels: number[]; resistance: number[] }) =>
       `  ${label} (${g.sequenced.toLocaleString()} sequenced): ` + a.levels.map((l, i) => `${l} ${g.levels[i]} (${pct(g.levels[i], g.sequenced)})`).join(", ") +
       `; resistance R1 ${g.resistance[0]}, R2 ${g.resistance[1]}`;

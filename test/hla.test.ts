@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { hlaPanel, covariateColumns, type HlaRec } from "../lib/views/hla/run.ts";
 import { viewToSvg } from "../lib/view-svg.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
+import { kindText } from "./support/kind-text.ts";
+import { hlaKind } from "../lib/views/hla/kind.ts";
 
 const rec = (hom: (number | null)[], loss: number | null, t: number | null, ev: number, cov: (string | null)[] = []): HlaRec => ({ hom, nf: hom.some((h) => h != null) ? 2 : null, loss, t, ev, cov, study: "s" });
 
@@ -47,4 +49,13 @@ describe("hla counts", () => {
       assert.deepEqual(lintSvg(svg), []);
     }
   });
+});
+
+test("a split with no hazard ratio and a median never reached, and a split not drawn", () => {
+  const curves = { curves: [{ label: "LOH", n: 4, events: 1, median: null }], logrank: null, hr: null, adjusted: null };
+  const [t] = kindText(hlaKind, { hla: { resolution: "full", endpoint: "OS", covariates: [],
+    panels: [{ cohort: "A", typed: 10, patients: 12, homozygous: [6, 3, 1, 0], loci: [{ locus: "A", homozygous: 2, typed: 10 }], loh: 4, lohEvaluated: 8,
+      byHomozygosity: null, byHomozygosityWhy: "fewer than 5 homozygous patients", byLoh: curves }] } });
+  assert.ok(t.includes("OS by homozygosity (≥1 locus vs none) not drawn: fewer than 5 homozygous patients"), t);
+  assert.ok(t.includes("OS by HLA LOH: LOH n=4, 1 events, median not reached; n/a"), t);
 });

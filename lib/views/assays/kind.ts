@@ -2,6 +2,7 @@
 import type { ViewKindDef } from "../kind-def.ts";
 import { assaysSvg } from "./figure.ts";
 import type { AssaysEntity } from "./types.ts";
+import { fmtNum, fmtShare } from "../../chart/format.ts";
 
 export const assaysKind: ViewKindDef<"assays"> = {
   kind: "assays",
@@ -10,11 +11,11 @@ export const assaysKind: ViewKindDef<"assays"> = {
   text: (v, { out, pFmt, caveatOf, noteOf }) => {
     const as = v.assays;
     const cell = (c: AssaysEntity["cells"][number]) => as.datatype === "numeric"
-      ? `${c.cohort} mean ${c.mean == null ? "—" : c.mean.toPrecision(3)} (n=${c.n})`
-      : `${c.cohort} ` + Object.entries(c.values || {}).map(([k, n]) => `${k} ${c.n ? (100 * n / c.n).toFixed(1) : "—"}%`).join(", ") + ` (n=${c.n})`;
+      ? `${c.cohort} mean ${c.mean == null ? "—" : fmtNum(c.mean)} (n=${c.n})`
+      : `${c.cohort} ` + Object.entries(c.values || {}).map(([k, n]) => `${k} ${fmtShare(n / c.n)}`).join(", ") + ` (n=${c.n})`;
     out.push(`Generic-assay comparison, ${as.profileName} (${as.profileType}; ${as.datatype}, per ${as.unit.replace(/s$/, "")}; ${as.test}, BH q over ${as.tested.toLocaleString()} entities; ${as.significant} at q<0.05):\n` +
       as.rows.slice(0, 40).map((g) => `  ${g.name}: ` + g.cells.map(cell).join(" | ") +
-        (g.diff != null ? `, difference ${g.diff.toPrecision(3)}` : "") + `, q=${pFmt(g.q)}, higher in ${g.higherIn}${g.value ? " (" + g.value + ")" : ""}`).join("\n") +
+        (g.diff != null ? `, difference ${fmtNum(g.diff)}` : "") + `, q=${pFmt(g.q)}, higher in ${g.higherIn}${g.value ? " (" + g.value + ")" : ""}`).join("\n") +
       (as.rows.length > 40 ? `\n  … ${as.tested - 40} more entities tested` : "") + caveatOf(v) + noteOf(v));
   },
   help: {

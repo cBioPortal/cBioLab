@@ -1,6 +1,7 @@
 // The clinical view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { clinicalSvg } from "./figure.ts";
+import { fmtNum } from "../../chart/format.ts";
 
 export const clinicalKind: ViewKindDef<"clinical"> = {
   kind: "clinical",
@@ -10,8 +11,8 @@ export const clinicalKind: ViewKindDef<"clinical"> = {
     out.push("Clinical comparison across cohorts:\n" +
       (v.clinical || []).slice(0, 20).map((row) => {
         const cells = row.cells.map((c) => row.kind === "num"
-          ? `${c.cohort} mean ${c.mean != null ? c.mean.toFixed(2) : "—"}` +
-            (c.sd != null ? ` sd ${c.sd.toFixed(2)}` : "") + ` (n=${c.n.toLocaleString()})`
+          ? `${c.cohort} mean ${c.mean != null ? fmtNum(c.mean) : "—"}` +
+            (c.sd != null ? ` sd ${fmtNum(c.sd)}` : "") + ` (n=${c.n.toLocaleString()})`
           : `${c.cohort} ` + (c.top && c.top.length
               ? c.top.slice(0, 3).map((t) => `${t.v} ${c.n ? Math.round(1000 * t.n / c.n) / 10 : 0}%`).join(", ")
               : "—")).join(" | ");
