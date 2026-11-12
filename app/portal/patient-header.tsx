@@ -27,8 +27,8 @@ type TableJson = { columns: { id: string; name: string }[]; rows: { patient: str
  * The patient's attributes, every sample's own attributes (a sample row carries its patient's too,
  * which are left to the patient), and the samples numbered as the timeline numbers them.
  */
-export function usePatientRecord(study: string, patient: string | null): { record: PatientRecord | null; error: string | null } {
-  const [out, setOut] = useState<{ record: PatientRecord | null; error: string | null }>({ record: null, error: null });
+export function usePatientRecord(study: string, patient: string | null): { record: PatientRecord | null; error: string | null; missing?: boolean } {
+  const [out, setOut] = useState<{ record: PatientRecord | null; error: string | null; missing?: boolean }>({ record: null, error: null });
   useEffect(() => {
     if (!study || !patient) return;
     setOut({ record: null, error: null });
@@ -49,7 +49,7 @@ export function usePatientRecord(study: string, patient: string | null): { recor
           t.columns.map((c, i) => ({ id: c.id, name: c.name, value: row.values[i] == null ? "" : String(row.values[i]) }))
             .filter((f) => !skip.has(f.id) && f.value !== "");
         const prow = pt.rows[0];
-        if (!prow) { setOut({ record: null, error: "no patient " + patient + " in " + study }); return; }
+        if (!prow) { setOut({ record: null, error: "no patient " + patient + " in " + study, missing: true }); return; }
         const patientCols = new Set(pt.columns.map((c) => c.id));
         const samples = st.rows.map((row) => ({ id: row.sample, fields: fieldsOf(st, row, new Set([...patientCols, "sample"])) }));
         // a study without a timeline still has its samples: they are numbered by type, then id

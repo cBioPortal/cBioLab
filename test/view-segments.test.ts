@@ -377,3 +377,11 @@ describe("the patient page's genomic overview (overview: true)", () => {
     assert.equal(panelIcons([{ sample: "a", panels: { mutation: "WES", cna: "WGS" } }, { sample: "b" }]).show, false);
   });
 });
+
+test("igv: with several studies a row is named by study and sample, so the same id in two studies stays two rows", () => {
+  const smp = (study: string, sample: string) => ({ study, patient: "P", sample, segs: [0, 1, 10, 0.5] });
+  const one = igvSegFeatures({ segChroms: ["1"], samples: [smp("a", "S1")] } as never);
+  assert.deepEqual(one.map((f) => f.sample), ["S1"]);
+  const two = igvSegFeatures({ segChroms: ["1"], samples: [smp("a", "S1"), smp("b", "S1")] } as never);
+  assert.deepEqual(two.map((f) => f.sample), ["a:S1", "b:S1"]);
+});

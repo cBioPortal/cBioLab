@@ -228,13 +228,13 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "Pairwise co-occurrence within “NSCLC”. Denominators are the patients profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on patients whose panel could not have detected it. Two-sided Fisher exact test. q-values are Benjamini–Hochberg across the 15 assessable pairs. Every site returns four counts per pair and nothing else.",
+      "note": "Pairwise co-occurrence within “NSCLC”. Denominators are the samples profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on samples whose panel could not have detected it. Two-sided Fisher exact test. q-values are Benjamini–Hochberg across the 15 assessable pairs. Every site returns four counts per pair and nothing else.",
       "method": {
         "steps": [
           {
             "kind": "fetch",
             "title": "Count each gene pair's 2×2 table",
-            "detail": "The pairCounts query above. Of the patients with a sample on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.",
+            "detail": "The pairCounts query above. Of the samples on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.",
             "scope": "NSCLC · msk_chord_2024",
             "rowsIn": 7809,
             "params": [
@@ -247,7 +247,7 @@
           {
             "kind": "statistic",
             "title": "Log₂ odds ratio per pair",
-            "detail": "log₂((both · neither) / (only first · only second)) on the counts summed across studies, with 0.5 added to every cell when any cell is 0."
+            "detail": "log₂((both · neither) / (only first · only second)) on the counts summed across studies, with 0.5 added to every cell when any cell is 0. A pair's tendency is co-occurrence when its log₂ odds ratio is above 0 and mutual exclusivity otherwise (0 and −∞ included), as the portal labels it."
           },
           {
             "kind": "statistic",

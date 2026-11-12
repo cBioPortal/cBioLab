@@ -45,8 +45,7 @@ export async function runCooccurrence(view: DocView, c: ViewRun): Promise<ViewRe
       row.pStratified = cmh.p; row.oddsRatioMH = cmh.oddsRatio; row.strata = cmh.tables;
     }
     const lor = row.oddsRatioMH != null ? Math.log2(row.oddsRatioMH) : row.log2Odds;
-    row.tendency = lor == null || !Number.isFinite(lor) || lor === 0 ? null
-      : lor > 0 ? "co-occurrence" : "mutual exclusivity";
+    row.tendency = lor == null || Number.isNaN(lor) ? null : lor > 0 ? "co-occurrence" : "mutual exclusivity";
     return row;
   });
   // A pair no panel covers is not a null result — it is an unasked question.
@@ -63,7 +62,7 @@ export async function runCooccurrence(view: DocView, c: ViewRun): Promise<ViewRe
     studies: cohorts[cn].studies,
     method: cooccurrenceMethod({
       cohort: cn, pairs: pairs.length, assessable: assessable.length,
-      cohortPatients: [...sites].sort().map((st) => ({ study: st, patients: cohorts[cn].perStudy[st]?.count || 0 })),
+      cohortSamples: [...sites].sort().map((st) => ({ study: st, samples: cohorts[cn].perStudy[st]?.samples || 0 })),
       counts: [...sites].sort().flatMap((st) => pairs.map(([a, b]) => find(st, a, b)).filter((x): x is PairCounts => !!x)
         .map((x) => ({ study: st, a: x.a, b: x.b, both: x.both, onlyA: x.onlyA, onlyB: x.onlyB, neither: x.neither }))),
       results: rows.map((r) => ({ a: r.a, b: r.b, p: r.p, q: r.q, ...(r.pStratified != null ? { pStratified: r.pStratified } : {}) })),
@@ -71,8 +70,8 @@ export async function runCooccurrence(view: DocView, c: ViewRun): Promise<ViewRe
     participation: participationFor(cohorts[cn].studies, false),
     note: "Pairwise co-occurrence within “" + cn + "”" +
       (vNames.length > 1 ? " (the first cohort in this view; co-occurrence describes one cohort, not a contrast)" : "") +
-      ". Denominators are the patients profiled for BOTH genes, computed per study against that study's own panels" +
-      " — a pair is never scored on patients whose panel could not have detected it." +
+      ". Denominators are the samples profiled for BOTH genes, computed per study against that study's own panels" +
+      " — a pair is never scored on samples whose panel could not have detected it." +
       (sites.length > 1
         ? " With " + sites.length + " studies the reported test is STRATIFIED by study (Cochran–Mantel–Haenszel):" +
           " each study contributes a 2×2 and the coordinator combines them, so a pair cannot be manufactured by" +

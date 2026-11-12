@@ -245,31 +245,31 @@ Patient alterations — patients to choose from: 5,368; the first 25, tab-separa
 P-0000012 (msk_chord_2024); samples: P-0000012-T02-IM3 (Primary), P-0000012-T03-IM3 (Metastasis)
 Mutations: 31 rows; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	samples	gene	proteinChange	annotation	mutationType	copy	freq	vaf
-  Breast	P-0000012-T03-IM3	ATRX	K983*	Likely Oncogenic	Nonsense_Mutation		3.3	0.198
-  Breast	P-0000012-T03-IM3	BLM	A363fs	Likely Oncogenic	Frame_Shift_Del		1.4	0.128
-  Breast	P-0000012-T03-IM3	FBXW7	G61*	Likely Oncogenic · Level 3A	Nonsense_Mutation		4.5	0.228
-  Breast	P-0000012-T03-IM3	FBXW7	X413_splice	Likely Oncogenic · Level 3A	Splice_Site		4.5	0.255
-  Breast	P-0000012-T03-IM3	MAP3K1	E302*	Likely Oncogenic	Nonsense_Mutation		3.1	0.174
-  Breast	P-0000012-T03-IM3	MAP3K1	X696_splice	Likely Oncogenic	Splice_Site		3.1	0.201
-  Breast	P-0000012-T03-IM3	PTPRD	E915*	Likely Oncogenic	Nonsense_Mutation		4.3	0.176
-  Breast	P-0000012-T03-IM3	PTPRD	P1338T	Unknown	Missense_Mutation		4.3	0.298
-  Breast	P-0000012-T03-IM3	PTPRT	G969V	Unknown	Missense_Mutation		4.8	0.142
-  Breast	P-0000012-T03-IM3	PTPRT	X1053_splice	Likely Oncogenic	Splice_Site		4.8	0.051
-  Breast	P-0000012-T03-IM3	SMARCA4	E1211*	Likely Oncogenic · Level 3A	Nonsense_Mutation		4.3	0.208
-  Breast	P-0000012-T02-IM3	TP53	T256P	Likely Oncogenic	Missense_Mutation		52.4	0.502
-  Breast	P-0000012-T03-IM3	TP53	P67Qfs*56	Likely Oncogenic	Frame_Shift_Del		52.4	0.402
-  Breast	P-0000012-T03-IM3	ATR	R2431M	Unknown	Missense_Mutation		2.7	0.174
-  Breast	P-0000012-T03-IM3	AXIN2	I375M	Unknown	Missense_Mutation		2.1	0.137
-  Breast	P-0000012-T03-IM3	BRIP1	D393V	Unknown	Missense_Mutation		1.4	0.146
-  Breast	P-0000012-T03-IM3	CCNE1	A47V	Unknown	Missense_Mutation		0.5	0.149
-  Breast	P-0000012-T03-IM3	CREBBP	M2161I	Unknown	Missense_Mutation		3.4	0.248
-  Breast	P-0000012-T03-IM3	DOT1L	W305C	Unknown	Missense_Mutation		2.3	0.158
-  Breast	P-0000012-T03-IM3	FLT4	S293R	Unknown	Missense_Mutation		2.8	0.179
-  Breast	P-0000012-T03-IM3	HGF	W547Cfs*35	Unknown	Frame_Shift_Del		2.2	0.141
-  Breast	P-0000012-T03-IM3	KDM5A	N212I	Unknown	Missense_Mutation		1.8	0.216
-  Breast	P-0000012-T03-IM3	KMT2C	K3105N	Unknown	Missense_Mutation		6.5	0.179
-  Breast	P-0000012-T03-IM3	NSD1	V1780F	Unknown	Missense_Mutation		2.1	0.194
-  Breast	P-0000012-T03-IM3	PDGFRA	L465M	Unknown	Missense_Mutation		2.1	0.204
+  Breast	P-0000012-T03-IM3	ATRX	K983*	Likely Oncogenic	Nonsense_Mutation		3.3	0.2
+  Breast	P-0000012-T03-IM3	BLM	A363fs	Likely Oncogenic	Frame_Shift_Del		1.4	0.13
+  Breast	P-0000012-T03-IM3	FBXW7	G61*	Likely Oncogenic · Level 3A	Nonsense_Mutation		4.5	0.23
+  Breast	P-0000012-T03-IM3	FBXW7	X413_splice	Likely Oncogenic · Level 3A	Splice_Site		4.5	0.26
+  Breast	P-0000012-T03-IM3	MAP3K1	E302*	Likely Oncogenic	Nonsense_Mutation		3.1	0.17
+  Breast	P-0000012-T03-IM3	MAP3K1	X696_splice	Likely Oncogenic	Splice_Site		3.1	0.2
+  Breast	P-0000012-T03-IM3	PTPRD	E915*	Likely Oncogenic	Nonsense_Mutation		4.3	0.18
+  Breast	P-0000012-T03-IM3	PTPRD	P1338T	Unknown	Missense_Mutation		4.3	0.3
+  Breast	P-0000012-T03-IM3	PTPRT	G969V	Unknown	Missense_Mutation		4.8	0.14
+  Breast	P-0000012-T03-IM3	PTPRT	X1053_splice	Likely Oncogenic	Splice_Site		4.8	0.05
+  Breast	P-0000012-T03-IM3	SMARCA4	E1211*	Likely Oncogenic · Level 3A	Nonsense_Mutation		4.3	0.21
+  Breast	P-0000012-T02-IM3	TP53	T256P	Likely Oncogenic	Missense_Mutation		52.4	0.5
+  Breast	P-0000012-T03-IM3	TP53	P67Qfs*56	Likely Oncogenic	Frame_Shift_Del		52.4	0.4
+  Breast	P-0000012-T03-IM3	ATR	R2431M	Unknown	Missense_Mutation		2.7	0.17
+  Breast	P-0000012-T03-IM3	AXIN2	I375M	Unknown	Missense_Mutation		2.1	0.14
+  Breast	P-0000012-T03-IM3	BRIP1	D393V	Unknown	Missense_Mutation		1.4	0.15
+  Breast	P-0000012-T03-IM3	CCNE1	A47V	Unknown	Missense_Mutation		0.5	0.15
+  Breast	P-0000012-T03-IM3	CREBBP	M2161I	Unknown	Missense_Mutation		3.4	0.25
+  Breast	P-0000012-T03-IM3	DOT1L	W305C	Unknown	Missense_Mutation		2.3	0.16
+  Breast	P-0000012-T03-IM3	FLT4	S293R	Unknown	Missense_Mutation		2.8	0.18
+  Breast	P-0000012-T03-IM3	HGF	W547Cfs*35	Unknown	Frame_Shift_Del		2.2	0.14
+  Breast	P-0000012-T03-IM3	KDM5A	N212I	Unknown	Missense_Mutation		1.8	0.22
+  Breast	P-0000012-T03-IM3	KMT2C	K3105N	Unknown	Missense_Mutation		6.5	0.18
+  Breast	P-0000012-T03-IM3	NSD1	V1780F	Unknown	Missense_Mutation		2.1	0.19
+  Breast	P-0000012-T03-IM3	PDGFRA	L465M	Unknown	Missense_Mutation		2.1	0.2
   … 6 more rows
 Copy Number Alterations: 3 rows; the first 3, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	samples	gene	cna	annotation	cytoband	freq

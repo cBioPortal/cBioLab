@@ -14,8 +14,10 @@ export interface PatientData {
   profileCatalog: ProfileInfo[];
   /** the genomic data types the study holds */
   held: ("MUTATION" | "CNA" | "SV")[];
-  /** the profiles are not known yet: the Mutational Signatures tab, which they decide, follows */
+  /** the profiles or the patient's samples are not known yet: the tabs they decide (Mutational Signatures, Genomic Evolution) follow */
   partial?: boolean;
+  /** the patient's samples, once known: Genomic Evolution needs more than one */
+  samples?: number;
 }
 
 export const PATIENT_COHORT = "Patient";
@@ -53,8 +55,8 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
       v("Patient", { kind: "table", unit: "patient" }),
       v("Samples", { kind: "table", unit: "sample" }),
     ] },
-    // each mutation's allele frequency across the patient's samples; the view says so when the patient has one sample or no allele counts
-    ...(q.sample || !data.held.includes("MUTATION") ? [] : [{ title: "Genomic Evolution", views: [v("Genomic evolution", { kind: "evolution" })] }]),
+    // each mutation's allele frequency across the patient's samples, offered as the portal offers it: more than one sample in view
+    ...(q.sample || !data.held.includes("MUTATION") || !((data.samples ?? 0) > 1) ? [] : [{ title: "Genomic Evolution", views: [v("Genomic evolution", { kind: "evolution" })] }]),
     // the view refuses, naming what there is, when this patient has no signature values
     ...(signatures ? [{ title: "Mutational Signatures", views: [v("Mutational signatures", { kind: "signatures", ...(q.sample ? { samples: "cohort" } : {}) })] }] : []),
     { title: "Files & Links", views: [], pending: "Links out for the patient and each sample: the study's resource data (pathology reports, slide images) as the portal's Files & Links tab lists them." },

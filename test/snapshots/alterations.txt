@@ -34,9 +34,9 @@ Patient alterations — patients to choose from: 3,211; the first 25, tab-separa
 P-0024249 (msk_chord_2024); samples: P-0024249-T01-IM6 (Primary), P-0024249-T02-IM7 (Primary)
 Mutations: 3 of 7 rows kept by the query; the first 3, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	samples	gene	proteinChange	annotation	mutationType	copy	freq	vaf
-  Prostate	P-0024249-T02-IM7	KRAS	G12V	Oncogenic · Level 1	Missense_Mutation		28.5	0.076
-  Prostate	P-0024249-T01-IM6	PTEN	G127V	Likely Oncogenic · Level 1	Missense_Mutation		4.8	0.619
-  Prostate	P-0024249-T01-IM6	TP53	P151R	Likely Oncogenic	Missense_Mutation		52.4	0.761
+  Prostate	P-0024249-T02-IM7	KRAS	G12V	Oncogenic · Level 1	Missense_Mutation		28.5	0.08
+  Prostate	P-0024249-T01-IM6	PTEN	G127V	Likely Oncogenic · Level 1	Missense_Mutation		4.8	0.62
+  Prostate	P-0024249-T01-IM6	TP53	P151R	Likely Oncogenic	Missense_Mutation		52.4	0.76
 Copy Number Alterations: 3 rows; the first 3, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	samples	gene	cna	annotation	cytoband	freq
   Prostate	P-0024249-T01-IM6	MAP3K1	HOMDEL	Likely Oncogenic	5q11.2	0.3

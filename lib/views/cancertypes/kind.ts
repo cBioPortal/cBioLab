@@ -10,14 +10,14 @@ export const cancertypesKind: ViewKindDef<"cancertypes"> = {
     const ct = v.cancertypes;
     const line = (g: { label: string; altered: number; profiled: number; mutation: number; amp: number; homdel: number; sv: number; multiple: number }) =>
       `    ${g.label}: ${(100 * g.altered / (g.profiled || 1)).toFixed(1)}% (${g.altered}/${g.profiled}; mutation ${g.mutation}, amp ${g.amp}, deep del ${g.homdel}, SV ${g.sv}, multiple ${g.multiple})`;
-    out.push(`Cancer types summary: ${ct.genes.join(", ")} by ${ct.groupBy} (${ct.measure === "driver" ? "drivers" : "any alteration"}; samples profiled for at least one gene):\n` +
-      ct.panels.map((pn) => `  ${pn.cohort}: ${pn.altered.toLocaleString()} of ${pn.profiled.toLocaleString()} profiled samples altered\n` +
+    out.push(`Cancer types summary: ${ct.genes.join(", ")} by ${ct.groupBy} (${ct.measure === "driver" ? "drivers" : "any alteration"}; ${ct.unit}s profiled for at least one gene):\n` +
+      ct.panels.map((pn) => `  ${pn.cohort}: ${pn.altered.toLocaleString()} of ${pn.profiled.toLocaleString()} profiled ${ct.unit}s altered\n` +
         [...pn.groups, ...(pn.pooled ? [pn.pooled] : [])].map(line).join("\n")).join("\n") +
       caveatOf(v) + noteOf(v));
   },
   help: {
     title: "What is this?",
-    text: "For a list of genes, shows what share of samples in each cancer type carry a change in at least one of them — mutated, gained in many copies, deleted, or rearranged — with each bar split by which kind of change it was. It answers which cancers these genes matter most in, the way cBioPortal's Cancer Types Summary does."
+    text: "For a list of genes, shows what share of patients (or samples) in each cancer type carry a change in at least one of them — mutated, gained in many copies, deleted, or rearranged — with each bar split by which kind of change it was. It answers which cancers these genes matter most in, the way cBioPortal's Cancer Types Summary does."
   },
   need: "local",
 };

@@ -288,7 +288,7 @@ describe("cooccurrenceMethod", () => {
     { study: "s2", a: "TP53", b: "KRAS", both: 1, onlyA: 2, onlyB: 6, neither: 9 },
   ];
   test("one study: Fisher, then BH over the assessable pairs; pairs no panel covers are named as set aside", () => {
-    const m = cooccurrenceMethod({ cohort: "C", cohortPatients: [{ study: "s1", patients: 40 }], counts: counts.slice(0, 1), pairs: 3, assessable: 1,
+    const m = cooccurrenceMethod({ cohort: "C", cohortSamples: [{ study: "s1", samples: 40 }], counts: counts.slice(0, 1), pairs: 3, assessable: 1,
       results: [{ a: "TP53", b: "KRAS", p: 0.2, q: 0.2 }] });
     assert.deepEqual(m.steps.map((s) => s.title), ["Count each gene pair's 2×2 table", "Set aside pairs no panel covers",
       "Log₂ odds ratio per pair", "Fisher's exact test per pair", "Benjamini–Hochberg across pairs"]);
@@ -297,7 +297,7 @@ describe("cooccurrenceMethod", () => {
     assert.match(m.python!, /p = result\["p_fisher"\]/);
   });
   test("several studies: CMH stratified by study ranks the pairs, with R's continuity rule and the p from the chi-squared tail", () => {
-    const m = cooccurrenceMethod({ cohort: "C", cohortPatients: [{ study: "s1", patients: 40 }, { study: "s2", patients: 20 }], counts, pairs: 1, assessable: 1,
+    const m = cooccurrenceMethod({ cohort: "C", cohortSamples: [{ study: "s1", samples: 40 }, { study: "s2", samples: 20 }], counts, pairs: 1, assessable: 1,
       results: [{ a: "TP53", b: "KRAS", p: 0.2, q: 0.2, pStratified: 0.3 }] });
     assert.match(m.steps.find((s) => s.kind === "statistic" && /Mantel/.test(s.title))!.detail, /\|Σa − ΣE\[a\]\| ≥ 0\.5/);
     assert.match(m.python!, /correction=bool\(delta >= 0\.5\)/);

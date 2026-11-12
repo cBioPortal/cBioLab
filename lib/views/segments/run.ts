@@ -195,7 +195,7 @@ export async function runSegments(view: SegmentsView, ctx: ViewRun): Promise<Vie
     ...(mutations ? { mutations } : {}),
     ...(excluded.length ? { excluded } : {}) };
   const order = sort === "gained" ? "highest mean over the region first" : sort === "lost" ? "lowest mean over the region first"
-    : onePatient ? "the patient's samples in collection order (the numbers the patient's other views give them)" : "each study's own sample order, as the portal lists them";
+    : onePatient ? "the patient's samples in collection order (the numbers the patient's other views give them)" : "each study's own sample order (internal sample id)";
   return {
     kind: "segments", cohorts: vNames, segments: result,
     method: segmentsMethod({ build, region: region.label, sort, order, rows, cohortSamples, segmented, drawn: samples.length, leftOut, segments: segTotal, noSegment: drawnNoSeg, otherChrom, studies,

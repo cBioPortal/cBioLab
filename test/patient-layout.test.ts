@@ -44,3 +44,11 @@ test("the genomic overview is the patient's mutations and copy-number segments, 
   assert.equal(patientLayout(q, { profileCatalog: [], held: ["CNA"] }).names.includes("Summary › Genomic overview"), true);
   assert.equal(patientLayout(q, { profileCatalog: [], held: ["SV"] }).names.includes("Summary › Genomic overview"), false);
 });
+
+test("Genomic Evolution is offered, as the portal offers it, only with more than one sample in view (PTB-MD-1, PTB-MD-2)", () => {
+  const evo = (l: ReturnType<typeof patientLayout>) => l.tabs.some((t) => t.title === "Genomic Evolution");
+  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], samples: 2 })), true);
+  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], samples: 1 })), false);
+  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"] })), false, "not before the samples are known");
+  assert.equal(evo(patientLayout({ study: "s", sample: "S1" }, { profileCatalog: [], held: ["MUTATION"], samples: 3 })), false);
+});

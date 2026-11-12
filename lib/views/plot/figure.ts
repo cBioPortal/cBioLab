@@ -353,7 +353,7 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
   y += 4;
   // the engine's note leads, as it does under the scatter: it is where the view says what it drew
   // over and what it had to leave out
-  const cap = caption((v.note ? v.note + "  " : "") + "Box: quartiles with Tukey whiskers, computed over every case in the group; each name carries its count." +
+  const cap = caption((v.note ? v.note + "  " : "") + "Box: quartiles; whiskers end at 1.5 × IQR past the box, or at the extreme value when none lies beyond (the portal's rule), computed over every case in the group; each name carries its count." +
     (d.overlay === "points" ? " Every value is drawn over its box; the jitter is fixed per case."
       : d.overlay === "violin" ? " The shaded width is the share of that group's values sitting at that height, scaled per group."
       : "") +

@@ -86,7 +86,7 @@ const LIST: Row[] = [
 ];
 const P1_SAMPLES = [{ cohort: "A", study: "s1", patient: "P1", sid: "S1a", type: "Metastasis" }, { cohort: "A", study: "s1", patient: "P1", sid: "S1b", type: "Primary" }];
 const MUT: Row[] = [{ cohort: "A", study: "s1", patient: "P1", sid: "S1a", gene: "KRAS", proteinChange: "G12D", oncogenicity: "Oncogenic", level: "LEVEL_1",
-  mutationType: "Missense_Mutation", copy: null, freq: 12.345, vaf: 0.12345, altCount: "", refCount: null, start: "25398284" }];
+  mutationType: "Missense_Mutation", copy: null, freq: 12.345, vaf: 10 / 57, altCount: "", refCount: null, start: "25398284" }];
 const CNA: Row[] = [{ cohort: "A", study: "s1", patient: "P1", sid: "S1a", gene: "MYC", cna: "AMP", oncogenicity: "Likely Oncogenic", level: "", cytoband: "8q24.21", freq: 3.06 }];
 const study = (o: { list?: Row[]; samples?: Row[]; mut?: Row[]; cna?: Row[]; sv?: Row[] } = {}): Tables => (table, src) => {
   switch (table) {
@@ -177,12 +177,12 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.match(v.caveat!, /The patient list: 2 patients\. Sorted with patients who have any alteration first, then by patient id across the cohort;/);
   });
 
-  test("each cell as the table shows it: OncoKB's call with its level, numbers as numbers, allele frequency to 3 places and Cohort % to 1, blanks", async () => {
+  test("each cell as the table shows it: OncoKB's call with its level, numbers as numbers, allele frequency to 2 places, rounded once (10/57 is 0.18, not 0.175 then 0.17), and Cohort % to 1, blanks", async () => {
     const t = alt(await run({ mutations: { columns: ["gene", "annotation", "vaf", "freq", "altCount", "refCount", "copy", "start"] } }, one())).tables;
     const cols = t.mutations!.columns.map((c) => c.id);
     const row = Object.fromEntries(cols.map((id, i) => [id, t.mutations!.rows[0].values[i]]));
     assert.equal(row.annotation, "Oncogenic · Level 1");
-    assert.equal(row.vaf, 0.123);
+    assert.equal(row.vaf, 0.18);
     assert.equal(row.freq, 12.3);
     assert.equal(row.altCount, null, "an empty number is missing, not 0");
     assert.equal(row.refCount, null);
