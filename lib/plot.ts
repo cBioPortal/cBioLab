@@ -542,16 +542,18 @@ export function coverageNote(d: PlotData, unit: "patient" | "sample"): string {
 }
 
 /**
- * exact statistics over every point: both coefficients and the least-squares line. A coefficient
- * is NULL when either axis has no spread, and the line when x has none: rankCorr returns a number
- * for an axis whose values are all tied, and that number means nothing.
+ * exact statistics over every point: both coefficients and the least-squares line. Spearman's ρ is
+ * Pearson's r of the ranks, tied values sharing their average rank (as scipy's spearmanr and the
+ * portal compute it), so it does not depend on row order. A coefficient is NULL when either axis
+ * has no spread, and the line when x has none.
  */
 export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): AggregateSql {
   const spread = "min(x) < max(x) AND min(y) < max(y)";
+  const avgRank = (v: string) => "rank() OVER (ORDER BY " + v + ") + (count() OVER (PARTITION BY " + v + ") - 1) / 2";
   return aggregateSql(pairCte(xSel, ySel, cohortSql) +
-    "SELECT count() AS n, if(" + spread + ", corr(x, y), NULL) AS pearson, if(" + spread + ", rankCorr(x, y), NULL) AS spearman,\n" +
+    "SELECT count() AS n, if(" + spread + ", corr(x, y), NULL) AS pearson, if(" + spread + ", corr(rx, ry), NULL) AS spearman,\n" +
     "       if(min(x) < max(x), simpleLinearRegression(x, y).1, NULL) AS slope, if(min(x) < max(x), simpleLinearRegression(x, y).2, NULL) AS intercept\n" +
-    "FROM pair");
+    "FROM (SELECT x, y, " + avgRank("x") + " AS rx, " + avgRank("y") + " AS ry FROM pair)");
 }
 
 /**
@@ -829,7 +831,11 @@ export function plotTableSql(xSel: string, ySel: string, cohortSql: string): Agg
 
 // ---- pure helpers, shared with the renderers -------------------------------
 
-/** Tukey's fences: the whiskers reach the furthest value inside 1.5 x IQR, as the portal's do. */
+/**
+ * The portal's whiskers: each ends at its fence (q1 − 1.5 × IQR, q3 + 1.5 × IQR) when some value lies
+ * beyond it, else at the extreme value. Not Tukey's furthest value inside the fence, so a whisker may
+ * end where no case lies.
+ */
 export function tukey(q1: number, q3: number, lo: number, hi: number): { loWhisker: number; hiWhisker: number; iqr: number } {
   const iqr = q3 - q1;
   return { loWhisker: Math.max(lo, q1 - 1.5 * iqr), hiWhisker: Math.min(hi, q3 + 1.5 * iqr), iqr };

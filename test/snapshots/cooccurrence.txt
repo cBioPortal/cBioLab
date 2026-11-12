@@ -3,7 +3,7 @@ Analysis over msk_chord_2024 — OncoKB pin v7.5 — (time)ms.
 Cohorts:
 - NSCLC: 7,809 patients — CANCER_TYPE in [Non-Small Cell Lung Cancer]
 
-Co-occurrence (2x2 per pair, among patients profiled for BOTH genes):
+Co-occurrence (2x2 per pair, among samples profiled for BOTH genes):
   STK11/KEAP1: both 571, STK11 only 538, KEAP1 only 511, neither 6,189 (of 7,809 profiled)  log2OR=3.68 (co-occur)  p=1.2e-248 q=1.7e-247
   EGFR/KRAS: both 71, EGFR only 1,946, KRAS only 2,187, neither 3,605 (of 7,809 profiled)  log2OR=-4.06 (mutually exclusive)  p=1.7e-240 q=1.3e-239
   EGFR/STK11: both 51, EGFR only 1,966, STK11 only 1,058, neither 4,734 (of 7,809 profiled)  log2OR=-3.11 (mutually exclusive)  p=2.6e-88 q=1.3e-87
@@ -19,11 +19,11 @@ Co-occurrence (2x2 per pair, among patients profiled for BOTH genes):
   TP53/ALK: both 303, TP53 only 3,771, ALK only 249, neither 3,486 (of 7,809 profiled)  log2OR=0.17 (co-occur)  p=0.1853 q=0.2138
   TP53/KEAP1: both 583, TP53 only 3,491, KEAP1 only 499, neither 3,236 (of 7,809 profiled)  log2OR=0.12 (co-occur)  p=0.2253 q=0.2414
   KEAP1/ALK: both 72, KEAP1 only 1,010, ALK only 480, neither 6,247 (of 7,809 profiled)  log2OR=-0.11 (mutually exclusive)  p=0.6093 q=0.6093
-  Pairwise co-occurrence within “NSCLC”. Denominators are the patients profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on patients whose panel could not have detected it. Two-sided Fisher exact test. q-values are Benjamini–Hochberg across the 15 assessable pairs. Every site returns four counts per pair and nothing else.
+  Pairwise co-occurrence within “NSCLC”. Denominators are the samples profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on samples whose panel could not have detected it. Two-sided Fisher exact test. q-values are Benjamini–Hochberg across the 15 assessable pairs. Every site returns four counts per pair and nothing else.
   METHOD:
-    - Count each gene pair's 2×2 table [NSCLC · msk_chord_2024]: The pairCounts query above. Of the patients with a sample on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.
+    - Count each gene pair's 2×2 table [NSCLC · msk_chord_2024]: The pairCounts query above. Of the samples on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.
         pairs: 15
-    - Log₂ odds ratio per pair: log₂((both · neither) / (only first · only second)) on the counts summed across studies, with 0.5 added to every cell when any cell is 0.
+    - Log₂ odds ratio per pair: log₂((both · neither) / (only first · only second)) on the counts summed across studies, with 0.5 added to every cell when any cell is 0. A pair's tendency is co-occurrence when its log₂ odds ratio is above 0 and mutual exclusivity otherwise (0 and −∞ included), as the portal labels it.
     - Fisher's exact test per pair: Two-sided, on the pair's 2×2 table.
     - Benjamini–Hochberg across pairs: q-values over the 15 assessable pairs, from the Fisher p-values.
     Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg statsmodels 0.15.0 multipletests(method="fdr_bh"), to a relative 1e-6 (test/tables-golden.test.ts).

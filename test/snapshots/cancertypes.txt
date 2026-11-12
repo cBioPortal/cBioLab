@@ -3,8 +3,8 @@ Analysis over msk_impact_50k_2026 — OncoKB pin v7.5 — (time)ms.
 Cohorts:
 - all patients: 48,179 patients — all samples in the study
 
-Cancer types summary: KRAS, NRAS, HRAS by CANCER_TYPE (any alteration; samples profiled for at least one gene):
-  all patients: 10,796 of 48,179 profiled samples altered
+Cancer types summary: KRAS, NRAS, HRAS by CANCER_TYPE (any alteration; patients profiled for at least one gene):
+  all patients: 10,796 of 48,179 profiled patients altered
     Pancreatic Cancer: 82.9% (2263/2729; mutation 2211, amp 3, deep del 0, SV 0, multiple 49)
     Appendiceal Cancer: 60.6% (163/269; mutation 163, amp 0, deep del 0, SV 0, multiple 0)
     Colorectal Cancer: 49.1% (2450/4993; mutation 2383, amp 48, deep del 4, SV 1, multiple 14)

@@ -83,16 +83,17 @@ function PatientView({ study, patient, sample, nav, tab }: { study: string; pati
   const { basics, known, error } = useStudyKnown(study && (patient || sample) ? study : "");
   const owner = useSamplePatient(study, sample);
   const owned = sample ? owner.patient : patient;
-  const { record, error: recordError } = usePatientRecord(study, owned);
+  const { record, error: recordError, missing } = usePatientRecord(study, owned);
   const query: PatientQuery | null = sample ? { study, sample } : patient ? { study, patient } : null;
   // laid out from the study list at once; the profiles only add the Mutational Signatures tab
   const fresh = useMemo(() => basics && query
-    ? patientLayout(query, { profileCatalog: known?.profileCatalog || [], held: basics.held.every, partial: !known })
-    : null, [basics, known, study, patient, sample]);   // eslint-disable-line react-hooks/exhaustive-deps -- `query` is rebuilt every render from these ids
+    ? patientLayout(query, { profileCatalog: known?.profileCatalog || [], held: basics.held.every, partial: !known || (!sample && !record), samples: record?.samples.length })
+    : null, [basics, known, study, patient, sample, record]);   // eslint-disable-line react-hooks/exhaustive-deps -- `query` is rebuilt every render from these ids
   const page = usePageDoc(fresh);
   const shell = (body: React.ReactNode) => <><SiteHeader page={sample ? "sample" : "patient"} /><main className="analysis-main">{body}</main></>;
   if (!study || !query) return shell(<p className="note">This page shows one patient, or one sample: give the study and the patient as <code>?study=&lt;study id&gt;&amp;patient=&lt;patient id&gt;</code>, or a sample as <code>?study=&lt;study id&gt;&amp;sample=&lt;sample id&gt;</code>.</p>);
   if (error || owner.error) return shell(<div className="error">{error || owner.error}</div>);
+  if (missing) return shell(<div className="error">{recordError}</div>);
   const ready = !!(page.layout && page.doc);
   return shell(<>
     <PortalSummary eyebrow={sample ? "Sample" : "Patient"} title={sample || patient} study={study}

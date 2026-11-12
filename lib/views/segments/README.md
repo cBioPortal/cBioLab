@@ -7,8 +7,8 @@ server SVG (`figure.ts`, for MCP and shared images) draws the same rows with `li
 `run.ts`, queries `sql.ts`). Ported from cbioportal-frontend's `resultsView/cnSegments/CNSegments.tsx`,
 `shared/lib/IGVUtils.ts` and igv.js 2.11's `SegTrack`.
 
-**Rows** are the cohort's samples with any segment, in the study's own sample order (internal id —
-the order `/api/copy-number-segments/fetch` returns them, so the order IGV draws them); for one
+**Rows** are the cohort's samples with any segment, in the study's own sample order (internal id; the portal's IGV draws
+them in the order its segment fetch returns them, which differs); for one
 patient, their samples numbered in collection order by `sampleMarks` (`lib/timeline-tracks.ts`), the
 markers the patient's other views draw. `sort: "gained" | "lost"` orders by the sample's mean over the
 region (bases-weighted; IGV's click-to-sort weights by the region's length). A sample with segments

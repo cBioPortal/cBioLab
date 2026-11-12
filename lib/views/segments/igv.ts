@@ -9,13 +9,16 @@ export function igvLocus(s: Pick<SegmentsResult, "region">): string {
 
 /**
  * The result's segments as igv.js seg features (0-based start, as a .seg file is read), in the
- * result's row order: IGV draws samples in the order they first appear. One patient's samples carry
- * their number, as the patient's other views name them.
+ * result's row order: IGV draws samples in the order they first appear, one row per distinct name.
+ * One patient's samples carry their number, as the patient's other views name them; with several
+ * studies each name carries its study, so two studies' samples with the same id stay two rows.
  */
 export function igvSegFeatures(s: Pick<SegmentsResult, "samples" | "segChroms">) {
   const out: { chr: string; start: number; end: number; value: number; sample: string }[] = [];
+  const several = new Set(s.samples.map((x) => x.study)).size > 1;
   for (const smp of s.samples) {
-    const name = smp.mark ? smp.mark.label + ". " + smp.sample : smp.sample;
+    const id = several ? smp.study + ":" + smp.sample : smp.sample;
+    const name = smp.mark ? smp.mark.label + ". " + id : id;
     for (let k = 0; k < smp.segs.length; k += 4)
       out.push({ chr: "chr" + s.segChroms[smp.segs[k]], start: smp.segs[k + 1] - 1, end: smp.segs[k + 2], value: smp.segs[k + 3], sample: name });
   }

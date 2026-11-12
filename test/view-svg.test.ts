@@ -478,7 +478,7 @@ describe("plot points: every case, or the outliers over the density", () => {
     assert.match(svg, />20<\/text>/, "the axis tops out at whisker + one whisker span (10 + 10)");
     assert.equal((svg.match(/<circle [^>]*fill-opacity/g) || []).length, 1, "the 15 is a dot on the axis");
     assert.equal((svg.match(/<path data-id="[^"]*" d="M[^"]*Z"/g) || []).length, 1, "the 570 is a triangle at the edge");
-    assert.match(svg, /1 value of a point layer lies more than a whisker span past the whiskers and is drawn as a triangle/);
+    assert.match(svg.replace(/<\/text><text [^>]*>/g, " "), /1 value of a point layer lies more than a whisker span past the whiskers and is drawn as a triangle/);
     // the violin stops at the whiskers: its bin at 15..16 lies past them but inside the axis, where the points are
     assert.equal((svg.match(/fill-opacity="0\.28"/g) || []).length, 1, "one violin bin drawn, the one inside the whiskers");
   });

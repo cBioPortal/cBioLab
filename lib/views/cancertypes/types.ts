@@ -4,9 +4,9 @@ import type { GeneTrackSpec } from "../../gene-tracks.ts";
 
 /**
  * Cancer Types Summary (cBioPortal's results-view tab): for a gene list, the share of the cohort's
- * samples altered in at least one of the genes, per cancer type (or any sample attribute, or per
- * study), split by kind of alteration. Each group's denominator is its samples profiled for at least
- * one of the genes. Counts only.
+ * patients (or samples, `unit`) altered in at least one of the genes, per cancer type (or any sample
+ * attribute, or per study), split by kind of alteration. Each group's denominator is its patients
+ * (or samples) profiled for at least one of the genes. Counts only.
  */
 export interface CancertypesView {
   note?: string;

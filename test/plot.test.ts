@@ -98,7 +98,9 @@ test("an axis with no spread draws in one row and has no correlation", () => {
   for (const sql of [plotBinsSql(x, x, ctx.cohortSql), plotViolinSql(x, x, ctx.cohortSql)])
     assert.equal(/nullIf\([xy]1 - [xy]0, 0\)/.test(sql), false, "a bin divides by a width that may be 0");
   const st = plotStatsSql(x, x, ctx.cohortSql);
-  assert.match(st, /if\(min\(x\) < max\(x\) AND min\(y\) < max\(y\), rankCorr\(x, y\), NULL\)/);
+  assert.match(st, /if\(min\(x\) < max\(x\) AND min\(y\) < max\(y\), corr\(rx, ry\), NULL\)/);
+  // tied values share their average rank, so ρ does not depend on row order
+  assert.match(st, /rank\(\) OVER \(ORDER BY x\) \+ \(count\(\) OVER \(PARTITION BY x\) - 1\) \/ 2 AS rx/);
   assert.match(st, /if\(min\(x\) < max\(x\) AND min\(y\) < max\(y\), corr\(x, y\), NULL\)/);
 });
 

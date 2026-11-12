@@ -17,7 +17,7 @@ export interface SegmentsView {
   /** sample rows drawn at most (default 300, 1–2000); the rest are counted and named as left out */
   rows?: number;
   /**
-   * row order: "order" (default) the study's own sample order, as the portal lists them — for one
+   * row order: "order" (default) the study's own sample order (internal sample id) — for one
    * patient, their samples numbered in collection order; "gained" / "lost" by the sample's mean over
    * the region drawn (covered bases weighted), highest / lowest first
    */

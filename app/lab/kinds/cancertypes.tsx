@@ -92,7 +92,7 @@ export const cancertypesUi: KindUi<"cancertypes"> = {
   genes: true,
   maxCohorts: 2,
   defaults: (known) => ({ kind: "cancertypes", genes: known.genes.length ? known.genes.slice(0, 5) : ["TP53", "KRAS"] }),
-  sub: (spec) => "by " + (spec.groupBy || "CANCER_TYPE") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled samples",
+  sub: (spec) => "by " + (spec.groupBy || "CANCER_TYPE") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled " + (spec.unit === "sample" ? "samples" : "patients"),
   Controls,
   body: (c) => c.v.cancertypes ? <CancertypesBody v={c.v} /> : null,
 };

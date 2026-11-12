@@ -10,7 +10,7 @@ function CooccurrenceCard({ ctx, v, vi }: CardProps) {
   const { busy, cohortChoice, docView, menuOpenRef, openGenes } = ctx;
   return <>
     {v.kind === "cooccurrence" && v.pairs && <>
-      <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi), 1)} sub="pairwise, among patients profiled for both genes" {...placement(ctx, vi)}
+      <ViewHead menuStore={menuOpenRef.current} v={v} title="Co-occurrence" cohorts={cohortChoice(vi, docView(vi), 1)} sub="pairwise, among samples profiled for both genes" {...placement(ctx, vi)}
         actions={<Button variant="link" size="inline" className="genesbtn text-md" disabled={busy} data-tip="choose the genes this view uses" onClick={() => openGenes(vi)}>genes</Button>} />
       {v.note && <p className="note">{v.note}</p>}
       <div className="vscroll">

@@ -34,10 +34,12 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   const COUNTS = ["samples", "profiled", "altered", "mutation", "amp", "homdel", "sv", "multiple"] as const;
   const ALL_KEY = "\x01all";
   const cohortTotal = new Map<string, { profiled: number; altered: number; samples: number }>();
-  // groups at or over the floor, most altered first; the rest pooled into one, counted
+  // groups at or over the floor, highest bar first (by share, or by count when counts are drawn); the
+  // rest pooled into one, counted
+  const height = (g: CancertypesGroup) => show === "count" ? g.altered : g.altered / g.profiled;
   const arrange = (all: CancertypesGroup[]) => {
     const named = all.map((g) => ({ ...g, label: g.key === "" ? "(no " + (attribute || "study") + " value)" : g.label }));
-    const keep = named.filter((g) => g.profiled >= minSamples).sort((a, b) => b.altered / b.profiled - a.altered / a.profiled || b.profiled - a.profiled);
+    const keep = named.filter((g) => g.profiled >= minSamples).sort((a, b) => height(b) - height(a) || b.profiled - a.profiled);
     const small = named.filter((g) => g.profiled < minSamples);
     let pooled: CancertypesPanel["pooled"];
     if (small.length) {

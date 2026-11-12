@@ -29,7 +29,7 @@ function cellOf(r: Record<string, unknown>, c: { id: string; numeric: boolean })
   if (!c.numeric) return x == null ? "" : String(x);
   if (x == null || x === "") return null;
   const n = Number(x);
-  return c.id === "vaf" ? Math.round(n * 1000) / 1000 : c.id === "freq" ? Math.round(n * 10) / 10 : n;
+  return c.id === "vaf" ? Math.round(n * 100) / 100 : c.id === "freq" ? Math.round(n * 10) / 10 : n;
 }
 
 /** A page of rows as the result carries them, aligned with `cols`. */
