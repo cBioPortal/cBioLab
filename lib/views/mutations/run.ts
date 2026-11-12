@@ -9,6 +9,7 @@ import { overLimit, refuse } from "../shared.ts";
 import type { MutationsView } from "./types.ts";
 import { mutationsMethod } from "./method.ts";
 import { describePins, studiesWithoutVariantAnnotation, variantPins } from "../../variant-annotation.ts";
+import { gnomadRows, gnomadUrl } from "../../mutation-cell-text.ts";
 import { portalSig2 } from "../../chart/format.ts";
 
 /** A row's value in a column, from the query's row (numbers as numbers, the annotation spelled out as the SQL spells it). */
@@ -26,16 +27,34 @@ function mutationValue(r: Record<string, unknown>, id: string, pin: string | nul
     case "proteinPos": return r.pos == null ? "" : String(r.pos);
     case "clinvar": return r.clinvar ? String(r.clinvar) + (r.clinvarConflicting ? "(" + String(r.clinvarConflicting) + ")" : "") : "";
     case "signal": return r.signalFreq == null ? "" : portalSig2(Number(r.signalFreq));
+    // the portal downloads gnomAD's frequency as JavaScript writes the number, and 0 as nothing
+    case "gnomad": return r.gnomadFreq == null || Number(r.gnomadFreq) === 0 ? null : Number(r.gnomadFreq);
+    case "dbsnp": return String(r.rsid ?? "");
     default: return r[id] == null ? "" : String(r[id]);
   }
 }
 
+const json = (x: unknown) => { if (!x) return null; try { return JSON.parse(String(x)); } catch { return null; } };
+const numOrNull = (x: unknown) => x == null || x === "" ? null : Number(x);
+
 /**
  * What a row's cells show beyond their text: whether its variant has a stored annotation, ClinVar's
- * record, SIGNAL's germline entry, and the study's genome (HGVSg links to that genome's Genome Nexus).
+ * record, SIGNAL's germline entry, gnomAD's table by population and its link, the four functional-impact
+ * predictions, and the study's genome (HGVSg links to that genome's Genome Nexus).
  */
 function mutationDetail(r: Record<string, unknown>, build: string | undefined): Record<string, unknown> | undefined {
   const d: Record<string, unknown> = {};
+  const gnomad = gnomadRows(json(r.gnomadRaw));
+  if (gnomad.length) d.gnomad = { rows: gnomad, url: gnomadUrl(String(r.seqRegion || ""), json(r.vcfRaw)) };
+  if (Number(r.gnOk) === 1) {
+    const tc = json(r.tc) || {}, ma = json(r.maRaw);
+    d.impact = {
+      ma: ma ? { prediction: ma.prediction ?? null, score: numOrNull(ma.score), msa: ma.msa ?? null } : null,
+      sift: { prediction: tc.siftPrediction || null, score: numOrNull(tc.siftScore) },
+      polyphen: { prediction: tc.polyphenPrediction || null, score: numOrNull(tc.polyphenScore) },
+      alphaMissense: { prediction: tc.alphaMissense?.pathogenicity || null, score: numOrNull(tc.alphaMissense?.score) },
+    };
+  }
   // the portal draws ClinVar's cell from the record whenever there is one, an empty significance included
   if (Number(r.clinvarId) > 0 || r.clinvar) d.clinvar = { significance: String(r.clinvar || ""), conflicting: String(r.clinvarConflicting || ""), id: Number(r.clinvarId) || null };
   if (Number(r.gnOk) === 1) d.annotated = true;
@@ -84,9 +103,10 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "Every " + gene + " mutation call in " + (vNames.length > 1 ? "each cohort's" : "the cohort's") + " samples, one row per call; uncalled mutations are left out, as the portal leaves them out. " +
       (pin ? "Annotation is OncoKB " + pin + " (oncogenicity and its highest sensitivity level for the gene). " : "No OncoKB version is pinned here, so the annotation column is empty. ") +
-      (gn ? "HGVSc, ClinVar and SIGNAL are " + gn + ", read from the offline store; HGVSc is on the canonical transcript of " + gene + " (MSKCC overrides). " +
+      (gn ? "HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL are " + gn + ", read from the offline store; HGVSc and SIFT, PolyPhen-2 and AlphaMissense are on the canonical transcript of " + gene + " (MSKCC overrides). " +
+        "Genome Nexus's GRCh38 service has no SIGNAL, so it is empty for a GRCh38 study; gnomAD and dbSNP are blank for the few variants Genome Nexus cannot serve myvariant.info's record of. " +
         (unannotated.length ? "Not yet annotated, so blank in those columns: " + (unannotated.length <= 3 ? unannotated.join(", ") : unannotated.length + " studies") + ". " : "")
-        : "No Genome Nexus release is stored here, so HGVSc, ClinVar and SIGNAL are empty. ") +
+        : "No Genome Nexus release is stored here, so HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL are empty. ") +
       "Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. " +
       tableTail(r, q, MUTATION_COLUMNS, "mutation", "drivers first, then by codon", excluded, vNames.length > 1)
   };

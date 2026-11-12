@@ -7,7 +7,7 @@ export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin:
   const steps = tableSteps({ label: "mutations", what: t.gene + " mutation calls", queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
     source: "every called " + t.gene + " mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded" +
       (t.oncokbPin ? " and the OncoKB " + t.oncokbPin + " call for its protein change" : "") +
-      (t.variantPins ? "; HGVSc, ClinVar and SIGNAL from the stored " + t.variantPins + " annotation of its genomic variant" : "") +
+      (t.variantPins ? "; HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL from the stored " + t.variantPins + " annotation of its genomic variant" : "") +
       "; HGVSg from its coordinates; allele frequency = variant / (variant + reference) reads.",
     order: (t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + ", missing last" : "drivers first, then by codon") + ", then sample" });
   return { steps, implementation: { functions: ["mutationRowSource", "pageSql", "countsSql"], file: "lib/mutation-table.ts, lib/table-query.ts", commit: BUILD_COMMIT },

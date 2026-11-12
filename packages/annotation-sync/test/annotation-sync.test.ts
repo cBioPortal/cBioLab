@@ -63,8 +63,9 @@ test("only the keys the store lacks for the release are asked for, in batches, a
   assert.match(diff, /WHERE oncokb_version = 'v9\.9' AND \(toString\(alteration_type\), toString\(hugo_gene_symbol\), toString\(alteration\)\) IN/);
   assert.match(diff, /USING \(alteration_type, hugo_gene_symbol, alteration\)/);
 
-  // two batches of at most two keys; within one, mutations and copy-number calls go to their own endpoints
-  assert.deepEqual(asked.map((a) => a.path), ["/annotate/mutations/byProteinChange", "/annotate/copyNumberAlterations", "/annotate/mutations/byProteinChange"]);
+  // two batches of at most two keys; within one, mutations and copy-number calls go to their own endpoints;
+  // before the write, the release is asked again
+  assert.deepEqual(asked.map((a) => a.path), ["/annotate/mutations/byProteinChange", "/annotate/copyNumberAlterations", "/annotate/mutations/byProteinChange", "/info"]);
   assert.deepEqual(asked[0].body, [{ gene: { hugoSymbol: "KRAS" }, alteration: "G12D" }]);
   assert.deepEqual(asked[1].body, [{ gene: { hugoSymbol: "ERBB2" }, copyNameAlterationType: "AMPLIFICATION" }]);
 
@@ -220,4 +221,12 @@ test("held rows are written at the row limit or the time limit, whichever comes 
   assert.equal(w.inserts, 3, "nothing held, nothing written");
   assert.deepEqual(insertLimits({}), { rows: 20_000, seconds: 300 });
   assert.deepEqual(insertLimits({ ANNOTATION_INSERT_ROWS: "5", ANNOTATION_INSERT_SECONDS: "7" }), { rows: 5, seconds: 7 });
+});
+
+test("a service that moves to another release during a sync stops it before anything of the new release is stored under the old one", async () => {
+  oncokb({ info: { dataVersion: { version: "v10.0" }, apiVersion: { version: "v1.5" } } });
+  ch = warehouse(3, KEYS);
+  await assert.rejects(syncKeys(ch.conn, src, RELEASE, "a_study", () => {}),
+    /OncoKB moved from release v9\.9 to v10\.0 during the sync; nothing since the last write was stored\. Re-run to sync the new release\./);
+  assert.equal(ch.rows("oncokb").length, 0);
 });

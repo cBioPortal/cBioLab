@@ -331,6 +331,8 @@ export interface DataTableProps<V> {
   onQuery: (q: TableQuery) => void;
   /** a cell drawn other than as its text (a badge, a link); the row says whose it is (study, sample) */
   cell?: (column: string, value: V, row: TableRows<V>["rows"][number]) => React.ReactNode;
+  /** what a column's header shows beyond its name (the Functional Impact column's predictor icons) */
+  colHead?: (column: string) => React.ReactNode;
   /** how a number shows (default: grouped) */
   num?: (column: string, value: number) => string;
   title?: React.ReactNode;
@@ -347,7 +349,7 @@ export interface DataTableProps<V> {
   groupBy?: string;
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, num, title, onRow, selected, groupBy, onHover, hot }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -454,10 +456,11 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                 return (
                   <th key={c.id} className={c.numeric ? "num" : undefined} aria-sort={sorted ? (q.sort!.desc ? "descending" : "ascending") : "none"}>
                     <span className="dt-th">
+                      {c.unsorted ? <span className="flex flex-col"><span className="dt-sort" data-tip={(c.tip ? c.tip + " — " : "") + "this column is not sorted"}>{c.name}</span>{colHead?.(c.id)}</span> :
                       <button type="button" className="dt-sort" onClick={() => sortBy(c)}
                         data-tip={(c.tip ? c.tip + " — click to " : "") + "sort the whole table by this column, across every page"}>
                         {c.name}{sorted ? (q.sort!.desc ? " ▾" : " ▴") : ""}
-                      </button>
+                      </button>}
                       <span className="dt-anchor">
                         <button type="button" className={"dt-funnel" + (fon ? " on" : "")} aria-label={"filter " + c.name}
                           data-tip={fon ? "filtered: " + filterText(q.filters![c.id]) : "filter this column"} onClick={() => setMenu(menu === c.id ? null : c.id)}>

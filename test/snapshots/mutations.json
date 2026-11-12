@@ -45,6 +45,13 @@
             "numeric": false
           },
           {
+            "id": "functionalImpact",
+            "name": "Functional Impact",
+            "numeric": false,
+            "unsorted": true,
+            "tip": "Functional impact of the variant on the protein: Mutation Assessor, SIFT, PolyPhen-2 and AlphaMissense predictions. Hover over a dot to see the prediction and its score."
+          },
+          {
             "id": "mutationType",
             "name": "Mutation Type",
             "numeric": false
@@ -117,13 +124,8 @@
             "tip": "Coding DNA change in HGVS notation (HGVSc) for the selected transcript"
           },
           {
-            "id": "status",
-            "name": "MS",
-            "numeric": false
-          },
-          {
-            "…": "2 more",
-            "sha256": "e78e1a111a11e87f"
+            "…": "5 more",
+            "sha256": "24193a917309c610"
           }
         ],
         "shown": [
@@ -175,6 +177,7 @@
               "G12D",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -189,10 +192,9 @@
               "T",
               "12:g.25398284C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -207,6 +209,7 @@
               "G12D",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -221,10 +224,9 @@
               "T",
               "12:g.25398284C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -239,6 +241,7 @@
               "G12D",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -253,10 +256,9 @@
               "T",
               "12:g.25398284C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -271,6 +273,7 @@
               "G13D",
               "13",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -285,10 +288,9 @@
               "T",
               "12:g.25398281C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -303,6 +305,7 @@
               "G12D",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -317,10 +320,9 @@
               "T",
               "12:g.25398284C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -335,6 +337,7 @@
               "G12A",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -349,10 +352,9 @@
               "G",
               "12:g.25398284C>G",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -367,6 +369,7 @@
               "G12C",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -381,10 +384,9 @@
               "A",
               "12:g.25398285C>A",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -399,6 +401,7 @@
               "G12D",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -413,10 +416,9 @@
               "T",
               "12:g.25398284C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -431,6 +433,7 @@
               "G13D",
               "13",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -445,10 +448,9 @@
               "T",
               "12:g.25398281C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -463,6 +465,7 @@
               "G12D",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -477,10 +480,9 @@
               "T",
               "12:g.25398284C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -495,6 +497,7 @@
               "G12C",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -509,10 +512,9 @@
               "A",
               "12:g.25398285C>A",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -527,6 +529,7 @@
               "G12C",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -541,10 +544,9 @@
               "A",
               "12:g.25398285C>A",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -559,6 +561,7 @@
               "G12S",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -573,10 +576,9 @@
               "T",
               "12:g.25398285C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -591,6 +593,7 @@
               "G12V",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -605,10 +608,9 @@
               "A",
               "12:g.25398284C>A",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -623,6 +625,7 @@
               "G12S",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -637,10 +640,9 @@
               "T",
               "12:g.25398285C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -655,6 +657,7 @@
               "G12V",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -669,10 +672,9 @@
               "A",
               "12:g.25398284C>A",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -687,6 +689,7 @@
               "G13D",
               "13",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -701,10 +704,9 @@
               "T",
               "12:g.25398281C>T",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -719,6 +721,7 @@
               "G12C",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -733,10 +736,9 @@
               "A",
               "12:g.25398285C>A",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -751,6 +753,7 @@
               "G12V",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -765,10 +768,9 @@
               "A",
               "12:g.25398284C>A",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
@@ -783,6 +785,7 @@
               "G12V",
               "12",
               "Oncogenic · Level 1",
+              "",
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
@@ -797,16 +800,15 @@
               "A",
               "12:g.25398284C>A",
               "",
-              "SOMATIC",
               {
-                "…": "2 more",
-                "sha256": "439083f38956ba51"
+                "…": "5 more",
+                "sha256": "0d03a6e960bcf9f5"
               }
             ]
           },
           {
             "…": "5 more",
-            "sha256": "85d56a32742cb9e8"
+            "sha256": "40aefd9e3f5a4c93"
           }
         ],
         "offset": 0,
@@ -823,8 +825,8 @@
         "all": 2410,
         "oncokbPin": "v7.5",
         "variantPins": {
-          "hg19": null,
-          "hg38": null
+          "hg19": "2.2.3-vep116-clinvar20260208+f2",
+          "hg38": "1.4.1-vepNA-clinvar20250106+f2"
         },
         "unannotated": [
           "msk_chord_2024"
@@ -842,13 +844,13 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "Every KRAS mutation call in the cohort's samples, one row per call; uncalled mutations are left out, as the portal leaves them out. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level for the gene). No Genome Nexus release is stored here, so HGVSc, ClinVar and SIGNAL are empty. Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. Showing 1,373 of 2,410 mutations: rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2. Sorted by Allele Freq (T) (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "Every KRAS mutation call in the cohort's samples, one row per call; uncalled mutations are left out, as the portal leaves them out. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level for the gene). HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL are Genome Nexus GRCh37 2.2.3-vep116-clinvar20260208+f2, GRCh38 1.4.1-vepNA-clinvar20250106+f2, read from the offline store; HGVSc and SIFT, PolyPhen-2 and AlphaMissense are on the canonical transcript of KRAS (MSKCC overrides). Genome Nexus's GRCh38 service has no SIGNAL, so it is empty for a GRCh38 study; gnomAD and dbSNP are blank for the few variants Genome Nexus cannot serve myvariant.info's record of. Not yet annotated, so blank in those columns: msk_chord_2024. Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. Showing 1,373 of 2,410 mutations: rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2. Sorted by Allele Freq (T) (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {
             "kind": "fetch",
             "title": "Count the KRAS mutation calls per cohort and study, and those the query keeps",
-            "detail": "The mutations:counts query above: every called KRAS mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded and the OncoKB v7.5 call for its protein change; HGVSg from its coordinates; allele frequency = variant / (variant + reference) reads. The query keeps rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2.",
+            "detail": "The mutations:counts query above: every called KRAS mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded and the OncoKB v7.5 call for its protein change; HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL from the stored Genome Nexus GRCh37 2.2.3-vep116-clinvar20260208+f2, GRCh38 1.4.1-vepNA-clinvar20250106+f2 annotation of its genomic variant; HGVSg from its coordinates; allele frequency = variant / (variant + reference) reads. The query keeps rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2.",
             "params": [
               [
                 "Colorectal · msk_chord_2024",

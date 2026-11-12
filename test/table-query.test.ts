@@ -26,6 +26,11 @@ describe("checkQuery", () => {
     assert.match(checkQuery({ sort: { column: "nope" } }, cols)!, /sort\.column nope is not a column/);
     assert.match(checkQuery({ filters: { nope: { op: "contains", value: "x" } } }, cols)!, /filters\.nope: not a column/);
   });
+  test("a column the portal does not sort by refuses a sort, and says so", () => {
+    const withUnsorted = [...cols, { id: "fi", name: "Functional Impact", numeric: false, unsorted: true }];
+    assert.match(checkQuery({ sort: { column: "fi" } }, withUnsorted)!, /sort\.column fi is not sortable — sort by another column/);
+    assert.equal(checkQuery({ sort: { column: "name" } }, withUnsorted), null);
+  });
   test("a filter must suit its column", () => {
     assert.match(checkQuery({ filters: { n: { op: "contains", value: "1" } } }, cols)!, /numeric column takes a range/);
     assert.match(checkQuery({ filters: { name: { min: 1 } } }, cols)!, /range filter needs a numeric column/);

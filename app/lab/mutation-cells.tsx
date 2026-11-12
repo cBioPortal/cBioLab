@@ -1,14 +1,16 @@
 "use client";
 // The mutation table's Genome Nexus cells, as cBioPortal's mutation table draws them
-// (react-mutation-mapper's Hgvsg, Hgvsc, ClinvarInterpretation and Signal columns): HGVSg links to the
-// variant's page on the Genome Nexus of the study's genome; ClinVar shows the clinical significance,
-// cut at 30 characters, and its record on hover; SIGNAL shows the germline frequency and, on hover,
-// its table by cancer type. The values come from the offline store (lib/variant-annotation.ts), so
+// (react-mutation-mapper's Hgvsg, Hgvsc, ClinvarInterpretation, Signal, Gnomad and Dbsnp columns, and the
+// Functional Impact column): HGVSg links to the variant's page on the Genome Nexus of the study's genome;
+// ClinVar shows the clinical significance, cut at 30 characters, and its record on hover; SIGNAL and
+// gnomAD show a frequency and, on hover, their tables; dbSNP links the id; Functional Impact draws a dot
+// per predictor, its call on hover. The values come from the offline store (lib/variant-annotation.ts), so
 // there is no loading or failed state here: a row whose variant the store does not hold says so.
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
-import { hgvsgUrl, num, signalRows, truncate, upperFirst, type SignalEntry } from "../../lib/mutation-cell-text.ts";
+import { dbsnpUrl, gnomadText, hgvsgUrl, impactLevel, msaUrls, num, signalRows, truncate, upperFirst,
+  type GnomadRow, type MaPrediction, type Prediction, type SignalEntry } from "../../lib/mutation-cell-text.ts";
 import { portalPct, portalSig2 } from "../../lib/chart/format.ts";
 
 export type CellTip = { at: TipBox; body: React.ReactNode };
@@ -143,4 +145,145 @@ export function SignalCell({ value, detail, show }: { value: string; detail: Det
   // the portal shows a frequency of 0 as nothing (its download keeps "0")
   if (!entry || !value || value === "0") return <div />;
   return <button type="button" className={PLAIN} {...hover(show, () => <SignalTable entry={entry} />)}>{value}</button>;
+}
+
+const GNOMAD_COLUMNS: [keyof GnomadRow, string, string][] = [
+  ["population", "Population", ""],
+  ["alleleCount", "Allele Count", "Number of individuals with this allele"],
+  ["alleleNumber", "Allele Number", "Number of times any allele has been observed at this position in the population"],
+  ["homozygotes", "Number of Homozygotes", "Number of individuals carrying this allele in both copies"],
+  ["alleleFrequency", "Allele Frequency", "Proportion of the population with this allele"],
+];
+
+/** gnomAD's table by population (GnomadFrequencyTable): the total last and in bold, and where the data comes from */
+function GnomadTable({ rows, url }: { rows: GnomadRow[]; url: string }) {
+  return (
+    <div className="max-w-[90vw]">
+      <table className="mut-signal">
+        <thead><tr>{GNOMAD_COLUMNS.map(([k, h, tip]) => <th key={k} className={k === "population" ? undefined : "num"} data-tip={tip || undefined}>{h}</th>)}</tr></thead>
+        <tbody>{rows.map((r) => (
+          <tr key={r.population} style={{ fontWeight: r.population === "Total" ? "bold" : "normal" }}>
+            <td>{r.population}</td><td className="num">{r.alleleCount}</td><td className="num">{r.alleleNumber}</td>
+            <td className="num">{r.homozygotes}</td><td className="num">{gnomadText(r.alleleFrequency)}</td>
+          </tr>))}</tbody>
+      </table>
+      <div className="mt-1 text-center text-[length:var(--t-xs)]">
+        Source: <a href="https://www.genomenexus.org/" target="_blank" rel="noopener noreferrer">genomenexus.org</a>, which serves{" "}
+        <a href="https://myvariant.info/" target="_blank" rel="noopener noreferrer">myvariant.info</a>&apos;s gnomAD data.<br />
+        Latest <a href={url} target="_blank" rel="noopener noreferrer">gnomAD</a> data may differ.
+      </div>
+    </div>
+  );
+}
+
+/** gnomAD's overall frequency, its table by population on hover (GnomadFrequency) */
+export function GnomadCell({ detail, show }: { detail: Detail; show: Show }) {
+  if (!detail?.annotated) return <span className="meta" data-tip={NOT_ANNOTATED}>&nbsp;</span>;
+  const g = detail.gnomad as { rows: GnomadRow[]; url: string } | undefined;
+  if (!g) return <span className="block w-full overflow-hidden" data-tip="Variant has no data in gnomAD.">&nbsp;</span>;
+  const total = g.rows[g.rows.length - 1].alleleFrequency;
+  return <button type="button" className={PLAIN} {...hover(show, () => <GnomadTable rows={g.rows} url={g.url} />)}>{gnomadText(total)}</button>;
+}
+
+/** dbSNP's id, linked to its page (DbsnpId) */
+export function DbsnpCell({ rsid, detail }: { rsid: string; detail: Detail }) {
+  if (!detail?.annotated) return <span className="meta" data-tip={NOT_ANNOTATED}>&nbsp;</span>;
+  if (!rsid) return <span className="block w-full overflow-hidden" data-tip="Variant has no dbSNP data.">&nbsp;</span>;
+  return (
+    <span className="float-right text-right">
+      <a href={dbsnpUrl(rsid)} target="_blank" rel="noopener noreferrer" data-tip="Click to see variant on dbSNP website.">{rsid}</a>
+    </span>
+  );
+}
+
+type Tool = "ma" | "sift" | "polyphen" | "alphaMissense";
+const TOOLS: { id: Tool; label: string; name: string; url?: string; about: React.ReactNode }[] = [
+  { id: "ma", label: "MA", name: "Mutation Assessor", about: <>
+    Mutation Assessor predicts the functional impact of amino-acid substitutions in proteins, such as mutations discovered in cancer or
+    missense polymorphisms. The functional impact is assessed based on evolutionary conservation of the affected amino acid in protein
+    homologs. The method has been validated on a large set of disease associated and polymorphic variants (
+    <a href="https://www.ncbi.nlm.nih.gov/clinvar/" target="_blank" rel="noopener noreferrer">ClinVar</a>).<br />
+    <b>Mutation Assessor V4 data is available in the portal since Oct. 8, 2024.</b> New manuscript is in progress. Click{" "}
+    <a href="http://mutationassessor.org/r3/" target="_blank" rel="noopener noreferrer">here</a> to see information about V3 data.</> },
+  { id: "sift", label: "SIFT", name: "SIFT", url: "http://sift.bii.a-star.edu.sg/", about: <>
+    <a href="http://sift.bii.a-star.edu.sg/" target="_blank" rel="noopener noreferrer">SIFT</a> predicts whether an amino acid substitution
+    affects protein function based on sequence homology and the physical properties of amino acids. SIFT can be applied to naturally
+    occurring nonsynonymous polymorphisms and laboratory-induced missense mutations.</> },
+  { id: "polyphen", label: "PP2", name: "PolyPhen-2", url: "http://genetics.bwh.harvard.edu/pph2/", about: <>
+    <a href="http://genetics.bwh.harvard.edu/pph2/" target="_blank" rel="noopener noreferrer">PolyPhen-2</a> (Polymorphism Phenotyping v2)
+    is a tool which predicts possible impact of an amino acid substitution on the structure and function of a human protein using
+    straightforward physical and comparative considerations.</> },
+  { id: "alphaMissense", label: "AM", name: "AlphaMissense", url: "https://alphamissense.hegelab.org/", about: <>
+    <a href="https://alphamissense.hegelab.org/" target="_blank" rel="noopener noreferrer">AlphaMissense</a> predicts the probability of a
+    missense single nucleotide variant being pathogenic and classifies it as either likely benign, likely pathogenic, or uncertain.</> },
+];
+
+/** the legend under each predictor's description: the dot colours and each predictor's call for them */
+const LEGEND: [string, string, string, string, string][] = [
+  ["high", "high", "deleterious", "probably_damaging", "pathogenic"],
+  ["medium", "medium", "-", "-", "-"],
+  ["low", "low", "deleterious_low_confidence", "possibly_damaging", "ambiguous"],
+  ["neutral", "neutral", "tolerated_low_confidence", "benign", "benign"],
+  ["neutral", "-", "tolerated", "-", "-"],
+];
+
+const Dot = ({ level }: { level: string }) => <span className={"fi-dot fi-" + level} aria-hidden="true">●</span>;
+
+/** a predictor's description and the legend, as the portal's header icons show them; hovering a legend icon switches the description */
+function ImpactLegend({ first }: { first: Tool }) {
+  const [active, setActive] = useState<Tool>(first);
+  return (
+    <div className="w-[530px] max-w-[90vw]">
+      <div className="mb-2">{TOOLS.find((t) => t.id === active)!.about}</div>
+      <table className="mut-signal">
+        <thead><tr><th>Legend</th>{TOOLS.map((t) => <th key={t.id} onPointerEnter={() => setActive(t.id)}>{t.label}</th>)}</tr></thead>
+        <tbody>{LEGEND.map(([lv, ...calls], i) => <tr key={i}><td><Dot level={lv} /></td>{calls.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+
+/** the Functional Impact header's row of predictor labels, each opening its description and the legend */
+export function FunctionalImpactHead({ show }: { show: Show }) {
+  return (
+    <span className="fi-row" aria-label="predictors: Mutation Assessor, SIFT, PolyPhen-2, AlphaMissense">
+      {TOOLS.map((t) => <span key={t.id} className="fi-slot fi-label" {...hover(show, () => <ImpactLegend first={t.id} />)}>{t.label}</span>)}
+    </span>
+  );
+}
+
+/** one predictor's call: Source, Impact and Score, as the portal's tooltip tables show them */
+function PredictionTip({ tool, p }: { tool: (typeof TOOLS)[number]; p: Prediction | MaPrediction }) {
+  const level = impactLevel(tool.id, p.prediction) ?? "neutral";
+  const msa = "msa" in p && p.msa ? msaUrls(p.msa) : null;
+  return (
+    <div>
+      <table className="mut-signal"><tbody>
+        <tr><td>Source</td><td>{tool.url ? <a href={tool.url} target="_blank" rel="noopener noreferrer">{tool.name}</a> : tool.name}</td></tr>
+        <tr><td>Impact</td><td><span className={"fi-" + level}>{p.prediction}</span></td></tr>
+        {(p.score || p.score === 0) && <tr><td>Score</td><td><b>{p.score.toFixed(2)}</b></td></tr>}
+      </tbody></table>
+      {msa && <div className="mt-1">Multiple sequence alignment file:{" "}
+        <a href={msa.view} target="_blank" rel="noopener noreferrer">View</a> |{" "}
+        <a href={msa.download} target="_blank" rel="noopener noreferrer">Download</a></div>}
+    </div>
+  );
+}
+
+/** a dot per predictor with a call, an empty slot for one without (FunctionalImpactColumnFormatter) */
+export function FunctionalImpactCell({ detail, show }: { detail: Detail; show: Show }) {
+  if (!detail?.annotated) return <span className="meta" data-tip={NOT_ANNOTATED}>&nbsp;</span>;
+  const fi = detail.impact as Record<Tool, Prediction | MaPrediction | null> | undefined;
+  if (!fi) return <span className="meta" data-tip="Data not available.">&nbsp;</span>;
+  return (
+    <span className="fi-row">
+      {TOOLS.map((t) => {
+        const p = fi[t.id];
+        const level = p && p.prediction ? impactLevel(t.id, p.prediction) : null;
+        if (!p || !p.prediction || !level) return <span key={t.id} className="fi-slot" />;
+        return <button key={t.id} type="button" className={PLAIN + " fi-slot"} aria-label={t.name + ": " + p.prediction}
+          {...hover(show, () => <PredictionTip tool={t} p={p} />)}><Dot level={level} /></button>;
+      })}
+    </span>
+  );
 }

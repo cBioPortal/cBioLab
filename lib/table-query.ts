@@ -71,7 +71,7 @@ export function shownColumns(q: TableQuery, all: { id: string }[], defaults: str
  * What is wrong with a query against these columns, or null. Each message names the problem and
  * what would be accepted, since an assistant writes these as often as a person clicks them.
  */
-export function checkQuery(q: TableQuery, all: { id: string; numeric: boolean }[]): string | null {
+export function checkQuery(q: TableQuery, all: { id: string; numeric: boolean; unsorted?: boolean }[]): string | null {
   const ids = all.map((c) => c.id);
   const known = (id: string) => ids.includes(id);
   const list = () => ids.length > 40 ? ids.slice(0, 40).join(", ") + ", …" : ids.join(", ");
@@ -84,6 +84,7 @@ export function checkQuery(q: TableQuery, all: { id: string; numeric: boolean }[
   if (q.sort != null) {
     if (typeof q.sort !== "object" || typeof q.sort.column !== "string") return "sort is { column, desc? }";
     if (!known(q.sort.column)) return "sort.column " + q.sort.column + " is not a column — columns are " + list();
+    if (all.find((c) => c.id === q.sort!.column)?.unsorted) return "sort.column " + q.sort.column + " is not sortable — sort by another column";
   }
   if (q.filters != null) {
     if (typeof q.filters !== "object" || Array.isArray(q.filters)) return "filters is an object keyed by column id";

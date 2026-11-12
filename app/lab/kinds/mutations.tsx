@@ -6,7 +6,7 @@ import { DraftInput } from "./parts.tsx";
 import { sampleHref } from "../../portal/cohort-navigation.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
-import { ClinvarCell, HgvscCell, HgvsgCell, SignalCell, useCellTips } from "../mutation-cells.tsx";
+import { ClinvarCell, DbsnpCell, FunctionalImpactCell, FunctionalImpactHead, GnomadCell, HgvscCell, HgvsgCell, SignalCell, useCellTips } from "../mutation-cells.tsx";
 
 // ---- Mutations: one gene's mutation table, on the shared table (app/_table/DataTable.tsx) ---------
 
@@ -19,11 +19,15 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
       {tips.node}
       <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} onQuery={onQuery}
         num={(id, x) => id === "vaf" ? x.toFixed(2) : x.toLocaleString()}
+        colHead={(id) => id === "functionalImpact" ? <FunctionalImpactHead show={tips.show} /> : null}
         cell={(id, x, r) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />
           : id === "hgvsg" ? <HgvsgCell hgvsg={String(x ?? "")} detail={r.detail} show={tips.show} />
           : id === "hgvsc" ? <HgvscCell hgvsc={String(x ?? "")} detail={r.detail} />
           : id === "clinvar" ? <ClinvarCell detail={r.detail} show={tips.show} />
           : id === "signal" ? <SignalCell value={String(x ?? "")} detail={r.detail} show={tips.show} />
+          : id === "gnomad" ? <GnomadCell detail={r.detail} show={tips.show} />
+          : id === "dbsnp" ? <DbsnpCell rsid={String(x ?? "")} detail={r.detail} />
+          : id === "functionalImpact" ? <FunctionalImpactCell detail={r.detail} show={tips.show} />
           // as on the portal's table, a sample id opens that sample's page, in a new tab so the table keeps its place
           : id === "sample" ? (r.study && x ? <a className="mono" href={sampleHref(r.study, String(x))} target="_blank" rel="noreferrer"
             data-tip={"open sample " + x + "'s page"}>{x}</a> : <span className="mono">{x}</span>) : undefined} />

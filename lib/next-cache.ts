@@ -88,7 +88,7 @@ export function dataVersion(): Promise<string> {
       }
     }
     parts.push("oncokb@" + ((await oncokbPin()) ?? ""));
-    // a new Genome Nexus release changes the mutation table's HGVSc, ClinVar and SIGNAL
+    // a new Genome Nexus release changes the mutation table's Genome Nexus columns
     const gn = await variantPins();
     parts.push("genome_nexus@" + (gn.hg19 ?? "") + "/" + (gn.hg38 ?? ""));
     return parts.join("|");

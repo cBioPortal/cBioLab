@@ -1812,3 +1812,12 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .evo-tip.below { transform: translate(-50%, 12px); }
 .evo-tip.below::before { top: auto; bottom: 100%; border: 8px solid transparent; border-top: 0; border-bottom-color: var(--line); }
 .evo-tip.below::after { top: auto; bottom: calc(100% - 1px); border: 8px solid transparent; border-top: 0; border-bottom-color: var(--bg); }
+/* the Functional Impact column (functionalImpact.scss): a 22px slot per predictor, a dot coloured by its call */
+.fi-row { display: inline-flex; }
+.fi-slot { display: inline-block; width: 22px; text-align: center; font-size: 9px; }
+.fi-label { font-weight: 600; cursor: default; }
+.fi-dot { font-size: 12px; font-weight: bold; }
+.fi-high { color: #f00; }
+.fi-medium { color: #ffaa22; }
+.fi-low { color: #ffd700; }
+.fi-neutral { color: #c1c1c1; }

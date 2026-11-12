@@ -483,7 +483,8 @@ export interface IncidenceCurve {
  */
 export interface TableRows<V> {
   /** every column the table holds, in download order; each row's values align with these */
-  columns: { id: string; name: string; numeric: boolean; tip?: string }[];
+  /** `unsorted`: a column the portal does not sort by, drawn without a sort control */
+  columns: { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean }[];
   /** the ids shown, in order, and those shown when the query names none */
   shown: string[]; defaults: string[];
   /** the view's search, filters and sort as applied (columns as given) */

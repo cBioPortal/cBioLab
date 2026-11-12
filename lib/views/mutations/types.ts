@@ -19,7 +19,7 @@ export interface MutationsResult extends TableRows<string | number | null> {
   gene: string;
   /** the OncoKB version the annotation column reads, or null when none is pinned */
   oncokbPin: string | null;
-  /** the Genome Nexus release HGVSc, ClinVar and SIGNAL are read at, per reference genome (null: none stored) */
+  /** the Genome Nexus release its Genome Nexus columns are read at, per reference genome (null: none stored) */
   variantPins: VariantPins;
   /** studies of the table no Genome Nexus sync has covered: blank in those columns */
   unannotated?: string[];

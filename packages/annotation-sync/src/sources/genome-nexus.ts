@@ -1,6 +1,6 @@
 // Genome Nexus: each genomic variant's annotation as cBioPortal's mutation table reads it — every
-// transcript's consequence (HGVSc, HGVSp, consequence, SIFT/PolyPhen), each gene's canonical transcript
-// (MSKCC isoform overrides), ClinVar and SIGNAL — stored in the shared public table `annotation.variant`,
+// transcript's consequence (HGVSc, HGVSp, consequence, SIFT, PolyPhen-2, AlphaMissense), each gene's
+// canonical transcript (MSKCC isoform overrides), ClinVar, SIGNAL, gnomAD, dbSNP, MutationAssessor and Cancer Hotspots — stored in the shared public table `annotation.variant`,
 // one row per (source, release, variant). Genome Nexus runs one service per reference genome, each with
 // its own releases, so each is a source of its own: `genome_nexus` (GRCh37, the studies on hg19) and
 // `genome_nexus_grch38` (hg38). The app reads the rows at a pin (lib/variant-annotation.ts).
@@ -10,8 +10,17 @@ import { VARIANT_DDL, VARIANT_TABLE } from "../store.ts";
 
 /** canonical-transcript requests in flight at once */
 const CANONICAL_CONCURRENCY = 8;
+/** variants per my_variant_info request, and such requests in flight at once */
+const MVI_BATCH = Number(process.env.GENOME_NEXUS_MVI_BATCH_SIZE || 25);
+const MVI_CONCURRENCY = 4;
 const KEY_COLUMNS = ["source", "chr", "start_position", "end_position", "reference_allele", "variant_allele"];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/**
+ * Which fields a row holds, part of its release: a row stored before a field was added lacks it, so
+ * adding one names a new release and the next sync asks for every variant again. 2: gnomAD, dbSNP,
+ * MutationAssessor and Cancer Hotspots.
+ */
+export const GN_FIELD_SET = 2;
 
 /** A request to a Genome Nexus service, retried with backoff on 429 and 5xx; `missing` is the answer to a 404, when one is expected. */
 async function gnFetch(base: string, path: string, body?: unknown, attempt = 0, missing?: unknown): Promise<unknown> {
@@ -44,7 +53,7 @@ export function gnRelease(v: GnVersion): string {
   const server = v.genomeNexus?.server?.version || "";
   if (!server) throw new Error("Genome Nexus /version named no server version, so there is nothing to pin rows to");
   const clinvar = v.annotationSourcesInfo?.find((s) => s.id === "clinvar")?.version || "NA";
-  return server + "-vep" + (v.vep?.cache?.version || "NA") + "-clinvar" + clinvar;
+  return server + "-vep" + (v.vep?.cache?.version || "NA") + "-clinvar" + clinvar + "+f" + GN_FIELD_SET;
 }
 
 interface GnSummary { transcriptId?: string; hugoGeneSymbol?: string; hgvsc?: string }
@@ -55,6 +64,22 @@ interface GnAnnotation {
   annotation_summary?: { canonicalTranscriptId?: string; transcriptConsequenceSummaries?: GnSummary[] };
   clinvar?: { annotation?: { clinvarId?: number; clinicalSignificance?: string; conflictingClinicalSignificance?: string } | null };
   signalAnnotation?: { annotation?: Record<string, unknown>[] };
+  seq_region_name?: string;
+  my_variant_info?: { annotation?: MyVariantInfo | null };
+  mutation_assessor?: { functionalImpactPrediction?: string | null; functionalImpactScore?: number | null; msa?: string | null } | null;
+  hotspots?: { annotation?: Record<string, unknown>[][] } | null;
+}
+interface GnomadCounts { alleleCount?: unknown; alleleNumber?: unknown; homozygotes?: unknown; alleleFrequency?: unknown }
+interface MyVariantInfo {
+  gnomadExome?: GnomadCounts | null;
+  gnomadGenome?: GnomadCounts | null;
+  vcf?: { position?: string; ref?: string; alt?: string } | null;
+  dbsnp?: { rsid?: string } | null;
+}
+
+/** gnomAD's counts by population, as cBioPortal's gnomAD column reads them (GnomadUtils), and nothing else of the record */
+function gnomadCounts(g: GnomadCounts | null | undefined) {
+  return g ? { alleleCount: g.alleleCount ?? null, alleleNumber: g.alleleNumber ?? null, homozygotes: g.homozygotes ?? null, alleleFrequency: g.alleleFrequency ?? null } : null;
 }
 
 /** How a variant is asked for: the warehouse's own values, with a `chr` prefix dropped, as cBioPortal asks (MutationUtils.extractGenomicLocation). */
@@ -83,13 +108,23 @@ export function variantData(a: GnAnnotation | undefined, genes: string[], canoni
   for (const g of [...genes].sort()) { const t = canonical.get(g); if (t) byGene[g] = t; }
   const cv = a.clinvar?.annotation;
   const signal = a.signalAnnotation?.annotation?.map(signalEntry) || [];
+  const mvi = a.my_variant_info?.annotation;
+  const ma = a.mutation_assessor;
   return {
     ok: true,
     variantCanonical: a.annotation_summary?.canonicalTranscriptId || "",
     canonical: byGene,
     transcripts,
     clinvar: cv ? { id: cv.clinvarId ?? null, significance: cv.clinicalSignificance || "", conflicting: cv.conflictingClinicalSignificance || "" } : null,
-    ...(signal.length ? { signal } : {})
+    ...(signal.length ? { signal } : {}),
+    // the chromosome as Genome Nexus names it, for gnomAD's link
+    seqRegion: a.seq_region_name || "",
+    gnomad: mvi && (mvi.gnomadExome || mvi.gnomadGenome) ? { exome: gnomadCounts(mvi.gnomadExome), genome: gnomadCounts(mvi.gnomadGenome) } : null,
+    vcf: mvi?.vcf ? { position: mvi.vcf.position ?? "", ref: mvi.vcf.ref ?? "", alt: mvi.vcf.alt ?? "" } : null,
+    rsid: mvi?.dbsnp?.rsid || "",
+    // Cancer Hotspots' residues (single residue and 3D) on any of the variant's transcripts, each once
+    hotspots: [...new Map((a.hotspots?.annotation || []).flat().map((h) => [JSON.stringify(h), h])).values()],
+    mutationAssessor: ma ? { prediction: ma.functionalImpactPrediction ?? null, score: ma.functionalImpactScore ?? null, msa: ma.msa ?? null } : null
   };
 }
 
@@ -114,12 +149,41 @@ function makeSource(o: { id: string; label: string; build: "hg19" | "hg38"; base
     return canonical;
   }
 
+  /**
+   * myvariant.info's record (gnomAD, dbSNP) of each location, by query key. Genome Nexus drops it for
+   * every variant of a request when one variant's record fails it (3:52475300 G>A on GRCh37, for one),
+   * answering the request without error; so it is asked in small requests of its own, and a request that
+   * comes back with none at all is split and asked again, down to the variant that fails. That variant
+   * alone is left without a record.
+   */
+  async function myVariantInfo(locs: ReturnType<typeof location>[]): Promise<Map<string, MyVariantInfo>> {
+    const out = new Map<string, MyVariantInfo>();
+    const ask = async (part: ReturnType<typeof location>[]): Promise<void> => {
+      const got = await gnFetch(base(), "/annotation/genomic?fields=my_variant_info&isoformOverrideSource=mskcc", part) as GnAnnotation[];
+      const found = got.filter((a) => a.originalVariantQuery && a.my_variant_info?.annotation);
+      if (!found.length && part.length > 1) {
+        const half = Math.ceil(part.length / 2);
+        await ask(part.slice(0, half));
+        await ask(part.slice(half));
+        return;
+      }
+      for (const a of found) out.set(a.originalVariantQuery!, a.my_variant_info!.annotation!);
+    };
+    const parts: ReturnType<typeof location>[][] = [];
+    for (let i = 0; i < locs.length; i += MVI_BATCH) parts.push(locs.slice(i, i + MVI_BATCH));
+    for (let i = 0; i < parts.length; i += MVI_CONCURRENCY) await Promise.all(parts.slice(i, i + MVI_CONCURRENCY).map(ask));
+    return out;
+  }
+
   async function annotateLocations(keys: Row[]): Promise<Map<string, GnAnnotation>> {
     const locs = keys.map(location);
-    const fields = "annotation_summary,clinvar" + (o.build === "hg19" ? ",signal" : "");
-    const out = await gnFetch(base(), "/annotation/genomic?fields=" + fields + "&isoformOverrideSource=mskcc", locs) as GnAnnotation[];
+    // the GRCh38 service has no SIGNAL
+    const fields = "annotation_summary,clinvar,hotspots,mutation_assessor" + (o.build === "hg19" ? ",signal" : "");
+    const [out, mvi] = await Promise.all([
+      gnFetch(base(), "/annotation/genomic?fields=" + fields + "&isoformOverrideSource=mskcc", locs) as Promise<GnAnnotation[]>,
+      myVariantInfo(locs)]);
     const by = new Map<string, GnAnnotation>();
-    for (const a of out) if (a.originalVariantQuery) by.set(a.originalVariantQuery, a);
+    for (const a of out) if (a.originalVariantQuery) by.set(a.originalVariantQuery, { ...a, my_variant_info: { annotation: mvi.get(a.originalVariantQuery) ?? null } });
     return by;
   }
 
@@ -177,7 +241,10 @@ function makeSource(o: { id: string; label: string; build: "hg19" | "hg38"; base
         batch.forEach((r, j) => {
           const a = JSON.parse(r.data), b = JSON.parse(String(live[j].data));
           for (const [what, x, y] of [["HGVSc", hgvscs(a), hgvscs(b)], ["ClinVar", a.clinvar?.significance, b.clinvar?.significance],
-            ["SIGNAL", JSON.stringify(a.signal ?? null), JSON.stringify(b.signal ?? null)]] as const)
+            ["SIGNAL", JSON.stringify(a.signal ?? null), JSON.stringify(b.signal ?? null)],
+            ["gnomAD", JSON.stringify(a.gnomad ?? null), JSON.stringify(b.gnomad ?? null)], ["dbSNP", a.rsid ?? "", b.rsid ?? ""],
+            ["MutationAssessor", JSON.stringify(a.mutationAssessor ?? null), JSON.stringify(b.mutationAssessor ?? null)],
+            ["Cancer Hotspots", JSON.stringify(a.hotspots ?? []), JSON.stringify(b.hotspots ?? [])]] as const)
             if (x !== y) mismatches.push(queryKey(location(r)) + " " + what + ": stored " + String(x) + ", live " + String(y));
         });
       }

@@ -9,7 +9,7 @@ delete process.env.GENOME_NEXUS_PIN; delete process.env.GENOME_NEXUS_GRCH38_PIN;
 const { variantPins, describePins, studiesWithoutVariantAnnotation, variantAnnotationCte, variantColumnsSql, hgvsgSql } = await import("../lib/variant-annotation.ts");
 const { mutationRowSource, MUTATION_COLUMNS } = await import("../lib/mutation-table.ts");
 const { pageSql } = await import("../lib/table-query.ts");
-const { hgvsgUrl, truncate, signalRows, num, upperFirst } = await import("../lib/mutation-cell-text.ts");
+const { hgvsgUrl, truncate, signalRows, num, upperFirst, gnomadRows, gnomadUrl, gnomadText, dbsnpUrl, impactLevel, msaUrls } = await import("../lib/mutation-cell-text.ts");
 
 const realFetch = globalThis.fetch;
 after(() => { globalThis.fetch = realFetch; });
@@ -66,7 +66,8 @@ test("a part reads the source of its study's own genome, at that genome's pin, f
 
 test("HGVSc is on the canonical transcript of the table's gene; ClinVar and SIGNAL's germline entry from the record", () => {
   const sql = variantColumnsSql("gd", "KRAS");
-  assert.match(sql, /JSONExtractString\(arrayFirst\(t -> JSONExtractString\(t, 'transcriptId'\) = JSONExtractString\(gd, 'canonical', 'KRAS'\), JSONExtractArrayRaw\(gd, 'transcripts'\)\), 'hgvsc'\) AS hgvsc/);
+  assert.match(sql, /arrayFirst\(t -> JSONExtractString\(t, 'transcriptId'\) = JSONExtractString\(gd, 'canonical', 'KRAS'\), JSONExtractArrayRaw\(gd, 'transcripts'\)\) AS tc,/);
+  assert.match(sql, /JSONExtractString\(tc, 'hgvsc'\) AS hgvsc/);
   assert.match(sql, /JSONExtractString\(gd, 'clinvar', 'significance'\) AS clinvar/);
   assert.match(sql, /arrayLast\(e -> position\(JSONExtractString\(e, 'mutationStatus'\), 'germline'\) > 0, JSONExtractArrayRaw\(gd, 'signal'\)\) AS sig/);
   assert.match(sql, /if\(lower\(JSONExtractString\(sig, 'mutationStatus'\)\) = 'germline' AND .*'variantCount'.* \/ .*'tumorTypeCount'.*, NULL\) AS signalFreq/s);
@@ -86,7 +87,14 @@ test("the mutation table reads the store only when a genome has a pin, and joins
   assert.match(sorted("hgvsc"), /ORDER BY toInt64OrNull\(extract\(hgvsc, 'c\\\.\(-\?\[0-9\]\+\)'\)\) ASC NULLS LAST/);
   assert.match(sorted("clinvar"), /ORDER BY nullIf\(clinvar, ''\) ASC NULLS LAST/);
   assert.match(sorted("signal"), /ORDER BY signalFreq ASC NULLS LAST/);
-  assert.deepEqual(MUTATION_COLUMNS.slice(-6).map((c) => c.id), ["var", "hgvsg", "hgvsc", "status", "clinvar", "signal"]);
+  // the portal's order: … HGVSg, HGVSc, then gnomAD, ClinVar, dbSNP, SIGNAL last; Functional Impact before Mutation Type
+  assert.deepEqual(MUTATION_COLUMNS.slice(-8).map((c) => c.id), ["var", "hgvsg", "hgvsc", "status", "gnomad", "clinvar", "dbsnp", "signal"]);
+  const ids = MUTATION_COLUMNS.map((c) => c.id);
+  assert.equal(ids.indexOf("functionalImpact") + 1, ids.indexOf("mutationType"));
+  // gnomAD sorts by its overall frequency, dbSNP by its id; Functional Impact is not sorted, as on the portal
+  assert.match(sorted("gnomad"), /ORDER BY gnomadFreq ASC NULLS LAST/);
+  assert.match(sorted("dbsnp"), /ORDER BY nullIf\(rsid, ''\) ASC NULLS LAST/);
+  assert.equal(MUTATION_COLUMNS.find((c) => c.id === "functionalImpact")!.unsorted, true);
 });
 
 test("HGVSg is built from the mutation's coordinates, as MutationUtils.generateHgvsgByMutation builds it", () => {
@@ -131,4 +139,53 @@ test("SIGNAL's table has a row per cancer type, with prevalence and the bialleli
   assert.equal(half.qcPassTumorCount, null);
   // a cancer type the stats leave out has no stats
   assert.deepEqual([half.ageAtDx, half.tmb, half.msiScore, half.lst], [null, null, null, null]);
+});
+
+test("gnomAD's frequency is pooled across exome and genome when both are stored, as the portal sorts it", () => {
+  const sql = variantColumnsSql("gd", "KRAS");
+  assert.match(sql, /multiIf\(JSONType\(gd, 'gnomad', 'exome'\) = 'Object' AND JSONType\(gd, 'gnomad', 'genome'\) = 'Object', if\(.* > 0, \(JSONExtractFloat\(gd, 'gnomad', 'exome', 'alleleCount', 'ac'\) \+ JSONExtractFloat\(gd, 'gnomad', 'genome', 'alleleCount', 'ac'\)\) \/ /);
+  assert.match(sql, /coalesce\(JSONExtract\(gd, 'gnomad', 'exome', 'alleleFrequency', 'af', 'Nullable\(Float64\)'\)/, "one of them alone: its stored frequency first");
+  assert.match(sql, /JSONExtractString\(gd, 'rsid'\) AS rsid/);
+});
+
+test("Functional Impact is spelled as the portal downloads it: four predictors, NA when one has no call, numbers as JavaScript writes them", () => {
+  const sql = variantColumnsSql("gd", "KRAS");
+  assert.match(sql, /if\(gd != '', concat\(concat\('MutationAssessor: ', if\(JSONType\(gd, 'mutationAssessor'\) = 'Object'/, "none for a variant the store lacks; all NA for one Genome Nexus could not annotate");
+  for (const piece of ["'SIFT: '", "'Polyphen-2: '", "'AlphaMissense: '", "'pathogenicity: '", "'NA'", "'undefined'", "'null'"]) assert.ok(sql.includes(piece), piece);
+  assert.match(sql, /JSONExtractFloat\(tc, 'siftScore'\) != 0 OR JSONExtractString\(tc, 'siftPrediction'\) != ''/, "a call when the score is non-zero or the prediction is named");
+});
+
+test("gnomAD's table by population is GnomadUtils': pooled when both are stored, by frequency, the total last", () => {
+  assert.deepEqual(gnomadRows(null), []);
+  const exome = { alleleCount: { ac: 3, ac_afr: 2, ac_nfe: 1 }, alleleNumber: { an: 300, an_afr: 100, an_nfe: 100, an_sas: 100 },
+    homozygotes: { hom: 1, hom_afr: 1 }, alleleFrequency: { af: 0.01, af_afr: 0.02, af_nfe: 0.01, af_sas: 0 } };
+  const one = gnomadRows({ exome, genome: null });
+  assert.deepEqual(one.map((r) => r.population), ["African", "European (Non-Finnish)", "South Asian", "East Asian", "Ashkenazi Jewish", "European (Finnish)", "Other", "Latino", "Total"],
+    "highest first; ties in reverse population order, as a stable ascending sort reversed leaves them");
+  assert.deepEqual(one.at(-1), { population: "Total", alleleCount: 3, alleleNumber: 300, homozygotes: 1, alleleFrequency: 0.01 });
+  assert.equal(one.find((r) => r.population === "Latino")!.alleleFrequency, 0, "no count, no number, no frequency: 0");
+  const genome = { alleleCount: { ac: 1 }, alleleNumber: { an: 100 }, homozygotes: {}, alleleFrequency: { af: 0.5 } };
+  assert.deepEqual(gnomadRows({ exome, genome }).at(-1), { population: "Total", alleleCount: 4, alleleNumber: 400, homozygotes: 1, alleleFrequency: 0.01 },
+    "both: counts summed and the frequency recomputed, the stored ones ignored");
+  assert.deepEqual(gnomadRows({ exome: null, genome: { alleleCount: { ac: 1 }, alleleNumber: { an: 4 }, homozygotes: {}, alleleFrequency: {} } }).at(-1)!.alleleFrequency, 0.25,
+    "no stored frequency: count over number");
+});
+
+test("gnomAD's and dbSNP's cells read as the portal's", () => {
+  assert.equal(gnomadUrl("17", { position: "7577120", ref: "C", alt: "T" }), "https://gnomad.broadinstitute.org/variant/17-7577120-C-T");
+  assert.equal(gnomadUrl("", { position: "1", ref: "C", alt: "T" }), "https://gnomad.broadinstitute.org/", "a part missing: the home page");
+  assert.equal(gnomadUrl("17", null), "https://gnomad.broadinstitute.org/");
+  // toLocaleString with two significant digits, kept: 0.5 as "0.50"
+  assert.deepEqual([0, 0.5, 0.00000397646, 0.012345].map(gnomadText), ["0", "0.50", "0.0000040", "0.012"]);
+  assert.equal(dbsnpUrl("rs121913529"), "https://www.ncbi.nlm.nih.gov/snp/rs121913529");
+});
+
+test("each predictor's call has the portal's colour; an unknown call is not drawn", () => {
+  assert.deepEqual(["high", "medium", "low", "neutral"].map((p) => impactLevel("ma", p)), ["high", "medium", "low", "neutral"]);
+  assert.deepEqual(["deleterious", "deleterious_low_confidence", "tolerated_low_confidence", "tolerated"].map((p) => impactLevel("sift", p)), ["high", "low", "neutral", "neutral"]);
+  assert.deepEqual(["probably_damaging", "possibly_damaging", "benign", "unknown"].map((p) => impactLevel("polyphen", p)), ["high", "low", "neutral", null]);
+  assert.deepEqual(["pathogenic", "ambiguous", "benign", null].map((p) => impactLevel("alphaMissense", p)), ["high", "low", "neutral", null]);
+  assert.deepEqual(msaUrls("P01116.2_full"), {
+    view: "https://projects.sanderlab.org/av/?url=https://genome-nexus-static-data.s3.us-east-1.amazonaws.com/mutationassessor-v4-multiple-sequence-alignment-files-uncompressed/P01116.2_full.fa",
+    download: "https://genome-nexus-static-data.s3.us-east-1.amazonaws.com/mutationassessor-v4-multiple-sequence-alignment-files-uncompressed/P01116.2_full.fa" });
 });
