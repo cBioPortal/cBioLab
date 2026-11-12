@@ -1012,8 +1012,8 @@ Explore's per-study event-type counts joined all of `clinical_event` (3.2M rows)
 studies before filtering; for one study it now filters the events by that study's patient ids with
 no join — CPU 0.35s → 0.17s, memory 133 → 84 MB.
 
-Measured page by page against a dedicated ClickHouse service (`portal-bench/measure.cjs` outside
-the repo: real browser, query log filtered to the lab's user, uncached, median of 3):
+Measured page by page against a dedicated ClickHouse service (`scripts/portal-bench/measure.cjs`:
+real browser, query log filtered to the lab's user, uncached, median of 3):
 
 | page | DB CPU before → after | rows read before → after |
 |---|---|---|
@@ -1029,6 +1029,19 @@ The same pages on cbioportal.org's backend (7.2.3, ClickHouse mode, no cache) co
 45s for the six. Verified: the view snapshots recorded again — only queries and answers changed,
 plus results that moved with the warehouse reload of 2026-11-02 (two-studies-plot: two more
 patients with SEX) and float sums' last digits (diffexpr, two-studies-four-views).
+
+Head-to-head with cbioportal 7.2.3 on the same service, both uncached, the six pages summed
+(medians of 3; `scripts/portal-bench/results/2026-11-10T02-21-24-094Z.jsonl`):
+
+| | cbioportal | cBioLab | ratio |
+|---|---|---|---|
+| DB CPU | 47.6s | 20.4s | 2.3× |
+| DB memory (each query's peak, summed) | 27.0 GiB | 10.3 GiB | 2.6× |
+| DB bytes read | 16.4 GiB | 3.1 GiB | 5× |
+| server CPU | 119s | 15s | 8× |
+| server peak memory (highest page) | 1.02 GiB | 0.64 GiB | 1.6× |
+
+Every page costs less on cBioLab. cbioportal's JVM grows over a run (1.4 GiB in one round).
 
 Still open: on Genomic Alterations the altered/unaltered cohort query (0.54s, 12M rows) runs twice,
 from two requests sent at once, and the result cache does not share a query that is still running.
