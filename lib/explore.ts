@@ -252,13 +252,19 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // once and hands each study its rows; a study alone counts its own.
   // A drafted attribute is keyed by name alone (a clinical clause matches it at whatever level
   // each study stores it), and its rows come back per level, so they land as "type|attr".
+  // Only a categorical facet draws these rows, so a numeric attribute's are never counted, and the
+  // counts run side by side.
+  const drawsValues = (attr: string): boolean => catAttrs.some((r) => r.a === attr) ||
+    (!cls.data.some((r) => r.a === attr) && String(meta.get(attr)?.datatype ?? "").toUpperCase() !== "NUMBER");
   const disjValues = new Map<string, { v: string; n: number }[]>(); // "type|attr" -> [{v,n}]
-  for (const { attr, rest } of draftedClinical(draft)) {
-    const rows = pre.disjunctive?.get(attr) ?? (await valueCounts({ studies: [study], db, conn, attrs: [attr],
-      set: cohortSet([study], db, rest, oneStudyCtx(study, { oncokbPin, profiles, gaProfiles })) })).get(study) ?? [];
+  const drafted = draftedClinical(draft).filter(({ attr }) => drawsValues(attr));
+  const disjRows = await Promise.all(drafted.map(async ({ attr, rest }) => pre.disjunctive?.get(attr) ??
+    (await valueCounts({ studies: [study], db, conn, attrs: [attr],
+      set: cohortSet([study], db, rest, oneStudyCtx(study, { oncokbPin, profiles, gaProfiles })) })).get(study) ?? []));
+  drafted.forEach(({ attr }, i) => {
     for (const lvl of ["patient", "sample"]) disjValues.set(lvl + "|" + attr, []);
-    for (const x of rows) disjValues.get(x.type + "|" + attr)!.push({ v: x.v, n: Number(x.n) });
-  }
+    for (const x of disjRows[i]) disjValues.get(x.type + "|" + attr)!.push({ v: x.v, n: Number(x.n) });
+  });
 
   // each attribute's values, grouped once ("type|attribute"), in the order the query returned them
   const valuesOf = new Map<string, { v: string; n: number }[]>();
