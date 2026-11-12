@@ -31,10 +31,6 @@ export function fmtPct(pct: number, decimals = 1): string {
 export const fmtShare = (f: number, decimals = 1): string => fmtPct(f * 100, decimals);
 
 /**
- * A p- or q-value's digits: two decimals at 0.1 and up, two significant figures down to 0.001,
- * then scientific; below the double-precision floor it is "<1e-300", never "0".
- */
-/**
  * A p- or q-value as cBioPortal's enrichment tables write it (toConditionalPrecision(x, 3, 0.01)):
  * from 1e-6 up to 0.01 in exponent form with three decimals ("1.235e-4"), otherwise to three
  * significant digits ("0.0123", "1.23e-12", "0.00" for an underflowed zero).
@@ -44,6 +40,27 @@ export function portalP(p: number): string {
   return 0.000001 <= p && p < 0.01 ? p.toExponential(3) : p.toPrecision(3);
 }
 
+/**
+ * A value at two significant digits, as cBioPortal's FormatUtils.formatNumberValueInSignificantDigits(x, 2)
+ * writes it for the mutation table's SIGNAL and gnomAD frequencies: no exponent, no separators,
+ * 0 as "0" (0.0000583 → "0.000058", 0.125 → "0.13", 1234 → "1200").
+ */
+export const portalSig2 = (x: number): string => x === 0 ? "0" : String(Number(x.toLocaleString("en-US", { maximumSignificantDigits: 2 }).replace(/,/g, "")));
+
+/**
+ * A share given as 0–1, as cBioPortal's FormatUtils.formatPercentValue writes it: one decimal and
+ * no % sign, "< 0.1" when it rounds to nothing, "-" when missing (0.0234 → "2.3", 0 → "0.0").
+ */
+export function portalPct(f: number | null): string {
+  if (f == null || Number.isNaN(f)) return "-";
+  const fixed = (f * 100).toFixed(1);
+  return f !== 0 && Number(fixed) === 0 ? "< 0.1" : fixed;
+}
+
+/**
+ * A p- or q-value's digits: two decimals at 0.1 and up, two significant figures down to 0.001,
+ * then scientific; below the double-precision floor it is "<1e-300", never "0".
+ */
 export function pDigits(p: number): string {
   if (!Number.isFinite(p)) return "–";
   if (p <= 1e-300) return "<1e-300";

@@ -1,6 +1,7 @@
 // How the mutation table spells its Genome Nexus cells, as cBioPortal's mutation table does
 // (react-mutation-mapper's Hgvsg, ClinvarInterpretation and Signal columns; cbioportal-utils'
-// SignalMutationUtils and FormatUtils). The cells (app/lab/mutation-cells.tsx) draw these.
+// SignalMutationUtils). The cells (app/lab/mutation-cells.tsx) draw these; FormatUtils' number
+// formats are lib/chart/format.ts's portalSig2 and portalPct.
 
 /** the Genome Nexus variant page HGVSg links to: the GRCh38 service's for a study on hg38 */
 export function hgvsgUrl(hgvsg: string, grch38: boolean): string {
@@ -39,14 +40,6 @@ export function signalRows(e: SignalEntry) {
   });
 }
 
-/** FormatUtils.formatPercentValue on a fraction: one decimal, "< 0.1" when it rounds to 0, "-" when missing */
-export function percent(f: number | null): string {
-  if (f == null || Number.isNaN(f)) return "-";
-  const fixed = (f * 100).toFixed(1);
-  return f !== 0 && Number(fixed) === 0 ? "< 0.1" : fixed;
-}
-/** FormatUtils.formatNumberValueInSignificantDigits(x, 2), as text: 0 is "0" */
-export const twoDigits = (x: number) => x === 0 ? "0" : String(Number(x.toLocaleString("en-US", { maximumSignificantDigits: 2 }).replace(/,/g, "")));
 export const num = (x: number | null, digits?: number) => x == null ? "-" : digits ? x.toFixed(digits) : String(x);
 export const upperFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 

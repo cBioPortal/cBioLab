@@ -9,7 +9,7 @@ delete process.env.GENOME_NEXUS_PIN; delete process.env.GENOME_NEXUS_GRCH38_PIN;
 const { variantPins, describePins, studiesWithoutVariantAnnotation, variantAnnotationCte, variantColumnsSql, hgvsgSql } = await import("../lib/variant-annotation.ts");
 const { mutationRowSource, MUTATION_COLUMNS } = await import("../lib/mutation-table.ts");
 const { pageSql } = await import("../lib/table-query.ts");
-const { hgvsgUrl, truncate, percent, signalRows, twoDigits, num, upperFirst } = await import("../lib/mutation-cell-text.ts");
+const { hgvsgUrl, truncate, signalRows, num, upperFirst } = await import("../lib/mutation-cell-text.ts");
 
 const realFetch = globalThis.fetch;
 after(() => { globalThis.fetch = realFetch; });
@@ -104,9 +104,8 @@ test("the cells' text is the portal's", () => {
   assert.equal(truncate("Pathogenic/Likely_pathogenic"), "Pathogenic/Likely_pathogenic");
   assert.equal(truncate("x".repeat(32)), "x".repeat(32));
   assert.equal(truncate("Conflicting_classifications_of_pathogenicity"), "Conflicting_classifications_of...");
-  // FormatUtils: two significant digits, 0 as "0"; a percentage at one decimal, "< 0.1" when it rounds to nothing
-  assert.deepEqual([0.00005830223880597015, 0.125, 0, 0.5].map(twoDigits), ["0.000058", "0.13", "0", "0.5"]);
-  assert.deepEqual([0.0234, 0.0004, 0, null].map(percent), ["2.3", "< 0.1", "0.0", "-"]);
+  assert.equal(truncate("abcdefgh", 4, 1), "abcd...", "a narrower cut: past max + buffer");
+  assert.equal(truncate("abcde", 4, 1), "abcde");
   assert.deepEqual([num(null), num(12.345, 1), num(7)], ["-", "12.3", "7"]);
   assert.equal(upperFirst("colorectal"), "Colorectal");
 });
@@ -122,4 +121,14 @@ test("SIGNAL's table has a row per cancer type, with prevalence and the bialleli
   assert.equal(rows[1].biallelicRatio, null, "0 / 0 is no ratio");
   assert.equal(signalRows({ mutationStatus: "germline", countsByTumorType: [{ tumorType: "x", tumorTypeCount: 1, variantCount: 1 }] })[0].mutationStatus, "Germline - Benign/VUS");
   assert.equal(signalRows({ mutationStatus: "somatic" }).length, 0);
+  const one = { tumorType: "x", tumorTypeCount: 10, variantCount: 2 };
+  assert.equal(signalRows({ mutationStatus: "Somatic", countsByTumorType: [one] })[0].mutationStatus, "Somatic", "status is read case-blind");
+  assert.equal(signalRows({ mutationStatus: "unknown", countsByTumorType: [one] })[0].mutationStatus, "Unknown");
+  // the biallelic share needs both lists; with only one, there is none, and the counts it has are kept
+  const half = signalRows({ mutationStatus: "germline", countsByTumorType: [one], biallelicCountsByTumorType: [{ ...one, variantCount: 1 }] })[0];
+  assert.equal(half.biallelicRatio, null);
+  assert.equal(half.biallelicTumorCount, 1);
+  assert.equal(half.qcPassTumorCount, null);
+  // a cancer type the stats leave out has no stats
+  assert.deepEqual([half.ageAtDx, half.tmb, half.msiScore, half.lst], [null, null, null, null]);
 });

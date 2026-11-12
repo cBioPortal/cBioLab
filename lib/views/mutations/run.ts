@@ -9,7 +9,7 @@ import { overLimit, refuse } from "../shared.ts";
 import type { MutationsView } from "./types.ts";
 import { mutationsMethod } from "./method.ts";
 import { describePins, studiesWithoutVariantAnnotation, variantPins } from "../../variant-annotation.ts";
-import { twoDigits } from "../../mutation-cell-text.ts";
+import { portalSig2 } from "../../chart/format.ts";
 
 /** A row's value in a column, from the query's row (numbers as numbers, the annotation spelled out as the SQL spells it). */
 function mutationValue(r: Record<string, unknown>, id: string, pin: string | null): string | number | null {
@@ -25,7 +25,7 @@ function mutationValue(r: Record<string, unknown>, id: string, pin: string | nul
     case "altCount": case "refCount": case "mutCount": case "start": case "end": return num(r[id]);
     case "proteinPos": return r.pos == null ? "" : String(r.pos);
     case "clinvar": return r.clinvar ? String(r.clinvar) + (r.clinvarConflicting ? "(" + String(r.clinvarConflicting) + ")" : "") : "";
-    case "signal": return r.signalFreq == null ? "" : twoDigits(Number(r.signalFreq));
+    case "signal": return r.signalFreq == null ? "" : portalSig2(Number(r.signalFreq));
     default: return r[id] == null ? "" : String(r[id]);
   }
 }

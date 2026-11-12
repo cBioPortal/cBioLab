@@ -8,7 +8,8 @@
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
-import { hgvsgUrl, num, percent, signalRows, truncate, twoDigits, upperFirst, type SignalEntry } from "../../lib/mutation-cell-text.ts";
+import { hgvsgUrl, num, signalRows, truncate, upperFirst, type SignalEntry } from "../../lib/mutation-cell-text.ts";
+import { portalPct, portalSig2 } from "../../lib/chart/format.ts";
 
 export type CellTip = { at: TipBox; body: React.ReactNode };
 type Show = (t: CellTip | null, x: number, y: number) => void;
@@ -100,7 +101,7 @@ export function SignalTable({ entry }: { entry: SignalEntry }) {
   const sum = (f: (r: (typeof rows)[number]) => number | null) => rows.reduce((a, r) => a + (f(r) || 0), 0);
   const patients = sum((r) => r.tumorTypeCount), carriers = sum((r) => r.variantCount);
   const bi = sum((r) => r.biallelicTumorCount), qc = sum((r) => r.qcPassTumorCount);
-  const total = (x: number) => Number.isFinite(x) ? twoDigits(x) : "0";
+  const total = (x: number) => Number.isFinite(x) ? portalSig2(x) : "0";
   return (
     <div className="w-[780px] max-w-[90vw]">
       <table className="mut-signal">
@@ -110,11 +111,11 @@ export function SignalTable({ entry }: { entry: SignalEntry }) {
             <tr key={r.tumorType}>
               <td>{upperFirst(r.tumorType)}</td><td>{upperFirst(r.mutationStatus)}</td>
               <td className="num">{r.tumorTypeCount}</td><td className="num">{r.variantCount}</td>
-              <td className="num" style={{ fontWeight: r.frequency > 0 ? "bold" : "normal" }}>{percent(r.frequency)}</td>
-              <td className="num">{percent(r.biallelicRatio)}</td>
+              <td className="num" style={{ fontWeight: r.frequency > 0 ? "bold" : "normal" }}>{portalPct(r.frequency)}</td>
+              <td className="num">{portalPct(r.biallelicRatio)}</td>
               <td className="num">{num(r.ageAtDx)}</td><td className="num">{num(r.tmb, 1)}</td><td className="num">{num(r.msiScore)}</td>
               <td className="num">{num(r.lst)}</td><td className="num">{num(r.ntelomericAi)}</td>
-              <td className="num">{r.fractionLoh === 0 ? "0" : percent(r.fractionLoh)}</td>
+              <td className="num">{r.fractionLoh === 0 ? "0" : portalPct(r.fractionLoh)}</td>
             </tr>))}
           {Array.from({ length: size - shown.length }, (_, k) => <tr key={"pad" + k}><td colSpan={12}>&nbsp;</td></tr>)}
         </tbody>
