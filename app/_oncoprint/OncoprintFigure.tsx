@@ -66,6 +66,8 @@ function patientPage(study: string, column: string, unit: string): { href: strin
  */
 export interface FigureDisplay {
   showUnaltered: boolean; whitespace: boolean; gaps: "none" | "gaps" | "pct" | "pct-left"; colorByType: boolean;
+  /** mark germline mutations with a white stripe (the portal's "Somatic vs Germline" colouring) */
+  colorByGermline: boolean;
   /** per track, per value: the portal's Edit Colors, applied in the browser */
   colors?: Record<string, Record<string, string>>;
   /**
@@ -74,7 +76,7 @@ export interface FigureDisplay {
    */
   whiteBackground?: boolean;
 }
-export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none", colorByType: true };
+export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none", colorByType: true, colorByGermline: true };
 
 export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; packMs?: number; decodeMs?: number; drawMs?: number;
   cellsDrawn?: number; bucketsDrawn?: number; sortMs?: number; hideMs?: number; gapMs?: number; frames: number; heapMB?: number;
@@ -193,6 +195,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
 
   // ---- fetch + decode: only when the spec itself changes -------------------
   const specKey = useMemo(() => JSON.stringify(spec), [spec]);
+  // a column's detail answers for one spec: a new one (other driver settings, other genes) asks again
+  useEffect(() => { setDetail({}); }, [specKey]);
   useEffect(() => {
     let alive = true;
     setLoading(true); setError(null);
@@ -318,7 +322,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     const mem = (performance as any).memory;
     bump({ drawMs: r.ms, cellsDrawn: r.cellsDrawn, bucketsDrawn: r.bucketsDrawn, frames: perfRef.current.frames + 1, heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, visible, view, cssW, maxScroll, gapPx, gapMode, display.colorByType, display.colors]);
+  }, [data, visible, view, cssW, maxScroll, gapPx, gapMode, display.colorByType, display.colorByGermline, display.colors]);
 
   // ---- minimap: the whole figure at two pixels a row, with the viewport on it -----
   const MINI_ROW = 3;
@@ -627,8 +631,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     else if (d) {
       const isMine = (gene: string) => t.kind !== "gene" || (t.members ? t.members.includes(gene) : gene === t.label);
       const mine = d.alterations.filter((a) => isMine(a.gene));
-      for (const a of mine)
-        lines.push({ text: a.gene + " " + a.alteration + " · " + a.kind.replace(/_/g, " ") + (a.driver ? " · putative driver" : " · unknown significance"), mono: true });
+      for (const a of mine) {
+        lines.push({ text: a.gene + " " + a.alteration + " · " + a.kind.replace(/_/g, " ") + (a.driver ? " · putative driver" : " · unknown significance") +
+          (a.germline ? " · Germline" : ""), mono: true });
+        // the study's own call and tier, as the portal's tooltip shows them whatever the settings
+        if (a.custom && a.custom.call !== "Unknown") lines.push({ text: "  " + a.custom.call + (a.custom.annotation ? ": " + a.custom.annotation : ""), dim: true });
+        if (a.tier) lines.push({ text: "  " + a.tier.tier + (a.tier.annotation ? ": " + a.tier.annotation : ""), dim: true });
+      }
       if (t.kind === "gene" && !mine.length && d.alterations.length) lines.push({ text: "no " + t.label + " alteration; " + d.alterations.length + " in other genes", dim: true });
       if (d.panels.length) lines.push({ text: "panel " + d.panels.map((p) => p.panel).join(", ") + (d.notProfiled.length ? " — not covering " + d.notProfiled.join(", ") : ""), dim: true });
       else if (d.notProfiled.length) lines.push({ text: "no panel covers " + d.notProfiled.join(", "), dim: true });
@@ -649,6 +658,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const offDefaults = (Number(display.showUnaltered !== DEFAULT_FIGURE_DISPLAY.showUnaltered) +
     Number(display.whitespace !== DEFAULT_FIGURE_DISPLAY.whitespace) +
     Number(display.colorByType !== DEFAULT_FIGURE_DISPLAY.colorByType) +
+    Number(display.colorByGermline !== DEFAULT_FIGURE_DISPLAY.colorByGermline) +
     Number(!!display.whiteBackground) + Number(display.gaps !== "none")) || 0;
 
   // The figure applies sort and viewing options in the browser. A server-rendered download has
@@ -742,6 +752,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <label className="chk" data-tip="colour each mutation class separately, or draw them all as one">
                   <Checkbox checked={display.colorByType} disabled={busy}
                     onCheckedChange={(c) => set({ colorByType: (c === true) })} /> colour by mutation type</label>
+                <label className="chk" data-tip="mark a germline mutation with a white stripe through its glyph — the portal's Somatic vs Germline colouring">
+                  <Checkbox checked={display.colorByGermline} disabled={busy}
+                    onCheckedChange={(c) => set({ colorByGermline: (c === true) })} /> mark germline mutations</label>
                 <label className="chk" data-tip="white instead of grey for unaltered cells — for print; profiled and unprofiled then look alike, apart from the stripe">
                   <Checkbox checked={!!display.whiteBackground} disabled={busy}
                     onCheckedChange={(c) => set({ whiteBackground: (c === true) || undefined })} /> white background (for print)</label>
@@ -1053,12 +1066,15 @@ function Legend({ data, display, colors }: { data: UnpackedContract; display: Fi
   return (
     <div className="onco-legend">
       {geneLegend(S, present).map((it) => <span key={it.label + it.color}>{it.kind === "notProfiled" ? np
+        // the stripe over a mutation glyph, at least 2px so a 10px swatch shows it
+        : it.kind === "germline" ? <span style={{ display: "inline-block", width: 10, height: 10, background: `linear-gradient(${S.glyph.mutation.single.color} calc(50% - 1px), ${it.color} calc(50% - 1px), ${it.color} calc(50% + 1px), ${S.glyph.mutation.single.color} calc(50% + 1px))`, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />
         : it.kind === "outline" ? <span style={{ display: "inline-block", width: 10, height: 10, border: "2px solid " + it.color, background: P.unaltered, marginRight: 4, verticalAlign: -1, borderRadius: 2, boxSizing: "border-box" }} />
         : sw(it.color)}{it.label}</span>)}
       {data.tracks.some((t) => t.kind === "derivedEvent") && <span>{sw(P.derived)}Derived event</span>}
       <span>% = driver / any</span>
       {white && <span className="mark">white background: unaltered and not-profiled differ only by the stripe</span>}
       {data.stats.hiddenVus != null && <span className="mark">{data.stats.hiddenVus.toLocaleString()} alterations of unknown significance hidden — the percentages are over drivers alone</span>}
+      {data.stats.hiddenGermline != null && <span className="mark">{data.stats.hiddenGermline.toLocaleString()} germline {data.stats.hiddenGermline === 1 ? "mutation" : "mutations"} hidden — the percentages are over somatic calls alone</span>}
       {!!data.stats.offPanel && <span className="mark" data-tip="the gene is not on any panel that column was sequenced with, so the column is not profiled for it — as on cBioPortal, the call is not drawn and the % leaves it out">{data.stats.offPanel.toLocaleString()} off-panel {data.stats.offPanel === 1 ? "call" : "calls"} not drawn — those cells are not profiled</span>}
       {data.display?.annotate === "none" && <span className="mark">driver annotation off: nothing is called a driver</span>}
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (

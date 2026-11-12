@@ -2,6 +2,7 @@
 import type {  } from "../../types.ts";
 import type { PlotAxis, PlotData } from "../../plot.ts";
 import type { PointLayerSpec } from "../../plot-layers.ts";
+import type { DriverSettings } from "../../driver-settings.ts";
 
 /**
  * A plot: two axes over the same cases. The shape — scatter, box, contingency — follows from
@@ -35,6 +36,12 @@ export interface PlotView {
    */
   colorBy?: PlotAxis;
   ringBy?: PlotAxis;
+  /**
+   * Which sources call a mutation a putative driver (lib/driver-settings.ts), for an axis or a
+   * colour that tells Driver from VUS. As on cBioPortal's Plots tab, hiding VUS or germline
+   * mutations does not apply here: a plot draws every mutation.
+   */
+  drivers?: DriverSettings;
 }
 
 declare module "../../types.ts" {

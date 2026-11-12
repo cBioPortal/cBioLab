@@ -321,3 +321,36 @@ test("hiding unknown significance leaves a covered cell profiled", () => {
   assert.equal(tp53.profiled, 5);
   assert.equal(tp53.altered, 2, "P1 and P5, both drivers");
 });
+
+test("germline: the stripe marks the mutation the cell shows when it is germline, and hiding germline drops it from the %", () => {
+  const i = input();
+  const g = (pid: string, gene: string, mt: string, driver: boolean, germ: boolean) => ({ ...ev(pid, gene, "mutation", mt, undefined, driver), germ });
+  i.events = [
+    g("P1", "TP53", "Missense_Mutation", true, true),        // germline driver: shown, striped
+    g("P2", "TP53", "Missense_Mutation", false, true),       // germline VUS missense ...
+    g("P2", "TP53", "Nonsense_Mutation", false, false),      // ... under a somatic VUS truncation, which the cell shows: no stripe
+    g("P3", "TP53", "Missense_Mutation", false, true),       // germline VUS ...
+    g("P3", "TP53", "Nonsense_Mutation", true, false),       // ... beside a somatic driver: the driver is drawn, no stripe
+    g("P4", "TP53", "Splice_Site", false, true),             // germline VUS alone: striped
+  ];
+  const c = assembleContract(i);
+  const tp53 = c.tracks.find((t) => t.label === "TP53")!;
+  const col = (p: string) => c.columns.indexOf(p);
+  assert.equal(tp53.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER | BITS.GERMLINE);
+  assert.equal(tp53.cells[col("P2")], BITS.MISSENSE | BITS.TRUNCATING, "truncating outranks missense, and it is somatic");
+  assert.equal(tp53.cells[col("P3")], BITS.TRUNCATING | BITS.DRIVER | BITS.MUT_DRIVER);
+  assert.equal(tp53.cells[col("P4")], BITS.SPLICE | BITS.GERMLINE);
+  assert.equal(c.stats.hiddenGermline, undefined);
+
+  const h = assembleContract({ ...i, display: { ...(i.display || {}), hideGermline: true } as AssembleInput["display"] });
+  const t = h.tracks.find((x) => x.label === "TP53")!;
+  assert.equal(t.cells[h.columns.indexOf("P1")], 0, "the germline driver is gone; the column stays profiled");
+  assert.equal(t.cells[h.columns.indexOf("P4")], 0);
+  assert.equal(t.cells[h.columns.indexOf("P2")], BITS.TRUNCATING);
+  assert.equal(t.altered, 2, "P2 and P3, the somatic calls");
+  assert.equal(h.stats.hiddenGermline, 4, "every germline mutation, the ones under a somatic call too");
+  // a structural variant or a copy-number call is never germline, whatever its row says
+  const sv = assembleContract({ ...input(), events: [{ ...ev("P5", "TP53", "structural_variant", undefined, undefined, true), germ: true }],
+    display: { hideGermline: true } as AssembleInput["display"] });
+  assert.equal(sv.tracks.find((x) => x.label === "TP53")!.cells[sv.columns.indexOf("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER);
+});

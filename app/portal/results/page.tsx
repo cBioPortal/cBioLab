@@ -11,7 +11,7 @@ import { useLinkParams } from "../../_links/use-link.ts";
 import { PortalTabs } from "../PortalTabs";
 import { useQueryKnown, expressionProfile, discreteCnaProfile, assayComparisonProfiles } from "../study-known";
 import { usePageDoc } from "../page-doc";
-import { resultsLayout, svCheckCohort } from "../results-layout.ts";
+import { resultsLayout, svCheckCohort, syncDrivers } from "../results-layout.ts";
 import { Button } from "../../_ui/button";
 import { TB } from "../../_ui/toolbar.ts";
 import { Pencil } from "lucide-react";
@@ -147,7 +147,7 @@ export default function ResultsPage() {
     {!ready
       ? <PortalLoading />
       : <PortalTabs legacy={{ page: { page: "results", studies, entries: check.entries.map((e) => e.text), filters,
-            query: legacyQueryParams(target.options || null, optionsData.data, studies, check.entries.map((e) => e.text)) }, held: basics?.portal || null }} doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
+            query: legacyQueryParams(target.options || null, optionsData.data, studies, check.entries.map((e) => e.text)) }, held: basics?.portal || null }} doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={(d) => page.update({ ...d, views: syncDrivers(page.doc?.views || [], d.views || []) })}
           catalog={{ attrs: known?.attrs || [], profiles, profileCatalog, loading: !known }} />}
   </>);
 }

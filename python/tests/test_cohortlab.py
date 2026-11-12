@@ -121,6 +121,33 @@ class Conformance(unittest.TestCase):
                 py.pop("stats", None)
                 self.assertEqual(json.dumps(py, sort_keys=True), json.dumps(ts, sort_keys=True))
 
+    def test_germline_matches_typescript(self):
+        """A germline mutation's stripe, and hiding germline, are the same in both implementations."""
+        with open(os.path.join(FIX, "events.tsv"), encoding="utf-8") as f:
+            base = f.read().rstrip("\n")
+        # P03's germline missense sits under its somatic splice call; P05's beside a somatic missense VUS; P07's is a germline driver over a promoter VUS
+        extra = "\nP03\tTP53\tR248Q\tMISSENSE_GERMLINE\nP05\tKRAS\tG13D\tMISSENSE_GERMLINE\nP07\tTP53\tR273H\tMISSENSE_GERMLINE_DRIVER\n"
+        for drivers in (None, '{"hideGermline": true}', '{"hideVus": true}'):
+            with tempfile.TemporaryDirectory() as d, self.subTest(drivers=drivers):
+                ev, out = os.path.join(d, "events.tsv"), os.path.join(d, "ts.json")
+                with open(ev, "w", encoding="utf-8") as f:
+                    f.write(base + extra)
+                cmd = ["node", os.path.join(ROOT, "scripts", "oncoprint-cli.ts"), "--events", ev, "--clinical", os.path.join(FIX, "clinical.tsv"),
+                       "--coverage", os.path.join(FIX, "coverage.tsv"), "--out", out, "--quiet"] + (["--drivers=" + drivers] if drivers else [])
+                subprocess.run(cmd, check=True, cwd=ROOT)
+                with open(out, encoding="utf-8") as f:
+                    ts = json.load(f)
+                py = Oncoprint.from_tables(ev, os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"),
+                                           drivers=json.loads(drivers) if drivers else None).to_json()
+                self.assertEqual(py["stats"].get("hiddenGermline"), ts["stats"].get("hiddenGermline"))
+                ts.pop("stats", None)
+                py.pop("stats", None)
+                self.assertEqual(json.dumps(py, sort_keys=True), json.dumps(ts, sort_keys=True))
+                cells = [c for t in py["tracks"] if t["kind"] == "gene" for c in t["cells"]]
+                germ = sum(1 for c in cells if c > 0 and c & BITS["GERMLINE"])
+                self.assertEqual(germ, 0 if drivers == '{"hideGermline": true}' else 2 if drivers is None else 1,
+                                 "striped: P05 and P07 (P03 shows its somatic splice call); only the driver once VUS are hidden")
+
     def test_off_panel_calls_match_typescript(self):
         """A call in a gene the column's panels do not cover is not drawn, in both implementations."""
         self.assertTrue(shutil.which("node"), "node is required to check conformance against the TypeScript implementation")
@@ -213,7 +240,13 @@ class StyleOverrides(unittest.TestCase):
 
     def test_display_validation_matches_typescript(self):
         from cohortlab import normalize_display
-        self.assertEqual(normalize_display(None), {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all", "colorByType": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False})
+        drivers = {"oncokb": True, "custom": True, "tiers": None, "annotated": True, "hideVus": False, "hideGermline": False}
+        self.assertEqual(normalize_display(None), {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all", "colorByType": True, "colorByGermline": True,
+                                                   "hideVUS": False, "annotate": "oncokb", "hideGermline": False, "drivers": drivers, "whiteBackground": False})
+        self.assertEqual(normalize_display({"annotate": "none", "hideVUS": True})["hideVUS"], False, "with no source on there is nothing to hide")
+        self.assertEqual(normalize_display(None, {"tiers": ["Tier 1"], "oncokb": False, "custom": False})["drivers"]["tiers"], ["Tier 1"])
+        with self.assertRaisesRegex(ValueError, "Cancer Hotspots is not loaded"):
+            normalize_display(None, {"hotspots": True})
         with self.assertRaisesRegex(ValueError, "unknown option 'showUnalterd'"):
             normalize_display({"showUnalterd": True})
         with self.assertRaisesRegex(ValueError, "is not one of none, gaps, pct, pct-left"):

@@ -16,7 +16,8 @@
     "PROT_HIGH": 4096,
     "PROT_LOW": 8192,
     "MUT_DRIVER": 16384,
-    "SV_DRIVER": 32768
+    "SV_DRIVER": 32768,
+    "GERMLINE": 65536
   },
   "palette": {
     "paper": "#ffffff",
@@ -231,6 +232,16 @@
         "vus": "#53d400",
         "label": "Mutation"
       }
+    },
+    "germline": {
+      "bit": "GERMLINE",
+      "color": "#ffffff",
+      "band": [
+        0.46,
+        0.54
+      ],
+      "label": "Germline Mutation",
+      "show": true
     },
     "driverLabels": {
       "driver": " (putative driver)",

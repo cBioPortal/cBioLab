@@ -289,8 +289,13 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] The tab for protein-only studies (ours needs an MRNA_EXPRESSION profile) (COE-0.1)
 - [ ] **Mutation annotation breadth** — CIViC, functional impact, gnomAD / ClinVar / dbSNP / SIGNAL columns, HGVSg/c, PTM tracks, the PDB 3D structure viewer, a transcript dropdown
 - [ ] **OQL coverage** — `GAIN`, `HETLOSS`, `CNA>=` (blocked by data: only high-level ±2 calls are loaded), `_GERMLINE` / `_SOMATIC` (blocked by the parser), per-track OQL inside merged oncoprint groups. Parity audit: on the Results page a merged `[BRAF NRAS]` is refused as "bad gene entry '[BRAF'" ([01-oncoprint](legacy-spec/parity/01-oncoprint.md), [03-mutual-exclusivity](legacy-spec/parity/03-mutual-exclusivity.md))
-- [ ] **Driver-annotation settings** — custom driver and tier annotations, germline/somatic filtering and colouring, driver/VUS colouring on plots (refused today as "not supported yet")
-  - [ ] "Show only profiled" and its CaseFilterWarning, and the AlterationFilterWarning, on every Results tab (ONC-MD-3, CTS-MD-7, MEX-MD-6, PLT-MD-5, PLT-CH-3, MUT-MD-13, CNS-0.2) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md), [05-mutations](legacy-spec/parity/05-mutations.md))
+- [x] **Driver-annotation settings** — the view's `drivers` (OncoKB, the study's `cbp_driver` and `cbp_driver_tiers`, Show only drivers, Show only somatic) in the oncoprint's "mutations" menu, the germline stripe, Driver vs VUS and Driver/VUS mutation types on plots; one setting across the Results page's Oncoprint and Plots tabs (#168)
+  - [ ] The other Results tabs following the settings: Cancer Types Summary, Mutual Exclusivity, the Mutations tab's lollipop and table, Comparison/Survival's Altered and Unaltered groups, Download, Pathways, the header's altered count (the portal's apply to every tab but Plots, Co-expression and CN Segments)
+  - [ ] The menu as a page-level sliders button beside Modify query (ours sits in the oncoprint's toolbar, where the custom calls it lists are known)
+  - [ ] Hotspots as a source: no Cancer Hotspots data is loaded (offered disabled, refused in a document)
+  - [ ] "Show only profiled" (`hide_unprofiled_samples`) with its all/any radios, its CaseFilterWarning, and the AlterationFilterWarning, on every Results tab (ONC-MD-3, CTS-MD-7, MEX-MD-6, PLT-MD-5, PLT-CH-3, MUT-MD-13, CNS-0.2) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md), [05-mutations](legacy-spec/parity/05-mutations.md))
+  - [ ] OncoKB's germline rule (Pathogenic / Likely Pathogenic for a germline mutation): the store holds one call per alteration
+  - [ ] A plot's menu lists no tiers (a plot does not report its data's tiers); the plot tooltip's OncoKB and hotspot icons
 - [ ] **Oncoprint export** — PDF and tabular
   - [ ] Open in Oncoprinter; the TSV in the portal's rows per alteration type (CNA, MUTATIONS, …; ours one row per track) (ONC-DL-4, ONC-DL-5) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
 
@@ -310,7 +315,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 
 - [ ] **Per-user, per-study access control** — the largest gap for any private instance; today a study is allowed or denied for the whole deployment (`STUDY_DENY`, `STUDY_ALLOW_RESTRICTED`)
 - [ ] **Data-governance switches** — an equivalent of `skin.hide_download_controls` and `download_custom_buttons_json`; and "Clear cache" restricted (open to every visitor today)
-- [ ] **Custom driver annotations** — `cbp_driver` / `cbp_driver_tiers` are imported but nothing uses them
+- [x] **Custom driver annotations** — `cbp_driver` / `cbp_driver_tiers` call drivers on the oncoprint and plots, and show in the oncoprint's tooltip (#168)
+  - [ ] The mutation table's Custom Driver and Custom Driver Tier columns
+  - [ ] The menu labels from deployment config (`oncoprint.custom_driver_annotation.*.menu_label`); ours are the portal's defaults
 - [ ] **Instance defaults** — deployment-level defaults for the oncoprint, clinical tracks, OncoKB/hotspot/VUS, table columns, survival display and query-page gene sets
 - [ ] **Branding and homepage curation** — blurb, footer, logos, priority studies, study tags, banners
 - [ ] **Authentication options** — SAML, LDAP, Keycloak roles, optional sign-in, data-access tokens (OIDC only today)

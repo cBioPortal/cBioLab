@@ -75,6 +75,7 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
     heatmap: (view as OncoprintView).heatmap || [],
     sort: (view as OncoprintView).sort,
     display: (view as OncoprintView).display,
+    drivers: (view as OncoprintView).drivers,
     unit: (view as OncoprintView).unit,
     overlays: (view as OncoprintView).overlays,
     ...(Object.keys(zReference).length ? { zReference } : {}),

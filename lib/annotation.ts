@@ -10,6 +10,7 @@
 // most recently synced version in the store.
 import { chQuery, isAbortError} from "./ch.ts";
 import type { ChRow } from "./types.ts";
+import { isDriverEvent, driverSourceText, type DriverFields, type ResolvedDrivers } from "./driver-settings.ts";
 import { sq } from "./compiler.ts";
 import { ONCOKB_TABLE, syncedStudiesSql } from "./annotation-store.ts";
 
@@ -142,4 +143,17 @@ export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], 
     // not licensed / store empty / db absent -> degrade loudly to the mock
     return mockIndex(eventRows);
   }
+}
+
+/**
+ * The driver call for each event under a view's driver settings (lib/driver-settings.ts): OncoKB
+ * (or, when the store cannot be read, the labelled mock) only when that source is on, the study's
+ * own calls and tiers from the event's columns. `source` says what the calls came from.
+ */
+export async function driverAnnotation(s: ResolvedDrivers, eventRows: (EvRow & DriverFields)[], genes: string[], study?: string | string[]): Promise<AnnotationIndex> {
+  const oncokb = s.oncokb ? await buildAnnotationIndex(eventRows, genes, study) : null;
+  return {
+    isDriver: (r) => isDriverEvent(r as DriverFields, s, () => !!oncokb && oncokb.isDriver(r)),
+    source: driverSourceText(s, oncokb ? oncokb.source : null),
+  };
 }

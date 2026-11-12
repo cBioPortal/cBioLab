@@ -15,6 +15,8 @@
 import { sq, genomicStudySql } from "./compiler.ts";
 import { DB } from "./ch.ts";
 import { STYLE } from "./oncoprint-style.ts";
+import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
+import { driverCondSql } from "./driver-sql.ts";
 import { clinicalTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { parseOql, oqlCasesSql } from "./oql.ts";
 import { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP, ALTERATION_GENE_SET_CAP } from "./plot-oql.ts";
@@ -40,7 +42,7 @@ export type PlotAxis =
    * against the study before it runs (lib/plot-profile.ts) into the forms below; a profile the
    * study does not have is refused by name.
    */
-  | { source: "profile"; profile: string; gene?: string; entity?: string; by?: "mutationType" | "mutated"; log?: boolean }
+  | { source: "profile"; profile: string; gene?: string; entity?: string; by?: "mutationType" | "mutated" | "driver"; log?: boolean }
   /**
    * The forms a profile axis resolves to, which the engine runs, and which a document may also give
    * directly: one gene's value in a profile (`discrete` reads it as copy-number levels), and below,
@@ -59,7 +61,13 @@ export type PlotAxis =
    * genes' mutation TYPES or copy-number states into one label has no single honest reading, so
    * that combination is refused rather than guessed at. `gene` (singular) is unchanged.
    */
-  | { source: "alteration"; gene: string; by?: AlterationBy }
+  /**
+   * `drivers` (lib/driver-settings.ts) are the sources that call a mutation a putative driver, for
+   * `by: "driver"` (Driver or VUS) and for `by: "mutationType"`, whose classes then split into
+   * "(Driver)" and "(VUS)" as the portal's Plots tab colours them. The plot view puts its own
+   * settings here; without them a mutation type is its class alone.
+   */
+  | { source: "alteration"; gene: string; by?: AlterationBy; drivers?: DriverSettings }
   | { source: "alteration"; genes: string[]; by?: "mutated" }
   /**
    * An OQL query, its statements separated by ";", a new line or ",". `by: "any"` (the default)
@@ -78,7 +86,7 @@ export type PlotAxis =
    */
   | { source: "cohort"; label?: string }
   | { source: "none" };
-export type AlterationBy = "mutated" | "mutationType" | "cna" | "sv";
+export type AlterationBy = "mutated" | "mutationType" | "driver" | "cna" | "sv";
 const AXIS_SOURCES: readonly string[] = ["clinical", "profile", "molecular", "assay", "alteration", "cohort", "none"] satisfies PlotAxis["source"][];
 /** an alteration axis given as an OQL query, rather than as genes */
 function isOqlAxis(a: PlotAxis): a is { source: "alteration"; oql: string; by?: "any" | "statement" } {
@@ -129,6 +137,12 @@ export function categoryColor(label: string, i = 0): string {
   // there it sits on a coloured row, here it is a dot on paper.
   if (isAbsent(label)) return STYLE.palette.groupLine;
   if (l === "multiple") return STYLE.palette.text;
+  // a class split by its driver call takes the oncoprint's driver or VUS colour for that class
+  const split = /^(.*) \((driver|vus)\)$/.exec(l);
+  if (split && split[1] === "multiple") return STYLE.palette.text;
+  if (split) for (const m of STYLE.glyph.mutation.priority) if (m.label.toLowerCase().startsWith(split[1])) return split[2] === "vus" ? m.vus : m.color;
+  if (l === "driver") return STYLE.glyph.mutation.single.color;
+  if (l === "vus") return STYLE.glyph.mutation.single.vus;
   for (const m of STYLE.glyph.mutation.priority) if (m.label.toLowerCase().startsWith(l)) return m.color;
   for (const o of STYLE.glyph.cna.options) if (o.label.toLowerCase() === l) return o.color;
   if (l === "deep deletion") return STYLE.glyph.cna.options.find((o) => /deletion/i.test(o.label))?.color || STYLE.palette.categorical[0];
@@ -175,7 +189,7 @@ export function axisLabel(a: PlotAxis): string {
   if (a.source === "alteration") {
     const genes = alterationGenes(a);
     const name = genes.length > 1 ? (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") : genes[0];
-    return name + (a.by === "cna" ? " copy number" : a.by === "sv" ? " structural variant" : a.by === "mutationType" ? " mutation type" : " mutation status");
+    return name + (a.by === "cna" ? " copy number" : a.by === "sv" ? " structural variant" : a.by === "mutationType" ? " mutation type" : a.by === "driver" ? " driver vs VUS" : " mutation status");
   }
   if (a.source === "cohort") return "cohort";
   return "ordered cases";
@@ -215,8 +229,8 @@ export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean }
       if (!ENTITY_RE.test(String(a.entity))) throw new Error(which + " axis: '" + String(a.entity).slice(0, 60) + "' is not a generic-assay entity");
     } else if (!GENE_RE.test(String(a.gene || "").toUpperCase()))
       throw new Error(which + " axis: a profile axis reads one gene (or, for a generic assay, one entity); name it");
-    if (a.by != null && a.by !== "mutationType" && a.by !== "mutated")
-      throw new Error(which + " axis: a mutation profile groups by \"mutationType\" or \"mutated\"; not " + JSON.stringify(a.by));
+    if (a.by != null && a.by !== "mutationType" && a.by !== "mutated" && a.by !== "driver")
+      throw new Error(which + " axis: a mutation profile groups by \"mutationType\", \"mutated\" or \"driver\"; not " + JSON.stringify(a.by));
   }
   if (a.source === "molecular") {
     if (!PROFILE_RE.test(String(a.profileType || ""))) throw new Error(which + " axis: '" + a.profileType + "' is not a profile type");
@@ -252,8 +266,11 @@ export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean }
       throw new Error(which + " axis: a gene-set alteration axis takes at most " + ALTERATION_GENE_SET_CAP + " genes; this asks for " + genes.length);
     if ("genes" in a && genes.length > 1 && a.by && a.by !== "mutated")
       throw new Error(which + " axis: a gene SET only supports by:\"mutated\" (any gene altered) — combining several genes' mutation types or copy-number states into one category has no single honest reading");
-    if ((a.by as string) === "driver")
-      throw new Error("driver-vs-VUS colouring is not supported yet: it needs the version-pinned annotation store joined per event");
+    if (a.by != null && !(["mutated", "mutationType", "driver", "cna", "sv"] as string[]).includes(a.by))
+      throw new Error(which + " axis: an alteration axis groups by \"mutated\", \"mutationType\", \"driver\", \"cna\" or \"sv\"; not " + JSON.stringify(a.by));
+    if ("drivers" in a && a.drivers != null) {
+      try { resolveDrivers(a.drivers); } catch (e) { throw new Error(which + " axis: " + (e as Error).message, { cause: e }); }
+    }
   }
 }
 
@@ -395,8 +412,15 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
   if (a.source === "alteration") {
     const genes = alterationGenes(a), by = a.by || "mutated";
     const idCol = strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study);
+    // each mutation's driver call under the view's settings: needed to tell Driver from VUS, and
+    // to split a mutation type by it when the view gave settings
+    const drivers = by === "driver" || (by === "mutationType" && "drivers" in a && a.drivers) ? resolveDrivers("drivers" in a ? a.drivers : undefined) : null;
+    if (drivers && drivers.oncokb && !ctx.oncokbPin)
+      throw new Error("calling drivers from OncoKB needs the version-pinned OncoKB store, which this instance cannot read; " +
+        "switch drivers.oncokb off to use the study's own driver calls (cbp_driver, cbp_driver_tiers)");
+    const drv = drivers ? ", toUInt8(" + driverCondSql(drivers, ctx.oncokbPin) + ") AS drv" : "";
     // every case in the cohort appears, because "no alteration" is an answer and not a missing value
-    const events = "SELECT sample_unique_id, mutation_type, variant_type, cna_alteration\n" +
+    const events = "SELECT sample_unique_id, mutation_type, variant_type, cna_alteration" + drv + "\n" +
       "     FROM " + db + ".genomic_event_derived\n" +
       "     WHERE " + genomicStudySql(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
       "       AND mutation_status != 'UNCALLED'"; // read support, not a call (lib/oql.ts specCond)
@@ -405,6 +429,14 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
       ? "if(countIf(g.cna_alteration >= 2) > 0, 'Amplification', if(countIf(g.cna_alteration <= -2) > 0, 'Deep deletion', 'Neutral'))"
       : by === "sv"
         ? "if(countIf(" + hit + ") > 0, 'Structural variant', 'No structural variant')"
+      : by === "driver"
+        // the portal's "Driver vs VUS": Driver when any of the case's mutations is a putative driver
+        ? "multiIf(countIf(g.variant_type = 'mutation') = 0, 'Not mutated', countIf(g.variant_type = 'mutation' AND g.drv = 1) > 0, 'Driver', 'VUS')"
+      : by === "mutationType" && drivers && drivers.annotated
+        // the class of the case's driver mutations when it has any, else of its VUS, and which
+        ? "multiIf(countIf(g.variant_type = 'mutation') = 0, 'Not mutated'," +
+          " countIf(g.variant_type = 'mutation' AND g.drv = 1) > 0, concat(" + oneClass("g.variant_type = 'mutation' AND g.drv = 1") + ", ' (Driver)')," +
+          " concat(" + oneClass("g.variant_type = 'mutation'") + ", ' (VUS)'))"
       : by === "mutationType"
         // one class per case; a case carrying two of them is its own honest category
         ? "multiIf(countIf(g.variant_type = 'mutation') = 0, 'Not mutated'," +
@@ -437,6 +469,10 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
   }
   throw new Error("axis source '" + (a as { source: string }).source + "' cannot be selected");
 }
+
+/** the one mutation class of the rows matching `cond`, or "Multiple" when they hold several */
+const oneClass = (cond: string): string =>
+  "if(length(groupUniqArrayIf(" + MUT_CLASS + ", " + cond + ")) > 1, 'Multiple', arrayElement(groupUniqArrayIf(" + MUT_CLASS + ", " + cond + "), 1))";
 
 /** mutation classes, spelled the way the oncoprint's legend spells them */
 const MUT_CLASS =

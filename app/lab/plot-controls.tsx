@@ -13,7 +13,8 @@ import { Choice, OptionSelect } from "../_ui/choice.tsx";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
 import { CHIP, FIELD } from "../_ui/toolbar.ts";
-import type { ProfileInfo } from "../../lib/profile-catalog.ts";
+import { profileUse, type ProfileInfo } from "../../lib/profile-catalog.ts";
+import { DriverSettingsMenu } from "../_oncoprint/DriverSettingsMenu.tsx";
 import type { PlotData } from "../../lib/plot.ts";
 import { PlotHover } from "./plot-hover.tsx";
 import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_BASE, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
@@ -129,6 +130,18 @@ function PointLayers({ layers, plot, cohortOptions, axisName, busy, onChange }: 
   );
 }
 
+/** the plot's axes and colours that group by mutation, with what they group by */
+function mutationAxes(spec: any, catalog: ProfileInfo[]): string[] {
+  return [spec.x, spec.y, spec.colorBy, spec.ringBy].flatMap((a: any) => !a ? []
+    : a.source === "alteration" && a.gene && (a.by === "driver" || a.by === "mutationType") ? [a.by]
+    : a.source === "profile" && a.by !== "mutated" && catalog.some((p) => p.profile === a.profile && profileUse(p) === "mutation") ? [a.by || "mutationType"]
+    : []);
+}
+/** whether a driver call can change what this plot draws */
+const callsDrivers = (spec: any, catalog: ProfileInfo[]): boolean => mutationAxes(spec, catalog).length > 0;
+/** whether it draws a mutation type, which driver settings split into Driver and VUS */
+const splitsTypes = (spec: any, catalog: ProfileInfo[]): boolean => mutationAxes(spec, catalog).includes("mutationType");
+
 export function PlotControls({ spec, plot, studies, attrs, catalog, loading, busy, cohortOptions, update, children }: {
   /** the view as the document holds it */
   spec: any;
@@ -229,6 +242,22 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
                   data-tip="Highlight groups of cases as coloured points over the plot. A case in more than one layer takes the colour of the first.">Highlight</span>
                 <PointLayers layers={layers} plot={plot} cohortOptions={cohortOptions} axisName={axisName} busy={busy}
                   onChange={(next) => update((vv) => ({ ...vv, points: next }))} />
+              </div>
+            )}
+            {callsDrivers(spec, catalog) && (
+              <div className="axfield flex flex-col gap-1">
+                <span className="axfield-name text-sm font-semibold text-foreground"
+                  data-tip="which sources call a mutation a putative driver, for an axis or colour that tells Driver from VUS">Driver annotation</span>
+                {/* the portal's Plots tab colours a mutation type as "(Driver)" or "(VUS)"; here a view asks for it by holding driver settings */}
+                {splitsTypes(spec, catalog) && <label className="chk" data-tip="split each mutation type into Driver and VUS, as cBioPortal's Plots tab colours them">
+                  <Checkbox checked={spec.drivers != null} disabled={busy}
+                    onCheckedChange={(c) => update((vv) => { const n = { ...vv }; if (c === true) n.drivers = n.drivers || {}; else delete n.drivers; return n; })} />
+                  mutation types as Driver / VUS</label>}
+                {(spec.drivers != null || !splitsTypes(spec, catalog)) &&
+                  // the plot does not report the study's custom calls, so they are offered and apply where the study has them
+                  <DriverSettingsMenu menuId="plot-drivers" drivers={spec.drivers} busy={busy} filters={false} report={{ binary: true, tiers: [] }}
+                    scope="this plot; it draws every mutation, VUS and germline included, as cBioPortal's Plots tab does"
+                    onChange={(d) => update((vv) => ({ ...vv, drivers: d || {} }))} />}
               </div>
             )}
           </div>

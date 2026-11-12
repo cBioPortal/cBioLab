@@ -5,7 +5,7 @@
 import { DEFAULT_FIGURE_DISPLAY, type FigureDisplay } from "./OncoprintFigure.tsx";
 
 /** the display keys the figure owns — written back without a re-run */
-export const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colors", "whiteBackground"]);
+export const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colorByGermline", "colors", "whiteBackground"]);
 
 export const figureDisplayOf = (v: { display?: unknown }): FigureDisplay => ({ ...DEFAULT_FIGURE_DISPLAY, ...((v.display || {}) as object) });
 
@@ -56,3 +56,6 @@ export function dataPart(v: Record<string, unknown>): Record<string, unknown> {
   const d = Object.fromEntries(Object.entries((display || {}) as Record<string, unknown>).filter(([k]) => !FIGURE_KEYS.has(k)));
   return Object.keys(d).length ? { ...rest, display: d } : rest;
 }
+
+/** where the settings apply, for the menu's tip */
+export const DRIVER_SCOPE = "this oncoprint; on a Results page they apply to its Oncoprint and Plots tabs together, and the other tabs do not follow them yet";

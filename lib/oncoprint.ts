@@ -25,7 +25,9 @@ export type PidsCarrier = CohortDef & { [PIDS_SQL]?: string | Record<string, str
  * in the map, only their place in this list.
  */
 export const PEER_STUDIES: unique symbol = Symbol("peerStudies");
-import { buildAnnotationIndex, oncokbPin } from "./annotation.ts";
+import { oncokbPin, driverAnnotation } from "./annotation.ts";
+import { germlineCondSql } from "./driver-sql.ts";
+import { forData } from "./driver-settings.ts";
 import { compileCohortDef, baseSamplesSql } from "./cohort2.ts";
 import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
 
@@ -131,7 +133,9 @@ export function genomicEventsSql(genes: string[], study: string = STUDY, db: str
   const puidPrefix = study + "_";
   return "SELECT " + idCol(unit, puidPrefix) + " AS pid,\n" +
     "       hugo_gene_symbol AS gene, variant_type AS vt, mutation_type AS mt,\n" +
-    "       mutation_variant AS mv, cna_alteration AS cna\n" +
+    "       mutation_variant AS mv, cna_alteration AS cna,\n" +
+    // the study's own driver call and tier, and whether the mutation is germline (lib/driver-settings.ts)
+    "       driver_filter AS df, driver_tiers_filter AS dt, toUInt8(" + germlineCondSql() + ") AS germ\n" +
     "FROM " + db + ".genomic_event_derived\n" +
     "WHERE " + genomicStudySql(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND mutation_status != 'UNCALLED'" + // read support, not a call (lib/oql.ts specCond)
@@ -318,7 +322,7 @@ export function normalizeSpec(spec: OncoprintSpec) {
     const threshold = Number(o && o.threshold);
     return { kind, profileType, threshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 2 };
   }).filter((o) => o.profileType);
-  return { genes, geneList, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays, display: normalizeDisplay(spec.display) };
+  return { genes, geneList, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays, display: normalizeDisplay(spec.display, spec.drivers) };
 }
 
 /** The study a single-study spec draws: `studies` when it lists exactly one, else `study`. */
@@ -487,8 +491,8 @@ export function checkStudyInputs(x: unknown, nGroups: number): StudyInputs {
   const r = x as Record<string, unknown>;
   const bad = (what: string): never => { throw new Error("the peer sent oncoprint " + what + " this instance cannot read"); };
   const ids = (v: unknown): string[] => Array.isArray(v) && v.every((p) => typeof p === "string" && p.length <= 200) ? v as string[] : bad("column ids");
-  const table = (v: unknown, width: number, what: string): unknown[][] =>
-    Array.isArray(v) && v.every((row) => Array.isArray(row) && row.length === width && typeof row[0] === "string") ? v as unknown[][] : bad(what);
+  const table = (v: unknown, width: number | number[], what: string): unknown[][] =>
+    Array.isArray(v) && v.every((row) => Array.isArray(row) && (Array.isArray(width) ? width.includes(row.length) : row.length === width) && typeof row[0] === "string") ? v as unknown[][] : bad(what);
   const strings = (v: unknown, what: string): string[] => Array.isArray(v) && v.every((p) => typeof p === "string") ? v as string[] : bad(what);
   if (!r || typeof r !== "object") bad("rows");
   const groups = Array.isArray(r.groups) && r.groups.length === nGroups ? r.groups.map(ids) : bad("column groups");
@@ -499,7 +503,7 @@ export function checkStudyInputs(x: unknown, nGroups: number): StudyInputs {
   });
   const overlays = (Array.isArray(r.overlays) ? r.overlays : bad("overlays")).map((o: Record<string, unknown>) =>
     ({ available: o?.available === true, values: table(o?.values, 3, "overlay values") }));
-  return { genes: strings(r.genes, "genes"), groups, events: table(r.events, 6, "alterations"), coverage: table(r.coverage, 2, "panel coverage"),
+  return { genes: strings(r.genes, "genes"), groups, events: table(r.events, [6, 9], "alterations"), coverage: table(r.coverage, 2, "panel coverage"),
     facts: table(r.facts, 3, "column facts"), clinical: table(r.clinical, 3, "clinical values"), heatmap, overlays,
     profileTypes: strings(r.profileTypes, "profile types"), assays: strings(r.assays, "assay profiles") };
 }
@@ -692,8 +696,9 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
                  lqRows("oncoprint:profiledTypes", columnFactsSql(s, dbOf(s), unit, samplesOf(s)), s)]).then(([e, c, p]) => ({ s, e, c, p }))));
   for (const { s, e, c, p } of evFetched) {
     const pref = multi ? s + "_" : "";
-    // column order is the SELECT's: pid, gene, vt, mt, mv, cna
-    for (const r of e.rows) events.push({ pid: pref + (r[0] as string), gene: r[1] as string, vt: r[2] as string, mt: r[3] as string, mv: r[4] as string, cna: r[5] as string });
+    // column order is the SELECT's: pid, gene, vt, mt, mv, cna, df, dt, germ (an older peer's rows stop at cna)
+    for (const r of e.rows) events.push({ pid: pref + (r[0] as string), gene: r[1] as string, vt: r[2] as string, mt: r[3] as string, mv: r[4] as string, cna: r[5] as string,
+      df: (r[6] as string) ?? null, dt: (r[7] as string) ?? null, germ: Number(r[8] ?? 0) === 1 });
     for (const r of c.rows) coverage.push({ pid: pref + (r[0] as string), mask: Number(r[1]) });
     // column order is the SELECT's: pid, samples, mask
     for (const r of p.rows) {
@@ -704,11 +709,12 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   // the alteration types this figure draws: the gene cells' three, and an overlay's
   const profiledTypes: ProfiledType[] = ["MUTATION_EXTENDED", "COPY_NUMBER_ALTERATION", "STRUCTURAL_VARIANT",
     ...overlays.map((o) => (o.kind === "mrna" ? "MRNA_EXPRESSION" : "PROTEIN_LEVEL") as ProfiledType)];
-  // "annotate: none" is a deliberate choice to draw without driver calls; say so rather than
-  // letting the figure look as though nothing was annotated
-  const annotation = display.annotate === "none"
-    ? { isDriver: () => false, source: "none — driver annotation turned off for this figure" }
-    : await buildAnnotationIndex(events as Parameters<typeof buildAnnotationIndex>[0], genes, multi ? studies : study);
+  // the view's driver settings decide the calls; with no source on, nothing is a driver and the
+  // figure says so rather than looking as though nothing was annotated. "Every tier" is a source
+  // only where these alterations carry a tier (forData).
+  const drivers = forData(display.drivers!, events.some((e) => e.dt));
+  if (drivers !== display.drivers) Object.assign(display, { drivers, hideVUS: drivers.hideVus, annotate: drivers.annotated ? "oncokb" : "none" });
+  const annotation = await driverAnnotation(drivers, events, genes, multi ? studies : study);
 
   // ---- clinical values per attribute -------------------------------------
   const clinicalIn: AssembleInput["clinical"] = [];

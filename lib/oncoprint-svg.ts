@@ -117,6 +117,11 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
         // a 10px swatch would thin the cell's line below a pixel; keep it one at least
         const [s0, s1] = S.glyph.notProfiled.stripe.band, sh = Math.max(1, 10 * (s1 - s0));
         parts.push(rect(lx, ly - 4 - sh / 2, 10, sh, it.color));
+      } else if (it.kind === "germline") {
+        // the stripe over a mutation glyph, as a cell draws it
+        const [g0, g1] = S.glyph.germline.band, gh = Math.max(2, 10 * (g1 - g0));
+        parts.push(rect(lx, ly - 9, 10, 10, S.glyph.mutation.single.color));
+        parts.push(rect(lx, ly - 4 - gh / 2, 10, gh, it.color));
       } else if (it.kind === "outline") {
         parts.push(rect(lx, ly - 9, 10, 10, S.palette.unaltered));
         parts.push(`<rect x="${lx + 1}" y="${ly - 8}" width="8" height="8" fill="none" stroke="${it.color}" stroke-width="2"/>`);
@@ -128,9 +133,10 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   }
   ly -= 16;
   const partial = contract.tracks.some((t) => t.kind === "gene" && t.profiled != null && t.profiled > 0 && t.profiled < contract.columns.length);
-  const hidden = contract.stats.hiddenVus;
+  const hidden = contract.stats.hiddenVus, hiddenGerm = contract.stats.hiddenGermline;
   const caption = "gene %: driver / any" +
     (hidden != null ? "; " + hidden.toLocaleString("en-US") + " alterations of unknown significance are hidden and are not in the %" : "") +
+    (hiddenGerm != null ? "; " + hiddenGerm.toLocaleString("en-US") + " germline " + (hiddenGerm === 1 ? "mutation is" : "mutations are") + " hidden and not in the %" : "") +
     (contract.stats.offPanel ? "; " + contract.stats.offPanel.toLocaleString("en-US") + " " + (contract.stats.offPanel === 1 ? "call" : "calls") +
       " in a gene no panel of the " + (contract.unit === "sample" ? "sample" : "patient") + " covers (off-panel) are not drawn in that gene's row and are not in its %" : "") +
     (contract.display?.annotate === "none" ? "; no driver calls were made" : "") + (partial ? "; " + PARTIAL_PROFILE_NOTE : "") +

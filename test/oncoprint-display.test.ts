@@ -6,11 +6,32 @@ import assert from "node:assert/strict";
 import { normalizeDisplay, normalizeSort } from "../lib/oncoprint-assemble.ts";
 
 test("display defaults", () => {
-  assert.deepEqual(normalizeDisplay(undefined), { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false });
+  const drivers = { oncokb: true, custom: true, tiers: null, annotated: true, hideVus: false, hideGermline: false };
+  assert.deepEqual(normalizeDisplay(undefined), { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, colorByGermline: true,
+    hideVUS: false, annotate: "oncokb", hideGermline: false, drivers, whiteBackground: false });
   assert.deepEqual(normalizeDisplay({ showUnaltered: false, gaps: "pct" }),
-    { showUnaltered: false, whitespace: true, gaps: "pct", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false });
+    { showUnaltered: false, whitespace: true, gaps: "pct", clinicalLegends: "all", colorByType: true, colorByGermline: true,
+      hideVUS: false, annotate: "oncokb", hideGermline: false, drivers, whiteBackground: false });
   assert.equal(normalizeDisplay({ annotate: "none" }).annotate, "none");
   assert.throws(() => normalizeDisplay({ annotate: "hotspots" } as never), /annotate.*oncokb, none/);
+});
+
+test("display: driver settings fold in, the older spellings read as their defaults", () => {
+  // annotate "none" is every source off, so nothing is told apart and hiding VUS has nothing to hide
+  const off = normalizeDisplay({ annotate: "none", hideVUS: true });
+  assert.equal(off.annotate, "none");
+  assert.equal(off.hideVUS, false);
+  assert.equal(normalizeDisplay({ hideVUS: true }).hideVUS, true);
+  // the view's settings override the older keys
+  assert.equal(normalizeDisplay({ annotate: "none" }, { custom: true }).annotate, "oncokb");
+  assert.equal(normalizeDisplay({ hideVUS: true }, { hideVus: false }).hideVUS, false);
+  const d = normalizeDisplay(undefined, { oncokb: false, custom: false, tiers: ["Tier 1"], hideGermline: true });
+  assert.deepEqual(d.drivers, { oncokb: false, custom: false, tiers: ["Tier 1"], annotated: true, hideVus: false, hideGermline: true });
+  assert.equal(d.hideGermline, true);
+  assert.throws(() => normalizeDisplay(undefined, { hotspots: true }), /Cancer Hotspots is not loaded/);
+  assert.throws(() => normalizeDisplay(undefined, { hideVUS: true } as never), /unknown setting 'hideVUS'.*hideVus/);
+  assert.throws(() => normalizeDisplay(undefined, [] as never), /drivers must be an object/);
+  assert.throws(() => normalizeDisplay({ colorByGermline: "no" } as never), /must be true or false/);
 });
 
 test("display rejects unknown options and bad values, naming what is accepted", () => {

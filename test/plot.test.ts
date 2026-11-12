@@ -40,7 +40,9 @@ test("an axis that would read a whole profile is refused by name", () => {
   assert.throws(() => validateAxis({ source: "alateration", gene: "APC" } as never, "covariate 1"),
     /unknown source 'alateration' — use one of clinical, profile, molecular, assay, alteration, none/);
   assert.throws(() => validateAxis({ source: "clinical", attribute: "not a name!" }, "x"), /not a clinical attribute name/);
-  assert.throws(() => validateAxis({ source: "alteration", gene: "TP53", by: "driver" } as never, "x"), /not supported yet/);
+  validateAxis({ source: "alteration", gene: "TP53", by: "driver" }, "x");
+  assert.throws(() => validateAxis({ source: "alteration", gene: "TP53", by: "driver", drivers: { hotspots: true } }, "x"), /x axis: drivers.hotspots: Cancer Hotspots is not loaded/);
+  assert.throws(() => validateAxis({ source: "alteration", gene: "TP53", by: "oncogenic" } as never, "x"), /groups by "mutated", "mutationType", "driver", "cna" or "sv"/);
   validateAxis(num, "x");   // the ordinary cases do not throw
   validateAxis(mol, "y");
 });

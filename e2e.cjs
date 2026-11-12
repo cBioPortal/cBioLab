@@ -16,6 +16,7 @@ const { assays } = require("./test/e2e/assays.cjs");
 const { riskmodel } = require("./test/e2e/riskmodel.cjs");
 const { patientViews } = require("./test/e2e/patient-views.cjs");
 const { lollipop } = require("./test/e2e/lollipop.cjs");
+const { drivers } = require("./test/e2e/drivers.cjs");
 const { homepage } = require("./test/e2e/homepage.cjs");
 const { portal } = require("./test/e2e/portal.cjs");
 const { savedCohorts } = require("./test/e2e/saved-cohorts.cjs");
@@ -92,6 +93,7 @@ async function main() {
   if (want("view-kinds")) await viewKinds(t);
   if (want("patient-views")) await patientViews(t);
   if (want("lollipop")) await lollipop(t);
+  if (want("drivers")) await drivers(t);
   if (want("homepage")) await homepage(t);
   if (want("portal")) await portal(t);
   if (want("saved-cohorts")) await savedCohorts(t);

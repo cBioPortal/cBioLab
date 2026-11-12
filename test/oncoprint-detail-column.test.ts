@@ -122,8 +122,31 @@ describe("a column's detail", () => {
     withData();
     const d = await columnDetail({ study: "s1", genes: ["TP53"], display: { annotate: "none" } } as never, "P1");
     assert.equal(d.alterations.every((a) => a.driver === false), true);
-    assert.match(d.annotation, /^none — driver annotation turned off/);
+    assert.match(d.annotation, /^none — no driver source is switched on/);
     assert.equal(sent.some((q) => /annotation\.oncokb/.test(q)), false);
+  });
+
+  test("the study's own call, tier and germline status ride with each alteration; the settings decide what is a driver and what is shown", async () => {
+    const CUSTOM: Row[] = [
+      { gene: "TP53", vt: "mutation", mt: "Missense_Mutation", mv: "R175H", cna: "", df: "Putative_Passenger", dfa: "curated: benign", dt: "", dta: "", germ: 0 },
+      { gene: "TP53", vt: "mutation", mt: "Nonsense_Mutation", mv: "Q100*", cna: "", df: "Putative_Driver", dfa: "", dt: "Tier 1", dta: "known", germ: 1 },
+      { gene: "TP53", vt: "mutation", mt: "Missense_Mutation", mv: "A1V", cna: "", df: "", dfa: "", dt: "Tier 3", dta: "", germ: 0 },
+    ];
+    answer = (q) => /genomic_event_derived/.test(q) ? CUSTOM : /annotation\.oncokb/.test(q) ? [{ t: "MUTATION", gene: "TP53", alteration: "R175H", is_driver: 1 }]
+      : /sync_run/.test(q) ? [{ study: "s1" }] : [];
+    const d = await columnDetail({ study: "s1", genes: ["TP53"], drivers: { tiers: ["Tier 1"] } } as never, "P1");
+    assert.match(events()[0], /driver_filter AS df, driver_filter_annotation AS dfa, driver_tiers_filter AS dt/);
+    assert.deepEqual(d.alterations, [
+      // a Putative_Passenger call does not overrule OncoKB, as in the portal
+      { gene: "TP53", kind: "Missense_Mutation", alteration: "R175H", driver: true, custom: { call: "Putative_Passenger", annotation: "curated: benign" } },
+      { gene: "TP53", kind: "Nonsense_Mutation", alteration: "Q100*", driver: true, custom: { call: "Putative_Driver", annotation: "" }, tier: { tier: "Tier 1", annotation: "known" }, germline: true },
+      // Tier 3 is not among the tiers that count
+      { gene: "TP53", kind: "Missense_Mutation", alteration: "A1V", driver: false, tier: { tier: "Tier 3", annotation: "" } },
+    ]);
+    assert.match(d.annotation, /OncoKB v-test \(pinned\) \+ the study's custom driver calls \(cbp_driver = Putative_Driver\) \+ custom driver tiers Tier 1/);
+    // OncoKB off, germline and VUS hidden: the germline Q100* goes, and R175H has no source left to call it
+    const off = await columnDetail({ study: "s1", genes: ["TP53"], drivers: { oncokb: false, hideGermline: true, hideVus: true } } as never, "P1");
+    assert.deepEqual(off.alterations.map((a) => a.alteration), ["A1V"], "every tier counts by default, so A1V (Tier 3) is a driver; R175H has no source left");
   });
 
   test("genes are upper-cased, invalid symbols dropped, at most 12 asked for", async () => {
