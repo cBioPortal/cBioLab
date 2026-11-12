@@ -151,6 +151,11 @@ they can't tell you:
 - Disable a rule only on the line where it is wrong, with the reason:
   `// eslint-disable-next-line <rule> -- <why>` (Python: `# noqa: <code>` plus a comment). Never
   change `eslint.config.mjs`, `knip.json` or the ruff rules as part of other work.
+- **Number formats live in `lib/chart/format.ts`** (`local/number-format`): cBioLab's own are `fmt*`,
+  the ones that must read as cbioportal.org writes them are `portal*` (citing the legacy function).
+  Don't call `toFixed`, `toPrecision`, `toExponential` or `toLocaleString` with options elsewhere;
+  add the format there, with a test. Files written before the rule are listed with their allowance
+  in `lint/number-format-baseline.json`; moving one lowers its number, which never goes up.
 - Off on purpose, so don't "fix" code for them: `any` / `no-unsafe-*`, complexity, nesting, formatting.
 - Accessibility (`jsx-a11y-x`, `app/**/*.tsx`): clickable things are `<button>`s, every input or
   select has a name (label text or `aria-label`; a `data-tip` tooltip is not a name). A native

@@ -10,6 +10,7 @@ import sonarjs from "eslint-plugin-sonarjs";
 import jsxA11y from "eslint-plugin-jsx-a11y-x";
 import globals from "globals";
 import path from "node:path";
+import fs from "node:fs";
 
 // View kinds stay independent. Each kind's code is its folder, lib/views/<kind>/ (and its card,
 // app/lab/kinds/<kind>.tsx): a kind's files import one another, the shared view modules below and
@@ -45,6 +46,43 @@ const kindBoundary = {
   },
 };
 
+// One place for number formats. A number written for a reader goes through lib/chart/format.ts:
+// cBioLab's own formats are fmt*, the ones that must read as cbioportal.org writes them are portal*,
+// so a percentage or a p-value reads the same in every view. Calling toFixed, toPrecision,
+// toExponential or toLocaleString with options anywhere else is an error. The files that still do
+// are listed in lint/number-format-baseline.json with how many calls each may keep; a file may lose
+// calls, never gain them, and its allowance comes down as they go, until the list is empty.
+const NUMBER_FORMAT_BASELINE = JSON.parse(fs.readFileSync(new URL("./lint/number-format-baseline.json", import.meta.url), "utf8"));
+const FORMAT_METHODS = new Set(["toFixed", "toPrecision", "toExponential"]);
+const numberFormat = {
+  meta: { type: "suggestion", schema: [] },
+  create(context) {
+    const file = path.relative(context.cwd, context.filename).split(path.sep).join("/");
+    const allowed = NUMBER_FORMAT_BASELINE[file] ?? 0;
+    const found = [];
+    const hint = "Number formats live in lib/chart/format.ts: use fmtNum, fmtPct, fmtShare, fmtP, fmtMonths, or a portal* " +
+      "one to match cbioportal.org; add a new one there, with a test.";
+    return {
+      CallExpression(node) {
+        const c = node.callee;
+        if (c.type !== "MemberExpression" || c.computed || c.property.type !== "Identifier") return;
+        const m = c.property.name;
+        if (FORMAT_METHODS.has(m) || (m === "toLocaleString" && node.arguments.length > 1)) found.push({ node, m });
+      },
+      "Program:exit"(program) {
+        if (found.length > allowed) {
+          for (const { node, m } of found) context.report({ node, message: m + " formats a number outside lib/chart/format.ts" +
+            (allowed ? " (this file may keep " + allowed + " while it waits to be moved, and has " + found.length + ")" : "") + ". " + hint });
+        } else if (found.length < allowed) {
+          context.report({ node: program, loc: { line: 1, column: 0 }, message: "this file now formats " + found.length + " number(s) by hand, " +
+            "under its allowance of " + allowed + ": set it to " + found.length + " in lint/number-format-baseline.json" +
+            (found.length ? "" : " (remove the entry)") + ", so it cannot creep back." });
+        }
+      },
+    };
+  },
+};
+
 export default tseslint.config(
   {
     ignores: [".next/**", ".next-gate/**", ".next-local/**", "node_modules/**", "python/**", "docs/**", "next-env.d.ts"],
@@ -58,6 +96,7 @@ export default tseslint.config(
       globals: { ...globals.node, ...globals.browser },
     },
     linterOptions: { reportUnusedDisableDirectives: "error" },
+    plugins: { local: { rules: { "kind-boundary": kindBoundary, "number-format": numberFormat } } },
     rules: {
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
@@ -131,8 +170,12 @@ export default tseslint.config(
   },
   {
     files: ["lib/views/**/*.ts", "lib/figures/*.ts", "app/lab/kinds/**/*.tsx"],
-    plugins: { local: { rules: { "kind-boundary": kindBoundary } } },
     rules: { "local/kind-boundary": "error" },
+  },
+  {
+    files: ["lib/**/*.ts", "app/**/*.{ts,tsx}", "mcp/**/*.ts"],
+    ignores: ["lib/chart/format.ts"],
+    rules: { "local/number-format": "error" },
   },
   {
     files: ["**/*.{cjs,mjs,js}"],
