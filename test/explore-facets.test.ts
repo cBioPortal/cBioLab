@@ -314,6 +314,23 @@ describe("one study", () => {
       assert.equal(disj.length, 1);
     });
 
+    test("a drafted numeric attribute's values are not counted without its clause, as no facet draws them", async () => {
+      facetAnswers();
+      on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }, { pid: "P2", sid: "S2" }]);
+      const draft = { all: [
+        { kind: "clinical" as const, attribute: "SEX", values: ["Female"] },
+        { kind: "clinical" as const, attribute: "AGE", range: { gt: 40, lte: 70 } },
+        { kind: "clinical" as const, attribute: "TMB", range: { gt: 1 } },
+      ] };
+      const r = await buildExplore({ study: S, draft, skipGenes: true, skipBins: true });
+      const disj = (a: string) => sent.filter((q) => /AS vkey/.test(q) && q.includes("IN ('" + a + "')") && !/_cohort_st1/.test(q));
+      assert.equal(disj("SEX").length, 1);
+      assert.equal(disj("AGE").length, 0, "declared NUMBER");
+      assert.equal(disj("TMB").length, 0, "sniffed numeric, no metadata row");
+      assert.equal((r.clinical.find((c) => c.attribute === "SEX") as { disjunctive?: boolean }).disjunctive, true);
+      assert.equal(r.clinical.find((c) => c.attribute === "AGE")!.kind, "num");
+    });
+
     test("past the bound, the definition is read inline and its size counted once", async () => {
       facetAnswers();
       on(/SELECT DISTINCT pid, sid FROM/, [1, 2, 3, 4].map((i) => ({ pid: "P" + i, sid: "S" + i })));
