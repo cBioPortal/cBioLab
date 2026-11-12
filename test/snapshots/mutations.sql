@@ -44,11 +44,20 @@ mc0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(a
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
 rows AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
+         (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
+          WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
          m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
          ann.oncogenicity AS oncogenicity, ann.level AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
          m.mutationType AS mutationType, m.variantType AS variantType,
          if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,
-         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos
+         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,
+         if((ifNull(m.chr, '') != '' AND ifNull(m.start, 0) > 0 AND ifNull(m.end, 0) > 0 AND ifNull(m.ref, '') NOT IN ('', 'NA') AND ifNull(m.var, '') NOT IN ('', 'NA') AND NOT (ifNull(m.ref, '') = '-' AND ifNull(m.var, '') = '-')), concat(ifNull(m.chr, ''), ':g.', multiIf(ifNull(m.ref, '') = '-', concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'ins', ifNull(m.var, '')), ifNull(m.var, '') = '-', if(ifNull(m.start, 0) = ifNull(m.end, 0), concat(toString(ifNull(m.start, 0)), 'del'), concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'del')), length(ifNull(m.ref, '')) = 1 AND length(ifNull(m.var, '')) = 1, concat(toString(ifNull(m.start, 0)), ifNull(m.ref, ''), '>', ifNull(m.var, '')), length(ifNull(m.ref, '')) = 1, concat(toString(ifNull(m.start, 0)), 'delins', ifNull(m.var, '')), concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'delins', ifNull(m.var, '')))), '') AS hgvsg,
+         JSONExtractBool('', 'ok') AS gnOk,
+         JSONExtractString(arrayFirst(t -> JSONExtractString(t, 'transcriptId') = JSONExtractString('', 'canonical', 'KRAS'), JSONExtractArrayRaw('', 'transcripts')), 'hgvsc') AS hgvsc,
+         JSONExtractString('', 'clinvar', 'significance') AS clinvar, JSONExtractString('', 'clinvar', 'conflicting') AS clinvarConflicting,
+         JSONExtractUInt('', 'clinvar', 'id') AS clinvarId,
+         arrayLast(e -> position(JSONExtractString(e, 'mutationStatus'), 'germline') > 0, JSONExtractArrayRaw('', 'signal')) AS sig,
+         if(lower(JSONExtractString(sig, 'mutationStatus')) = 'germline' AND arraySum(arrayMap(c -> JSONExtractFloat(c, 'tumorTypeCount'), JSONExtractArrayRaw(sig, 'countsByTumorType'))) > 0, arraySum(arrayMap(c -> JSONExtractFloat(c, 'variantCount'), JSONExtractArrayRaw(sig, 'countsByTumorType'))) / arraySum(arrayMap(c -> JSONExtractFloat(c, 'tumorTypeCount'), JSONExtractArrayRaw(sig, 'countsByTumorType'))), NULL) AS signalFreq
   FROM m0 AS m
   LEFT JOIN ann ON ann.alteration = m.proteinChange
   LEFT JOIN ct0 AS ct ON ct.sid = m.sid LEFT JOIN mc0 AS mc ON mc.sid = m.sid
@@ -87,11 +96,20 @@ mc0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(a
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
 rows AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
+         (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
+          WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
          m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
          ann.oncogenicity AS oncogenicity, ann.level AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
          m.mutationType AS mutationType, m.variantType AS variantType,
          if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,
-         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos
+         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,
+         if((ifNull(m.chr, '') != '' AND ifNull(m.start, 0) > 0 AND ifNull(m.end, 0) > 0 AND ifNull(m.ref, '') NOT IN ('', 'NA') AND ifNull(m.var, '') NOT IN ('', 'NA') AND NOT (ifNull(m.ref, '') = '-' AND ifNull(m.var, '') = '-')), concat(ifNull(m.chr, ''), ':g.', multiIf(ifNull(m.ref, '') = '-', concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'ins', ifNull(m.var, '')), ifNull(m.var, '') = '-', if(ifNull(m.start, 0) = ifNull(m.end, 0), concat(toString(ifNull(m.start, 0)), 'del'), concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'del')), length(ifNull(m.ref, '')) = 1 AND length(ifNull(m.var, '')) = 1, concat(toString(ifNull(m.start, 0)), ifNull(m.ref, ''), '>', ifNull(m.var, '')), length(ifNull(m.ref, '')) = 1, concat(toString(ifNull(m.start, 0)), 'delins', ifNull(m.var, '')), concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'delins', ifNull(m.var, '')))), '') AS hgvsg,
+         JSONExtractBool('', 'ok') AS gnOk,
+         JSONExtractString(arrayFirst(t -> JSONExtractString(t, 'transcriptId') = JSONExtractString('', 'canonical', 'KRAS'), JSONExtractArrayRaw('', 'transcripts')), 'hgvsc') AS hgvsc,
+         JSONExtractString('', 'clinvar', 'significance') AS clinvar, JSONExtractString('', 'clinvar', 'conflicting') AS clinvarConflicting,
+         JSONExtractUInt('', 'clinvar', 'id') AS clinvarId,
+         arrayLast(e -> position(JSONExtractString(e, 'mutationStatus'), 'germline') > 0, JSONExtractArrayRaw('', 'signal')) AS sig,
+         if(lower(JSONExtractString(sig, 'mutationStatus')) = 'germline' AND arraySum(arrayMap(c -> JSONExtractFloat(c, 'tumorTypeCount'), JSONExtractArrayRaw(sig, 'countsByTumorType'))) > 0, arraySum(arrayMap(c -> JSONExtractFloat(c, 'variantCount'), JSONExtractArrayRaw(sig, 'countsByTumorType'))) / arraySum(arrayMap(c -> JSONExtractFloat(c, 'tumorTypeCount'), JSONExtractArrayRaw(sig, 'countsByTumorType'))), NULL) AS signalFreq
   FROM m0 AS m
   LEFT JOIN ann ON ann.alteration = m.proteinChange
   LEFT JOIN ct0 AS ct ON ct.sid = m.sid LEFT JOIN mc0 AS mc ON mc.sid = m.sid

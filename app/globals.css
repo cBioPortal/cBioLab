@@ -1638,6 +1638,17 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .dt-funnel.on { background: var(--accent-soft); }
 .dt-table tbody tr { cursor: default; }
 .dt .tv-scroll > table { width: 100%; }
+/* the mutation table's Genome Nexus tips (app/lab/kinds/mutation-cells.tsx): SIGNAL's table by cancer type, striped */
+.mut-tip { font-size: var(--t-sm); }
+/* SIGNAL's table by cancer type is wider than a tip's usual cap: the box takes its width, inside the window */
+.onco-tip.mut-tip-box { max-width: min(820px, calc(100vw - 16px)); }
+.mut-signal { border-collapse: collapse; width: 100%; font-size: var(--t-xs); }
+.mut-signal th { font-weight: 600; text-align: left; vertical-align: bottom; padding: 2px 4px; border-bottom: 1px solid var(--line); }
+.mut-signal td { padding: 2px 4px; white-space: nowrap; }
+.mut-signal td.num { text-align: right; }
+.mut-signal tbody tr:nth-child(odd) { background: var(--paper); }
+.mut-signal tbody tr:hover { background: var(--accent-soft); }
+.mut-signal tfoot td { border-top: 1px solid var(--line); }
 /* waiting: the rows are covered while a request for them runs; the bar, chips and headers stay usable */
 .dt-body { position: relative; }
 .dt-body.waiting-rows .tv-scroll { min-height: 9rem; }

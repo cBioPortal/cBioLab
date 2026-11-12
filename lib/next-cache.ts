@@ -37,6 +37,7 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { chQuery, directConnections, loopbackOnlyConn, connById, withoutFailedQueries, type ChConn } from "./ch.ts";
+import { variantPins } from "./variant-annotation.ts";
 import { oncokbPin } from "./annotation.ts";
 import { runAnalysis } from "./analysis.ts";
 import { buildContract } from "./oncoprint.ts";
@@ -87,6 +88,9 @@ export function dataVersion(): Promise<string> {
       }
     }
     parts.push("oncokb@" + ((await oncokbPin()) ?? ""));
+    // a new Genome Nexus release changes the mutation table's HGVSc, ClinVar and SIGNAL
+    const gn = await variantPins();
+    parts.push("genome_nexus@" + (gn.hg19 ?? "") + "/" + (gn.hg38 ?? ""));
     return parts.join("|");
   })();
   versionMemo = { at: Date.now(), value };

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat } from "../lib/chart/format.ts";
+import { fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalSig2, portalPct } from "../lib/chart/format.ts";
 import { linear, log, symlog } from "../lib/chart/scale.ts";
 import { axisBottom, bandLabels, leftAxisWidth } from "../lib/chart/axis.ts";
 import { legend } from "../lib/chart/legend.ts";
@@ -55,6 +55,15 @@ test("one rule per kind of number", () => {
   assert.equal(tickFormat(0.2)(0.4), "0.4");
   assert.equal(tickFormat(0.05)(0.1), "0.10");
   assert.equal(tickFormat(2000)(10000), "10,000");
+});
+
+test("the portal's own number spellings, where a table must read as cBioPortal's does", () => {
+  // FormatUtils.formatNumberValueInSignificantDigits(x, 2): no exponent, no separators, 0 as "0"
+  assert.deepEqual([0.00005830223880597015, 0.125, 0, 0.5, 1234, 0.995].map(portalSig2), ["0.000058", "0.13", "0", "0.5", "1200", "1"]);
+  // FormatUtils.formatPercentValue on a share: one decimal, no % sign; "< 0.1" for a sliver, "-" for nothing
+  assert.deepEqual([0.0234, 0.0004, 0, 1, null, NaN].map(portalPct), ["2.3", "< 0.1", "0.0", "100.0", "-", "-"]);
+  // toConditionalPrecision(x, 3, 0.01)
+  assert.deepEqual([0.0001234, 0.0123, 1.23e-12, 0].map(portalP), ["1.234e-4", "0.0123", "1.23e-12", "0.00"]);
 });
 
 test("linear ticks are round steps; log ticks are powers of ten", () => {

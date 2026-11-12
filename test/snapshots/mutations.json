@@ -105,9 +105,25 @@
             "numeric": false
           },
           {
+            "id": "hgvsg",
+            "name": "HGVSg",
+            "numeric": false,
+            "tip": "Genomic change in HGVS notation (HGVSg). Click a value to view it in Genome Nexus."
+          },
+          {
+            "id": "hgvsc",
+            "name": "HGVSc",
+            "numeric": false,
+            "tip": "Coding DNA change in HGVS notation (HGVSc) for the selected transcript"
+          },
+          {
             "id": "status",
             "name": "MS",
             "numeric": false
+          },
+          {
+            "…": "2 more",
+            "sha256": "e78e1a111a11e87f"
           }
         ],
         "shown": [
@@ -171,7 +187,13 @@
               25398284,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398284C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -197,7 +219,13 @@
               25398284,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398284C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -223,7 +251,13 @@
               25398284,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398284C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -249,7 +283,13 @@
               25398281,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398281C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -275,7 +315,13 @@
               25398284,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398284C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -301,7 +347,13 @@
               25398284,
               "C",
               "G",
-              "SOMATIC"
+              "12:g.25398284C>G",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -327,7 +379,13 @@
               25398285,
               "C",
               "A",
-              "SOMATIC"
+              "12:g.25398285C>A",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -353,7 +411,13 @@
               25398284,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398284C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -379,7 +443,13 @@
               25398281,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398281C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -405,7 +475,13 @@
               25398284,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398284C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -431,7 +507,13 @@
               25398285,
               "C",
               "A",
-              "SOMATIC"
+              "12:g.25398285C>A",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -457,7 +539,13 @@
               25398285,
               "C",
               "A",
-              "SOMATIC"
+              "12:g.25398285C>A",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -483,7 +571,13 @@
               25398285,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398285C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -509,7 +603,13 @@
               25398284,
               "C",
               "A",
-              "SOMATIC"
+              "12:g.25398284C>A",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -535,7 +635,13 @@
               25398285,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398285C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -561,7 +667,13 @@
               25398284,
               "C",
               "A",
-              "SOMATIC"
+              "12:g.25398284C>A",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -587,7 +699,13 @@
               25398281,
               "C",
               "T",
-              "SOMATIC"
+              "12:g.25398281C>T",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -613,7 +731,13 @@
               25398285,
               "C",
               "A",
-              "SOMATIC"
+              "12:g.25398285C>A",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -639,7 +763,13 @@
               25398284,
               "C",
               "A",
-              "SOMATIC"
+              "12:g.25398284C>A",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
@@ -665,12 +795,18 @@
               25398284,
               "C",
               "A",
-              "SOMATIC"
+              "12:g.25398284C>A",
+              "",
+              "SOMATIC",
+              {
+                "…": "2 more",
+                "sha256": "439083f38956ba51"
+              }
             ]
           },
           {
             "…": "5 more",
-            "sha256": "e786ee05e30d140e"
+            "sha256": "85d56a32742cb9e8"
           }
         ],
         "offset": 0,
@@ -685,7 +821,14 @@
         ],
         "total": 1373,
         "all": 2410,
-        "oncokbPin": "v7.5"
+        "oncokbPin": "v7.5",
+        "variantPins": {
+          "hg19": null,
+          "hg38": null
+        },
+        "unannotated": [
+          "msk_chord_2024"
+        ]
       },
       "participation": {
         "studies": [
@@ -699,13 +842,13 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "Every KRAS mutation call in the cohort's samples, one row per call; uncalled mutations are left out, as the portal leaves them out. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level for the gene). Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. Showing 1,373 of 2,410 mutations: rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2. Sorted by Allele Freq (T) (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "Every KRAS mutation call in the cohort's samples, one row per call; uncalled mutations are left out, as the portal leaves them out. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level for the gene). No Genome Nexus release is stored here, so HGVSc, ClinVar and SIGNAL are empty. Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. Showing 1,373 of 2,410 mutations: rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2. Sorted by Allele Freq (T) (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {
             "kind": "fetch",
             "title": "Count the KRAS mutation calls per cohort and study, and those the query keeps",
-            "detail": "The mutations:counts query above: every called KRAS mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded and the OncoKB v7.5 call for its protein change; allele frequency = variant / (variant + reference) reads. The query keeps rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2.",
+            "detail": "The mutations:counts query above: every called KRAS mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded and the OncoKB v7.5 call for its protein change; HGVSg from its coordinates; allele frequency = variant / (variant + reference) reads. The query keeps rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2.",
             "params": [
               [
                 "Colorectal · msk_chord_2024",

@@ -1,6 +1,7 @@
 // The mutations view's spec and result, added to lib/types.ts's maps by the declaration at the end.
 import type { TableRows } from "../../types.ts";
 import type { TableQuery } from "../../table-query.ts";
+import type { VariantPins } from "../../variant-annotation.ts";
 
 /**
  * The mutation table (cBioPortal's Mutations tab, under the lollipop): one gene's mutations in each
@@ -18,6 +19,10 @@ export interface MutationsResult extends TableRows<string | number | null> {
   gene: string;
   /** the OncoKB version the annotation column reads, or null when none is pinned */
   oncokbPin: string | null;
+  /** the Genome Nexus release HGVSc, ClinVar and SIGNAL are read at, per reference genome (null: none stored) */
+  variantPins: VariantPins;
+  /** studies of the table no Genome Nexus sync has covered: blank in those columns */
+  unannotated?: string[];
 }
 
 declare module "../../types.ts" {

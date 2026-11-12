@@ -8,8 +8,9 @@ import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, 
 import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
+import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } from "./variant-annotation.ts";
 
-export interface MutationColumn { id: string; name: string; numeric: boolean }
+export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string }
 
 /** The table's columns, in the portal's order. */
 export const MUTATION_COLUMNS: MutationColumn[] = [
@@ -32,7 +33,14 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
   { id: "end", name: "End Pos", numeric: true },
   { id: "ref", name: "Ref", numeric: false },
   { id: "var", name: "Var", numeric: false },
+  // from the mutation's own coordinates, as the portal builds it
+  { id: "hgvsg", name: "HGVSg", numeric: false, tip: "Genomic change in HGVS notation (HGVSg). Click a value to view it in Genome Nexus." },
+  // the rest from Genome Nexus, read from the offline store at its pin (lib/variant-annotation.ts)
+  { id: "hgvsc", name: "HGVSc", numeric: false, tip: "Coding DNA change in HGVS notation (HGVSc) for the selected transcript" },
   { id: "status", name: "MS", numeric: false },
+  { id: "clinvar", name: "ClinVar", numeric: false, tip: "ClinVar aggregates information about genomic variation and its relationship to human health." },
+  // SIGNAL's germline frequency, spelled at two significant digits and sorted by number
+  { id: "signal", name: "SIGNAL", numeric: false, tip: "Prevalence of germline mutations in cancer patients from SIGNAL" },
 ];
 
 /** Shown unless the view names its columns: the portal's own default set. */
@@ -65,15 +73,23 @@ function queryColumn(c: MutationColumn, pin: string | null): QueryColumn {
     case "alteration": return { ...c, text: alterationSql(pin) };
     case "proteinPos": return { ...c, text: str("pos"), order: "pos" };
     case "vaf": return { ...c, text: str("round(vaf, 2)"), num: num("vaf") };
+    // the portal sorts HGVSc by the number after "c." (Hgvsc.tsx), ClinVar by its significance
+    case "hgvsc": return { ...c, text: "hgvsc", order: "toInt64OrNull(extract(hgvsc, 'c\\.(-?[0-9]+)'))" };
+    case "clinvar": return { ...c, text: "if(clinvar = '' OR clinvarConflicting = '', clinvar, concat(clinvar, '(', clinvarConflicting, ')'))", order: "nullIf(clinvar, '')" };
+    case "signal": return { ...c, text: str(SIGNAL_TEXT), order: "signalFreq" };
     default: return c.numeric ? { ...c, text: str(c.id), num: num(c.id) } : { ...c, text: str(c.id) };
   }
 }
+
+/** SIGNAL's frequency at two significant digits, as the portal's download spells it (0 as "0"). */
+const SIGNAL_TEXT = "if(signalFreq IS NULL, NULL, if(signalFreq = 0, '0', " +
+  "toString(toFloat64(round(toDecimal64(signalFreq, 12), 1 - toInt32(floor(log10(signalFreq))))))))";
 
 /** One (cohort, study) part of a table: the cohort's SQL as that study's resolver compiles it. */
 export interface TablePart { cohort: string; study: string; cohortSql: string }
 
 /** A part's rows, every column the table has, labelled with its cohort, study and document order. */
-function partRows(p: TablePart, i: number, db: string, gene: string, pin: string | null): { ctes: string; rows: string } {
+function partRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, pins: VariantPins): { ctes: string; rows: string } {
   const pre = sq(p.study + "_");
   const attr = (name: string, as: string) =>
     as + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, any(attribute_value) AS v FROM " + clinicalTable(db, [name]) + "\n" +
@@ -90,22 +106,28 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "),\n" +
     attr("CANCER_TYPE_DETAILED", "ct" + i) + ",\n" +
     attr("MUTATION_COUNT", "mc" + i) + ",\n";
+  const gn = variantAnnotationCte("g" + i, db, p.study, "SELECT chr, start, end, ref, var FROM m" + i, pins);
   const rows =
     "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
+    "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
+    "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
     "         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,\n" +
     (pin ? "         ann.oncogenicity AS oncogenicity, ann.level AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,\n"
       : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
     "         m.mutationType AS mutationType, m.variantType AS variantType,\n" +
     "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
-    "         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos\n" +
+    "         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,\n" +
+    "         " + hgvsgSql("ifNull(m.chr, '')", "ifNull(m.start, 0)", "ifNull(m.end, 0)", "ifNull(m.ref, '')", "ifNull(m.var, '')") + " AS hgvsg,\n" +
+    "         " + variantColumnsSql(gn ? "ifNull(g.gd, '')" : "''", gene) + "\n" +
     "  FROM m" + i + " AS m\n" +
     (pin ? "  LEFT JOIN ann ON ann.alteration = m.proteinChange\n" : "") +
+    (gn ? "  LEFT JOIN g" + i + " AS g ON g.chr = m.chr AND g.start = m.start AND g.end = m.end AND g.ref = m.ref AND g.var = m.var\n" : "") +
     "  LEFT JOIN ct" + i + " AS ct ON ct.sid = m.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = m.sid\n";
-  return { ctes, rows };
+  return { ctes: ctes + (gn ? gn + ",\n" : ""), rows };
 }
 
-function allRows(parts: TablePart[], db: string, gene: string, pin: string | null): string {
-  const built = parts.map((p, i) => partRows(p, i, db, gene, pin));
+function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins): string {
+  const built = parts.map((p, i) => partRows(p, i, db, gene, pin, pins));
   return "WITH " +
     (pin
       ? "ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver\n" +
@@ -121,13 +143,14 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
  * search, filter, sort and page in the database — so the order is global (studies interleave, as in
  * the portal's table) and any page is one query however deep. Uncalled calls are left out, as the
  * portal leaves them out; the sample's detailed cancer type and mutation count come from the
- * study's own attributes; the OncoKB call at `pin` when there is one. With no sort, drivers come
- * first, then by codon. All parts must live in the database this runs in.
+ * study's own attributes; the OncoKB call at `pin` when there is one; Genome Nexus's HGVSc, ClinVar
+ * and SIGNAL at the pin of the study's reference genome (`pins`), when it has one. With no sort,
+ * drivers come first, then by codon. All parts must live in the database this runs in.
  */
-export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null): RowSource {
+export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins): RowSource {
   if (!parts.length) throw new Error("mutationRowSource needs at least one part");
   return {
-    with: allRows(parts, db, gene, pin),
+    with: allRows(parts, db, gene, pin, pins),
     columns: MUTATION_COLUMNS.map((c) => queryColumn(c, pin)),
     select: "*",
     defaultOrder: "drv DESC, pos ASC NULLS LAST",

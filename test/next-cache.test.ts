@@ -26,6 +26,8 @@ process.env.CLICKHOUSE_DB = "cbioportal";
 process.env.CLICKHOUSE2_URL = "http://secondary.invalid";
 process.env.CLICKHOUSE2_DB = "cbioportal_b";
 process.env.ONCOKB_PIN = "v4.20";
+process.env.GENOME_NEXUS_PIN = "2.2.3-vep116-clinvar20260208";
+process.env.GENOME_NEXUS_GRCH38_PIN = "1.4.1-vepNA-clinvar20250106";
 process.env.AGGREGATE_ONLY_INSTANCES = "b";
 for (const k of ["LOOPBACK_PEER", "RESULT_CACHE", "FEDERATION_PEERS", "AGGREGATE_ONLY_STUDIES"]) delete process.env[k];
 
@@ -102,9 +104,10 @@ test("throughCache: RESULT_CACHE=off answers directly without reading the cache"
   assert.equal(read, 0);
 });
 
-test("the data version: each instance's cbioportal databases' latest import, then the OncoKB pin", async () => {
+test("the data version: each instance's cbioportal databases' latest import, then the OncoKB and Genome Nexus pins", async () => {
   const v = await nc.dataVersion();
-  assert.equal(v, "a:cbioportal@2026-10-01 00:00:00|a:cbioportal_x@2026-11-01 00:00:00|b:cbioportal_b@2026-09-09 00:00:00|oncokb@v4.20");
+  assert.equal(v, "a:cbioportal@2026-10-01 00:00:00|a:cbioportal_x@2026-11-01 00:00:00|b:cbioportal_b@2026-09-09 00:00:00|oncokb@v4.20|" +
+    "genome_nexus@2.2.3-vep116-clinvar20260208/1.4.1-vepNA-clinvar20250106");
 });
 
 test("the data version is asked at most once a minute", async () => {

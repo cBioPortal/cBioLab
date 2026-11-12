@@ -5,8 +5,9 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { fakeCh, type FakeCh } from "@cbiolab/clickhouse/testing";
-import { MAX_CONSECUTIVE_FAILURES, pendingKeys, syncKeys, syncStudies, warehouseStudies, ensureStore } from "../src/sync.ts";
+import { MAX_CONSECUTIVE_FAILURES, HeldWriter, insertLimits, pendingKeys, syncKeys, syncStudies, warehouseStudies, ensureStore } from "../src/sync.ts";
 import { oncokbSource } from "../src/sources/oncokb.ts";
+import { genomeNexusSource, genomeNexusGrch38Source } from "../src/sources/genome-nexus.ts";
 import { annotationSource, annotationStoreDdl, missingNeeds, syncConn } from "../src/index.ts";
 
 const realFetch = globalThis.fetch;
@@ -107,9 +108,15 @@ test("--all syncs each study, then records how much of the portal's key space is
   const studies = await warehouseStudies(ch.conn);
   assert.deepEqual(studies, ["a_study", "b_study"]);
   const r = await syncStudies(ch.conn, src, RELEASE, studies, () => {});
-  assert.equal(r.done, 2);
+  // both studies list the key; the second finds it held, not yet stored, and does not ask again
+  assert.equal(r.done, 1);
+  assert.equal(ch.rows("oncokb").length, 1);
   const runs = ch.rows("sync_run");
   assert.deepEqual(runs.map((x) => x.study), ["a_study", "b_study", "__portal__"]);
+  assert.deepEqual([runs[1].already_stored, runs[1].annotated_new], [3, 0]);
+  // one write of the rows, one of both studies' log rows after it, then the portal-wide row
+  const inserts = ch.statements.filter((x) => /^INSERT INTO/.test(x)).map((x) => /INTO ([\w.]+)/.exec(x)![1]);
+  assert.deepEqual(inserts, ["annotation.oncokb", "annotation.sync_run", "annotation.sync_run"]);
   // the stand-in still says one key is missing, as a store would if a study's run had failed
   assert.deepEqual([runs[2].variants_total, runs[2].already_stored, runs[2].note], [3, 2, "incomplete: 1 keys still missing"]);
   assert.equal(r.missing, 1);
@@ -156,9 +163,14 @@ test("verify re-asks the service for sampled stored keys and lists every disagre
 test("the store is created by its own statements, idempotently", async () => {
   ch = fakeCh();
   await ensureStore(ch.conn, oncokbSource);
-  assert.deepEqual(ch.statements, annotationStoreDdl(), "the database, the shared log and OncoKB's table");
-  assert.deepEqual(ch.statements.map((s) => /^CREATE (DATABASE|TABLE) IF NOT EXISTS (\S+)/.exec(s)?.[2]),
-    ["annotation", "annotation.sync_run", "annotation.oncokb"]);
+  const made = () => ch!.statements.map((s) => /^CREATE (DATABASE|TABLE) IF NOT EXISTS (\S+)/.exec(s)?.[2]);
+  assert.deepEqual(made(), ["annotation", "annotation.sync_run", "annotation.oncokb"], "the database, the shared log and OncoKB's table");
+  ch.clear();
+  await ensureStore(ch.conn, genomeNexusSource);
+  assert.deepEqual(made(), ["annotation", "annotation.sync_run", "annotation.variant"], "a public source's: the shared table");
+  // a new local database gets every store once, the shared table though two sources write it
+  assert.deepEqual(annotationStoreDdl().map((s) => /IF NOT EXISTS (\S+)/.exec(s)?.[1]),
+    ["annotation", "annotation.sync_run", "annotation.oncokb", "annotation.variant"]);
 });
 
 test("a sync writes as the source's own writer, or as the local instance; never silently as the app", () => {
@@ -174,5 +186,38 @@ test("a sync writes as the source's own writer, or as the local instance; never 
 
 test("an unknown source is refused, naming the ones there are", () => {
   assert.equal(annotationSource("oncokb"), oncokbSource);
-  assert.throws(() => annotationSource("civic"), /no annotation source 'civic' \(sources: oncokb\)/);
+  assert.equal(annotationSource("genome_nexus_grch38"), genomeNexusGrch38Source);
+  assert.throws(() => annotationSource("civic"), /no annotation source 'civic' \(sources: oncokb, genome_nexus, genome_nexus_grch38\)/);
+});
+
+test("a study's rows are written in one insert, however many service batches it took, and its log row after them", async () => {
+  oncokb();
+  ch = warehouse(3, KEYS);
+  await syncKeys(ch.conn, src, RELEASE, "a_study", () => {});
+  const inserts = ch.statements.filter((x) => /^INSERT INTO/.test(x)).map((x) => /INTO ([\w.]+)/.exec(x)![1]);
+  assert.deepEqual(inserts, ["annotation.oncokb", "annotation.sync_run"], "two service batches, one insert");
+  assert.equal(ch.rows("oncokb").length, 3);
+});
+
+test("held rows are written at the row limit or the time limit, whichever comes first, and the log row after its rows", async () => {
+  ch = warehouse(0, []);
+  let t = 0;
+  const w = new HeldWriter(ch.conn, "annotation.variant", { rows: 3, seconds: 60 }, () => t);
+  await w.add([{ k: 1 }, { k: 2 }], ["1", "2"]);
+  assert.equal(w.inserts, 0);
+  assert.ok(w.holds("1") && !w.holds("3"));
+  await w.add([{ k: 3 }], ["3"]);
+  assert.equal(w.inserts, 1, "three rows: written");
+  assert.equal(w.holds("1"), false, "written keys are in the store now, not held");
+  await w.add([{ k: 4 }], ["4"]);
+  w.log({ study: "s" });
+  t = 59_999; await w.add([], []);
+  assert.equal(w.inserts, 1);
+  t = 60_000; await w.add([], []);
+  assert.equal(w.inserts, 3, "a minute on: the row, then the log row");
+  assert.deepEqual(ch.statements.filter((x) => /^INSERT/.test(x)).map((x) => /INTO ([\w.]+)/.exec(x)![1]), ["annotation.variant", "annotation.variant", "annotation.sync_run"]);
+  await w.flush();
+  assert.equal(w.inserts, 3, "nothing held, nothing written");
+  assert.deepEqual(insertLimits({}), { rows: 20_000, seconds: 300 });
+  assert.deepEqual(insertLimits({ ANNOTATION_INSERT_ROWS: "5", ANNOTATION_INSERT_SECONDS: "7" }), { rows: 5, seconds: 7 });
 });
