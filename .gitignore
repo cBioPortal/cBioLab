@@ -41,3 +41,8 @@ quality-report/
 
 # npm run local: build output of the local-mode app (scripts/local.ts)
 .next-local
+
+# scripts/portal-bench: generated config (holds a password), server logs, the bench build
+scripts/portal-bench/application.properties
+scripts/portal-bench/*.log
+.next-bench
