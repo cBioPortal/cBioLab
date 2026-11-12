@@ -10,7 +10,7 @@ import { inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
 import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } from "./variant-annotation.ts";
 
-export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string }
+export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean }
 
 /** The table's columns, in the portal's order. */
 export const MUTATION_COLUMNS: MutationColumn[] = [
@@ -21,6 +21,9 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
   // set of values (the stems selected there), so a text column that sorts by number
   { id: "proteinPos", name: "Protein Position", numeric: false },
   { id: "annotation", name: "Annotation (OncoKB)", numeric: false },
+  // MutationAssessor, SIFT, PolyPhen-2 and AlphaMissense on the canonical transcript; the portal does not sort it
+  { id: "functionalImpact", name: "Functional Impact", numeric: false, unsorted: true,
+    tip: "Functional impact of the variant on the protein: Mutation Assessor, SIFT, PolyPhen-2 and AlphaMissense predictions. Hover over a dot to see the prediction and its score." },
   { id: "mutationType", name: "Mutation Type", numeric: false },
   { id: "alteration", name: "Alteration", numeric: false },
   { id: "variantType", name: "Variant Type", numeric: false },
@@ -38,7 +41,11 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
   // the rest from Genome Nexus, read from the offline store at its pin (lib/variant-annotation.ts)
   { id: "hgvsc", name: "HGVSc", numeric: false, tip: "Coding DNA change in HGVS notation (HGVSc) for the selected transcript" },
   { id: "status", name: "MS", numeric: false },
+  { id: "gnomad", name: "gnomAD", numeric: true,
+    tip: "gnomAD population allele frequencies. Overall population allele frequency is shown. Hover over a frequency to see the frequency for each specific population." },
   { id: "clinvar", name: "ClinVar", numeric: false, tip: "ClinVar aggregates information about genomic variation and its relationship to human health." },
+  { id: "dbsnp", name: "dbSNP", numeric: false,
+    tip: "The Single Nucleotide Polymorphism Database (dbSNP) is a free public archive for genetic variation within and across different species. NOTE: Currently only SNPs, single base deletions and insertions are supported." },
   // SIGNAL's germline frequency, spelled at two significant digits and sorted by number
   { id: "signal", name: "SIGNAL", numeric: false, tip: "Prevalence of germline mutations in cancer patients from SIGNAL" },
 ];
@@ -77,6 +84,10 @@ function queryColumn(c: MutationColumn, pin: string | null): QueryColumn {
     case "hgvsc": return { ...c, text: "hgvsc", order: "toInt64OrNull(extract(hgvsc, 'c\\.(-?[0-9]+)'))" };
     case "clinvar": return { ...c, text: "if(clinvar = '' OR clinvarConflicting = '', clinvar, concat(clinvar, '(', clinvarConflicting, ')'))", order: "nullIf(clinvar, '')" };
     case "signal": return { ...c, text: str(SIGNAL_TEXT), order: "signalFreq" };
+    // the portal sorts gnomAD by the overall frequency, dbSNP by its id; Functional Impact is not sorted
+    case "gnomad": return { ...c, text: str("gnomadFreq"), num: "gnomadFreq" };
+    case "dbsnp": return { ...c, text: "rsid", order: "nullIf(rsid, '')" };
+    case "functionalImpact": return { ...c, text: "functionalImpact" };
     default: return c.numeric ? { ...c, text: str(c.id), num: num(c.id) } : { ...c, text: str(c.id) };
   }
 }

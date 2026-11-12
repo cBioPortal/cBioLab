@@ -84,19 +84,69 @@ export function variantAnnotationCte(name: string, db: string, study: string, va
  * - `clinvar`, `clinvarConflicting`, `clinvarId`: ClinVar's clinical significance, its conflicting
  *   classifications, and the variation id (0: ClinVar has no record of the variant);
  * - `signal`: SIGNAL's germline entry (the last whose status names germline), as JSON, and
- *   `signalFreq`, its overall frequency (Σ carriers / Σ patients), when its status is germline.
+ *   `signalFreq`, its overall frequency (Σ carriers / Σ patients), when its status is germline;
+ * - `tc`: the canonical transcript's consequence, as JSON (SIFT, PolyPhen-2 and AlphaMissense are read off it);
+ * - `rsid`: dbSNP's id; `gnomadRaw`, `vcfRaw`, `seqRegion`: gnomAD's counts and what its link is built from,
+ *   and `gnomadFreq`, the overall allele frequency as the portal's gnomAD column sorts it;
+ * - `maRaw`: MutationAssessor's call; `functionalImpact`: the Functional Impact column as the portal downloads it.
  */
 export function variantColumnsSql(gd: string, gene: string): string {
   const tid = "JSONExtractString(" + gd + ", 'canonical', " + sq(gene) + ")";
   const sg = "arrayLast(e -> position(JSONExtractString(e, 'mutationStatus'), 'germline') > 0, JSONExtractArrayRaw(" + gd + ", 'signal'))";
   const counts = (field: string) => "arraySum(arrayMap(c -> JSONExtractFloat(c, " + sq(field) + "), JSONExtractArrayRaw(sig, 'countsByTumorType')))";
   return "JSONExtractBool(" + gd + ", 'ok') AS gnOk,\n" +
-    "         JSONExtractString(arrayFirst(t -> JSONExtractString(t, 'transcriptId') = " + tid + ", JSONExtractArrayRaw(" + gd + ", 'transcripts')), 'hgvsc') AS hgvsc,\n" +
+    "         arrayFirst(t -> JSONExtractString(t, 'transcriptId') = " + tid + ", JSONExtractArrayRaw(" + gd + ", 'transcripts')) AS tc,\n" +
+    "         JSONExtractString(tc, 'hgvsc') AS hgvsc,\n" +
     "         JSONExtractString(" + gd + ", 'clinvar', 'significance') AS clinvar, JSONExtractString(" + gd + ", 'clinvar', 'conflicting') AS clinvarConflicting,\n" +
     "         JSONExtractUInt(" + gd + ", 'clinvar', 'id') AS clinvarId,\n" +
     "         " + sg + " AS sig,\n" +
     "         if(lower(JSONExtractString(sig, 'mutationStatus')) = 'germline' AND " + counts("tumorTypeCount") + " > 0, " +
-    counts("variantCount") + " / " + counts("tumorTypeCount") + ", NULL) AS signalFreq";
+    counts("variantCount") + " / " + counts("tumorTypeCount") + ", NULL) AS signalFreq,\n" +
+    "         JSONExtractString(" + gd + ", 'rsid') AS rsid, JSONExtractRaw(" + gd + ", 'gnomad') AS gnomadRaw, JSONExtractRaw(" + gd + ", 'vcf') AS vcfRaw,\n" +
+    "         JSONExtractString(" + gd + ", 'seqRegion') AS seqRegion,\n" +
+    "         " + gnomadFreqSql(gd) + " AS gnomadFreq,\n" +
+    "         JSONExtractRaw(" + gd + ", 'mutationAssessor') AS maRaw,\n" +
+    // the portal spells it for any variant Genome Nexus answered, one it could not annotate included (all NA)
+    "         if(" + gd + " != '', " + functionalImpactSql(gd) + ", '') AS functionalImpact";
+}
+
+/**
+ * gnomAD's overall allele frequency as the portal's gnomAD column sorts it (Gnomad.tsx): with both exome
+ * and genome counts, their pooled allele count over their pooled allele number; with one, its stored
+ * frequency, or its count over its number; with neither, NULL.
+ */
+function gnomadFreqSql(gd: string): string {
+  const f = (x: string, part: string, key: string) => "JSONExtractFloat(" + gd + ", 'gnomad', '" + x + "', '" + part + "', '" + key + "')";
+  const has = (x: string) => "JSONType(" + gd + ", 'gnomad', '" + x + "') = 'Object'";
+  const one = (x: string) => "coalesce(JSONExtract(" + gd + ", 'gnomad', '" + x + "', 'alleleFrequency', 'af', 'Nullable(Float64)'), if(" +
+    f(x, "alleleNumber", "an") + " > 0, " + f(x, "alleleCount", "ac") + " / " + f(x, "alleleNumber", "an") + ", 0))";
+  const an = f("exome", "alleleNumber", "an") + " + " + f("genome", "alleleNumber", "an");
+  return "multiIf(" + has("exome") + " AND " + has("genome") + ", if(" + an + " > 0, (" + f("exome", "alleleCount", "ac") + " + " + f("genome", "alleleCount", "ac") + ") / (" + an + "), 0), " +
+    has("exome") + ", " + one("exome") + ", " + has("genome") + ", " + one("genome") + ", NULL)";
+}
+
+/** a JSON value as JavaScript's template literal prints it: a number as JS writes it, a missing key "undefined", null "null" */
+function jsText(json: string, ...path: string[]): string {
+  const at = json + ", " + path.map(sq).join(", ");
+  return "multiIf(NOT JSONHas(" + at + "), 'undefined', JSONType(" + at + ") = 'Null', 'null', JSONType(" + at + ") IN ('Int64', 'UInt64', 'Double'), " +
+    "toString(JSONExtractFloat(" + at + ")), JSONExtractString(" + at + "))";
+}
+
+/**
+ * The Functional Impact column as the portal downloads it (FunctionalImpactColumnFormatter.download):
+ * MutationAssessor, SIFT, PolyPhen-2 and AlphaMissense on the canonical transcript, each "NA" when it has
+ * no call, joined by ";".
+ */
+function functionalImpactSql(gd: string): string {
+  const has = (key: string) => "(JSONExtractFloat(tc, '" + key + "') != 0 OR JSONExtractString(tc, '" + key.replace("Score", "Prediction") + "') != '')";
+  const part = (label: string, score: string, pred: string) =>
+    "concat('" + label + ": ', if(" + has(score) + ", concat('impact: ', " + jsText("tc", pred) + ", ', score: ', " + jsText("tc", score) + "), 'NA'))";
+  const am = "(JSONExtractFloat(tc, 'alphaMissense', 'score') != 0 OR JSONExtractString(tc, 'alphaMissense', 'pathogenicity') != '')";
+  return "concat(" +
+    "concat('MutationAssessor: ', if(JSONType(" + gd + ", 'mutationAssessor') = 'Object', concat('impact: ', " + jsText(gd, "mutationAssessor", "prediction") +
+      ", ', score: ', " + jsText(gd, "mutationAssessor", "score") + "), 'NA')), ';', " +
+    part("SIFT", "siftScore", "siftPrediction") + ", ';', " + part("Polyphen-2", "polyphenScore", "polyphenPrediction") + ", ';', " +
+    "concat('AlphaMissense: ', if(" + am + ", concat('pathogenicity: ', " + jsText("tc", "alphaMissense", "pathogenicity") + ", ', score: ', " + jsText("tc", "alphaMissense", "score") + "), 'NA')))";
 }
 
 /**

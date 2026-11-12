@@ -30,7 +30,7 @@ export function insertLimits(env: Record<string, string | undefined> = process.e
  * A run's sync_run row is held too and written after the rows it counts, so the log never reports a
  * study whose rows are not yet stored. A sync that stops loses only what it held, and the next run
  * asks for it again (the diff). The keys it holds are skipped by a later study of the same run, which
- * cannot see them in the store yet.
+ * cannot see them in the store yet. `before` runs ahead of each write of rows (the release guard).
  */
 export class HeldWriter {
   private rows: Row[] = [];
@@ -41,9 +41,10 @@ export class HeldWriter {
   private table: string;
   private limits: InsertLimits;
   private clock: () => number;
+  private before: () => Promise<void>;
   inserts = 0;
-  constructor(conn: WriteConn, table: string, limits: InsertLimits = insertLimits(), clock: () => number = Date.now) {
-    this.conn = conn; this.table = table; this.limits = limits; this.clock = clock;
+  constructor(conn: WriteConn, table: string, limits: InsertLimits = insertLimits(), clock: () => number = Date.now, before: () => Promise<void> = async () => {}) {
+    this.conn = conn; this.table = table; this.limits = limits; this.clock = clock; this.before = before;
     this.last = clock();
   }
   holds(key: string): boolean { return this.keys.has(key); }
@@ -55,10 +56,22 @@ export class HeldWriter {
   /** a sync_run row, written after every row held before it */
   log(row: Row): void { this.logs.push(row); }
   async flush(): Promise<void> {
-    if (this.rows.length) { await insertRows(this.conn, this.table, this.rows); this.inserts++; }
+    if (this.rows.length) { await this.before(); await insertRows(this.conn, this.table, this.rows); this.inserts++; }
     if (this.logs.length) { await insertRows(this.conn, SYNC_RUN_TABLE, this.logs); this.inserts++; }
     this.rows = []; this.logs = []; this.keys.clear(); this.last = this.clock();
   }
+}
+
+/**
+ * A writer for `src`'s rows of `release` that, before each write, asks the service for its release again
+ * and stops the sync when it has moved on: rows annotated after the change would be stored under a release
+ * that did not make them. What it held is not written; the next run starts on the new release.
+ */
+export function releaseWriter(conn: WriteConn, src: AnnotationSource, release: Release): HeldWriter {
+  return new HeldWriter(conn, src.table, insertLimits(), Date.now, async () => {
+    const now = (await src.release()).version;
+    if (now !== release.version) throw new Error(src.label + " moved from release " + release.version + " to " + now + " during the sync; nothing since the last write was stored. Re-run to sync the new release.");
+  });
 }
 
 const keyOf = (src: AnnotationSource, r: Row) => src.keyColumns.map((c) => String(r[c])).join("\u0000");
@@ -103,7 +116,7 @@ export async function ensureStore(conn: WriteConn, src: AnnotationSource): Promi
  */
 export async function syncKeys(conn: WriteConn, src: AnnotationSource, release: Release, study: string, log: Log, out?: HeldWriter): Promise<SyncResult> {
   const own = !out;
-  const w = out ?? new HeldWriter(conn, src.table);
+  const w = out ?? releaseWriter(conn, src, release);
   try {
     return await syncInto(w, conn, src, release, study, log);
   } finally {
@@ -166,7 +179,7 @@ export async function warehouseStudies(conn: WriteConn): Promise<string[]> {
 export async function syncStudies(conn: WriteConn, src: AnnotationSource, release: Release, studies: string[], log: Log):
     Promise<{ done: number; failed: number; aborted: boolean; missing: number; total: number }> {
   let done = 0, failed = 0, aborted = false;
-  const w = new HeldWriter(conn, src.table);
+  const w = releaseWriter(conn, src, release);
   try {
     for (const [i, study] of studies.entries()) {
       log(`--- study ${i + 1}/${studies.length}: ${study}`);

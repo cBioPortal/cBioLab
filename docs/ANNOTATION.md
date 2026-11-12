@@ -1,9 +1,9 @@
 # Annotation stores
 
 **The app never calls an annotation service.** Everything a result says about a variant beyond
-the study's own data — OncoKB's oncogenicity and levels, Genome Nexus's HGVSc, ClinVar and SIGNAL
-today, and the sources still to come (gnomAD, dbSNP and functional-impact predictions; CIViC;
-transcripts, Pfam domains, PTMs and structures) — is resolved **offline**, by `npm run annotate`,
+the study's own data — OncoKB's oncogenicity and levels; Genome Nexus's HGVSc, functional-impact
+predictions, gnomAD, ClinVar, dbSNP, SIGNAL and Cancer Hotspots today; and the sources still to come
+(CIViC; transcripts, Pfam domains, PTMs and structures) — is resolved **offline**, by `npm run annotate`,
 into a version-pinned store in ClickHouse, and read from there at query time. So a result never
 depends on whether a service answered in time, every annotation it shows names the release it
 came from, and no variant leaves the warehouse while someone is waiting for an answer.
@@ -31,27 +31,43 @@ from the portal's, so a portal dump never holds annotations, licensed or not; a 
 Genome Nexus runs one service per reference genome, each with its own releases, so each is a source:
 `genome_nexus` (GRCh37, `v1.genomenexus.org`, the studies on hg19) and `genome_nexus_grch38`
 (`grch38.genomenexus.org`, hg38). A sync asks each distinct variant of its studies' mutations as
-cBioPortal asks it — `POST /annotation/genomic` with `annotation_summary`, `clinvar` and (GRCh37
-only: the GRCh38 service has none) `signal`, MSKCC isoform overrides — and stores, per variant:
-every transcript's consequence summary (HGVSc, HGVSp, consequence, SIFT/PolyPhen); each gene's
+cBioPortal asks it — `POST /annotation/genomic` with `annotation_summary`, `clinvar`, `hotspots`,
+`mutation_assessor` and (GRCh37 only: the GRCh38 service has none) `signal`, MSKCC isoform
+overrides — and stores, per variant: every transcript's consequence summary (HGVSc, HGVSp,
+consequence, SIFT, PolyPhen-2, AlphaMissense); each gene's
 canonical transcript (`/ensembl/canonical-transcript/hgnc`, asked once per gene per sync), because the
 portal's HGVSc is on the canonical transcript of the gene the mutation is listed under and a third of
-variants lie in two genes; ClinVar's record; and SIGNAL's entries. A variant the service cannot
-annotate is stored with its error, so it is not asked again. The release is the server version, its
-VEP cache and its ClinVar release (`2.2.3-vep116-clinvar20260208`); GRCh38's service reports its VEP
-as `NA` (it asks Ensembl), so its rows are pinned to less than GRCh37's.
+variants lie in two genes; ClinVar's record; SIGNAL's entries; MutationAssessor's call; Cancer
+Hotspots' residues on any of its transcripts; and myvariant.info's gnomAD counts (exome and genome,
+by population), VCF position and dbSNP id. A variant the service cannot annotate is stored with its
+error, so it is not asked again. The release is the server version, its VEP cache, its ClinVar
+release and the set of fields stored (`2.2.3-vep116-clinvar20260208+f2`): a row stored before a field
+was added lacks it, so adding one (`GN_FIELD_SET`) names a new release and the next sync asks again.
+GRCh38's service reports its VEP as `NA` (it asks Ensembl), so its rows are pinned to less than GRCh37's.
+
+**myvariant.info is asked on its own, in small requests.** Genome Nexus answers a request with no
+myvariant.info record for *any* of its variants when one variant's record fails it (`3:52475300 G>A`
+on GRCh37, for one; about 2% of variants), without an error. So gnomAD and dbSNP are asked 25 variants
+at a time, four requests at once, and a request that comes back with none at all is split in half and
+asked again, down to the variant that fails, which alone is left without them. (cBioPortal asks a
+gene's mutations in one request, so there such a variant blanks gnomAD and dbSNP for the whole gene.)
+
+**A release that changes mid-sync stops it.** Before each write the sync asks the service for its
+release again; when it has moved on, the sync stops without writing what it held, so no row is stored
+under a release that did not make it, and the next run syncs the new release.
 
 The mutation table (`lib/mutation-table.ts`, `lib/variant-annotation.ts`) joins each study's
 mutations to its own genome's source at that source's pin, the newest release a sync stored
-(`GENOME_NEXUS_PIN`, `GENOME_NEXUS_GRCH38_PIN` override it), and reads HGVSc, ClinVar and SIGNAL off
-the JSON; HGVSg it builds from the mutation's coordinates, as the portal does. Its caveat names the
+(`GENOME_NEXUS_PIN`, `GENOME_NEXUS_GRCH38_PIN` override it), and reads HGVSc, Functional Impact,
+gnomAD, ClinVar, dbSNP and SIGNAL off the JSON; HGVSg it builds from the mutation's coordinates, as the portal does. Its caveat names the
 pins and the studies no sync has covered. Before the first sync there is no pin, and the table
 leaves the store alone.
 
 The public warehouse holds about 6.0M distinct GRCh37 variants and 3.1M GRCh38 ones (November 2026).
-They are stored at about 0.2 KB each, compressed (2.5–3 KB as JSON), so about 2 GB in all. At the
-public services' pace measured on one study (about 60 variants a second, the canonical-transcript
-calls included) a first full sync takes about two days; later ones ask only for new variants.
+They are stored at about 0.2 KB each, compressed (2.5–4 KB as JSON), so about 2 GB in all. At the
+public services' pace measured on one study (12–35 variants a second, the canonical-transcript and
+myvariant.info calls included, and slower when Genome Nexus is busy) a first full sync takes several
+days; later ones ask only for new variants.
 
 ## How a store works
 

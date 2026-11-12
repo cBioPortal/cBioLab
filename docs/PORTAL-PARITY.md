@@ -290,8 +290,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [ ] **Mutation annotation breadth** — CIViC, functional impact, gnomAD / ClinVar / dbSNP / SIGNAL columns, HGVSg/c, PTM tracks, the PDB 3D structure viewer, a transcript dropdown
   - [x] HGVSg, HGVSc, ClinVar and SIGNAL columns on the mutation table, Genome Nexus read from the offline store (#179)
   - [ ] ClinVar's header sorts descending first, as the portal's does; the HGVSg tooltip's Genome Nexus logo
-  - [ ] gnomAD and dbSNP columns
-  - [ ] Functional impact (SIFT, PolyPhen-2, MutationAssessor)
+  - [x] gnomAD, dbSNP and Functional Impact (Mutation Assessor, SIFT, PolyPhen-2, AlphaMissense) columns, read from the offline store (#182)
+  - [ ] The Functional Impact column's sectioned filter menu (by predictor and call); its header icons are text labels, not the tools' logos
+  - [ ] gnomAD and dbSNP for the ~2% of variants Genome Nexus cannot serve myvariant.info's record of (asking myvariant.info directly would be a second source)
   - [ ] CIViC
   - [ ] The transcript dropdown, with the lollipop's transcripts and Pfam domains read from the store instead of Genome Nexus live
   - [ ] PTM tracks
