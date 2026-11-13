@@ -353,6 +353,15 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .fpill .fx:hover, .fgroup .fx:hover { color: var(--err); }
 .fconn { font-size: var(--t-xs); font-weight: 700; color: var(--muted); letter-spacing: 0.09em; }
 .fgroup { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; border: 1px dashed var(--line); border-radius: var(--r-md); padding: 0.15rem 0.4rem; }
+/* Explore's filter bar: "<chart> : pill or pill", each pill a .fpill with editable interval ends */
+.svpills { display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; align-items: center; }
+.svgroup { display: inline-flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; font-size: var(--t-xs); }
+.svname { font-weight: 600; }
+.svop { color: var(--muted); }
+.svedit {
+  background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 3px;
+  padding: 0 0.2rem; font: inherit; text-align: center; min-width: 2.2em;
+}
 
 /* condensed study rows in the Explore study panel */
 /* The study list is one grid and each row a subgrid, so a column is as wide as its widest

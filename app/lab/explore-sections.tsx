@@ -4,7 +4,7 @@
 // section the same ExploreCtx — what it reads and the edits it can make.
 import { useState } from "react";
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
-import CohortPills from "./pills";
+import StudyViewPills from "./study-view-pills";
 import { ChartMenu, type ChartAction } from "./partitions.tsx";
 import { ANALYSIS_MAX_COHORTS, armLabel, COMPARISON_MAX_ACTIVE, COMPARISON_MAX_GROUPS, type ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
@@ -219,7 +219,7 @@ function StudyActions({ id, ctx, onQuery }: { id: string; ctx: ExploreCtx; onQue
 }
 
 export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
-  const { addMode, clearDraft, confirmSave, exMsg, exStudies, explore, exploreBusy, openSaveDialog, parseDraft, removeDraftClause, saveDraftAsFeature, confirmSaveFeature, saving, setSaving, savingFeature, setSavingFeature, showClauseData } = ctx;
+  const { addMode, applyOrSay, clearDraft, confirmSave, exMsg, exStudies, explore, exploreBusy, openSaveDialog, parseDraft, removeDraftClause, saveDraftAsFeature, confirmSaveFeature, saving, setSaving, savingFeature, setSavingFeature, showClauseData } = ctx;
   return <>
     {(() => {
       const d = parseDraft();
@@ -252,10 +252,17 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
                 <Tag />Save as feature
               </Button>
             </>}
-            <Button variant="ghost" size="sm" onClick={clearDraft}><X />Clear</Button>
+            <Button variant="ghost" size="sm" onClick={clearDraft} data-tip="remove every filter, keeping the studies"><X />Clear All Filters</Button>
           </div>
           <div className="row mt-1.5">
-            {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />; })()}
+            {(() => {
+              const dr = parseDraft();
+              if (!dr) return null;
+              const names = new Map<string, string>();
+              for (const f of explore?.clinical || []) if (f.displayName && !names.has(f.attribute)) names.set(f.attribute, f.displayName);
+              return <StudyViewPills draft={dr} labelOf={(a) => names.get(a)} apply={applyOrSay}
+                onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />;
+            })()}
           </div>
           {exMsg && <p className="note flush mt-1.5">{exMsg}</p>}
           {!!explore?.unknownAttributes?.length && <p className="error flush mt-1.5" data-unknown-attrs>

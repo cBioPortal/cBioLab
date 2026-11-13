@@ -10,10 +10,13 @@ import { entityShortName } from "../../lib/profile-names.ts";
 /** opens the uploaded data behind a clause (see custom-data-dialog.tsx) */
 export type OnCustomData = (attribute: string, leaf: any, negated: boolean) => void;
 
+/** the edge colour of a clinical clause's pill */
+export const CLINICAL_COLOR = "#0072B2";
+
 const KIND_META: Record<string, { label: string; color: string }> = {
   alteration: { label: "gene", color: "#CC79A7" },
   oql: { label: "OQL", color: "#CC79A7" },
-  clinical: { label: "clinical", color: "#0072B2" },
+  clinical: { label: "clinical", color: CLINICAL_COLOR },
   event: { label: "timeline", color: "#009E73" },
   sampleList: { label: "samples", color: "#999999" },
   patientList: { label: "patients", color: "#999999" },
@@ -142,6 +145,23 @@ export function normalizeDef(def: any) {
   return def;
 }
 
+/** one top-level clause: a pill, a NOT pill, or an OR group, with an × when it can be removed */
+export function ClausePill({ clause: c, onRemove, onCustomData }: { clause: any; onRemove?: () => void; onCustomData?: OnCustomData }) {
+  if (c.any) return (
+    <span className="fgroup">
+      {c.any.map((l: any, j: any) => (
+        <Fragment key={j}>
+          {j > 0 && <span className="fconn">OR</span>}
+          <Pill leaf={l} onCustomData={onCustomData} />
+        </Fragment>
+      ))}
+      {onRemove && <button className="fx" aria-label="remove group" onClick={onRemove}>×</button>}
+    </span>
+  );
+  if (c.not) return <Pill leaf={c.not} negated onRemove={onRemove} onCustomData={onCustomData} />;
+  return <Pill leaf={c} onRemove={onRemove} onCustomData={onCustomData} />;
+}
+
 export default function CohortPills({ def, onRemoveClause, onCustomData }: { def: any; onRemoveClause?: (i: number) => void; onCustomData?: OnCustomData }) {
   const d = normalizeDef(def);
   if (!d || !Array.isArray(d.all) || !d.all.length) return <span className="meta">no clauses</span>;
@@ -150,21 +170,7 @@ export default function CohortPills({ def, onRemoveClause, onCustomData }: { def
       {d.all.map((c: any, i: any) => (
         <Fragment key={i}>
           {i > 0 && <span className="fconn">AND</span>}
-          {c.any ? (
-            <span className="fgroup">
-              {c.any.map((l: any, j: any) => (
-                <Fragment key={j}>
-                  {j > 0 && <span className="fconn">OR</span>}
-                  <Pill leaf={l} onCustomData={onCustomData} />
-                </Fragment>
-              ))}
-              {onRemoveClause && <button className="fx" aria-label="remove group" onClick={() => onRemoveClause(i)}>×</button>}
-            </span>
-          ) : c.not ? (
-            <Pill leaf={c.not} negated onRemove={onRemoveClause ? () => onRemoveClause(i) : undefined} onCustomData={onCustomData} />
-          ) : (
-            <Pill leaf={c} onRemove={onRemoveClause ? () => onRemoveClause(i) : undefined} onCustomData={onCustomData} />
-          )}
+          <ClausePill clause={c} onRemove={onRemoveClause ? () => onRemoveClause(i) : undefined} onCustomData={onCustomData} />
         </Fragment>
       ))}
     </span>

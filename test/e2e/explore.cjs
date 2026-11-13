@@ -339,6 +339,30 @@ async function explore({ ok, BASE, page }) {
     urlOk = !!first && first === again && q.has("filters") && !q.has("filterAttributeId");
   } catch (e) { urlDetail = String(e.message).split("\n")[0]; }
   ok("explore: a portal link's filters open filtered, are written as the page's own, and survive a reload", urlOk, urlDetail);
+
+  // The filter bar as the Study View's (lib/study-view-pills.ts): "Diagnosis Age : 50 < x ≤ 60",
+  // its end typed in place widens the filter, and a pill's × takes it out.
+  let pillDetail = "", pillOk = false;
+  try {
+    const matchCount = async (not) => {
+      await page.waitForFunction((n) => { const m = /([\d,]+) patients match/.exec(document.querySelector(".exbar")?.textContent || ""); return m && m[1] !== n; }, not, { timeout: 240000 });
+      return Number((/([\d,]+) patients match/.exec(await page.locator(".exbar").innerText()) || [])[1].replace(/,/g, ""));
+    };
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018&filterAttributeId=AGE&filterValues=50-60", { waitUntil: "domcontentloaded" });
+    const narrow = await matchCount(null);
+    const group = page.locator(".svgroup[data-sv-chart='AGE']");
+    const name = (await group.locator(".svname").innerText()).trim();
+    const ends = await group.locator(".svedit").evaluateAll((e) => e.map((x) => x.value));
+    const text = (await group.locator(".svpill").innerText()).replace(/\s+/g, " ").trim();
+    const end = page.getByRole("textbox", { name: name + " end" });
+    await end.fill("70"); await end.press("Enter");
+    const wide = await matchCount(String(narrow));
+    await page.getByRole("button", { name: "remove " + name + " 50 < x ≤ 70" }).click();
+    await page.waitForFunction(() => !document.querySelector(".svgroup[data-sv-chart='AGE']"), null, { timeout: 60000 });
+    pillDetail = JSON.stringify({ name, ends, text, narrow, wide });
+    pillOk = name === "Diagnosis Age" && ends.join("-") === "50-60" && /< x ≤/.test(text) && wide > narrow;
+  } catch (e) { pillDetail = String(e.message).split("\n")[0]; }
+  ok("explore: filter pills are named by chart, an interval's end is edited in place, and × removes the filter", pillOk, pillDetail);
 }
 
 module.exports = { explore };
