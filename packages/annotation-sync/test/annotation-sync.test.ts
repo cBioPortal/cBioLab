@@ -171,7 +171,7 @@ test("the store is created by its own statements, idempotently", async () => {
   assert.deepEqual(made(), ["annotation", "annotation.sync_run", "annotation.variant"], "a public source's: the shared table");
   // a new local database gets every store once, the shared table though two sources write it
   assert.deepEqual(annotationStoreDdl().map((s) => /IF NOT EXISTS (\S+)/.exec(s)?.[1]),
-    ["annotation", "annotation.sync_run", "annotation.oncokb", "annotation.variant"]);
+    ["annotation", "annotation.sync_run", "annotation.oncokb", "annotation.variant", "annotation.oncokb_tumor_type"]);
 });
 
 test("a sync writes as the source's own writer, or as the local instance; never silently as the app", () => {
@@ -188,7 +188,7 @@ test("a sync writes as the source's own writer, or as the local instance; never 
 test("an unknown source is refused, naming the ones there are", () => {
   assert.equal(annotationSource("oncokb"), oncokbSource);
   assert.equal(annotationSource("genome_nexus_grch38"), genomeNexusGrch38Source);
-  assert.throws(() => annotationSource("civic"), /no annotation source 'civic' \(sources: oncokb, genome_nexus, genome_nexus_grch38\)/);
+  assert.throws(() => annotationSource("civic"), /no annotation source 'civic' \(sources: oncokb, genome_nexus, genome_nexus_grch38, oncokb_tumor_type\)/);
 });
 
 test("a study's rows are written in one insert, however many service batches it took, and its log row after them", async () => {

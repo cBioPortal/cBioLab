@@ -2,12 +2,13 @@
 import { envConn, writerConn, type Conn } from "@cbiolab/clickhouse";
 import type { AnnotationSource } from "./source.ts";
 import { oncokbSource } from "./sources/oncokb.ts";
+import { oncokbTumorTypeSource } from "./sources/oncokb-tumor-type.ts";
 import { genomeNexusSource, genomeNexusGrch38Source } from "./sources/genome-nexus.ts";
 import { STORE_DDL } from "./store.ts";
 
 export { ANNOTATION_DB, SYNC_RUN_TABLE, VARIANT_TABLE } from "./store.ts";
 
-export const ANNOTATION_SOURCES: AnnotationSource[] = [oncokbSource, genomeNexusSource, genomeNexusGrch38Source];
+export const ANNOTATION_SOURCES: AnnotationSource[] = [oncokbSource, genomeNexusSource, genomeNexusGrch38Source, oncokbTumorTypeSource];
 
 export function annotationSource(id: string): AnnotationSource {
   const s = ANNOTATION_SOURCES.find((x) => x.id === id);

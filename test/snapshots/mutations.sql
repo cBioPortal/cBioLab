@@ -16,6 +16,10 @@
 WITH ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
   FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
   GROUP BY alteration),
+att AS (SELECT alteration, consequence, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,
+    max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found
+  FROM annotation.oncokb_tumor_type AS t WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
+  GROUP BY alteration, consequence, tumor_type),
 c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
@@ -42,6 +46,15 @@ mc0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(a
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'MUTATION_COUNT'
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
+k0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,
+    anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
+    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
+mt0 AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence,
+    if(ifNull(k.sid, '') = '', (SELECT t.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
+      WHERE cs.cancer_study_identifier = 'msk_chord_2024'), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType
+  FROM m0 AS m LEFT JOIN k0 AS k ON k.sid = m.sid),
 g0 AS (SELECT chr, start_position AS start, end_position AS end, reference_allele AS ref, variant_allele AS var, any(data) AS gd
   FROM annotation.variant
   WHERE (source, version) IN (('genome_nexus', '2.2.3-vep116-clinvar20260208+f2'), ('genome_nexus_grch38', '1.4.1-vepNA-clinvar20250106+f2')) AND source = (SELECT multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id WHERE cs.cancer_study_identifier = 'msk_chord_2024')
@@ -52,7 +65,8 @@ rows AS (
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
          m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
-         ann.oncogenicity AS oncogenicity, ann.level AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
+         if(tt.found = 1, tt.oncogenicity, ann.oncogenicity) AS oncogenicity, if(tt.found = 1, tt.level, ann.level) AS level,
+         toUInt8(if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) AS drv,
          m.mutationType AS mutationType, m.variantType AS variantType,
          if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,
          toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,
@@ -69,8 +83,9 @@ rows AS (
          multiIf(JSONType(ifNull(g.gd, ''), 'gnomad', 'exome') = 'Object' AND JSONType(ifNull(g.gd, ''), 'gnomad', 'genome') = 'Object', if(JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleNumber', 'an') + JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleNumber', 'an') > 0, (JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleCount', 'ac') + JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleCount', 'ac')) / (JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleNumber', 'an') + JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleNumber', 'an')), 0), JSONType(ifNull(g.gd, ''), 'gnomad', 'exome') = 'Object', coalesce(JSONExtract(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleFrequency', 'af', 'Nullable(Float64)'), if(JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleNumber', 'an') > 0, JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleCount', 'ac') / JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleNumber', 'an'), 0)), JSONType(ifNull(g.gd, ''), 'gnomad', 'genome') = 'Object', coalesce(JSONExtract(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleFrequency', 'af', 'Nullable(Float64)'), if(JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleNumber', 'an') > 0, JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleCount', 'ac') / JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleNumber', 'an'), 0)), NULL) AS gnomadFreq,
          JSONExtractRaw(ifNull(g.gd, ''), 'mutationAssessor') AS maRaw,
          if(ifNull(g.gd, '') != '', concat(concat('MutationAssessor: ', if(JSONType(ifNull(g.gd, ''), 'mutationAssessor') = 'Object', concat('impact: ', multiIf(NOT JSONHas(ifNull(g.gd, ''), 'mutationAssessor', 'prediction'), 'undefined', JSONType(ifNull(g.gd, ''), 'mutationAssessor', 'prediction') = 'Null', 'null', JSONType(ifNull(g.gd, ''), 'mutationAssessor', 'prediction') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(ifNull(g.gd, ''), 'mutationAssessor', 'prediction')), JSONExtractString(ifNull(g.gd, ''), 'mutationAssessor', 'prediction')), ', score: ', multiIf(NOT JSONHas(ifNull(g.gd, ''), 'mutationAssessor', 'score'), 'undefined', JSONType(ifNull(g.gd, ''), 'mutationAssessor', 'score') = 'Null', 'null', JSONType(ifNull(g.gd, ''), 'mutationAssessor', 'score') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(ifNull(g.gd, ''), 'mutationAssessor', 'score')), JSONExtractString(ifNull(g.gd, ''), 'mutationAssessor', 'score'))), 'NA')), ';', concat('SIFT: ', if((JSONExtractFloat(tc, 'siftScore') != 0 OR JSONExtractString(tc, 'siftPrediction') != ''), concat('impact: ', multiIf(NOT JSONHas(tc, 'siftPrediction'), 'undefined', JSONType(tc, 'siftPrediction') = 'Null', 'null', JSONType(tc, 'siftPrediction') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'siftPrediction')), JSONExtractString(tc, 'siftPrediction')), ', score: ', multiIf(NOT JSONHas(tc, 'siftScore'), 'undefined', JSONType(tc, 'siftScore') = 'Null', 'null', JSONType(tc, 'siftScore') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'siftScore')), JSONExtractString(tc, 'siftScore'))), 'NA')), ';', concat('Polyphen-2: ', if((JSONExtractFloat(tc, 'polyphenScore') != 0 OR JSONExtractString(tc, 'polyphenPrediction') != ''), concat('impact: ', multiIf(NOT JSONHas(tc, 'polyphenPrediction'), 'undefined', JSONType(tc, 'polyphenPrediction') = 'Null', 'null', JSONType(tc, 'polyphenPrediction') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'polyphenPrediction')), JSONExtractString(tc, 'polyphenPrediction')), ', score: ', multiIf(NOT JSONHas(tc, 'polyphenScore'), 'undefined', JSONType(tc, 'polyphenScore') = 'Null', 'null', JSONType(tc, 'polyphenScore') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'polyphenScore')), JSONExtractString(tc, 'polyphenScore'))), 'NA')), ';', concat('AlphaMissense: ', if((JSONExtractFloat(tc, 'alphaMissense', 'score') != 0 OR JSONExtractString(tc, 'alphaMissense', 'pathogenicity') != ''), concat('pathogenicity: ', multiIf(NOT JSONHas(tc, 'alphaMissense', 'pathogenicity'), 'undefined', JSONType(tc, 'alphaMissense', 'pathogenicity') = 'Null', 'null', JSONType(tc, 'alphaMissense', 'pathogenicity') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'alphaMissense', 'pathogenicity')), JSONExtractString(tc, 'alphaMissense', 'pathogenicity')), ', score: ', multiIf(NOT JSONHas(tc, 'alphaMissense', 'score'), 'undefined', JSONType(tc, 'alphaMissense', 'score') = 'Null', 'null', JSONType(tc, 'alphaMissense', 'score') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'alphaMissense', 'score')), JSONExtractString(tc, 'alphaMissense', 'score'))), 'NA'))), '') AS functionalImpact
-  FROM m0 AS m
+  FROM mt0 AS m
   LEFT JOIN ann ON ann.alteration = m.proteinChange
+  LEFT JOIN att AS tt ON tt.alteration = m.proteinChange AND tt.consequence = m.consequence AND tt.tumor_type = m.tumorType
   LEFT JOIN g0 AS g ON g.chr = m.chr AND g.start = m.start AND g.end = m.end AND g.ref = m.ref AND g.var = m.var
   LEFT JOIN ct0 AS ct ON ct.sid = m.sid LEFT JOIN mc0 AS mc ON mc.sid = m.sid
 )
@@ -80,6 +95,10 @@ SELECT cohort, study, countIf((match(ifNull(toString(proteinChange), ''), '^G1[2
 WITH ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
   FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
   GROUP BY alteration),
+att AS (SELECT alteration, consequence, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,
+    max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found
+  FROM annotation.oncokb_tumor_type AS t WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
+  GROUP BY alteration, consequence, tumor_type),
 c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
@@ -106,6 +125,15 @@ mc0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(a
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'MUTATION_COUNT'
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
+k0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,
+    anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
+    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
+mt0 AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence,
+    if(ifNull(k.sid, '') = '', (SELECT t.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
+      WHERE cs.cancer_study_identifier = 'msk_chord_2024'), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType
+  FROM m0 AS m LEFT JOIN k0 AS k ON k.sid = m.sid),
 g0 AS (SELECT chr, start_position AS start, end_position AS end, reference_allele AS ref, variant_allele AS var, any(data) AS gd
   FROM annotation.variant
   WHERE (source, version) IN (('genome_nexus', '2.2.3-vep116-clinvar20260208+f2'), ('genome_nexus_grch38', '1.4.1-vepNA-clinvar20250106+f2')) AND source = (SELECT multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id WHERE cs.cancer_study_identifier = 'msk_chord_2024')
@@ -116,7 +144,8 @@ rows AS (
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
          m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
-         ann.oncogenicity AS oncogenicity, ann.level AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
+         if(tt.found = 1, tt.oncogenicity, ann.oncogenicity) AS oncogenicity, if(tt.found = 1, tt.level, ann.level) AS level,
+         toUInt8(if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) AS drv,
          m.mutationType AS mutationType, m.variantType AS variantType,
          if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,
          toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,
@@ -133,8 +162,9 @@ rows AS (
          multiIf(JSONType(ifNull(g.gd, ''), 'gnomad', 'exome') = 'Object' AND JSONType(ifNull(g.gd, ''), 'gnomad', 'genome') = 'Object', if(JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleNumber', 'an') + JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleNumber', 'an') > 0, (JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleCount', 'ac') + JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleCount', 'ac')) / (JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleNumber', 'an') + JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleNumber', 'an')), 0), JSONType(ifNull(g.gd, ''), 'gnomad', 'exome') = 'Object', coalesce(JSONExtract(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleFrequency', 'af', 'Nullable(Float64)'), if(JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleNumber', 'an') > 0, JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleCount', 'ac') / JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'exome', 'alleleNumber', 'an'), 0)), JSONType(ifNull(g.gd, ''), 'gnomad', 'genome') = 'Object', coalesce(JSONExtract(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleFrequency', 'af', 'Nullable(Float64)'), if(JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleNumber', 'an') > 0, JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleCount', 'ac') / JSONExtractFloat(ifNull(g.gd, ''), 'gnomad', 'genome', 'alleleNumber', 'an'), 0)), NULL) AS gnomadFreq,
          JSONExtractRaw(ifNull(g.gd, ''), 'mutationAssessor') AS maRaw,
          if(ifNull(g.gd, '') != '', concat(concat('MutationAssessor: ', if(JSONType(ifNull(g.gd, ''), 'mutationAssessor') = 'Object', concat('impact: ', multiIf(NOT JSONHas(ifNull(g.gd, ''), 'mutationAssessor', 'prediction'), 'undefined', JSONType(ifNull(g.gd, ''), 'mutationAssessor', 'prediction') = 'Null', 'null', JSONType(ifNull(g.gd, ''), 'mutationAssessor', 'prediction') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(ifNull(g.gd, ''), 'mutationAssessor', 'prediction')), JSONExtractString(ifNull(g.gd, ''), 'mutationAssessor', 'prediction')), ', score: ', multiIf(NOT JSONHas(ifNull(g.gd, ''), 'mutationAssessor', 'score'), 'undefined', JSONType(ifNull(g.gd, ''), 'mutationAssessor', 'score') = 'Null', 'null', JSONType(ifNull(g.gd, ''), 'mutationAssessor', 'score') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(ifNull(g.gd, ''), 'mutationAssessor', 'score')), JSONExtractString(ifNull(g.gd, ''), 'mutationAssessor', 'score'))), 'NA')), ';', concat('SIFT: ', if((JSONExtractFloat(tc, 'siftScore') != 0 OR JSONExtractString(tc, 'siftPrediction') != ''), concat('impact: ', multiIf(NOT JSONHas(tc, 'siftPrediction'), 'undefined', JSONType(tc, 'siftPrediction') = 'Null', 'null', JSONType(tc, 'siftPrediction') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'siftPrediction')), JSONExtractString(tc, 'siftPrediction')), ', score: ', multiIf(NOT JSONHas(tc, 'siftScore'), 'undefined', JSONType(tc, 'siftScore') = 'Null', 'null', JSONType(tc, 'siftScore') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'siftScore')), JSONExtractString(tc, 'siftScore'))), 'NA')), ';', concat('Polyphen-2: ', if((JSONExtractFloat(tc, 'polyphenScore') != 0 OR JSONExtractString(tc, 'polyphenPrediction') != ''), concat('impact: ', multiIf(NOT JSONHas(tc, 'polyphenPrediction'), 'undefined', JSONType(tc, 'polyphenPrediction') = 'Null', 'null', JSONType(tc, 'polyphenPrediction') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'polyphenPrediction')), JSONExtractString(tc, 'polyphenPrediction')), ', score: ', multiIf(NOT JSONHas(tc, 'polyphenScore'), 'undefined', JSONType(tc, 'polyphenScore') = 'Null', 'null', JSONType(tc, 'polyphenScore') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'polyphenScore')), JSONExtractString(tc, 'polyphenScore'))), 'NA')), ';', concat('AlphaMissense: ', if((JSONExtractFloat(tc, 'alphaMissense', 'score') != 0 OR JSONExtractString(tc, 'alphaMissense', 'pathogenicity') != ''), concat('pathogenicity: ', multiIf(NOT JSONHas(tc, 'alphaMissense', 'pathogenicity'), 'undefined', JSONType(tc, 'alphaMissense', 'pathogenicity') = 'Null', 'null', JSONType(tc, 'alphaMissense', 'pathogenicity') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'alphaMissense', 'pathogenicity')), JSONExtractString(tc, 'alphaMissense', 'pathogenicity')), ', score: ', multiIf(NOT JSONHas(tc, 'alphaMissense', 'score'), 'undefined', JSONType(tc, 'alphaMissense', 'score') = 'Null', 'null', JSONType(tc, 'alphaMissense', 'score') IN ('Int64', 'UInt64', 'Double'), toString(JSONExtractFloat(tc, 'alphaMissense', 'score')), JSONExtractString(tc, 'alphaMissense', 'score'))), 'NA'))), '') AS functionalImpact
-  FROM m0 AS m
+  FROM mt0 AS m
   LEFT JOIN ann ON ann.alteration = m.proteinChange
+  LEFT JOIN att AS tt ON tt.alteration = m.proteinChange AND tt.consequence = m.consequence AND tt.tumor_type = m.tumorType
   LEFT JOIN g0 AS g ON g.chr = m.chr AND g.start = m.start AND g.end = m.end AND g.ref = m.ref AND g.var = m.var
   LEFT JOIN ct0 AS ct ON ct.sid = m.sid LEFT JOIN mc0 AS mc ON mc.sid = m.sid
 )

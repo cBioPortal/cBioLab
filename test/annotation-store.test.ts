@@ -5,13 +5,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { GENOME_NEXUS_SOURCES, ONCOKB_TABLE, SYNC_RUN_TABLE, VARIANT_TABLE, syncedStudiesSql } from "../lib/annotation-store.ts";
+import { GENOME_NEXUS_SOURCES, ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE, SYNC_RUN_TABLE, VARIANT_TABLE, syncedStudiesSql } from "../lib/annotation-store.ts";
 import { ANNOTATION_SOURCES, SYNC_RUN_TABLE as SYNC_RUN_WRITTEN, VARIANT_TABLE as VARIANT_WRITTEN, annotationSource, annotationStoreDdl } from "@cbiolab/annotation-sync";
 
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
 
 test("the app reads the tables the sync writes", () => {
   assert.equal(ONCOKB_TABLE, annotationSource("oncokb").table);
+  assert.equal(ONCOKB_TUMOR_TYPE_TABLE, annotationSource("oncokb_tumor_type").table);
   assert.equal(SYNC_RUN_TABLE, SYNC_RUN_WRITTEN);
   assert.equal(VARIANT_TABLE, VARIANT_WRITTEN);
   assert.ok(ANNOTATION_SOURCES.every((s) => s.table.startsWith("annotation.")), "every source's table is in the one annotation database");
@@ -24,14 +25,25 @@ const statementsOf = (file: string) =>
 
 test("the migrations, run in order, create exactly what the code creates", () => {
   const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
-  assert.deepEqual(files, ["001-annotation-database.sql", "002-annotation-variant.sql"]);
+  // 003 (annotation.record) is committed with the first source that writes it
+  assert.deepEqual(files, ["001-annotation-database.sql", "002-annotation-variant.sql", "004-oncokb-tumor-type.sql"]);
   const statements = files.flatMap(statementsOf);
   const creates = statements.filter((s) => /^CREATE (DATABASE|TABLE) /.test(s));
   assert.deepEqual(creates, annotationStoreDdl().map(squash));
   // and grant nothing on the shared annotation database as a whole: OncoKB's licence is its table's
   assert.ok(!statements.some((s) => /^GRANT .* ON annotation\.\*/.test(s)));
   // the public sources' writer never reaches the licensed table
-  assert.ok(!statements.some((s) => /^GRANT .* ON annotation\.oncokb TO annotation_writer/.test(s)));
+  assert.ok(!statements.some((s) => /^GRANT .* ON annotation\.oncokb(_tumor_type)? TO annotation_writer/.test(s)));
+});
+
+test("OncoKB by tumour type is licensed like OncoKB: its writer, and SELECT for the app", () => {
+  const s = annotationSource("oncokb_tumor_type");
+  assert.equal(s.writer, "oncokb");
+  assert.deepEqual(s.needs, ["ONCOKB_TOKEN"]);
+  assert.deepEqual(statementsOf("004-oncokb-tumor-type.sql").filter((x) => x.startsWith("GRANT ")), [
+    "GRANT SELECT, INSERT, ALTER DELETE ON annotation.oncokb_tumor_type TO oncokb_writer",
+    "GRANT SELECT ON annotation.oncokb_tumor_type TO cohort_lab_ro"
+  ]);
 });
 
 test("the public sources write as one writer, the app reads what they write", () => {

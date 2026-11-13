@@ -155,7 +155,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [ ] **Results → Mutations tab** — lollipop and table against the portal's ([05-mutations](legacy-spec/parity/05-mutations.md))
   - [ ] Fusions as "A-B Fusion" mutations: Q2 TMPRSS2 4 rows vs 240, 0.8 % vs 41.5 %, Fusion badges 0/0 vs 207/29; ERG shows nothing (the portal 220 fusions) (MUT-0-4, MUT-MD-11, MUT-STM-1, MUT-STM-4, SV-STM-5; [06-structural-variants](legacy-spec/parity/06-structural-variants.md))
   - [ ] Table defaults: Copy # and Allele Freq (T) shown; Mutation Type as the portal's coloured label (ours `Missense_Mutation`); sorted by Annotation ↓ (KRAS: G12C first; ours "drivers, then codon", A11_G12dup first) (MUT-COL-38, MUT-COL-11, MUT-COL-T1, MUT-TB-9, MUT-STM-10)
-  - [ ] The Annotation column's icons, cards and header; the OncoKB level for the study's tumour type, not the highest across types (KRAS: 206 of 223 rows differ, G12D "Level 1" vs the portal's 3B). Hotspot and CIViC are under *Mutation annotation breadth* (MUT-COL-7, MUT-AN-1…6)
+  - [ ] The Annotation column's icons, cards and header. The OncoKB level by tumour type, hotspots and CIViC are under *Mutation annotation breadth* (MUT-COL-7, MUT-AN-1…6)
   - [ ] Table search and column filters reach the lollipop and badges (search "G12D": table 59 rows, lollipop still 14 stems / 223) (MUT-TB-3, MUT-FM-1, MUT-FM-3, MUT-STM-4)
   - [ ] The Y-Axis Max slider; axis "# patients" (ours "# KRAS Mutations"); top tick at the data, "≥" when capped (142; ours niced to 150) (MUT-LP-2, MUT-LP-6, MUT-STM-17)
   - [ ] Stem tooltip "142 mutated of 594 profiled patients / AA Change: G12D/V/C/A/S/R" (ours a native SVG title); hover highlights the table's rows (MUT-LP-10, MUT-LP-11)
@@ -311,6 +311,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] gnomAD, dbSNP and Functional Impact (Mutation Assessor, SIFT, PolyPhen-2, AlphaMissense) columns, read from the offline store (#182)
   - [ ] The Functional Impact column's sectioned filter menu (by predictor and call); its header icons are text labels, not the tools' logos
   - [ ] gnomAD and dbSNP for the ~2% of variants Genome Nexus cannot serve myvariant.info's record of (asking myvariant.info directly would be a second source)
+  - [x] The Annotation column's OncoKB call for the sample's tumour type (gene, protein change, mutation type, tumour type, as the portal asks), not the highest level across types, synced offline to `annotation.oncokb_tumor_type` (#202)
+  - [ ] Shown once the full sync puts both OncoKB tables at one release (they are read at the same pin; the test studies are at v7.7, the gene-level store at v7.5)
+  - [ ] Resistance, diagnostic and prognostic levels, and OncoKB's answer for the card, are stored but not shown (the card is MUT-AN-1)
   - [ ] CIViC
   - [ ] The transcript dropdown, with the lollipop's transcripts and Pfam domains read from the store instead of Genome Nexus live
   - [ ] PTM tracks
