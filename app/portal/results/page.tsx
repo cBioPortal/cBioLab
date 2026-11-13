@@ -11,7 +11,7 @@ import { useLinkParams } from "../../_links/use-link.ts";
 import { PortalTabs } from "../PortalTabs";
 import { useQueryKnown, expressionProfile, discreteCnaProfile, assayComparisonProfiles } from "../study-known";
 import { usePageDoc } from "../page-doc";
-import { resultsLayout, svCheckCohort, syncDrivers } from "../results-layout.ts";
+import { resultsLayout, samplesLine, svCheckCohort, syncDrivers } from "../results-layout.ts";
 import { Button } from "../../_ui/button";
 import { TB } from "../../_ui/toolbar.ts";
 import { Pencil } from "lucide-react";
@@ -64,7 +64,7 @@ export default function ResultsPage() {
     : null, [basics, known, asked, chosen, genes, queryError, across, svs]);
   const page = usePageDoc(fresh);
   // the header's "altered in N of the queried": its own request, beside the tabs', so no tab waits for it
-  const [altered, setAltered] = useState<{ altered: number; queried: number } | null>(null);
+  const [altered, setAltered] = useState<{ altered: number; queried: number; alteredSamples?: number; queriedSamples?: number } | null>(null);
   const groups = fresh?.doc.cohorts;
   const groupsKey = JSON.stringify(groups || null);
   const svHeld = !!basics && (basics.held.every.includes("SV") || basics.held.some.includes("SV"));
@@ -79,7 +79,8 @@ export default function ResultsPage() {
       .then((r) => r.json())
       .then((j) => {
         if (j.error) { if (svHeld) setSvs(null); return; }
-        setAltered({ altered: j.cohorts?.Altered?.count ?? 0, queried: j.cohorts?.Queried?.count ?? 0 });
+        setAltered({ altered: j.cohorts?.Altered?.count ?? 0, queried: j.cohorts?.Queried?.count ?? 0,
+          alteredSamples: j.cohorts?.Altered?.samples, queriedSamples: j.cohorts?.Queried?.samples });
         if (svHeld) setSvs(typeof j.cohorts?.Fused?.count === "number" ? j.cohorts.Fused.count > 0 : null);
       })
       .catch(() => { if (!ctl.signal.aborted && svHeld) setSvs(null); });
@@ -113,7 +114,8 @@ export default function ResultsPage() {
       studyTitle={studies.map((s) => s + (basics?.names[s] ? " — " + basics.names[s] : "")).join("\n")} genes={check.entries.map((e) => e.text)}
       detail={known && <span className="tabular-nums">{filters.length ? fmtInt(known.patients) + " patients after filters" : fmtInt(known.samples) + " samples · " + fmtInt(known.patients) + " patients"}</span>}
       onEditGenes={() => setEditingGenes(true)} left={fresh?.left || []}
-      stat={altered && altered.queried ? { value: altered.altered, of: altered.queried, label: "of " + fmtInt(altered.queried) + " queried patients altered in the queried genes" } : null}
+      stat={altered && altered.queried ? { value: altered.altered, of: altered.queried, decimals: 0, also: samplesLine(altered),
+        label: "of " + fmtInt(altered.queried) + " queried patients altered in the queried genes" } : null}
       action={<Button variant="outline" size="sm" className={TB} aria-haspopup="dialog" onClick={() => setModifying(true)}><Pencil />Modify query</Button>}>
       {filters.length > 0 && (
         <div className="mt-2.5 flex flex-wrap items-center gap-2 text-sm">

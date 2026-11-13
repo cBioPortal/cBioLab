@@ -61,7 +61,8 @@ export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes
   /** the most groups compared at once: past it, a group taken out stays out until another is */
   maxOn?: number;
   /** the headline number, right of the title */
-  stat?: { value: number; of: number; label: string } | null;
+  /** a headline count of a total; `decimals` for its %, `also` a line under it for a second unit */
+  stat?: { value: number; of: number; label: string; decimals?: number; also?: string | null } | null;
   /** a control over the whole page (the Results page's "Modify query"): at the end of the groups row, or right of the title without one */
   action?: React.ReactNode;
   /** right of the title, in place of `stat` (the Patient page's navigation through a cohort) */
@@ -91,9 +92,10 @@ export function PortalSummary({ eyebrow, title, study, studyTitle, detail, genes
         {stat && (
           <div className="min-w-56 sm:text-right">
             <div className="text-2xl leading-tight font-semibold text-accent-foreground tabular-nums">
-              {fmtInt(stat.value)} <span className="text-lg font-normal text-muted-foreground">({fmtPct(stat.of ? 100 * stat.value / stat.of : 0)})</span>
+              {fmtInt(stat.value)} <span className="text-lg font-normal text-muted-foreground">({fmtPct(stat.of ? 100 * stat.value / stat.of : 0, stat.decimals)})</span>
             </div>
             <div className="text-sm text-muted-foreground">{stat.label}</div>
+            {stat.also && <div className="text-sm text-muted-foreground tabular-nums" data-test="statAlso">{stat.also}</div>}
             <div className="mt-1.5 h-1.5 w-56 sm:ml-auto overflow-hidden rounded-pill bg-muted" aria-hidden="true">
               <div className="h-full rounded-pill bg-primary" style={{ width: Math.min(100, stat.of ? 100 * stat.value / stat.of : 0) + "%" }} />
             </div>

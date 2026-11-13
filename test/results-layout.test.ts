@@ -3,7 +3,7 @@
 // expression tabs follow cBioPortal's cross-study rule.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { resultsGroups, resultsLayout, linkMutations, svCheckCohort } from "../app/portal/results-layout.ts";
+import { resultsGroups, resultsLayout, linkMutations, samplesLine, svCheckCohort } from "../app/portal/results-layout.ts";
 import type { View, Clause } from "../lib/types.ts";
 
 const ALL3 = { every: ["MUTATION", "CNA", "SV"] as const, some: [] as never[] };
@@ -183,4 +183,12 @@ describe("the query page's choices in the document", () => {
     const mdl = (m.doc.views || []).find((v) => (v as { kind: string }).kind === "datafiles") as unknown as { ifHeld?: boolean };
     assert.equal(mdl.ifHeld, true);
   });
+});
+
+test("the header's samples line, only when the queried samples outnumber the patients (ONC-RV-1, ONC-STM-2)", () => {
+  // msk_impact_2017 TP53 KRAS TERT: the portal's "6494 (59%) of queried samples"
+  assert.equal(samplesLine({ queried: 10336, alteredSamples: 6494, queriedSamples: 10945 }), "6,494 (59%) of 10,945 queried samples altered");
+  assert.equal(samplesLine({ queried: 594, alteredSamples: 485, queriedSamples: 594 }), null);
+  assert.equal(samplesLine({ queried: 594 }), null);
+  assert.equal(samplesLine({ queried: 10, alteredSamples: 0, queriedSamples: 12 }), "0 (0%) of 12 queried samples altered");
 });

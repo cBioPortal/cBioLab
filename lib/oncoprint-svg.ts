@@ -86,7 +86,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   contract.tracks.forEach((t, ti: number) => {
     const y = HEADER_H + ti * (ROW_H + ROW_GAP);
     parts.push(`<text x="4" y="${y + 14}" fill="${P.text}"><title>${esc(trackTooltipLines(t, contract.columns.length, contract.unit).join("\n"))}</title>${esc(trackLabelText(t, S))}</text>`);
-    if (t.freqPct != null) parts.push(`<text x="${GUTTER - 8}" y="${y + 14}" fill="${P.muted}" text-anchor="end">${formatGutterPct(t.driverPct, t.freqPct, t.profiled, contract.columns.length)}</text>`);
+    if (t.freqPct != null) parts.push(`<text x="${GUTTER - 8}" y="${y + 14}" fill="${P.muted}" text-anchor="end">${formatGutterPct(t, contract.columns.length)}</text>`);
     contract.groups.forEach((g, gi: number) => {
       const x0 = groupX[gi], pxW = g.count * colW;
       // one rect per column above a pixel per column; otherwise one bucket per pixel

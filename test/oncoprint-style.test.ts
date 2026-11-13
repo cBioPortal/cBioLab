@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STYLE, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines } from "../lib/oncoprint-style.ts";
+import { STYLE, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines } from "../lib/oncoprint-style.ts";
 import { assembleContract, mutClassBit, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { STYLE_JSON } from "../scripts/gen-style.ts";
 import { bucketCodes, bucketEdges } from "../lib/oncoprint-lod.ts";
@@ -76,10 +76,10 @@ test("percent format follows the portal, legend order is mutations, SV, CNA, not
   assert.deepEqual(geneLegend(STYLE).map((i) => i.label).slice(0, 3),
     ["Truncating Mutation (putative driver)", "Truncating Mutation (unknown significance)", "Splice Mutation (putative driver)"]);
   assert.equal(geneLegend(STYLE).at(-1)!.kind, "notProfiled");
-  assert.equal(formatGutterPct(10, 20), "10% / 20%");
-  assert.equal(formatGutterPct(10, 20, 50, 100), "10% / 20%*", "the asterisk says the denominator was not every column");
-  assert.equal(formatGutterPct(10, 20, 100, 100), "10% / 20%");
-  assert.equal(formatGutterPct(null, null), "N/P");
+  assert.equal(formatGutterPct({ driverPct: 10, freqPct: 20 }), "10% / 20%");
+  assert.equal(formatGutterPct({ driverPct: 10, freqPct: 20, profiled: 50 }, 100), "10% / 20%*", "the asterisk says the denominator was not every column");
+  assert.equal(formatGutterPct({ driverPct: 10, freqPct: 20, profiled: 100 }, 100), "10% / 20%");
+  assert.equal(formatGutterPct({ driverPct: null, freqPct: null, profiled: 0, altered: 0 }), "N/P");
   // a legend lists only what the cells draw: the displayed mutation class, as driver or VUS
   const tracks = [{ kind: "gene", cells: [0, -1, B.MISSENSE | B.TRUNCATING, B.MISSENSE | B.MUT_DRIVER | B.DRIVER, B.AMP | B.DRIVER] }];
   assert.deepEqual(geneLegend(STYLE, glyphPresence(tracks)).map((i) => i.label),
@@ -230,4 +230,25 @@ test("level of detail: a germline mark goes with the mutation classes it was dra
   assert.deepEqual(bucketCodes(gene, [B.MISSENSE | D | B.GERMLINE, B.AMP], 0, 2, 1), [B.MISSENSE | D | B.GERMLINE | B.AMP]);
   // VUS only: the germline VUS's mark stays
   assert.deepEqual(bucketCodes(gene, [B.SPLICE | B.GERMLINE, 0], 0, 2, 1), [B.SPLICE | B.GERMLINE]);
+});
+
+test("track-label percent is the portal's: 0%, <1%, else an integer (ONC-LY-4, ONC-STM-3)", () => {
+  assert.equal(formatLabelPct(null), "N/P");
+  assert.equal(formatLabelPct(0), "0%");
+  assert.equal(formatLabelPct(0.04), "<1%");
+  assert.equal(formatLabelPct(0.99), "<1%");
+  assert.equal(formatLabelPct(1.2), "1%");
+  assert.equal(formatLabelPct(2.5), "3%");
+  assert.equal(formatLabelPct(37.37), "37%");
+});
+
+test("the gutter prints driver and any % from the counts, as the portal rounds them (ONC-LY-4, ONC-STM-1)", () => {
+  // coadread_tcga_pan_can_atlas_2018: KRAS 219 driver, 222 altered of 594; the portal's label "37%"
+  assert.equal(formatGutterPct({ driverAltered: 219, altered: 222, profiled: 594, driverPct: 36.9, freqPct: 37.4 }, 594), "37% / 37%");
+  // msk_impact_2017 RAC1: 128 of 10336 patients ("1%"), and a driver share under 1 %
+  assert.equal(formatGutterPct({ driverAltered: 40, altered: 128, profiled: 10336 }, 10336), "<1% / 1%");
+  // from the counts, not the 1-decimal %: 36.45 % is "36%", where 36.5 would round to "37%"
+  assert.equal(formatGutterPct({ altered: 3645, profiled: 10000, freqPct: 36.5 }), "36%");
+  // a partial panel keeps the asterisk; nothing altered is "0%"
+  assert.equal(formatGutterPct({ driverAltered: 0, altered: 0, profiled: 7773 }, 10336), "0% / 0%*");
 });

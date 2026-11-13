@@ -1,6 +1,6 @@
 """The shared oncoprint style, read from style.json (generated from lib/oncoprint-style.ts).
 
-`cell_layers`, `numeric_color`, `category_color`, `format_pct` and `truncate_label` are the
+`cell_layers`, `numeric_color`, `category_color`, `format_pct`, `format_label_pct`, `format_gutter_pct` and `truncate_label` are the
 Python side of the same pure functions; the TypeScript module is the reference.
 """
 from __future__ import annotations
@@ -121,11 +121,29 @@ def format_pct(p: float | None) -> str:
     return (str(v) if p < 3 else str(int(v))) + "%"
 
 
-def format_gutter_pct(driver_pct: float | None, freq_pct: float | None, profiled: int | None = None, columns: int | None = None) -> str:
-    if freq_pct is None:
+def format_label_pct(p: float | None) -> str:
+    """The portal's track-label percent: "0%", "<1%" above 0 and under 1, otherwise an integer; N/P when nothing was profiled."""
+    if p is None:
         return "N/P"
+    if p == 0:
+        return "0%"
+    import math
+    return "<1%" if p < 1 else f"{math.floor(p + 0.5)}%"
+
+
+def format_gutter_pct(t: dict[str, Any], columns: int | None = None) -> str:
+    """"driver% / any%" in the label format, from the counts when present; N/P when nothing was profiled; "*" over part of the columns."""
+    profiled = t.get("profiled")
+
+    def pct(n: Any, p: Any) -> float | None:
+        return 100 * n / profiled if n is not None and profiled else p
+
+    any_ = pct(t.get("altered"), t.get("freqPct"))
+    if any_ is None:
+        return "N/P"
+    driver = pct(t.get("driverAltered"), t.get("driverPct"))
     star = "*" if profiled is not None and columns is not None and 0 < profiled < columns else ""
-    return (f"{driver_pct}% / {freq_pct}%" if driver_pct is not None else f"{freq_pct}%") + star
+    return (format_label_pct(driver) + " / " if driver is not None else "") + format_label_pct(any_) + star
 
 
 def truncate_label(label: str, S: dict[str, Any] = STYLE) -> str:

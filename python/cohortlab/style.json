@@ -373,7 +373,7 @@
     ]
   },
   "percent": {
-    "gutterDecimals": 1,
-    "runRule": "portal"
+    "label": "portal",
+    "tooltip": "portal"
   }
 }
