@@ -20,7 +20,7 @@ const isPlainLeaf = (c: unknown, attribute: string): c is ClinicalLeaf => {
 };
 
 /** the leaves of a top-level clause, when it is one of this chart's selections; otherwise null */
-function chartLeaves(c: Clause, attribute: string): ClinicalLeaf[] | null {
+export function chartLeaves(c: Clause, attribute: string): ClinicalLeaf[] | null {
   if (isPlainLeaf(c, attribute)) return [c];
   const any = (c as { any?: unknown[] }).any;
   return Array.isArray(any) && any.length && any.every((l) => isPlainLeaf(l, attribute)) ? any as ClinicalLeaf[] : null;
@@ -137,7 +137,7 @@ function chartValues(draft: CohortDef | null | undefined, attribute: string): (s
 
 /** the clause selecting a chart's NA: cases with no value of the attribute (none recorded, or a spelling of NA) */
 export const naClause = (attribute: string): Clause => ({ not: { kind: "clinical", attribute, op: "!=", value: "" } });
-const isNaClause = (c: Clause, attribute: string): boolean => {
+export const isNaClause = (c: Clause, attribute: string): boolean => {
   const n = (c as { not?: ClinicalLeaf }).not;
   return !!n && n.kind === "clinical" && n.attribute === attribute && n.op === "!=" && n.value === "";
 };

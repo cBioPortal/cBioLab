@@ -16,7 +16,8 @@ export const STYLE = {
     MRNA_HIGH: 1024, MRNA_LOW: 2048, PROT_HIGH: 4096, PROT_LOW: 8192,
     MUT_DRIVER: 16384, // the mutation classes in the cell are its driver mutations' (see the assembler)
     SV_DRIVER: 32768,  // the cell's structural variant is a driver
-    GERMLINE: 65536    // the mutation the cell shows is germline (the class and driver call drawn are a germline mutation's)
+    GERMLINE: 65536,   // the mutation the cell shows is germline (the class and driver call drawn are a germline mutation's)
+    CNA_DRIVER: 131072 // the cell's copy-number call is a driver
   },
   palette: {
     paper: "#ffffff", unaltered: "#bebebe", derived: "#0f86a1",
@@ -244,6 +245,56 @@ export function formatGutterPct(t: GutterCounts, columns?: number): string {
   return (driver != null ? formatLabelPct(driver) + " / " : "") + formatLabelPct(any) + star;
 }
 export const PARTIAL_PROFILE_NOTE = "* = % over the columns profiled for that gene";
+
+/** The staircase's switches, the portal's Sort-menu toggles; left out, each is the portal's default. */
+export interface StaircaseOptions { byType?: boolean; byDriver?: boolean; ignoreVus?: boolean }
+/** every staircaseRank is below this: structural variant 3 × copy number 5 × mutation 13 × germline, mRNA, protein 3 each */
+export const STAIRCASE_RADIX = 3 * 5 * 13 * 3 * 3 * 3;
+
+/**
+ * A gene row's cell, ranked as the portal's staircase ranks it (ONC-ST-2; its SortUtils
+ * getGeneticTrackSortComparator), smaller first: structural variant, then copy number, then
+ * mutation, germline, mRNA and protein, each its own key. With the driver switch on, a driver
+ * comes before every VUS of its kind (a driver missense before a VUS truncation); with the type
+ * switch, mutations follow the glyph priority; Ignore VUS ranks a VUS as no alteration.
+ */
+export function staircaseRank(c: number, o: StaircaseOptions = {}, S: Style = STYLE): number {
+  const B = S.bits, byType = o.byType ?? true, byDriver = o.byDriver ?? true, ignoreVus = !!o.ignoreVus;
+  const v = c > 0 ? c : 0;
+  const sv = !(v & B.SV) ? 2 : v & B.SV_DRIVER ? 0 : ignoreVus ? 2 : byDriver ? 1 : 0;
+  const level = v & B.AMP ? 0 : v & B.HOMDEL ? 1 : -1, cnaDrv = !!(v & B.CNA_DRIVER);
+  const cna = level < 0 ? 4 : cnaDrv ? level : ignoreVus ? 4 : byDriver ? 2 + level : level;
+  const cls = S.glyph.mutation.priority.findIndex((m) => v & B[m.bit as keyof typeof B]), mutDrv = !!(v & B.MUT_DRIVER);
+  const counted = cls >= 0 && (mutDrv || !ignoreVus);
+  const mut = !counted ? 12 : ignoreVus ? (byType ? cls : 0)
+    : byType ? (byDriver && !mutDrv ? 6 + cls : cls) : (byDriver && !mutDrv ? 1 : 0);
+  const germ = counted ? (v & B.GERMLINE ? 0 : 1) : 2;
+  const mrna = v & B.MRNA_HIGH ? 0 : v & B.MRNA_LOW ? 1 : 2;
+  const prot = v & B.PROT_HIGH ? 0 : v & B.PROT_LOW ? 1 : 2;
+  return ((((sv * 5 + cna) * 13 + mut) * 3 + germ) * 3 + mrna) * 3 + prot;
+}
+
+/**
+ * A case id as oncoprintjs orders it (bucketsort.ts stringToVector): each run of digits one
+ * number, every other character its char code, so "P2" < "P10" and "A00N" (65, …) < "3864".
+ */
+export function naturalVector(id: string): number[] {
+  const out: number[] = [];
+  let num = -1;
+  for (let i = 0; i < id.length; i++) {
+    const c = id.charCodeAt(i);
+    if (c >= 48 && c <= 57) { num = num < 0 ? c - 48 : num * 10 + c - 48; continue; }
+    if (num >= 0) { out.push(num); num = -1; }
+    out.push(c);
+  }
+  if (num >= 0) out.push(num);
+  return out;
+}
+/** left to right, the first difference decides; a vector that runs out first comes first */
+export function compareVectors(a: number[], b: number[]): number {
+  for (let i = 0; i < a.length && i < b.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
+  return a.length - b.length;
+}
 
 export function truncateLabel(label: string, S: Style = STYLE): string {
   const n = S.geometry.labelMaxChars;

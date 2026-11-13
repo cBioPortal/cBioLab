@@ -118,13 +118,13 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STV-FB-1 | 🟡 | B | Pill per clause with × ✅; kind label prefix ("CLINICAL"); no pending style |
-| STV-FB-2 | 🔶 | B | Values of one attribute shown "∈ {…}"; OQL clauses joined "; "; no and/or words between pills |
-| STV-FB-3 | 🟡 | B | Pills for clinical, OQL gene picks, profiled, case lists, events, custom, GA, derived; labels are attribute ids/clause text, not chart names; no group-filter or treatment pills |
+| STV-FB-1 | 🟡 | B | A pill per value or range with its × ✅; cBioLab's own pill style kept on purpose (not the portal's blue); no pending style (no manual mode, STV-FB-6) |
+| STV-FB-2 | ✅ | B | "<chart> : a or b"; no word between charts, as the portal |
+| STV-FB-3 | 🟡 | B | Clinical (incl. NA) named by the chart's display name, a pill per value or range; gene, GA, case-list, event and derived clauses still the generic pills; no group-filter or treatment pills |
 | STV-FB-3a | ❌ | C | No survival-attribute pills (no survival filter) |
 | STV-FB-3b | 🟡 | C | Density drag → two visible range pills (legacy: chart-only) |
-| STV-FB-4 | 🔶 | B | Interval text from the clause (`> 50 ≤ 60`), not "50 < x ≤ 60"; not inline-editable |
-| STV-FB-5 | 🟡 | B | "Clear" removes every clause (keeps studies) |
+| STV-FB-4 | 🟡 | B | "50 < x ≤ 60", "a ≤ x ≤ b", "> a", "≤ b", one value; ends edited in place (start > end swaps, start = end and empty refused). Separate ranges are separate pills (portal: one merged interval); an edit filters on the range but makes no custom bins yet |
+| STV-FB-5 | ✅ | B | "Clear All Filters" removes every clause (keeps studies) |
 | STV-FB-6 | ❌ | C | No manual mode / Submit (filters apply at once) |
 | STV-FB-7 | ❌ | B | No bookmark icon |
 

@@ -4,7 +4,7 @@
 // land on a device pixel, and neighbours must meet, at any zoom and any pixel ratio.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { draw, fitZoom, fitAlteredView, PORTAL_FULL_ZOOM, GEOM, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
+import { draw, fitZoom, fitAlteredView, PORTAL_FULL_ZOOM, sortColumns, GEOM, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
 import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
 import { assembleContract } from "../lib/oncoprint-assemble.ts";
 
@@ -85,4 +85,24 @@ test("the initial zoom fits the altered columns, at most the portal's 100 % (ONC
   const z2 = fitAlteredView(two.data, two.order, two.vg, 600, 10);
   assert.equal(z2.zoom, PORTAL_FULL_ZOOM);
   assert.ok(z2.scrollX > 200 * PORTAL_FULL_ZOOM, "starts at the first altered column, in the second group");
+});
+
+test("the browser's genomic re-sort is the engine's staircase, ids in the portal's natural order", () => {
+  const pids = ["P10", "P2", "TCGA-AA-3864", "TCGA-AA-A00N", "A", "B", "C", "D", "E", "G"];
+  const ev = (pid: string, gene: string, vt: string, mt?: string, cna?: number, driver = false) => ({ pid, gene, vt, mt, cna, driver });
+  const build = (sort: { track: string; dir: "asc" | "desc" }[]) => assembleContract({ genes: ["TP53", "KRAS"], groups: [{ name: "all", pids }], studies: ["s"],
+    events: [ev("A", "TP53", "mutation", "Nonsense_Mutation"), ev("B", "TP53", "mutation", "Missense_Mutation", undefined, true),
+      ev("C", "TP53", "cna", undefined, 2), ev("D", "TP53", "cna", undefined, 2), ev("D", "TP53", "mutation", "Missense_Mutation", undefined, true),
+      ev("E", "TP53", "cna", undefined, -2, true), ev("G", "KRAS", "mutation", "Missense_Mutation", undefined, true)],
+    coverage: pids.map((pid) => ({ pid, genes: pid === "G" ? ["KRAS"] : ["TP53", "KRAS"] })),
+    isDriver: (r) => !!(r as { driver?: boolean }).driver, annotationSource: "t", clinical: [], heatmap: [], derived: [], sort, lineGap: 0 });
+  const engine = build([{ track: "genomic", dir: "asc" }]);
+  const byId = build([{ track: "id", dir: "desc" }]);
+  const buf = packContract(byId);
+  const data = unpackContract(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
+  const order = Uint32Array.from({ length: data.n }, (_, i) => i);
+  const sorted = sortColumns(data, order, [{ name: "all", start: 0, count: data.n, patients: data.n }], [{ track: "genomic", dir: "asc" }]);
+  const ids = data.columns();
+  assert.deepEqual(Array.from(sorted, (i) => ids[i]), engine.columns);
+  assert.deepEqual(engine.columns, ["E", "D", "C", "B", "A", "P2", "P10", "TCGA-AA-A00N", "TCGA-AA-3864", "G"]);
 });

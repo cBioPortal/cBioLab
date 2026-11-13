@@ -14,7 +14,7 @@ import numpy as np
 
 from .contract import BITS, DEFAULT_DISPLAY, NOT_PROFILED, Contract, Track
 from .gene_tracks import normalize_gene_tracks
-from .style import STYLE, encode_numeric
+from .style import STAIRCASE_RADIX, STYLE, encode_numeric, natural_vector, staircase_rank
 
 
 def _round(x: float) -> int:
@@ -157,7 +157,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 held[i] |= bit
             continue
         if driver:
-            bit |= BITS["DRIVER"] | (BITS["MUT_DRIVER"] if mut else BITS["SV_DRIVER"] if bit == BITS["SV"] else 0)
+            bit |= BITS["DRIVER"] | (BITS["MUT_DRIVER"] if mut else BITS["SV_DRIVER"] if bit == BITS["SV"] else BITS["CNA_DRIVER"])
         for cells in covered:
             cells[i] = int(cells[i]) | bit
     for cells, held in vus_mut.values():
@@ -272,23 +272,22 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
         dev.append(Track("derivedEvent", str(de.get("label") or "derived event")[:60], cells, {}))
 
     # ---- column sort within groups ------------------------------------------
-    def cell_rank(c: int) -> int:
-        if c <= 0:
-            return 0
-        t = 8 if c & BITS["AMP"] else 7 if c & BITS["HOMDEL"] else 6 if c & BITS["SV"] else 5 if c & BITS["TRUNCATING"] else \
-            4 if c & BITS["INFRAME"] else 3 if c & BITS["SPLICE"] else 2 if c & BITS["MISSENSE"] else 1
-        return t * 2 + (1 if c & BITS["DRIVER"] else 0)
+    # the portal's staircase: each gene row's staircase_rank, not profiled after unaltered; then the natural case id
+    gene_ranks = [[STAIRCASE_RADIX if int(c) == NOT_PROFILED else staircase_rank(int(c)) for c in gene_cells[t.label]] for t in gene_tracks]
 
-    gene_cell_list = [gene_cells[t.label] for t in gene_tracks]
+    def bare(p: str) -> str:
+        st = study_of.get(p)
+        return p[len(st) + 1:] if st and p.startswith(st + "_") else p
+
+    id_key = [(natural_vector(bare(p)), p) for p in all_pids]
 
     def by_id(x: int, y: int) -> int:
-        return -1 if all_pids[x] < all_pids[y] else (1 if all_pids[x] > all_pids[y] else 0)
+        return -1 if id_key[x] < id_key[y] else (1 if id_key[x] > id_key[y] else 0)
 
     def genomic_cmp(x: int, y: int) -> int:
-        for cells in gene_cell_list:
-            rx, ry = cell_rank(int(cells[x])), cell_rank(int(cells[y]))
-            if rx != ry:
-                return ry - rx
+        for ranks in gene_ranks:
+            if ranks[x] != ranks[y]:
+                return ranks[x] - ranks[y]
         return 0
 
     sortable = {t.label: t for t in [*clin, *dev, *heat]}
@@ -328,7 +327,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             r = c(x, y)
             if r:
                 return r
-        return -1 if all_pids[x] < all_pids[y] else 1
+        return by_id(x, y)
 
     order: list[int] = []
     ranges = []

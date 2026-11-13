@@ -17,7 +17,8 @@
     "PROT_LOW": 8192,
     "MUT_DRIVER": 16384,
     "SV_DRIVER": 32768,
-    "GERMLINE": 65536
+    "GERMLINE": 65536,
+    "CNA_DRIVER": 131072
   },
   "palette": {
     "paper": "#ffffff",

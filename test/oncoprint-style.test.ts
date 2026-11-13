@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STYLE, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines } from "../lib/oncoprint-style.ts";
+import { STYLE, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines, STAIRCASE_RADIX, staircaseRank } from "../lib/oncoprint-style.ts";
 import { assembleContract, mutClassBit, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { STYLE_JSON } from "../scripts/gen-style.ts";
 import { bucketCodes, bucketEdges } from "../lib/oncoprint-lod.ts";
@@ -252,3 +252,18 @@ test("the gutter prints driver and any % from the counts, as the portal rounds t
   // a partial panel keeps the asterisk; nothing altered is "0%"
   assert.equal(formatGutterPct({ driverAltered: 0, altered: 0, profiled: 7773 }, 10336), "0% / 0%*");
 });
+test("staircaseRank: the portal's keys and its Sort-menu switches (ONC-ST-2, ONC-ST-3)", () => {
+  const B = STYLE.bits, r = (c: number, o = {}) => staircaseRank(c, o);
+  const drvMis = B.MISSENSE | B.MUT_DRIVER | B.DRIVER, vusTrunc = B.TRUNCATING;
+  assert.ok(r(B.SV) < r(B.AMP | B.CNA_DRIVER | B.DRIVER), "a structural variant before any copy-number call");
+  assert.ok(r(B.AMP | drvMis) < r(B.AMP), "an amplification with a mutation before one without");
+  assert.ok(r(drvMis) < r(vusTrunc), "every driver mutation before every VUS one");
+  assert.ok(r(vusTrunc, { byDriver: false }) < r(drvMis, { byDriver: false }), "without the driver switch, the class decides");
+  assert.equal(r(vusTrunc, { byType: false }), r(B.MISSENSE, { byType: false }), "without the type switch, classes tie");
+  assert.equal(r(vusTrunc, { ignoreVus: true }), r(0, { ignoreVus: true }), "Ignore VUS ranks a VUS as no alteration");
+  assert.ok(r(drvMis | B.GERMLINE) < r(drvMis), "germline before somatic");
+  assert.ok(r(B.MRNA_HIGH) < r(B.MRNA_LOW) && r(B.MRNA_LOW) < r(0));
+  assert.equal(r(NOT_PROFILED_CELL), r(0));
+  assert.ok(r(B.SV | B.SV_DRIVER | B.AMP | B.CNA_DRIVER | drvMis | B.GERMLINE) >= 0 && r(0) < STAIRCASE_RADIX);
+});
+const NOT_PROFILED_CELL = -1;
