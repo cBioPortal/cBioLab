@@ -23,6 +23,8 @@ PR cites the IDs it covers and the ones it leaves out. The per-ID scorecards of 
 that spec are in [`legacy-spec/parity/`](legacy-spec/parity/) (audit of 2026-11-11), with the index
 in [`legacy-spec/parity/README.md`](legacy-spec/parity/README.md).
 
+A session building parity work follows [`PARITY-BUILD.md`](PARITY-BUILD.md).
+
 Every portal page also has an "Open in cBioPortal" button (`lib/legacy-link.ts`). A new tab adds its
 title there. On the Comparison page the button saves the page's groups to cbioportal.org's session
 service and opens that comparison (`lib/legacy-comparison.ts`; a new comparison tab adds its title there).
@@ -195,7 +197,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Pie: for any attribute with few values (ours 9 allowlisted ids, else a list), slice labels, unselected slices greyed, a second click unselects (see bugs), the portal's colours (ours Okabe-Ito) (STS-LY-9, STS-PIE-3, STS-PIE-6…8)
   - [ ] Survival: one KM tile per endpoint (ours one chart with an endpoint picker; numbers match) (STS-KM-1)
   - [ ] Density: x = FGA, y = mutation count, linear (ours x = log10(MC + 1)); 44×38 bins (ours 48×32); Pearson / Spearman text; Swap Axes and Log menu; a fuller tooltip (ours "n samples") (STS-SC-2…5, STS-STM-15)
-  - [ ] Chart chrome: drag, resize, ✕ delete, ↶ reset, ⓘ overlay (STS-LY-1…6, STS-HD-2…4)
+  - ~~Chart chrome: drag, resize, ✕ delete, ↶ reset, ⓘ overlay (STS-LY-1…6, STS-HD-2…4)~~ Decided against (2026-11-13): the Explore page keeps its fixed layout.
   - [ ] Downloads: Summary and Full data, SVG, PDF, gene-table TSV (STS-DL-1…3, STS-HD-5)
   - [ ] Empty selection: the "filtered out all the samples" message, other tabs hidden (ours draws the charts and "0 patients match") (STS-LY-11, STS-MD-14, STV-LD-6, STV-MD-6)
   - [ ] Case lists: all of them, counted in samples (ours 10, `LIMIT 10 BY s`, in patients; coad, read, protein_quantification, methylation_hm450 missing) (STS-OT-2)
