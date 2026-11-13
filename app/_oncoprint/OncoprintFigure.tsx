@@ -13,7 +13,7 @@ import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOff
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { portalTipNumber } from "../../lib/chart/format.ts";
-import { STYLE, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { STYLE, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { setPngDpi } from "../../lib/png-dpi.ts";
@@ -633,11 +633,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         if (t.members && t.members.length > 1) lines.push({ text: "merged: " + t.members.join(" · "), dim: true });
       }
       else if (t.kind === "derivedEvent") lines.push({ text: t.label + ": " + (c > 0 ? "yes" : "no") });
-      else if (t.stack && t.values) {
-        // each substitution with its count, in its colour's order, as the portal's tooltip lists them
-        const k = t.stack.length;
-        lines.push({ text: c === -1 ? t.label + ": no data" : t.label + ": " + t.stack.map((s, j) => s + " " + t.values![c * k + j]).join(" · ") });
-      }
+      else if (t.stack && t.values) lines.push({ text: stackCellText({ label: t.label, stack: t.stack, values: t.values }, c) });
       else if (t.numeric) {
         // the exact value where the contract carries it; an older contract has only the drawing code
         const x = t.values ? t.values[hit.ci] : NaN;

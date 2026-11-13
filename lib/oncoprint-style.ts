@@ -285,6 +285,16 @@ export const PARTIAL_PROFILE_NOTE = "* = % over the columns profiled for that ge
  * them (makeCountsMapClinicalComparator): the column whose largest category comes earlier in the
  * list first, then the smaller share of that category. `values` holds k counts per column.
  */
+/**
+ * A stacked row's cell in the tooltip: each class with its count (not its share), in the classes'
+ * order, as the portal's lists them (TooltipUtils makeClinicalTrackTooltip, "counts").
+ */
+export function stackCellText(t: { label: string; stack: string[]; values: ArrayLike<number> }, cell: number): string {
+  if (cell === -1) return t.label + ": no data";
+  const k = t.stack.length;
+  return t.label + ": " + t.stack.map((s, j) => s + " " + t.values[cell * k + j]).join(" · ");
+}
+
 export function stackCompare(values: ArrayLike<number>, k: number, x: number, y: number): number {
   const top = (c: number) => { let m = 0, tot = 0; for (let j = 0; j < k; j++) { const v = values[c * k + j]; tot += v; if (v > values[c * k + m]) m = j; } return { m, share: tot ? values[c * k + m] / tot : 0 }; };
   const a = top(x), b = top(y);

@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { contractToTsv, geneCellLabel } from "../lib/oncoprint-tabular.ts";
-import { BITS, NOT_PROFILED } from "../lib/oncoprint-assemble.ts";
+import { BITS, NOT_PROFILED, assembleContract } from "../lib/oncoprint-assemble.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
 import type { Contract, Track } from "../lib/types.ts";
 
@@ -93,4 +93,35 @@ test("a numeric row gives the exact value where the contract carries one, and th
 test("the mutation spectrum exports as the portal's: one row per substitution, its counts", () => {
   const tsv = contractToTsv({ columns: ["A", "B"], tracks: [{ kind: "clinical", label: "MUTATION_SPECTRUM", stack: ["C>A", "C>G"], cells: [0, -1], values: [119, 186, 0, 0] }] } as never);
   assert.deepEqual(tsv.split("\n").filter(Boolean).slice(1), ["MUTATION_SPECTRUM (C>A)\tCLINICAL\t119\t", "MUTATION_SPECTRUM (C>G)\tCLINICAL\t186\t"]);
+});
+
+// #199 W1: the mutation spectrum in the TSV (tabularDownload 23-25, 150-185)
+test("#199 W1: one row per class, '<label> (C>A)' ... '(T>G)', each the count, blank with no data", () => {
+  const stack = ["C>A", "C>G", "C>T", "T>A", "T>C", "T>G"];
+  const tsv = contractToTsv({ columns: ["A", "B", "C"], tracks: [{ kind: "clinical", label: "MUTATION_SPECTRUM", stack, cells: [1, -1, 0],
+    values: [0, 0, 0, 0, 0, 7, 1, 2, 3, 4, 5, 6] }] } as never);
+  assert.deepEqual(tsv.split("\n").filter(Boolean), [
+    "track_name\ttrack_type\tA\tB\tC",
+    "MUTATION_SPECTRUM (C>A)\tCLINICAL\t1\t\t0",
+    "MUTATION_SPECTRUM (C>G)\tCLINICAL\t2\t\t0",
+    "MUTATION_SPECTRUM (C>T)\tCLINICAL\t3\t\t0",
+    "MUTATION_SPECTRUM (T>A)\tCLINICAL\t4\t\t0",
+    "MUTATION_SPECTRUM (T>C)\tCLINICAL\t5\t\t0",
+    "MUTATION_SPECTRUM (T>G)\tCLINICAL\t6\t\t7"
+  ], "column A reads its own cell's counts (cell 1), C its (cell 0); B has none");
+});
+
+// Legacy: a case whose spectrum rows sum to 0 (only ref = alt SNVs) is no data for drawing and sort,
+// but its attr_val is still the zero counts (DataUtils 736-746), so the TSV writes 0, not blank
+// (tabularDownload 172-185); a case with no spectrum row has no attr_val and is blank.
+test("#199 W1: no spectrum row, or an all-zero one, writes blank (the portal writes 0 for all-zero: docs/PORTAL-PARITY.md ONC-TT-3)", () => {
+  const pids = ["Z", "N", "D"];
+  const c = assembleContract({ genes: ["TP53"], groups: [{ name: "all", pids }], studies: ["s"], events: [], coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })),
+    isDriver: () => false, annotationSource: "t", heatmap: [], derived: [], lineGap: 0, sort: [{ track: "id", dir: "asc" }],
+    clinical: [{ attr: "MUTATION_SPECTRUM", values: new Map([["Z", "0,0,0,0,0,0"], ["D", "1,0,0,0,0,0"]]) }] });
+  const lines = contractToTsv(c).split("\n");
+  const cols = lines[0].split("\t"), row = lines.find((l) => l.startsWith("MUTATION_SPECTRUM (C>A)"))!.split("\t");
+  assert.equal(row[cols.indexOf("D")], "1");
+  assert.equal(row[cols.indexOf("N")], "", "no spectrum row: blank");
+  assert.equal(row[cols.indexOf("Z")], "", "all-zero spectrum: blank, as no data");
 });

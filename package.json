@@ -35,6 +35,7 @@
     "check:genefacets": "node --env-file=.env.local scripts/check-gene-facets.ts",
     "check:values": "node --env-file=.env.local scripts/check-value-folding.ts",
     "check:oncoprint-values": "node --env-file=.env.local scripts/check-oncoprint-values.ts",
+    "check:oncoprint-spectrum": "node --env-file=.env.local scripts/check-oncoprint-spectrum.ts",
     "check:denominators": "node --env-file=.env.local scripts/check-denominators.ts",
     "denominators:pin": "UPDATE_DENOM=1 node --env-file=.env.local scripts/check-denominators.ts",
     "check:splitby-perf": "node --env-file=.env.local scripts/check-splitby-perf.ts",

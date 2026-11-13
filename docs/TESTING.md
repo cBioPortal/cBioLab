@@ -148,6 +148,9 @@ checks assert rather than whatever a real warehouse happens to contain:
   (`KI67_INDEX` `>90`, `high`; `PARSE_PROBE` `12abc`, `0x10`, `1,5`, `1e3`), differ only in case or
   spaces (`SITE_LABEL`) or are BOOLEAN (`FLAG_BOOL`), with patient-level `PATIENT_SCORE` and
   `PATIENT_FLAG`, for `check:oncoprint-values`: an oncoprint patient column's value.
+- **Single-base substitutions of every kind** on `FX-P21`–`FX-P30` (both strands of each class, a
+  second row at one locus, a DNP and an insertion, a lowercase allele, germline and UNCALLED rows,
+  ref = alt), each on a gene the patient already had mutated, for `check:oncoprint-spectrum`.
 - **OncoKB calls** for its variants (`test/fixtures/peer-oncokb.tsv`, a hand-written subset of
   OncoKB's public calls; some variants are left unannotated). A peer annotates with its caller's pin,
   so they are stored under the version the app pins (`ONCOKB_PIN`, else the warehouse's latest) and

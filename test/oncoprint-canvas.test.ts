@@ -173,3 +173,28 @@ test("zoomed out, a stacked row shows the first column with data", async () => {
   assert.equal(aggregate({ kind: "clinical", stack: ["a"] }, [-1, 4, 7], null, 0, 3, new Int32Array(4)), 4);
   assert.equal(aggregate({ kind: "clinical", stack: ["a"] }, [-1, -1], null, 0, 2, new Int32Array(4)), -1);
 });
+
+// #199 S1-S3 in the browser: the mutation spectrum's sort (SortUtils 280-345)
+test("#199 S1/S2: the browser sorts the spectrum as the engine does: largest class (first on a tie), then its share; no data last both ways", () => {
+  const spec = new Map([["S1", "5,0,5,0,0,0"], ["S2", "2,0,2,0,0,0"], ["S3", "9,0,1,0,0,0"], ["S4", "0,3,1,0,0,0"], ["S5", "0,0,9,0,0,1"], ["S6", "1,0,0,0,0,9"], ["S7", "0,0,0,0,0,0"]]);
+  const pids = ["S7", "S8", "S6", "S5", "S4", "S3", "S2", "S1"];
+  const asc = browserSort([{ attr: "MUTATION_SPECTRUM", values: spec }], pids, [{ track: "MUTATION_SPECTRUM", dir: "asc" }]);
+  assert.deepEqual([...asc.slice(0, 2)].sort(), ["S1", "S2"], "asc: C>A at 0.5 (S1's C>A/C>T tie goes to C>A)");
+  assert.deepEqual(asc.slice(2, 6), ["S3", "S4", "S5", "S6"], "asc");
+  assert.deepEqual([...asc.slice(6)].sort(), ["S7", "S8"], "asc: no data last");
+  const desc = browserSort([{ attr: "MUTATION_SPECTRUM", values: spec }], pids, [{ track: "MUTATION_SPECTRUM", dir: "desc" }]);
+  assert.deepEqual(desc.slice(0, 4), ["S6", "S5", "S4", "S3"], "desc");
+  assert.deepEqual([...desc.slice(6)].sort(), ["S7", "S8"], "desc: no data still last");
+});
+
+const spectrumTie = (keys: { track: string; dir: "asc" | "desc" }[]) => {
+  const pids = Array.from({ length: 12 }, (_, i) => "S" + (i + 1));
+  const spec = new Map([["S1", "5,0,5,0,0,0"], ["S2", "2,0,2,0,0,0"]]);
+  const next = new Map(pids.map((p, i): [string, string] => [p, p === "S2" ? "0.5" : String(10 + i * 3.25)]));
+  return browserSort([{ attr: "MUTATION_SPECTRUM", values: spec }, { attr: "NEXT", values: next }], pids, keys).filter((p) => p === "S1" || p === "S2");
+};
+
+test("#199 S3: in the browser, a spectrum tie goes to the next key", () => {
+  for (const dir of ["asc", "desc"] as const) assert.deepEqual(spectrumTie([{ track: "MUTATION_SPECTRUM", dir }, { track: "NEXT", dir: "asc" }]), ["S2", "S1"], dir + ": NEXT decides");
+});
+

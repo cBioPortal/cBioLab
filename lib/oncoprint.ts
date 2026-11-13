@@ -202,7 +202,10 @@ export function spectrumSql(study: string, db: string, unit: Unit, samples?: str
     "JOIN " + db + ".sample_derived sd ON sd.internal_id = m.sample_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'MUTATION_EXTENDED'" +
     (samples ? "\n  AND replaceOne(sd.sample_unique_id, " + pre + ", '') IN (" + samples + ")" : "") + "\n" +
-    "GROUP BY pid";
+    "GROUP BY pid\n" +
+    // a case none of whose mutations is a single-base substitution has no spectrum, as the portal's
+    // (MutationSpectrumServiceImpl groups only the snpOnly mutations by sample)
+    "HAVING " + counts.join(" + ") + " > 0";
 }
 
 export function clinicalSql(attrs: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
