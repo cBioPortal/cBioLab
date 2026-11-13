@@ -110,7 +110,8 @@ def parse_sort(spec: str | list[str] | None) -> list[dict[str, str]]:
     return [{"track": s[1:], "dir": "desc"} if s.startswith("-") else {"track": s, "dir": "asc"} for s in items]
 
 
-DISPLAY_KEYS = ("showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground", "style", "colors")
+DISPLAY_KEYS = ("showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground",
+                "sortByMutationType", "sortByDrivers", "sortIgnoreVUS", "style", "colors")
 _GAP_MODES = ("none", "gaps", "pct", "pct-left")
 _LEGEND_MODES = ("all", "none")
 _ANNOTATE_MODES = ("oncokb", "none")
@@ -207,6 +208,13 @@ def normalize_display(d: dict[str, Any] | None, drivers: dict[str, Any] | None =
         "drivers": resolved,
         "whiteBackground": boolean("whiteBackground", False),
     }
+    # the staircase switches, echoed only when off the portal's defaults
+    if not boolean("sortByMutationType", True):
+        out["sortByMutationType"] = False
+    if not boolean("sortByDrivers", True):
+        out["sortByDrivers"] = False
+    if boolean("sortIgnoreVUS", False):
+        out["sortIgnoreVUS"] = True
     if src.get("style") is not None:
         out["style"] = src["style"]
     if colors is not None:

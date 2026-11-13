@@ -248,6 +248,10 @@ export const PARTIAL_PROFILE_NOTE = "* = % over the columns profiled for that ge
 
 /** The staircase's switches, the portal's Sort-menu toggles; left out, each is the portal's default. */
 export interface StaircaseOptions { byType?: boolean; byDriver?: boolean; ignoreVus?: boolean }
+/** a display's Sort switches as staircaseRank takes them (display.sortByMutationType, sortByDrivers, sortIgnoreVUS) */
+export function staircaseOptions(d?: { sortByMutationType?: boolean; sortByDrivers?: boolean; sortIgnoreVUS?: boolean }): StaircaseOptions {
+  return { byType: d?.sortByMutationType ?? true, byDriver: d?.sortByDrivers ?? true, ignoreVus: d?.sortIgnoreVUS ?? false };
+}
 /** every staircaseRank is below this: structural variant 3 × copy number 5 × mutation 13 × germline, mRNA, protein 3 each */
 export const STAIRCASE_RADIX = 3 * 5 * 13 * 3 * 3 * 3;
 

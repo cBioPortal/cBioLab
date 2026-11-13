@@ -50,6 +50,16 @@ class StaircaseTest(unittest.TestCase):
         self.assertEqual(staircase_rank(BITS["TRUNCATING"], {"ignoreVus": True}), staircase_rank(0, {"ignoreVus": True}))
         self.assertEqual(sorted(["TCGA-AA-3864", "TCGA-AA-A00N", "P10", "P2"], key=natural_vector), ["P2", "P10", "TCGA-AA-A00N", "TCGA-AA-3864"])
 
+    def test_sort_switches(self) -> None:
+        from cohortlab.local import normalize_display
+        from cohortlab.style import staircase_rank
+        self.assertNotIn("sortIgnoreVUS", normalize_display({}))
+        self.assertTrue(normalize_display({"sortIgnoreVUS": True})["sortIgnoreVUS"])
+        with self.assertRaises(ValueError):
+            normalize_display({"sortByDrivers": "no"})
+        drv_mis = BITS["MISSENSE"] | BITS["MUT_DRIVER"] | BITS["DRIVER"]
+        self.assertLess(staircase_rank(BITS["TRUNCATING"], {"byDriver": False}), staircase_rank(drv_mis, {"byDriver": False}))
+
 class LocalTables(unittest.TestCase):
     def setUp(self):
         self.op = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"),

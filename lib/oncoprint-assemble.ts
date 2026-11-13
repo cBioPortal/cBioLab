@@ -8,7 +8,7 @@
 // tables, and a port in another language has this function as its conformance target.
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
-import { STYLE, encodeNumeric, staircaseRank, STAIRCASE_RADIX, naturalVector, compareVectors } from "./oncoprint-style.ts";
+import { STYLE, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
 import type { Contract, Track, GroupRange, ResolvedDisplay, DisplaySpec } from "./types.ts";
@@ -53,7 +53,8 @@ export function normalizeSort(sort: SortKeySpec[] | undefined): { track: string;
   });
 }
 
-const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground", "style", "colors"] as const;
+const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground",
+  "sortByMutationType", "sortByDrivers", "sortIgnoreVUS", "style", "colors"] as const;
 const GAP_MODES = ["none", "gaps", "pct", "pct-left"] as const;
 const LEGEND_MODES = ["all", "none"] as const;
 const ANNOTATE_MODES = ["oncokb", "none"] as const;
@@ -68,7 +69,7 @@ export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: Driver
   for (const k of Object.keys(src))
     if (!(DISPLAY_KEYS as readonly string[]).includes(k))
       throw new Error("display: unknown option '" + k + "' (accepted: " + DISPLAY_KEYS.join(", ") + ")");
-  const bool = (k: "showUnaltered" | "whitespace" | "colorByType" | "colorByGermline" | "hideVUS" | "whiteBackground", dflt: boolean): boolean => {
+  const bool = (k: "showUnaltered" | "whitespace" | "colorByType" | "colorByGermline" | "hideVUS" | "whiteBackground" | "sortByMutationType" | "sortByDrivers" | "sortIgnoreVUS", dflt: boolean): boolean => {
     const v = src[k];
     if (v === undefined) return dflt;
     if (typeof v !== "boolean") throw new Error("display." + k + " must be true or false");
@@ -109,6 +110,10 @@ export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: Driver
     hideGermline: drivers.hideGermline,
     drivers,
     whiteBackground: bool("whiteBackground", false),
+    // the staircase switches, echoed only when off the portal's defaults
+    ...(!bool("sortByMutationType", true) ? { sortByMutationType: false } : {}),
+    ...(!bool("sortByDrivers", true) ? { sortByDrivers: false } : {}),
+    ...(bool("sortIgnoreVUS", false) ? { sortIgnoreVUS: true } : {}),
     ...(src.style !== undefined ? { style: src.style as Record<string, unknown> } : {}),
     ...(colors !== undefined ? { colors } : {})
   };
@@ -472,13 +477,14 @@ export function assembleContract(input: AssembleInput): Contract {
   // sort, so the rows' ranks are packed, four to a double ((STAIRCASE_RADIX + 1)^4 < 2^53), and
   // compared as numbers.
   const PER_KEY = 4, RADIX = STAIRCASE_RADIX + 1;
+  const switches = staircaseOptions(input.display);
   const keys: Float64Array[] = [];
   for (let from = 0; from < geneTracks.length; from += PER_KEY) {
     const key = new Float64Array(allPids.length);
     const list = geneTracks.slice(from, from + PER_KEY).map((t) => geneCells.get(t.label)!);
     for (let i = 0; i < allPids.length; i++) {
       let k = 0;
-      for (const cells of list) k = k * RADIX + (cells[i] === NOT_PROFILED ? STAIRCASE_RADIX : staircaseRank(cells[i]));
+      for (const cells of list) k = k * RADIX + (cells[i] === NOT_PROFILED ? STAIRCASE_RADIX : staircaseRank(cells[i], switches));
       key[i] = k;
     }
     keys.push(key);

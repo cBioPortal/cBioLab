@@ -273,7 +273,9 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
 
     # ---- column sort within groups ------------------------------------------
     # the portal's staircase: each gene row's staircase_rank, not profiled after unaltered; then the natural case id
-    gene_ranks = [[STAIRCASE_RADIX if int(c) == NOT_PROFILED else staircase_rank(int(c)) for c in gene_cells[t.label]] for t in gene_tracks]
+    d = display or {}
+    switches = {"byType": d.get("sortByMutationType", True), "byDriver": d.get("sortByDrivers", True), "ignoreVus": d.get("sortIgnoreVUS", False)}
+    gene_ranks = [[STAIRCASE_RADIX if int(c) == NOT_PROFILED else staircase_rank(int(c), switches) for c in gene_cells[t.label]] for t in gene_tracks]
 
     def bare(p: str) -> str:
         st = study_of.get(p)

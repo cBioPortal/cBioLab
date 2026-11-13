@@ -6,7 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { draw, fitZoom, sortColumns, GEOM, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
 import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
-import { assembleContract } from "../lib/oncoprint-assemble.ts";
+import { assembleContract, normalizeDisplay } from "../lib/oncoprint-assemble.ts";
 
 function recorder(dpr: number) {
   const rects: { x: number; y: number; w: number; h: number }[] = [];
@@ -69,4 +69,22 @@ test("the browser's genomic re-sort is the engine's staircase, ids in the portal
   const ids = data.columns();
   assert.deepEqual(Array.from(sorted, (i) => ids[i]), engine.columns);
   assert.deepEqual(engine.columns, ["E", "D", "C", "B", "A", "P2", "P10", "TCGA-AA-A00N", "TCGA-AA-3864", "G"]);
+});
+
+test("the browser re-sorts with the Sort switches as the engine does", () => {
+  const pids = ["A", "B", "C", "D"];
+  const build = (display: Record<string, unknown>) => assembleContract({ genes: ["TP53"], groups: [{ name: "all", pids }], studies: ["s"],
+    events: [{ pid: "A", gene: "TP53", vt: "mutation", mt: "Nonsense_Mutation" }, { pid: "B", gene: "TP53", vt: "mutation", mt: "Missense_Mutation", driver: true },
+      { pid: "D", gene: "TP53", vt: "mutation", mt: "In_Frame_Del" }],
+    coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })), isDriver: (r) => !!(r as { driver?: boolean }).driver, annotationSource: "t",
+    clinical: [], heatmap: [], derived: [], sort: [], lineGap: 0, display: normalizeDisplay(display) });
+  const base = build({});
+  const buf = packContract(base);
+  const data = unpackContract(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
+  const order = Uint32Array.from({ length: data.n }, (_, i) => i), ids = data.columns();
+  const groups = [{ name: "all", start: 0, count: data.n, patients: data.n }];
+  for (const [display, switches] of [[{ sortByDrivers: false }, { byDriver: false }], [{ sortIgnoreVUS: true }, { ignoreVus: true }]] as const) {
+    const sorted = sortColumns(data, order, groups, [{ track: "genomic", dir: "asc" }], switches);
+    assert.deepEqual(Array.from(sorted, (i) => ids[i]), build(display).columns, JSON.stringify(display));
+  }
 });
