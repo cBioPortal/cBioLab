@@ -1,4 +1,5 @@
 // The oncoprint's track edits on a view (the document): pure functions, each returning the next view.
+import { portalFreq } from "../../lib/chart/format.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import { heatmapTrackLabel, assayTrackLabel, STUDY_TRACK } from "../../lib/profile-names.ts";
 
@@ -76,3 +77,23 @@ export const splitGeneTrack = (v: V, label: string): V => {
   // the same gene may already be drawn on its own; expanding must not create two rows with one name
   return withGenes(v, out.filter((e, i) => typeof e !== "string" || out.indexOf(e) === i));
 };
+
+/** a clinical attribute as the Tracks menu lists it: `n` is counted at its own level (`per`) */
+export interface TrackAttr { attribute: string; kind: string; patients: number; displayName?: string; per?: "patient" | "sample"; priority?: number }
+
+/** the portal's Tracks-menu frequency: its Study View getFrequencyStr, "NA" with no denominator */
+export const trackFreqText = (pct: number | null): string => pct == null ? "NA" : portalFreq(pct);
+
+/**
+ * The Clinical tab's rows (ONC-TR-1, ONC-STM-4): each attribute's share of the queried cases with
+ * a value — a sample-level one over the queried samples, as the portal counts it; a patient-level
+ * one over the queried patients (the portal counts its samples) — most first, then by priority,
+ * then by name.
+ */
+export function clinicalTrackRows(attrs: TrackAttr[], totals?: { patients: number; samples: number }) {
+  return attrs.map((a) => {
+    const of = !totals ? 0 : a.per === "sample" ? totals.samples : totals.patients;
+    const pct = of ? Math.min(100, 100 * a.patients / of) : null;
+    return { ...a, label: a.displayName || a.attribute, pct, unit: a.per === "sample" ? "samples" as const : "patients" as const };
+  }).sort((x, y) => (y.pct ?? -1) - (x.pct ?? -1) || (y.priority ?? 0) - (x.priority ?? 0) || x.label.localeCompare(y.label));
+}

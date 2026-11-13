@@ -364,3 +364,10 @@ describe("SQL builders", () => {
     assert.throws(() => normalizeSpec({ genes: [] } as never), /at least one valid gene symbol required/);
   });
 });
+
+describe("clinical tracks", () => {
+  test("past the limit an oncoprint refuses, naming it, rather than drawing the first eight", async () => {
+    const many = Array.from({ length: 101 }, (_, i) => "ATTR_" + i);
+    await assert.rejects(buildContract(spec({ clinical: many })), /101 tracks asked for; an oncoprint draws at most 100/);
+  });
+});
