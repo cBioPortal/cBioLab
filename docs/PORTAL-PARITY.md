@@ -143,7 +143,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Tracks › Clinical: display names (ours `SAMPLE_TYPE`), Freq % (ours patient counts), Select / Deselect all, applied on submit (ours each tick re-runs), no cap of 8; 59 attributes listed vs 64 (ONC-TR-1, ONC-STM-4)
   - [ ] Clinical tracks: every value its own colour (ours the top 8 + "Other", Okabe-Ito); a patient's value as the portal's (mean, MUTATION_COUNT max, "Mixed"; ours the patient row, else one sample's); exact tooltip values (ours "≈x" from a 256-step code) (ONC-TT-1, ONC-TT-2, ONC-TT-12, ONC-TP-3, ONC-STM-5)
   - [ ] The mutation spectrum track (ONC-TT-3, ONC-STM-6)
-  - [ ] Heatmaps: expression blue→black→red (ours blue→white→red), methylation fixed to [0, 1], VAF yellow→teal (ours blue), a patient's value max |x| (ours the mean) (ONC-TT-5…7, ONC-TT-12, ONC-STM-7)
+  - [x] Heatmaps: expression blue→black→red, methylation fixed to [0, 1] (white at 0.35), VAF yellow→teal, a patient's value max |x| (ONC-TT-5…7, ONC-TT-12, ONC-STM-7) (#200)
+    - [ ] Generic-assay pivot and sort order (ONC-TT-8); VAF's "Not mutated/no VAF data" state; the #e0e0e0 null colour
   - [ ] Clustering: average linkage on 1 − Spearman, rows and columns (ours Ward on Euclidean over per-gene z-scores, NaN → mean, columns only, ≤4,000 columns) (ONC-SO-4, ONC-TM-5, ONC-STM-9)
     - Measured ([spike](spikes/oncoprint-clustering.md)). Legacy's own library takes 20–34 s at 4k columns and fails past ~8–10k: 25k would need ~8 GB. Clustering the distinct column patterns instead is exact and fast: msk_chord_2024 CNA (25,040 columns) → 7,689 with data → 602 patterns, 0.33 s. Plan:
       - legacy's method over distinct rank patterns, weighted by count, with all-null/0 columns placed last;
