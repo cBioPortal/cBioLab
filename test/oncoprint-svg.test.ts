@@ -6,6 +6,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { assembleContract } from "../lib/oncoprint-assemble.ts";
 import { localInput, parseTsv } from "../lib/oncoprint-local.ts";
 import { contractToSvg } from "../lib/oncoprint-svg.ts";
+import { clinicalColor } from "../lib/oncoprint-style.ts";
+import type { Contract } from "../lib/types.ts";
 
 const FIX = "test/fixtures/oncoprint/";
 const fixture = () => assembleContract(localInput({
@@ -73,4 +75,12 @@ test("germline: the legend draws the stripe, and the caption says how many hidin
   const hidden = contractToSvg(make({ hideGermline: true }), 900);
   assert.doesNotMatch(hidden, />Germline Mutation</);
   assert.match(hidden, /1 germline mutation is hidden and not in the %/);
+});
+
+test("zoomed out, a track with more than 63 values still draws its commonest one", () => {
+  const n = 3000, cats = Array.from({ length: 100 }, (_, i) => "v" + i);
+  const c = { study: "s", studies: ["s"], groups: [{ name: "all", start: 0, count: n }], columns: Array.from({ length: n }, (_, i) => "P" + i),
+    unit: "patient", conventions: { sort: [] }, stats: { nColumns: n }, display: {},
+    tracks: [{ kind: "clinical", label: "X", categories: cats, cells: new Array(n).fill(70) }] } as unknown as Contract;
+  assert.ok(contractToSvg(c, 800).includes(clinicalColor(70)), "value v70's colour, past the old 64-slot vote");
 });
