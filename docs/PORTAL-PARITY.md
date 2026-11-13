@@ -154,7 +154,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
         - a BOOLEAN attribute (5 in the warehouse) is shown as its value, or "Mixed"; the portal's fillClinicalTrackDatum has no branch for it and draws nothing.
       - Known: values travel as float32, so two values equal to 7 significant digits tie where the portal's doubles would order them (two `todo` tests).
     - [ ] ONC-TT-2's numeric typing by the attribute's datatype (ours: ≥90 % parse and >10 distinct values); "(average of n values)" zoomed out (ONC-STM-8)
-  - [ ] The mutation spectrum track (ONC-TT-3, ONC-STM-6)
+  - [x] The mutation spectrum track (ONC-TT-3, ONC-STM-6) (#199)
+    - [ ] Its Freq in Tracks › Clinical (the portal's % of samples sequenced) and Edit Colors
   - [x] Heatmaps: expression blue→black→red, methylation fixed to [0, 1] (white at 0.35), VAF yellow→teal, a patient's value max |x| (ONC-TT-5…7, ONC-TT-12, ONC-STM-7) (#200)
     - [ ] Generic-assay pivot and sort order (ONC-TT-8); VAF's "Not mutated/no VAF data" state; the #e0e0e0 null colour
   - [ ] Clustering: average linkage on 1 − Spearman, rows and columns (ours Ward on Euclidean over per-gene z-scores, NaN → mean, columns only, ≤4,000 columns) (ONC-SO-4, ONC-TM-5, ONC-STM-9)
