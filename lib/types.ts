@@ -804,6 +804,8 @@ export interface PartitionResult {
 export type TrackKind = "gene" | "clinical" | "derivedEvent" | "heatmap";
 export interface Track {
   kind: TrackKind; label: string; cells: number[] | Int32Array;
+  /** a heatmap row's colour ramp, the portal's for its profile (lib/oncoprint-style.ts ramps) */
+  ramp?: "expression" | "methylation" | "vaf";
   /** gene tracks */
   altered?: number; profiled?: number; driverAltered?: number;
   /** a merged gene row: the symbols it pools, in order. Absent on a single-gene row. */

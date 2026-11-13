@@ -400,3 +400,13 @@ test("the Sort switches: Driver off ranks by class alone, Ignore VUS orders as i
   assert.equal(normalizeDisplay({ sortIgnoreVUS: true }).sortIgnoreVUS, true);
   assert.throws(() => normalizeDisplay({ sortByDrivers: "no" as unknown as boolean }), /display.sortByDrivers must be true or false/);
 });
+
+test("heatmap rows: the portal's fixed ranges by profile, whatever the data's spread (ONC-TT-5, ONC-TT-6)", () => {
+  const vals = (xs: number[]) => new Map(["P1", "P2", "P3"].map((p, i): [string, number] => [p + "|TP53", xs[i]]));
+  const c = assembleContract({ ...input(), genes: ["TP53"], groups: [{ name: "all", pids: ["P1", "P2", "P3"] }], clinical: [], derived: [],
+    heatmap: [{ profileType: "rna_seq_v2_mrna", genes: ["TP53"], values: vals([120, 4000, 950]) },
+      { profileType: "methylation_hm450", genes: ["TP53"], values: vals([0.1, 0.5, 0.9]) }] } as never);
+  const [rna, meth] = c.tracks.filter((t) => t.kind === "heatmap");
+  assert.deepEqual([rna.ramp, rna.min, rna.max], ["expression", -3, 3], "raw expression on the portal's -3..3, as it draws it");
+  assert.deepEqual([meth.ramp, meth.min, meth.max], ["methylation", 0, 1]);
+});

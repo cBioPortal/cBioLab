@@ -12,7 +12,7 @@ import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binar
 import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
-import { STYLE, geneLegend, glyphPresence, numericValue, resolveStyle, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { STYLE, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { setPngDpi } from "../../lib/png-dpi.ts";
@@ -1110,7 +1110,7 @@ function Legend({ data, display, colors }: { data: UnpackedContract; display: Fi
               {[3, 5, 7, 10].map((hh) => <span key={hh} style={{ width: 3, height: hh, background: S.glyph.bar.color }} />)}</span>
               {fmtRange(t.min!)} → {fmtRange(t.max!)}{t.logScale ? " (log scale)" : ""}</>
           : t.numeric
-          ? <>{sw(t.center != null ? "linear-gradient(90deg,#2166ac,#fff,#b2182b)" : "linear-gradient(90deg,#deebf7,#084887)", 44)}{t.min} → {t.max}</>
+          ? <>{sw("linear-gradient(90deg," + [0, 64, 128, 191, 255].map((c) => heatColor(t, c, S)).join(",") + ")", 44)}{t.min} → {t.max}</>
           : <>{(t.categories || []).slice(0, 8).map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(trackCategoryColor(t, i, S, colors))}{c}</span>)}
             {t.profiledFor && <span style={{ marginRight: 6 }}>{np}{S.glyph.profiled.no}</span>}
             {(t.categories || []).length > 8 && <span className="meta">+{(t.categories || []).length - 8} more</span>}</>}</span>

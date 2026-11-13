@@ -94,6 +94,10 @@ export const STYLE = {
   ramps: {
     sequential: { from: [222, 235, 247], to: [8, 72, 135] },            // #deebf7 -> #084887
     diverging: { low: [33, 102, 172], mid: [255, 255, 255], high: [178, 24, 43] },  // #2166ac -> white -> #b2182b
+    // the portal's heatmap rows (getHeatmapTrackRuleSetParams): colours at value stops
+    expression: { stops: [-3, 0, 3], colors: [[0, 0, 255], [0, 0, 0], [255, 0, 0]] },
+    methylation: { stops: [0, 0.35, 1], colors: [[0, 0, 255], [255, 255, 255], [255, 0, 0]] },
+    vaf: { stops: [0, 1], colors: [[241, 242, 181], [19, 80, 88]] },
     // an altered % (0-100) on a pathway diagram's gene node: PathwayMapper's own scale (GenomicDataOverlayManager),
     // white to red on log(1 + %), reaching `reach` of the way at 100% so a frequent gene is never solid red
     frequency: { from: [255, 255, 255], to: [255, 0, 0], reach: 0.8 }
@@ -168,6 +172,22 @@ export function numericColor(v: number, center: number | null | undefined, S: St
   if (v <= center) { const t = center ? v / center : 1; return rgb([lerp(low[0], mid[0], t), lerp(low[1], mid[1], t), lerp(low[2], mid[2], t)]); }
   const t = (v - center) / (255 - center || 1);
   return rgb([lerp(mid[0], high[0], t), lerp(mid[1], high[1], t), lerp(mid[2], high[2], t)]);
+}
+
+/** A value on one of the portal's heatmap ramps: linear between its stops, clamped at the ends. */
+export function rampColor(ramp: { stops: number[]; colors: number[][] }, v: number): string {
+  const { stops, colors } = ramp;
+  if (v <= stops[0]) return rgb(colors[0]);
+  for (let i = 1; i < stops.length; i++) if (v <= stops[i]) {
+    const t = (v - stops[i - 1]) / (stops[i] - stops[i - 1] || 1), a = colors[i - 1], b = colors[i];
+    return rgb([lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]);
+  }
+  return rgb(colors[colors.length - 1]);
+}
+
+/** A numeric cell's colour: its heatmap ramp when it has one, the generic ramps otherwise. */
+export function heatColor(t: NumericScale & { ramp?: "expression" | "methylation" | "vaf"; center?: number | null }, code: number, S: Style = STYLE): string {
+  return t.ramp ? rampColor(S.ramps[t.ramp], numericValue(t, code)) : numericColor(code, t.center, S);
 }
 
 /** Colour for an altered % (0..100) on a pathway diagram's gene node, as hex (so `textOn` can pick its ink). */

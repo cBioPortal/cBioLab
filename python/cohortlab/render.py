@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from .contract import Contract, Track
-from .style import BITS, STYLE, bar_band, cell_layers, format_gutter_pct, gene_legend, glyph_presence, numeric_rgb, resolve_style, style_for_display, track_category_color, track_label_text
+from .style import BITS, STYLE, bar_band, cell_layers, heat_rgb, format_gutter_pct, gene_legend, glyph_presence, resolve_style, style_for_display, track_category_color, track_label_text
 
 _G = STYLE["geometry"]
 _MUT = BITS["MISSENSE"] | BITS["TRUNCATING"] | BITS["INFRAME"] | BITS["SPLICE"] | BITS["OTHER_MUT"] | BITS["PROMOTER"]
@@ -133,7 +133,7 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
                     (b0, b1), negative = bar_band(t.meta, code)
                     img[y0 + int(round(ROW_H * b0)):y0 + int(round(ROW_H * b1)), x0:x1] = _rgb(S["glyph"]["bar"]["negative" if negative else "color"])
                 elif t.meta.get("numeric"):
-                    img[y0:y0 + ROW_H, x0:x1] = np.array(numeric_rgb(code, t.meta.get("center"), S), dtype=np.float64)
+                    img[y0:y0 + ROW_H, x0:x1] = np.array(heat_rgb(t.meta, code, S), dtype=np.float64)
                 else:
                     img[y0:y0 + ROW_H, x0:x1] = _rgb(track_category_color(t, code, S, colors))
         x += int(bw.sum()) + GROUP_GAP
