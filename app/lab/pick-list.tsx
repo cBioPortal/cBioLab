@@ -94,8 +94,10 @@ export type ValueRow = { key: string; name: string; n: number; total?: number; o
  * A ranked value list (a categorical facet, a gene's states, timeline events, case lists): name, a
  * bar of its count against the largest, the count, and its share of `total` when there is one.
  */
-export function ValueList({ rows, onApply, why, hint, picks: shared }: {
+export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPct }: {
   rows: ValueRow[]; onApply: (keys: string[]) => void; why?: (keys: string[]) => string | null; hint?: string;
+  /** how a share (0–100) is written */
+  pct?: (pct: number) => string;
   /** the checked rows, when something outside the list (its chart menu) reads them too */
   picks?: Picks;
 }) {
@@ -110,7 +112,7 @@ export function ValueList({ rows, onApply, why, hint, picks: shared }: {
           <span className="vname" style={r.muted ? { color: "var(--muted)" } : undefined}>{r.name}</span>
           <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * r.n / max)) + "%" }} /></span>
           <span className="vn">{r.n.toLocaleString()}</span>
-          <span className="vpct">{r.total ? fmtPct(100 * r.n / r.total) : ""}</span>
+          <span className="vpct">{r.total ? pct(100 * r.n / r.total) : ""}</span>
         </PickRow>
       )}
     </VirtualRows>

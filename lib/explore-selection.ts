@@ -135,16 +135,38 @@ function chartValues(draft: CohortDef | null | undefined, attribute: string): (s
   return l.range ? null : l.op === "=" ? [l.value!] : l.values || null;
 }
 
+/** the clause selecting a chart's NA: cases with no value of the attribute (none recorded, or a spelling of NA) */
+export const naClause = (attribute: string): Clause => ({ not: { kind: "clinical", attribute, op: "!=", value: "" } });
+const isNaClause = (c: Clause, attribute: string): boolean => {
+  const n = (c as { not?: ClinicalLeaf }).not;
+  return !!n && n.kind === "clinical" && n.attribute === attribute && n.op === "!=" && n.value === "";
+};
+/** whether the draft selects this chart's NA */
+export const naSelected = (draft: CohortDef | null | undefined, attribute: string): boolean =>
+  (draft?.all || []).some((c) => isNaClause(c, attribute));
+
+/** NA and values can't be OR'd in one clause yet: an `any` holds leaves, and NA is a negation */
+const NA_WITH_VALUES = "NA can't be selected together with other values of the same chart; take those out first";
+
+/** A click on a chart's NA slice or row: selected alone, or taken out again. */
+export function toggleNa(draft: CohortDef | null | undefined, attribute: string): { draft: CohortDef } | { why: string } {
+  const all = draft?.all || [];
+  if (naSelected(draft, attribute)) return { draft: { ...(draft || {}), all: all.filter((c) => !isNaClause(c, attribute)) } };
+  if (chartSelection(draft, attribute).length) return { why: NA_WITH_VALUES };
+  return { draft: { ...(draft || {}), all: [...all, naClause(attribute)] } };
+}
+
 /**
  * A click on value `v` of a categorical chart: added to the chart's values, or taken out when it
  * is already one of them (matched as the facet folds them: case and surrounding space).
  */
-export function toggleValue(draft: CohortDef | null | undefined, attribute: string, v: string): CohortDef {
+export function toggleValue(draft: CohortDef | null | undefined, attribute: string, v: string): { draft: CohortDef } | { why: string } {
+  if (naSelected(draft, attribute)) return { why: NA_WITH_VALUES };
   const fold = (x: unknown) => String(x).trim().toLowerCase();
   const cur = chartValues(draft, attribute) || [];
   const has = cur.some((x) => fold(x) === fold(v));
   const next = has ? cur.filter((x) => fold(x) !== fold(v)) : [...cur, v];
   const clause: ClinicalLeaf | null = !next.length ? null : next.length === 1
     ? { kind: "clinical", attribute, op: "=", value: next[0] } : { kind: "clinical", attribute, values: next };
-  return replaceChart(draft, attribute, clause);
+  return { draft: replaceChart(draft, attribute, clause) };
 }

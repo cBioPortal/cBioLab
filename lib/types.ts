@@ -882,6 +882,8 @@ export type ClinicalFacet =
       values: { v: string; n: number }[];
       /** set when re-queried against the draft minus its own clauses */
       disjunctive?: true;
+      /** cases at its level with no value (the portal's NA slice), on the same basis as `values` */
+      na?: number;
     })
   | (FacetBase & {
       kind: "num"; min: number; max: number; median: number;

@@ -12,9 +12,10 @@ import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
 import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
-import { fmtInt, fmtNum, fmtPct } from "../../lib/chart/format.ts";
+import { fmtInt, fmtNum, fmtPct, portalFreq } from "../../lib/chart/format.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
-import { binSelected, chartSelection } from "../../lib/explore-selection.ts";
+import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
+import { PORTAL_NA } from "../../lib/chart/style.ts";
 import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState, type GroupsTarget } from "./use-explore-state.ts";
@@ -654,6 +655,9 @@ function compareNumeric(label: string, singleStudy: boolean, working: boolean, q
   ] };
 }
 
+/** a value list's key for its NA row, which no value can spell */
+const NA_KEY = "\u0000NA";
+
 /** a clinical histogram bar as a filter: a word ("Negative"), one value (start = end), an outlier bar or an interval (start, end] */
 function binClause(attribute: string, b: any): Clause {
   if (b.value != null) return { kind: "clinical", attribute, values: [b.value] };
@@ -679,7 +683,7 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
    change when the draft does. One tile per attribute, the portal's
    own study-view density — see .facetgrid's own comment. */
 function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clinical"][number]; ctx: ExploreCtx }) {
-  const { addClause, addMode, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, togglePieValue } = ctx;
+  const { addClause, addMode, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, togglePieValue, toggleNaValue } = ctx;
   const picks = usePicks();
   return (
     <div data-attr={c.per + "|" + c.attribute}
@@ -727,18 +731,20 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           );
         })()}
         {c.kind === "cat" && (() => {
-          const total = c.values.reduce((n: number, v: any) => n + v.n, 0) || 1;
           const d = parseDraft();
-          const isSel = (v: any) => !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
+          const isSel = (v: any) => v.isNa ? naSelected(d, c.attribute) : !!(d && d.all.some((cl: any) => cl.kind === "clinical" && cl.attribute === c.attribute &&
             ((cl.values || []).includes(v.v) || cl.value === v.v)));
+          const pick = (v: any) => v.isNa ? toggleNaValue(c.attribute) : togglePieValue(c.attribute, String(v.v));
           const clause = (v: any) => ({ kind: "clinical", attribute: c.attribute, op: "=", value: v.v });
           // slice geometry: cumulative angles over the returned values.
           // The shape comes from PIE_ATTRIBUTES, a fixed allowlist — see
           // its own comment for why cardinality (the study's, or worse,
           // the draft's) can't be trusted to decide this.
           const asList = !PIE_ATTRIBUTES.has(c.attribute);
-          // stage, grade and the like read in their own order (lib/ordinal.ts); the rest by count
-          const values: any[] = naturalOrder(c.values, (v: any) => String(v.v));
+          // stage, grade and the like read in their own order (lib/ordinal.ts); the rest by count; NA last,
+          // its own slice or row, and every share is of all the chart's cases, NA among them (STS-PIE-9, STS-STM-3)
+          const values: any[] = [...naturalOrder(c.values, (v: any) => String(v.v)), ...(c.na ? [{ v: "NA", n: c.na, isNa: true }] : [])];
+          const total = values.reduce((n: number, v: any) => n + v.n, 0) || 1;
           let acc = 0;
           const R = 34, CX = 36, CY = 36;
           const arcs = values.map((v: any, i: number) => {
@@ -752,19 +758,17 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
             const path = frac >= 0.999
               ? "M " + CX + " " + (CY - R) + " A " + R + " " + R + " 0 1 1 " + (CX - 0.01) + " " + (CY - R) + " Z"
               : "M " + CX + " " + CY + " L " + x0 + " " + y0 + " A " + R + " " + R + " 0 " + large + " 1 " + x1 + " " + y1 + " Z";
-            return { v, path, color: CAT_COLORS[i % CAT_COLORS.length], frac };
+            return { v, path, color: v.isNa ? PORTAL_NA : CAT_COLORS[i % CAT_COLORS.length], frac };
           });
           if (asList) {
             const byKey = new Map(values.map((v: any) => [String(v.v), v]));
             return (<>
-              {/* a value's share is of the cases that HAVE a value for this attribute — the
-                  facet's own total, the disjunctive-safe sum of its values the pie also uses —
-                  not the whole cohort, which would make every sparsely-recorded attribute look
-                  small, nor c.patients, which a drafted attribute narrows to itself */}
-              <ValueList picks={picks} hint={"keep the cases whose " + (c.displayName || c.attribute) + " is any of the checked values"}
-                rows={values.map((v: any) => ({ key: String(v.v), name: String(v.v), n: v.n, total, on: isSel(v),
-                  title: v.v + " — " + v.n.toLocaleString() }))}
+              <ValueList picks={picks} pct={portalFreq} hint={"keep the cases whose " + (c.displayName || c.attribute) + " is any of the checked values"}
+                rows={values.map((v: any) => ({ key: v.isNa ? NA_KEY : String(v.v), name: String(v.v), n: v.n, total, on: isSel(v), muted: v.isNa,
+                  title: v.isNa ? "no " + (c.displayName || c.attribute) + " recorded — " + v.n.toLocaleString() : v.v + " — " + v.n.toLocaleString() }))}
+                why={(keys) => keys.includes(NA_KEY) && keys.length > 1 ? "NA can't be combined with other values" : null}
                 onApply={(keys) => {
+                  if (keys.includes(NA_KEY)) { toggleNaValue(c.attribute); return; }
                   const vs = keys.map((k) => byKey.get(k).v);
                   addClause(vs.length === 1 ? clause(byKey.get(keys[0])) : { kind: "clinical", attribute: c.attribute, values: vs });
                 }} />
@@ -782,13 +786,13 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
               <svg viewBox="0 0 72 72" className="pie" role="img" aria-label={c.attribute + " distribution"}>
                 {arcs.map((a: any, i: number) => (
                   <path key={i} d={a.path} fill={a.color} className={isSel(a.v) ? "slice on" : "slice"}
-                    onClick={() => togglePieValue(c.attribute, String(a.v.v))}
-                    data-tip={a.v.v + " — " + a.v.n.toLocaleString() + " (" + Math.round(1000 * a.frac) / 10 + "%)"} />
+                    onClick={() => pick(a.v)}
+                    data-tip={a.v.v + " — " + a.v.n.toLocaleString() + " (" + portalFreq(100 * a.frac) + ")"} />
                 ))}
               </svg>
               <div className="pielegend">
                 {arcs.map((a: any, i: number) => (
-                  <button key={i} className={isSel(a.v) ? "pikey on" : "pikey"} onClick={() => togglePieValue(c.attribute, String(a.v.v))}
+                  <button key={i} className={isSel(a.v) ? "pikey on" : "pikey"} onClick={() => pick(a.v)}
                     aria-pressed={isSel(a.v)} data-tip={isSel(a.v) ? "click to take " + a.v.v + " out of the filter" : "click to filter to " + a.v.v}>
                     <span className="swatch" style={{ background: a.color }} />
                     <span className="pname">{a.v.v}</span>

@@ -370,3 +370,37 @@ function toDistinct(bins: DBin[], all: Vals, bounds: Bound[]): DBin[] {
   const interior = conv.filter((b) => b.start && b.end);
   return interior.length && interior.every((b) => cmp(b.start!, b.end!) === 0) ? conv : bins;
 }
+
+/**
+ * The portal's STATIC bin method (`DataBinner.recalcBinCount`): bars laid out once over the whole
+ * study (`dataBins` of its unfiltered values) and counted again over a selection's values, so the
+ * bars stay put as filters change and a bar the selection leaves empty is drawn at 0. A value goes
+ * to the bar holding it as dataBins would place it: `(start, end]`, a one-value bar by equality, an
+ * outlier bar by its side, a bound recorded as a value (">90") to the outlier bar on its side, a
+ * word by its text (case aside). A value no bar holds is not counted.
+ */
+export function recountBins(bins: Bin[], values: BinInput[]): Bin[] {
+  const out = bins.map((b) => ({ ...b, count: 0 }));
+  const edge = (x: number | undefined) => x === undefined ? undefined : decOf(x);
+  const ranges = out.map((b) => ({ b, lo: edge(b.start), hi: edge(b.end) }));
+  const words = new Map(out.filter((b) => b.value != null).map((b) => [b.value!.trim().toUpperCase(), b]));
+  const lower = out.find((b) => b.special === "<="), upper = out.find((b) => b.special === ">");
+  for (const { value, count } of values) {
+    if (!(count > 0)) continue;
+    const plain = parseDec(value);
+    if (!plain) {
+      const t = value.trim(), op = /^(<=|>=|<|>)/.exec(t)?.[1];
+      if (op && parseDec(t.slice(op.length))) { const side = op[0] === "<" ? lower : upper; if (side) side.count += count; continue; }
+      const w = words.get(t.toUpperCase());
+      if (w) w.count += count;
+      continue;
+    }
+    const hit = ranges.find(({ b, lo, hi }) => b.value == null && (
+      b.special === "<=" ? cmp(plain, hi!) <= 0
+        : b.special === ">" ? cmp(plain, lo!) > 0
+          : cmp(lo!, hi!) === 0 ? cmp(plain, lo!) === 0
+            : cmp(plain, lo!) > 0 && cmp(plain, hi!) <= 0));
+    if (hit) hit.b.count += count;
+  }
+  return out;
+}

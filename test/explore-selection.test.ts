@@ -3,7 +3,7 @@
 // (STS-PIE-6), and other charts' clauses are left alone.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { binSelected, binsToLeaves, chartSelection, toggleBin, toggleValue, ANY_LEAF_LIMIT } from "../lib/explore-selection.ts";
+import { binSelected, binsToLeaves, chartSelection, naClause, naSelected, toggleBin, toggleNa, toggleValue, ANY_LEAF_LIMIT } from "../lib/explore-selection.ts";
 import type { CohortDef, NumericBin } from "../lib/types.ts";
 
 // AGE as coadread draws it: ≤35, then 5-year bars to 90, then >90
@@ -79,19 +79,35 @@ describe("histogram bars", () => {
 
 describe("pie values", () => {
   test("a click adds the value; a second click on it takes it out again", () => {
-    let d = toggleValue({ all: [] }, "SEX", "Female");
+    let d = (toggleValue({ all: [] }, "SEX", "Female") as { draft: CohortDef }).draft;
     assert.deepEqual(d.all, [sex]);
-    d = toggleValue(d, "SEX", "Male");
+    d = (toggleValue(d, "SEX", "Male") as { draft: CohortDef }).draft;
     assert.deepEqual(d.all, [{ kind: "clinical", attribute: "SEX", values: ["Female", "Male"] }]);
-    d = toggleValue(d, "SEX", "female");
+    d = (toggleValue(d, "SEX", "female") as { draft: CohortDef }).draft;
     assert.deepEqual(d.all, [{ kind: "clinical", attribute: "SEX", op: "=", value: "Male" }], "matched as the facet folds values");
-    d = toggleValue(d, "SEX", "Male");
+    d = (toggleValue(d, "SEX", "Male") as { draft: CohortDef }).draft;
     assert.deepEqual(d.all, []);
   });
 
   test("the chart's clause keeps its place among the others", () => {
     const age = { kind: "clinical" as const, attribute: "AGE", range: { gt: 50 } };
-    const d = toggleValue({ study: "s", all: [sex, age] }, "SEX", "Male");
+    const d = (toggleValue({ study: "s", all: [sex, age] }, "SEX", "Male") as { draft: CohortDef }).draft;
     assert.deepEqual(d, { study: "s", all: [{ kind: "clinical", attribute: "SEX", values: ["Female", "Male"] }, age] });
+  });
+});
+
+describe("the NA slice", () => {
+  test("selected alone, as the cases with no value, and taken out by a second click", () => {
+    const d1 = (toggleNa({ all: [] }, "RACE") as { draft: CohortDef }).draft;
+    assert.deepEqual(d1.all, [{ not: { kind: "clinical", attribute: "RACE", op: "!=", value: "" } }]);
+    assert.ok(naSelected(d1, "RACE"));
+    assert.deepEqual((toggleNa(d1, "RACE") as { draft: CohortDef }).draft.all, []);
+  });
+
+  test("not combined with values of the same chart, either way round, saying why", () => {
+    const withValue = (toggleValue({ all: [] }, "RACE", "White") as { draft: CohortDef }).draft;
+    assert.ok("why" in toggleNa(withValue, "RACE"));
+    assert.ok("why" in toggleValue({ all: [naClause("RACE")] }, "RACE", "White"));
+    assert.ok("draft" in toggleNa({ all: [sex] }, "RACE"), "another chart's values are no obstacle");
   });
 });

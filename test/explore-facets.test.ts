@@ -306,7 +306,7 @@ describe("one study", () => {
       assert.equal(r.draftCount, 2);
       assert.equal(sent.filter((q) => /SELECT DISTINCT pid, sid FROM/.test(q)).length, 1);
       assert.ok(!sent.some((q) => /uniqExact\(pid\) AS n, uniqExact\(sid\) AS ns/.test(q)), "its size came from the rows");
-      assert.ok(sent.filter((q) => /AS pts, uniqExact/.test(q)).every((q) => q.includes("_cohort_st1")));
+      assert.ok(sent.filter((q) => /^SELECT cancer_study_identifier AS s, uniqExact\(patient_unique_id\) AS pts/.test(q)).every((q) => q.includes("_cohort_st1")));
       assert.deepEqual(r.studyBreakdown![0].n, 2);
       const sex = r.clinical.find((c) => c.attribute === "SEX")!;
       assert.equal((sex as { disjunctive?: boolean }).disjunctive, true);
@@ -349,9 +349,11 @@ describe("one study", () => {
       assert.equal(a.bins!.reduce((n, b) => n + b.count, 0), 90, "every AGE value of the rest of the draft, not only the chosen ranges");
       assert.equal(a.naCount, 5, "95 patients in the rest of the draft, 90 with an age");
       assert.deepEqual([a.min, a.median, a.max], [30, 60, 60], "its range and median read from the same values (position 45 of 90)");
-      const own = sent.find((q) => /attribute_value AS v, uniqExact/.test(q) && /'AGE'/.test(q))!;
-      assert.doesNotMatch(own, /_cohort_st1/, "the draft's own table holds the AGE ranges, so it is not read");
-      assert.match(own, /'Female'/, "the rest of the draft still applies");
+      const own = sent.find((q) => /attribute_value AS v, uniqExact/.test(q) && /'AGE'/.test(q) && /'Female'/.test(q));
+      assert.ok(own, "AGE's values are counted under the rest of the draft");
+      assert.doesNotMatch(own!, /_cohort_st1/, "the draft's own table holds the AGE ranges, so it is not read");
+      const layout = sent.filter((q) => /attribute_value AS v, uniqExact/.test(q) && /'AGE'/.test(q) && !/_cohort_st1|'Female'/.test(q));
+      assert.equal(layout.length, 1, "the bars are laid out over the unfiltered study, once");
       const tmb = r.clinical.find((c) => c.attribute === "TMB")!;
       assert.ok(tmb.kind === "num" && tmb.disjunctive === undefined, "an attribute the draft does not filter on is drawn under it");
     });
@@ -365,6 +367,39 @@ describe("one study", () => {
       assert.deepEqual(r.unknownAttributes, ["FOO", "BAR"]);
       const ok = await buildExplore({ study: S, draft: female, skipGenes: true, skipBins: true });
       assert.equal(ok.unknownAttributes, undefined);
+    });
+
+    test("NA: a categorical chart's cases without a value, against the cohort its values are counted in", async () => {
+      on(/^SELECT uniqExact\(patient_unique_id\) AS pts/, [{ pts: 100, smp: 120 }]);
+      on(/^SELECT type, uniqExact\(if\(type = 'sample', sample_unique_id, patient_unique_id\)\) AS n\nFROM/, (q) => /'SEX'/.test(q) ? [{ type: "patient", n: 97 }] : []);
+      facetAnswers();
+      answers = answers.filter(([re]) => !/numratio/.test(re.source));
+      on(/AS numratio/, [
+        { s: S, type: "patient", a: "SEX", nv: 2, numratio: 0, np: 40 },
+        { s: S, type: "patient", a: "RACE", nv: 3, numratio: 0, np: 1 },
+      ]);
+      on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }, { pid: "P2", sid: "S2" }]);
+      const r = await buildExplore({ study: S, draft: female, skipGenes: true, skipBins: true });
+      const sexF = r.clinical.find((c) => c.attribute === "SEX")!, race = r.clinical.find((c) => c.attribute === "RACE")!;
+      assert.ok(sexF.kind === "cat" && race.kind === "cat");
+      assert.equal(sexF.na, 3, "counted without its own filter: 100 patients, 97 with a value");
+      assert.equal(race.na, 99, "under the draft: the draft's patients as its totals query counts them (100 here), 1 with a value");
+    });
+
+    test("bins are laid out over the unfiltered study and counted over the selection (STATIC)", async () => {
+      facetAnswers();
+      on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }, { pid: "P2", sid: "S2" }]);
+      answers = answers.filter(([re]) => !/attribute_value AS v/.test(re.source));
+      const all = Array.from({ length: 40 }, (_, i) => ({ type: "patient", a: "AGE", v: String(20 + i * 1.5), n: 2 }));
+      on(/attribute_value AS v, uniqExact/, (q) => q.includes("_cohort_st1") ? [{ type: "patient", a: "AGE", v: "50", n: 1 }] : all);
+      const r = await buildExplore({ study: S, draft: female, skipGenes: true });
+      const age = r.clinical.find((c) => c.attribute === "AGE")!;
+      assert.ok(age.kind === "num");
+      const { dataBins } = await import("../lib/data-binner.ts");
+      const layout = dataBins(all.map((x) => ({ value: x.v, count: x.n })), "AGE");
+      assert.deepEqual(age.bins!.map((b) => [b.special, b.start, b.end]), layout.map((b) => [b.special, b.start, b.end]), "the unfiltered study's bars");
+      assert.equal(age.bins!.reduce((n, b) => n + b.count, 0), 1, "counted over the selection");
+      assert.equal(age.bins!.filter((b) => b.count === 0).length, layout.length - 1, "empty bars are kept");
     });
 
     test("past the bound, the definition is read inline and its size counted once", async () => {

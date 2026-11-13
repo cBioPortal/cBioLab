@@ -71,7 +71,7 @@ function leafText(leaf: any) {
       // `leaf.value` here printed the literal string "undefined" instead of describing the
       // percentile request itself.
       ? `${leaf.op} ${Math.round(leaf.percentile * 100)}th percentile${leaf.percentileOf ? " of " + leaf.percentileOf : ""}`
-      : `${leaf.op} ${leaf.value}`);
+      : leaf.op === "!=" && leaf.value === "" ? "has a value" : `${leaf.op} ${leaf.value}`);
     return `${attributeLabel(String(leaf.attribute ?? ""), "short")} ${bits.join(" ")}`;
   }
   if (k === "derived") {

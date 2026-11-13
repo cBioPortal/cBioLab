@@ -182,10 +182,12 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] A gene with no alterations: grey tab label, "There are no alterations in this gene." (CTS-GT-4, CTS-MD-10)
 - [ ] **Study View → summary charts** — the Explore page's charts ([30-study-summary](legacy-spec/parity/30-study-summary.md))
   - [x] Default charts as the portal picks them: priorities from its config table, then coverage. Q1 shows 8 of the portal's 17 clinical charts; Sex, Race, Ethnicity, Subtype, T/M stage, Aneuploidy and the DFS/DSS/PFS KM are hidden (STS-LY-7, STS-LY-8, STS-MD-1; see bugs) (PR #188 open)
-  - [ ] Categorical % of every patient, NA its own slice or row (Race White 48.0 % of 594, NA 232; ours 78.7 % of 362) (STS-PIE-9, STS-TBL-1, STS-STM-1, STS-STM-3, STS-MD-9)
+  - [x] Categorical % of every patient, NA its own slice or row (Race White 48.0 % of 594, NA 232; ours 78.7 % of 362) (STS-PIE-9, STS-TBL-1, STS-STM-1, STS-STM-3, STS-MD-9) (PR #190 open)
+    - [ ] NA selected together with other values of the same chart (an `any` holds leaves only, and NA is a negation)
   - [ ] Numeric bins fixed for the study, and a chart freed of its own filter (Q2 MSI MANTIS 0.01-wide bars; ours 0.02, recomputed on the filtered cohort) (STS-BAR-1, STS-STM-2, STS-STM-8, STS-MD-6; see bugs)
     - [x] A numeric chart freed of its own filter: its bars counted over the rest of the filters (STS-STM-2, STS-MD-6) (PR #188 open)
-    - [ ] Bins fixed for the study rather than recomputed on the filtered cohort (STS-BAR-1, STS-STM-8)
+    - [x] Bins fixed for the study rather than recomputed on the filtered cohort (STS-BAR-1, STS-STM-8) (PR #190 open)
+    - [ ] The single scan (per-sample bitmask, `uniqExactIf`) in place of one query per filtered chart (spike)
     - Measured ([spike](spikes/explore-filter-parity.md)). Re-running Explore once per filtered chart doubles a click (msk_chord_2024 + genie_public at 4 filters: 3.0 → 6.3 s). Instead:
       - per drafted numeric attribute, its value counts without its own clause, in parallel (≈0 ms added);
       - bin edges from the unfiltered distribution, cached per study set and attribute;
