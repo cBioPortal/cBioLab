@@ -10,7 +10,7 @@
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { STUDY_TRACK } from "../../lib/profile-names.ts";
 
-import { STYLE, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, STAIRCASE_RADIX, naturalVector, compareVectors } from "../../lib/oncoprint-style.ts";
+import { STYLE, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, STAIRCASE_RADIX, type StaircaseOptions, naturalVector, compareVectors } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -317,10 +317,10 @@ export function decodeGene(code: number): string {
 }
 
 /** Rank per (gene, column), smaller first: the engine's staircaseRank, a cell not profiled after an unaltered one. */
-function staircaseRanks(data: UnpackedContract): Uint16Array[] {
+function staircaseRanks(data: UnpackedContract, opts: StaircaseOptions): Uint16Array[] {
   return data.tracks.filter((t) => t.kind === "gene").map((t) => {
     const r = new Uint16Array(data.n);
-    for (let i = 0; i < data.n; i++) r[i] = t.cells[i] === -1 ? STAIRCASE_RADIX : staircaseRank(t.cells[i]);
+    for (let i = 0; i < data.n; i++) r[i] = t.cells[i] === -1 ? STAIRCASE_RADIX : staircaseRank(t.cells[i], opts);
     return r;
   });
 }
@@ -343,8 +343,8 @@ export interface SortKey { track: string; dir: "asc" | "desc" }
  * missing values last), "genomic" (staircase) or "id" (patient id) — with the staircase
  * and patient id as the final tiebreakers, exactly like the engine.
  */
-export function sortColumns(data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], keys: SortKey[]): Uint32Array {
-  const ranks = staircaseRanks(data);
+export function sortColumns(data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], keys: SortKey[], staircase: StaircaseOptions = {}): Uint32Array {
+  const ranks = staircaseRanks(data, staircase);
   const genomic = (a: number, b: number): number => { for (const r of ranks) { const d = r[a] - r[b]; if (d) return d; } return 0; };
   const byId = idOrder(data);
   const cmps = keys.map((k): ((a: number, b: number) => number) => {

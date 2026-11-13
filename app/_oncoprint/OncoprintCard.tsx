@@ -11,7 +11,8 @@ import OncoprintFigure, { type ColumnSelection } from "./OncoprintFigure.tsx";
 import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, DRIVER_SCOPE } from "./view-display.ts";
 import { driversOf, withDrivers } from "../../lib/driver-settings.ts";
 import { assayTrackLabel } from "../../lib/profile-names.ts";
-import { geneRowCount, withClinical, withHeatmap, withDerived, withGenes, moveTrack, removeTrack, canRemoveTrack, splitGeneTrack } from "./track-edits.ts";
+import { CLINICAL_TRACK_LIMIT } from "../../lib/views/oncoprint/types.ts";
+import { clinicalTrackRows, trackFreqText, type TrackAttr, geneRowCount, withClinical, withHeatmap, withDerived, withGenes, moveTrack, removeTrack, canRemoveTrack, splitGeneTrack } from "./track-edits.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
@@ -21,7 +22,7 @@ import { Rows3 } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { ViewGenesDialog } from "../_genes/GeneQueryDialog.tsx";
-import { GearMenu } from "../_ui/gear-menu.tsx";
+import { GearMenu, closeGearMenu } from "../_ui/gear-menu.tsx";
 import { Input } from "../_ui/input";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
@@ -48,8 +49,10 @@ export function Waiting({ what }: { what: string }) {
  * first, because that is what decides whether a track is worth a row.
  */
 type HeatEntry = { profileType: string; genes?: string[]; entities?: string[] };
-export function TracksMenu({ attrs, profiles, assays = [], clinical, heatmap, cohorts, derivedCohorts, busy, loading, onClinical, onHeatmap, onDerived }: {
-  attrs: { attribute: string; kind: string; patients: number }[];
+export function TracksMenu({ attrs, totals, profiles, assays = [], clinical, heatmap, cohorts, derivedCohorts, busy, loading, onClinical, onHeatmap, onDerived }: {
+  attrs: TrackAttr[];
+  /** the queried patients and samples, each attribute's Freq denominator */
+  totals?: { patients: number; samples: number };
   /** the attribute/profile catalog is still being fetched */
   loading?: boolean;
   profiles: string[];
@@ -65,6 +68,11 @@ export function TracksMenu({ attrs, profiles, assays = [], clinical, heatmap, co
   onDerived: (next: string[]) => void;
 }) {
   const [tab, setTab] = useState<"clinical" | "custom" | "heatmap" | "cohorts">("clinical");
+  // clinical ticks are staged, as the portal's are, and applied together by "Update tracks"
+  const [staged, setStaged] = useState<string[] | null>(null);
+  const pending = staged ?? clinical;
+  const changed = staged !== null && (staged.length !== clinical.length || staged.some((x, i) => x !== clinical[i]));
+  const rows = clinicalTrackRows(attrs.filter((a) => !isCustomAttr(a.attribute)), totals);
   const [q, setQ] = useState("");
   const match = (s: string) => s.toLowerCase().includes(q.trim().toLowerCase());
   const heatOptions = ["VAF", ...profiles, ...assays.map((p) => p.profile)];
@@ -72,12 +80,13 @@ export function TracksMenu({ attrs, profiles, assays = [], clinical, heatmap, co
   // uploads get their own tab, but they are clinical tracks to the engine: one list, one cap of 8
   const studyAttrs = attrs.filter((a) => !isCustomAttr(a.attribute)), customAttrs = attrs.filter((a) => isCustomAttr(a.attribute));
   const isClin = tab === "clinical" || tab === "custom";
-  const chosen = isClin ? clinical : tab === "heatmap" ? heatmap.map((h) => h.profileType) : derivedCohorts;
-  const shown = (tab === "clinical" ? studyAttrs.map((a) => a.attribute) : tab === "custom" ? customAttrs.map((a) => a.attribute)
+  const chosen = isClin ? pending : tab === "heatmap" ? heatmap.map((h) => h.profileType) : derivedCohorts;
+  const shown = (tab === "clinical" ? rows.map((a) => a.attribute) : tab === "custom" ? customAttrs.map((a) => a.attribute)
     : tab === "heatmap" ? heatOptions : cohorts).filter((n) => match(n) || match(attributeLabel(n)));
-  const cap = isClin ? 8 : tab === "heatmap" ? 4 : 3;
+  const cap = isClin ? CLINICAL_TRACK_LIMIT : tab === "heatmap" ? 4 : 3;
+  const rowOf = (name: string) => rows.find((r) => r.attribute === name);
   const toggle = (name: string) => {
-    if (isClin) onClinical(clinical.includes(name) ? clinical.filter((x) => x !== name) : clinical.length < 8 ? [...clinical, name] : clinical);
+    if (isClin) setStaged(pending.includes(name) ? pending.filter((x) => x !== name) : pending.length < cap ? [...pending, name] : pending);
     else if (tab === "heatmap") {
       const ga = assayOf(name);
       if (chosen.includes(name)) onHeatmap(heatmap.filter((h) => h.profileType !== name));
@@ -109,9 +118,18 @@ export function TracksMenu({ attrs, profiles, assays = [], clinical, heatmap, co
           </Tabs>
           <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="search…" className={cn(FIELD, "ml-auto w-32")} />
         </div>
-        <span className="meta">{chosen.length} of {cap} chosen{
-          tab === "clinical" ? " · cases with data, most first"
-          : tab === "custom" ? " · your uploads, kept in this browser; they share the 8 clinical tracks"
+        {isClin && <div className="flex flex-wrap items-center gap-1.5">
+          {/* Select all / Deselect all apply at once, as the portal's do; single ticks wait for Update tracks */}
+          <Button variant="outline" size="xs" disabled={busy || !shown.length} onClick={() => { setStaged(null);
+            onClinical([...clinical, ...shown.filter((n) => !clinical.includes(n) && (rowOf(n)?.pct ?? 1) > 0)].slice(0, cap)); }}>
+            Select all ({shown.filter((n) => (rowOf(n)?.pct ?? 1) > 0).length})</Button>
+          <Button variant="outline" size="xs" disabled={busy || !clinical.some((n) => shown.includes(n))}
+            onClick={() => { setStaged(null); onClinical(clinical.filter((n) => !shown.includes(n))); }}>Deselect all</Button>
+          {changed && <Button size="xs" className="ml-auto" disabled={busy} onClick={() => { onClinical(pending); setStaged(null); closeGearMenu("onco-tracks"); }}>Update tracks</Button>}
+        </div>}
+        <span className="meta">{chosen.length} chosen{
+          tab === "clinical" ? " · Freq: the queried cases with data, most first"
+          : tab === "custom" ? " · your uploads, kept in this browser; they are clinical tracks too"
           : tab === "heatmap" ? " · a profile draws one row per gene (blank genes follow the figure); a generic assay one per entity"
           : " · any cohort in this document can be a binary row (patients only, one study)"}</span>
         <div style={{ maxHeight: 260, overflowY: "auto", marginTop: "0.3rem" }}>
@@ -121,15 +139,20 @@ export function TracksMenu({ attrs, profiles, assays = [], clinical, heatmap, co
           {shown.map((name) => {
             const on = chosen.includes(name);
             const a = isClin ? attrs.find((x) => x.attribute === name) : undefined;
+            const r = tab === "clinical" ? rowOf(name) : undefined;
             const h = tab === "heatmap" && on ? heatmap.find((x) => x.profileType === name) : undefined;
             const ga = tab === "heatmap" ? assayOf(name) : undefined;
             return (
               <div key={name}>
                 <label className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
-                  <Checkbox className="self-center" checked={on} disabled={busy || (!on && chosen.length >= cap)} onCheckedChange={() => toggle(name)} />
-                  <span style={{ flex: 1 }} data-tip={tab === "custom" || ga ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : ga ? ga.name + " (generic assay)" : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
+                  <Checkbox className="self-center" checked={on} disabled={busy || (!on && (chosen.length >= cap || r?.pct === 0))} onCheckedChange={() => toggle(name)} />
+                  <span style={{ flex: 1 }} data-tip={tab === "custom" || ga || r ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : ga ? ga.name + " (generic assay)"
+                    : r ? r.label : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
                     {tab === "custom" && <span className="meta"> · {parseCustomAttr(name)?.dataset}</span>}</span>
-                  {a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
+                  {r && r.pct != null ? <span style={{ fontVariantNumeric: "tabular-nums" }}
+                    data-tip={a!.patients.toLocaleString() + " of " + (r.unit === "samples" ? totals!.samples : totals!.patients).toLocaleString() + " queried " + r.unit + " have a value" +
+                      (r.unit === "patients" ? " (a patient attribute: the portal counts these patients' samples)" : "")}>{trackFreqText(r.pct)}</span>
+                    : a && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
                 </label>
                 {h && ga && <div className="mb-1.5 ml-6 flex flex-wrap items-center gap-1">
                   {(h.entities || []).map((e) => <span key={e} className="flex items-center gap-1 rounded border border-input px-1 text-sm">
@@ -154,7 +177,9 @@ export function TracksMenu({ attrs, profiles, assays = [], clinical, heatmap, co
 
 // ---- the card ----------------------------------------------------------------------------------
 
-export interface TrackCatalog { attrs: { attribute: string; kind: string; patients: number }[]; profiles: string[]; loading: boolean;
+export interface TrackCatalog { attrs: TrackAttr[]; profiles: string[]; loading: boolean;
+  /** the queried patients and samples: the Tracks menu's Freq denominators */
+  totals?: { patients: number; samples: number };
   /** every profile as the studies describe them, for a plot axis's Data picker */
   profileCatalog?: ProfileInfo[] }
 
@@ -220,7 +245,7 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
             onChange={(d) => edit(withDrivers(view, d))} />
         </>}
         tracksMenu={<TracksMenu
-          attrs={catalog.attrs} profiles={catalog.profiles} loading={catalog.loading}
+          attrs={catalog.attrs} totals={catalog.totals} profiles={catalog.profiles} loading={catalog.loading}
           assays={(catalog.profileCatalog || []).filter((p) => profileUse(p) === "assayNumber" && p.study)}
           clinical={view.clinical || []} heatmap={view.heatmap || []}
           cohorts={cohortNames} derivedCohorts={view.derivedCohorts || []}

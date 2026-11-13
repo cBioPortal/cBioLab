@@ -138,8 +138,11 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] The Results header's samples line when samples ≠ patients (msk_impact_2017 TP53 KRAS TERT: "6494 (59%) of queried samples") (ONC-RV-1, ONC-STM-2) (#192)
   - [x] Initial zoom fits the altered columns, not every column (the portal's 30 % on Q1, 3 % on Q3) (ONC-ZM-2, ONC-STM-13, ONC-MD-11) (#194)
   - [x] Staircase sort per key, CNA then mutation, drivers before VUS, not profiled last, natural id order; over the portal's own cells our order is its order (Q1 594/594, Q3 10,336/10,336); over our cells Q1 449 of 594 positions agree, the rest from annotation differences (ONC-ST-1, ONC-ST-2) (#193)
-  - [ ] Sort menu: the Mutation Type, Driver and Ignore VUS toggles; "case list order" (ONC-SO-1, ONC-SO-3, ONC-ST-3)
-  - [ ] Tracks › Clinical: display names (ours `SAMPLE_TYPE`), Freq % (ours patient counts), Select / Deselect all, applied on submit (ours each tick re-runs), no cap of 8; 59 attributes listed vs 64 (ONC-TR-1, ONC-STM-4)
+  - [x] Sort menu: the Mutation Type, Driver and Ignore VUS toggles (ONC-SO-1, ONC-ST-3) (#195)
+    - [ ] "Case list order" (ONC-SO-3): the portal offers it only for a query naming sample ids, which no Results query here can yet
+  - [x] Tracks › Clinical: display names, Freq %, Select / Deselect all, applied by Update tracks, no cap of 8 (ONC-TR-1, ONC-STM-4) (#196)
+    - [ ] A patient-level attribute's Freq in samples, as the portal counts it (ours its patients; msk_impact_2017 OS_MONTHS 73.3 % vs 74.4 %): needs a samples count in Explore's facet query
+    - [ ] Mutation spectrum, Profiled-in and Study of origin listed first as rows of the tab
   - [ ] Clinical tracks: every value its own colour (ours the top 8 + "Other", Okabe-Ito); a patient's value as the portal's (mean, MUTATION_COUNT max, "Mixed"; ours the patient row, else one sample's); exact tooltip values (ours "≈x" from a 256-step code) (ONC-TT-1, ONC-TT-2, ONC-TT-12, ONC-TP-3, ONC-STM-5)
   - [ ] The mutation spectrum track (ONC-TT-3, ONC-STM-6)
   - [ ] Heatmaps: expression blue→black→red (ours blue→white→red), methylation fixed to [0, 1], VAF yellow→teal (ours blue), a patient's value max |x| (ours the mean) (ONC-TT-5…7, ONC-TT-12, ONC-STM-7)

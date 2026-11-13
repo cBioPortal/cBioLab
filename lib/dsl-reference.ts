@@ -1568,6 +1568,9 @@ all reproduce the same picture. Unknown keys are rejected loudly.
 | \`colorByType\` | \`true\` | colour each mutation class separately; off draws them as one |
 | \`colorByGermline\` | \`true\` | mark a germline mutation with a white stripe through its glyph (the portal's Somatic vs Germline); off draws it like any other |
 | \`whiteBackground\` | \`false\` | white instead of grey for unaltered cells, for print |
+| \`sortByMutationType\` | \`true\` | the genomic staircase ranks mutations by class (the portal's Sort › Mutation Type) |
+| \`sortByDrivers\` | \`true\` | the staircase ranks every driver before every VUS (Sort › Driver) |
+| \`sortIgnoreVUS\` | \`false\` | the staircase orders as if VUS were absent, still drawing them (Sort › Ignore VUS) |
 | \`clinicalLegends\` | \`"all"\` | \`"none"\` drops the category keys under the figure |
 | \`colors\` | — | \`{track: {value: "#rrggbb"}}\`, the portal's Edit Colors |
 | \`style\` | — | override any visual decision (palette, glyph bands, legend); validated against the style schema |
@@ -1657,7 +1660,7 @@ take a standalone spec (the analysis oncoprint view compiles to the same engine)
 \`\`\`
 { "study"?: "<id>",
   "genes": [≤12],
-  "clinical": [≤8],
+  "clinical": [≤100],
   "heatmap"?: [{ "profileType": P, "genes"?: [...] | "entities"?: [...] } × ≤4], // continuous molecular / generic-assay tracks
   "sort"?: ["CANCER_TYPE", "-CURRENT_AGE_DEID", "genomic"],                   // column sort (≤4 keys)
   "derivedEvents": [{ "label": L, "expression": <event cohortDef> } × ≤3],   // phenotype tracks

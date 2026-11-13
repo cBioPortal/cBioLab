@@ -150,6 +150,6 @@ export default function ResultsPage() {
       ? <PortalLoading />
       : <PortalTabs legacy={{ page: { page: "results", studies, entries: check.entries.map((e) => e.text), filters,
             query: legacyQueryParams(target.options || null, optionsData.data, studies, check.entries.map((e) => e.text)) }, held: basics?.portal || null }} doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={(d) => page.update({ ...d, views: syncDrivers(page.doc?.views || [], d.views || []) })}
-          catalog={{ attrs: known?.attrs || [], profiles, profileCatalog, loading: !known }} />}
+          catalog={{ attrs: known?.attrs || [], profiles, profileCatalog, loading: !known, ...(known ? { totals: { patients: known.patients, samples: known.samples } } : {}) }} />}
   </>);
 }
