@@ -3,7 +3,7 @@
 // the staircase sort are all asserted on a fixture small enough to check by hand.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assembleContract, BITS, NOT_PROFILED, type AssembleInput, type EventRow } from "../lib/oncoprint-assemble.ts";
+import { assembleContract, normalizeDisplay, BITS, NOT_PROFILED, type AssembleInput, type EventRow } from "../lib/oncoprint-assemble.ts";
 
 const ev = (pid: string, gene: string, vt: string, mt?: string, cna?: number, driver = false) => ({ pid, gene, vt, mt, cna, driver });
 const input = (): AssembleInput => ({
@@ -382,4 +382,21 @@ test("the id tie-break is the portal's natural order of the bare case id", () =>
   const c = assembleContract({ ...input(), genes: ["TP53"], groups: [{ name: "all", pids }], clinical: [], derived: [], events: [],
     coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })) });
   assert.deepEqual(c.columns, ["P2", "P10", "TCGA-AA-A00N", "TCGA-AA-3864"]);
+});
+
+test("the Sort switches: Driver off ranks by class alone, Ignore VUS orders as if VUS were absent (ONC-SO-1, ONC-ST-3)", () => {
+  const pids = ["A", "B", "C"];
+  const build = (display: Record<string, unknown>) => assembleContract({
+    ...input(), genes: ["TP53"], groups: [{ name: "all", pids }], clinical: [], derived: [],
+    events: [ev("A", "TP53", "mutation", "Nonsense_Mutation", undefined, false), ev("B", "TP53", "mutation", "Missense_Mutation", undefined, true)],
+    coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })), display: normalizeDisplay(display) });
+  assert.deepEqual(build({}).columns, ["B", "A", "C"], "default: the driver missense before the VUS truncation");
+  assert.deepEqual(build({ sortByDrivers: false }).columns, ["A", "B", "C"], "Driver off: truncating before missense");
+  assert.deepEqual(build({ sortByMutationType: false, sortByDrivers: false }).columns, ["A", "B", "C"], "neither: mutated before not, then the id");
+  const ignored = build({ sortIgnoreVUS: true });
+  assert.deepEqual(ignored.columns, ["B", "A", "C"], "Ignore VUS: the VUS column ties the unaltered one, then the id");
+  assert.equal(ignored.tracks.find((t) => t.label === "TP53")!.cells[1], BITS.TRUNCATING, "the VUS is still drawn");
+  assert.deepEqual(normalizeDisplay({}).sortIgnoreVUS, undefined, "defaults are not echoed");
+  assert.equal(normalizeDisplay({ sortIgnoreVUS: true }).sortIgnoreVUS, true);
+  assert.throws(() => normalizeDisplay({ sortByDrivers: "no" as unknown as boolean }), /display.sortByDrivers must be true or false/);
 });

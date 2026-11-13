@@ -455,6 +455,12 @@ export interface DisplaySpec {
   annotate?: "oncokb" | "none";
   /** unaltered cells drawn white rather than grey, for print (default false) */
   whiteBackground?: boolean;
+  /** the genomic staircase ranks mutations by class (default true) — the portal's Sort › Mutation Type */
+  sortByMutationType?: boolean;
+  /** the genomic staircase ranks every driver before every VUS (default true) — the portal's Sort › Driver */
+  sortByDrivers?: boolean;
+  /** the staircase orders as if VUS were absent, still drawing them (default false) — the portal's Sort › Ignore VUS */
+  sortIgnoreVUS?: boolean;
   /** partial override of lib/oncoprint-style.ts (Phase 1b) */
   style?: Record<string, unknown>;
   /** per-track, per-category colours: {trackLabel: {value: "#rrggbb"}} (Phase 1b) */
@@ -466,7 +472,7 @@ export interface DisplaySpec {
  * `drivers` the settings in full.
  */
 export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends" | "colorByType" | "hideVUS" | "annotate" | "whiteBackground">>
-  & Pick<DisplaySpec, "style" | "colors" | "colorByGermline"> & { hideGermline?: boolean; drivers?: ResolvedDrivers };
+  & Pick<DisplaySpec, "style" | "colors" | "colorByGermline" | "sortByMutationType" | "sortByDrivers" | "sortIgnoreVUS"> & { hideGermline?: boolean; drivers?: ResolvedDrivers };
 export interface IncidenceCurve {
   cohort: string;
   n: number; events: number; competing: number; censored: number;

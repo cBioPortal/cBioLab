@@ -6,7 +6,8 @@ import { DEFAULT_FIGURE_DISPLAY, type FigureDisplay } from "./OncoprintFigure.ts
 import { sortKeyText } from "./track-edits.ts";
 
 /** the display keys the figure owns — written back without a re-run */
-export const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colorByGermline", "colors", "whiteBackground"]);
+export const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colorByGermline", "colors", "whiteBackground",
+  "sortByMutationType", "sortByDrivers", "sortIgnoreVUS"]);
 
 export const figureDisplayOf = (v: { display?: unknown }): FigureDisplay => ({ ...DEFAULT_FIGURE_DISPLAY, ...((v.display || {}) as object) });
 

@@ -12,7 +12,7 @@ import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binar
 import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
-import { STYLE, geneLegend, glyphPresence, numericValue, resolveStyle, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { STYLE, geneLegend, glyphPresence, numericValue, resolveStyle, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { setPngDpi } from "../../lib/png-dpi.ts";
@@ -20,7 +20,7 @@ import { api } from "../lab/api.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
 import type { OncoprintBody } from "../../lib/api-schemas.ts";
 
-import { Check, Download, Ellipsis, ImageDown, ListOrdered, LoaderCircle, Minus, Plus, Sheet, SlidersHorizontal, Tag, X } from "lucide-react";
+import { ArrowDownWideNarrow, Check, Download, Ellipsis, ImageDown, ListOrdered, LoaderCircle, Minus, Plus, Sheet, SlidersHorizontal, Tag, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { ErrorAlert } from "../_ui/error-alert.tsx";
 import { Checkbox } from "../_ui/checkbox";
@@ -75,8 +75,11 @@ export interface FigureDisplay {
    * about it, because profiled and unprofiled then look alike — so the legend says so too.
    */
   whiteBackground?: boolean;
+  /** the genomic staircase's switches, the portal's Sort › Mutation Type / Driver / Ignore VUS */
+  sortByMutationType: boolean; sortByDrivers: boolean; sortIgnoreVUS: boolean;
 }
-export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none", colorByType: true, colorByGermline: true };
+export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none", colorByType: true, colorByGermline: true,
+  sortByMutationType: true, sortByDrivers: true, sortIgnoreVUS: false };
 
 export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; packMs?: number; decodeMs?: number; drawMs?: number;
   cellsDrawn?: number; bucketsDrawn?: number; sortMs?: number; hideMs?: number; gapMs?: number; frames: number; heapMB?: number;
@@ -264,11 +267,15 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     }
     // A clustering is computed in the engine from values the browser never receives, so a
     // figure sorted that way keeps the order it was given rather than trying to redo it.
-    const engineSorted = sortKeys.some((k) => k.replace(/^-/, "").startsWith("cluster:"));
-    if (sortKeys.length && !engineSorted) {
+    // The staircase switches re-sort here too: the engine's order was drawn with its own.
+    const keys = sortKeys.length ? sortKeys : data.conventions.sort;
+    const engineSorted = keys.some((k) => k.replace(/^-/, "").startsWith("cluster:"));
+    const switches = staircaseOptions(display), engineSwitches = staircaseOptions(data.display);
+    const switched = switches.byType !== engineSwitches.byType || switches.byDriver !== engineSwitches.byDriver || switches.ignoreVus !== engineSwitches.ignoreVus;
+    if ((sortKeys.length || switched) && !engineSorted) {
       const t0 = performance.now();
-      order = sortColumns(data, order, groups, sortKeys.map((k) => k.startsWith("-")
-        ? { track: k.slice(1), dir: "desc" as const } : { track: k, dir: "asc" as const }));
+      order = sortColumns(data, order, groups, keys.map((k) => k.startsWith("-")
+        ? { track: k.slice(1), dir: "desc" as const } : { track: k, dir: "asc" as const }), switches);
       // eslint-disable-next-line react-hooks/set-state-in-render -- a timing readout; perf is not an input of this memo, so the update does not recompute it
       bump({ sortMs: performance.now() - t0 });
     }
@@ -280,7 +287,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     }
     return { order, groups };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, base, display.showUnaltered, sortKeys.join("\u0000"), gapMode, gapTrack]);
+  }, [data, base, display.showUnaltered, sortKeys.join("\u0000"), gapMode, gapTrack, display.sortByMutationType, display.sortByDrivers, display.sortIgnoreVUS]);
 
   // ---- sizing ---------------------------------------------------------------
   useEffect(() => {
@@ -662,6 +669,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     Number(display.colorByType !== DEFAULT_FIGURE_DISPLAY.colorByType) +
     Number(display.colorByGermline !== DEFAULT_FIGURE_DISPLAY.colorByGermline) +
     Number(!!display.whiteBackground) + Number(display.gaps !== "none")) || 0;
+  // the staircase switches, as the portal's Sort menu offers them: Mutation Type needs colour by
+  // type, Driver an annotation, Ignore VUS the driver switch and VUS not already hidden
+  const staircaseOff = Number(!display.sortByMutationType) + Number(!display.sortByDrivers) + Number(display.sortIgnoreVUS);
+  const annotated = !!data && data.display.annotate !== "none";
+  const ignoreVusOk = annotated && display.sortByDrivers && !!data && !data.display.hideVUS;
 
   // The figure applies sort and viewing options in the browser. A server-rendered download has
   // to be told about them, or the file would not be the picture on screen.
@@ -776,6 +788,19 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                   <label className="chk" data-tip="an overview of the whole figure, with the part you are looking at marked">
                     <Checkbox checked={showMini} onCheckedChange={(c) => setShowMini((c === true))} /> minimap</label>
                 </div>
+            </GearMenu>
+            <GearMenu menuId="onco-staircase" title="how the genomic staircase ranks a gene row's alterations — the portal's Sort › Sort by data"
+              label={<><ArrowDownWideNarrow />staircase{staircaseOff ? " (" + staircaseOff + ")" : ""}</>}>
+                <label className="chk" data-tip={display.colorByType ? "rank mutations by class: truncating, splice, inframe, promoter, missense, other" : "turn on colour by mutation type first"}>
+                  <Checkbox checked={display.sortByMutationType} disabled={busy || !display.colorByType}
+                    onCheckedChange={(c) => set({ sortByMutationType: (c === true) })} /> mutation type</label>
+                <label className="chk" data-tip={annotated ? "rank every driver before every alteration of unknown significance" : "no driver annotation is on"}>
+                  <Checkbox checked={display.sortByDrivers} disabled={busy || !annotated}
+                    onCheckedChange={(c) => set({ sortByDrivers: (c === true) })} /> driver</label>
+                <label className="chk pl-5" data-tip={ignoreVusOk ? "Order columns as if alterations of unknown significance were absent, while keeping them visible in the oncoprint."
+                  : data.display.hideVUS ? "alterations of unknown significance are hidden already" : "turn on driver first"}>
+                  <Checkbox checked={display.sortIgnoreVUS} disabled={busy || !ignoreVusOk}
+                    onCheckedChange={(c) => set({ sortIgnoreVUS: (c === true) })} /> ignore VUS</label>
             </GearMenu>
             <label className="tbfield">sort <OptionSelect value={sortKeys[0] || ""} disabled={busy}
               onValueChange={(v) => onSortKeys(v ? [v, ...sortKeys.slice(1)].slice(0, 4) : sortKeys.slice(1))}>
