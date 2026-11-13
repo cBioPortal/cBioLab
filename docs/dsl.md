@@ -619,7 +619,9 @@ Each returns three totals per gene (n, Σx, Σx²), which is all a mean and stan
 so the reference population can be far larger than the drawn one without any value moving.
 
 **Oncoprint sorting**: `sort` is an ordered list of track keys — `"genomic"` (the default
-staircase: alteration type + driver rank across the gene tracks), `"id"` (the column id),
+staircase, cBioPortal's: each gene row, top to bottom, ranks structural variant, then copy number,
+then mutation class, germline, mRNA and protein, a driver before any VUS of its kind, and not
+profiled after unaltered), `"id"` (the column id, in natural order: P2 before P10),
 `"cluster:<profileType>"` (a Ward dendrogram over that profile's values, computed in the engine
 because the browser never receives them; capped at 4,000 columns), a clinical or derived-event
 track label, or `"-label"` for descending (e.g. `["CANCER_TYPE", "-CURRENT_AGE_DEID"]`). Applied

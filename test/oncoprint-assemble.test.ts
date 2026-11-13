@@ -36,7 +36,7 @@ test("cells: bitmask, driver bit, NOT_PROFILED from coverage", () => {
   const col = (p: string) => c.columns.indexOf(p);
   assert.equal(byLabel.TP53.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER);
   assert.equal(byLabel.TP53.cells[col("P2")], BITS.TRUNCATING);
-  assert.equal(byLabel.KRAS.cells[col("P2")], BITS.AMP | BITS.DRIVER);
+  assert.equal(byLabel.KRAS.cells[col("P2")], BITS.AMP | BITS.DRIVER | BITS.CNA_DRIVER);
   assert.equal(byLabel.KRAS.cells[col("P3")], 0, "gain is below the high-level threshold");
   assert.equal(byLabel.KRAS.cells[col("P4")], NOT_PROFILED, "P4's panel does not cover KRAS");
   assert.equal(byLabel.TP53.cells[col("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER);
@@ -71,7 +71,7 @@ test("a call on a cell no panel covers is not drawn, and not in the %, as cBioPo
   // a merged row is profiled where ANY member is, so P6's KRAS amp draws there (TP53 covers the
   // column), while KRAS's own row leaves it out — the call is still counted as left out of a row
   const m = assembleContract({ ...i, genes: [{ label: "either", genes: ["TP53", "KRAS"] }, "KRAS"] });
-  assert.equal(m.tracks.find((t) => t.label === "either")!.cells[m.columns.indexOf("P6")], BITS.AMP | BITS.DRIVER);
+  assert.equal(m.tracks.find((t) => t.label === "either")!.cells[m.columns.indexOf("P6")], BITS.AMP | BITS.DRIVER | BITS.CNA_DRIVER);
   assert.equal(m.tracks.find((t) => t.label === "KRAS")!.cells[m.columns.indexOf("P6")], NOT_PROFILED);
   assert.equal(m.stats.offPanel, 3);
 });
@@ -148,8 +148,9 @@ test("clinical typing: categorical with Other, numeric only past 10 distinct val
 test("groups keep their order and the staircase sorts within each group", () => {
   const c = assembleContract(input());
   assert.deepEqual(c.groups, [{ name: "A", start: 0, count: 3 }, { name: "B", start: 3, count: 2 }]);
-  // A: P1 (missense driver) vs P2 (truncating VUS + KRAS amp driver): TP53 is the first gene, truncating outranks missense
-  assert.deepEqual(c.columns.slice(0, 3), ["P2", "P1", "P3"]);
+  // A: P1 (missense driver) vs P2 (truncating VUS + KRAS amp driver): TP53 is the first gene, and
+  // as in the portal every driver mutation ranks above every VUS one, whatever the class
+  assert.deepEqual(c.columns.slice(0, 3), ["P1", "P2", "P3"]);
   assert.deepEqual(c.columns.slice(3), ["P5", "P4"]);
 });
 
@@ -243,7 +244,7 @@ test("a merged row is the OR of its members, and profiled where any member was",
   const col = (p: string) => c.columns.indexOf(p);
   assert.deepEqual(t.members, ["TP53", "KRAS"]);
   assert.equal(t.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER);
-  assert.equal(t.cells[col("P2")], BITS.TRUNCATING | BITS.AMP | BITS.DRIVER, "both members' bits land in one cell");
+  assert.equal(t.cells[col("P2")], BITS.TRUNCATING | BITS.AMP | BITS.DRIVER | BITS.CNA_DRIVER, "both members' bits land in one cell");
   assert.equal(t.cells[col("P4")], 0, "profiled for TP53 only, and unaltered in both");
   assert.equal(t.cells[col("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER);
 });
@@ -305,7 +306,7 @@ test("hiding unknown significance drops the alteration, not the whole cell", () 
   // P2 has a non-driver TP53 truncation and a driver KRAS amp: the truncation goes, the amp stays.
   // A merged row must not let one gene's driver smuggle another gene's passenger through.
   const row = c.tracks.find((x) => x.kind === "gene")!;
-  assert.equal(row.cells[col("P2")], BITS.AMP | BITS.DRIVER);
+  assert.equal(row.cells[col("P2")], BITS.AMP | BITS.DRIVER | BITS.CNA_DRIVER);
   assert.equal(row.cells[col("P1")], BITS.MISSENSE | BITS.DRIVER | BITS.MUT_DRIVER, "a driver is kept");
   assert.equal(c.stats.hiddenVus, 1);
 });
@@ -353,4 +354,32 @@ test("germline: the stripe marks the mutation the cell shows when it is germline
   const sv = assembleContract({ ...input(), events: [{ ...ev("P5", "TP53", "structural_variant", undefined, undefined, true), germ: true }],
     display: { hideGermline: true } as AssembleInput["display"] });
   assert.equal(sv.tracks.find((x) => x.label === "TP53")!.cells[sv.columns.indexOf("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER);
+});
+
+test("the portal's staircase: CNA then mutation per row, every driver before every VUS, not profiled last (ONC-ST-1, ONC-ST-2)", () => {
+  const pids = ["A", "B", "C", "D", "E", "F", "G"];
+  const c = assembleContract({
+    ...input(), genes: ["TP53", "KRAS"], groups: [{ name: "all", pids }], clinical: [], derived: [],
+    events: [
+      ev("A", "TP53", "mutation", "Nonsense_Mutation", undefined, false),    // VUS truncating
+      ev("B", "TP53", "mutation", "Missense_Mutation", undefined, true),     // driver missense
+      ev("C", "TP53", "cna", undefined, 2, false),                           // VUS amplification
+      ev("D", "TP53", "cna", undefined, 2, false),                           // VUS amplification + driver missense
+      ev("D", "TP53", "mutation", "Missense_Mutation", undefined, true),
+      ev("E", "TP53", "cna", undefined, -2, true),                           // driver deep deletion
+      ev("G", "KRAS", "mutation", "Missense_Mutation", undefined, true)      // TP53 not profiled, KRAS altered
+    ],
+    coverage: [...["A", "B", "C", "D", "E", "F"].map((pid) => ({ pid, genes: ["TP53", "KRAS"] })), { pid: "G", genes: ["KRAS"] }]
+  });
+  // a driver deep deletion before every VUS amplification; an amplification with a missense before
+  // one without; a driver missense before a VUS truncation; the column not profiled for TP53 after
+  // the unaltered one, though its KRAS row is altered
+  assert.deepEqual(c.columns, ["E", "D", "C", "B", "A", "F", "G"]);
+});
+
+test("the id tie-break is the portal's natural order of the bare case id", () => {
+  const pids = ["TCGA-AA-3864", "TCGA-AA-A00N", "P10", "P2"];
+  const c = assembleContract({ ...input(), genes: ["TP53"], groups: [{ name: "all", pids }], clinical: [], derived: [], events: [],
+    coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })) });
+  assert.deepEqual(c.columns, ["P2", "P10", "TCGA-AA-A00N", "TCGA-AA-3864"]);
 });

@@ -8,7 +8,8 @@
 // tables, and a port in another language has this function as its conformance target.
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
-import { STYLE, encodeNumeric } from "./oncoprint-style.ts";
+import { STYLE, encodeNumeric, staircaseRank, STAIRCASE_RADIX, naturalVector, compareVectors } from "./oncoprint-style.ts";
+export { naturalVector, compareVectors };
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
 import type { Contract, Track, GroupRange, ResolvedDisplay, DisplaySpec } from "./types.ts";
 import type { ZReference, SortKeySpec } from "./views/oncoprint/types.ts";
@@ -19,6 +20,7 @@ const PRIORITY_BITS = STYLE.glyph.mutation.priority.map((m) => BITS[m.bit as key
 /** the mutation class bit a cell draws (the first by display priority), 0 for none */
 const shownMutation = (c: number): number => { for (const b of PRIORITY_BITS) if (c & b) return b; return 0; };
 export const NOT_PROFILED = -1;
+
 
 export function mutClassBit(mt: string | undefined): number {
   if (!mt) return BITS.OTHER_MUT;
@@ -280,7 +282,7 @@ export function assembleContract(input: AssembleInput): Contract {
       for (const cells of covered) mark(vusMut, cells, i, bit);
       continue;
     }
-    if (driver) bit |= BITS.DRIVER | (mut ? BITS.MUT_DRIVER : bit === BITS.SV ? BITS.SV_DRIVER : 0);
+    if (driver) bit |= BITS.DRIVER | (mut ? BITS.MUT_DRIVER : bit === BITS.SV ? BITS.SV_DRIVER : BITS.CNA_DRIVER);
     for (const cells of covered) cells[i] |= bit;
   }
   for (const [cells, held] of vusMut)
@@ -461,45 +463,37 @@ export function assembleContract(input: AssembleInput): Contract {
 
   phase("derived");
   // ---- column sort within groups ----------------------------------------
-  // Default is the genomic staircase: cells ranked by alteration type (CNA > SV >
-  // truncating > in-frame > splice > missense > other), driver above VUS within
-  // each type. sort can put clinical/derived tracks first ("-" = descending,
-  // missing values always last); the staircase and patient id remain the final
-  // tiebreakers so every sort is total and deterministic.
-  const cellRank = (c: number): number => {
-    if (c <= 0) return 0;
-    const t = c & BITS.AMP ? 10 : c & BITS.HOMDEL ? 9 : c & BITS.SV ? 8 : c & BITS.TRUNCATING ? 7 :
-      c & BITS.SPLICE ? 6 : c & BITS.INFRAME ? 5 : c & BITS.PROMOTER ? 4 : c & BITS.MISSENSE ? 3 :
-      c & BITS.OTHER_MUT ? 2 : 1;
-    return t * 2 + (c & BITS.DRIVER ? 1 : 0);
-  };
-  // The staircase compares every gene track in order. Doing that inside a comparator costs
-  // one array read and a branch per gene per comparison — the dominant cost of a 400k-column
-  // sort. Each rank is 0..17, so five bits hold it: pack the first ten genes into one float
-  // (50 bits, exact in a double) and the rest into a second, then compare two numbers.
-  const RANK_BITS = 32, PACKED = 10;   // ranks run 0..21, so five bits each; ten fit in a double
-  const packKeys = (from: number, count: number): Float64Array => {
+  // Default is the portal's genomic staircase (ONC-ST-1, ONC-ST-2): each gene row, top to
+  // bottom, ranks its cell by structural variant, copy number, mutation, germline, mRNA and
+  // protein (staircaseRank), with a cell not profiled after an unaltered one; then the case id in
+  // the portal's natural order. sort can put clinical/derived tracks first ("-" = descending,
+  // missing values always last); the staircase and the id remain the final tiebreakers, so every
+  // sort is total. Comparing every row inside a comparator is the dominant cost of a 400k-column
+  // sort, so the rows' ranks are packed, four to a double ((STAIRCASE_RADIX + 1)^4 < 2^53), and
+  // compared as numbers.
+  const PER_KEY = 4, RADIX = STAIRCASE_RADIX + 1;
+  const keys: Float64Array[] = [];
+  for (let from = 0; from < geneTracks.length; from += PER_KEY) {
     const key = new Float64Array(allPids.length);
-    const list = geneTracks.slice(from, from + count).map((t) => geneCells.get(t.label)!);
+    const list = geneTracks.slice(from, from + PER_KEY).map((t) => geneCells.get(t.label)!);
     for (let i = 0; i < allPids.length; i++) {
       let k = 0;
-      for (const cells of list) k = k * RANK_BITS + cellRank(cells[i]);
+      for (const cells of list) k = k * RADIX + (cells[i] === NOT_PROFILED ? STAIRCASE_RADIX : staircaseRank(cells[i]));
       key[i] = k;
     }
-    return key;
-  };
-  const keyHi = packKeys(0, PACKED);
-  const keyLo = geneTracks.length > PACKED ? packKeys(PACKED, geneTracks.length - PACKED) : null;
+    keys.push(key);
+  }
   const genomicCmp = (x: number, y: number): number => {
-    const d = keyHi[y] - keyHi[x];
-    if (d) return d;
-    return keyLo ? keyLo[y] - keyLo[x] : 0;
+    for (const key of keys) { const d = key[x] - key[y]; if (d) return d; }
+    return 0;
   };
   // the id tiebreaker compares integers: rank the ids once instead of on every comparison
   const idRank = new Int32Array(allPids.length);
   {
+    // the portal's natural order of the bare case id (oncoprintjs stringToVector), then the full id
+    const vec = allPids.map((p) => { const st = studyOf.get(p); return naturalVector(st && p.startsWith(st + "_") ? p.slice(st.length + 1) : p); });
     const idx = Array.from(allPids.keys());
-    idx.sort((a, b) => allPids[a] < allPids[b] ? -1 : allPids[a] > allPids[b] ? 1 : 0);
+    idx.sort((a, b) => compareVectors(vec[a], vec[b]) || (allPids[a] < allPids[b] ? -1 : allPids[a] > allPids[b] ? 1 : 0));
     for (let r = 0; r < idx.length; r++) idRank[idx[r]] = r;
   }
   const sortableTracks = new Map<string, Track>([...clinTracks, ...devTracks, ...heatTracks].map((t) => [t.label, t]));
