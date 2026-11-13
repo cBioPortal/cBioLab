@@ -59,7 +59,7 @@ test("the browser's genomic re-sort is the engine's staircase, ids in the portal
       ev("C", "TP53", "cna", undefined, 2), ev("D", "TP53", "cna", undefined, 2), ev("D", "TP53", "mutation", "Missense_Mutation", undefined, true),
       ev("E", "TP53", "cna", undefined, -2, true), ev("G", "KRAS", "mutation", "Missense_Mutation", undefined, true)],
     coverage: pids.map((pid) => ({ pid, genes: pid === "G" ? ["KRAS"] : ["TP53", "KRAS"] })),
-    isDriver: (r: { driver?: boolean }) => !!r.driver, annotationSource: "t", clinical: [], heatmap: [], derived: [], sort, lineGap: 0 });
+    isDriver: (r) => !!(r as { driver?: boolean }).driver, annotationSource: "t", clinical: [], heatmap: [], derived: [], sort, lineGap: 0 });
   const engine = build([{ track: "genomic", dir: "asc" }]);
   const byId = build([{ track: "id", dir: "desc" }]);
   const buf = packContract(byId);
