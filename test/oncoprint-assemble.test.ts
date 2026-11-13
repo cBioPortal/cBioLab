@@ -422,3 +422,12 @@ test("a numeric clinical track carries its exact values, and sorts by them, not 
   assert.ok(c.columns.indexOf("P2") < c.columns.indexOf("P1"), "500.3 before 500.4");
   assert.equal(t.values![c.columns.indexOf("P1")], Math.fround(500.4));
 });
+
+test("a heatmap row carries its exact values, after the patient's collapse and the profile's transform", () => {
+  const c = assembleContract({ ...input(), heatmap: [{ profileType: "mrna_zscore", genes: ["TP53"], isVaf: false,
+    values: new Map([["P1|TP53", 1.234567], ["P2|TP53", -0.5], ["P4|TP53", 2]]) }] });
+  const t = c.tracks.find((x) => x.kind === "heatmap")!;
+  const at = (p: string) => t.values![c.columns.indexOf(p)];
+  assert.equal(at("P1"), Math.fround(1.234567)); assert.equal(at("P2"), Math.fround(-0.5)); assert.equal(at("P4"), 2);
+  assert.equal(at("P3"), null, "no value: null in the contract");
+});

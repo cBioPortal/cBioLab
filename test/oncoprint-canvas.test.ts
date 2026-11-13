@@ -124,3 +124,25 @@ test("the browser re-sorts with the Sort switches as the engine does", () => {
     assert.deepEqual(Array.from(sorted, (i) => ids[i]), build(display).columns, JSON.stringify(display));
   }
 });
+
+test("the browser sorts a numeric track by its exact values, either way, with no value last", () => {
+  // P1 and P2 share one of the 256 drawing steps of 0..1000; P12 has no value; >10 distinct values make the track numeric
+  const pids = Array.from({ length: 12 }, (_, i) => "P" + (i + 1));
+  const tmb = new Map(pids.slice(0, 11).map((p, i): [string, string] => [p, String(i === 0 ? 500.4 : i === 1 ? 500.3 : i * 100)]));
+  const contract = (dir: "asc" | "desc") => assembleContract({ genes: ["TP53"], groups: [{ name: "all", pids }], studies: ["s"],
+    events: [] as EventRow[], coverage: [], isDriver: () => false, annotationSource: "t",
+    clinical: [{ attr: "TMB", values: tmb }], heatmap: [], derived: [], sort: [{ track: "TMB", dir }], lineGap: 0, display: normalizeDisplay({}) });
+  const base = contract("asc"), buf = packContract(base);
+  const data = unpackContract(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
+  const t = base.tracks.find((x) => x.label === "TMB")!;
+  assert.ok(t.numeric);
+  assert.equal(t.cells[base.columns.indexOf("P1")], t.cells[base.columns.indexOf("P2")], "P1 and P2 share a drawing step");
+  const order = Uint32Array.from({ length: data.n }, (_, i) => i), ids = data.columns();
+  const groups = [{ name: "all", start: 0, count: data.n, patients: data.n }];
+  for (const dir of ["asc", "desc"] as const) {
+    const sorted = Array.from(sortColumns(data, order, groups, [{ track: "TMB", dir }]), (i) => ids[i]);
+    assert.deepEqual(sorted, contract(dir).columns, dir + ": the engine's order");
+    const pick = sorted.filter((p) => ["P1", "P2", "P12"].includes(p));
+    assert.deepEqual(pick, dir === "asc" ? ["P2", "P1", "P12"] : ["P1", "P2", "P12"], dir);
+  }
+});

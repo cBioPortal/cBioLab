@@ -142,6 +142,10 @@ checks assert rather than whatever a real warehouse happens to contain:
   EGFR-mutant there — mutated on no panel covering the gene, the case `check:genefacets` exists for.
   `FX-P02` is FAT1-amplified in one sample and FAT1-deleted in the other, its other case.
 - **`DEAD` spelled `False`/`FALSE` and `True`/`TRUE`**, for `check:values`.
+- **Two samples each for `FX-P01`–`FX-P04`**, whose values agree (`CANCER_TYPE`), differ
+  (`SAMPLE_TYPE`), differ as numbers (`MUTATION_COUNT`, `FRACTION_GENOME_ALTERED`), look like
+  numbers in a STRING attribute (`TUMOR_GRADE` 1 and 2) and are not numbers in a NUMBER one
+  (`KI67_INDEX` `>90`, `high`), for `check:oncoprint-values`: an oncoprint patient column's value.
 - **OncoKB calls** for its variants (`test/fixtures/peer-oncokb.tsv`, a hand-written subset of
   OncoKB's public calls; some variants are left unannotated). A peer annotates with its caller's pin,
   so they are stored under the version the app pins (`ONCOKB_PIN`, else the warehouse's latest) and

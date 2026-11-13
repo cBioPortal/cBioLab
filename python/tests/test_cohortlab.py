@@ -216,6 +216,64 @@ class Conformance(unittest.TestCase):
                     self.assertEqual(json.dumps(py, sort_keys=True), json.dumps(ts, sort_keys=True))
 
 
+class ExactValuesConformance(unittest.TestCase):
+    """A numeric track's exact values: the same contract, sort, .opb1 bytes and TSV in both languages."""
+
+    # P01 and P02 share one of the 256 drawing steps of TMB's 0..800 range, so only the exact values
+    # can order them; P09 has none; 0.1 is not a float32, so the TSV shows what float32 kept
+    TMB = {"P01": "500.4", "P02": "500.3", "P03": "80", "P04": "160", "P05": "240", "P06": "0.1",
+           "P07": "400", "P08": "560", "P09": "", "P10": "720", "P11": "800", "P12": "640"}
+
+    def ts(self, d: str, clinical: str, out: str, *extra: str) -> str:
+        path = os.path.join(d, out)
+        subprocess.run(["node", os.path.join(ROOT, "scripts", "oncoprint-cli.ts"), "--events", os.path.join(FIX, "events.tsv"),
+                        "--clinical", clinical, "--out", path, "--quiet", *extra], check=True, cwd=ROOT)
+        return path
+
+    @staticmethod
+    def without_timing(b: bytes) -> tuple[dict, bytes]:
+        """an .opb1 file as its header (less the assembly time in stats) and its payload"""
+        n = int.from_bytes(b[4:8], "big")
+        header = json.loads(b[8:8 + n])
+        header.pop("stats", None)
+        return header, b[8 + n + (-n % 4):]   # the payload starts at the next multiple of 4
+
+    def test_values_sort_opb1_and_tsv_match_typescript(self):
+        self.assertTrue(shutil.which("node"), "node is required to check conformance against the TypeScript implementation")
+        with tempfile.TemporaryDirectory() as d:
+            clinical = os.path.join(d, "clinical.tsv")
+            with open(clinical, "w", encoding="utf-8") as f:
+                f.write("patient\tTMB\n" + "".join(f"{p}\t{v}\n" for p, v in self.TMB.items()))
+            for sort in ("TMB", "-TMB"):
+                with self.subTest(sort=sort):
+                    with open(self.ts(d, clinical, "ts.json", "--sort=" + sort), encoding="utf-8") as f:
+                        ts = json.load(f)
+                    py = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), clinical, sort=sort)
+                    t = next(x for x in ts["tracks"] if x["label"] == "TMB")
+                    self.assertEqual(t["cells"][ts["columns"].index("P01")], t["cells"][ts["columns"].index("P02")], "one drawing step")
+                    order = [p for p in ts["columns"] if p in ("P01", "P02", "P09")]
+                    self.assertEqual(order, ["P02", "P01", "P09"] if sort == "TMB" else ["P01", "P02", "P09"],
+                                     "exact values decide, and no value comes last either way")
+                    ts.pop("stats", None)
+                    pj = py.to_json()
+                    pj.pop("stats", None)
+                    self.assertEqual(json.dumps(pj, sort_keys=True), json.dumps(ts, sort_keys=True))
+
+                    # the same bytes either way, the same values read back, the same TSV from either file
+                    with open(self.ts(d, clinical, "ts.opb1", "--sort=" + sort), "rb") as f:
+                        ts_bin = f.read()
+                    self.assertEqual(self.without_timing(write_opb1(py.contract)), self.without_timing(ts_bin))
+                    back = read_opb1(ts_bin)
+                    self.assertEqual(next(x for x in back.tracks if x.label == "TMB").meta["values"], t["values"])
+                    with open(self.ts(d, clinical, "ts.tsv", "--sort=" + sort), encoding="utf-8") as f:
+                        ts_tsv = f.read()
+                    self.assertEqual(py.to_tsv(), ts_tsv)
+                    self.assertEqual(back.to_tsv(), ts_tsv)
+                    lines = [r.split("\t") for r in ts_tsv.splitlines()]
+                    at = dict(zip(lines[0][2:], next(r for r in lines if r[0] == "TMB")[2:]))
+                    self.assertEqual((at["P01"], at["P06"], at["P09"]), ("500.4", "0.1", ""), "float32 printed at the digits it holds")
+
+
 class LevelOfDetailConformance(unittest.TestCase):
     """Bucket codes must match lib/oncoprint-lod.ts at several widths, including the 400k-style case."""
 
