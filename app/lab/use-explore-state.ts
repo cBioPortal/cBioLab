@@ -7,7 +7,7 @@
 import { useSaved } from "../_saved/saved-context.tsx";
 import { useRef, useState } from "react";
 import { normalizeDef } from "./pills";
-import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, PartitionArm, PartitionDef } from "../../lib/types.ts";
+import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, NumericBin, PartitionArm, PartitionDef } from "../../lib/types.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { type SplitSpec } from "./partitions.tsx";
 import { armsFromSelection, withoutChart, comparisonCohorts, type ChartKey } from "../../lib/partition-arms.ts";
@@ -17,13 +17,15 @@ import type { AddCohortTarget } from "./add-cohort-dialog.tsx";
 import type { CustomDataTab } from "./custom-data-panel.tsx";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useExplore, type ExploreAsk } from "./use-explore.ts";
+import { toggleBin, toggleValue } from "../../lib/explore-selection.ts";
+import { defaultChartKeys } from "../../lib/study-view-config.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
 import { encodeParam } from "../portal/page-doc.ts";
 import { currentLinkUrlMax, linkTo } from "../_links/link-state.ts";
 
 /** how many clinical charts Explore draws until the reader picks — cBioPortal's own default
  *  (studyview_clinical_attribute_chart_count) */
-export const DEFAULT_CLINICAL_CHARTS = 20;
+export { DEFAULT_CLINICAL_CHARTS } from "../../lib/study-view-config.ts";
 
 /** where a chart's groups open: the comparison page (a new tab), or a fresh analysis here */
 export type GroupsTarget = "comparison" | "analysis";
@@ -363,12 +365,12 @@ export function useExploreState(page: ExplorePage) {
     attrCoverage === 0 || (c.studyCount ?? 1) >= Math.ceil(attrCoverage * exStudies.length);
   /**
    * The charts checked until the reader changes them: cBioPortal's study-view default — the
-   * first DEFAULT_CLINICAL_CHARTS attributes with a priority above 0, in priority order
-   * (priority 0 is the portal's "available, hidden by default"). Read from the answer with no
-   * draft applied (use-explore.ts `vocab`), so a facet click never changes which charts show.
+   * first DEFAULT_CLINICAL_CHARTS attributes with a priority above 0, in chart order, less those
+   * with a single value (lib/study-view-config.ts). Read from the answer with no draft applied
+   * (use-explore.ts `vocab`), so a facet click never changes which charts show.
    */
-  const defaultCharts = (): Set<string> => new Set(exploring.vocab.current
-    .filter((a) => a.priority > 0 && coverageOk(a)).slice(0, DEFAULT_CLINICAL_CHARTS).map((a) => a.key));
+  const defaultCharts = (): Set<string> => new Set(defaultChartKeys(exploring.vocab.current.attrs,
+    { filtered: false, totalSamples: exploring.vocab.current.samples, allowed: coverageOk }));
   const draftedAttrs = (): Set<string> => {
     const keys = new Set<string>();
     const walk = (cs: any[]) => { for (const c of cs || []) {
@@ -471,6 +473,25 @@ export function useExploreState(page: ExplorePage) {
     d.all.push(clause);
     const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d);
   };
+
+  /** the draft as the page holds it, or an empty one */
+  const currentDraft = (): CohortDef => {
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+    return d && Array.isArray(d.all) ? d : { all: [] };
+  };
+  const applyDraft = (d: CohortDef) => {
+    setCDefText(JSON.stringify(d, null, 2));
+    fetchExplore(d.all?.length ? d : null);
+  };
+  /** A click on bar `i` of a clinical histogram: in or out of that chart's OR'd selection (lib/explore-selection.ts). */
+  const toggleBar = (attribute: string, bins: NumericBin[], i: number) => {
+    const r = toggleBin(currentDraft(), attribute, bins, i);
+    if ("why" in r) { setExMsg(r.why); return; }
+    setExMsg(null);
+    applyDraft(r.draft);
+  };
+  /** A click on a value of a categorical chart: added to its values, or taken out when already chosen. */
+  const togglePieValue = (attribute: string, v: string) => applyDraft(toggleValue(currentDraft(), attribute, v));
 
   /**
    * Append several clauses as one action. A gene-state pick is two of them —
@@ -742,7 +763,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

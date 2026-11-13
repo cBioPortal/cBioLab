@@ -14,6 +14,8 @@ import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
 import { fmtInt, fmtNum, fmtPct } from "../../lib/chart/format.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
+import { binSelected, chartSelection } from "../../lib/explore-selection.ts";
+import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState, type GroupsTarget } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
@@ -674,7 +676,7 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
    change when the draft does. One tile per attribute, the portal's
    own study-view density — see .facetgrid's own comment. */
 function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clinical"][number]; ctx: ExploreCtx }) {
-  const { addClause, addMode, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy } = ctx;
+  const { addClause, addMode, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, togglePieValue } = ctx;
   const picks = usePicks();
   return (
     <div data-attr={c.per + "|" + c.attribute}
@@ -686,8 +688,9 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           // selectable — so its total is the draft-minus-itself total,
           // not the draft total. Say so rather than show two numbers
           // that cannot be reconciled.
-          const disj = c.kind === "cat" && (c as any).disjunctive;
-          const shown = disj ? c.values.reduce((n: number, v: any) => n + v.n, 0) : c.patients;
+          const disj = !!(c as any).disjunctive;
+          const shown = !disj ? c.patients : c.kind === "cat" ? c.values.reduce((n: number, v: any) => n + v.n, 0)
+            : (c.bins || []).reduce((n: number, b: any) => n + b.count, 0);
           const unit = c.per === "sample" ? " samples" : " patients";
           return (
             <div
@@ -776,14 +779,14 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
               <svg viewBox="0 0 72 72" className="pie" role="img" aria-label={c.attribute + " distribution"}>
                 {arcs.map((a: any, i: number) => (
                   <path key={i} d={a.path} fill={a.color} className={isSel(a.v) ? "slice on" : "slice"}
-                    onClick={() => addClause(clause(a.v))}
+                    onClick={() => togglePieValue(c.attribute, String(a.v.v))}
                     data-tip={a.v.v + " — " + a.v.n.toLocaleString() + " (" + Math.round(1000 * a.frac) / 10 + "%)"} />
                 ))}
               </svg>
               <div className="pielegend">
                 {arcs.map((a: any, i: number) => (
-                  <button key={i} className={isSel(a.v) ? "pikey on" : "pikey"} onClick={() => addClause(clause(a.v))}
-                    data-tip={"click to filter to " + a.v.v}>
+                  <button key={i} className={isSel(a.v) ? "pikey on" : "pikey"} onClick={() => togglePieValue(c.attribute, String(a.v.v))}
+                    aria-pressed={isSel(a.v)} data-tip={isSel(a.v) ? "click to take " + a.v.v + " out of the filter" : "click to filter to " + a.v.v}>
                     <span className="swatch" style={{ background: a.color }} />
                     <span className="pname">{a.v.v}</span>
                     <span className="pn">{a.v.n.toLocaleString()}</span>
@@ -796,17 +799,22 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
         {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
           const maxN = Math.max(...c.bins.map((b: any) => b.count), 1);
           // a bar is a word ("Negative"), one value (start = end), an outlier bar or an interval (start, end]
-          const clauseFor = (b: any) => binClause(c.attribute, b);
           const label = binLabel;
           const tick = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start);
+          const sel = chartSelection(parseDraft(), c.attribute);
+          const unit = c.per === "sample" ? "samples" : "patients";
           return (
             <Histogram ticks={c.bins.map(tick)} na={c.naCount ? "NA " + fmtInt(c.naCount) : null}>
-              {c.bins.map((b: any, i: number) => (
-                <button key={i} className="hbar" data-tip={label(b) + " · " + fmtInt(b.count) + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"} aria-label={label(b) + " · " + fmtInt(b.count) + " " + (c.per === "sample" ? "samples" : "patients") + " — click to filter"}
-                  onClick={() => addClause(clauseFor(b))}>
-                  <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
-                </button>
-              ))}
+              {c.bins.map((b: any, i: number) => {
+                const on = binSelected(sel, b);
+                const tip = label(b) + " · " + fmtInt(b.count) + " " + unit + " — click to " + (on ? "take it out of the filter" : sel.length ? "add it to the filter" : "filter");
+                return (
+                  <button key={i} className={cn("hbar", sel.length > 0 && (on ? "on" : "off"))} data-tip={tip} aria-label={tip} aria-pressed={on}
+                    onClick={() => toggleBar(c.attribute, c.bins!, i)}>
+                    <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
+                  </button>
+                );
+              })}
             </Histogram>
           );
         })()}

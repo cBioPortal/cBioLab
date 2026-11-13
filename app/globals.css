@@ -499,6 +499,9 @@ main.analysis-main { max-width: min(132rem, 100%); }
 }
 .hbar:hover .hfill { opacity: 1; }
 .hbar .hfill { display: block; width: 100%; background: var(--accent-ink); opacity: 0.72; border-radius: 2px 2px 0 0; }
+/* while the chart has a filter: its selected bars full strength, the rest grey (STS-BAR-5) */
+.hbar.on .hfill { opacity: 1; }
+.hbar.off .hfill { background: var(--control-line); opacity: 0.5; }
 /* the bins' labels, a row of their own under the bars (app/lab/explore-sections.tsx Histogram
    thins them to what fits, so none is cut or runs into the next) */
 .histo-ticks { display: flex; gap: 2px; }
