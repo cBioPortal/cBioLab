@@ -117,3 +117,15 @@ export function tickFormat(step: number): (n: number) => string {
 const minus = (s: string) => s.replace(/^-/, "−");
 const trimZeros = (s: string) => s.includes(".") && !s.includes("e") ? s.replace(/\.?0+$/, "") : s;
 const trimExp = (s: string) => s.replace(/\.0+e/, "e").replace(/(\.\d*?)0+e/, "$1e").replace("e+", "e");
+
+/**
+ * A number in an oncoprint tooltip, as the portal writes it (TooltipUtils): two decimals, with a
+ * clinical value's ".00" dropped ("12", "2.45"); a heatmap value keeps them ("1.00").
+ */
+export function portalTipNumber(x: number, clinical = true): string {
+  const s = x.toFixed(2);
+  return clinical && s.endsWith(".00") ? s.slice(0, -3) : s;
+}
+
+/** a value carried as float32, at the seven significant digits it holds ("2.446799", not 2.4467992782592773) */
+export const fmtFloat32 = (x: number): string => String(Number(x.toPrecision(7)));

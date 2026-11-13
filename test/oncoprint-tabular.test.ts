@@ -80,3 +80,12 @@ test("typed-array cells are read the same as plain ones", () => {
 test("a germline mutation is named in the tabular download", () => {
   assert.equal(geneCellLabel(BITS.MISSENSE | BITS.GERMLINE), "Missense Mutation (unknown significance), Germline Mutation");
 });
+
+test("a numeric row gives the exact value where the contract carries one, and the drawing code's value where it does not", () => {
+  const rows = table(contractToTsv(contract(["A", "B", "C"], [
+    { kind: "clinical", label: "TMB", numeric: true, min: 0, max: 255, cells: [100, 100, -1], values: [Math.fround(100.4), Math.fround(0.1), null] } as Track,
+    { kind: "clinical", label: "AGE", numeric: true, min: 0, max: 255, cells: [61, 0, -1] } as Track,
+  ])));
+  assert.deepEqual(rows[1], ["TMB", "CLINICAL", "100.4", "0.1", ""], "float32 at the digits it holds; the code would say 100 for both");
+  assert.deepEqual(rows[2], ["AGE", "CLINICAL", "61", "0", ""], "an older contract: no values, the code's");
+});

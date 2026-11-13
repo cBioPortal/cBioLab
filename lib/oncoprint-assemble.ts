@@ -8,6 +8,7 @@
 // tables, and a port in another language has this function as its conformance target.
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
+import { finiteNumber } from "./sql-number.ts";
 import { STYLE, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
@@ -336,8 +337,9 @@ export function assembleContract(input: AssembleInput): Contract {
     for (let i = 0; i < n.length; i++) if (n[i] > max) max = n[i];
     if (max > 1) {
       const cells = new Int32Array(allPids.length);
-      for (let i = 0; i < n.length; i++) cells[i] = n[i] ? Math.round(255 * n[i] / max) : -1;
-      clinTracks.push({ kind: "clinical", label: SAMPLES_TRACK, numeric: true, bar: true, peak: true, min: 0, max, cells });
+      const values = new Float32Array(allPids.length).fill(NaN);
+      for (let i = 0; i < n.length; i++) { cells[i] = n[i] ? Math.round(255 * n[i] / max) : -1; if (n[i]) values[i] = n[i]; }
+      clinTracks.push({ kind: "clinical", label: SAMPLES_TRACK, numeric: true, bar: true, peak: true, min: 0, max, cells, values });
     }
   }
   if (input.profiled) {
@@ -370,7 +372,7 @@ export function assembleContract(input: AssembleInput): Contract {
       const v = val[i];
       if (v == null) continue;
       nPresent++;
-      const x = Number(v);
+      const x = finiteNumber(v);
       if (!Number.isFinite(x)) continue;
       nNumeric++;
       if (x < min) min = x;
@@ -387,14 +389,14 @@ export function assembleContract(input: AssembleInput): Contract {
       const fraction = attr === "FRACTION_GENOME_ALTERED";
       if (fraction) { min = Math.min(min, 0); max = Math.max(max, 1); }
       const logScale = attr === "MUTATION_COUNT" && min >= 0;
-      const cells = new Int32Array(allPids.length).fill(-1);
+      const cells = new Int32Array(allPids.length).fill(-1), values = new Float32Array(allPids.length).fill(NaN);
       for (let i = 0; i < val.length; i++) {
         const v = val[i];
         if (v == null) continue;
-        const x = Number(v);
-        if (Number.isFinite(x)) cells[i] = encodeNumeric(x, min, max, logScale);
+        const x = finiteNumber(v);
+        if (Number.isFinite(x)) { cells[i] = encodeNumeric(x, min, max, logScale); values[i] = x; }
       }
-      clinTracks.push({ kind: "clinical", numeric: true, bar: true, ...(logScale ? { logScale } : {}), label: attr, min, max, cells });
+      clinTracks.push({ kind: "clinical", numeric: true, bar: true, ...(logScale ? { logScale } : {}), label: attr, min, max, cells, values });
       continue;
     }
     const counts = new Map<string, number>();
@@ -442,10 +444,10 @@ export function assembleContract(input: AssembleInput): Contract {
         else { min = dMin; max = dMax; center = null; }
       }
       const span = max - min || 1;
-      const cells = new Int32Array(allPids.length).fill(-1);
+      const cells = new Int32Array(allPids.length).fill(-1), values = new Float32Array(allPids.length).fill(NaN);
       allPids.forEach((p, i) => {
         const v = h.values.get(p + "|" + gene);
-        if (v !== undefined) cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span);
+        if (v !== undefined) { cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span); values[i] = tx(v); }
       });
       heatTracks.push({ kind: "heatmap", numeric: true, ...(ramp ? { ramp } : {}), label, gene, profileType: h.profileType,
         note: usingRef
@@ -454,7 +456,7 @@ export function assembleContract(input: AssembleInput): Contract {
             "the reference is federated even where the columns are not"
           : h.isVaf ? "allele fraction, max across a patient's mutations in the gene" : "a patient's: its samples' value furthest from 0",
         min: Math.round(min * 100) / 100, max: Math.round(max * 100) / 100,
-        center: center == null ? null : Math.round(255 * (0 - min) / span), cells });
+        center: center == null ? null : Math.round(255 * (0 - min) / span), cells, values });
     }
   }
 
@@ -504,7 +506,12 @@ export function assembleContract(input: AssembleInput): Contract {
     for (let r = 0; r < idx.length; r++) idRank[idx[r]] = r;
   }
   const sortableTracks = new Map<string, Track>([...clinTracks, ...devTracks, ...heatTracks].map((t) => [t.label, t]));
-  const trackCmp = (t: Track, sign: number) => (x: number, y: number): number => {
+  const trackCmp = (t: Track, sign: number) => t.values ? (x: number, y: number): number => {
+    // a numeric track sorts by its exact values, missing last
+    const a = t.values![x], b = t.values![y], na = Number.isNaN(a), nb = Number.isNaN(b);
+    if (na || nb) return na === nb ? 0 : na ? 1 : -1;
+    return sign * (a - b);
+  } : (x: number, y: number): number => {
     const a = (t.cells as number[])[x], b = (t.cells as number[])[y];
     if (a === b) return 0;
     if (a === -1) return 1;
@@ -549,7 +556,8 @@ export function assembleContract(input: AssembleInput): Contract {
   // ---- track meta (panel-aware frequencies) -----------------------------
   // Rows top to bottom in the portal's order: clinical (the study, sample-count and profiled-for
   // rows first), then the derived-cohort rows beside them, then genes, then heatmaps.
-  const tracks: Track[] = clinTracks.map((t) => ({ ...t, cells: remap(t.cells) }));
+  const remapValues = (t: Track) => t.values ? { values: order.map((i) => { const x = t.values![i]; return Number.isNaN(x) ? null : x; }) as number[] } : {};
+  const tracks: Track[] = clinTracks.map((t) => ({ ...t, cells: remap(t.cells), ...remapValues(t) }));
   // an overlay is evidence about the gene, not an alteration of it: expression does not
   // enter the altered fraction, which is what the portal reports too
   const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
@@ -584,7 +592,7 @@ export function assembleContract(input: AssembleInput): Contract {
       }) } : {})
     });
   }
-  for (const t of heatTracks) tracks.push({ ...t, cells: remap(t.cells) });
+  for (const t of heatTracks) tracks.push({ ...t, cells: remap(t.cells), ...remapValues(t) });
 
   phase("track meta");
   return {
@@ -596,7 +604,7 @@ export function assembleContract(input: AssembleInput): Contract {
       frequencyDenominator: unit === "sample" ? "profiled samples" : "profiled patients",
       column: unit === "sample"
         ? "one sample; a cohort selects patients, so every sample of a selected patient is drawn — including samples on which the cohort's own criterion was never measured. Patient-level clinical values repeat across that patient's samples."
-        : "one patient; a patient's samples are collapsed (clinical: patient rows win, else one sample's value; heatmap: the sample value furthest from 0; VAF: max)",
+        : "one patient; a patient's samples are collapsed (clinical: a patient row wins, else for a NUMBER its samples' mean, MUTATION_COUNT their max, for anything else the value they agree on, otherwise \"Mixed\"; heatmap: the sample value furthest from 0; VAF: max)",
       annotation: input.annotationSource, lineGap,
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track),
       ...customDriverReport(events) },

@@ -2,6 +2,7 @@
 // one row per track (track_name, track_type, then one column per case in oncoprint order).
 import { BITS, NOT_PROFILED } from "./oncoprint-assemble.ts";
 import { STYLE, numericValue } from "./oncoprint-style.ts";
+import { fmtFloat32 } from "./chart/format.ts";
 import type { Contract } from "./types.ts";
 
 export function geneCellLabel(code: number): string {
@@ -32,7 +33,10 @@ export function contractToTsv(contract: Contract): string {
       const c = cells[i];
       if (t.kind === "gene") vals[i] = geneCellLabel(c);
       else if (t.kind === "derivedEvent") vals[i] = c > 0 ? "yes" : "no";
-      else if (t.numeric) vals[i] = c === -1 ? "" : String(Math.round(numericValue(t, c) * 100) / 100);
+      else if (t.numeric) {
+        const x = t.values ? t.values[i] : undefined;
+        vals[i] = c === -1 ? "" : x != null && !Number.isNaN(x) ? fmtFloat32(x) : String(Math.round(numericValue(t, c) * 100) / 100);
+      }
       else vals[i] = c === -1 ? (t.profiledFor ? STYLE.glyph.profiled.no : "") : (t.categories && t.categories[c]) ?? "Other";
     }
     const type = t.kind === "gene" ? "GENE" : t.kind === "heatmap" ? "HEATMAP " + (t.profileType || "") : t.kind === "derivedEvent" ? "DERIVED" : "CLINICAL";

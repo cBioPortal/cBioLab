@@ -2,7 +2,8 @@
 //
 // Layout:  "OPB1" | u32 headerBytes | header JSON (padded to 4 bytes) | cell arrays | column ids
 // The header is the contract minus the two bulk fields (`tracks[].cells`, `columns`);
-// each track carries `dtype`, `offset` (bytes from payload start) and `length`.
+// each track carries `dtype`, `offset` (bytes from payload start) and `length`; a numeric track's
+// exact values follow its cells as little-endian float32 at `valuesOffset`.
 // Column ids are one UTF-8 string joined by "\n" at `columnsOffset`.
 //
 // Isomorphic: `packContract` runs on the server, `unpackContract` in the browser.
@@ -12,7 +13,7 @@ import type { Contract, Track } from "./types.ts";
 const MAGIC = 0x4f504231; // "OPB1"
 
 export type CellDtype = "i16" | "i32";
-export interface PackedTrackMeta extends Omit<Track, "cells"> { dtype: CellDtype; offset: number; length: number }
+export interface PackedTrackMeta extends Omit<Track, "cells" | "values"> { dtype: CellDtype; offset: number; length: number; valuesOffset?: number }
 export interface PackedHeader extends Omit<Contract, "tracks" | "columns"> {
   n: number;
   tracks: PackedTrackMeta[];
@@ -23,7 +24,7 @@ export interface PackedHeader extends Omit<Contract, "tracks" | "columns"> {
 export interface UnpackedContract extends Omit<Contract, "tracks" | "columns"> {
   /** `display` and `queries` ride in the header, so a renderer sees them without the cells */
   n: number;
-  tracks: (Omit<Track, "cells"> & { cells: Int16Array | Int32Array })[];
+  tracks: (Omit<Track, "cells" | "values"> & { cells: Int16Array | Int32Array; values?: Float32Array })[];
   /** decoded lazily — 200k ids are only needed for tooltips and exports */
   columns: () => string[];
 }
@@ -44,9 +45,11 @@ export function packContract(contract: Contract): Uint8Array {
     for (let i = 0; i < cells.length; i++) { const c = cells[i]; if (c > 32767 || c < -32768) { wide = true; break; } }
     const dtype: CellDtype = wide ? "i32" : "i16";
     const bytes = cells.length * (wide ? 4 : 2);
-    const { cells: _omit, ...meta } = t;
-    metas.push({ ...meta, dtype, offset: cursor, length: cells.length });
+    const { cells: _omit, values, ...meta } = t;
+    const m: PackedTrackMeta = { ...meta, dtype, offset: cursor, length: cells.length };
     cursor += pad4(bytes);
+    if (values) { m.valuesOffset = cursor; cursor += values.length * 4; }
+    metas.push(m);
   }
   const columnsOffset = cursor;
   const payloadBytes = columnsOffset + colBytes.length;
@@ -66,6 +69,10 @@ export function packContract(contract: Contract): Uint8Array {
     const m = metas[ti];
     if (m.dtype === "i16") new Int16Array(out.buffer, base + m.offset, m.length).set(t.cells as ArrayLike<number>);
     else new Int32Array(out.buffer, base + m.offset, m.length).set(t.cells as ArrayLike<number>);
+    if (t.values && m.valuesOffset != null) {
+      const v = new DataView(out.buffer, base + m.valuesOffset, m.length * 4);
+      for (let i = 0; i < m.length; i++) { const x = t.values[i]; v.setFloat32(i * 4, x == null ? NaN : x, true); }
+    }
   });
   out.set(colBytes, base + columnsOffset);
   return out;
@@ -78,9 +85,12 @@ export function unpackContract(buf: ArrayBuffer): UnpackedContract {
   const header = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 8, headerLen))) as PackedHeader;
   const base = 8 + pad4(headerLen);
   const tracks = header.tracks.map((m) => {
-    const { dtype, offset, length, ...meta } = m;
+    const { dtype, offset, length, valuesOffset, ...meta } = m;
     const cells = dtype === "i16" ? new Int16Array(buf, base + offset, length) : new Int32Array(buf, base + offset, length);
-    return { ...meta, cells };
+    if (valuesOffset == null) return { ...meta, cells };
+    const dv2 = new DataView(buf, base + valuesOffset, length * 4), values = new Float32Array(length);
+    for (let i = 0; i < length; i++) values[i] = dv2.getFloat32(i * 4, true);
+    return { ...meta, cells, values };
   });
   let cols: string[] | null = null;
   const columns = () => {

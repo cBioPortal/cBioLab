@@ -35,7 +35,7 @@ import { PROFILED_TYPES, type ProfiledType } from "./profile-names.ts";
 import { inGeneticAlterationDerived } from "./profile-catalog.ts";
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
-import { clinicalTable, assertCustomDataPresent } from "./custom-data.ts";
+import { clinicalTable, clinicalMetaTable, assertCustomDataPresent } from "./custom-data.ts";
 import { finiteSql } from "./sql-number.ts";
 import { ENTITY_RE, isCategoricalAssay } from "./generic-assay.ts";
 import type { OncoprintSpec, HeatmapSpec } from "./views/oncoprint/types.ts";
@@ -195,15 +195,32 @@ export function clinicalSql(attrs: string[], study: string = STUDY, db: string =
       "  AND (cd.type = 'patient' OR cd.sample_unique_id = sd.sample_unique_id)\n" +
       "WHERE cd.cancer_study_identifier = " + sq(study) + " AND cd." + inAttrs + "\n" +
       "GROUP BY pid, k";
-  // patient-level rows win; sample-level attributes (e.g. CANCER_TYPE in MSK studies)
-  // fall back to one of the patient's sample values (of its samples in the cohort) via argMax
-  return "SELECT replaceOne(patient_unique_id, " + sq(puidPrefix) + ", '') AS pid,\n" +
-    "       attribute_name AS k, argMax(attribute_value, type = 'patient') AS v\n" +
-    "FROM " + clinicalTable(db, attrs) + "\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + "\n" +
-    "  AND " + inAttrs +
-    (samples ? "\n  AND (type = 'patient' OR replaceOne(sample_unique_id, " + sq(puidPrefix) + ", '') IN (" + samples + "))" : "") + "\n" +
-    "GROUP BY pid, k";
+  // A patient-level row wins. A sample-level attribute (e.g. CANCER_TYPE in MSK studies) is the
+  // portal's patient value of its samples in the cohort (fillClinicalTrackDatum; ONC-TT-12,
+  // ONC-STM-5), by the attribute's declared datatype: a NUMBER, the mean of the values that are
+  // numbers (MUTATION_COUNT their max), no value when none is; anything else, the value when the
+  // samples agree, otherwise "Mixed". A NUMBER's value is a number only when the whole text is one:
+  // the portal's parseFloat reads Gleason "4+3" as 4, and a case with no MUTATION_COUNT as 0, and
+  // both are left as no value here (docs/PORTAL-PARITY.md, ONC-TT-12).
+  const smp = "type = 'sample'", num = finiteSql("attribute_value");
+  const declaredNumbers = "SELECT cam.attr_id FROM " + clinicalMetaTable(db) + " cam\n" +
+    "         JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+    "         WHERE cs.cancer_study_identifier = " + sq(study) + " AND upper(cam.datatype) = 'NUMBER'";
+  return "SELECT pid, k, v FROM (\n" +
+    "  SELECT replaceOne(patient_unique_id, " + sq(puidPrefix) + ", '') AS pid,\n" +
+    "       attribute_name AS k, attribute_name IN (" + declaredNumbers + ") AS declared_number,\n" +
+    "       multiIf(countIf(type = 'patient') > 0,\n" +
+    "           if(declared_number, toString(anyIf(" + num + ", type = 'patient')), anyIf(attribute_value, type = 'patient')),\n" +
+    "         declared_number,\n" +
+    "           if(countIf(" + smp + " AND " + num + " IS NOT NULL) = 0, NULL,\n" +
+    "             toString(if(attribute_name = 'MUTATION_COUNT', maxIf(" + num + ", " + smp + "), avgIf(" + num + ", " + smp + ")))),\n" +
+    "         uniqExactIf(attribute_value, " + smp + ") > 1, 'Mixed', anyIf(attribute_value, " + smp + ")) AS v\n" +
+    "  FROM " + clinicalTable(db, attrs) + "\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + "\n" +
+    "    AND " + inAttrs +
+    (samples ? "\n    AND (type = 'patient' OR replaceOne(sample_unique_id, " + sq(puidPrefix) + ", '') IN (" + samples + "))" : "") + "\n" +
+    "  GROUP BY pid, k\n" +
+    ") WHERE v IS NOT NULL";
 }
 
 // per-study molecular-profile inventory (validation for heatmap tracks)

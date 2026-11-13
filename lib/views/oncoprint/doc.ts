@@ -8,7 +8,7 @@ export const oncoprintDoc: KindDoc = {
  "heatmap":[{"profileType":"<profile>","genes":[...]?|"entities":[...]?}, ...(max 4)]?,
  "sort":["<track>"|"-<track>"|"genomic", ...(max 4)]?,"cohorts":[names?]}`,
   grammarNotes: `Oncoprint clinical tracks: any clinical attribute name works (patient- or sample-level; sample-level
-falls back to one sample's value per patient). Numeric attributes (age, TMB, ...) render as a
+a patient column takes its samples' mean, MUTATION_COUNT their max, a word when they agree, else "Mixed"). Numeric attributes (age, TMB, ...) render as a
 continuous heat track with a min→max key; unknown attributes render a labeled "(no data)" track.
 Oncoprint heatmap: continuous molecular-profile rows per gene (genes default to the gene tracks);
 profile must exist in the study (get_catalog lists them; e.g. rna_seq_v2_mrna_median_Zscores in TCGA studies);

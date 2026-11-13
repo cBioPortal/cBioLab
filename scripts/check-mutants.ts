@@ -23,11 +23,13 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
   "portal-parity": ["node", "--env-file=.env.local", "scripts/check-portal-parity.ts"],
+  // reads the fixture study on connection b (CLICKHOUSE2_*, from scripts/peer-db.ts)
+  "oncoprint-values": ["node", "--env-file=.env.local", "scripts/check-oncoprint-values.ts"],
 };
 
 interface Mutant {
@@ -182,6 +184,27 @@ const MUTANTS: Mutant[] = [
     effect: "Table 1's q-values are corrected together with the rows the model was built from, whose tiny p-values are guaranteed, so every other row looks more significant than it is.",
     find: "r.role !== \"in the model\" && r.role !== \"outcome\"",
     replace: "r.role !== \"outcome\"" },
+  { id: "oncoprint-patient-value-one-sample", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
+    effect: "An oncoprint patient column shows one of its samples' values instead of their mean, so a patient's TMB or fraction genome altered depends on which sample was read first.",
+    find: "avgIf(\" + num + \", \" + smp + \")",
+    replace: "anyIf(\" + num + \", \" + smp + \")" },
+  { id: "oncoprint-mutation-count-mean", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
+    effect: "An oncoprint patient column's mutation count is its samples' mean rather than their max, so a patient with a hypermutated metastasis reads as moderately mutated.",
+    find: "if(attribute_name = 'MUTATION_COUNT', maxIf(",
+    replace: "if(attribute_name = 'MUTATION_COUNT', avgIf(" },
+  { id: "oncoprint-mixed-hidden", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
+    effect: "A patient whose samples disagree (a primary and a metastasis) shows one sample's value instead of \"Mixed\", so the track hides the disagreement.",
+    find: "uniqExactIf(attribute_value, \" + smp + \") > 1, 'Mixed'",
+    replace: "uniqExactIf(attribute_value, \" + smp + \") > 99, 'Mixed'" },
+  { id: "oncoprint-patient-number-unchecked", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
+    effect: "A number recorded on the patient is shown as written even when it is not one, so \"12abc\" appears in a numeric track's place.",
+    find: "if(declared_number, toString(anyIf(\" + num + \", type = 'patient')), anyIf(attribute_value, type = 'patient'))",
+    replace: "anyIf(attribute_value, type = 'patient')" },
+  { id: "oncoprint-number-by-parsing", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
+    effect: "An attribute is averaged whenever its values parse as numbers, whatever the study declares, so a STRING grade of \"1\" and \"2\" reads \"1.5\" instead of \"Mixed\".",
+    history: "Shipped in #198 before review: numbers were told from words by parsing the values.",
+    find: "attribute_name IN (\" + declaredNumbers + \") AS declared_number",
+    replace: "countIf(\" + smp + \" AND \" + num + \" IS NULL) = 0 AS declared_number" },
 ];
 
 /**

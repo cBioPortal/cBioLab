@@ -5,7 +5,7 @@
 # lanes it names: `local` (unit tests, the stores' Postgres tests, the planted sharing bugs, the
 # Python port's conformance; no secrets), `warehouse` (the counts against cBioPortal, the cohort
 # logic, the pooled paths, the gallery examples and their method scripts, the denominator, facet,
-# value-folding and splitBy checks) and `e2e` (the build, then the browser suite and federation
+# value-folding, oncoprint patient-value and splitBy checks) and `e2e` (the build, then the browser suite and federation
 # against it). The planted-bug check follows the warehouse lane rather than running beside it, so
 # no more than two jobs query the warehouse at once, each with its ClickHouse concurrency halved.
 # The report /verification displays (docs/verification/*.json) is kept as this run's
@@ -15,11 +15,12 @@
 # CLICKHOUSE_PASSWORD, CLICKHOUSE_DB). The warehouse must accept connections from GitHub's runners.
 # Network access to www.cbioportal.org is required.
 #
-# The second database the checks read (connection b: federation, the facet and value-folding checks,
-# Explore across two databases) is not a secret warehouse: scripts/gate.sh starts a private ClickHouse
-# on the runner holding the committed fixture study (scripts/peer-db.ts, test/fixtures/peer-study), so
-# no check depends on another database's contents. The ClickHouse binary and cBioPortal's reference
-# files it is set up from are cached, keyed on the versions the code pins.
+# The second database the checks read (connection b: federation, the facet, value-folding and
+# oncoprint patient-value checks, Explore across two databases) is not a secret warehouse:
+# scripts/gate.sh, and the planted-bug job for its oncoprint-values guard, start a private ClickHouse
+# on the runner holding the committed fixture study (scripts/peer-db.ts, test/fixtures/peer-study),
+# so no check depends on another database's contents. The ClickHouse binary and cBioPortal's
+# reference files it is set up from are cached, keyed on the versions the code pins.
 name: Verify
 
 on:
@@ -231,6 +232,14 @@ jobs:
       - run: npm ci
 
       - *env-local
+
+      - *peer-db-pins
+      - *peer-db-binary
+      - *peer-db-upstream
+
+      # the oncoprint-values guard reads the fixture study on connection b
+      - name: Peer database (test/fixtures/peer-study)
+        run: node --env-file=.env.local scripts/peer-db.ts --port 21999 >> "$GITHUB_ENV"
 
       - name: Planted bugs
         run: npm run check:mutants

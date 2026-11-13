@@ -1,49 +1,49 @@
-#Sample Identifier	Patient Identifier	Cancer Type	Cancer Type Detailed	Oncotree Code	Sample Type	Fraction Genome Altered
-#Sample Identifier	Patient Identifier	Cancer Type	Cancer Type Detailed	Oncotree Code	Sample Type	Fraction Genome Altered
-#STRING	STRING	STRING	STRING	STRING	STRING	NUMBER
-#1	1	1	1	1	1	1
-SAMPLE_ID	PATIENT_ID	CANCER_TYPE	CANCER_TYPE_DETAILED	ONCOTREE_CODE	SAMPLE_TYPE	FRACTION_GENOME_ALTERED
-FX-P01-T1	FX-P01	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.354
-FX-P01-T2	FX-P01	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Metastasis	0.338
-FX-P02-T1	FX-P02	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.104
-FX-P02-T2	FX-P02	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Metastasis	0.322
-FX-P03-T1	FX-P03	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.225
-FX-P03-T2	FX-P03	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Metastasis	0.526
-FX-P04-T1	FX-P04	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.207
-FX-P04-T2	FX-P04	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Metastasis	0.246
-FX-P05-T1	FX-P05	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.579
-FX-P06-T1	FX-P06	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.172
-FX-P07-T1	FX-P07	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.08
-FX-P08-T1	FX-P08	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.129
-FX-P09-T1	FX-P09	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.589
-FX-P10-T1	FX-P10	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.438
-FX-P11-T1	FX-P11	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.326
-FX-P12-T1	FX-P12	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.246
-FX-P13-T1	FX-P13	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.222
-FX-P14-T1	FX-P14	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.589
-FX-P15-T1	FX-P15	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.516
-FX-P16-T1	FX-P16	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.326
-FX-P17-T1	FX-P17	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.368
-FX-P18-T1	FX-P18	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.127
-FX-P19-T1	FX-P19	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.302
-FX-P20-T1	FX-P20	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.375
-FX-P21-T1	FX-P21	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.109
-FX-P22-T1	FX-P22	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.465
-FX-P23-T1	FX-P23	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.34
-FX-P24-T1	FX-P24	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.249
-FX-P25-T1	FX-P25	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.153
-FX-P26-T1	FX-P26	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.049
-FX-P27-T1	FX-P27	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.209
-FX-P28-T1	FX-P28	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.198
-FX-P29-T1	FX-P29	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.273
-FX-P30-T1	FX-P30	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.089
-FX-P31-T1	FX-P31	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.233
-FX-P32-T1	FX-P32	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.548
-FX-P33-T1	FX-P33	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.122
-FX-P34-T1	FX-P34	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.344
-FX-P35-T1	FX-P35	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.121
-FX-P36-T1	FX-P36	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.131
-FX-P37-T1	FX-P37	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.587
-FX-P38-T1	FX-P38	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.354
-FX-P39-T1	FX-P39	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.196
-FX-P40-T1	FX-P40	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.284
+#Sample Identifier	Patient Identifier	Cancer Type	Cancer Type Detailed	Oncotree Code	Sample Type	Fraction Genome Altered	Tumor Grade	Ki-67 Index	Parse Probe	Site Label	Flag Bool
+#Sample Identifier	Patient Identifier	Cancer Type	Cancer Type Detailed	Oncotree Code	Sample Type	Fraction Genome Altered	Tumor Grade	Ki-67 Index	Parse Probe	Site Label	Flag Bool
+#STRING	STRING	STRING	STRING	STRING	STRING	NUMBER	STRING	NUMBER	NUMBER	STRING	BOOLEAN
+#1	1	1	1	1	1	1	1	1	1	1	1
+SAMPLE_ID	PATIENT_ID	CANCER_TYPE	CANCER_TYPE_DETAILED	ONCOTREE_CODE	SAMPLE_TYPE	FRACTION_GENOME_ALTERED	TUMOR_GRADE	KI67_INDEX	PARSE_PROBE	SITE_LABEL	FLAG_BOOL
+FX-P01-T1	FX-P01	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.354	1	10	12abc	Lung	TRUE
+FX-P01-T2	FX-P01	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Metastasis	0.338	2	20	1e3	lung	TRUE
+FX-P02-T1	FX-P02	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.104	2	30	0x10	Left  Lung	TRUE
+FX-P02-T2	FX-P02	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Metastasis	0.322	2	>90	4	Left Lung	FALSE
+FX-P03-T1	FX-P03	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.225		high	.5	Lung	
+FX-P03-T2	FX-P03	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Metastasis	0.526		high	abc	Lung	
+FX-P04-T1	FX-P04	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.207			-2		
+FX-P04-T2	FX-P04	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Metastasis	0.246			1,5		
+FX-P05-T1	FX-P05	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.579			12abc		TRUE
+FX-P06-T1	FX-P06	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.172			0x10		
+FX-P07-T1	FX-P07	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.08			1e3		
+FX-P08-T1	FX-P08	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.129			7		
+FX-P09-T1	FX-P09	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.589					
+FX-P10-T1	FX-P10	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.438					
+FX-P11-T1	FX-P11	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.326					
+FX-P12-T1	FX-P12	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.246					
+FX-P13-T1	FX-P13	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.222					
+FX-P14-T1	FX-P14	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.589					
+FX-P15-T1	FX-P15	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.516					
+FX-P16-T1	FX-P16	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.326					
+FX-P17-T1	FX-P17	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.368					
+FX-P18-T1	FX-P18	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.127					
+FX-P19-T1	FX-P19	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.302					
+FX-P20-T1	FX-P20	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.375					
+FX-P21-T1	FX-P21	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.109					
+FX-P22-T1	FX-P22	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.465					
+FX-P23-T1	FX-P23	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.34					
+FX-P24-T1	FX-P24	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.249					
+FX-P25-T1	FX-P25	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.153					
+FX-P26-T1	FX-P26	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.049					
+FX-P27-T1	FX-P27	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.209					
+FX-P28-T1	FX-P28	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.198					
+FX-P29-T1	FX-P29	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.273					
+FX-P30-T1	FX-P30	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.089					
+FX-P31-T1	FX-P31	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.233					
+FX-P32-T1	FX-P32	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.548					
+FX-P33-T1	FX-P33	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.122					
+FX-P34-T1	FX-P34	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.344					
+FX-P35-T1	FX-P35	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.121					
+FX-P36-T1	FX-P36	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.131					
+FX-P37-T1	FX-P37	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.587					
+FX-P38-T1	FX-P38	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.354					
+FX-P39-T1	FX-P39	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.196					
+FX-P40-T1	FX-P40	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.284					
