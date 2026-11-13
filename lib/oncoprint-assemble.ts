@@ -603,7 +603,7 @@ export function assembleContract(input: AssembleInput): Contract {
       frequencyDenominator: unit === "sample" ? "profiled samples" : "profiled patients",
       column: unit === "sample"
         ? "one sample; a cohort selects patients, so every sample of a selected patient is drawn — including samples on which the cohort's own criterion was never measured. Patient-level clinical values repeat across that patient's samples."
-        : "one patient; a patient's samples are collapsed (clinical: patient rows win, else one sample's value; heatmap: the sample value furthest from 0; VAF: max)",
+        : "one patient; a patient's samples are collapsed (clinical: a patient row wins, else for a NUMBER its samples' mean, MUTATION_COUNT their max, for anything else the value they agree on, otherwise \"Mixed\"; heatmap: the sample value furthest from 0; VAF: max)",
       annotation: input.annotationSource, lineGap,
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track),
       ...customDriverReport(events) },
