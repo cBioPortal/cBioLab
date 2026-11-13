@@ -3,7 +3,7 @@
 // these pin the rules, so a later edit cannot quietly narrow them.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { columnFactsSql, coverageSql, assayHeatmapSql, normalizeSpec } from "../lib/oncoprint.ts";
+import { columnFactsSql, coverageSql, assayHeatmapSql, normalizeSpec, clinicalSql, spectrumSql } from "../lib/oncoprint.ts";
 import { assayTrackLabel, entityShortName } from "../lib/profile-names.ts";
 
 test("a gene cell is profiled by a mutation, copy number or structural variant panel, as in the portal", () => {
@@ -43,4 +43,15 @@ test("a generic-assay track's label drops the words its entity repeats from the 
   assert.equal(assayTrackLabel("8q_status", "armlevel_cna"), "8q_status arm");
   assert.equal(assayTrackLabel("cg00032419", "methylation_hm450"), "cg00032419 meth");
   assert.equal(entityShortName("signature", "signature"), "signature", "never the last word");
+});
+
+test("the mutation spectrum: six pyrimidine-folded substitution counts per case, unioned into the clinical rows", () => {
+  const s = spectrumSql("s", "db", "patient");
+  assert.match(s, /me\.reference_allele = 'C' AND me\.tumor_seq_allele = 'A'\) OR \(me\.reference_allele = 'G' AND me\.tumor_seq_allele = 'T'/, "C>A includes G>T");
+  assert.match(s, /replaceOne\(sd\.patient_unique_id, 's_', ''\) AS pid, 'MUTATION_SPECTRUM' AS k/, "a patient's: its samples' summed");
+  assert.match(s, /gp\.genetic_alteration_type = 'MUTATION_EXTENDED'/);
+  assert.match(spectrumSql("s", "db", "sample", "'S1'"), /sd\.sample_unique_id, 's_', ''\) IN \('S1'\)/);
+  const both = clinicalSql(["SEX", "MUTATION_SPECTRUM"], "s", "db", "patient");
+  assert.match(both, /attribute_name IN \('SEX'\)[\s\S]*UNION ALL[\s\S]*'MUTATION_SPECTRUM' AS k/);
+  assert.equal(clinicalSql(["MUTATION_SPECTRUM"], "s", "db", "sample"), spectrumSql("s", "db", "sample"));
 });

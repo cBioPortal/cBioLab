@@ -84,3 +84,13 @@ test("zoomed out, a track with more than 63 values still draws its commonest one
     tracks: [{ kind: "clinical", label: "X", categories: cats, cells: new Array(n).fill(70) }] } as unknown as Contract;
   assert.ok(contractToSvg(c, 800).includes(clinicalColor(70)), "value v70's colour, past the old 64-slot vote");
 });
+
+test("the server SVG draws a stacked row as shares in the portal's colours, and lists them in the legend", () => {
+  const c = { study: "s", studies: ["s"], groups: [{ name: "all", start: 0, count: 2 }], columns: ["A", "B"], unit: "patient",
+    conventions: { sort: [] }, stats: { nColumns: 2 }, display: {},
+    tracks: [{ kind: "clinical", label: "MUTATION_SPECTRUM", stack: ["C>A", "C>G", "C>T", "T>A", "T>C", "T>G"], cells: [0, -1],
+      values: [3, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0] }] } as unknown as Contract;
+  const svg = contractToSvg(c, 400);
+  assert.ok(svg.includes('fill="#3D6EB1"') && svg.includes('fill="#DFF1F8"'), "C>A and C>T drawn, in the portal's colours");
+  assert.ok(svg.includes(">T>G<") || svg.includes(">T&gt;G<"), "the legend names every substitution");
+});
