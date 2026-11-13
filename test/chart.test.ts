@@ -136,3 +136,17 @@ test("oncoprint tooltip numbers and float32 values, as the portal prints them", 
   assert.equal(portalTipNumber(12), "12"); assert.equal(portalTipNumber(2.446799), "2.45"); assert.equal(portalTipNumber(1, false), "1.00");
   assert.equal(fmtFloat32(Math.fround(2.446799244)), "2.446799"); assert.equal(fmtFloat32(61), "61");
 });
+
+test("oncoprint tooltip numbers: toFixed(2), and a clinical value loses exactly a trailing \".00\" (TooltipUtils 240-243, 361-363)", () => {
+  assert.equal(portalTipNumber(3.0004), "3", "rounds to .00: trimmed");
+  assert.equal(portalTipNumber(-0.004), "-0", "toFixed(2) gives \"-0.00\", trimmed to \"-0\"");
+  assert.equal(portalTipNumber(10), "10", "only \".00\" goes, not the integer's own zero");
+  assert.equal(portalTipNumber(2.5), "2.50", "a single trailing zero stays");
+  assert.equal(portalTipNumber(-3), "-3");
+  assert.equal(portalTipNumber(0), "0");
+  assert.equal(portalTipNumber(1.005), "1", "toFixed's binary rounding: 1.005 is 1.00499…");
+  assert.equal(portalTipNumber(0.005), "0.01", "toFixed's binary rounding: 0.005 is 0.005000…01");
+  assert.equal(portalTipNumber(10, false), "10.00", "a heatmap value keeps its decimals");
+  assert.equal(portalTipNumber(-0.004, false), "-0.00");
+  assert.equal(portalTipNumber(3.0004, false), "3.00");
+});

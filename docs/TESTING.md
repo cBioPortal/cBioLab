@@ -144,8 +144,10 @@ checks assert rather than whatever a real warehouse happens to contain:
 - **`DEAD` spelled `False`/`FALSE` and `True`/`TRUE`**, for `check:values`.
 - **Two samples each for `FX-P01`–`FX-P04`**, whose values agree (`CANCER_TYPE`), differ
   (`SAMPLE_TYPE`), differ as numbers (`MUTATION_COUNT`, `FRACTION_GENOME_ALTERED`), look like
-  numbers in a STRING attribute (`TUMOR_GRADE` 1 and 2) and are not numbers in a NUMBER one
-  (`KI67_INDEX` `>90`, `high`), for `check:oncoprint-values`: an oncoprint patient column's value.
+  numbers in a STRING attribute (`TUMOR_GRADE` 1 and 2), are not wholly numbers in a NUMBER one
+  (`KI67_INDEX` `>90`, `high`; `PARSE_PROBE` `12abc`, `0x10`, `1,5`, `1e3`), differ only in case or
+  spaces (`SITE_LABEL`) or are BOOLEAN (`FLAG_BOOL`), with patient-level `PATIENT_SCORE` and
+  `PATIENT_FLAG`, for `check:oncoprint-values`: an oncoprint patient column's value.
 - **OncoKB calls** for its variants (`test/fixtures/peer-oncokb.tsv`, a hand-written subset of
   OncoKB's public calls; some variants are left unannotated). A peer annotates with its caller's pin,
   so they are stored under the version the app pins (`ONCOKB_PIN`, else the warehouse's latest) and

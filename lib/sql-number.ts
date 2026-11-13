@@ -9,6 +9,15 @@
 export const finiteSql = (expr: string): string =>
   "if(isFinite(ifNull(toFloat64OrNull(" + expr + "), nan)), toFloat64OrNull(" + expr + "), NULL)";
 
+const DECIMAL = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/;
+
+/**
+ * finiteSql's rule for a value already in hand: a number only when the whole text is a decimal
+ * one ("1e3", ".5", "-2"), else NaN. JavaScript's Number() would also take "0x10" as 16 and ""
+ * as 0; parseFloat would take Gleason "4+3" as 4.
+ */
+export const finiteNumber = (s: string): number => (DECIMAL.test(s) ? Number(s) : NaN);
+
 /**
  * A clinical value as a number for a comparison open on one side, as cBioPortal's study-view filter
  * reads it (castStringValueToFloat): a value recorded as a bound — a de-identified age ">90", a lab

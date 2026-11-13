@@ -196,11 +196,15 @@ const MUTANTS: Mutant[] = [
     effect: "A patient whose samples disagree (a primary and a metastasis) shows one sample's value instead of \"Mixed\", so the track hides the disagreement.",
     find: "uniqExactIf(attribute_value, \" + smp + \") > 1, 'Mixed'",
     replace: "uniqExactIf(attribute_value, \" + smp + \") > 99, 'Mixed'" },
+  { id: "oncoprint-patient-number-unchecked", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
+    effect: "A number recorded on the patient is shown as written even when it is not one, so \"12abc\" appears in a numeric track's place.",
+    find: "if(declared_number, toString(anyIf(\" + num + \", type = 'patient')), anyIf(attribute_value, type = 'patient'))",
+    replace: "anyIf(attribute_value, type = 'patient')" },
   { id: "oncoprint-number-by-parsing", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
     effect: "An attribute is averaged whenever its values parse as numbers, whatever the study declares, so a STRING grade of \"1\" and \"2\" reads \"1.5\" instead of \"Mixed\".",
     history: "Shipped in #198 before review: numbers were told from words by parsing the values.",
-    find: "attribute_name IN (\" + declaredNumbers + \"),",
-    replace: "countIf(\" + smp + \" AND \" + num + \" IS NULL) = 0," },
+    find: "attribute_name IN (\" + declaredNumbers + \") AS declared_number",
+    replace: "countIf(\" + smp + \" AND \" + num + \" IS NULL) = 0 AS declared_number" },
 ];
 
 /**

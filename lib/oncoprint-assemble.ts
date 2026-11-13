@@ -8,6 +8,7 @@
 // tables, and a port in another language has this function as its conformance target.
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
+import { finiteNumber } from "./sql-number.ts";
 import { STYLE, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
@@ -371,7 +372,7 @@ export function assembleContract(input: AssembleInput): Contract {
       const v = val[i];
       if (v == null) continue;
       nPresent++;
-      const x = Number(v);
+      const x = finiteNumber(v);
       if (!Number.isFinite(x)) continue;
       nNumeric++;
       if (x < min) min = x;
@@ -392,7 +393,7 @@ export function assembleContract(input: AssembleInput): Contract {
       for (let i = 0; i < val.length; i++) {
         const v = val[i];
         if (v == null) continue;
-        const x = Number(v);
+        const x = finiteNumber(v);
         if (Number.isFinite(x)) { cells[i] = encodeNumeric(x, min, max, logScale); values[i] = x; }
       }
       clinTracks.push({ kind: "clinical", numeric: true, bar: true, ...(logScale ? { logScale } : {}), label: attr, min, max, cells, values });

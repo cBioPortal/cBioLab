@@ -37,15 +37,12 @@ def mut_class_bit(mt: str | None) -> int:
     return BITS["OTHER_MUT"]
 
 
-def _js_number(s: str) -> float:
-    """Number(str) for the strings a clinical table holds; NaN when JS would give NaN."""
-    try:
-        v = s.strip()
-        if v == "":
-            return 0.0
-        return float(v)
-    except ValueError:
-        return math.nan
+_DECIMAL = re.compile(r"^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$")
+
+
+def _finite_number(s: str) -> float:
+    """lib/sql-number.ts finiteNumber: a number only when the whole text is a decimal one, else NaN."""
+    return float(s) if _DECIMAL.match(s) else math.nan
 
 
 def _heatmap_label(gene: str, profile_type: str) -> str:
@@ -190,7 +187,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
         if not present:
             clin.append(Track("clinical", attr + " (no data)", np.full(n, -1, dtype=np.int32), {"categories": []}))
             continue
-        nums = [x for x in (_js_number(v) for v in present) if math.isfinite(x)]
+        nums = [x for x in (_finite_number(v) for v in present) if math.isfinite(x)]
         if present and len(nums) >= 0.9 * len(present) and len(set(nums)) > 10:
             # bars over the data's range, as the portal draws them: its fixed range for a fraction of
             # the genome, its log scale for mutation counts
@@ -202,7 +199,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             values = np.full(n, np.nan, dtype=np.float32)
             for i, p in enumerate(all_pids):
                 if p in val_by_pid:
-                    x = _js_number(val_by_pid[p])
+                    x = _finite_number(val_by_pid[p])
                     if math.isfinite(x):
                         cells[i] = encode_numeric(x, lo, hi, log_scale)
                         values[i] = x

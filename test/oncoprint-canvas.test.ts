@@ -146,3 +146,24 @@ test("the browser sorts a numeric track by its exact values, either way, with no
     assert.deepEqual(pick, dir === "asc" ? ["P2", "P1", "P12"] : ["P1", "P2", "P12"], dir);
   }
 });
+
+// O3 in the browser: a tie on a numeric key goes to the next key; a tie on every key to the natural
+// id in the first key's direction (SortUtils 333-345, 362-365; PrecomputedComparator).
+function browserSort(clinical: { attr: string; values: Map<string, string> }[], pids: string[], keys: { track: string; dir: "asc" | "desc" }[]) {
+  const c = assembleContract({ genes: ["TP53"], groups: [{ name: "all", pids }], studies: ["s"], events: [] as EventRow[],
+    coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })), isDriver: () => false, annotationSource: "t",
+    clinical, heatmap: [], derived: [], sort: [{ track: "id", dir: "asc" }], lineGap: 0, display: normalizeDisplay({}) });
+  const buf = packContract(c);
+  const data = unpackContract(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
+  const order = Uint32Array.from({ length: data.n }, (_, i) => i), ids = data.columns();
+  return Array.from(sortColumns(data, order, [{ name: "all", start: 0, count: data.n, patients: data.n }], keys), (i) => ids[i]);
+}
+
+test("the browser sorts a numeric track by values finer than float32, as the portal's doubles", { todo: "values travel as float32 (docs/PORTAL-PARITY.md, ONC-TT-12)" }, () => {
+  const pids = Array.from({ length: 12 }, (_, i) => "R" + String(i + 1).padStart(2, "0"));
+  const vals = new Map(pids.map((p, i): [string, string] => [p, i === 0 ? "1.00000002" : i === 1 ? "1.00000001" : String(i * 10)]));
+  for (const dir of ["asc", "desc"] as const) {
+    const pick = browserSort([{ attr: "V", values: vals }], pids, [{ track: "V", dir }]).filter((p) => p === "R01" || p === "R02");
+    assert.deepEqual(pick, dir === "asc" ? ["R02", "R01"] : ["R01", "R02"], dir);
+  }
+});

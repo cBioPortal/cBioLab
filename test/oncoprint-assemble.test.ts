@@ -431,3 +431,67 @@ test("a heatmap row carries its exact values, after the patient's collapse and t
   assert.equal(at("P1"), Math.fround(1.234567)); assert.equal(at("P2"), Math.fround(-0.5)); assert.equal(at("P4"), 2);
   assert.equal(at("P3"), null, "no value: null in the contract");
 });
+
+// O3: SortUtils getClinicalTrackSortComparator (mandatory = the value alone, preferred = the value
+// then the natural id) and oncoprintmodel sortByTracks (every track's mandatory value before any
+// track's preferred one): a tie on a key goes to the next key, and only a tie on every key goes to
+// the id, ordered in the first key's direction (PrecomputedComparator multiplies the whole
+// preferred comparison, id included, by the sort direction).
+const tieInput = (sort: { track: string; dir: "asc" | "desc" }[], arm: Record<string, string>): AssembleInput => {
+  const pids = Array.from({ length: 14 }, (_, i) => "Q" + String(i + 1).padStart(2, "0"));
+  // Q01..Q11 are 10..110; Q12..Q14 equal Q05's 50, written three ways: more than 10 distinct values, so numeric
+  const tmb = new Map(pids.map((p, i): [string, string] => [p, i < 11 ? String((i + 1) * 10) : ["50.0", "5e1", "50"][i - 11]]));
+  return { genes: ["TP53"], groups: [{ name: "all", pids }], studies: ["s"], events: [], coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })),
+    isDriver: () => false, annotationSource: "t", heatmap: [], derived: [], lineGap: 0, sort,
+    clinical: [{ attr: "TMB", values: tmb }, { attr: "ARM", values: new Map(Object.entries(arm)) }] };
+};
+
+test("equal numeric values go to the next sort key, not to the id (SortUtils 333-345, 362-365)", () => {
+  // ARM: a three times, b twice, c once, so its categories' order is a, b, c however it is derived
+  const arm = { Q01: "a", Q02: "a", Q03: "b", Q05: "c", Q12: "a", Q13: "b" };   // Q14 has no ARM
+  const asc = assembleContract(tieInput([{ track: "TMB", dir: "asc" }, { track: "ARM", dir: "asc" }], arm));
+  assert.equal(asc.tracks.find((t) => t.label === "TMB")!.numeric, true, "the fixture's TMB is a numeric track");
+  assert.deepEqual(asc.columns, ["Q01", "Q02", "Q03", "Q04", "Q12", "Q13", "Q05", "Q14", "Q06", "Q07", "Q08", "Q09", "Q10", "Q11"],
+    "50, 50.0 and 5e1 tie; ARM a, b, c, then no ARM");
+  const armDesc = assembleContract(tieInput([{ track: "TMB", dir: "asc" }, { track: "ARM", dir: "desc" }], arm));
+  assert.deepEqual(armDesc.columns.slice(4, 8), ["Q05", "Q13", "Q12", "Q14"], "the second key's own direction; no value still last");
+});
+
+test("a numeric sort compares exact values, finer than float32 (SortUtils 252-267)", { todo: "values travel as float32 (docs/PORTAL-PARITY.md, ONC-TT-12)" }, () => {
+  // 1.00000001 and 1.00000002 are one float32, two doubles; the portal compares the doubles
+  const pids = Array.from({ length: 12 }, (_, i) => "R" + String(i + 1).padStart(2, "0"));
+  const vals = new Map(pids.map((p, i): [string, string] => [p, i === 0 ? "1.00000002" : i === 1 ? "1.00000001" : String(i * 10)]));
+  assert.equal(Math.fround(1.00000002), Math.fround(1.00000001));
+  for (const dir of ["asc", "desc"] as const) {
+    const c = assembleContract({ genes: ["TP53"], groups: [{ name: "all", pids }], studies: ["s"], events: [], coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })),
+      isDriver: () => false, annotationSource: "t", heatmap: [], derived: [], lineGap: 0, sort: [{ track: "V", dir }], clinical: [{ attr: "V", values: vals }] });
+    const pick = c.columns.filter((p) => p === "R01" || p === "R02");
+    assert.deepEqual(pick, dir === "asc" ? ["R02", "R01"] : ["R01", "R02"], dir);
+  }
+});
+
+test("MUTATION_COUNT with no value stays no value (the portal shows 0, DataUtils 655-658: docs/PORTAL-PARITY.md ONC-TT-12)", () => {
+  const pids = Array.from({ length: 12 }, (_, i) => "M" + String(i + 1).padStart(2, "0"));
+  // M12 has no MUTATION_COUNT: it may never have been sequenced, so it is not shown as 0 mutations
+  const counts = new Map(pids.slice(0, 11).map((p, i): [string, string] => [p, String(i + 1)]));
+  const c = assembleContract({ genes: ["TP53"], groups: [{ name: "all", pids }], studies: ["s"], events: [], coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })),
+    isDriver: () => false, annotationSource: "t", heatmap: [], derived: [], lineGap: 0, sort: [{ track: "MUTATION_COUNT", dir: "asc" }],
+    clinical: [{ attr: "MUTATION_COUNT", values: counts }, { attr: "OTHER", values: new Map(counts) }] });
+  const mc = c.tracks.find((t) => t.label === "MUTATION_COUNT")!, other = c.tracks.find((t) => t.label === "OTHER")!;
+  assert.equal(mc.values![c.columns.indexOf("M12")], null, "MUTATION_COUNT: no value");
+  assert.equal(c.columns[c.columns.length - 1], "M12", "and it sorts last, as no value does");
+  assert.equal(other.values![c.columns.indexOf("M12")], null, "another attribute: no value");
+});
+
+test("a numeric clinical value is a number only when its whole text is one (the portal's parseFloat reads 12abc as 12: docs/PORTAL-PARITY.md ONC-TT-12)", () => {
+  // a sample column's value, or a patient row's, reaches the track as the stored text
+  const pids = Array.from({ length: 40 }, (_, i) => "N" + String(i + 1).padStart(2, "0"));   // enough that 90 % parse either way
+  const raw = ["12abc", "0x10", "1e3", ">90", ".5", "1,5"];
+  const vals = new Map(pids.map((p, i): [string, string] => [p, i < raw.length ? raw[i] : String(i * 3)]));
+  const c = assembleContract({ genes: ["TP53"], groups: [{ name: "all", pids }], studies: ["s"], events: [], coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })),
+    isDriver: () => false, annotationSource: "t", heatmap: [], derived: [], lineGap: 0, sort: [], clinical: [{ attr: "V", values: vals }] });
+  const t = c.tracks.find((x) => x.label === "V")!;
+  assert.equal(t.numeric, true);
+  const at = (i: number) => t.values![c.columns.indexOf(pids[i])];
+  assert.deepEqual(raw.map((_, i) => at(i)), [null, null, 1000, null, 0.5, null], "12abc, 0x10, 1e3, >90, .5, 1,5");
+});

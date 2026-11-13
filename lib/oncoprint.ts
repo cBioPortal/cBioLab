@@ -199,16 +199,19 @@ export function clinicalSql(attrs: string[], study: string = STUDY, db: string =
   // portal's patient value of its samples in the cohort (fillClinicalTrackDatum; ONC-TT-12,
   // ONC-STM-5), by the attribute's declared datatype: a NUMBER, the mean of the values that are
   // numbers (MUTATION_COUNT their max), no value when none is; anything else, the value when the
-  // samples agree, otherwise "Mixed".
+  // samples agree, otherwise "Mixed". A NUMBER's value is a number only when the whole text is one:
+  // the portal's parseFloat reads Gleason "4+3" as 4, and a case with no MUTATION_COUNT as 0, and
+  // both are left as no value here (docs/PORTAL-PARITY.md, ONC-TT-12).
   const smp = "type = 'sample'", num = finiteSql("attribute_value");
   const declaredNumbers = "SELECT cam.attr_id FROM " + clinicalMetaTable(db) + " cam\n" +
     "         JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
     "         WHERE cs.cancer_study_identifier = " + sq(study) + " AND upper(cam.datatype) = 'NUMBER'";
   return "SELECT pid, k, v FROM (\n" +
     "  SELECT replaceOne(patient_unique_id, " + sq(puidPrefix) + ", '') AS pid,\n" +
-    "       attribute_name AS k,\n" +
-    "       multiIf(countIf(type = 'patient') > 0, anyIf(attribute_value, type = 'patient'),\n" +
-    "         attribute_name IN (" + declaredNumbers + "),\n" +
+    "       attribute_name AS k, attribute_name IN (" + declaredNumbers + ") AS declared_number,\n" +
+    "       multiIf(countIf(type = 'patient') > 0,\n" +
+    "           if(declared_number, toString(anyIf(" + num + ", type = 'patient')), anyIf(attribute_value, type = 'patient')),\n" +
+    "         declared_number,\n" +
     "           if(countIf(" + smp + " AND " + num + " IS NOT NULL) = 0, NULL,\n" +
     "             toString(if(attribute_name = 'MUTATION_COUNT', maxIf(" + num + ", " + smp + "), avgIf(" + num + ", " + smp + ")))),\n" +
     "         uniqExactIf(attribute_value, " + smp + ") > 1, 'Mixed', anyIf(attribute_value, " + smp + ")) AS v\n" +

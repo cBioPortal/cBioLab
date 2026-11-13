@@ -140,12 +140,19 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Staircase sort per key, CNA then mutation, drivers before VUS, not profiled last, natural id order; over the portal's own cells our order is its order (Q1 594/594, Q3 10,336/10,336); over our cells Q1 449 of 594 positions agree, the rest from annotation differences (ONC-ST-1, ONC-ST-2) (#193)
   - [x] Sort menu: the Mutation Type, Driver and Ignore VUS toggles (ONC-SO-1, ONC-ST-3) (#195)
     - [ ] "Case list order" (ONC-SO-3): the portal offers it only for a query naming sample ids, which no Results query here can yet
+    - [ ] A tie on every sort key: the portal orders the tied columns by natural id in the direction of its first clinical track (SortUtils alphabeticalDefault, PrecomputedComparator); ours, ascending
+    - [ ] A text clinical track sorts by the natural order of its values ("x2" before "x10", SortUtils stringClinicalComparator); ours, by category order
   - [x] Tracks › Clinical: display names, Freq %, Select / Deselect all, applied by Update tracks, no cap of 8 (ONC-TR-1, ONC-STM-4) (#196)
     - [ ] A patient-level attribute's Freq in samples, as the portal counts it (ours its patients; msk_impact_2017 OS_MONTHS 73.3 % vs 74.4 %): needs a samples count in Explore's facet query
     - [ ] Mutation spectrum, Profiled-in and Study of origin listed first as rows of the tab
   - [ ] Clinical tracks (ONC-TT-1, ONC-TT-2, ONC-TT-12, ONC-TP-3, ONC-STM-5)
     - [x] Every value its own colour, the portal's list and reserved colours (ONC-TT-1) (#197)
-    - [x] A patient's value as the portal's (mean, MUTATION_COUNT max, "Mixed"); exact tooltip values (ONC-TT-12, ONC-TP-3, ONC-STM-5) (#198)
+    - [x] A patient's value as the portal's, by the attribute's declared datatype (a NUMBER's mean, MUTATION_COUNT max; otherwise the shared value or "Mixed"); exact tooltip values; a numeric sort by exact value, no value last (ONC-TT-12, ONC-TP-3, ONC-STM-5) (#198)
+      - Not as the portal, on purpose:
+        - a NUMBER's value is a number only when its whole text is one. The portal's parseFloat reads Gleason "4+3" as 4, "9-10" as 9 and "1801082_2" as 1801082 (85 values in the warehouse). Reading a prefix is a silent approximation (invariant 1).
+        - a case with no MUTATION_COUNT shows no value; the portal shows 0 (fillNoDataValue). That is 74,489 patients in 337 studies, many perhaps never sequenced, and not profiled is never wild-type (invariant 7).
+        - a BOOLEAN attribute (5 in the warehouse) is shown as its value, or "Mixed"; the portal's fillClinicalTrackDatum has no branch for it and draws nothing.
+      - Known: values travel as float32, so two values equal to 7 significant digits tie where the portal's doubles would order them (two `todo` tests).
     - [ ] ONC-TT-2's numeric typing by the attribute's datatype (ours: ≥90 % parse and >10 distinct values); "(average of n values)" zoomed out (ONC-STM-8)
   - [ ] The mutation spectrum track (ONC-TT-3, ONC-STM-6)
   - [x] Heatmaps: expression blue→black→red, methylation fixed to [0, 1] (white at 0.35), VAF yellow→teal, a patient's value max |x| (ONC-TT-5…7, ONC-TT-12, ONC-STM-7) (#200)

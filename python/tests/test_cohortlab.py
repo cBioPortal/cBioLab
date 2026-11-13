@@ -6,6 +6,7 @@ The conformance test shells out to node (scripts/oncoprint-cli.ts) and requires 
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -216,6 +217,20 @@ class Conformance(unittest.TestCase):
                     self.assertEqual(json.dumps(py, sort_keys=True), json.dumps(ts, sort_keys=True))
 
 
+class FiniteNumber(unittest.TestCase):
+    def test_same_rule_as_typescript(self):
+        """the cases of test/sql-number.test.ts WHOLE_NUMBER_CASES, read by the Python assembler's rule"""
+        from cohortlab.assemble import _finite_number
+        with open(os.path.join(ROOT, "test", "sql-number.test.ts"), encoding="utf-8") as f:
+            src = f.read()
+        block = src[src.index("WHOLE_NUMBER_CASES"):src.index("];", src.index("WHOLE_NUMBER_CASES"))]
+        cases = json.loads("[" + block[block.index("[\n") + 2:].replace("\n", "").rstrip().rstrip(",") + "]")
+        self.assertGreater(len(cases), 15)
+        for s, want in cases:
+            x = _finite_number(s)
+            self.assertEqual(None if math.isnan(x) else x, want, s)
+
+
 class ExactValuesConformance(unittest.TestCase):
     """A numeric track's exact values: the same contract, sort, .opb1 bytes and TSV in both languages."""
 
@@ -272,6 +287,34 @@ class ExactValuesConformance(unittest.TestCase):
                     lines = [r.split("\t") for r in ts_tsv.splitlines()]
                     at = dict(zip(lines[0][2:], next(r for r in lines if r[0] == "TMB")[2:]))
                     self.assertEqual((at["P01"], at["P06"], at["P09"]), ("500.4", "0.1", ""), "float32 printed at the digits it holds")
+
+
+class SortTieConformance(unittest.TestCase):
+    """A tie on a numeric sort key, the same in both languages: the next key decides, then the order on a tie."""
+
+    # P10, P12, P13, P14 tie on TMB (100, written four ways); none of them has an event, so the
+    # genomic rows cannot split them. ARM: P12 and P13 tie on "a", P10 is "c", P14 has none.
+    TMB = {**{f"P{i:02d}": str(i * 10) for i in range(1, 12)}, "P12": "100.0", "P13": "1e2", "P14": "100"}
+    ARM = {"P01": "a", "P10": "c", "P12": "a", "P13": "a"}
+    TIES = ("P10", "P12", "P13", "P14")
+
+    def build(self, d: str, sort: str) -> tuple[dict, Oncoprint]:
+        clinical = os.path.join(d, "clinical.tsv")
+        with open(clinical, "w", encoding="utf-8") as f:
+            f.write("patient\tTMB\tARM\n" + "".join(f"{p}\t{v}\t{self.ARM.get(p, '')}\n" for p, v in self.TMB.items()))
+        out = os.path.join(d, "ts.json")
+        subprocess.run(["node", os.path.join(ROOT, "scripts", "oncoprint-cli.ts"), "--events", os.path.join(FIX, "events.tsv"),
+                        "--clinical", clinical, "--out", out, "--quiet", "--sort=" + sort], check=True, cwd=ROOT)
+        with open(out, encoding="utf-8") as f:
+            return json.load(f), Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), clinical, sort=sort)
+
+    def test_tie_order_matches_typescript(self):
+        self.assertTrue(shutil.which("node"), "node is required to check conformance against the TypeScript implementation")
+        with tempfile.TemporaryDirectory() as d:
+            for sort in ("TMB,ARM", "-TMB,ARM", "TMB,-ARM"):
+                with self.subTest(sort=sort):
+                    ts, py = self.build(d, sort)
+                    self.assertEqual(py.to_json()["columns"], ts["columns"])
 
 
 class LevelOfDetailConformance(unittest.TestCase):
