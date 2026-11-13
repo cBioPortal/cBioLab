@@ -889,6 +889,8 @@ export type ClinicalFacet =
       bins?: NumericBin[];
       /** values that are not numbers (the portal's "NA" bar) */
       naCount?: number;
+      /** set when the bars are counted against the draft minus this attribute's own clauses */
+      disjunctive?: true;
     });
 
 /**

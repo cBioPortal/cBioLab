@@ -43,6 +43,22 @@ class Superseded extends Error {}
 type FacetKey = { per: string; attribute: string };
 const facetKey = (c: FacetKey) => c.per + "|" + c.attribute;
 
+/** what choosing the default charts reads of one attribute (lib/study-view-config.ts defaultChartKeys) */
+export type VocabEntry = { key: string; attribute: string; displayName?: string; priority: number; studyCount: number;
+  /** its distinct values, NA one of them when some case has none (shouldShowChart); Infinity under a filter */
+  values: number; };
+
+/** each attribute of an answer as a VocabEntry; an answer drawn under a filter shows every chart, as the portal does */
+function vocabOf(j: ExploreResult, filtered: boolean): VocabEntry[] {
+  const totals = j.totals || { patients: 0, samples: 0 };
+  return (j.clinical || []).map((c) => {
+    const all = c.per === "sample" ? totals.samples : totals.patients;
+    const distinct = c.distinct ?? (c.kind === "cat" ? c.values.length : 2);
+    return { key: facetKey(c), attribute: c.attribute, displayName: c.displayName, priority: c.priority ?? 0, studyCount: c.studyCount ?? 1,
+      values: filtered ? Infinity : distinct + (c.patients < all ? 1 : 0) };
+  });
+}
+
 export function useExplore(onError: (message: string) => void) {
   const [ask, setAsk] = useState<ExploreAsk | null>(null);
   const req = ask && ask.req.studies.length ? ask.req : null;
@@ -83,16 +99,16 @@ export function useExplore(onError: (message: string) => void) {
    */
   const order = useRef<string[] | null>(null);
   /** the same pinned answer's attributes in that order, with what choosing the default charts reads */
-  const vocab = useRef<{ key: string; priority: number; studyCount: number }[]>([]);
+  const vocab = useRef<{ attrs: VocabEntry[]; samples: number }>({ attrs: [], samples: 0 });
   /** facets from the last UNNARROWED answer — the coverage bar is always computed from these */
   const fullAttrs = useRef<{ attribute: string; studyCount: number }[]>([]);
   const arranged = useMemo(() => {
     if (!q.data || !req) return null;
     const j = { ...q.data };
     const noSelection = !req.draft || !Array.isArray(req.draft.all) || !req.draft.all.length;
-    if (noSelection) {
-      order.current = (j.clinical || []).map(facetKey);
-      vocab.current = (j.clinical || []).map((c) => ({ key: facetKey(c), priority: c.priority ?? 0, studyCount: c.studyCount ?? 1 }));
+    if (noSelection || !vocab.current.attrs.length) {
+      if (noSelection) order.current = (j.clinical || []).map(facetKey);
+      vocab.current = { attrs: vocabOf(j, !noSelection), samples: noSelection ? j.totals?.samples ?? 0 : 0 };
     }
     else if (order.current && j.clinical) {
       const pinned = order.current;
@@ -105,6 +121,7 @@ export function useExplore(onError: (message: string) => void) {
   }, [q.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lastGood = useRef<ExploreResult | null>(null);
+  if (!req) vocab.current = { attrs: [], samples: 0 };
   if (!req) lastGood.current = null;
   else if (arranged) lastGood.current = arranged;
 

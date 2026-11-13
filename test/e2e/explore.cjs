@@ -62,12 +62,13 @@ async function explore({ ok, BASE, page }) {
 
   // The grid draws the checked attributes of "+ Add chart" > Clinical, and until the
   // reader changes them those are cBioPortal's default: the first 20 with a priority
-  // above 0 — this selection carries 66, and drawing every one is what froze the page
-  // across many studies. The rest are said to be there, never silently missing.
+  // above 0, less any with a single value (lib/study-view-config.ts) — this selection
+  // carries 66, and drawing every one is what froze the page across many studies. The
+  // rest are said to be there, never silently missing.
   const attrTileCount = await page.locator("[data-attr]").count();
   const charted = (await page.locator("[data-charted]").getAttribute("data-charted").catch(() => null)) || "";
-  ok("Explore charts the portal's default 20 attributes and says how many it leaves out",
-    attrTileCount === 20 && charted === "20/" + charted.split("/")[1] && Number(charted.split("/")[1]) > 20,
+  ok("Explore charts the portal's default attributes (at most 20) and says how many it leaves out",
+    attrTileCount > 0 && attrTileCount <= 20 && charted === attrTileCount + "/" + charted.split("/")[1] && Number(charted.split("/")[1]) > 20,
     attrTileCount + " attribute tiles, charted " + (charted || "(no note)"));
 
   ok("derived facets appear and filter", derivedFacetsHidden || (der.facets >= 2 && der.filtered),

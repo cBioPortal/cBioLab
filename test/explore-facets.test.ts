@@ -219,8 +219,9 @@ describe("one study", () => {
     assert.equal(r.draftCount, null);
     assert.deepEqual(r.totals, { patients: 100, samples: 120 });
     assert.deepEqual(r.studyBreakdown, [{ study: S, n: 100, instance: "a", instanceLabel: "primary" }]);
-    assert.deepEqual(r.clinical.map((c) => [c.attribute, c.kind]), [["AGE", "num"], ["SEX", "cat"], ["CODE", "cat"], ["TMB", "num"]]);
-    const age = r.clinical[0];
+    // SEX's database priority 1 is the default, so the portal's table gives it 9 (above AGE's 5)
+    assert.deepEqual(r.clinical.map((c) => [c.attribute, c.kind, c.priority]), [["SEX", "cat", 9], ["AGE", "num", 5], ["CODE", "cat", undefined], ["TMB", "num", undefined]]);
+    const age = r.clinical[1];
     assert.ok(age.kind === "num");
     assert.deepEqual([age.displayName, age.description, age.priority, age.min, age.max, age.median], ["Age", "at diagnosis", 5, 20, 80, 55]);
     assert.equal(age.bins!.reduce((n, b) => n + b.count, 0), 90);
@@ -228,7 +229,7 @@ describe("one study", () => {
     const tmb = r.clinical[3];
     assert.ok(tmb.kind === "num");
     assert.equal(tmb.naCount, 20, "a sample attribute's NA is counted against samples: 120 − 100");
-    const sex = r.clinical[1];
+    const sex = r.clinical[0];
     assert.ok(sex.kind === "cat");
     assert.deepEqual(sex.values, [{ v: "Female", n: 60 }, { v: "Male", n: 40 }]);
     assert.equal(sex.disjunctive, undefined);
@@ -329,6 +330,30 @@ describe("one study", () => {
       assert.equal(disj("TMB").length, 0, "sniffed numeric, no metadata row");
       assert.equal((r.clinical.find((c) => c.attribute === "SEX") as { disjunctive?: boolean }).disjunctive, true);
       assert.equal(r.clinical.find((c) => c.attribute === "AGE")!.kind, "num");
+    });
+
+    test("a drafted numeric attribute is binned without its own clauses, its NA against that cohort, so its other bars stay", async () => {
+      on(/^SELECT uniqExact\(patient_unique_id\) AS pts/, [{ pts: 95, smp: 110 }]);
+      facetAnswers();
+      on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }, { pid: "P2", sid: "S2" }]);
+      answers = answers.filter(([re]) => !/attribute_value AS v/.test(re.source));
+      on(/attribute_value AS v, uniqExact/, (q) => q.includes("_cohort_st1")
+        ? [{ type: "sample", a: "TMB", v: "5", n: 2 }]
+        : [{ type: "patient", a: "AGE", v: "30", n: 40 }, { type: "patient", a: "AGE", v: "60", n: 50 }]);
+      const age = (lo: number, hi: number) => ({ kind: "clinical" as const, attribute: "AGE", range: { gt: lo, lte: hi } });
+      const draft = { all: [{ kind: "clinical" as const, attribute: "SEX", values: ["Female"] }, { any: [age(50, 60), age(70, 75)] }] };
+      const r = await buildExplore({ study: S, draft, skipGenes: true });
+      const a = r.clinical.find((c) => c.attribute === "AGE")!;
+      assert.ok(a.kind === "num");
+      assert.equal(a.disjunctive, true);
+      assert.equal(a.bins!.reduce((n, b) => n + b.count, 0), 90, "every AGE value of the rest of the draft, not only the chosen ranges");
+      assert.equal(a.naCount, 5, "95 patients in the rest of the draft, 90 with an age");
+      assert.deepEqual([a.min, a.median, a.max], [30, 60, 60], "its range and median read from the same values (position 45 of 90)");
+      const own = sent.find((q) => /attribute_value AS v, uniqExact/.test(q) && /'AGE'/.test(q))!;
+      assert.doesNotMatch(own, /_cohort_st1/, "the draft's own table holds the AGE ranges, so it is not read");
+      assert.match(own, /'Female'/, "the rest of the draft still applies");
+      const tmb = r.clinical.find((c) => c.attribute === "TMB")!;
+      assert.ok(tmb.kind === "num" && tmb.disjunctive === undefined, "an attribute the draft does not filter on is drawn under it");
     });
 
     test("past the bound, the definition is read inline and its size counted once", async () => {
