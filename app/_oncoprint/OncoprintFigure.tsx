@@ -97,6 +97,8 @@ export interface OncoprintFigureProps {
   /** move a track within its kind, or drop it; absent means the page cannot edit tracks */
   onMoveTrack?: (label: string, dir: -1 | 1) => void;
   onRemoveTrack?: (label: string) => void;
+  /** whether "Remove track" does anything for this row; offered only where it does */
+  canRemoveTrack?: (label: string) => boolean;
   /** draw a merged gene row's members as rows of their own */
   onExpandTrack?: (label: string) => void;
   /** the Tracks menu's contents — the page owns what can be added */
@@ -866,7 +868,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                   {t.members && t.members.length > 1 && <><br />{t.members.join(" · ")}</>}</span>
                 {props.onMoveTrack && item("Move up", false, () => props.onMoveTrack!(t.label, -1))}
                 {props.onMoveTrack && item("Move down", false, () => props.onMoveTrack!(t.label, 1))}
-                {props.onRemoveTrack && item("Remove track", false, () => props.onRemoveTrack!(t.label))}
+                {props.onRemoveTrack && (!props.canRemoveTrack || props.canRemoveTrack(t.label)) && item("Remove track", false, () => props.onRemoveTrack!(t.label))}
                 {props.onExpandTrack && t.members && t.members.length > 1 &&
                   item("Expand into " + t.members.length + " rows", false, () => props.onExpandTrack!(t.label))}
                 {item("Sort a-Z", isKey(""), () => setPrimary(key("")), sortable)}

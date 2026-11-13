@@ -6,7 +6,7 @@
 // goes through the document store (doc-store.ts), so a view keeps its id and its card.
 import { kindUi } from "./kinds/index.ts";
 import { defaultView } from "./kind-cards";
-import { pruneSort } from "../_oncoprint/OncoprintCard.tsx";
+import { pruneSort } from "../_oncoprint/track-edits.ts";
 import { geneSymbols, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import { pruneCodons } from "../../lib/lollipop.ts";
 import type { AnalysisDoc, AnalysisResult, CohortDef } from "../../lib/types.ts";

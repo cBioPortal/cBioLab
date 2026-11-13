@@ -3,6 +3,7 @@
 // options and sort live in the view (invariant 9: they change what a shared link shows), written
 // down only where they differ from the defaults, and changing them never re-runs the view.
 import { DEFAULT_FIGURE_DISPLAY, type FigureDisplay } from "./OncoprintFigure.tsx";
+import { sortKeyText } from "./track-edits.ts";
 
 /** the display keys the figure owns — written back without a re-run */
 export const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colorByGermline", "colors", "whiteBackground"]);
@@ -21,9 +22,7 @@ export function withFigureDisplay<V extends { display?: unknown }>(v: V, d: Figu
   return next;
 }
 
-/** a sort key as the figure spells it: "label" / "-label" / "genomic" */
-export const sortKeyText = (k: unknown): string =>
-  k == null ? "genomic" : typeof k === "string" ? k : ((k as { dir?: string }).dir === "desc" ? "-" : "") + String((k as { track?: string }).track || "genomic");
+export { sortKeyText };
 
 export const sortKeysOf = (v: { sort?: unknown[] }): string[] => (v.sort || []).map(sortKeyText);
 
