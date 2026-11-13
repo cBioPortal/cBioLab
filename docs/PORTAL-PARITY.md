@@ -31,8 +31,8 @@ service and opens that comparison (`lib/legacy-comparison.ts`; a new comparison 
 
 Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard's bug section.
 
-- [ ] OncoPrint: a clustered sort (`cluster:` key) is silently dropped on any track edit (`pruneSort`, `app/_oncoprint/OncoprintCard.tsx`) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
-- [ ] OncoPrint: "Remove track" is offered on a single gene and does nothing (`app/_oncoprint/OncoprintCard.tsx:81`) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
+- [x] OncoPrint: a clustered sort (`cluster:` key) is silently dropped on any track edit (`pruneSort`, `app/_oncoprint/OncoprintCard.tsx`) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md)) (#187)
+- [x] OncoPrint: "Remove track" is offered on a single gene and does nothing (`app/_oncoprint/OncoprintCard.tsx:81`) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md)) (#187)
 - [x] Cancer Types Summary says "samples" where the unit is patients: the results text (`lib/views/cancertypes/kind.ts:13-14`) and the card subtitle "% of profiled samples" (`app/lab/kinds/cancertypes.tsx:95`), though the default unit is patients (`run.ts:27`); the caption is right ([02-cancer-types-summary](legacy-spec/parity/02-cancer-types-summary.md)) (#183)
 - [x] Cancer Types Summary: `types.ts:6-10` and the DSL summary (`doc.ts:9`) describe "% of samples" for a view that counts patients by default ([02-cancer-types-summary](legacy-spec/parity/02-cancer-types-summary.md)) (#183)
 - [x] Cancer Types Summary: Absolute Counts is not "highest first" as the figure says (`figure.ts:22`): bars are always sorted by altered ÷ profiled (`lib/views/cancertypes/run.ts:47`) ([02-cancer-types-summary](legacy-spec/parity/02-cancer-types-summary.md)) (#183)
