@@ -8,8 +8,9 @@
 // `order` is an indirection over contract columns (k-space -> column index) so
 // hiding unaltered columns or re-sorting on the client never touches the data.
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
+import { STUDY_TRACK } from "../../lib/profile-names.ts";
 
-import { STYLE, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
+import { STYLE, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, STAIRCASE_RADIX, naturalVector, compareVectors } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -280,26 +281,30 @@ export function decodeGene(code: number): string {
   const muts = STYLE.glyph.mutation.priority.filter((m) => code & B[m.bit]).map((m) => m.label.toLowerCase());
   if (muts.length) parts.push(muts.join(", ") + sig(BITS.MUT_DRIVER));
   if (code & BITS.SV) parts.push(STYLE.glyph.sv.label.toLowerCase() + sig(BITS.SV_DRIVER));
-  for (const o of STYLE.glyph.cna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase() + (code & BITS.DRIVER && !(code & (BITS.MUT_DRIVER | BITS.SV_DRIVER)) ? " (putative driver)" : ""));
+  for (const o of STYLE.glyph.cna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase() + (code & BITS.CNA_DRIVER ? " (putative driver)" : ""));
   for (const o of STYLE.glyph.mrna.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
   for (const o of STYLE.glyph.protein.options) if (code & B[o.bit]) parts.push(o.label.toLowerCase());
   return parts.join(" · ");
 }
 
-/** Rank byte per (gene, column): 0 = unaltered; higher draws earlier. Same ranking as the engine. */
-function staircaseRanks(data: UnpackedContract): Uint8Array[] {
+/** Rank per (gene, column), smaller first: the engine's staircaseRank, a cell not profiled after an unaltered one. */
+function staircaseRanks(data: UnpackedContract): Uint16Array[] {
   return data.tracks.filter((t) => t.kind === "gene").map((t) => {
-    const r = new Uint8Array(data.n);
-    const c = t.cells;
-    for (let i = 0; i < data.n; i++) {
-      const v = c[i];
-      if (v <= 0) { r[i] = 0; continue; }
-      const type = v & BITS.AMP ? 8 : v & BITS.HOMDEL ? 7 : v & BITS.SV ? 6 : v & BITS.TRUNCATING ? 5 :
-        v & BITS.INFRAME ? 4 : v & BITS.SPLICE ? 3 : v & BITS.MISSENSE ? 2 : 1;
-      r[i] = type * 2 + (v & BITS.DRIVER ? 1 : 0);
-    }
+    const r = new Uint16Array(data.n);
+    for (let i = 0; i < data.n; i++) r[i] = t.cells[i] === -1 ? STAIRCASE_RADIX : staircaseRank(t.cells[i]);
     return r;
   });
+}
+
+/** each column's case id as the engine orders it: natural order of the id without its study prefix, then the full id */
+function idOrder(data: UnpackedContract): (a: number, b: number) => number {
+  const ids = data.columns();
+  const study = data.tracks.find((t) => t.label === STUDY_TRACK);
+  const vec = Array.from(ids, (id, i) => {
+    const st = study && study.cells[i] >= 0 ? study.categories?.[study.cells[i]] : undefined;
+    return naturalVector(st && id.startsWith(st + "_") ? id.slice(st.length + 1) : id);
+  });
+  return (a, b) => compareVectors(vec[a], vec[b]) || (ids[a] < ids[b] ? -1 : ids[a] > ids[b] ? 1 : 0);
 }
 
 export interface SortKey { track: string; dir: "asc" | "desc" }
@@ -311,9 +316,8 @@ export interface SortKey { track: string; dir: "asc" | "desc" }
  */
 export function sortColumns(data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], keys: SortKey[]): Uint32Array {
   const ranks = staircaseRanks(data);
-  const ids = data.columns();
-  const genomic = (a: number, b: number): number => { for (const r of ranks) { const d = r[b] - r[a]; if (d) return d; } return 0; };
-  const byId = (a: number, b: number): number => (ids[a] < ids[b] ? -1 : ids[a] > ids[b] ? 1 : 0);
+  const genomic = (a: number, b: number): number => { for (const r of ranks) { const d = r[a] - r[b]; if (d) return d; } return 0; };
+  const byId = idOrder(data);
   const cmps = keys.map((k): ((a: number, b: number) => number) => {
     const sign = k.dir === "desc" ? -1 : 1;
     if (k.track === "genomic") return (a, b) => sign * genomic(a, b);

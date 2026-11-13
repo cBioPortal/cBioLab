@@ -37,6 +37,19 @@ class LabelPctTest(unittest.TestCase):
         self.assertEqual(format_gutter_pct({"driverAltered": 0, "altered": 0, "profiled": 7773}, 10336), "0% / 0%*")
         self.assertEqual(format_gutter_pct({"freqPct": None, "profiled": 0, "altered": 0}), "N/P")
 
+
+class StaircaseTest(unittest.TestCase):
+    """The portal's staircase key and case-id order, as lib/oncoprint-style.ts and lib/oncoprint-assemble.ts have them."""
+
+    def test_rank_and_ids(self) -> None:
+        from cohortlab.style import natural_vector, staircase_rank
+        drv_mis = BITS["MISSENSE"] | BITS["MUT_DRIVER"] | BITS["DRIVER"]
+        self.assertLess(staircase_rank(drv_mis), staircase_rank(BITS["TRUNCATING"]))
+        self.assertLess(staircase_rank(BITS["AMP"] | drv_mis), staircase_rank(BITS["AMP"]))
+        self.assertLess(staircase_rank(BITS["SV"]), staircase_rank(BITS["AMP"] | BITS["CNA_DRIVER"]))
+        self.assertEqual(staircase_rank(BITS["TRUNCATING"], {"ignoreVus": True}), staircase_rank(0, {"ignoreVus": True}))
+        self.assertEqual(sorted(["TCGA-AA-3864", "TCGA-AA-A00N", "P10", "P2"], key=natural_vector), ["P2", "P10", "TCGA-AA-A00N", "TCGA-AA-3864"])
+
 class LocalTables(unittest.TestCase):
     def setUp(self):
         self.op = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"),
@@ -48,7 +61,7 @@ class LocalTables(unittest.TestCase):
         tp53, kras, egfr = c.track("TP53"), c.track("KRAS"), c.track("EGFR")
         self.assertEqual(int(tp53.cells[col("P01")]), BITS["MISSENSE"] | BITS["DRIVER"] | BITS["MUT_DRIVER"])
         self.assertEqual(int(tp53.cells[col("P02")]), BITS["TRUNCATING"] | BITS["DRIVER"] | BITS["MUT_DRIVER"])
-        self.assertEqual(int(kras.cells[col("P03")]), BITS["AMP"] | BITS["DRIVER"])
+        self.assertEqual(int(kras.cells[col("P03")]), BITS["AMP"] | BITS["DRIVER"] | BITS["CNA_DRIVER"])
         self.assertEqual(int(kras.cells[col("P08")]), 0, "GAIN is below the high-level threshold")
         self.assertEqual(int(egfr.cells[col("P05")]), NOT_PROFILED, "P05's panel does not cover EGFR")
         self.assertEqual(int(egfr.cells[col("P04")]), BITS["MISSENSE"] | BITS["SV"] | BITS["DRIVER"] | BITS["MUT_DRIVER"], "the fusion is a VUS beside a driver missense")

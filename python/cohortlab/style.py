@@ -146,6 +146,54 @@ def format_gutter_pct(t: dict[str, Any], columns: int | None = None) -> str:
     return (format_label_pct(driver) + " / " if driver is not None else "") + format_label_pct(any_) + star
 
 
+STAIRCASE_RADIX = 3 * 5 * 13 * 3 * 3 * 3
+
+
+def staircase_rank(c: int, o: dict[str, Any] | None = None, S: dict[str, Any] = STYLE) -> int:
+    """A gene row's cell, ranked as the portal's staircase ranks it, smaller first (lib/oncoprint-style.ts staircaseRank)."""
+    o = o or {}
+    B = S["bits"]
+    by_type, by_driver, ignore_vus = o.get("byType", True), o.get("byDriver", True), bool(o.get("ignoreVus"))
+    v = c if c > 0 else 0
+    sv = 2 if not v & B["SV"] else 0 if v & B["SV_DRIVER"] else 2 if ignore_vus else 1 if by_driver else 0
+    level = 0 if v & B["AMP"] else 1 if v & B["HOMDEL"] else -1
+    cna_drv = bool(v & B["CNA_DRIVER"])
+    cna = 4 if level < 0 else level if cna_drv else 4 if ignore_vus else 2 + level if by_driver else level
+    cls = next((i for i, m in enumerate(S["glyph"]["mutation"]["priority"]) if v & B[m["bit"]]), -1)
+    mut_drv = bool(v & B["MUT_DRIVER"])
+    counted = cls >= 0 and (mut_drv or not ignore_vus)
+    if not counted:
+        mut = 12
+    elif ignore_vus:
+        mut = cls if by_type else 0
+    elif by_type:
+        mut = 6 + cls if by_driver and not mut_drv else cls
+    else:
+        mut = 1 if by_driver and not mut_drv else 0
+    germ = (0 if v & B["GERMLINE"] else 1) if counted else 2
+    mrna = 0 if v & B["MRNA_HIGH"] else 1 if v & B["MRNA_LOW"] else 2
+    prot = 0 if v & B["PROT_HIGH"] else 1 if v & B["PROT_LOW"] else 2
+    return ((((sv * 5 + cna) * 13 + mut) * 3 + germ) * 3 + mrna) * 3 + prot
+
+
+def natural_vector(case_id: str) -> list[int]:
+    """A case id as oncoprintjs orders it: each run of digits one number, every other character its code."""
+    out: list[int] = []
+    num = -1
+    for ch in case_id:
+        c = ord(ch)
+        if 48 <= c <= 57:
+            num = c - 48 if num < 0 else num * 10 + c - 48
+            continue
+        if num >= 0:
+            out.append(num)
+            num = -1
+        out.append(c)
+    if num >= 0:
+        out.append(num)
+    return out
+
+
 def truncate_label(label: str, S: dict[str, Any] = STYLE) -> str:
     n = S["geometry"]["labelMaxChars"]
     return label[: n - 1] + "…" if len(label) > n else label
