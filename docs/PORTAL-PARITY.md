@@ -145,7 +145,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] Mutation spectrum, Profiled-in and Study of origin listed first as rows of the tab
   - [ ] Clinical tracks (ONC-TT-1, ONC-TT-2, ONC-TT-12, ONC-TP-3, ONC-STM-5)
     - [x] Every value its own colour, the portal's list and reserved colours (ONC-TT-1) (#197)
-    - [ ] A patient's value as the portal's (mean, MUTATION_COUNT max, "Mixed"; ours the patient row, else one sample's); exact tooltip values (ours "≈x" from a 256-step code) (ONC-TT-2, ONC-TT-12, ONC-TP-3, ONC-STM-5)
+    - [x] A patient's value as the portal's (mean, MUTATION_COUNT max, "Mixed"); exact tooltip values (ONC-TT-12, ONC-TP-3, ONC-STM-5) (#198)
+    - [ ] ONC-TT-2's numeric typing by the attribute's datatype (ours: ≥90 % parse and >10 distinct values); "(average of n values)" zoomed out (ONC-STM-8)
   - [ ] The mutation spectrum track (ONC-TT-3, ONC-STM-6)
   - [x] Heatmaps: expression blue→black→red, methylation fixed to [0, 1] (white at 0.35), VAF yellow→teal, a patient's value max |x| (ONC-TT-5…7, ONC-TT-12, ONC-STM-7) (#200)
     - [ ] Generic-assay pivot and sort order (ONC-TT-8); VAF's "Not mutated/no VAF data" state; the #e0e0e0 null colour
