@@ -412,9 +412,9 @@ export function assembleContract(input: AssembleInput): Contract {
 
   phase("clinical");
   // ---- heatmap tracks (continuous molecular-profile values per gene) ----
-  // Portal-style: z-score profiles get a fixed diverging ramp (±3, center 0)
-  // so colors are comparable across oncoprints; other profiles that span zero
-  // get a symmetric diverging ramp; positive-only data gets a sequential ramp.
+  // The portal's ramps, fixed so colours compare across oncoprints: a molecular profile on
+  // -3..3, blue-black-red; methylation 0..1, white at 0.35; VAF 0..1, yellow to teal. A generic
+  // assay is scaled to its data: diverging when it spans zero, sequential otherwise.
   const heatTracks: Track[] = [];
   for (const h of heatmap) {
     const isZ = /zscore/i.test(h.profileType);
@@ -432,9 +432,13 @@ export function assembleContract(input: AssembleInput): Contract {
         heatTracks.push({ kind: "clinical", label: label + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
         continue;
       }
+      // the portal's fixed ranges and colours (ONC-TT-5..7): VAF 0..1; methylation 0..1, white at
+      // 0.35; every other molecular profile, z-scored or not, -3..3 around a black 0. A generic
+      // assay keeps its own range.
+      const ramp: Track["ramp"] = h.assay ? undefined : h.isVaf ? "vaf" : /methylation/i.test(h.profileType) ? "methylation" : "expression";
       let min: number, max: number, center: number | null;
-      if (h.isVaf) { min = 0; max = 1; center = null; }
-      else if (isZ || usingRef) { min = -3; max = 3; center = 0; }
+      if (ramp === "vaf" || ramp === "methylation") { min = 0; max = 1; center = null; }
+      else if (ramp === "expression" || isZ || usingRef) { min = -3; max = 3; center = 0; }
       else {
         const dMin = Math.min(...vals), dMax = Math.max(...vals);
         if (dMin < 0 && dMax > 0) { const m = Math.max(-dMin, dMax); min = -m; max = m; center = 0; }
@@ -446,12 +450,12 @@ export function assembleContract(input: AssembleInput): Contract {
         const v = h.values.get(p + "|" + gene);
         if (v !== undefined) cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span);
       });
-      heatTracks.push({ kind: "heatmap", numeric: true, label, gene, profileType: h.profileType,
+      heatTracks.push({ kind: "heatmap", numeric: true, ...(ramp ? { ramp } : {}), label, gene, profileType: h.profileType,
         note: usingRef
           ? "z-scored against " + ref!.n.toLocaleString() + " patients pooled from " + ref!.studies.length +
             " stud" + (ref!.studies.length === 1 ? "y" : "ies") + " (" + ref!.studies.join(", ") + ") — " +
             "the reference is federated even where the columns are not"
-          : h.isVaf ? "allele fraction, max across a patient's mutations in the gene" : "mean across a patient's samples",
+          : h.isVaf ? "allele fraction, max across a patient's mutations in the gene" : "a patient's: its samples' value furthest from 0",
         min: Math.round(min * 100) / 100, max: Math.round(max * 100) / 100,
         center: center == null ? null : Math.round(255 * (0 - min) / span), cells });
     }
@@ -595,7 +599,7 @@ export function assembleContract(input: AssembleInput): Contract {
       frequencyDenominator: unit === "sample" ? "profiled samples" : "profiled patients",
       column: unit === "sample"
         ? "one sample; a cohort selects patients, so every sample of a selected patient is drawn — including samples on which the cohort's own criterion was never measured. Patient-level clinical values repeat across that patient's samples."
-        : "one patient; a patient's samples are collapsed (clinical: patient rows win, else one sample's value; heatmap: mean across samples; VAF: max)",
+        : "one patient; a patient's samples are collapsed (clinical: patient rows win, else one sample's value; heatmap: the sample value furthest from 0; VAF: max)",
       annotation: input.annotationSource, lineGap,
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track),
       ...customDriverReport(events) },

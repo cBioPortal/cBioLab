@@ -1954,7 +1954,7 @@ One cohort unioned across two studies (members are study-qualified; overlap is N
 
 ### Example 15: Molecular heatmap tracks, sorted by expression
 
-ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene tracks, columns sorted by descending ERBB2 expression. Z-scores render on a fixed diverging ±3 ramp; the track label (gene + short profile name) is the sort key.
+ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene tracks, columns sorted by descending ERBB2 expression. Z-scores render on the portal's fixed ±3 ramp, blue through black to red; the track label (gene + short profile name) is the sort key.
 
 ```json
 {

@@ -65,6 +65,26 @@ def numeric_rgb(v: float, center: float | None, S: dict[str, Any] = STYLE) -> tu
     return (_lerp(d["mid"][0], d["high"][0], t), _lerp(d["mid"][1], d["high"][1], t), _lerp(d["mid"][2], d["high"][2], t))
 
 
+def ramp_rgb(ramp: dict[str, Any], v: float) -> tuple[int, int, int]:
+    """A value on one of the portal's heatmap ramps (port of rampColor)."""
+    stops, colors = ramp["stops"], ramp["colors"]
+    if v <= stops[0]:
+        return tuple(colors[0])  # type: ignore[return-value]
+    for i in range(1, len(stops)):
+        if v <= stops[i]:
+            t = (v - stops[i - 1]) / ((stops[i] - stops[i - 1]) or 1)
+            a, b = colors[i - 1], colors[i]
+            return (_lerp(a[0], b[0], t), _lerp(a[1], b[1], t), _lerp(a[2], b[2], t))
+    return tuple(colors[-1])  # type: ignore[return-value]
+
+
+def heat_rgb(meta: dict[str, Any], code: int, S: dict[str, Any] = STYLE) -> tuple[int, int, int]:
+    """A numeric cell's colour: its heatmap ramp when it has one (port of heatColor)."""
+    if meta.get("ramp"):
+        return ramp_rgb(S["ramps"][meta["ramp"]], numeric_value(meta, code))
+    return numeric_rgb(code, meta.get("center"), S)
+
+
 def numeric_color(v: float, center: float | None, S: dict[str, Any] = STYLE) -> str:
     r, g, b = numeric_rgb(v, center, S)
     return f"rgb({r},{g},{b})"

@@ -23,7 +23,7 @@ test("a generic-assay heatmap reads the study's own profile, one row per (column
   const sql = assayHeatmapSql("mutational_signatures_contribution_SBS", ["mutational_signature_contribution_SBS4"], "s", "db");
   assert.match(sql, /g\.profile_type = 'mutational_signatures_contribution_SBS' AND g\.profile_stable_id = 's_mutational_signatures_contribution_SBS'/);
   assert.match(sql, /g\.entity_stable_id IN \('mutational_signature_contribution_SBS4'\)/);
-  assert.match(sql, /replaceOne\(g\.patient_unique_id, 's_', ''\) AS pid,\n\s+g\.entity_stable_id AS gene, avg\(/, "patient columns average their samples");
+  assert.match(sql, /replaceOne\(g\.patient_unique_id, 's_', ''\) AS pid,\n\s+g\.entity_stable_id AS gene, argMax\(.*, abs\(/, "a patient column takes its samples' value furthest from 0, as the portal does");
   assert.match(sql, /isFinite\(ifNull\(toFloat64OrNull\(g\.value\), nan\)\)/);
   assert.match(assayHeatmapSql("p", ["e"], "s", "db", "sample"), /replaceOne\(g\.sample_unique_id, 's_', ''\) AS pid/);
   assert.match(assayHeatmapSql("p", ["e"], "s", "db", "sample", true), /JOIN db\.sample_derived sd ON sd\.patient_unique_id = g\.patient_unique_id/,

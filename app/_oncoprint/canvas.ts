@@ -10,7 +10,7 @@
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { STUDY_TRACK } from "../../lib/profile-names.ts";
 
-import { STYLE, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, STAIRCASE_RADIX, type StaircaseOptions, naturalVector, compareVectors } from "../../lib/oncoprint-style.ts";
+import { STYLE, heatColor, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, STAIRCASE_RADIX, type StaircaseOptions, naturalVector, compareVectors } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -135,7 +135,7 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
     ctx.fillStyle = negative ? S.glyph.bar.negative : S.glyph.bar.color; ctx.fillRect(x, y + h * band[0], w, h * (band[1] - band[0]));
     return;
   }
-  if (t.numeric) { ctx.fillStyle = styleNumericColor(code, t.center, S); ctx.fillRect(x, y, w, h); return; }
+  if (t.numeric) { ctx.fillStyle = heatColor(t, code, S); ctx.fillRect(x, y, w, h); return; }
   ctx.fillStyle = trackCategoryColor(t, code, S, colors); ctx.fillRect(x, y, w, h);
 }
 

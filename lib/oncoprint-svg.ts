@@ -2,7 +2,7 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { barBand, cellLayers, numericColor, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
+import { heatColor, barBand, cellLayers, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 
 const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -100,7 +100,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
         else if (t.kind === "derivedEvent") parts.push(rect(x, y, w, ROW_H, code > 0 ? P.derived : P.unaltered));
         else if (code === -1) noData(x, y, w);
         else if (t.bar) { const { band, negative } = barBand(t, code); parts.push(rect(x, y + ROW_H * band[0], w, ROW_H * (band[1] - band[0]), negative ? S.glyph.bar.negative : S.glyph.bar.color)); }
-        else if (t.numeric) parts.push(rect(x, y, w, ROW_H, numericColor(code, t.center, S)));
+        else if (t.numeric) parts.push(rect(x, y, w, ROW_H, heatColor(t, code, S)));
         else parts.push(rect(x, y, w, ROW_H, trackCategoryColor(t, code, S, colors)));
       }
     });
@@ -156,8 +156,8 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
       continue;
     }
     if (t.numeric) {
-      for (let i = 0; i < 24; i++) parts.push(rect(cx + i * 4, cy - 9, 4, 10, numericColor(255 * i / 23, t.center, S)));
-      parts.push(`<text x="${cx + 24 * 4 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}${t.center != null ? " (0 at white)" : ""}${t.kind === "heatmap" ? " · " + esc(t.profileType) + ", " + esc(t.note || "") : ""}</text>`);
+      for (let i = 0; i < 24; i++) parts.push(rect(cx + i * 4, cy - 9, 4, 10, heatColor(t, 255 * i / 23, S)));
+      parts.push(`<text x="${cx + 24 * 4 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}${t.ramp === "expression" ? " (0 at black)" : t.ramp === "methylation" ? " (white at 0.35)" : t.center != null ? " (0 at white)" : ""}${t.kind === "heatmap" ? " · " + esc(t.profileType) + ", " + esc(t.note || "") : ""}</text>`);
       continue;
     }
     t.categories!.slice(0, 8).forEach((c, i: number) => {

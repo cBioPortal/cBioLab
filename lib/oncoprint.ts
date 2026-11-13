@@ -257,9 +257,10 @@ export function vafSql(genes: string[], study: string = STUDY, db: string = DB, 
 // patient-level continuous values for heatmap tracks (columns are patients, so
 // multi-sample patients get the mean across their samples — stated in the label)
 export function heatmapSql(profileType: string, genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
-  // values are stored per sample; only patient mode has to average them
+  // values are stored per sample; only patient mode has to combine them
   return "SELECT " + (unit === "sample" ? "replaceOne(ga.sample_unique_id, " + sq(study + "_") + ", '')" : "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')") + " AS pid,\n" +
-    "       ga.hugo_gene_symbol AS gene, avg(" + finiteSql("ga.alteration_value") + ") AS v\n" +
+    // a patient's value is its samples' furthest from 0, sign kept, as the portal aggregates a heatmap (ONC-STM-7)
+    "       ga.hugo_gene_symbol AS gene, argMax(" + finiteSql("ga.alteration_value") + ", abs(" + finiteSql("ga.alteration_value") + ")) AS v\n" +
     "FROM " + db + ".genetic_alteration_derived ga\n" +
     (unit === "sample" ? "" : "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n") +
     "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
@@ -275,7 +276,8 @@ export function assayHeatmapSql(profileType: string, entities: string[], study: 
   const strip = (col: string) => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
   const sampleLevel = unit === "sample" && patientLevel;
   return "SELECT " + (unit === "sample" ? strip(sampleLevel ? "sd.sample_unique_id" : "g.sample_unique_id") : strip("g.patient_unique_id")) + " AS pid,\n" +
-    "       g.entity_stable_id AS gene, avg(" + finiteSql("g.value") + ") AS v\n" +
+    // as the portal does for every heatmap, generic assays included: the value furthest from 0
+    "       g.entity_stable_id AS gene, argMax(" + finiteSql("g.value") + ", abs(" + finiteSql("g.value") + ")) AS v\n" +
     "FROM " + db + ".generic_assay_data_derived g\n" +
     (sampleLevel ? "JOIN " + db + ".sample_derived sd ON sd.patient_unique_id = g.patient_unique_id\n" : "") +
     "WHERE g.profile_type = " + sq(profileType) + " AND g.profile_stable_id = " + sq(study + "_" + profileType) + "\n" +

@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STYLE, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines, STAIRCASE_RADIX, staircaseRank } from "../lib/oncoprint-style.ts";
+import { STYLE, heatColor, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines, STAIRCASE_RADIX, staircaseRank } from "../lib/oncoprint-style.ts";
 import { assembleContract, mutClassBit, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { STYLE_JSON } from "../scripts/gen-style.ts";
 import { bucketCodes, bucketEdges } from "../lib/oncoprint-lod.ts";
@@ -267,3 +267,12 @@ test("staircaseRank: the portal's keys and its Sort-menu switches (ONC-ST-2, ONC
   assert.ok(r(B.SV | B.SV_DRIVER | B.AMP | B.CNA_DRIVER | drvMis | B.GERMLINE) >= 0 && r(0) < STAIRCASE_RADIX);
 });
 const NOT_PROFILED_CELL = -1;
+
+test("heatmap rows take the portal's ramps: expression blue-black-red, methylation white at 0.35, VAF yellow to teal (ONC-TT-5..7)", () => {
+  const expr = { ramp: "expression" as const, min: -3, max: 3 }, meth = { ramp: "methylation" as const, min: 0, max: 1 }, vaf = { ramp: "vaf" as const, min: 0, max: 1 };
+  assert.equal(heatColor(expr, 0), "rgb(0,0,255)"); assert.equal(heatColor(expr, 255), "rgb(255,0,0)");
+  assert.equal(heatColor(expr, 127.5), "rgb(0,0,0)", "0 is black");
+  assert.equal(heatColor(meth, 0.35 * 255), "rgb(255,255,255)", "methylation's white sits at 0.35");
+  assert.equal(heatColor(vaf, 0), "rgb(241,242,181)"); assert.equal(heatColor(vaf, 255), "rgb(19,80,88)");
+  assert.equal(heatColor({ min: -3, max: 3, center: 128 }, 128), numericColor(128, 128), "no ramp: the generic diverging ramp");
+});

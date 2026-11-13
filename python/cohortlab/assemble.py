@@ -235,9 +235,11 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             if not vals:
                 heat.append(Track("clinical", label + " (no data)", np.full(n, -1, dtype=np.int32), {"categories": []}))
                 continue
-            if h.get("isVaf"):
+            # the portal's fixed ranges and colours: VAF and methylation 0..1, other profiles -3..3
+            ramp = None if h.get("assay") else "vaf" if h.get("isVaf") else "methylation" if re.search("methylation", h["profileType"], re.I) else "expression"
+            if ramp in ("vaf", "methylation"):
                 lo, hi, center = 0.0, 1.0, None
-            elif is_z or using_ref:
+            elif ramp == "expression" or is_z or using_ref:
                 lo, hi, center = -3.0, 3.0, 0.0
             else:
                 d_min, d_max = min(vals), max(vals)
@@ -260,7 +262,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 note = "allele fraction, max across a patient's mutations in the gene"
             else:
                 note = "mean across a patient's samples"
-            heat.append(Track("heatmap", label, cells, {"numeric": True, "gene": gene, "profileType": h["profileType"], "note": note,
+            heat.append(Track("heatmap", label, cells, {"numeric": True, **({"ramp": ramp} if ramp else {}), "gene": gene, "profileType": h["profileType"], "note": note,
                                                         "min": _num(_round(lo * 100) / 100), "max": _num(_round(hi * 100) / 100),
                                                         "center": None if center is None else _round(255 * (0 - lo) / span)}))
 
@@ -379,7 +381,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                                 "including samples on which the cohort's own criterion was never measured. Patient-level "
                                 "clinical values repeat across that patient's samples.") if unit == "sample" else
                                ("one patient; a patient's samples are collapsed (clinical: patient rows win, else one "
-                                "sample's value; heatmap: mean across samples; VAF: max)"),
+                                "sample's value; heatmap: the sample value furthest from 0; VAF: max)"),
                      "annotation": annotation_source, "lineGap": line_gap,
                      "sort": [("-" if s.get("dir") == "desc" else "") + s["track"] for s in sort],
                      **_custom_driver_report(events)},
