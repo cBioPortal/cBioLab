@@ -25,6 +25,35 @@ What each suite checks, how to run it, and how the gate and CI put them together
   working on (file names in `test/e2e/`, e.g. `view-kinds,riskmodel`), against your running `next dev`.
   The whole suite runs in the gate.
 
+## Writing the tests for a change
+
+The gates below can tell that code ran, not that anything checked what it computed: a line a test
+merely passes through counts as covered, and SQL counts as covered when a test matches its text.
+A portal comparison over real data agrees on the cases the data happens to hold, which are
+ordinarily the common ones. So the tests for a change that computes something a reader sees are
+written this way.
+
+1. **The spec is a table, written before the code.** For a parity change, read the legacy
+   function itself (cbioportal-frontend, oncoprintjs, the backend), not a summary of it, and list
+   each of its branches as input → expected output, citing the source line. Add the inputs that
+   find edges: none, one, all equal, mixed types, missing, unparseable, ties, the limits. For a
+   change of cBioLab's own, the table states the rule the same way. The table goes in the PR
+   description, so a reviewer checks it against the source rather than against the code.
+2. **The tests come from the table, and fail first.** Each row is a test, run against the code
+   before the change and seen to fail where the behaviour changes. A test derived from the
+   implementation checks the implementation against itself.
+3. **The tests are written without the implementation in view.** When an agent writes the code, a
+   separate agent writes the tests from the table and the legacy source alone, so the tests do not
+   inherit the code's assumptions.
+4. **The data is asked what it holds.** For each rule, query the warehouse for the value shapes
+   that actually occur (non-numbers in a NUMBER attribute, an attribute typed differently across
+   studies, a patient with dozens of samples) and add a row for each shape the table lacks.
+5. **What computes is run, and a planted bug proves the test.** Logic in SQL is run against the
+   fixture study ([below](#the-second-database-is-a-committed-fixture-study)), never only matched
+   as text, as `check:values` and `check:genefacets` run theirs. Each new rule gets planted bugs in
+   `scripts/check-mutants.ts` that some check must catch; one that survives means the tests are
+   not testing the rule.
+
 ## Coverage rules — new code is tested
 
 CI's `coverage` job runs `npm run report:coverage` (node's coverage of `npm test`) and then

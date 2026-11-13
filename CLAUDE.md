@@ -110,14 +110,20 @@ withdrawn by their owner — before changing how a page reads or writes its URL)
    change to how a view computes updates its method builder in the same commit**, and
    `check:methods` fails on any number the script does not reproduce.
 13. **`/verification` reports what the checks found; it never restates a claim by hand.** A new
-   statistic gets a row in `lib/verification.ts`; new cohort or count logic should get a planted bug
-   that proves a check would notice it breaking ([`TESTING.md`](docs/TESTING.md)).
-14. **New code is tested, and every settled view is drawn by a browser check.** CI's `coverage` job
-   fails a PR whose changed lines in `lib/` and `mcp/` the unit tests leave under 80% run, that adds
-   a file there no unit test loads, or that drops an area below its floor (`npm run report:coverage
-   && npm run check:coverage`). Every view kind is in some e2e area's `covers` unless it is `preview`
-   or provisional (`e2ePending` in its `kind.ts`); `test/e2e-coverage.test.ts` holds this, and
-   promoting a kind adds its browser check in the same change ([`TESTING.md`](docs/TESTING.md)).
+   statistic gets a row in `lib/verification.ts`; new logic that computes a value a reader sees
+   (a cohort, a count, a figure's value) gets a planted bug that proves a check would notice it
+   breaking ([`TESTING.md`](docs/TESTING.md)).
+14. **New code is tested from its spec.** The tests for a change come from a table of its rule's
+   cases (for parity, every branch of the legacy function, cited), written before the code and seen
+   to fail, by someone other than the code's author where an agent wrote it; logic in SQL is run
+   against the fixture study, never matched as text ([`TESTING.md`](docs/TESTING.md), "Writing the
+   tests for a change"). CI's `coverage` job fails a PR whose changed lines in `lib/` and `mcp/` the
+   unit tests leave under 80% run, that adds a file there no unit test loads, or that drops an area
+   below its floor (`npm run report:coverage && npm run check:coverage`).
+15. **Every view kind is rendered by a browser test.** Each kind has a Playwright test that renders
+   it (it is in some e2e area's `covers`), unless it is a `preview` or provisional (`e2ePending` in
+   its `kind.ts`) kind; `test/e2e-coverage.test.ts` fails otherwise, and making a provisional kind
+   permanent adds its browser test in the same change ([`TESTING.md`](docs/TESTING.md)).
 
 ## UI conventions
 
