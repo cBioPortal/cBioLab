@@ -39,6 +39,7 @@ import { clinicalTable, assertCustomDataPresent } from "./custom-data.ts";
 import { finiteSql } from "./sql-number.ts";
 import { ENTITY_RE, isCategoricalAssay } from "./generic-assay.ts";
 import type { OncoprintSpec, HeatmapSpec } from "./views/oncoprint/types.ts";
+import { CLINICAL_TRACK_LIMIT } from "./views/oncoprint/types.ts";
 export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
@@ -292,7 +293,9 @@ export function normalizeSpec(spec: OncoprintSpec) {
   const { tracks: geneTracks, symbols: genes } = normalizeGeneTracks(spec.genes || []);
   if (!genes.length) throw new Error("at least one valid gene symbol required");
   const geneList = toGeneList(geneTracks);
-  const clinical = (spec.clinical || []).map(String).slice(0, 8);
+  const clinical = (spec.clinical || []).map(String);
+  if (clinical.length > CLINICAL_TRACK_LIMIT)
+    throw new Error("clinical: " + clinical.length + " tracks asked for; an oncoprint draws at most " + CLINICAL_TRACK_LIMIT);
   const derivedEvents = (spec.derivedEvents || []).slice(0, 3);
   const lineGap = spec.conventions && spec.conventions.lineGap ? Number(spec.conventions.lineGap) : 90;
   // sort: ordered track keys — "genomic" (staircase), a clinical/derived/heatmap

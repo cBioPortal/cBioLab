@@ -30,7 +30,8 @@ export interface StudyKnown extends StudyBasics {
   /** every profile as the studies describe them, for a plot axis's Data picker */
   profileCatalog: ProfileInfo[];
   /** the clinical attributes with their kind and coverage, for the oncoprint's Tracks menu */
-  attrs: { attribute: string; kind: string; patients: number }[];
+  /** a clinical attribute: `patients` counts it at its own level (`per`), `displayName` and `priority` as the study declares them */
+  attrs: { attribute: string; kind: string; patients: number; displayName?: string; per?: "patient" | "sample"; priority?: number }[];
   /** the selection's size: the whole studies', or what the filters keep */
   patients: number; samples: number;
 }
@@ -76,14 +77,15 @@ export function useQueryKnown(studies: string[], filters: Clause[] = []): { basi
       .then(([j, b]) => {
         if (j.error) { fail(j.error); return; }
         if (!b || !live) return;
-        const sorted = ((j.clinical || []) as { attribute: string; kind?: string; patients?: number }[])
+        const sorted = ((j.clinical || []) as { attribute: string; kind?: string; patients?: number; displayName?: string; per?: "patient" | "sample"; priority?: number }[])
           .slice().sort((a, b) => (b.patients || 0) - (a.patients || 0));
         setKnown({
           ...b,
           profiles: (j.profiles || []).filter((p: string) => p !== "cna"), gaProfiles: j.gaProfiles || [],
           profileCatalog: j.profileCatalog || [],
           clinical: sorted.map((c) => c.attribute),
-          attrs: sorted.map((c) => ({ attribute: c.attribute, kind: c.kind || "cat", patients: c.patients || 0 })),
+          attrs: sorted.map((c) => ({ attribute: c.attribute, kind: c.kind || "cat", patients: c.patients || 0,
+            ...(c.displayName ? { displayName: c.displayName } : {}), ...(c.per ? { per: c.per } : {}), ...(c.priority != null ? { priority: c.priority } : {}) })),
           patients: j.totals?.patients || 0, samples: j.totals?.samples || 0,
         });
       })

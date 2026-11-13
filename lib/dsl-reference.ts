@@ -1660,7 +1660,7 @@ take a standalone spec (the analysis oncoprint view compiles to the same engine)
 \`\`\`
 { "study"?: "<id>",
   "genes": [≤12],
-  "clinical": [≤8],
+  "clinical": [≤100],
   "heatmap"?: [{ "profileType": P, "genes"?: [...] | "entities"?: [...] } × ≤4], // continuous molecular / generic-assay tracks
   "sort"?: ["CANCER_TYPE", "-CURRENT_AGE_DEID", "genomic"],                   // column sort (≤4 keys)
   "derivedEvents": [{ "label": L, "expression": <event cohortDef> } × ≤3],   // phenotype tracks

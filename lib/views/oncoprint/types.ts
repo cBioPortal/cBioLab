@@ -3,6 +3,9 @@ import type { SplitBy, DisplaySpec, CohortDef } from "../../types.ts";
 import type { GeneTrackSpec } from "../../gene-tracks.ts";
 import type { DriverSettings } from "../../driver-settings.ts";
 
+/** the most clinical tracks one oncoprint draws; the engine fetches them in one query, and refuses more */
+export const CLINICAL_TRACK_LIMIT = 100;
+
 export interface HeatmapSpec {
   profileType: string; genes?: string[];
   /** a generic-assay profile's tracks: its entities (signatures, probes, …), at most 12, in place of genes */
