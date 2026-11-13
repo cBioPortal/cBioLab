@@ -1,7 +1,7 @@
 // Faceted study explorer: what exists, in what numbers — optionally conditioned on a
 // draft cohort so every count narrows as clauses are added (study-view-style feedback).
 // Everything returned is designed to be clickable into a DSL clause.
-import { chQuery, PRIMARY, ensureChContext, registerChExternal, type ChConn } from "./ch.ts";
+import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, type ChConn } from "./ch.ts";
 import { sq, genomicStudySql } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
@@ -10,7 +10,7 @@ import { driverEventSql } from "./oql.ts";
 import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, DerivedRequest, AssayFacet } from "./types.ts";
 import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
-import { dataBins, type BinInput } from "./data-binner.ts";
+import { dataBins, recountBins, type BinInput } from "./data-binner.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor } from "./custom-data.ts";
 
 /**
@@ -202,15 +202,23 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   const driverPin = driversPin(drivers, oncokbPin);
   const t0 = Date.now();
   let draftSet = NO_SET, draftCount: number | null = null, draftSamples: number | null = null;
+  const sctx = oneStudyCtx(study, { oncokbPin, profiles, gaProfiles });
+  // A study alone, filtered: the single scan counts every chart, and its bit m is the cohort.
+  // A study read as part of several is scanned by the federated pass.
+  const scan = draft?.all?.length && !prefetched ? await scanDraft({ conn, studies: [study] }, draft, sctx) : null;
   if (draft && Array.isArray(draft.all) && draft.all.length) {
     const dsql = compileCohortDef(draft, { oncokbPin, profiles, gaProfiles, study, db });
     // Resolved once here; every facet query below then reads the cohort rather than
     // recomputing it.
-    const c = resolved ?? await resolveCohort(study, db, dsql, conn);
+    const c = resolved ?? (scan && resolvedFromRows(study, scan.cohort.get(study) || [])) ?? await resolveCohort(study, db, dsql, conn);
     draftSet = c.set;
     draftCount = c.count;
     draftSamples = c.sampleCount;
   }
+  // What each filtered attribute is counted against without its own clauses: started now, beside
+  // everything else. A study read as part of several gets these from the federated pass instead.
+  const basesP = prefetched ? Promise.resolve(new Map<string, DraftedBase>())
+    : scan ? scan.bases() : draftedBases(draftedClinical(draft), [{ conn, studies: [study] }], sctx);
   // Derived facets are independent of everything below, so start them here and
   // collect at the end — serially they cost ~400ms on a ~600ms page, overlapped
   // they cost almost nothing.
@@ -219,7 +227,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // The facet queries, shared with the federated path, which fetches them for every study on a
   // connection at once and hands each study its rows; a study alone is the list of length one.
   const pre = prefetched ?? (await prefetchFacets({ studies: [study], db, conn, attributes,
-    set: draftSet })).get(study)!;
+    set: draftSet, scan, drafted: draftedClinical(draft).map((d) => d.attr) })).get(study)!;
 
   // how many patients this study contributes under the current draft (or in total): the
   // owners of the draft's samples
@@ -273,12 +281,15 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     const k = x.type + "|" + x.a, l = valuesOf.get(k), row = { v: x.v, n: Number(x.n) };
     if (l) l.push(row); else valuesOf.set(k, [row]);
   }
+  const bases = await basesP;
   const clinical: ClinicalFacet[] = [
     ...catAttrs.map((r): ClinicalFacet => ({
       attribute: r.a, per: r.type as "patient" | "sample", kind: "cat", patients: Number(r.np),
       distinct: Number(r.nv),
       values: disjValues.get(r.type + "|" + r.a) || valuesOf.get(r.type + "|" + r.a) || [],
-      disjunctive: disjValues.has(r.type + "|" + r.a) || undefined
+      disjunctive: disjValues.has(r.type + "|" + r.a) || undefined,
+      na: disjValues.has(r.type + "|" + r.a) ? baseNa(bases.get(r.a), r.type as "patient" | "sample")
+        : Math.max(0, (r.type === "sample" ? totals.samples : totals.patients) - Number(r.np)),
     })),
     // A drafted attribute keeps its facet when the draft leaves no member with a value — its own NA
     // filter, or a study whose values all lie outside the other studies' pick — with its values
@@ -288,7 +299,8 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
         String(meta.get(k.slice(k.indexOf("|") + 1))?.datatype ?? "").toUpperCase() !== "NUMBER")
       .map(([k, vals]): ClinicalFacet => ({
         attribute: k.slice(k.indexOf("|") + 1), per: k.slice(0, k.indexOf("|")) as "patient" | "sample", kind: "cat",
-        patients: 0, distinct: vals.length, values: vals, disjunctive: true
+        patients: 0, distinct: vals.length, values: vals, disjunctive: true,
+        na: baseNa(bases.get(k.slice(k.indexOf("|") + 1)), k.slice(0, k.indexOf("|")) as "patient" | "sample"),
       })),
     ...numAttrs.map((r): ClinicalFacet => ({
       attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np), distinct: Number(r.nv),
@@ -307,8 +319,8 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // ---- numeric histograms (cBioPortal study-view bins) --------------------
   if (!skipBins) {
     const numFacets = clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num").slice(0, NUM_HISTOGRAM_LIMIT);
-    await fillHistograms({ facets: numFacets, groups: [{ conn, studies: [study], set: draftSet }], cohort: totals,
-      draft, ctx: oneStudyCtx(study, { oncokbPin, profiles, gaProfiles }) });
+    await fillHistograms({ facets: numFacets, groups: [{ conn, studies: [study], set: draftSet, scan }], cohort: totals,
+      draft, ctx: sctx, bases });
   }
 
   // ---- timeline event types ----------------------------------------------
@@ -882,9 +894,16 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
   // A draft is resolved once per study up front: the pooled passes read every study's cohort, and
   // each study's own pass (disjunctive values, derived facets) reuses it.
   const resolvedByStudy = new Map<string, Awaited<ReturnType<typeof resolveCohort>>>();
-  if (draft && Array.isArray(draft.all) && draft.all.length) await Promise.all(studies.map(async (s) => {
+  // Filtered: one scan per connection counts every chart, and its bit m is each study's cohort.
+  const scans = new Map<ConnGroup, Scan | null>();
+  const filtered = !!(draft && Array.isArray(draft.all) && draft.all.length);
+  if (filtered) await Promise.all(groups.map(async (g) => { scans.set(g, await scanDraft(g, draft!, { oncokbPin, profilesByStudy })); }));
+  const scanOf = (s: string) => scans.get(groups.find((g) => g.studies.includes(s))!) ?? null;
+  if (filtered) await Promise.all(studies.map(async (s) => {
     const conn = connByStudy?.get(s) || PRIMARY;
-    const dsql = compileCohortDef(draft, { oncokbPin, ...(profilesByStudy.get(s) || {}), study: s, db: conn.db });
+    const fromScan = scanOf(s) && resolvedFromRows(s, scanOf(s)!.cohort.get(s) || []);
+    if (fromScan) { resolvedByStudy.set(s, fromScan); return; }
+    const dsql = compileCohortDef(draft!, { oncokbPin, ...(profilesByStudy.get(s) || {}), study: s, db: conn.db });
     resolvedByStudy.set(s, await resolveCohort(s, conn.db, dsql, conn));
   }));
   // The pooled queries read the draft as ONE uploaded table per connection of study-qualified
@@ -898,12 +917,15 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
   const prefetched = new Map<string, Prefetched>();
   const prefetchP = Promise.all(groups.map(async (g) => {
     const m = await prefetchFacets({ studies: g.studies, db: g.conn.db, conn: g.conn, attributes, set: setOf.get(g)!,
+      scan: scans.get(g), drafted: draftedClinical(draft).map((d) => d.attr),
       // Pooled only where the rest of the draft is empty — the common case, a single clicked
       // attribute. Otherwise the rest is each study's compiled definition, and one statement
       // evaluating all of them measured slower than a query per study in parallel (§3c).
       disjunctive: draftedClinical(draft).filter((d) => !d.rest.all?.length).map(({ attr }) => ({ attr, set: NO_SET })) });
     for (const [st, p] of m) prefetched.set(st, p);
   }));
+  const basesP = filtered && groups.every((g) => scans.get(g)) ? mergedBases(groups.map((g) => scans.get(g)!))
+    : draftedBases(draftedClinical(draft), groups, { oncokbPin, profilesByStudy });
   const partsP = prefetchP.then(() => Promise.all(studies.map(s =>
     buildExplore({ study: s, draft, oncokbPin, geneSearch, skipBins: true, skipGenes: true, attributes, geneCharts, derived, drivers,
       conn: connByStudy?.get(s) || PRIMARY, ...(profilesByStudy.get(s) || {}), resolved: resolvedByStudy.get(s), prefetched: prefetched.get(s) }))));
@@ -914,7 +936,7 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
     const facets = mergeExplore(parts, !!draft);
     const numFacets = facets.clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num").slice(0, NUM_HISTOGRAM_LIMIT);
     await fillHistograms({ facets: numFacets, cohort: facets.totals || { patients: 0, samples: 0 },
-      groups: groups.map((g) => ({ ...g, set: setOf.get(g)! })), draft, ctx: { oncokbPin, profilesByStudy } });
+      groups: groups.map((g) => ({ ...g, set: setOf.get(g)!, scan: scans.get(g) })), draft, ctx: { oncokbPin, profilesByStudy }, bases: await basesP });
     return new Map(numFacets.filter((f) => f.bins).map((f) => [f.per + "|" + f.attribute, { bins: f.bins!, naCount: f.naCount, disjunctive: f.disjunctive }]));
   });
   const [parts, geneParts, bins] = await Promise.all([
@@ -935,6 +957,8 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
   ]);
   const merged = mergeExplore([...parts, ...geneParts], !!draft);
   if (driverPin) merged.drivers = driverPin;
+  const bases = await basesP;
+  for (const f of merged.clinical) if (f.kind === "cat" && f.disjunctive) f.na = baseNa(bases.get(f.attribute), f.per);
   for (const f of merged.clinical) {
     const b = f.kind === "num" ? bins.get(f.per + "|" + f.attribute) : undefined;
     if (b && f.kind === "num") { f.bins = b.bins; f.naCount = b.naCount; if (b.disjunctive) f.disjunctive = true; }
@@ -967,42 +991,125 @@ function byConnection(studies: string[], connByStudy?: Map<string, ChConn>): Con
  */
 async function fillHistograms(opts: {
   facets: Extract<ClinicalFacet, { kind: "num" }>[];
-  groups: (ConnGroup & { set: CohortSet })[];
+  groups: (ConnGroup & { set: CohortSet; scan?: Scan | null })[];
   cohort: { patients: number; samples: number };
   draft?: CohortDef | null;
   ctx?: DefCtx;
+  /** each filtered attribute's cohort without its own clauses (draftedBases) */
+  bases?: Map<string, DraftedBase>;
 }): Promise<void> {
   const { facets, groups, cohort } = opts;
   if (!facets.length) return;
+  if (opts.draft?.all?.length && groups.length && groups.every((g) => g.scan)) return fillFromScans(opts as Parameters<typeof fillFromScans>[0]);
+  const filtered = !!opts.draft?.all?.length;
   const own = new Map(draftedClinical(opts.draft).map((d) => [d.attr, d.rest]));
   const free = facets.filter((f) => !own.has(f.attribute));
-  const bin = (fs: typeof facets, lists: Map<string, BinInput[]>[], base: { patients: number; samples: number }) => {
+  const key = (f: { per: string; attribute: string }) => f.per + "|" + f.attribute;
+  // The bars are laid out over the whole study, unfiltered, and only counted over the selection
+  // (the portal's STATIC bins): a filter elsewhere never moves them. Unfiltered, the two are one.
+  const layoutP = filtered
+    ? Promise.all(groups.map((g) => numericValueCounts({ facets, studies: g.studies, db: g.conn.db, conn: g.conn, set: NO_SET })))
+    : null;
+  const bin = async (fs: typeof facets, lists: Map<string, BinInput[]>[], base: (f: (typeof facets)[number]) => number) => {
+    const layout = await layoutP;
     for (const f of fs) {
-      const values = lists.flatMap((m) => m.get(f.per + "|" + f.attribute) || []);
-      f.bins = dataBins(values, f.attribute);
+      const values = lists.flatMap((m) => m.get(key(f)) || []);
+      f.bins = layout ? recountBins(dataBins(layout.flatMap((m) => m.get(key(f)) || []), f.attribute), values) : dataBins(values, f.attribute);
       const counted = values.reduce((n, v) => n + v.count, 0);
-      f.naCount = Math.max(0, (f.per === "sample" ? base.samples : base.patients) - counted);
+      f.naCount = Math.max(0, base(f) - counted);
     }
   };
   await Promise.all([
     free.length ? Promise.all(groups.map((g) => numericValueCounts({ facets: free, studies: g.studies, db: g.conn.db, conn: g.conn, set: g.set })))
-      .then((lists) => bin(free, lists, cohort)) : null,
+      .then((lists) => bin(free, lists, (f) => f.per === "sample" ? cohort.samples : cohort.patients)) : null,
     ...[...own].map(async ([attr, rest]) => {
       const mine = facets.filter((f) => f.attribute === attr);
       if (!mine.length) return;
-      const sets = groups.map((g) => cohortSet(g.studies, g.conn.db, rest, opts.ctx || {}));
-      const [lists, sizes] = await Promise.all([
-        Promise.all(groups.map((g, i) => numericValueCounts({ facets: mine, studies: g.studies, db: g.conn.db, conn: g.conn, set: sets[i] }))),
-        Promise.all(groups.map((g, i) => cohortSize(g.studies, g.conn.db, g.conn, sets[i]))),
-      ]);
-      bin(mine, lists, sizes.reduce((a, b) => ({ patients: a.patients + b.patients, samples: a.samples + b.samples }), { patients: 0, samples: 0 }));
+      const lists = await Promise.all(groups.map((g) => numericValueCounts({ facets: mine, studies: g.studies, db: g.conn.db, conn: g.conn,
+        set: cohortSet(g.studies, g.conn.db, rest, opts.ctx || {}) })));
+      const b = opts.bases?.get(attr) ?? await draftedBase(attr, rest, groups, opts.ctx || {});
+      await bin(mine, lists, (f) => f.per === "sample" ? b.samples : b.patients);
       for (const f of mine) {
         f.disjunctive = true;
-        const s = valueSummary(lists.flatMap((m) => m.get(f.per + "|" + f.attribute) || []));
+        const s = valueSummary(lists.flatMap((m) => m.get(key(f)) || []));
         if (s) Object.assign(f, s);
       }
     }),
   ]);
+}
+
+/** fillHistograms from the single scan: every chart's values at its own bit, laid out over the unfiltered ones, in one statement per connection */
+async function fillFromScans(opts: {
+  facets: Extract<ClinicalFacet, { kind: "num" }>[];
+  groups: (ConnGroup & { scan: Scan })[];
+  cohort: { patients: number; samples: number };
+  draft: CohortDef;
+  bases?: Map<string, DraftedBase>;
+}): Promise<void> {
+  const { facets, groups, cohort } = opts;
+  const own = new Set(draftedClinical(opts.draft).map((d) => d.attr));
+  const scans = await Promise.all(groups.map((g) => g.scan.numeric(facets)));
+  const bases = opts.bases ?? await mergedBases(groups.map((g) => g.scan));
+  const key = (f: { per: string; attribute: string }) => f.per + "|" + f.attribute;
+  for (const f of facets) {
+    const values = scans.flatMap((x) => x.sel.get(key(f)) || []);
+    f.bins = recountBins(dataBins(scans.flatMap((x) => x.all.get(key(f)) || []), f.attribute), values);
+    const counted = values.reduce((n, v) => n + v.count, 0);
+    const b = own.has(f.attribute) ? bases.get(f.attribute) : undefined;
+    f.naCount = Math.max(0, (f.per === "sample" ? (b ?? cohort).samples : (b ?? cohort).patients) - counted);
+    if (own.has(f.attribute)) {
+      f.disjunctive = true;
+      const s = valueSummary(values);
+      if (s) Object.assign(f, s);
+    }
+  }
+}
+
+/** every connection's scan bases, summed */
+async function mergedBases(scans: Scan[]): Promise<Map<string, DraftedBase>> {
+  const out = new Map<string, DraftedBase>();
+  for (const m of await Promise.all(scans.map((x) => x.bases()))) for (const [a, b] of m) {
+    const c = out.get(a);
+    out.set(a, c ? { patients: c.patients + b.patients, samples: c.samples + b.samples,
+      covered: { patient: c.covered.patient + b.covered.patient, sample: c.covered.sample + b.covered.sample } } : b);
+  }
+  return out;
+}
+
+/**
+ * A filtered attribute's cohort without its own clauses: how many patients and samples it holds,
+ * and how many of each level have a value of the attribute. The NA of a chart freed of its own
+ * filter is the difference (STS-STM-1: cases in a study without the attribute are NA too).
+ */
+type DraftedBase = { patients: number; samples: number; covered: { patient: number; sample: number } };
+/** a chart's NA at its level, from its attribute's base; undefined without one */
+const baseNa = (b: DraftedBase | undefined, per: "patient" | "sample"): number | undefined =>
+  b ? Math.max(0, (per === "sample" ? b.samples : b.patients) - b.covered[per]) : undefined;
+
+/** every filtered attribute's DraftedBase over these connections' studies, side by side */
+async function draftedBases(drafted: { attr: string; rest: CohortDef }[], groups: ConnGroup[], ctx: DefCtx): Promise<Map<string, DraftedBase>> {
+  const out = await Promise.all(drafted.map(async ({ attr, rest }) => [attr, await draftedBase(attr, rest, groups, ctx)] as const));
+  return new Map(out);
+}
+
+async function draftedBase(attr: string, rest: CohortDef, groups: ConnGroup[], ctx: DefCtx): Promise<DraftedBase> {
+  const parts = await Promise.all(groups.map(async (g) => {
+    const set = cohortSet(g.studies, g.conn.db, rest, ctx);
+    const [size, cov] = await Promise.all([
+      cohortSize(g.studies, g.conn.db, g.conn, set),
+      chQuery<ChRow>(
+        "SELECT type, uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
+        "FROM " + clinicalTable(g.conn.db, [attr]) + "\n" +
+        "WHERE " + studyIn(g.studies) + " AND attribute_name = " + sq(attr) + " AND attribute_value != ''" +
+        inClinical(set, ownersIn(g.conn.db, g.studies)) + "\nGROUP BY type", g.conn),
+    ]);
+    const covered = { patient: 0, sample: 0 };
+    for (const r of cov.data) if (r.type === "patient" || r.type === "sample") covered[r.type as "patient" | "sample"] = Number(r.n);
+    return { ...size, covered };
+  }));
+  return parts.reduce((a, b) => ({ patients: a.patients + b.patients, samples: a.samples + b.samples,
+    covered: { patient: a.covered.patient + b.covered.patient, sample: a.covered.sample + b.covered.sample } }),
+  { patients: 0, samples: 0, covered: { patient: 0, sample: 0 } });
 }
 
 /**
@@ -1017,6 +1124,144 @@ function valueSummary(values: BinInput[]): { min: number; max: number; median: n
   let at = Math.floor(n / 2), median = nums[nums.length - 1].x;
   for (const v of nums) { if (at < v.n) { median = v.x; break; } at -= v.n; }
   return { min: nums[0].x, max: nums[nums.length - 1].x, median };
+}
+
+/**
+ * The single scan (docs/spikes/explore-filter-parity.md, variant C3): what every chart of a filtered
+ * page is counted against, from one pass over the draft per connection instead of a query per
+ * filtered chart.
+ *
+ * Each filtered clinical attribute j owns its top-level clauses F_j (draftedClinical); the rest of
+ * the draft is B. One statement gives every sample a mask: bit j set when it passes B and every F
+ * but F_j (the cohort chart j is counted against), bit m when it passes them all (the draft). Only
+ * samples with some bit set come back. A patient's mask is the OR of its samples' (a patient row
+ * counts for a cohort holding one of its samples), and both go up as one external table, which
+ * every count then joins: a chart's values at its own bit (`uniqExactIf`), a numeric chart's
+ * values at its bit and unfiltered, each filtered attribute's cohort size and coverage. Exact
+ * (each bit is the cohort the per-chart query would compile); null past the external-table bound
+ * or with no request context, and the caller counts chart by chart as before.
+ */
+interface Scan {
+  /** the draft's (pid, sid) rows per study: the samples with bit m */
+  cohort: Map<string, [string, string][]>;
+  /** value lists as valueCounts returns them (by study), each attribute counted at its own bit */
+  values(attrs: string[]): Promise<Map<string, ChRow[]>>;
+  /** numeric facets' values at their own bit (`sel`) and unfiltered (`all`), keyed "per|attribute" */
+  numeric(facets: { per: string; attribute: string }[]): Promise<{ sel: Map<string, BinInput[]>; all: Map<string, BinInput[]> }>;
+  /** each filtered attribute's cohort without its own clauses (DraftedBase) */
+  bases(): Promise<Map<string, DraftedBase>>;
+}
+/** at most this many filtered attributes get a bit of their own (a mask is a UInt64) */
+const SCAN_MAX_ATTRS = 60;
+/**
+ * The scan is used from this many filter groups (each filtered attribute, plus the rest of the
+ * draft when there is any). Below it, most of the study passes all filters but one, so the masks
+ * shipped are nearly the whole study and counting chart by chart is quicker. Measured in process,
+ * medians of 5 (msk_chord_2024 / coadread, ms, chart by chart → scan): 1 group 716 → 1,060 /
+ * 197 → 234; 2 groups 709 → 835 / 226 → 194; 3 groups 1,163 → 844 / 314 → 216; 4 groups
+ * 1,016 → 739 / 334 → 255.
+ */
+const SCAN_MIN_GROUPS = 3;
+
+async function scanDraft(g: ConnGroup, draft: CohortDef, ctx: DefCtx): Promise<Scan | null> {
+  const drafted = draftedClinical(draft);
+  // EXPLORE_SCAN=off counts chart by chart, for comparing the two (docs/ENVIRONMENT.md)
+  if (process.env.EXPLORE_SCAN === "off" || drafted.length > SCAN_MAX_ATTRS || !inChContext()) return null;
+  const { conn, studies } = g, db = conn.db;
+  const m = drafted.length;
+  const own = new Set(drafted.map((d) => d.attr));
+  const base = draftWithout(draft, (c) => { const a = clinicalClauseAttr(c); return !!a && own.has(a); });
+  if (m + (base.all?.length ? 1 : 0) < SCAN_MIN_GROUPS && process.env.EXPLORE_SCAN !== "always") return null;
+  const inSet = (def: CohortDef) => { const st = cohortSet(studies, db, def, ctx); return st.samples ? "sample_unique_id IN " + st.samples : "1"; };
+  const terms = ["b", ...drafted.map((_, j) => "f" + j)];
+  const bit = (k: number) => "toUInt64(" + terms.filter((t) => t !== "f" + k).join(" AND ") + ") * " + (1n << BigInt(k)).toString();
+  const r = await chQuery<ChRow>(
+    "SELECT st, s, p, pm FROM (\n" +
+    "  SELECT cancer_study_identifier AS st, sample_unique_id AS s, patient_unique_id AS p, " +
+    [...drafted.map((_, j) => bit(j)), bit(m)].join(" + ") + " AS pm\n" +
+    "  FROM (SELECT cancer_study_identifier, sample_unique_id, patient_unique_id, " + inSet(base) + " AS b" +
+    drafted.map((d, j) => ", " + inSet({ ...draft, all: (draft.all || []).filter((c) => clinicalClauseAttr(c) === d.attr) }) + " AS f" + j).join("") + "\n" +
+    "    FROM " + db + ".sample_derived WHERE " + studyIn(studies) + "))\n" +
+    "WHERE pm > 0\nLIMIT " + (COHORT_EXTERNAL_LIMIT + 1), conn);
+  if (r.data.length > COHORT_EXTERNAL_LIMIT) return null;
+  // masks as BigInt: a UInt64 arrives as a string, and JavaScript's | is 32-bit
+  const ALL = 1n << BigInt(m);
+  const patients = new Map<string, bigint>();
+  const cohort = new Map<string, [string, string][]>(studies.map((st) => [st, []]));
+  const lines: string[] = [];
+  for (const x of r.data) {
+    const pm = BigInt(String(x.pm)), st = String(x.st), sid = String(x.s), pid = String(x.p);
+    lines.push("sample\t" + sid + "\t" + pm);
+    patients.set(pid, (patients.get(pid) ?? 0n) | pm);
+    if (pm & ALL) cohort.get(st)?.push([pid.slice(st.length + 1), sid.slice(st.length + 1)]);
+  }
+  for (const [pid, pm] of patients) lines.push("patient\t" + pid + "\t" + pm);
+  const E = "_scan_" + (conn.id + "_" + db).replace(/[^A-Za-z0-9_]/g, "_");
+  if (!registerChExternal({ name: E, structure: "lvl String, id String, pm UInt64", data: lines.length ? lines.join("\n") + "\n" : "" })) return null;
+  const bitOf = drafted.length
+    ? "transform(attribute_name, [" + drafted.map((d) => sq(d.attr)).join(",") + "], [" + drafted.map((_, j) => j).join(",") + "], " + m + ")"
+    : String(m);
+  const rows = (attrs: string[], where: string) =>
+    "(SELECT cancer_study_identifier AS s, type, attribute_name AS a, attribute_value AS val,\n" +
+    "    if(type = 'sample', sample_unique_id, patient_unique_id) AS id, toUInt8(" + bitOf + ") AS bit\n" +
+    "  FROM " + clinicalTable(db, attrs) + "\n  WHERE " + studyIn(studies) + " AND " + where + ") c";
+  const join = (kind: string) => kind + " JOIN " + E + " e ON e.lvl = c.type AND e.id = c.id";
+  return {
+    cohort,
+    async values(attrs) {
+      if (!attrs.length) return new Map();
+      return groupByStudy((await chQuery<ChRow>(
+        "SELECT s, type, a, v, vkey, n FROM (\n" +
+        "SELECT c.s AS s, c.type AS type, c.a AS a, " + clinicalValueFoldSql("c.val") + " AS vkey,\n" +
+        "  topKIf(1)(c.val, bitTest(e.pm, c.bit))[1] AS v, uniqExactIf(c.id, bitTest(e.pm, c.bit)) AS n\n" +
+        "FROM " + rows(attrs, "attribute_value != '' AND attribute_name IN (" + attrs.map(sq).join(",") + ")") + "\n" + join("INNER") + "\n" +
+        "GROUP BY s, type, a, vkey)\nWHERE n > 0 ORDER BY n DESC, vkey LIMIT " + FACET_VALUE_LIMIT + " BY s, type, a", conn)).data);
+    },
+    async numeric(facets) {
+      const sel = new Map<string, BinInput[]>(), all = new Map<string, BinInput[]>();
+      if (!facets.length) return { sel, all };
+      const attrs = [...new Set(facets.map((f) => f.attribute))];
+      const q = await chQuery<ChRow>(
+        "SELECT c.type AS type, c.a AS a, c.val AS v, uniqExactIf(c.id, bitTest(e.pm, c.bit)) AS n, uniqExact(c.id) AS n_all\n" +
+        "FROM " + rows(attrs, "(type, attribute_name) IN (" + facets.map((f) => "(" + sq(f.per) + ", " + sq(f.attribute) + ")").join(", ") + ")" +
+          inClinical(NO_SET, ownersIn(db, studies))) + "\n" + join("LEFT ANY") + "\n" +
+        "GROUP BY type, a, v", conn);
+      const push = (mp: Map<string, BinInput[]>, k: string, value: string, count: number) => {
+        if (!(count > 0)) return;
+        const l = mp.get(k); if (l) l.push({ value, count }); else mp.set(k, [{ value, count }]);
+      };
+      for (const x of q.data) {
+        const k = x.type + "|" + x.a;
+        push(sel, k, String(x.v), Number(x.n));
+        push(all, k, String(x.v), Number(x.n_all));
+      }
+      return { sel, all };
+    },
+    async bases() {
+      const out = new Map<string, DraftedBase>();
+      if (!m) return out;
+      const [sizes, cov] = await Promise.all([
+        chQuery<ChRow>("SELECT lvl, k, uniqExactIf(id, bitTest(pm, k)) AS n FROM " + E + " ARRAY JOIN range(" + m + ") AS k GROUP BY lvl, k", conn),
+        chQuery<ChRow>(
+          "SELECT c.type AS type, c.a AS a, uniqExactIf(c.id, bitTest(e.pm, c.bit)) AS n\n" +
+          "FROM " + rows(drafted.map((d) => d.attr), "attribute_value != '' AND attribute_name IN (" + drafted.map((d) => sq(d.attr)).join(",") + ")") + "\n" +
+          join("INNER") + "\nGROUP BY type, a", conn),
+      ]);
+      drafted.forEach((d, j) => {
+        const size = (lvl: string) => Number(sizes.data.find((x) => x.lvl === lvl && Number(x.k) === j)?.n ?? 0);
+        const covered = (lvl: string) => Number(cov.data.find((x) => x.type === lvl && x.a === d.attr)?.n ?? 0);
+        out.set(d.attr, { patients: size("patient"), samples: size("sample"), covered: { patient: covered("patient"), sample: covered("sample") } });
+      });
+      return out;
+    },
+  };
+}
+
+/** a study's cohort rows as resolveCohort's answer, shipped as its external table; null when it can't be */
+function resolvedFromRows(study: string, rows: [string, string][]): Awaited<ReturnType<typeof resolveCohort>> | null {
+  if (!registerChExternal({ name: cohortTable(study), structure: "pid String, sid String", data: rows.length ? rows.map((x) => x.join("\t")).join("\n") + "\n" : "" }))
+    return null;
+  return { set: studySet(study, cohortTable(study)), rows, count: new Set(rows.map((x) => x[0])).size, sampleCount: rows.length };
 }
 
 /** How many patients (owners of a sample) and samples these studies hold within `set`. */
@@ -1094,6 +1339,10 @@ async function prefetchFacets(opts: {
   set: CohortSet;
   /** drafted attributes to count without their own clauses, each with the rest of the draft as such a set */
   disjunctive?: { attr: string; set: CohortSet }[];
+  /** the draft's single scan (scanDraft): every value list counted from it, the drafted attributes' at their own bits */
+  scan?: Scan | null;
+  /** with a scan: the drafted attributes, whose values it counts without their own clauses */
+  drafted?: string[];
 }): Promise<Map<string, Prefetched>> {
   const { studies, db, conn, set } = opts;
   const IN = "(" + studies.map(sq).join(",") + ")";
@@ -1167,10 +1416,13 @@ async function prefetchFacets(opts: {
   const catKeys = new Set<string>();
   for (const r of cls.data) if (!isNumericAttr(r, metaOf.get(String(r.s))!)) catKeys.add(r.s + "|" + r.type + "|" + r.a);
   const catNames = [...new Set(cls.data.filter((r) => catKeys.has(r.s + "|" + r.type + "|" + r.a)).map((r) => String(r.a)))];
-  const values = [...(await valueCounts({ studies, db, conn, attrs: catNames, set })).values()].flat()
+  const scanned = opts.scan ? [...(await opts.scan.values([...new Set([...catNames, ...(opts.drafted || [])])])).values()].flat() : null;
+  const values = (scanned ?? [...(await valueCounts({ studies, db, conn, attrs: catNames, set })).values()].flat())
     .filter((r) => catKeys.has(r.s + "|" + r.type + "|" + r.a));
-  const disj = await Promise.all((opts.disjunctive || []).map(async (d) =>
-    [d.attr, await valueCounts({ studies, db, conn, attrs: [d.attr], set: d.set })] as const));
+  const disj = scanned
+    ? (opts.drafted || []).map((attr) => [attr, groupByStudy(scanned.filter((r) => r.a === attr))] as const)
+    : await Promise.all((opts.disjunctive || []).map(async (d) =>
+      [d.attr, await valueCounts({ studies, db, conn, attrs: [d.attr], set: d.set })] as const));
   const [tot, cl, vals, ev, dt, li] = [totals.data, cls.data, values, events.data, dataTypes.data, lists.data].map(groupByStudy);
   return new Map(studies.map((st) => [st, {
     totals: tot.get(st)?.[0] || { pts: "0", smp: "0" },
@@ -1200,7 +1452,7 @@ async function valueCounts(o: { studies: string[]; db: string; conn: ChConn; att
     "FROM " + clinicalTable(o.db, o.attrs) + "\n" +
     "WHERE " + studyIn(o.studies) + " AND attribute_value != ''\n" +
     "  AND attribute_name IN (" + o.attrs.map(sq).join(",") + ")" + inClinical(o.set, ownersIn(o.db, o.studies)) + "\n" +
-    "GROUP BY s, type, a, vkey ORDER BY n DESC LIMIT " + FACET_VALUE_LIMIT + " BY s, type, a", o.conn)).data);
+    "GROUP BY s, type, a, vkey ORDER BY n DESC, vkey LIMIT " + FACET_VALUE_LIMIT + " BY s, type, a", o.conn)).data);
 }
 
 /**
@@ -1260,6 +1512,10 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
   const draft = hasDraft ?? parts.some((p) => p.draftCount != null);
   const studies = parts.flatMap((p) => p.studies || [p.study]);
 
+  const mergedTotals = {
+    patients: parts.reduce((n, p) => n + (p.totals?.patients || 0), 0),
+    samples: parts.reduce((n, p) => n + (p.totals?.samples || 0), 0),
+  };
   const clin = new Map<string, ClinicalFacet[]>(); // per|attribute -> list of items
   for (const p of parts) for (const a of p.clinical) {
     const k = a.per + "|" + a.attribute;
@@ -1292,7 +1548,11 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     // preserve the disjunctive marker: if any participant re-queried this
     // attribute without its own clauses, the merged totals are on that basis
     const disjunctive = cats.some((i) => i.disjunctive) || undefined;
-    return { ...base, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}),
+    // NA: unfiltered by its own clauses, the parts' (a federated pass sets it again from every study);
+    // otherwise everyone the merged selection holds at its level, less those with a value
+    const total = (mergedTotals[base.per === "sample" ? "samples" : "patients"]);
+    const na = disjunctive ? (cats.some((i) => i.na != null) ? cats.reduce((n, i) => n + (i.na || 0), 0) : undefined) : Math.max(0, total - patients);
+    return { ...base, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}), ...(na != null ? { na } : {}),
       values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n || x.v.localeCompare(y.v)).slice(0, FACET_VALUE_LIMIT) };
   }).sort(chartOrder);
 

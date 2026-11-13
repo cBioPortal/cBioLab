@@ -157,6 +157,7 @@ cluster's SAML job refreshes every 3 h.
 | `RESULT_CACHE_MB` | `50` | the result cache's size in MB where it is process memory (anywhere but Vercel); read at server start |
 | `CLICKHOUSE_MAX_INFLIGHT` | `8` | ClickHouse queries in flight at once per process; the rest queue (`docs/PERFORMANCE.md`) |
 | `EXPLORE_COHORT_EXTERNAL_LIMIT` | `50000` | the most patient ids Explore ships to ClickHouse for one draft cohort |
+| `EXPLORE_SCAN` | on | `off`: count a filtered Explore page chart by chart instead of with the single scan (`scanDraft`, lib/explore.ts); `always`: scan even below its 3 filter groups. For comparing the two |
 | `ONCOPRINT_CLUSTER_LIMIT` | `4000` | the most columns an oncoprint clusters (`cluster:<profile>` sort) |
 
 ## Building and serving

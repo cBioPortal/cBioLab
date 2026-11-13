@@ -8,7 +8,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { dataBins } from "../lib/data-binner.ts";
+import { dataBins, recountBins } from "../lib/data-binner.ts";
 
 interface PortalBin { specialValue?: string; start?: number; end?: number; count: number }
 const { cases } = JSON.parse(readFileSync(new URL("./fixtures/data-binner.json", import.meta.url), "utf8")) as
@@ -55,5 +55,24 @@ describe("data binner: the rules that decide a bar", () => {
   test("a word in a numeric column is its own bar, its spellings folded", () => {
     const bins = dataBins([...Array.from({ length: 20 }, (_, i) => ({ value: String(i), count: 1 })), { value: "Negative", count: 2 }, { value: "NEGATIVE", count: 1 }]);
     assert.deepEqual(bins.at(-1), { value: "Negative", count: 3 });
+  });
+});
+
+describe("data binner: the portal's STATIC bins, laid out once and counted again", () => {
+  for (const c of cases) test(c.study + " " + c.attribute + ": every value lands in the bar dataBins put it in, and a subset keeps the bars", () => {
+    const bins = dataBins(c.values, c.attribute);
+    assert.deepEqual(recountBins(bins, c.values), bins, "the whole study counted again is the same bars");
+    const half = c.values.filter((_, i) => i % 2 === 0);
+    const again = recountBins(bins, half);
+    assert.deepEqual(again.map(({ count: _c, ...b }) => b), bins.map(({ count: _c, ...b }) => b), "the bars stay put");
+    assert.equal(again.reduce((n, b) => n + b.count, 0), half.reduce((n, v) => n + v.count, 0), "no value of the subset is lost");
+  });
+
+  test("a bar the subset leaves empty is kept at 0, and a value no bar holds is not counted", () => {
+    const bins = dataBins([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((v) => ({ value: String(v * 10), count: 1 })));
+    const again = recountBins(bins, [{ value: "10", count: 2 }, { value: "Negative", count: 5 }]);
+    assert.equal(again.length, bins.length);
+    assert.equal(again.reduce((n, b) => n + b.count, 0), 2);
+    assert.ok(again.some((b) => b.count === 0));
   });
 });

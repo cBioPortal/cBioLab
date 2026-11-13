@@ -27,6 +27,18 @@ export function fmtPct(pct: number, decimals = 1): string {
   return minus(pct.toFixed(decimals)) + "%";
 }
 
+/**
+ * A share of a Study View chart (0–100), as cbioportal.org writes it (`getFrequencyStr`,
+ * StudyViewUtils.tsx): "0%", one decimal, "99.9%" for anything from 99.9 up to but short of 100,
+ * "<0.1%" below a tenth, "NA" when negative or not a number.
+ */
+export function portalFreq(pct: number): string {
+  if (!(pct >= 0)) return "NA";
+  if (pct === 0) return "0%";
+  if (pct < 100 && pct >= 99.9) return "99.9%";
+  return pct >= 0.1 ? pct.toFixed(1) + "%" : "<0.1%";
+}
+
 /** a share given as 0–1, as a percentage */
 export const fmtShare = (f: number, decimals = 1): string => fmtPct(f * 100, decimals);
 

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths } from "../lib/chart/format.ts";
+import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths } from "../lib/chart/format.ts";
 
 test("an estimate and its 95% interval read alike in every view", () => {
   assert.equal(fmtCI95(1.0123, 1.5), "95% CI 1.01–1.50");
@@ -120,4 +120,14 @@ test("text on a fill takes the ink that contrasts", () => {
   assert.equal(textOn("#0072B2"), "#ffffff");
   assert.equal(textOn("#E69F00"), "#16232b");
   assert.equal(textOn("#f0f0f0"), "#16232b");
+});
+
+test("portalFreq: a Study View share as cbioportal.org writes it (getFrequencyStr)", () => {
+  assert.equal(portalFreq(0), "0%");
+  assert.equal(portalFreq(52.52), "52.5%");
+  assert.equal(portalFreq(99.95), "99.9%", "never rounded up to 100 short of it");
+  assert.equal(portalFreq(100), "100.0%");
+  assert.equal(portalFreq(0.05), "<0.1%");
+  assert.equal(portalFreq(-1), "NA");
+  assert.equal(portalFreq(Number.NaN), "NA");
 });
