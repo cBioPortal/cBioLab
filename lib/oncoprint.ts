@@ -195,10 +195,18 @@ export function clinicalSql(attrs: string[], study: string = STUDY, db: string =
       "  AND (cd.type = 'patient' OR cd.sample_unique_id = sd.sample_unique_id)\n" +
       "WHERE cd.cancer_study_identifier = " + sq(study) + " AND cd." + inAttrs + "\n" +
       "GROUP BY pid, k";
-  // patient-level rows win; sample-level attributes (e.g. CANCER_TYPE in MSK studies)
-  // fall back to one of the patient's sample values (of its samples in the cohort) via argMax
+  // A patient-level row wins. A sample-level attribute (e.g. CANCER_TYPE in MSK studies) is the
+  // portal's patient value of its samples in the cohort (ONC-TT-12, ONC-STM-5): numbers, their
+  // mean (MUTATION_COUNT their max), "NA"-like values left out; words, the value when the
+  // samples agree, otherwise "Mixed".
+  const smp = "type = 'sample'", num = finiteSql("attribute_value");
+  const naLike = "upper(attribute_value) IN ('NA', 'N/A', 'NAN', 'UNKNOWN')";
   return "SELECT replaceOne(patient_unique_id, " + sq(puidPrefix) + ", '') AS pid,\n" +
-    "       attribute_name AS k, argMax(attribute_value, type = 'patient') AS v\n" +
+    "       attribute_name AS k,\n" +
+    "       multiIf(countIf(type = 'patient') > 0, anyIf(attribute_value, type = 'patient'),\n" +
+    "         countIf(" + smp + " AND " + num + " IS NOT NULL) > 0 AND countIf(" + smp + " AND " + num + " IS NULL AND NOT " + naLike + ") = 0,\n" +
+    "           toString(if(attribute_name = 'MUTATION_COUNT', maxIf(" + num + ", " + smp + "), avgIf(" + num + ", " + smp + " AND " + num + " IS NOT NULL))),\n" +
+    "         uniqExactIf(attribute_value, " + smp + ") > 1, 'Mixed', anyIf(attribute_value, " + smp + ")) AS v\n" +
     "FROM " + clinicalTable(db, attrs) + "\n" +
     "WHERE cancer_study_identifier = " + sq(study) + "\n" +
     "  AND " + inAttrs +

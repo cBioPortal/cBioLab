@@ -199,12 +199,15 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 lo, hi = min(lo, 0), max(hi, 1)
             log_scale = attr == "MUTATION_COUNT" and lo >= 0
             cells = np.full(n, -1, dtype=np.int32)
+            values = np.full(n, np.nan, dtype=np.float32)
             for i, p in enumerate(all_pids):
                 if p in val_by_pid:
                     x = _js_number(val_by_pid[p])
                     if math.isfinite(x):
                         cells[i] = encode_numeric(x, lo, hi, log_scale)
-            clin.append(Track("clinical", attr, cells, {"numeric": True, "bar": True, **({"logScale": True} if log_scale else {}), "min": _num(lo), "max": _num(hi)}))
+                        values[i] = x
+            clin.append(Track("clinical", attr, cells, {"numeric": True, "bar": True, **({"logScale": True} if log_scale else {}), "min": _num(lo), "max": _num(hi),
+                                                        "values": values}))
             continue
         counts: dict[str, int] = {}
         for p in all_pids:
@@ -249,10 +252,12 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                     lo, hi, center = d_min, d_max, None
             span = (hi - lo) or 1
             cells = np.full(n, -1, dtype=np.int32)
+            values = np.full(n, np.nan, dtype=np.float32)
             for i, p in enumerate(all_pids):
                 k = p + "|" + gene
                 if k in h["values"]:
                     cells[i] = _round(255 * (max(lo, min(hi, tx(h["values"][k]))) - lo) / span)
+                    values[i] = tx(h["values"][k])
             if using_ref:
                 nst = len(ref["studies"])
                 note = ("z-scored against " + f"{ref['n']:,}" + " patients pooled from " + str(nst) + " stud" + ("y" if nst == 1 else "ies") +
@@ -263,7 +268,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 note = "mean across a patient's samples"
             heat.append(Track("heatmap", label, cells, {"numeric": True, **({"ramp": ramp} if ramp else {}), "gene": gene, "profileType": h["profileType"], "note": note,
                                                         "min": _num(_round(lo * 100) / 100), "max": _num(_round(hi * 100) / 100),
-                                                        "center": None if center is None else _round(255 * (0 - lo) / span)}))
+                                                        "center": None if center is None else _round(255 * (0 - lo) / span), "values": values}))
 
     # ---- derived-event tracks ---------------------------------------------
     dev: list[Track] = []
@@ -297,6 +302,14 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
 
     def track_cmp(t: Track, sign: int):
         cells = t.cells
+        vals = t.meta.get("values")
+        if vals is not None:
+            def vcmp(x: int, y: int) -> int:
+                a, b = float(vals[x]), float(vals[y])
+                if math.isnan(a) or math.isnan(b):
+                    return 0 if math.isnan(a) == math.isnan(b) else (1 if math.isnan(a) else -1)
+                return sign * ((a > b) - (a < b))
+            return vcmp
 
         def cmp(x: int, y: int) -> int:
             a, b = int(cells[x]), int(cells[y])
@@ -345,7 +358,13 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
 
     # ---- track meta (panel-aware frequencies) -------------------------------
     # rows top to bottom in the portal's order: clinical, derived-cohort rows, genes, heatmaps
-    tracks: list[Track] = [Track(t.kind, t.label, t.cells[order_arr], t.meta) for t in clin]
+    def reordered(t: Track) -> dict[str, Any]:
+        """the track's meta with its exact values in column order, float32 as the TypeScript carries them, None where absent"""
+        if "values" not in t.meta:
+            return t.meta
+        return {**t.meta, "values": [None if math.isnan(x) else float(x) for x in t.meta["values"][order_arr]]}
+
+    tracks: list[Track] = [Track(t.kind, t.label, t.cells[order_arr], reordered(t)) for t in clin]
 
     def gene_counts(cells: np.ndarray) -> dict[str, Any]:
         """The pooled numbers and each group's: the same formula over a slice of the columns."""
@@ -369,7 +388,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             **gene_counts(cells),
             **({"byGroup": by_group} if by_group is not None else {})}))
     for t in heat:
-        tracks.append(Track(t.kind, t.label, t.cells[order_arr], t.meta))
+        tracks.append(Track(t.kind, t.label, t.cells[order_arr], reordered(t)))
 
     return Contract(
         study=" + ".join(studies) if multi else studies[0], studies=list(studies), groups=ranges, columns=columns, tracks=tracks,

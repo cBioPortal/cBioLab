@@ -66,3 +66,17 @@ test("cells cost exactly 2 bytes each and unpack is zero-copy over the response 
 test("rejects a payload that is not OPB1", () => {
   assert.throws(() => unpackContract(new Uint8Array([1, 2, 3, 4, 0, 0, 0, 0]).buffer), /OPB1/);
 });
+
+test("a numeric track's exact values ride beside its cells as float32, NaN where there is none", () => {
+  const c = { study: "s", studies: ["s"], groups: [{ name: "all", start: 0, count: 3 }], columns: ["A", "B", "C"], unit: "patient",
+    conventions: {}, stats: {}, display: {},
+    tracks: [{ kind: "clinical", label: "TMB", numeric: true, bar: true, min: 0, max: 10, cells: [0, 255, -1], values: [0.978719698, 3.91487879, null] },
+      { kind: "clinical", label: "SEX", categories: ["F"], cells: [0, 0, -1] }] } as unknown as Contract;
+  const buf = packContract(c);
+  const u = unpackContract(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
+  const v = u.tracks[0].values!;
+  assert.equal(v[0], Math.fround(0.978719698)); assert.equal(v[1], Math.fround(3.91487879)); assert.ok(Number.isNaN(v[2]));
+  assert.equal(u.tracks[1].values, undefined, "a categorical track has none");
+  assert.deepEqual(Array.from(u.tracks[1].cells), [0, 0, -1], "the cells after it are where they were");
+  assert.deepEqual(u.columns(), ["A", "B", "C"]);
+});

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths } from "../lib/chart/format.ts";
+import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32 } from "../lib/chart/format.ts";
 
 test("an estimate and its 95% interval read alike in every view", () => {
   assert.equal(fmtCI95(1.0123, 1.5), "95% CI 1.01–1.50");
@@ -130,4 +130,9 @@ test("portalFreq: a Study View share as cbioportal.org writes it (getFrequencySt
   assert.equal(portalFreq(0.05), "<0.1%");
   assert.equal(portalFreq(-1), "NA");
   assert.equal(portalFreq(Number.NaN), "NA");
+});
+
+test("oncoprint tooltip numbers and float32 values, as the portal prints them", () => {
+  assert.equal(portalTipNumber(12), "12"); assert.equal(portalTipNumber(2.446799), "2.45"); assert.equal(portalTipNumber(1, false), "1.00");
+  assert.equal(fmtFloat32(Math.fround(2.446799244)), "2.446799"); assert.equal(fmtFloat32(61), "61");
 });

@@ -410,3 +410,15 @@ test("heatmap rows: the portal's fixed ranges by profile, whatever the data's sp
   assert.deepEqual([rna.ramp, rna.min, rna.max], ["expression", -3, 3], "raw expression on the portal's -3..3, as it draws it");
   assert.deepEqual([meth.ramp, meth.min, meth.max], ["methylation", 0, 1]);
 });
+
+test("a numeric clinical track carries its exact values, and sorts by them, not by the drawing code", () => {
+  const pids = Array.from({ length: 12 }, (_, i) => "P" + (i + 1));
+  // P1 and P2 differ by less than one of the 256 drawing steps of a 0..1000 range
+  const vals = new Map(pids.map((p, i): [string, string] => [p, String(i === 0 ? 500.4 : i === 1 ? 500.3 : i * 80)]));
+  const c = assembleContract({ ...input(), groups: [{ name: "all", pids }], clinical: [{ attr: "TMB", values: vals }],
+    sort: [{ track: "TMB", dir: "asc" }] });
+  const t = c.tracks.find((x) => x.label === "TMB")!;
+  assert.equal(t.cells[c.columns.indexOf("P1")], t.cells[c.columns.indexOf("P2")], "one drawing code");
+  assert.ok(c.columns.indexOf("P2") < c.columns.indexOf("P1"), "500.3 before 500.4");
+  assert.equal(t.values![c.columns.indexOf("P1")], Math.fround(500.4));
+});

@@ -12,6 +12,7 @@ import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binar
 import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
+import { portalTipNumber } from "../../lib/chart/format.ts";
 import { STYLE, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
@@ -632,7 +633,12 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         if (t.members && t.members.length > 1) lines.push({ text: "merged: " + t.members.join(" · "), dim: true });
       }
       else if (t.kind === "derivedEvent") lines.push({ text: t.label + ": " + (c > 0 ? "yes" : "no") });
-      else if (t.numeric) lines.push({ text: t.label + ": " + (c === -1 ? "no data" : "≈" + (Math.round(numericValue(t, c) * 10) / 10)) });
+      else if (t.numeric) {
+        // the exact value where the contract carries it; an older contract has only the drawing code
+        const x = t.values ? t.values[hit.ci] : NaN;
+        lines.push({ text: t.label + ": " + (c === -1 ? "no data" : !Number.isNaN(x) ? portalTipNumber(x, t.kind !== "heatmap")
+          : "≈" + portalTipNumber(numericValue(t, c), t.kind !== "heatmap")) });
+      }
       else lines.push({ text: t.label + ": " + (c === -1 ? (t.profiledFor ? STYLE.glyph.profiled.no : "no data") : (t.categories && t.categories[c]) || "Other") });
     } else if (t.kind === "gene" || t.kind === "derivedEvent") {
       let alt = 0, prof = 0;

@@ -355,6 +355,8 @@ export function sortColumns(data: UnpackedContract, order: Uint32Array, groups: 
     const t = data.tracks.find((x) => x.label === k.track);
     if (!t) throw new Error("sort: no track labelled '" + k.track + "'");
     const c = t.cells;
+    const v = t.values;
+    if (v) return (a, b) => { const x = v[a], y = v[b], na = Number.isNaN(x), nb = Number.isNaN(y); if (na || nb) return na === nb ? 0 : na ? 1 : -1; return sign * (x - y); };
     return (a, b) => { const x = c[a], y = c[b]; if (x === y) return 0; if (x === -1) return 1; if (y === -1) return -1; return sign * (x - y); };
   });
   cmps.push(genomic, byId);

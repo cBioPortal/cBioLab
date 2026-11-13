@@ -806,6 +806,11 @@ export interface Track {
   kind: TrackKind; label: string; cells: number[] | Int32Array;
   /** a heatmap row's colour ramp, the portal's for its profile (lib/oncoprint-style.ts ramps) */
   ramp?: "expression" | "methylation" | "vaf";
+  /**
+   * A numeric track's exact values beside its 0–255 cells, NaN (null in JSON) where a cell has
+   * none: what a tooltip, the TSV and a sort read. The cells stay the drawing code.
+   */
+  values?: number[] | Float32Array;
   /** gene tracks */
   altered?: number; profiled?: number; driverAltered?: number;
   /** a merged gene row: the symbols it pools, in order. Absent on a single-gene row. */

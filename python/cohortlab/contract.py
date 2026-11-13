@@ -7,6 +7,7 @@ tracks a category index; -1 means not profiled / no data everywhere.
 from __future__ import annotations
 
 import json
+import math
 import struct
 from dataclasses import dataclass, field
 from typing import Any, Iterable
@@ -103,7 +104,9 @@ class Contract:
                 vals = ["yes" if c > 0 else "no" for c in t.cells]
                 kind = "DERIVED"
             elif t.meta.get("numeric"):
-                vals = ["" if c == -1 else str(round(numeric_value(t.meta, int(c)), 2)) for c in t.cells]
+                exact = t.meta.get("values")
+                vals = ["" if c == -1 else _float32_text(exact[i]) if exact is not None and exact[i] is not None
+                        else str(round(numeric_value(t.meta, int(c)), 2)) for i, c in enumerate(t.cells)]
                 kind = "HEATMAP " + t.meta.get("profileType", "") if t.kind == "heatmap" else "CLINICAL"
             else:
                 cats = t.meta.get("categories") or []
@@ -117,6 +120,12 @@ class Contract:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
         return text
+
+
+def _float32_text(x: float) -> str:
+    """a float32 value at the seven significant digits it holds, printed as JavaScript prints it (fmtFloat32)"""
+    v = float(f"{x:.7g}")
+    return str(int(v)) if v.is_integer() else repr(v)
 
 
 def _jsnum(v: Any) -> Any:
@@ -169,7 +178,10 @@ def read_opb1(data: bytes | bytearray | memoryview) -> Contract:
     for m in header["tracks"]:
         dtype = np.dtype("<i2") if m["dtype"] == "i16" else np.dtype("<i4")
         cells = np.frombuffer(buf, dtype=dtype, count=m["length"], offset=base + m["offset"])
-        meta = {k: v for k, v in m.items() if k not in ("kind", "label", "dtype", "offset", "length")}
+        meta = {k: v for k, v in m.items() if k not in ("kind", "label", "dtype", "offset", "length", "valuesOffset")}
+        if "valuesOffset" in m:
+            vals = np.frombuffer(buf, dtype="<f4", count=m["length"], offset=base + m["valuesOffset"])
+            meta["values"] = [None if math.isnan(x) else float(x) for x in vals]
         tracks.append(Track(m["kind"], m["label"], cells, meta))
     co, cb = header["columnsOffset"], header["columnsBytes"]
     columns = bytes(buf[base + co: base + co + cb]).decode("utf-8").split("\n") if cb else []
@@ -186,9 +198,17 @@ def write_opb1(c: Contract) -> bytes:
         wide = bool(cells.size) and (int(cells.max()) > 32767 or int(cells.min()) < -32768)
         arr = cells.astype("<i4" if wide else "<i2")
         raw = arr.tobytes()
-        metas.append({"kind": t.kind, "label": t.label, **t.meta, "dtype": "i32" if wide else "i16", "offset": cursor, "length": int(arr.size)})
+        meta = {k: v for k, v in t.meta.items() if k != "values"}
+        m = {"kind": t.kind, "label": t.label, **meta, "dtype": "i32" if wide else "i16", "offset": cursor, "length": int(arr.size)}
         blobs.append(raw + b"\0" * (_pad4(len(raw)) - len(raw)))
         cursor += _pad4(len(raw))
+        if t.meta.get("values") is not None:
+            # a numeric track's exact values follow its cells, little-endian float32
+            vals = np.asarray([np.nan if v is None else v for v in t.meta["values"]], dtype="<f4").tobytes()
+            m["valuesOffset"] = cursor
+            blobs.append(vals)
+            cursor += len(vals)
+        metas.append(m)
     header = {"study": c.study, "studies": c.studies, "unit": c.unit, "groups": c.groups, "conventions": c.conventions,
               "display": c.display or DEFAULT_DISPLAY, "stats": c.stats,
               "n": c.n, "tracks": metas, "columnsOffset": cursor, "columnsBytes": len(col_bytes), "format": "OPB1"}

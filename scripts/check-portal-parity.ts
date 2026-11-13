@@ -30,6 +30,8 @@
  *   8. Uncalled mutations: glioma_msk_2018, the study that holds them (read support for a
  *      patient's other samples, below the caller's thresholds), against the portal's mutation
  *      profile, which leaves them out. Counted in samples, where they would differ.
+ *  19. An oncoprint patient column's clinical value when the patient has several samples
+ *      (msk_impact_2017): the portal's mean / MUTATION_COUNT max / "Mixed" of its sample data.
  *
  * Every comparison must agree EXACTLY; a count is a count. Differences are reported, never
  * tolerated, so a disagreement caused by the two databases holding different releases of a
@@ -50,6 +52,7 @@ import { compileCohortDef, memberSamplesSql } from "../lib/cohort2.ts";
 import { resolverFor, hasViewAggregates } from "../lib/federation.ts";
 import { survivalLeftOutSql } from "../lib/survival-queries.ts";
 import { oqlCasesSql } from "../lib/oql.ts";
+import { clinicalSql } from "../lib/oncoprint.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
 import { oncokbPin } from "../lib/annotation.ts";
 import type { CohortDef, GeneTableRow, ClinicalFacet } from "../lib/types.ts";
@@ -627,6 +630,35 @@ for (const studies of [["brca_tcga_pan_can_atlas_2018"], ["prostate_pcbm_swiss_2
     const ours = Number((await chQuery<{ n: string }>("SELECT count() AS n FROM (" + sql + ")", PRIMARY)).data[0].n);
     record({ study, group: "cohort", what: `samples matching OQL "${g}: MUT" (the study's uncalled mutations left out, as the portal does)`,
       ours: String(ours), portal: String(pn), agree: ours === pn });
+  }
+}
+
+// 19. an oncoprint column's value for a patient with several samples: the portal's (ONC-TT-12,
+// ONC-STM-5) — numbers their mean (MUTATION_COUNT their max), words the value when they agree,
+// else "Mixed" — from its sample data, against the engine's patient-mode clinical track SQL
+{
+  const study = "msk_impact_2017", attrs = ["CANCER_TYPE", "MUTATION_COUNT", "TMB_NONSYNONYMOUS"];
+  // six patients whose samples differ in cancer type ("Mixed"), six whose mutation counts differ
+  const differing = (attr: string) => "SELECT replaceOne(patient_unique_id, '" + study + "_', '') AS p FROM " + DB + ".clinical_data_derived\n" +
+    "WHERE cancer_study_identifier = '" + study + "' AND type = 'sample' AND attribute_name = '" + attr + "'\n" +
+    "GROUP BY p HAVING uniqExact(attribute_value) > 1 ORDER BY p LIMIT 6";
+  const picked = await chQuery<{ p: string }>(differing("CANCER_TYPE") + "\nUNION ALL\n" + differing("MUTATION_COUNT"), PRIMARY);
+  const pids = [...new Set(picked.data.map((r) => r.p))];
+  const meta = await api<{ clinicalAttributeId: string; datatype: string }[]>("/studies/" + study + "/clinical-attributes");
+  const isNumber = new Set(meta.filter((m) => m.datatype === "NUMBER").map((m) => m.clinicalAttributeId));
+  const samples = (await Promise.all(pids.map((p) => api<{ sampleId: string; patientId: string }[]>("/studies/" + study + "/patients/" + p + "/samples")))).flat();
+  const data = await api<{ patientId: string; clinicalAttributeId: string; value: string }[]>("/clinical-data/fetch?clinicalDataType=SAMPLE",
+    { attributeIds: attrs, identifiers: samples.map((x) => ({ entityId: x.sampleId, studyId: study })) });
+  const ours = await chQuery<{ pid: string; k: string; v: string }>("SELECT * FROM (" + clinicalSql(attrs, study, DB) + ") WHERE pid IN (" + pids.map((p) => "'" + p + "'").join(",") + ")", PRIMARY);
+  for (const p of pids) for (const a of attrs) {
+    const vals = data.filter((d) => d.patientId === p && d.clinicalAttributeId === a).map((d) => d.value);
+    if (!vals.length) continue;
+    const nums = vals.map(Number).filter(Number.isFinite);
+    const theirs = isNumber.has(a) ? String(a === "MUTATION_COUNT" ? Math.max(...nums) : nums.reduce((x, y) => x + y, 0) / nums.length)
+      : new Set(vals).size > 1 ? "Mixed" : vals[0];
+    const mine = ours.data.find((r) => r.pid === p && r.k === a)?.v ?? "(none)";
+    const agree = isNumber.has(a) ? Math.abs(Number(mine) - Number(theirs)) <= 1e-9 * Math.max(1, Math.abs(Number(theirs))) : mine === theirs;
+    record({ study, group: "oncoprint", what: `${p} ${a} over ${vals.length} samples (patient column)`, ours: mine, portal: theirs, agree });
   }
 }
 
