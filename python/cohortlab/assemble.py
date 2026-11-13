@@ -381,7 +381,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                                 "including samples on which the cohort's own criterion was never measured. Patient-level "
                                 "clinical values repeat across that patient's samples.") if unit == "sample" else
                                ("one patient; a patient's samples are collapsed (clinical: patient rows win, else one "
-                                "sample's value; heatmap: mean across samples; VAF: max)"),
+                                "sample's value; heatmap: the sample value furthest from 0; VAF: max)"),
                      "annotation": annotation_source, "lineGap": line_gap,
                      "sort": [("-" if s.get("dir") == "desc" else "") + s["track"] for s in sort],
                      **_custom_driver_report(events)},
