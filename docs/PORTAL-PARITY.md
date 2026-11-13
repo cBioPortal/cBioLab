@@ -136,7 +136,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [ ] **Results → OncoPrint, the default view** — what a reader sees differ from the portal's before touching a control ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
   - [x] Gutter % as the portal prints it: an integer, "<1%", "0%"; the header "485 (82%)". We keep both numbers, "driver% / any%" ("37% / 37%"), where the portal prints one (ONC-LY-4, ONC-STM-1, ONC-STM-2) (#192)
   - [x] The Results header's samples line when samples ≠ patients (msk_impact_2017 TP53 KRAS TERT: "6494 (59%) of queried samples") (ONC-RV-1, ONC-STM-2) (#192)
-  - [ ] Initial zoom fits the altered columns, not every column (the portal's 30 % on Q1, 3 % on Q3) (ONC-ZM-2, ONC-STM-13, ONC-MD-11)
+  - [x] Initial zoom fits the altered columns, not every column (the portal's 30 % on Q1, 3 % on Q3) (ONC-ZM-2, ONC-STM-13, ONC-MD-11) (#194)
   - [ ] Staircase sort per key, CNA then mutation (ours one rank per cell: VUS truncating above driver in-frame and missense, not profiled tied with unaltered instead of last); Q1 order agrees at 191 of 594 positions (ONC-ST-1, ONC-ST-2)
   - [ ] Sort menu: the Mutation Type, Driver and Ignore VUS toggles; "case list order" (ONC-SO-1, ONC-SO-3, ONC-ST-3)
   - [ ] Tracks › Clinical: display names (ours `SAMPLE_TYPE`), Freq % (ours patient counts), Select / Deselect all, applied on submit (ours each tick re-runs), no cap of 8; 59 attributes listed vs 64 (ONC-TR-1, ONC-STM-4)
