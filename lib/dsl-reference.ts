@@ -1645,8 +1645,11 @@ so the reference population can be far larger than the drawn one without any val
 staircase, cBioPortal's: each gene row, top to bottom, ranks structural variant, then copy number,
 then mutation class, germline, mRNA and protein, a driver before any VUS of its kind, and not
 profiled after unaltered), \`"id"\` (the column id, in natural order: P2 before P10),
-\`"cluster:<profileType>"\` (a Ward dendrogram over that profile's values, computed in the engine
-because the browser never receives them; capped at 4,000 columns), a clinical or derived-event
+\`"cluster:<profileType>"\` (cBioPortal's clustering of that heatmap profile: average linkage on
+1 − Spearman over its cases and its rows, computed in the engine because the browser never receives
+the values; cases with no value but 0 go last; exact up to 8,000 distinct rank patterns, past that a
+2,000-pattern sample with the rest placed by their nearest, said in \`conventions.cluster\`; refused
+past 50,000), a clinical or derived-event
 track label, or \`"-label"\` for descending (e.g. \`["CANCER_TYPE", "-CURRENT_AGE_DEID"]\`). Applied
 within each cohort group; missing values always sort last; the genomic staircase and patient id are
 always the final tiebreakers. A sort key that names a track not in the oncoprint errors loudly,

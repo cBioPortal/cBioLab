@@ -1116,6 +1116,14 @@ function Legend({ data, display, colors }: { data: UnpackedContract; display: Fi
       {data.stats.hiddenGermline != null && <span className="mark">{data.stats.hiddenGermline.toLocaleString()} germline {data.stats.hiddenGermline === 1 ? "mutation" : "mutations"} hidden — the percentages are over somatic calls alone</span>}
       {!!data.stats.offPanel && <span className="mark" data-tip="the gene is not on any panel that column was sequenced with, so the column is not profiled for it — as on cBioPortal, the call is not drawn and the % leaves it out">{data.stats.offPanel.toLocaleString()} off-panel {data.stats.offPanel === 1 ? "call" : "calls"} not drawn — those cells are not profiled</span>}
       {data.display?.annotate === "none" && <span className="mark">driver annotation off: nothing is called a driver</span>}
+      {data.conventions.cluster && (() => {
+        const k = data.conventions.cluster;
+        // what the clustering did, as the method record says it
+        return <span className="mark" data-test="clusterNote">clustered by {k.profileType}: average linkage, 1 − Spearman
+          {k.approximate ? <> — approximate: {k.approximate.sampled.toLocaleString()} of {k.patterns.toLocaleString()} patterns clustered, the others placed next to their nearest</>
+            : <>; {(k.columns - k.noData).toLocaleString()} {data.unit}s as {k.patterns.toLocaleString()} distinct patterns</>}
+          {k.noData > 0 && <>; {k.noData.toLocaleString()} with no value placed last</>}</span>;
+      })()}
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
         <span key={t.label}>{t.label}: {t.stack
           ? <>{t.stack.map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(S.glyph.spectrum.colors[i])}{c}</span>)}</>
