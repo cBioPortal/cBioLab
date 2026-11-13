@@ -4,6 +4,11 @@
 
 /** OncoKB, licensed: a reader is licensed by SELECT on this table, and degrades loudly without it */
 export const ONCOKB_TABLE = "annotation.oncokb";
+/**
+ * OncoKB by tumour type, licensed with ONCOKB_TABLE: one row per (gene, protein change, mutation
+ * type, tumour type) of a synced study, with the levels of evidence for that tumour type
+ */
+export const ONCOKB_TUMOR_TYPE_TABLE = "annotation.oncokb_tumor_type";
 /** every public source's annotations, one row per (source, release, variant), the source's JSON in `data` */
 export const VARIANT_TABLE = "annotation.variant";
 /** Genome Nexus's source in VARIANT_TABLE for each reference genome (one service, and one release line, per genome) */

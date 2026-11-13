@@ -225,7 +225,7 @@ Data version: mutation rows, VAFs, mutation counts and OncoKB oncogenicity are i
 |---|---|---|---|
 | MUT-AN-1 | ❌ | B | Header "Annotation (OncoKB)", no icon row, cards or Compact/Expanded toggle |
 | MUT-AN-2 | 🔶 | B | One text badge (orange when oncogenic), no icons |
-| MUT-AN-3 | 🔶 | BC | Oncogenicity identical 555/555; level = highest across tumour types (store keyed by gene + alteration, `importer/setup.ts:48`): KRAS 206/223 differ; no resistance, Dx, Px, card |
+| MUT-AN-3 | 🔶 | BC | Oncogenicity and level for the sample's tumour type (`annotation.oncokb_tumor_type`, #PRNUM): identical to the portal's query for every mutation of acc_tcga_pan_can_atlas_2018 (7,568) and paad_iatlas_prince_2022 (7,255), all four highest levels; resistance, Dx, Px stored but not shown; no card |
 | MUT-AN-4 | ❌ | C | (tracked: hotspots) |
 | MUT-AN-5 | ❌ | C | (tracked: CIViC); no reVUE |
 | MUT-AN-6 | 🔶 | B | CSV "Oncogenic · Level 1" vs "OncoKB: Oncogenic, level_1, resistance NA;CIViC: …;CancerHotspot: yes;3DHotspot: no" |

@@ -7,7 +7,7 @@ import type { QueryColumn, RowSource } from "./table-query.ts";
 import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS } from "./lollipop.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
-import { ONCOKB_TABLE } from "./annotation-store.ts";
+import { ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE } from "./annotation-store.ts";
 import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } from "./variant-annotation.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean }
@@ -116,25 +116,47 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + "\n" +
     "),\n" +
     attr("CANCER_TYPE_DETAILED", "ct" + i) + ",\n" +
-    attr("MUTATION_COUNT", "mc" + i) + ",\n";
+    attr("MUTATION_COUNT", "mc" + i) + ",\n" +
+    (pin ? tumorTypeCtes(p, i, db) : "");
   const gn = variantAnnotationCte("g" + i, db, p.study, "SELECT chr, start, end, ref, var FROM m" + i, pins);
   const rows =
     "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
     "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
     "         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,\n" +
-    (pin ? "         ann.oncogenicity AS oncogenicity, ann.level AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,\n"
+    (pin ? "         if(tt.found = 1, tt.oncogenicity, ann.oncogenicity) AS oncogenicity, if(tt.found = 1, tt.level, ann.level) AS level,\n" +
+      "         toUInt8(if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) AS drv,\n"
       : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
     "         m.mutationType AS mutationType, m.variantType AS variantType,\n" +
     "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,\n" +
     "         " + hgvsgSql("ifNull(m.chr, '')", "ifNull(m.start, 0)", "ifNull(m.end, 0)", "ifNull(m.ref, '')", "ifNull(m.var, '')") + " AS hgvsg,\n" +
     "         " + variantColumnsSql(gn ? "ifNull(g.gd, '')" : "''", gene) + "\n" +
-    "  FROM m" + i + " AS m\n" +
-    (pin ? "  LEFT JOIN ann ON ann.alteration = m.proteinChange\n" : "") +
+    "  FROM " + (pin ? "mt" : "m") + i + " AS m\n" +
+    (pin ? "  LEFT JOIN ann ON ann.alteration = m.proteinChange\n" +
+      "  LEFT JOIN att AS tt ON tt.alteration = m.proteinChange AND tt.consequence = m.consequence AND tt.tumor_type = m.tumorType\n" : "") +
     (gn ? "  LEFT JOIN g" + i + " AS g ON g.chr = m.chr AND g.start = m.start AND g.end = m.end AND g.ref = m.ref AND g.var = m.var\n" : "") +
     "  LEFT JOIN ct" + i + " AS ct ON ct.sid = m.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = m.sid\n";
   return { ctes: ctes + (gn ? gn + ",\n" : ""), rows };
+}
+
+/**
+ * A part's mutations with the tumour type the portal asks OncoKB with (StoreUtils
+ * generateUniqueSampleKeyToTumorTypeMap): the sample's CANCER_TYPE_DETAILED; for a sample with
+ * neither CANCER_TYPE nor CANCER_TYPE_DETAILED, its study's cancer type; for one with CANCER_TYPE
+ * alone, none (''). The same rule as the sync's key space (packages/annotation-sync, oncokb-tumor-type).
+ */
+function tumorTypeCtes(p: TablePart, i: number, db: string): string {
+  const pre = sq(p.study + "_");
+  const types = ["CANCER_TYPE", "CANCER_TYPE_DETAILED"];
+  return "k" + i + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,\n" +
+    "    anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM " + clinicalTable(db, types) + "\n" +
+    "  WHERE cancer_study_identifier = " + sq(p.study) + " AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')\n" +
+    "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM m" + i + ") GROUP BY sid),\n" +
+    "mt" + i + " AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence,\n" +
+    "    if(ifNull(k.sid, '') = '', (SELECT t.name FROM " + db + ".cancer_study cs JOIN " + db + ".type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id\n" +
+    "      WHERE cs.cancer_study_identifier = " + sq(p.study) + "), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType\n" +
+    "  FROM m" + i + " AS m LEFT JOIN k" + i + " AS k ON k.sid = m.sid),\n";
 }
 
 function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins): string {
@@ -143,7 +165,11 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
     (pin
       ? "ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver\n" +
         "  FROM " + ONCOKB_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
-        "  GROUP BY alteration),\n"
+        "  GROUP BY alteration),\n" +
+        "att AS (SELECT alteration, consequence, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,\n" +
+        "    max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found\n" +
+        "  FROM " + ONCOKB_TUMOR_TYPE_TABLE + " AS t WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
+        "  GROUP BY alteration, consequence, tumor_type),\n"
       : "") +
     built.map((b) => b.ctes).join("") +
     "rows AS (\n" + built.map((b) => b.rows).join("  UNION ALL\n") + ")\n";
